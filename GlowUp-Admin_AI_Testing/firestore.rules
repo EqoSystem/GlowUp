@@ -1,0 +1,184 @@
+rules_version = '2';
+
+// GlowUp: one database shared by the admin website and the mobile app.
+//
+// BEFORE YOU PUBLISH THESE RULES: add your own admin account to the "admins" collection
+// (see FIRESTORE_SCHEMA.md, "Admin accounts"). Without that document the website can still
+// read, but every Save and Delete on the website will be refused.
+//
+// To publish: Firebase console > Firestore Database > Rules > paste this whole file > Publish.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // An admin is an account whose UID is the id of a document in "admins".
+    function isAdmin() {
+      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // What the app itself adds to the catalogue (an ingredient its AI lookup found, a product or
+    // brand it met in a scan) must carry the user's own id and must be marked "not reviewed".
+    // The app can only CREATE such entries: it can never change or delete anything in the catalogue.
+    function addedByTheApp() {
+      return signedIn()
+        && request.resource.data.addedBy == request.auth.uid
+        && request.resource.data.reviewed == false
+        && request.resource.data.addedAtUnix is number;
+    }
+
+    // GlowUp lists MAKE-UP AND FACE PRODUCTS ONLY. What the app adds from a scan must not be a hair, body, nail or
+    // fragrance product. The same rule as productScope() on the website (adminCommon.js) and ProductScope.cs in the app:
+    // a make-up type is always fine; otherwise a hair / body word is refused unless a face word stands next to it.
+    function makeupWords(text) {
+      return text.matches('(?is).*\\b(lipstick|lip gloss|lip tint|lip balm|lip liner|gloss|tint|foundation|concealer|primer|powder|blush|blusher|bronzer|highlighter|contour|eyeshadow|eye shadow|eyeliner|liner|mascara|brow|cushion|bb cream|cc cream|makeup|make-up|setting spray)\\b.*');
+    }
+    function faceWords(text) {
+      return text.matches('(?is).*\\b(face|facial|lip|lips|eye|eyes|brow|brows|lash|lashes|cheek|cheeks|complexion)\\b.*');
+    }
+    function notFaceWords(text) {
+      return text.matches('(?is).*\\b(shampoo|conditioner|hair|scalp|body|hand|hands|foot|feet|nail|nails|deodorant|antiperspirant|perfume|fragrance|cologne|eau de|soap|shower|bath|shaving|shave|toothpaste|oral|intimate|baby|tanning|massage)\\b.*');
+    }
+    function faceProduct(type, name) {
+      return makeupWords(type) || !notFaceWords(type + ' ' + name) || faceWords(type + ' ' + name);
+    }
+
+    // ---- who is an admin -------------------------------------------------------------------
+    // Created and removed only by hand in the Firebase console. An account may look up its own
+    // entry (the website does this when "REQUIRE_ADMIN_RECORD" is switched on).
+    match /admins/{uid} {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+
+    // ---- catalogue: the website writes it, the app reads it ---------------------------------
+    match /brands/{brandId} {
+      allow read: if true;
+      allow delete: if isAdmin();
+      // the app may add a brand it met in a scan: always Pending, so the app does not use it until an admin approves it
+      allow create: if isAdmin()
+        || (addedByTheApp()
+            && brandId.matches('scan_.*')
+            && request.resource.data.keys().hasOnly(['name', 'category', 'market', 'status', 'scans', 'source', 'reviewed', 'addedBy', 'addedAtUnix'])
+            && request.resource.data.source == 'scan'
+            && request.resource.data.status == 'Pending'
+            && request.resource.data.scans == 0
+            && request.resource.data.name is string
+            && request.resource.data.name.size() >= 2
+            && request.resource.data.name.size() <= 60
+            && request.resource.data.get('category', 'Skincare') in ['Makeup', 'Skincare']);
+      // the app may add exactly 1 to "scans" and change nothing else
+      allow update: if isAdmin()
+        || (signedIn()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['scans'])
+            && request.resource.data.scans == resource.data.get('scans', 0) + 1);
+    }
+
+    match /products/{productId} {
+      allow read: if true;
+      allow delete: if isAdmin();
+      // the app may add a product it met in a scan: always Pending, so it is not recommended until an admin approves it.
+      // Only make-up and face products are taken (see faceProduct above).
+      // The website also keeps "folder" (how the admins arranged it) and "binned" (it is in the Recycle bin) here.
+      allow create: if isAdmin()
+        || (addedByTheApp()
+            && productId.matches('scan_.*')
+            && request.resource.data.keys().hasOnly(['name', 'brandId', 'brandName', 'cosmeticType', 'description', 'ingredients', 'shades',
+                 'minAge', 'status', 'scans', 'source', 'reviewed', 'addedBy', 'addedAtUnix', 'barcode'])
+            // "barcode": the digits under the product's barcode, when the camera saw them
+            && request.resource.data.get('barcode', '') is string
+            && request.resource.data.get('barcode', '').matches('[0-9]{0,20}')
+            && request.resource.data.source == 'scan'
+            && request.resource.data.status == 'Pending'
+            && request.resource.data.scans == 0
+            && request.resource.data.name is string
+            && request.resource.data.name.size() >= 1
+            && request.resource.data.name.size() <= 100
+            && request.resource.data.get('cosmeticType', '') is string
+            && faceProduct(request.resource.data.get('cosmeticType', ''), request.resource.data.name)
+            && request.resource.data.ingredients is list
+            && request.resource.data.ingredients.size() >= 1
+            && request.resource.data.ingredients.size() <= 80
+            && request.resource.data.shades is list
+            && request.resource.data.shades.size() <= 12);
+      // the app may add exactly 1 to "scans" (a scan was recognised as this product) and change nothing else
+      allow update: if isAdmin()
+        || (signedIn()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['scans'])
+            && request.resource.data.scans == resource.data.get('scans', 0) + 1);
+    }
+
+    match /ingredients/{ingredientId} {
+      allow read: if true;
+      allow update, delete: if isAdmin();
+      // the app may add an ingredient its AI lookup found. It is marked source "ai" and "not reviewed";
+      // the app treats such an entry as a warning at most, never as proof that an ingredient is safe.
+      allow create: if isAdmin()
+        || (addedByTheApp()
+            && ingredientId.matches('ai_.*')
+            && request.resource.data.keys().hasOnly(['name', 'techName', 'description', 'riskLevel', 'cautionNote', 'commonUses', 'fdaUnii', 'model',
+                 'minAge', 'keyActive', 'umbrella', 'aliases', 'allergenTags', 'avoidForSkinTypes', 'avoidForConditions',
+                 'goodForSkinTypes', 'goodForConditions', 'sources', 'source', 'reviewed', 'webSearched', 'addedBy', 'addedAtUnix'])
+            && request.resource.data.source == 'ai'
+            && request.resource.data.name is string
+            && request.resource.data.name.size() >= 3
+            && request.resource.data.name.size() <= 80
+            && request.resource.data.description is string
+            && request.resource.data.description.size() <= 700
+            && request.resource.data.riskLevel in ['safe', 'caution', 'harmful']
+            && request.resource.data.aliases is list
+            && request.resource.data.aliases.size() <= 10
+            && request.resource.data.sources is list
+            && request.resource.data.sources.size() <= 10);
+    }
+
+    // ---- each app user's own data -----------------------------------------------------------
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      match /scans/{scanId} {
+        allow read, write: if isOwner(uid);
+      }
+    }
+
+    // ---- anonymous scan notes for the dashboard: the app adds them, only admins read them ----
+    match /scanActivity/{activityId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly([
+             'productName', 'brandId', 'brandName', 'cosmeticType', 'status', 'source', 'scannedAtUnix',
+             'ingredientCount', 'harmfulCount', 'cautionCount', 'allergenFlagged', 'flaggedIngredients'])
+        && request.resource.data.status in ['safe', 'caution', 'harmful']
+        && request.resource.data.scannedAtUnix is number;
+      allow read, delete: if isAdmin();
+    }
+
+    // ---- allergens / skin conditions a user typed in because they were not on the app's lists ----
+    function validSuggestion() {
+      return signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 100;
+    }
+
+    match /allergenSuggestions/{suggestionId} {
+      allow create: if validSuggestion();
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /conditionSuggestions/{suggestionId} {
+      allow create: if validSuggestion();
+      allow read, update, delete: if isAdmin();
+    }
+
+    // anything not listed above is closed
+  }
+}

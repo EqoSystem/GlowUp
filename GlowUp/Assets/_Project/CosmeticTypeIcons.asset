@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9ed48aa14f21eec40996a619ba727f36, type: 3}
+  m_Name: CosmeticTypeIcons
+  m_EditorClassIdentifier: 
+  entries:
+  - keywords: lipstick, lip, gloss, tint
+    icon: {fileID: 21300000, guid: 292ba1a37c9063a4b92e6c6906137370, type: 3}
+  - keywords: mascara, eyeliner, liner, brow
+    icon: {fileID: 21300000, guid: 9ce6ae33a1f03d7449887a16401f20aa, type: 3}
+  - keywords: eyeshadow, eye shadow, palette, shadow
+    icon: {fileID: 21300000, guid: 5c260a383fc489e4194f60b290fb2208, type: 3}
+  - keywords: blush, bronzer, highlighter, powder, compact, cushion, contour
+    icon: {fileID: 21300000, guid: cf5102d7bf9471349b3f2706994e43ed, type: 3}
+  - keywords: cream, moistur, mask, balm, butter, gel, scrub
+    icon: {fileID: 21300000, guid: 427b0677fdda90c4c9505e67c8c14dc5, type: 3}
+  - keywords: foundation, concealer, primer, serum, toner, cleanser, lotion, sunscreen,
+      oil, wash, essence, shampoo, mist
+    icon: {fileID: 21300000, guid: 20cc9f7853455074f94ddd08179eac03, type: 3}
+  fallback: {fileID: 21300000, guid: 20cc9f7853455074f94ddd08179eac03, type: 3}

@@ -1,0 +1,4 @@
+# Keep every file exactly as it is on disk: Git must not change line endings.
+# (Unity writes scenes and .meta files with one kind of line ending and the scripts use another.)
+* -text
+/GlowUp/Assets/Firebase/Plugins/x86_64/FirebaseCppApp-13_17_0.bundle filter=lfs diff=lfs merge=lfs -text

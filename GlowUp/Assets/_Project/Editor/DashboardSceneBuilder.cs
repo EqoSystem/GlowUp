@@ -1,0 +1,169 @@
+using GlowUp.Common;
+using GlowUp.Dashboard;
+using GlowUp.Notifications;
+using GlowUp.Theme;
+using GlowUp.Views;
+using TMPro;
+using UnityEditor;
+using UnityEngine;
+using UnityEngine.UI;
+using A = GlowUp.EditorTools.AppKit;
+using Kit = GlowUp.EditorTools.OnboardingKit;
+
+namespace GlowUp.EditorTools
+{
+    /// <summary>
+    /// Menu: GlowUp > Build Scene > 8 User Dashboard.
+    /// Avatar + greeting + Settings button, the quick summary of the user's profile, the list of
+    /// recommended products, the bottom action bar and the account pop-up.
+    /// (The dark mode button now lives on the Settings page.)
+    /// </summary>
+    public static class DashboardSceneBuilder
+    {
+        const float TileHeight = 128, TileStep = 148, AllergenTileHeight = 132;
+
+        [MenuItem("GlowUp/Build Scene/8 User Dashboard", false, 118)]
+        public static void Build()
+        {
+            A.AppScreen s = A.Begin("UserDashboardScene", null, false, "DashboardCard", "UserDashboardPanel");
+            Transform card = s.card;
+
+            // ---- top row: avatar, greeting, settings ----
+            Button avatar = A.IconButton(card, "AvatarButton", IconFactory.User, 104, 60, ThemeRole.MainText, ThemeRole.SurfaceAlt);
+            A.At(avatar.transform, A.TL, new Vector2(28, -28), new Vector2(104, 104));
+            A.Outline(avatar.transform, ThemeRole.Gold, 104f);
+
+            TextMeshProUGUI greeting = A.Label(card, "GreetingText", "Hi, there", 62, ThemeRole.Heading, FontRole.Title);
+            A.TopStrip(greeting.transform, 28, 104, 152, 136);
+            A.Shrink(greeting, 40);
+
+            // the Settings page (dark mode, graphics quality, account, alerts ...) opens from here
+            Button settings = A.IconButton(card, "SettingsButton", IconFactory.Gear, 92, 58, ThemeRole.MainText);
+            A.At(settings.transform, A.TR, new Vector2(-28, -34), new Vector2(92, 92));
+
+            // ---- quick summary ----
+            TextMeshProUGUI summaryHeader = A.Label(card, "SummaryHeaderText", "Quick Summary", 40, ThemeRole.Heading, FontRole.Heading);
+            A.TopStrip(summaryHeader.transform, 160, 58, 48, 48);
+            TextMeshProUGUI summaryHint = A.Label(card, "SummaryHintText", "Tap your picture for your account", 26, ThemeRole.SecondaryText, FontRole.Body,
+                                                  TextAlignmentOptions.MidlineRight);
+            A.TopStrip(summaryHint.transform, 160, 58, 420, 48);
+            A.Shrink(summaryHint, 20); A.HintOnly(summaryHint);
+
+            float panelHeight = 24 + 2 * TileStep + AllergenTileHeight + 24;
+            Image summary = A.Panel(card, "QuickSummaryPanel", ThemeRole.SurfaceAlt, Kit.PanelAlpha, 56f);
+            A.TopStrip(summary.transform, 224, panelHeight);
+            TextMeshProUGUI age = SummaryTile(summary.transform, "Age", "Age", "24", 0, 0);
+            TextMeshProUGUI birthday = SummaryTile(summary.transform, "Birthday", "Birthday", "May 12, 2002", 1, 0);
+            TextMeshProUGUI skinType = SummaryTile(summary.transform, "SkinType", "Skin Type", "Combination", 0, 1);
+            TextMeshProUGUI skinTone = SummaryTile(summary.transform, "SkinTone", "Skin Tone", "Medium", 1, 1);
+
+            Image allergenTile = A.Panel(summary.transform, "AllergensTile", ThemeRole.InputBackground, 1f, 40f);
+            A.TopStrip(allergenTile.transform, 24 + 2 * TileStep, AllergenTileHeight, 24, 24);
+            TextMeshProUGUI allergenCaption = A.Label(allergenTile.transform, "Caption", "Allergens", 27, ThemeRole.SecondaryText, FontRole.Body);
+            A.TopStrip(allergenCaption.transform, 12, 40, 30, 20);
+            TextMeshProUGUI allergens = A.Label(allergenTile.transform, "AllergensValue", "Fragrance / Parfum, Parabens", 32, ThemeRole.MainText, FontRole.Label,
+                                                TextAlignmentOptions.TopLeft, true);
+            A.TopStrip(allergens.transform, 50, 76, 30, 20);
+            A.ShrinkWrapped(allergens, 22);
+
+            // ---- recommendations ----
+            float listTop = 224 + panelHeight + 20;
+            TextMeshProUGUI recommendedHeader = A.Label(card, "RecommendedHeaderText", "Recommended for you", 40, ThemeRole.Heading, FontRole.Heading);
+            A.TopStrip(recommendedHeader.transform, listTop, 58, 48, 48);
+            TextMeshProUGUI recommendedHint = A.Label(card, "RecommendedHintText", "Checked against your profile", 26, ThemeRole.SecondaryText, FontRole.Body,
+                                                      TextAlignmentOptions.MidlineRight);
+            A.TopStrip(recommendedHint.transform, listTop, 58, 540, 48);
+            A.Shrink(recommendedHint, 20); A.HintOnly(recommendedHint);
+
+            GameObject listArea = A.Node(card, "RecommendationsArea");
+            A.Between(listArea.transform, listTop + 64, A.AboveBar);
+            // square tiles, two per row: only the name, the brand and the kind; the arrow slides the Save / Try On / AI drawer down
+            AppTiles.GridScroll(listArea.transform, "RecommendationsScrollView", out RectTransform content);
+            ProductTileView template = AppTiles.ProductTile(content, "RecommendationTemplate", AppTiles.TileKind.Dashboard);
+            // grey placeholder tiles for the time the list loads (inactive here: the app switches them on)
+            GameObject skeleton = AppTiles.SkeletonTiles(listArea.transform, "RecommendationsSkeleton", 4);
+            skeleton.SetActive(false);
+
+            TextMeshProUGUI empty = A.Label(listArea.transform, "RecommendationsEmptyText",
+                "No recommendations yet. Products that are safe for your skin will appear here as the catalogue grows.",
+                32, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center, true);
+            A.Fill(empty.transform, 60, 0, 60, 0);
+            empty.gameObject.SetActive(false);            // the app shows it when there is nothing to recommend
+
+            // ---- "the ingredient rules were updated" (appears by itself; the pill is inactive until then) ----
+            GameObject noticeHolder = A.Node(card, "RuleUpdateBanner", typeof(RuleUpdateBanner));
+            A.BottomStrip(noticeHolder.transform, A.AboveBar, 104, 28, 28);
+            Image noticePill = A.Panel(noticeHolder.transform, "Notice", ThemeRole.Surface, 1f, 104f);
+            noticePill.raycastTarget = true;
+            A.Fill(noticePill.transform);
+            A.Outline(noticePill.transform, ThemeRole.Gold, 104f);
+            var noticeGroup = SceneBuilderCore.Ensure<CanvasGroup>(noticePill.gameObject);
+            Image noticeIcon = A.Icon(noticePill.transform, "Icon", IconFactory.Shield, 52, ThemeRole.Gold);
+            A.At(noticeIcon.transform, A.ML, new Vector2(30, 0), new Vector2(52, 52));
+            TextMeshProUGUI noticeText = A.Label(noticePill.transform, "MessageText", "Ingredient safety rules were updated. New scans use them.", 28,
+                                                 ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.MidlineLeft, true);
+            A.Fill(noticeText.transform, 100, 8, 100, 8);
+            A.ShrinkWrapped(noticeText, 22);
+            Button noticeClose = A.IconButton(noticePill.transform, "CloseButton", IconFactory.Close, 80, 38, ThemeRole.MainText);
+            A.At(noticeClose.transform, A.MR, new Vector2(-12, 0), new Vector2(80, 80));
+            var notice = noticeHolder.GetComponent<RuleUpdateBanner>();
+            A.Set(notice, "notice", noticeGroup); A.Set(notice, "messageText", noticeText); A.Set(notice, "closeButton", noticeClose);
+            noticePill.gameObject.SetActive(false);
+
+            BottomActionBar bar = A.BottomBar(s, 0);
+            AppTiles.SwipeNavigation(s, bar);       // drag the dashboard left: Recent Scans; right: AI Smart Scan, then AR Try-On
+
+            // ---- account pop-up (opens from the avatar) ----
+            A.AppPopup account = A.Overlay(s, "AccountPanel", "Your account");
+            A.At(account.box, A.MC, new Vector2(0, 60), new Vector2(880, 660));
+            Image accountAvatar = A.Panel(account.box, "AccountAvatar", ThemeRole.SurfaceAlt, 1f, 130f);
+            A.At(accountAvatar.transform, A.TC, new Vector2(0, -136), new Vector2(130, 130));
+            A.Icon(accountAvatar.transform, "Icon", IconFactory.User, 76, ThemeRole.MainText);
+            TextMeshProUGUI accountName = A.Label(account.box, "AccountNameText", "Your name", 44, ThemeRole.MainText, FontRole.Heading, TextAlignmentOptions.Center);
+            A.TopStrip(accountName.transform, 282, 68, 48, 48); A.Shrink(accountName, 30);
+            TextMeshProUGUI accountEmail = A.Label(account.box, "AccountEmailText", "name@email.com", 31, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center);
+            A.TopStrip(accountEmail.transform, 352, 50, 48, 48); A.Shrink(accountEmail, 24);
+            TextMeshProUGUI accountNote = A.Label(account.box, "AccountNoteText", "You can sign back in at any time with your email and password.",
+                                                  27, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center, true);
+            A.TopStrip(accountNote.transform, 414, 74, 60, 60);
+            Button signOut = A.PillButton(account.box, "SignOutButton", "Sign Out", 40, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.SignOut);
+            A.BottomStrip(signOut.transform, 44, 120, 48, 48);
+
+            AiInsightPanel aiPanel = AppTiles.AiPanel(s);
+
+            // ---- controller ----
+            var controller = A.Controller<DashboardFlowController>("DashboardFlowController");
+            A.Set(controller, "recommendationsSkeleton", skeleton); A.Set(controller, "aiPanel", aiPanel);
+            A.Set(controller, "greetingText", greeting);
+            A.Set(controller, "ageValue", age); A.Set(controller, "birthdayValue", birthday);
+            A.Set(controller, "skinTypeValue", skinType); A.Set(controller, "skinToneValue", skinTone);
+            A.Set(controller, "allergensValue", allergens);
+            A.Set(controller, "recommendationsContent", content); A.Set(controller, "recommendationTemplate", template);
+            A.Set(controller, "recommendationsEmptyText", empty); A.Set(controller, "typeIcons", A.TypeIcons());
+            A.Set(controller, "avatarButton", avatar); A.Set(controller, "accountPanel", account.panel);
+            A.Set(controller, "accountNameText", accountName); A.Set(controller, "accountEmailText", accountEmail);
+            A.Set(controller, "signOutButton", signOut);
+            A.Set(controller, "settingsButton", settings);
+
+            A.Finish(s);
+            Debug.Log("[GlowUp] UserDashboardScene built. RecommendationTemplate is the pattern tile (its Drawer is parked above it); RecommendationsSkeleton and AiInsightPanel are inactive until needed; AccountPanel is inactive until the avatar is tapped. The gear opens the Settings page.");
+        }
+
+        /// <summary>One tile of the quick summary: a small caption and the value under it. Two tiles per line.</summary>
+        static TextMeshProUGUI SummaryTile(Transform panel, string key, string caption, string sample, int column, int row)
+        {
+            Image tile = A.Panel(panel, key + "Tile", ThemeRole.InputBackground, 1f, 40f);
+            var rt = (RectTransform)tile.transform;
+            float top = 24 + row * TileStep;
+            rt.anchorMin = new Vector2(column * 0.5f, 1); rt.anchorMax = new Vector2(column * 0.5f + 0.5f, 1); rt.pivot = new Vector2(0.5f, 1);
+            rt.offsetMin = new Vector2(column == 0 ? 24 : 10, -top - TileHeight); rt.offsetMax = new Vector2(column == 0 ? -10 : -24, -top);
+
+            TextMeshProUGUI captionText = A.Label(tile.transform, "Caption", caption, 27, ThemeRole.SecondaryText, FontRole.Body);
+            A.TopStrip(captionText.transform, 14, 40, 30, 20);
+            TextMeshProUGUI value = A.Label(tile.transform, key + "Value", sample, 40, ThemeRole.MainText, FontRole.Heading);
+            A.TopStrip(value.transform, 54, 62, 30, 20);
+            A.Shrink(value, 26);
+            return value;
+        }
+    }
+}

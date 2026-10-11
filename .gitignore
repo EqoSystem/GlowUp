@@ -1,0 +1,51 @@
+# GlowUp repository: what is NOT kept in Git, and why.
+# The repository holds the Unity app (GlowUp/) and the admin website (GlowUp-Admin_AI_Testing/).
+
+# 1. The file that holds the AI key. It must never enter Git history, because history cannot be
+#    cleaned afterwards. A fresh copy of this repository will not compile until this one file is
+#    copied in by hand (its .meta file IS kept, so Unity recognises it again).
+GlowUp/Assets/_Project/Scripts/Security/SecureProfileStore.cs
+
+# 2. Folders and files Unity, Visual Studio and Gradle make again by themselves
+GlowUp/Library/
+GlowUp/Temp/
+GlowUp/Logs/
+GlowUp/obj/
+GlowUp/Builds/
+GlowUp/UserSettings/
+GlowUp/MemoryCaptures/
+GlowUp/Recordings/
+GlowUp/.vs/
+GlowUp/.gradle/
+GlowUp/*_BurstDebugInformation_DoNotShip/
+GlowUp/*_BackUpThisFolder_ButDontShipItWithYourGame/
+GlowUp/*.csproj
+GlowUp/*.sln
+GlowUp/*.user
+GlowUp/*.apk
+GlowUp/*.aab
+
+# 3. Downloads and hand-made backups (Git is the history from now on)
+GlowUp/tesseract-unity-master/
+GlowUp-Admin_Backup_*/
+GlowUp-Unity_Backup_*/
+GlowUp-Unity_Removed_*/
+facebook-unity-sdk-*/
+facebook-unity-sdk-*.unitypackage
+facebook-unity-sdk-*.zip
+GlowUp-Admin_AI_Testing/firebase_unity_sdk_*/
+
+# 4. Website tool files
+.vercel/
+.env*
+node_modules/
+firestore-debug.log
+*.bak
+
+# 5. Windows and editor leftovers
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# 6. Local tool settings of this computer
+.claude/

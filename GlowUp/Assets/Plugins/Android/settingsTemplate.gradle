@@ -1,0 +1,44 @@
+pluginManagement {
+    repositories {
+        **ARTIFACTORYREPOSITORY**
+        gradlePluginPortal()
+        google()
+        mavenCentral()
+    }
+}
+
+// GlowUp: Unity 2022's build tools (R8 4.x) cannot process libraries built with Kotlin 2, which the Firebase
+// libraries now use. Without this block the build stops with "ERROR:D8: com.android.tools.r8.kotlin.H".
+// It only swaps in a newer R8; nothing else about the build changes. (Fix documented by Unity.)
+buildscript {
+    repositories {
+        maven {
+            url "https://storage.googleapis.com/r8-releases/raw"
+        }
+    }
+    dependencies {
+        classpath 'com.android.tools:r8:8.5.35'
+    }
+}
+
+include ':launcher', ':unityLibrary'
+**INCLUDES**
+
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    repositories {
+        **ARTIFACTORYREPOSITORY**
+        google()
+        mavenCentral()
+// Android Resolver Repos Start
+        def unityProjectPath = $/file:///**DIR_UNITYPROJECT**/$.replace("\\", "/")
+        maven {
+            url (unityProjectPath + "/Assets/GeneratedLocalRepo/Firebase/m2repository") // Assets/Firebase/Editor/AppDependencies.xml:25, Assets/Firebase/Editor/AuthDependencies.xml:23, Assets/Firebase/Editor/FirestoreDependencies.xml:23
+        }
+        mavenLocal()
+// Android Resolver Repos End
+        flatDir {
+            dirs "${project(':unityLibrary').projectDir}/libs"
+        }
+    }
+}

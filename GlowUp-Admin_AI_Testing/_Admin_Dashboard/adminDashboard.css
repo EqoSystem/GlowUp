@@ -1,0 +1,66 @@
+/* Operations Dashboard: only where things sit. Colours, buttons and panels come from ../_Shared/adminCommon.css. */
+
+/* ---- the five numbers ---- */
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--gap); }
+.kpi {
+    display: flex; flex-direction: column; gap: 6px; padding: var(--pad); border-radius: var(--radius); text-decoration: none; color: var(--text);
+    background: var(--surface); border: 1px solid var(--border); transition: transform .16s var(--ease), box-shadow .2s, border-color .2s;
+}
+.kpi-top { display: flex; align-items: center; justify-content: space-between; }
+.kpi-icon { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; font-size: 17px; color: var(--gold); background: color-mix(in srgb, var(--gold) 14%, transparent); }
+.kpi-value { font-size: var(--fs-kpi); font-weight: 700; line-height: 1.1; letter-spacing: -.5px; font-variant-numeric: tabular-nums; width: fit-content; min-width: 1.6em; }
+.kpi-title { font-size: var(--fs-sm); color: var(--muted); display: flex; align-items: center; gap: 6px; }
+
+/* ---- lists ---- */
+.activity-list, .suggestion-list, .rank-list, .result-legend { list-style: none; display: flex; flex-direction: column; }
+.activity-item, .suggestion-item, .rank-item { display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-bottom: 1px solid var(--border); }
+.activity-item:last-child, .suggestion-item:last-child, .rank-item:last-child { border-bottom: none; }
+.activity-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--warn); box-shadow: 0 0 0 4px color-mix(in srgb, var(--warn) 18%, transparent); }
+.activity-dot.safe { background: var(--ok); box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 18%, transparent); }
+.activity-dot.harmful { background: var(--bad); box-shadow: 0 0 0 4px color-mix(in srgb, var(--bad) 18%, transparent); }
+.activity-main, .suggestion-main { flex: 1; min-width: 0; }
+.activity-title { font-size: var(--fs-base); font-weight: 600; }
+.activity-title .chip { margin: 0 0 0 6px; }
+.activity-detail { font-size: var(--fs-xs); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.activity-time { font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; }
+.suggestion-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.suggestion-main .chip { margin: 0; }
+.suggestion-text { font-weight: 600; }
+.rank-number { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-size: var(--fs-xs); font-weight: 700; color: var(--gold); background: color-mix(in srgb, var(--gold) 14%, transparent); flex: none; }
+.rank-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 550; }
+.rank-value { font-size: var(--fs-xs); color: var(--muted); }
+
+/* ---- quick actions ---- */
+.tile-stack { display: flex; flex-direction: column; gap: 8px; }
+.tile-line { display: flex; align-items: center; gap: 8px; }
+.tile {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: var(--radius-sm); text-decoration: none; color: var(--text);
+    background: var(--surface-2); border: 1px solid var(--border); font-size: var(--fs-base); font-weight: 550;
+    transition: transform .16s var(--ease), box-shadow .2s, background-color .2s;
+}
+.tile .tile-title { flex: 1; min-width: 0; }
+.tile svg.ic:first-child { color: var(--gold); }
+.tile svg.ic:last-child { color: var(--muted); }
+.tile.review { border-color: color-mix(in srgb, var(--info) 45%, transparent); background: color-mix(in srgb, var(--info) 10%, var(--surface)); }
+.tile.review svg.ic:first-child { color: var(--info); }
+
+/* ---- the results of today ---- */
+.result-bar { display: flex; height: 14px; border-radius: 999px; overflow: hidden; background: var(--surface-2); gap: 2px; }
+.result-bar span { height: 100%; min-width: 0; transition: flex-grow .5s var(--ease); }
+.result-bar .safe { background: var(--ok); } .result-bar .caution { background: var(--warn); } .result-bar .harmful { background: var(--bad); }
+.result-legend li { display: flex; align-items: center; gap: 8px; padding: 6px 2px; font-size: var(--fs-sm); }
+.result-legend .num { margin-left: auto; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+/* ---- things that answer a click ---- */
+.kpi[role=button] { cursor: pointer; }
+.activity-item { flex-wrap: wrap; border-radius: 8px; transition: background-color .15s; }
+.activity-item:hover { background: color-mix(in srgb, var(--accent) 6%, transparent); }
+.activity-more { flex-basis: 100%; margin: 2px 0 4px 21px; padding: 8px 12px; border-radius: 8px; background: var(--surface-2); font-size: var(--fs-xs); color: var(--text-2); line-height: 1.6; animation: rise .22s var(--ease); }
+.activity-more b { color: var(--text); font-weight: 600; }
+.result-bar span, .result-legend li { cursor: pointer; }
+.result-bar span { transition: flex-grow .5s var(--ease), filter .15s, transform .15s; }
+.result-bar span:hover { filter: brightness(1.15); }
+.result-legend li { border-radius: 8px; padding-left: 6px; padding-right: 6px; transition: background-color .15s; }
+.result-legend li:hover, .result-legend li.on { background: color-mix(in srgb, var(--text) 7%, transparent); }
+.rank-item.can-open { border-radius: 8px; transition: background-color .15s, transform .16s var(--ease); }
+.rank-item.can-open:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); transform: translateX(3px); }

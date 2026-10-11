@@ -1,0 +1,122 @@
+# Privacy Policy
+Last updated: 9 October 2026
+
+## 1. Introduction
+GlowUp ("we", "our", or "us") respects your privacy and is committed to protecting your personal data. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application. Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the application.
+
+## 2. Information We Collect
+We collect information that you voluntarily provide to us when registering for an account and while using the application. This includes:
+
+- Personal Identifiers: your first name, middle name, last name, date of birth, age, and email address.
+- Profile and Preference Data: your skin type, skin tone, skin conditions, and known cosmetic allergens and sensitivities. This information is used exclusively to tailor the app's safety analyses and product recommendations to your personal profile.
+- Scan Data: the ingredient text read from product labels, the results of each analysis, the products you save to your Recent Scans, and any names you give them.
+- Suggestions: skin conditions, allergens, or ingredients you add that are not yet in our lists, so that we can review them and improve the database.
+- Technical Data: our cloud provider may process basic technical information, such as your IP address and device identifiers, in order to deliver and secure the service.
+
+## 3. How We Use Your Information
+Having accurate information permits us to provide you with a smooth, efficient, and customized experience. Specifically, we use information collected via GlowUp to:
+
+- Create and secure your user account using Google Firebase Authentication.
+- Store and retrieve your profile preferences securely using Google Cloud Firestore.
+- Personalize cosmetic ingredient safety assessments and filter recommendations based on your registered skin type, skin conditions, age, and allergies.
+- Keep your scan history available across sessions and, when you are online, across your devices.
+- Count how often a brand is scanned, without attaching your name to that count, so that we can prioritise which products to add to the database.
+- Communicate with you regarding account updates, security alerts, and support messages.
+
+## 4. Camera, Scans, and AR Try-On
+GlowUp asks for permission to use your camera for two features: reading the ingredient list on a product, and previewing shades on your face with AR Try-On.
+
+- Camera images are processed on your device. We do not record, upload, or store the live camera feed.
+- For an ingredient scan, only the text that was read from the label is kept and analysed.
+- For AR Try-On, the picture of your face is used only while the preview is on screen. It is not saved and it is not sent to us.
+
+You can withdraw camera permission at any time in your device settings. The scanning and try-on features will stop working until permission is given again, but you can still type ingredients in by hand.
+
+## 5. AI-Assisted Analysis
+Part of each analysis is produced automatically. When you are online, the ingredient text and the skin-profile details needed for the analysis (your age, skin type, skin tone, skin conditions, and allergens) may be sent to our AI service provider to produce a plain-language explanation. Your name, email address, and password are never included in that request.
+
+Automated results can be incomplete or wrong. Please read section 4 of the Terms and Conditions below.
+
+## 6. Data Security and Third-Party Services
+We implement industry-standard security measures, including encrypted transit layers (HTTPS) and salted password hashing, to protect your personal information. Your password is never stored in readable form. We utilize Google Firebase as our primary cloud backend infrastructure. Google Firebase adheres to rigorous security standards. We do not sell, trade, or otherwise transfer your personally identifiable information to outside parties.
+
+No method of transmission or storage is completely secure. We cannot guarantee absolute security, and you use the application with that understanding.
+
+## 7. Offline Use
+To let GlowUp work without an internet connection, a copy of your profile, your scan history, and the ingredient database is kept on your device. Changes you make offline are sent to the cloud the next time you are online. If you share your device with other people, sign out when you are finished.
+
+## 8. Data Retention and Account Deletion
+We retain your personal data only for as long as your account is active or as needed to provide you with app services. You have the right to request the deletion of your account and all associated data at any time by contacting our support team.
+
+## 9. Children's Privacy
+GlowUp is not intended for children under 13 years of age, and we do not knowingly collect personal data from them. If you believe a child under 13 has created an account, please contact us so that we can remove it.
+
+## 10. Your Rights and Choices
+Depending on where you live, you may have the right to see the personal data we hold about you, to correct it, to ask for it to be deleted, and to withdraw your consent. You can update your profile in the app at any time, and you can contact us for any other request.
+
+## 11. Changes to This Policy
+We may update this Privacy Policy from time to time. When we do, we will change the "Last updated" date at the top and, where the change is significant, tell you inside the app.
+
+## 12. Contact Us
+If you have questions about this Privacy Policy, contact our support team at: [add your support email here]
+
+
+# Terms and Conditions
+
+## 1. Acceptance of Terms
+By downloading, installing, or creating an account on GlowUp, you agree to be bound by these Terms and Conditions. If you disagree with any part of these terms, you must discontinue use of the application immediately.
+
+## 2. Eligibility
+You must be at least 13 years old to use GlowUp. If you are under 18, you confirm that a parent or guardian has read and agreed to these terms on your behalf.
+
+## 3. Medical and Dermatological Disclaimer
+- Not a Medical Device: GlowUp is designed strictly as a cosmetic safety and ingredient-analysis tool. It is not a medical device, clinical diagnostic tool, or a substitute for professional dermatological advice, diagnosis, or treatment.
+- Consult a Professional: always seek the advice of a licensed dermatologist or qualified healthcare provider with any questions you may have regarding a medical skin condition, severe dermatitis, or acute allergic reactions. Never disregard professional medical advice or delay in seeking it because of information provided by GlowUp.
+- Patch Testing: cosmetic formulations react differently across individuals. Users are strongly advised to perform a patch test on a small area of skin before applying any new skincare product, regardless of the app's safety result or ingredient analysis.
+
+## 4. Ingredient Analysis and AI Results
+The results shown by GlowUp are generated automatically from the text read off a product label, from our ingredient database, and from an AI service. They are provided for general information only.
+
+- The camera can misread a label, and manufacturers change their formulas. Always check the ingredient list printed on the product you actually hold.
+- An ingredient that is not yet in our database is not part of the result. A result of "safe" means that nothing in our records conflicts with your profile. It is not a guarantee that you will not react to the product.
+- A result of "caution" or "harmful" is a prompt to look more closely or to ask a professional. It is not a diagnosis.
+
+## 5. AR Try-On
+AR Try-On shows a simulated preview. Colours and finish depend on your screen, your camera, and the lighting around you, and the real product may look different on your skin. The preview is not a promise of how a product will look or perform.
+
+## 6. Product Information and Recommendations
+Product, brand, and ingredient information is supplied by our team and by third parties and may be incomplete or out of date. A recommendation in the app is not an endorsement, and we do not guarantee that a recommended product is available where you live.
+
+## 7. User Accounts and Responsibilities
+- You are responsible for maintaining the confidentiality of your login credentials and password.
+- You agree to provide accurate, current, and complete information during the onboarding and registration process and to keep your profile updated.
+- You agree not to use the app for any unlawful purpose or in any way that could damage, disable, or impair the application's infrastructure.
+
+## 8. Acceptable Use
+You agree not to copy or extract the database in bulk, attempt to bypass the security of the application, use the application to harass or harm another person, or submit content that is unlawful, misleading, or that you do not have the right to share.
+
+## 9. Your Suggestions
+When you suggest a skin condition, allergen, ingredient, or product, you allow us to review it, edit it, and add it to the database so that other users can benefit from it. Do not include personal or confidential information in a suggestion.
+
+## 10. Intellectual Property Rights
+The GlowUp name, logo, source code, design elements, and underlying software are the intellectual property of the developers. You may not copy, modify, distribute, or reverse-engineer any portion of this application without express written permission.
+
+## 11. Third-Party Services
+GlowUp relies on services operated by other companies, including Google Firebase and, if you choose to use them, sign-in services such as Google or Facebook. Your use of those services is also subject to their own terms and privacy policies.
+
+## 12. Suspension and Termination
+You may stop using GlowUp at any time. We may suspend or close an account that breaks these terms or that puts the service or other users at risk.
+
+## 13. Limitation of Liability
+To the maximum extent permitted by applicable law, the creators and operators of GlowUp shall not be held liable for any direct, indirect, incidental, special, or consequential damages resulting from your use of the application, including but not limited to adverse skin reactions, allergic flare-ups, or reliance on ingredient analysis data. Use the application at your own risk.
+
+## 14. Changes to These Terms
+We may update these Terms and Conditions from time to time. If you continue to use GlowUp after a change takes effect, you accept the updated terms.
+
+## 15. Governing Law
+These terms are governed by the laws of the country in which the operator of GlowUp is established, without affecting any consumer protection rights you have under the law of the country where you live.
+
+## 16. Contact
+Questions about these Terms and Conditions can be sent to: [add your support email here]
+
+Thank you for reading. Tick the box below to confirm that you have read and agree to the Privacy Policy and the Terms and Conditions.

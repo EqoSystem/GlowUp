@@ -1,0 +1,122 @@
+using System;
+using System.Collections.Generic;
+using GlowUp.Data;
+using UnityEngine;
+
+namespace GlowUp.Scan
+{
+    /// <summary>
+    /// ONLINE. When a scanned product is not in the website's Brand &amp; Product Inventory, this adds it:
+    /// the ingredient list exactly as read from the label, plus the name, brand and type that are known
+    /// (from the label or from the AI). If its brand is new, the brand is added as well.
+    ///
+    /// Everything it adds has status "Pending", source "scan" and "not reviewed", so:
+    ///   - it shows on the website at once, marked as added by a scan and waiting for review;
+    ///   - the app does NOT recommend it to anyone until an admin approves it there.
+    /// A product that is already listed (also while still Pending) is not added twice: the scan is
+    /// counted on the existing entry instead.
+    /// GlowUp lists make-up and face products only: a hair, body, nail or fragrance product is never
+    /// added (ProductScope decides; the website and the database rules use the same rule).
+    /// Settings are Inspector fields on LoadingSceneController.
+    /// </summary>
+    public static class ScannedProductPublisher
+    {
+        public static bool Enabled = true;
+        /// <summary>Only add a product whose name is known. Off = nameless scans are added too, as "Unnamed ...".</summary>
+        public static bool RequireProductName = true;
+
+        /// <summary>
+        /// Makes sure the scanned product is in the inventory. Sets record.productId to the inventory entry
+        /// (existing or newly added) so the caller can count the scan. Does nothing when the product cannot
+        /// be added (not signed in to the cloud, too few ingredients, no name).
+        /// </summary>
+        public static void PublishIfNew(ScanRecord record, List<string> labelIngredients)
+        {
+            if (!Enabled || record == null || !string.IsNullOrEmpty(record.productId)) return;
+            if (labelIngredients == null || labelIngredients.Count < Mathf.Max(1, ProductMatcher.MinimumShared)) return;
+
+            // already listed but not Active yet (waiting for review, or switched off)? count the scan there
+            ProductData listed = ProductMatcher.Find(labelIngredients, ProductRepository.All(), null);
+            if (listed != null) { record.productId = listed.id; return; }
+
+            string uid = UserProfileRepository.CurrentUid;
+            if (string.IsNullOrEmpty(uid)) return;                               // the cloud only accepts additions from a signed-in user
+            bool named = !string.IsNullOrWhiteSpace(record.productName);
+            if (!named && RequireProductName) return;
+            if (ProductScope.Classify(record) == ProductScope.Kind.OutOfScope) return;      // not make-up or a face product: the inventory does not take it
+
+            long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            if (string.IsNullOrEmpty(record.id)) record.id = Guid.NewGuid().ToString("N");     // the inventory entry is named after the scan
+            string type = string.IsNullOrWhiteSpace(record.cosmeticType) ? "Skincare" : record.cosmeticType.Trim();
+
+            // ---- the brand ----
+            string brandId = record.brandId ?? "", brandName = (record.brandName ?? "").Trim();
+            if (brandId.Length == 0 && brandName.Length >= 2)
+            {
+                BrandData known = BrandRepository.FindByName(brandName);
+                if (known != null) { brandId = known.id; brandName = known.name; }
+                else
+                {
+                    brandId = "scan_" + IngredientKnowledge.Key(brandName).Replace(' ', '_');
+                    if (brandId.Length > 90) brandId = brandId.Substring(0, 90);
+                    var brand = new ScannedBrandRecord
+                    {
+                        name = Limit(brandName, 60), category = ShadeAdvisor.IsColourCosmetic(type) ? "Makeup" : "Skincare", market = "",
+                        status = "Pending", scans = 0, source = "scan", reviewed = false, addedBy = uid, addedAtUnix = now
+                    };
+                    SyncQueue.EnqueueSet("brands/" + brandId, brand);
+                    BrandRepository.AddLocal(new BrandData { id = brandId, name = brand.name, category = brand.category, market = "", status = "Pending" });
+                }
+                record.brandId = brandId;
+            }
+
+            // ---- the product ----
+            string name = named ? record.productName.Trim() : "Unnamed " + type.ToLowerInvariant() + " (scanned)";
+            var shades = new List<string>();
+            if (!string.IsNullOrWhiteSpace(record.shadeHex) && ShadeAdvisor.IsColourCosmetic(type)) shades.Add(record.shadeHex.Trim());
+
+            var ingredients = new List<string>();
+            foreach (string ingredient in labelIngredients)
+                if (!string.IsNullOrWhiteSpace(ingredient) && ingredients.Count < 80) ingredients.Add(Limit(ingredient.Trim(), 120));
+
+            string productId = "scan_" + record.id;
+            var product = new ScannedProductRecord
+            {
+                name = Limit(name, 100), brandId = brandId, brandName = Limit(brandName, 60), cosmeticType = Limit(type, 40),
+                description = Limit((record.aiEnhanced ? "Added automatically from an app scan. Name and type suggested by the AI." : "Added automatically from an app scan.")
+                    + FdaNote(record), 400),
+                ingredients = ingredients, shades = shades, minAge = 0,
+                status = "Pending", scans = 0, source = "scan", reviewed = false, addedBy = uid, addedAtUnix = now
+            };
+            // the barcode the camera saw goes with it, so the next scan of this product is found by its barcode
+            string barcode = MlKitBarcodeReader.Key(record.barcode).Length > 0 ? Limit(record.barcode.Trim(), 20) : "";
+            if (barcode.Length > 0) SyncQueue.EnqueueSet("products/" + productId, ScannedProductWithBarcodeRecord.From(product, barcode));
+            else SyncQueue.EnqueueSet("products/" + productId, product);
+            ProductRepository.AddLocal(new ProductData
+            {
+                id = productId, name = product.name, brandId = brandId, brandName = product.brandName, cosmeticType = product.cosmeticType,
+                description = product.description, status = "Pending", ingredients = new List<string>(ingredients), shades = new List<string>(shades),
+                source = "scan", reviewed = false, barcode = barcode
+            });
+            record.productId = productId;
+        }
+
+        /// <summary>
+        /// What the description says about the FDA Philippines list. Only a record that is clearly this product is quoted
+        /// (the website approves an entry that carries such a line by itself); a record that is merely similar is not.
+        /// </summary>
+        static string FdaNote(ScanRecord record)
+        {
+            switch (PhFdaVerification.StatusOf(record))
+            {
+                case PhFdaVerification.Registered:
+                case PhFdaVerification.Expired: return string.IsNullOrEmpty(record.fdaLine) ? "" : " " + record.fdaLine;
+                case PhFdaVerification.Similar: return " A similar record is on the FDA Philippines list: check it by hand.";
+                case PhFdaVerification.None: return " Not found on the FDA Philippines list under this name.";
+                default: return "";
+            }
+        }
+
+        static string Limit(string s, int max) => string.IsNullOrEmpty(s) || s.Length <= max ? (s ?? "") : s.Substring(0, max).TrimEnd();
+    }
+}

@@ -1,0 +1,17 @@
+# Not part of the website: never upload these.
+firebase_unity_sdk_13.17.0
+google-services*.json
+firestore.rules
+FIRESTORE_SCHEMA.md
+*.md
+
+# local tool files
+.env*
+.vercel
+.gitignore
+vercel.json.bak
+
+# Firebase tool files
+firebase.json
+.firebaserc
+firestore-debug.log

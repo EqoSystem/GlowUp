@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" class="auth-pending">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GlowUp Admin - Ingredient Curator</title>
+    <script>
+        // dark or light before anything is drawn: the person's choice, else the computer's own setting
+        (function () {
+            var t = null;
+            try { t = localStorage.getItem("glowup.theme"); } catch (e) { }
+            if (t !== "light" && t !== "dark") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+            document.documentElement.dataset.theme = t;
+        })();
+        // if the sign-in check never answers (no internet), say so instead of leaving a blank page
+        setTimeout(function () {
+            if (document.documentElement.classList.contains("auth-pending")) document.documentElement.classList.add("auth-stuck");
+        }, 10000);
+    </script>
+    <link rel="stylesheet" href="../_Shared/adminCommon.css">
+    <link rel="stylesheet" href="../_Admin_Ingredient_Curator/adminIngredientCurator.css">
+</head>
+<body>
+    <script src="../_Shared/pageSkeleton.js"></script>
+
+    <main class="main-content" data-title="Ingredient Curator" data-subtitle="What each ingredient is, in plain words, and how the app judges it">
+        <div class="board">
+
+            <!-- the counts; a click on one filters the list -->
+            <section class="panel bare" data-panel="counts" data-label="Counts" data-w="12">
+                <div class="stat-row" id="curatorStats"></div>
+            </section>
+
+            <!-- find and add -->
+            <section class="panel" data-panel="tools" data-label="Search and actions" data-w="12">
+                <div class="toolbar">
+                    <div class="search-container">
+                        <i data-icon="search"></i>
+                        <input type="text" placeholder="Search ingredients" class="search-input" id="ingredientSearchInput" autocomplete="off">
+                    </div>
+                    <select id="ingredientSourceFilter" class="toolbar-select" aria-label="Show only the entries of one origin">
+                        <option value="">All ingredients</option>
+                    </select>
+                    <select id="ingredientRiskFilter" class="toolbar-select" aria-label="Show one risk level">
+                        <option value="">Any risk level</option>
+                        <option value="harmful">Harmful</option>
+                        <option value="caution">Caution</option>
+                        <option value="safe">Safe</option>
+                        <option value="auto">App decides</option>
+                    </select>
+                    <button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most harmful, waiting for review, most used, or newest." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button>
+                    <span class="spacer"></span>
+                    <div class="btn-group">
+                        <button type="button" class="primary-btn" id="addIngredientBtn" data-guide="Add an ingredient with its plain-words definition." data-guide-preview="Opens a form. Only the first three boxes are required."><i data-icon="plus"></i>Ingredient</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- the ingredients -->
+            <section class="panel" data-panel="list" data-label="Ingredient list" data-w="12" data-source="ingredients">
+                <div class="panel-head">
+                    <button type="button" class="pick" data-pick-all role="checkbox" aria-checked="false" aria-label="Select all shown" data-tip="Select every ingredient shown here."></button>
+                    <h3 class="panel-title">Ingredients</h3>
+                    <button type="button" class="guide-badge" data-tip-title="Ingredients" data-tip="A card shows the name and the scientific name. Click it for everything else; double-click to edit. An entry here takes priority over the app's own built-in wording." data-tip-preview="Drag cards onto a folder or the Recycle bin. The small box picks a card; Ctrl+click picks several.">i</button>
+                    <span class="panel-count" id="ingredientCountLine"></span>
+                    <span id="ingredientQuick"></span>
+                    <span class="spacer"></span>
+                    <div class="pager" id="ingredientPagerTop"></div>
+                </div>
+                <!-- everything, the folders and the Recycle bin -->
+                <div class="shelf" id="ingredientShelf"></div>
+                <div class="ingredients-list" id="ingredientsList">
+                    <div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div>
+                </div>
+                <!-- shows while cards are picked -->
+                <div class="w-bar sel-bar" id="ingredientBar" hidden></div>
+                <div class="table-foot"><span class="spacer"></span><div class="pager" id="ingredientPager"></div></div>
+            </section>
+        </div>
+    </main>
+
+    <div id="addIngredientModal" class="modal-overlay">
+        <div class="modal-content wide">
+            <h3 id="modalTitle">Add Ingredient</h3>
+            <p class="modal-intro">The first three boxes are what app users read. The rest tells the app how to judge the ingredient for each user; leave any of it empty and the app uses its own built-in knowledge.</p>
+            <p class="review-note" id="ingredientReviewNote" style="display: none;"></p>
+            <form id="addIngredientForm" class="modal-form" novalidate>
+                <div class="form-row">
+                    <div class="field">
+                        <label for="ingredientNameInput">Ingredient Name <span class="required">*</span></label>
+                        <input type="text" id="ingredientNameInput" maxlength="80" placeholder="e.g., Vitamin B3" autocomplete="off">
+                    </div>
+                    <div class="field">
+                        <label for="ingredientTechInput">Technical / Scientific Name <span class="required">*</span></label>
+                        <input type="text" id="ingredientTechInput" maxlength="120" placeholder="e.g., Niacinamide" autocomplete="off">
+                        <span class="field-hint">As it is printed on labels. The app matches scanned text against this name.</span>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="ingredientDescInput">User-Friendly Definition <span class="required">*</span></label>
+                    <textarea id="ingredientDescInput" rows="3" maxlength="600" placeholder="What it is and what it does, in plain words."></textarea>
+                </div>
+
+                <div class="field">
+                    <label for="ingredientAliasesInput">Also Known As</label>
+                    <input type="text" id="ingredientAliasesInput" maxlength="300" placeholder="e.g., Nicotinamide, Vitamin B3" autocomplete="off">
+                    <span class="field-hint">Other spellings found on labels, separated by commas. A scan of any of them finds this ingredient.</span>
+                </div>
+
+                <div class="form-section">
+                    <span class="form-section-title">How the app judges it</span>
+
+                    <div class="form-row">
+                        <div class="field">
+                            <label for="ingredientRiskInput">Risk Level</label>
+                            <select id="ingredientRiskInput">
+                                <option value="">Let the app decide</option>
+                                <option value="safe">Safe</option>
+                                <option value="caution">Caution</option>
+                                <option value="harmful">Harmful</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="ingredientMinAgeInput">Minimum Age</label>
+                            <input type="number" id="ingredientMinAgeInput" min="0" max="99" step="1" placeholder="0 = no age limit">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label for="ingredientCautionInput">Caution Note</label>
+                        <input type="text" id="ingredientCautionInput" maxlength="160" placeholder="e.g., can clog pores" autocomplete="off">
+                        <span class="field-hint">Finish the sentence "It ...". The app shows it when the ingredient is flagged, for example: "May not suit Oily skin: it can clog pores."</span>
+                    </div>
+
+                    <div class="field">
+                        <label for="ingredientUsesInput">Commonly Used In</label>
+                        <input type="text" id="ingredientUsesInput" maxlength="160" placeholder="e.g., serums, moisturisers, toners" autocomplete="off">
+                    </div>
+
+                    <div class="field">
+                        <span class="field-label">Highlights</span>
+                        <div class="checks">
+                            <label class="check"><input type="checkbox" id="ingredientKeyActiveInput"> <span>Key active (show it as a highlighted chip in results)</span></label>
+                            <label class="check"><input type="checkbox" id="ingredientUmbrellaInput"> <span>Umbrella term that can hide other ingredients (like "Fragrance")</span></label>
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <span class="field-label">Allergen Family</span>
+                        <div class="checks" id="allergenTagsChecks"></div>
+                        <span class="field-hint">A user who picked that allergen in the app is warned about this ingredient.</span>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="field">
+                            <span class="field-label">Avoid For Skin Types</span>
+                            <div class="checks" id="avoidSkinTypesChecks"></div>
+                        </div>
+                        <div class="field">
+                            <span class="field-label">Good For Skin Types</span>
+                            <div class="checks" id="goodSkinTypesChecks"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="field">
+                            <span class="field-label">Avoid For Skin Conditions</span>
+                            <div class="checks" id="avoidConditionsChecks"></div>
+                        </div>
+                        <div class="field">
+                            <span class="field-label">Good For Skin Conditions</span>
+                            <div class="checks" id="goodConditionsChecks"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="form-error" role="alert"></p>
+
+                <div class="modal-actions">
+                    <button type="button" id="cancelModalBtn" class="cancel-btn" data-close>Cancel</button>
+                    <button type="submit" id="saveIngredientBtn" class="save-btn">Save Ingredient</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module" src="../_Admin_Ingredient_Curator/adminIngredientCurator.js"></script>
+</body>
+</html>

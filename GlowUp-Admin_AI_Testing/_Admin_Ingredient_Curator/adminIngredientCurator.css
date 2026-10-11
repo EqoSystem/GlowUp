@@ -1,0 +1,28 @@
+/* Ingredient Curator: only where things sit. Colours, buttons and panels come from ../_Shared/adminCommon.css. */
+
+/* a card shows the name and the scientific name; clicked, it opens across the row and shows the rest */
+.ingredients-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; align-items: start; }
+.ingredients-list > .empty-state { grid-column: 1 / -1; }
+.ingredient-card {
+    display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: var(--radius-sm); min-width: 0; cursor: pointer;
+    background: var(--surface-2); border: 1px solid var(--border); transition: transform .16s var(--ease), box-shadow .2s, border-color .2s, background-color .2s;
+}
+.ingredient-card.needs-review { border-color: color-mix(in srgb, var(--info) 50%, transparent); }
+.ingredient-card.open { grid-column: 1 / -1; cursor: default; border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+.ingredient-card.open.fx:hover { transform: none; }
+.ingredient-card.open:focus-visible { outline: none; }
+.ingredient-card.is-picked { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface-2)); animation: neon 1.7s ease-in-out infinite; }
+.card-head { display: flex; align-items: center; gap: 9px; min-height: 30px; }
+.card-head h4 { font-size: var(--fs-base); font-weight: 650; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ingredient-card.open .card-head h4 { white-space: normal; overflow-wrap: anywhere; font-size: var(--fs-md); }
+.card-head .spacer { flex: 1; }
+.ingredient-tech { font-size: var(--fs-sm); color: var(--muted); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 45px; }
+.ingredient-card.open .ingredient-tech { white-space: normal; overflow-wrap: anywhere; }
+.ingredient-card .detail-box { margin-top: 10px; }
+.ingredient-card .pick { margin-right: -2px; }
+.panel-head > .pick { margin-right: 2px; }
+.table-foot { display: flex; align-items: center; gap: 12px; }
+.table-foot .spacer { flex: 1; }
+@media (max-width: 620px) { .ingredients-list { grid-template-columns: 1fr; } }
+.ingredient-card.from-product { border-style: dashed; }
+.ingredient-card.from-product .ingredient-tech { font-style: normal; padding-left: 18px; }
