@@ -13,7 +13,7 @@ namespace GlowUp.Scan
     /// <summary>
     /// Asks the AI (Gemini) a research question and returns its answer as text, together with the web
     /// pages it used when "search the web" is on. Used to look up ingredients the app has never seen.
-    /// It walks the same model list as the scan's AI second opinion (GeminiApiConfig > Model Chain).
+    /// It walks the model list of the AI settings (GeminiApiConfig > Model Chain).
     /// If a model or key does not offer web search, the same question is asked again without it.
     /// Needs the internet; the caller checks that first.
     /// </summary>

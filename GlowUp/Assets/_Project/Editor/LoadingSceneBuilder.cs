@@ -92,7 +92,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "cancelButton", cancel);
             var aiConfig = AssetDatabase.LoadAssetAtPath<GeminiApiConfig>(AiConfigPath);
             if (aiConfig != null) A.Set(controller, "aiConfig", aiConfig);
-            else Debug.LogWarning("[GlowUp] " + AiConfigPath + " was not found. Drag your Gemini Api Config onto LoadingSceneController > Ai Config, or the AI second opinion stays off.");
+            else Debug.LogWarning("[GlowUp] " + AiConfigPath + " was not found. Drag your Gemini Api Config onto LoadingSceneController > Ai Config, or unknown ingredients are not looked up.");
 
             A.Finish(s);
             Debug.Log("[GlowUp] LoadingScene built. The steps tick off as the analysis moves on; texts and timings are on the LoadingSceneController object.");

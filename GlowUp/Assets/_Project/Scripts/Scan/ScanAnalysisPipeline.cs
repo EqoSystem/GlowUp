@@ -1,8 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
 using GlowUp.Common;
 using GlowUp.Data;
@@ -16,16 +13,15 @@ namespace GlowUp.Scan
     /// The work the loading scene runs after a scan:
     ///   step 0  split the label text into ingredients
     ///   step 1  look them up (website database, then built-in knowledge)
-    ///   step 2  cross-check with the user's profile (+ an AI second opinion when online)
+    ///   step 2  cross-check with the user's profile (done on the phone: the profile is never sent to the AI)
     ///   step 3  save to Recent Scans and hand the result to the result scene
-    /// Everything except the AI second opinion works offline.
+    /// All of it works offline for ingredients the phone knows. Online it also looks up unknown ingredients and the FDA Philippines list.
     /// </summary>
     public static class ScanAnalysisPipeline
     {
         // set by LoadingSceneController from its Inspector fields
-        public static bool UseAi = true;
+        /// <summary>The AI settings for looking up ingredients nobody has described yet (see IngredientResearcher).</summary>
         public static GeminiApiConfig AiConfig;
-        public static float AiTimeoutSeconds = 20f;
         /// <summary>Compare each scan with the website's product inventory (see ProductMatcher).</summary>
         public static bool RecogniseCatalogueProducts = true;
         /// <summary>
@@ -86,13 +82,6 @@ namespace GlowUp.Scan
             ApplyRecognised(record, profile);
             if (!string.IsNullOrEmpty(record.fdaStatus)) fdaSearch = null;                        // the inventory had the FDA record
             else if (fdaSearch == null) fdaSearch = StartFdaSearch(record.productName, record.brandName);
-
-            if (UseAi && AiConfig != null && ConnectivityMonitor.Online)
-            {
-                report(2, "Asking the AI for a second opinion");
-                try { await EnhanceWithAi(record, profile); }
-                catch (Exception e) { Debug.LogWarning("AI second opinion skipped: " + e.Message); }
-            }
 
             // the FDA Philippines answer: taken now when it has arrived. Otherwise the result waits a few seconds for it and then
             // opens without it: its badge says "checking" and fills in by itself when the answer comes (FinishFdaLater).
@@ -188,74 +177,6 @@ namespace GlowUp.Scan
             }
         }
 
-        // ---------------------------------------------------------------------------------------
-        //  AI second opinion (Gemini). The rule-based result above stays the base; the AI adds a
-        //  plain-language explanation, product / type guesses and anything our database missed.
-        // ---------------------------------------------------------------------------------------
-        static async Task EnhanceWithAi(ScanRecord record, UserProfileData profile)
-        {
-            string apiKey = GlowUp.Security.SecureProfileStore.GetApiKey();
-            if (string.IsNullOrEmpty(apiKey)) return;
-
-            var client = new GeminiApiClient(AiConfig, apiKey);
-            using (var cts = new CancellationTokenSource(TimeSpan.FromSeconds(Mathf.Max(5f, AiTimeoutSeconds))))
-            {
-                GeminiScanResult result = await client.AnalyzeAsync(BuildRequest(record, profile), cts.Token);
-                if (result == null || !result.Success || result.Analysis == null) return;
-                Merge(record, result.Analysis);
-            }
-        }
-
-        static string BuildRequest(ScanRecord record, UserProfileData profile)
-        {
-            var p = new StringBuilder();
-            p.Append("You are a cosmetic ingredient safety assistant. Analyse this ingredient list for the user below. ");
-            p.Append("Reply with ONLY one JSON object, no markdown, with exactly these fields: ");
-            p.Append("ProductSummary (string, 1-2 short sentences), IsSafeForUser (boolean), ");
-            p.Append("ProductName (string, empty if unknown), BrandName (string, empty if unknown), ");
-            p.Append("CosmeticType (one of: Lipstick, Lip Gloss, Lip Balm, Foundation, Concealer, Blush, Eyeshadow, Mascara, Moisturizer, Serum, Cleanser, Toner, Sunscreen, Mask, Skincare), ");
-            p.Append("RawIngredients (array of strings), ");
-            p.Append("SafetyFlags (array of objects with Ingredient, Severity which is low or medium or high, and Reason), ");
-            p.Append("MatchedAllergens (array of strings), KeyActives (array of at most 6 strings), ");
-            p.Append("HiddenIngredientAlerts (array of objects with LabelTerm, WhyItsOpaque, CommonlyHiddenSubstances as an array of strings, RelevanceToUserProfile), ");
-            p.Append("RecommendationNotes (array of short strings), RegulatoryInsights (empty array), ");
-            p.Append("Explanation (string, 3-5 plain sentences on why this product suits or conflicts with THIS user). ");
-            p.Append("Only flag an ingredient when it genuinely matters for this user's allergens, skin type, skin conditions or age. ");
-            p.Append("Do not diagnose or give medical advice. ").Append(ProductScope.AiRules).Append("\n\n");
-            p.Append("INGREDIENTS (read by a camera, may contain spelling errors): ").Append(string.Join(", ", record.ingredients)).Append("\n\n");
-            p.Append("USER: age ").Append(profile.age > 0 ? profile.age.ToString() : "unknown");
-            p.Append("; skin type ").Append(Or(profile.skinType));
-            p.Append("; skin tone ").Append(Or(profile.skinTone));
-            p.Append("; skin conditions ").Append(profile.skinConditions != null && profile.skinConditions.Count > 0 ? string.Join(", ", profile.skinConditions) : "none");
-            var realAllergens = profile.RealAllergens();
-            p.Append("; known allergens ").Append(realAllergens.Count > 0 ? string.Join(", ", realAllergens) : "none").Append('.');
-
-            return "{\"contents\":[{\"role\":\"user\",\"parts\":[{\"text\":\"" + JsonEscape(p.ToString()) + "\"}]}]," +
-                   "\"generationConfig\":{\"temperature\":0.2,\"responseMimeType\":\"application/json\"}}";
-        }
-
-        static string Or(string s) => string.IsNullOrWhiteSpace(s) ? "unknown" : s;
-
-        static string JsonEscape(string s)
-        {
-            var sb = new StringBuilder(s.Length + 16);
-            foreach (char c in s)
-            {
-                switch (c)
-                {
-                    case '"': sb.Append("\\\""); break;
-                    case '\\': sb.Append("\\\\"); break;
-                    case '\n': sb.Append("\\n"); break;
-                    case '\r': break;
-                    case '\t': sb.Append("\\t"); break;
-                    default:
-                        if (c < 32) sb.Append(' '); else sb.Append(c);
-                        break;
-                }
-            }
-            return sb.ToString();
-        }
-
         /// <summary>
         /// Starts the look-up in the FDA Philippines Verification Portal and returns at once (null when it cannot be done:
         /// offline, or switched off). A product the app could name is searched by name and brand; one it could not name is
@@ -330,58 +251,6 @@ namespace GlowUp.Scan
         {
             string lower = (text ?? "").Trim().ToLowerInvariant();
             return lower.Length == 0 ? "" : System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(lower);
-        }
-
-        static void Merge(ScanRecord record, ProductAnalysis ai)
-        {
-            record.aiEnhanced = true;
-            if (string.IsNullOrWhiteSpace(record.productName) && !string.IsNullOrWhiteSpace(ai.ProductName)) record.productName = ai.ProductName.Trim();
-            if (string.IsNullOrWhiteSpace(record.brandName) && !string.IsNullOrWhiteSpace(ai.BrandName)) record.brandName = ai.BrandName.Trim();
-            if (string.IsNullOrEmpty(record.productId)                                         // a recognised product keeps the type set on the website
-                && (string.IsNullOrWhiteSpace(record.cosmeticType) || record.cosmeticType == "Skincare") && !string.IsNullOrWhiteSpace(ai.CosmeticType))
-                record.cosmeticType = ai.CosmeticType.Trim();
-
-            // anything the AI flags that our own check had no opinion on
-            foreach (SafetyFlag flag in ai.SafetyFlags ?? new List<SafetyFlag>())
-            {
-                if (flag == null || string.IsNullOrWhiteSpace(flag.Ingredient)) continue;
-                var finding = record.findings.FirstOrDefault(f => string.Equals(f.name, flag.Ingredient.Trim(), StringComparison.OrdinalIgnoreCase)
-                                                               || string.Equals(f.techName, flag.Ingredient.Trim(), StringComparison.OrdinalIgnoreCase));
-                if (finding == null || (finding.level != "unknown" && finding.level != "safe")) continue;
-                string severity = (flag.Severity ?? "").ToLowerInvariant();
-                if (severity != "high" && severity != "medium") continue;
-                finding.level = "caution";
-                finding.reason = "AI note: " + (flag.Reason ?? "may not suit your profile.").Trim();
-                if (record.status == "safe") { record.status = "caution"; record.summary = "The AI flagged something to check."; }
-            }
-
-            foreach (string active in ai.KeyActives ?? new List<string>())
-                if (!string.IsNullOrWhiteSpace(active) && record.keyActives.Count < 8 && !record.keyActives.Contains(active.Trim(), StringComparer.OrdinalIgnoreCase))
-                    record.keyActives.Add(active.Trim());
-
-            foreach (HiddenIngredientAlert alert in ai.HiddenIngredientAlerts ?? new List<HiddenIngredientAlert>())
-            {
-                if (alert == null || string.IsNullOrWhiteSpace(alert.LabelTerm) || string.IsNullOrWhiteSpace(alert.WhyItsOpaque)) continue;
-                string line = $"\"{alert.LabelTerm.Trim()}\": {alert.WhyItsOpaque.Trim()}";
-                if (alert.CommonlyHiddenSubstances != null && alert.CommonlyHiddenSubstances.Count > 0)
-                {
-                    line += " It can contain: " + string.Join(", ", alert.CommonlyHiddenSubstances.Take(8)) + ".";
-                    // remembered on the phone and sent to the shared database, so the next scan knows it without the AI (also offline)
-                    try { HiddenAdditives.Learn(alert.LabelTerm, alert.CommonlyHiddenSubstances, alert.WhyItsOpaque, null, false, "second opinion"); }
-                    catch (Exception e) { Debug.LogWarning("Hidden ingredients were not saved: " + e.Message); }
-                }
-                if (!record.hiddenAlerts.Any(h => h.IndexOf(alert.LabelTerm.Trim(), StringComparison.OrdinalIgnoreCase) >= 0)) record.hiddenAlerts.Add(line);
-            }
-
-            string insight = !string.IsNullOrWhiteSpace(ai.Explanation) ? ai.Explanation.Trim() : (ai.ProductSummary ?? "").Trim();
-            if (insight.Length > 0)
-            {
-                string disclaimer = "\n\nThis is guidance, not a medical opinion.";
-                int cut = record.explanation != null ? record.explanation.LastIndexOf(disclaimer, StringComparison.Ordinal) : -1;
-                string body = cut >= 0 ? record.explanation.Substring(0, cut) : (record.explanation ?? "");
-                string tail = cut >= 0 ? record.explanation.Substring(cut) : "";
-                record.explanation = body + "\n\n<b>AI second opinion</b>\n" + insight + tail;
-            }
         }
     }
 }

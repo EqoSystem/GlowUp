@@ -1,5 +1,5 @@
 # Privacy Policy
-Last updated: 9 October 2026
+Last updated: 11 October 2026
 
 ## 1. Introduction
 GlowUp ("we", "our", or "us") respects your privacy and is committed to protecting your personal data. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application. Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the application.
@@ -26,14 +26,16 @@ Having accurate information permits us to provide you with a smooth, efficient, 
 ## 4. Camera, Scans, and AR Try-On
 GlowUp asks for permission to use your camera for two features: reading the ingredient list on a product, and previewing shades on your face with AR Try-On.
 
-- Camera images are processed on your device. We do not record, upload, or store the live camera feed.
-- For an ingredient scan, only the text that was read from the label is kept and analysed.
-- For AR Try-On, the picture of your face is used only while the preview is on screen. It is not saved and it is not sent to us.
+- The text on a product is read on your device. We do not record or store the live camera feed, and we keep no photos.
+- For a scan, only the text that was read, the product's name and the result are kept and analysed. When you are online, one still picture of the PRODUCT you are holding may be sent to our AI service provider so that the product can be recognised (see section 5). That picture is not saved by us.
+- For AR Try-On, the picture of your face is used only while the preview is on screen. It is not saved and it is never sent to us or to anyone else.
 
 You can withdraw camera permission at any time in your device settings. The scanning and try-on features will stop working until permission is given again, but you can still type ingredients in by hand.
 
 ## 5. AI-Assisted Analysis
-Part of each analysis is produced automatically. When you are online, the ingredient text and the skin-profile details needed for the analysis (your age, skin type, skin tone, skin conditions, and allergens) may be sent to our AI service provider to produce a plain-language explanation. Your name, email address, and password are never included in that request.
+Part of each analysis is produced automatically. When you are online, the following may be sent to our AI service provider: a still picture of the product, the text read from it, the product's name, and ingredient names. This is used to recognise the product, to find its published ingredient list, and to describe ingredients that are not yet in our database. The product's name may also be sent to the FDA Philippines verification site to check whether the product is registered.
+
+Your profile is never sent to the AI service. Your name, email address, password, age, skin type, skin tone, skin conditions, and allergens stay out of every such request: the comparison between a product and your profile is made on your device.
 
 Automated results can be incomplete or wrong. Please read section 4 of the Terms and Conditions below.
 

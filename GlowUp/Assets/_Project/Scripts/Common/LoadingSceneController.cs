@@ -94,11 +94,9 @@ namespace GlowUp.Common
         [Tooltip("The search runs beside the other steps. When they are done, the result waits at most this many more seconds for it; after that the result opens and its FDA badge fills in by itself when the answer arrives.")]
         [SerializeField] private float fdaExtraWaitSeconds = 4f;
 
-        [Header("AI second opinion (used only when online)")]
-        [SerializeField] private bool useAiWhenOnline = true;
+        [Header("AI settings (for looking up unknown ingredients)")]
+        [Tooltip("The list of AI models to ask. The app never sends the user's profile (name, e-mail, age, skin conditions, allergens) to the AI: the comparison with the profile is done on the phone.")]
         [SerializeField] private GeminiApiConfig aiConfig;
-        [Tooltip("If the AI has not answered after this many seconds, the result is shown without it")]
-        [SerializeField] private float aiTimeoutSeconds = 20f;
 
         float targetProgress, shownProgress;
         int currentStep = -1;
@@ -106,9 +104,7 @@ namespace GlowUp.Common
 
         void Awake()
         {
-            ScanAnalysisPipeline.UseAi = useAiWhenOnline;
             ScanAnalysisPipeline.AiConfig = aiConfig;
-            ScanAnalysisPipeline.AiTimeoutSeconds = aiTimeoutSeconds;
             ScanAnalysisPipeline.RecogniseCatalogueProducts = recogniseCatalogueProducts;
             ProductMatcher.MinimumShared = minimumSharedIngredients;
             ProductMatcher.MinimumShareOfProduct = minimumShareOfProduct;
