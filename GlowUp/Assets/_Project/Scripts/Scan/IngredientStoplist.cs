@@ -84,6 +84,23 @@ namespace GlowUp.Scan
             return null;
         }
 
+        static readonly string[][] SmallPrintGroups = { WeightAndSize, MakerAndOrigin, CodesAndDates, Contact, DirectionsAndWarnings };
+
+        /// <summary>
+        /// The entry that marks this text as the SMALL PRINT of a pack (weights, the maker's address, codes and dates, contact
+        /// details, directions and warnings), or null. Advertising words are left out here: "matte" and "new" stand on the
+        /// front of a pack too. The scan uses this to tell the front of a product from its back.
+        /// </summary>
+        public static string SmallPrintHit(string text)
+        {
+            string key = " " + TextKey.Normalize(text) + " ";
+            if (key.Length <= 2) return null;
+            foreach (string[] group in SmallPrintGroups)
+                foreach (string entry in group)
+                    if (key.IndexOf(" " + entry + " ", StringComparison.Ordinal) >= 0) return entry;
+            return null;
+        }
+
         /// <summary>Where an ingredient list ENDS on a label: the text from one of these on is not read.</summary>
         public static readonly Regex ListEnd = new Regex(
             @"\b(directions?|how to use|to use|usage|warnings?|cautions?|precautions?|for external use|keep out of|store in|storage|made in|product of|" +
