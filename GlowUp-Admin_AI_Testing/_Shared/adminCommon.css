@@ -894,3 +894,55 @@ tr.detail-row > td { padding: 0 12px 12px; background: color-mix(in srgb, var(--
 .toolbar .seg { padding: 6px 11px; transition: background-color .2s, color .2s, transform .16s var(--ease); }
 .sort-now { color: var(--muted); font-weight: 500; }
 @media (max-width: 1280px) { .sort-now { display: none; } }
+
+/* ============================================================== 8. Clean up and Find duplicates (adminCleanup.js) */
+.modal-content.xl { width: 1040px; display: flex; flex-direction: column; padding: 0; overflow: hidden; }
+.xl-head { display: flex; align-items: flex-start; gap: 12px; padding: 20px 24px 14px; border-bottom: 1px solid var(--border); }
+.xl-titles { flex: 1; min-width: 0; }
+.xl-body { flex: 1; min-height: 120px; overflow-y: auto; padding: 16px 24px; display: flex; flex-direction: column; gap: 12px; }
+.xl-foot { display: flex; align-items: center; gap: 12px; padding: 12px 24px 16px; border-top: 1px solid var(--border); }
+.xl-foot .spacer, .dup-bar .spacer { flex: 1; }
+.modal-content.xl.is-busy .xl-body { opacity: .55; pointer-events: none; }
+
+.plan-done, .plan-clean { font-size: var(--fs-sm); padding: 10px 12px; border-radius: var(--radius-sm); }
+.plan-done { color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, transparent); border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent); }
+.plan-clean { color: var(--text-2); background: var(--surface-2); text-align: center; }
+.plan-step { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface-2); }
+.plan-step.careful { border-color: color-mix(in srgb, var(--warn) 45%, var(--border)); }
+.plan-step.note { background: transparent; }
+.plan-step.note summary { cursor: pointer; font-size: var(--fs-sm); }
+.plan-head { display: flex; align-items: center; gap: 10px; }
+.plan-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-base); }
+.plan-toggle { display: inline-grid; place-items: center; width: 30px; height: 30px; flex: none; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-2); cursor: pointer; }
+.plan-toggle svg.ic { transition: rotate .2s var(--ease); rotate: -90deg; }
+.plan-toggle[aria-expanded="true"] svg.ic { rotate: 0deg; }
+.plan-why { font-size: var(--fs-sm); color: var(--text-2); margin: 8px 0 0; line-height: 1.5; }
+.plan-list { margin-top: 10px; }
+.plan-list .table-container { max-height: 340px; background: var(--surface); }
+.plan-table th:first-child, .plan-table td:first-child { width: 34px; padding-right: 0; }
+.plan-table .chip { margin: 0; }
+.plan-reason { color: var(--text-2); max-width: 40ch; }
+
+.dup-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.dup-slider { display: inline-flex; align-items: center; gap: 10px; font-size: var(--fs-sm); color: var(--text-2); }
+.dup-slider input[type=range] { width: 180px; accent-color: var(--accent); }
+.dup-list { display: flex; flex-direction: column; gap: 12px; }
+.dup-group { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; background: var(--surface-2); }
+.dup-group.sure { border-color: color-mix(in srgb, var(--bad) 40%, var(--border)); }
+.dup-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.dup-head .chip, .dup-title .chip { margin: 0; }
+.dup-items { display: flex; flex-direction: column; gap: 6px; }
+.dup-item { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); cursor: pointer; }
+.dup-item.keep { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent); }
+.dup-item input[type=radio] { accent-color: var(--accent); margin-top: 3px; }
+.dup-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dup-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dup-role { font-size: var(--fs-xs); font-weight: 650; color: var(--accent-text); white-space: nowrap; }
+.dup-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+
+/* the X that empties a search box */
+.search-clear { position: absolute; right: 6px; top: 50%; translate: 0 -50%; display: inline-grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; }
+.search-clear:hover { background: var(--surface-3); color: var(--text); }
+.search-container .search-clear svg.ic { position: static; transform: none; pointer-events: auto; width: 14px; height: 14px; }
+.search-container:has(.search-clear:not([hidden])) .search-input { padding-right: 36px; }
+@media (max-width: 720px) { .modal-content.xl { width: 100%; } .xl-head, .xl-body, .xl-foot { padding-left: 14px; padding-right: 14px; } .plan-head { flex-wrap: wrap; } }

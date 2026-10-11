@@ -23,7 +23,7 @@
 <body>
     <script src="../_Shared/pageSkeleton.js"></script>
 
-    <main class="main-content" data-title="Brand &amp; Product Inventory" data-subtitle="Make-up and face products only: what the app knows, arranged your way">
+    <main class="main-content" data-title="Brand &amp; Product Inventory" data-subtitle="Make-up only: what the app knows, arranged your way">
         <div class="board">
 
             <!-- the counts; a click on one filters the table -->
@@ -31,8 +31,8 @@
                 <div class="stat-row">
                     <button type="button" class="stat" data-show="" data-tip-title="Everything" data-tip="Show every brand and product."><span class="stat-icon"><i data-icon="tag"></i></span><span><span class="stat-value skeleton" id="statBrands">00</span><span class="stat-title">Brands</span></span></button>
                     <button type="button" class="stat" data-show="" data-tip-title="Everything" data-tip="Show every brand and product."><span class="stat-icon"><i data-icon="lipstick"></i></span><span><span class="stat-value skeleton" id="statProducts">00</span><span class="stat-title">Products</span></span></button>
-                    <button type="button" class="stat" data-show="review" data-tip-title="Waiting for review" data-tip="Entries the app added from a scan, or that were imported. The app does not use them until you approve them." data-tip-preview="Click: the table shows only these."><span class="stat-icon"><i data-icon="inbox"></i></span><span><span class="stat-value skeleton" id="statReview">00</span><span class="stat-title">Waiting for review</span></span></button>
-                    <button type="button" class="stat" data-show="out" data-tip-title="Not make-up or face" data-tip="Hair, body, nail and fragrance products. GlowUp is for make-up and face products only." data-tip-preview="Click: the table shows only these, ready to be removed."><span class="stat-icon"><i data-icon="ban"></i></span><span><span class="stat-value skeleton" id="statOut">00</span><span class="stat-title">Not make-up or face</span></span></button>
+                    <button type="button" class="stat" data-show="review" data-tip-title="Waiting for review" data-tip="Entries the app added from a scan or that were imported, and products whose kind is not clear. The app does not use them until you have dealt with them." data-tip-preview="Click: the table shows only these."><span class="stat-icon"><i data-icon="inbox"></i></span><span><span class="stat-value skeleton" id="statReview">00</span><span class="stat-title">Waiting for review</span></span></button>
+                    <button type="button" class="stat" data-show="out" data-tip-title="Not make-up" data-tip="Skin care, hair, body, nail and fragrance products. GlowUp is for make-up only." data-tip-preview="Click: the table shows only these, ready to go to the Recycle bin."><span class="stat-icon"><i data-icon="ban"></i></span><span><span class="stat-value skeleton" id="statOut">00</span><span class="stat-title">Not make-up</span></span></button>
                 </div>
             </section>
 
@@ -41,7 +41,8 @@
                 <div class="toolbar">
                     <div class="search-container">
                         <i data-icon="search"></i>
-                        <input type="text" placeholder="Search brands and products" class="search-input" id="inventorySearchInput" autocomplete="off">
+                        <input type="text" placeholder="Search brands and products" class="search-input" id="inventorySearchInput" autocomplete="off" aria-label="Search brands and products">
+                        <button type="button" class="search-clear" id="inventorySearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
                     </div>
                     <select id="brandFilterSelect" class="toolbar-select" aria-label="Show one brand only">
                         <option value="">All brands</option>
@@ -56,7 +57,7 @@
                         <button type="button" class="seg" data-mode="all" data-tip-title="All products" data-tip="Every product in one list, without the brand rows." data-tip-preview="Ten at a time, in the order chosen with Sort."><i data-icon="list"></i>All products</button>
                     </div>
                     <span class="spacer"></span>
-                    <button type="button" class="icon-btn" id="moreMenuBtn" aria-label="More" aria-haspopup="menu" data-tip-title="More" data-tip="Open or close every brand, or remove the products that are not make-up or face products."><i data-icon="more"></i></button>
+                    <button type="button" class="icon-btn" id="moreMenuBtn" aria-label="More" aria-haspopup="menu" data-tip-title="More" data-tip="Clean up, find duplicates, open or close every brand, add the FDA Philippines catalogue."><i data-icon="more"></i></button>
                     <button type="button" class="primary-btn" id="addMenuBtn" aria-haspopup="menu" data-guide="Add a brand, or a product to a brand that is listed already." data-guide-title="Add" data-guide-preview="Choose Brand or Product; a form opens."><i data-icon="plus"></i>Add</button>
                 </div>
             </section>
@@ -98,17 +99,14 @@
             <form id="addBrandForm" class="modal-form" novalidate>
                 <div class="field">
                     <label for="brandNameInput">Brand Name <span class="required">*</span></label>
-                    <input type="text" id="brandNameInput" maxlength="60" placeholder="e.g., Glow Recipe" autocomplete="off">
+                    <input type="text" id="brandNameInput" maxlength="60" placeholder="e.g., Maybelline" autocomplete="off">
                     <span class="field-hint">Write it exactly as printed on the packaging: the app looks for this name on scanned labels.</span>
                 </div>
 
                 <div class="field">
-                    <label for="brandCategoryInput">Category <span class="required">*</span></label>
-                    <input type="text" id="brandCategoryInput" maxlength="40" placeholder="e.g., Skincare" list="brandCategoryOptions" autocomplete="off">
-                    <datalist id="brandCategoryOptions">
-                        <option value="Skincare"></option>
-                        <option value="Makeup"></option>
-                    </datalist>
+                    <label for="brandCategoryInput">Category</label>
+                    <input type="text" id="brandCategoryInput" maxlength="40" value="Makeup" readonly aria-describedby="brandCategoryHint">
+                    <span class="field-hint" id="brandCategoryHint">GlowUp lists make-up brands only, so every brand is a Makeup brand.</span>
                 </div>
 
                 <div class="form-row">
@@ -152,7 +150,7 @@
             <form id="productForm" class="modal-form" novalidate>
                 <div class="field">
                     <label for="productNameInput">Product Name <span class="required">*</span></label>
-                    <input type="text" id="productNameInput" maxlength="100" placeholder="e.g., Watermelon Glow Niacinamide Dew Drops" autocomplete="off">
+                    <input type="text" id="productNameInput" maxlength="100" placeholder="e.g., Superstay Matte Ink Liquid Lipstick" autocomplete="off">
                 </div>
 
                 <div class="form-row">
@@ -176,14 +174,14 @@
 
                 <div class="field">
                     <label for="productIngredientsInput">Ingredients <span class="required">*</span></label>
-                    <textarea id="productIngredientsInput" rows="5" placeholder="Paste the ingredient list from the packaging, e.g. Aqua, Glycerin, Niacinamide, Parfum"></textarea>
+                    <textarea id="productIngredientsInput" rows="5" placeholder="Paste the ingredient list from the packaging, e.g. Dimethicone, Isododecane, Mica, Parfum"></textarea>
                     <span class="field-hint" id="productIngredientsHint">Separate the ingredients with commas (or put one on each line).</span>
                 </div>
 
                 <div class="field">
                     <span class="field-label">Shades</span>
                     <div class="shade-editor" id="productShadeEditor"></div>
-                    <span class="field-hint">For make-up (lips, cheeks, eyes, face). AR Try-On shows these shades. Leave empty for skin care: the app gives no Try-On for it.</span>
+                    <span class="field-hint">The colours of the product (lips, cheeks, eyes, face). AR Try-On shows these shades.</span>
                 </div>
 
                 <div class="form-row">

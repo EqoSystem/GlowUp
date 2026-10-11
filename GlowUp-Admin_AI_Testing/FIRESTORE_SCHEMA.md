@@ -21,7 +21,8 @@ The admin website and the mobile app use the same Firebase project (`glowup-admi
 | Field | Type | Notes |
 |---|---|---|
 | `name` | text | The app looks for this name on scanned labels, so write it as printed on the packaging. |
-| `category` | text | For example Skincare, Makeup. |
+| `category` | text | Always `Makeup`: GlowUp lists make-up brands only. (Older entries may still say Skincare or Haircare until the clean-up has run.) |
+| `aliases` | list of text | Optional. Other ways the brand's name is written. A brand that was merged into this one leaves its name here, so it is still found. |
 | `market` | text | Defaults to Global. |
 | `status` | text | `Active`, `Pending` or `Inactive`. The app uses only Active brands. |
 | `scans` | number | The app adds 1 each time a scan is found to be this brand: its name is on the scanned label, or the scan is one of its products. |
@@ -34,7 +35,8 @@ The admin website and the mobile app use the same Firebase project (`glowup-admi
 | `name` | text | |
 | `brandId` | text | The id of the brand document. |
 | `brandName` | text | A copy of the brand's name. Renaming a brand on the website updates it. |
-| `cosmeticType` | text | For example Lipstick, Serum. Words such as lip, blush, eye, foundation tell AR Try-On where the colour goes. |
+| `cosmeticType` | text | The kind of make-up, in the app's own words: Lipstick, Lip Gloss, Lip Tint, Lip Liner, Foundation, Concealer, Primer, Powder, Blush, Bronzer, Highlighter, Contour, Eyeshadow, Eyeliner, Mascara, Brow, Setting Spray. It tells AR Try-On where the colour goes. |
+| `aliases` | list of text | Optional. Other names of the product: an old name, a name with the brand in front, the name of a copy that was merged into it. Search and the duplicate check look at them too. |
 | `description` | text | Optional. |
 | `ingredients` | list of text | The names from the packaging. |
 | `shades` | list of text | Colours as `#RRGGBB`. Used by AR Try-On. |
@@ -114,19 +116,32 @@ The Brand & Product Inventory and the Ingredient Curator let an admin arrange en
 | `binnedAt` | brands, products, ingredients | When it went there. |
 | `statusBeforeBin` | brands, products | The status it had. "Restore" puts it back. |
 | `binnedWith` | products | The id of the brand it went to the bin with. Restoring that brand restores these products too. |
+| `binnedReason` | brands, products, ingredients | Optional. Why it is in the bin, when a tool put it there ("Not make-up: a hair product.", "The same product as ...: merged into it."). Restore clears it. |
 
 - Moving a brand or a product to the bin also sets its `status` to `Inactive` in the same write, so every build of the app stops using it at once.
 - An ingredient has no status. App builds from 2026-10-10 on leave a `binned` ingredient out; an older build keeps reading it until "Delete forever".
 - Only "Delete forever" (or "Empty bin") deletes a document. A folder that is still empty is remembered only in the browser that made it.
 
-### Make-up and face products only
+### Make-up only
 
-GlowUp lists make-up and products for the face. The same rule lives in three places and must stay the same: `productScope()` in the website's `_Shared/adminCommon.js`, `ProductScope.cs` in the app, and `faceProduct()` in `firestore.rules`.
+GlowUp lists make-up only. Skin care, hair, body, nail and fragrance products are not added, not shown and not recommended.
 
-- A make-up type (lipstick, foundation, blush, mascara ...) is always accepted.
-- Otherwise a hair / body / nail / fragrance word (shampoo, hair, body, hand, nail, perfume, deodorant ...) in the type or the name makes the product "not make-up or face", unless a face word (face, lip, eye, brow, lash, cheek ...) stands next to it.
-- The website refuses to save such a product or brand and never shows existing ones in the normal list: they wait under "Not make-up or face" until an admin removes them.
-- The app does not add such a product from a scan, and the rules refuse it if an older build tries.
+The rule is written twice, word for word, and both copies are tested against the same lists of examples (`MakeupScopeCases.txt` and `SharedRuleCases.txt` in the app's `Assets/_Project/Editor/Tests`):
+
+- the app: `ProductScope.cs` (with `TextKey.cs`, `ProductIndex.cs`, `IngredientStoplist.cs`)
+- the website: `_Shared/glowupRules.js`. Run `node tests/rules.test.mjs` in the website folder after changing either side.
+
+What the rule says about a product, from its kind and its name:
+
+| Answer | Meaning | What happens |
+|---|---|---|
+| make-up | foundation, concealer, powder, blush, bronzer, highlighter, contour, eyeshadow, eyeliner, mascara, brow products, lipstick, lip gloss, lip tint, lip liner, primer, setting spray | Listed. The app checks it, recommends it and offers AR Try-On. |
+| skin care / other | moisturizer, serum, cleanser, sunscreen, make-up remover, shampoo, body lotion, nail polish, perfume ... | The website refuses to save it. Existing ones wait under "Not make-up" until an admin moves them to the Recycle bin. The app does not add one from a scan. |
+| not clear | a name and kind that say nothing clear, or a kind the project has not decided on yet (tinted moisturizer, skin tint, BB and CC cream, lip balm, lip oil, tinted sunscreen) | The website saves it only as Pending. The app hides it until an admin has given it a clear kind. |
+
+The security rules still hold the older, looser check (`faceProduct()` in `firestore.rules`): it is tightened to the same list of kinds when the next rule change is published.
+
+On the Brand & Product Inventory page, "Clean up" lists every change the rules propose (what is not make-up, what is there twice, kinds and names to put right) and applies one step at a time after the admin confirms. "Find duplicates" lists entries that are, or may be, the same thing. Neither deletes anything: what is removed goes to the Recycle bin. `tools/cleanupReport.mjs` makes the same list from a saved copy of the data without touching the database.
 
 ### `scanActivity/{id}`
 

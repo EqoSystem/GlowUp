@@ -109,6 +109,25 @@ export function squashKey(key) {
     return squashed;
 }
 
+/**
+ * Does what was typed in a search box match an entry? Every word typed must be found in one of the entry's texts (its
+ * name, its other names, its kind ...): in any order, in any letter case, with or without accents and punctuation, and
+ * also as a part of a word ("ink" finds "Superstay Matte Ink"; "super stay" finds "Superstay").
+ * An empty search matches everything. `texts` = one text or a list of texts.
+ */
+export function matchesSearch(typed, texts) {
+    const words = nameWords(typed);
+    if (words.length === 0) return true;
+    const keys = (Array.isArray(texts) ? texts : [texts]).map(normalizeName).filter((key) => key.length > 0);
+    if (keys.length === 0) return false;
+    const joined = " " + keys.join(" | ");
+    // a word of one or two letters must START a word ("c" finds "Vitamin C", not the middle of "Tocopherol")
+    if (words.every((word) => joined.includes(word.length <= 2 ? " " + word : word))) return true;
+    // typed with the spaces somewhere else: "super stay" for "Superstay", "superstay" for "Super Stay"
+    const typedTogether = words.join("");
+    return keys.some((key) => key.replace(/ /g, "").includes(typedTogether));
+}
+
 // =============================================================================================
 //  2. Make-up only
 // =============================================================================================

@@ -123,6 +123,28 @@ equal(rules.notMakeupWords(rules.judgeProduct("", "Vitamin C Serum")), "a skin c
 equal(rules.notMakeupWords(rules.judgeProduct("", "Matte Lipstick")), "", "make-up needs no such words");
 
 // ---------------------------------------------------------------------------------------------
+// 4. The search boxes of the admin pages
+// ---------------------------------------------------------------------------------------------
+const vitaminE = ["Vitamin E", "Tocopherol", "Tocopheryl Acetate"];             // a name, its label name, another spelling
+for (const typed of ["VITAMIN E", "vitamin e", "Vitamin E", "  vitamin   e  ", "Vitamin-E", "e vitamin"])
+    check(rules.matchesSearch(typed, vitaminE), `"${typed}" finds Vitamin E`);
+check(rules.matchesSearch("tocoph", vitaminE), "the first letters of another spelling find it");
+check(rules.matchesSearch("vi", vitaminE) && rules.matchesSearch("v", vitaminE), "the first one or two letters find it while typing");
+check(rules.matchesSearch("vitamin c", ["Vitamin C", "Ascorbic Acid"]), "one letter finds a one-letter word");
+check(rules.matchesSearch("ACETATE", vitaminE), "an alias finds it, in capitals too");
+check(!rules.matchesSearch("vitamin c", vitaminE), "another vitamin does not");
+check(rules.matchesSearch("loreal", ["L'Or" + String.fromCharCode(0xe9) + "al Paris"]), "typed without the accent and the apostrophe");
+check(rules.matchesSearch("L'OREAL", ["Loreal Paris"]), "typed with an apostrophe the entry does not have");
+check(rules.matchesSearch("ink", ["Superstay Matte Ink"]), "a word from the middle or the end");
+check(rules.matchesSearch("matte superstay", ["Superstay Matte Ink"]), "several words in any order");
+check(rules.matchesSearch("super stay", ["Superstay Matte Ink"]), "typed as two words, written as one");
+check(rules.matchesSearch("superstay", ["Super Stay Matte Ink"]), "typed as one word, written as two");
+check(!rules.matchesSearch("superstay gloss", ["Superstay Matte Ink"]), "every word typed must be found");
+check(rules.matchesSearch("", ["Anything"]) && rules.matchesSearch("   ", ["Anything"]), "an empty search shows everything");
+check(!rules.matchesSearch("lipstick", []) && !rules.matchesSearch("lipstick", [""]), "an entry without any text is never found");
+check(rules.matchesSearch("maybelline lipstick", ["Superstay Matte Ink", "Maybelline", "Lipstick"]), "words may be found in different fields (name, brand, kind)");
+
+// ---------------------------------------------------------------------------------------------
 console.log(`make-up examples: ${scopeLines.length}, shared-rule examples: ${sharedLines.length}, checks made: ${checks}`);
 if (failures.length > 0) {
     console.log("\nFAILED: " + failures.length + " check(s)\n");

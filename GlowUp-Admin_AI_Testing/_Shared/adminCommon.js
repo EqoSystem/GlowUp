@@ -2,6 +2,7 @@
 import { auth, db } from "../_Database/firebase-console.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { MAKEUP_TYPES, normalizeName, judgeProduct, notMakeupWords } from "./glowupRules.js";
 
 export const LOGIN_PAGE = "../_Index/index.html";
 export const DASHBOARD_PAGE = "../_Admin_Dashboard/adminDashboard.html";
@@ -36,34 +37,35 @@ export const SKIN_CONDITIONS = [
     { value: "melasma", label: "Melasma / hyperpigmentation" },
     { value: "contact", label: "Contact dermatitis" }
 ];
-// GlowUp is about make-up and products for the face. Hair, body, nail and fragrance products are not listed.
-export const COSMETIC_TYPES = [
-    "Lipstick", "Lip Gloss", "Lip Balm", "Lip Tint", "Foundation", "Concealer", "Primer", "Powder", "Blush", "Bronzer", "Highlighter",
-    "Eyeshadow", "Eyeliner", "Mascara", "Brow", "Moisturizer", "Serum", "Cleanser", "Toner", "Sunscreen", "Mask", "Skincare"
-];
+// GlowUp is about MAKE-UP ONLY. Skin care, hair, body, nail and fragrance products are not listed.
+// The rule itself lives in glowupRules.js (the same rule as the app's ProductScope.cs, tested against the same examples).
+/** The kinds of make-up a product can be: the app's own words. */
+export const COSMETIC_TYPES = MAKEUP_TYPES;
+/** The one category a brand can have. */
+export const BRAND_CATEGORY = "Makeup";
 
-// ---------------------------------------------------------------------------------------------
-// What kind of product is it? (the same rule as the app's ProductScope.cs)
-//   "makeup"   - colour cosmetics for the face: the app checks them and offers AR Try-On
-//   "skincare" - face care: the app only warns about harmful ingredients, no Try-On, no treatment advice
-//   "out"      - hair, body, nails, fragrance and the like: not what GlowUp is for
-// ---------------------------------------------------------------------------------------------
-const FACE_WORDS = /\b(face|facial|lip|lips|eye|eyes|brow|brows|lash|lashes|cheek|cheeks|complexion)\b/i;
-const OUT_WORDS = /\b(shampoo|conditioner|hair|scalp|body|hand|hands|foot|feet|nail|nails|deodorant|antiperspirant|perfume|fragrance|cologne|eau de|soap|shower|bath|shaving|shave|toothpaste|oral|intimate|baby|tanning|massage)\b/i;
-const MAKEUP_WORDS = /\b(lipstick|lip gloss|lip tint|lip balm|lip liner|gloss|tint|foundation|concealer|primer|powder|blush|blusher|bronzer|highlighter|contour|eyeshadow|eye shadow|eyeliner|liner|mascara|brow|cushion|bb cream|cc cream|makeup|make-up|setting spray)\b/i;
-
-export function productScope(cosmeticType, productName) {
-    const type = String(cosmeticType || ""), text = type + " " + String(productName || "");
-    if (MAKEUP_WORDS.test(type)) return "makeup";
-    if (OUT_WORDS.test(text) && !FACE_WORDS.test(text)) return "out";
-    if (MAKEUP_WORDS.test(text)) return "makeup";
-    return "skincare";
+/**
+ * What kind of product is it?
+ *   "makeup"   - the app checks it, recommends it and offers AR Try-On
+ *   "skincare" - not make-up: not listed
+ *   "out"      - hair, body, nail, fragrance, make-up tools: not listed
+ *   "unclear"  - the rule cannot tell, or the kind is not decided yet (lip balm, BB cream ...): it waits for an admin
+ */
+export const productScope = (cosmeticType, productName) => judgeProduct(cosmeticType, productName).kind;
+/** True for a product that is clearly something else than make-up. */
+export const notMakeup = (cosmeticType, productName) => { const kind = productScope(cosmeticType, productName); return kind === "skincare" || kind === "out"; };
+/** In a few words why a product is not listed ("a hair product"), or why its kind is unclear. "" for make-up. */
+export function scopeWords(cosmeticType, productName) {
+    const judged = judgeProduct(cosmeticType, productName);
+    if (judged.kind === "makeup") return "";
+    if (judged.kind === "unclear") return judged.word ? `its kind is not clear (the word "${judged.word}")` : "its kind is not clear";
+    return notMakeupWords(judged);
 }
 
-/** A brand category that is outside make-up and face care ("Haircare", "Body Care", "Fragrance" ...). */
+/** A brand category other than Makeup ("Skincare", "Haircare" ...). GlowUp lists make-up brands only. */
 export function categoryOutOfScope(category) {
-    const text = String(category || "");
-    return /\b(hair|haircare|body|fragrance|perfume|nail|nails|oral|baby)\b/i.test(text) && !/\b(makeup|make-up|skin|skincare|face|cosmetic)/i.test(text);
+    const key = normalizeName(category);
+    return key !== "makeup" && key !== "make up";
 }
 export const STATUSES = ["Active", "Pending", "Inactive"];
 
@@ -165,9 +167,12 @@ export function toList(text) {
     return result;
 }
 
-/** The same ingredient / brand written with different capitals or spacing compares as equal. */
+/**
+ * The same name written with different capitals, spacing, accents or punctuation compares as equal
+ * ("L-Oreal  PARIS" and "l oreal paris"). The rule is the app's own: normalizeName in glowupRules.js.
+ */
 export function sameKey(value) {
-    return String(value || "").replace(/\s+/g, " ").trim().toLowerCase();
+    return normalizeName(value);
 }
 
 /** Always an array of text, whatever shape the field was saved in (array, or one comma-separated text). */

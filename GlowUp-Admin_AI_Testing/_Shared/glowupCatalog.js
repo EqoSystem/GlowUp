@@ -382,7 +382,8 @@ export function mergeIngredients(keep, others) {
 //  5. The clean-up: every change it would make, as a list (a dry run). Nothing is written here.
 // ---------------------------------------------------------------------------------------------
 /**
- * The whole clean-up as a list of steps. Each step: { id, title, why, changes[] }, each change:
+ * The whole clean-up as a list of steps. Each step: { id, title, why, careful, changes[] } (careful = a person should
+ * look at every row before it is applied), each change:
  *   { collection, docId, name, brand, action: "bin" | "update", fields, reason }
  * "bin" = move to the Recycle bin (it can be restored; fields.binnedWith = the brand it goes there with, if any);
  * "update" = write `fields`. Nothing is ever deleted.
@@ -409,7 +410,7 @@ export function cleanupPlan(brands, products, ingredients, options) {
         return change;
     };
     const steps = [];
-    const step = (id, title, why, make) => { if (wanted(id)) steps.push({ id, title, why, changes: make() }); };
+    const step = (id, title, why, make, careful) => { if (wanted(id)) steps.push({ id, title, why, careful: careful === true, changes: make() }); };
 
     // --- 1. clearly not make-up (the name itself says so)
     const whyNot = (entry) => `Not make-up: ${notMakeupWords(entry.judged) || "another kind of product"} (decided by the word "${entry.judged.word}").`;
@@ -424,7 +425,7 @@ export function cleanupPlan(brands, products, ingredients, options) {
             const scope = scopeReport(P);
             return scope.skincare.concat(scope.out).filter((entry) => !entry.sure).map((entry) => bin("products", entry.product,
                 whyNot(entry) + ` Its stored kind is "${text(entry.product.cosmeticType) || "(empty)"}".`));
-        });
+        }, true);
 
     // --- 3. brands that are left without make-up, and the category of the ones that stay
     step("brands", "Brands without make-up go to the Recycle bin; the others become Makeup brands",

@@ -1,6 +1,8 @@
 // Brand & Product Inventory: the 'brands' and 'products' collections the mobile app reads.
-// GlowUp lists MAKE-UP AND FACE PRODUCTS ONLY. Hair, body, nail and fragrance entries are never shown in
-// the normal list: they wait under "Not make-up or face" until they are removed.
+// GlowUp lists MAKE-UP ONLY. Skin care, hair, body, nail and fragrance entries are never shown in the normal list:
+// they wait under "Not make-up" until they are moved to the Recycle bin. A product whose kind the rule cannot tell
+// (or that is of a kind the project has not decided on yet) is listed, marked, and hidden by the app until an admin
+// has given it a clear kind. The rule is the app's own: ../_Shared/glowupRules.js.
 //
 // A brand document:   { name, category, market, status, scans, createdAt, updatedAt }
 //   - the app only uses brands whose status is "Active"
@@ -31,8 +33,11 @@ import {
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
     statusPill, normalizeStatus, notify, describeError, setBusy, setFormError, originLabel, sourceLinks, COSMETIC_TYPES, STATUSES,
-    productScope, categoryOutOfScope
+    productScope, notMakeup, scopeWords, categoryOutOfScope, BRAND_CATEGORY
 } from "../_Shared/adminCommon.js";
+import { matchesSearch, compactName, barcodeKey } from "../_Shared/glowupRules.js";
+import { cleanupPlan, productDuplicates, brandDuplicates, mergeProducts, mergeBrands, nameWithoutBrand } from "../_Shared/glowupCatalog.js";
+import { openPlanDialog, openDuplicatesDialog } from "../_Shared/adminCleanup.js";
 import { mountShell, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm } from "../_Shared/adminShell.js";
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
@@ -142,13 +147,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     setAssistPage("inventory");
     registerHelpers();
 
-    el("inventorySearchInput").addEventListener("input", fromFirstPage);
+    wireSearch(el("inventorySearchInput"), el("inventorySearchClear"), fromFirstPage);
     el("brandFilterSelect").addEventListener("change", fromFirstPage);
     el("reviewFilterSelect").addEventListener("change", fromFirstPage);
     document.querySelectorAll(".stat[data-show]").forEach((tile) => tile.addEventListener("click", () => showOnly(tile.dataset.show)));
     el("addMenuBtn").addEventListener("click", (event) => openMenu(event.currentTarget, [
         { label: "Brand", icon: "tag", description: "A new brand: name, category, market, status.", run: () => openBrandForm(null) },
-        { label: "Product", icon: "lipstick", description: "A make-up or face product of a listed brand.", disabled: brands.length === 0, run: () => openProductForm(null, el("brandFilterSelect").value) }
+        { label: "Product", icon: "lipstick", description: "A make-up product of a listed brand.", disabled: brands.length === 0, run: () => openProductForm(null, el("brandFilterSelect").value) }
     ]));
     el("moreMenuBtn").addEventListener("click", (event) => {
         const allClosed = shownGroups.length > 0 && shownGroups.every((g) => closed.has(g.id));
@@ -156,9 +161,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         openMenu(event.currentTarget, [
             { label: allClosed ? "Open all brands" : "Close all brands", icon: "down", disabled: view.mode !== "brands" || org.view.kind === "bin", description: allClosed ? "Show every brand's products." : "Show the brands only.", run: () => { if (allClosed) closed.clear(); else shownGroups.forEach((g) => closed.add(g.id)); renderInventory(); } },
             { separator: true },
-            { label: "Add the FDA Philippines catalogue", icon: "download", description: "Face products that are on the FDA Philippines list of notified cosmetics. You see how many and confirm first.", run: importFdaCatalogue },
+            { label: "Clean up", icon: "sparkle", description: "What is not make-up, what is there twice, kinds and names to put right. You see every change and apply one step at a time.", run: openCleanUp },
+            { label: "Find duplicates", icon: "layers", description: "Products and brands that are (or may be) the same thing. You choose which one to keep.", run: () => openDuplicates("products") },
+            { separator: true },
+            { label: "Add the FDA Philippines catalogue", icon: "download", description: "Make-up that is on the FDA Philippines list of notified cosmetics. You see how many and confirm first.", run: importFdaCatalogue },
             { label: "Trim the FDA Philippines catalogue", icon: "undo", description: "Moves FDA-list products that are no longer in the catalogue, have no ingredient list and were never scanned to the Recycle bin.", run: trimFdaCatalogue },
-            { label: `Remove non-face products (${outside})`, icon: "ban", danger: true, disabled: outside === 0, description: "Hair, body, nail and fragrance entries. You see the list and confirm first.", run: removeOutOfScope }
+            { label: `Remove what is not make-up (${outside})`, icon: "ban", danger: true, disabled: outside === 0, description: "Skin care, hair, body, nail and fragrance entries go to the Recycle bin. You see the list and confirm first.", run: removeOutOfScope }
         ]);
     });
     el("sortMenuBtn").addEventListener("click", (event) => openMenu(event.currentTarget, [{ heading: "Order of the list" }].concat(
@@ -203,7 +211,7 @@ function showOnly(value, keep) {
 /** When an entry was made, in seconds (for "Newest first"). */
 const madeAt = (data) => { const made = toDate(data.createdAt); return made ? Math.floor(made.getTime() / 1000) : toWholeNumber(data.addedAtUnix); };
 /** What the Recycle bin wrote on an entry. */
-const binFields = (data) => { const since = toDate(data.binnedAt); return { binned: data.binned === true, binnedAt: since ? since.getTime() : 0, statusBeforeBin: String(data.statusBeforeBin || ""), binnedWith: String(data.binnedWith || "") }; };
+const binFields = (data) => { const since = toDate(data.binnedAt); return { binned: data.binned === true, binnedAt: since ? since.getTime() : 0, statusBeforeBin: String(data.statusBeforeBin || ""), binnedWith: String(data.binnedWith || ""), binnedReason: String(data.binnedReason || "") }; };
 
 async function loadInventory() {
     const body = el("inventoryTableBody");
@@ -224,6 +232,7 @@ async function loadInventory() {
                 source: String(data.source || "").trim().toLowerCase(),
                 reviewed: data.reviewed === true,
                 needsReview: data.reviewed === false,         // only entries the app or an import added carry this mark
+                aliases: asArray(data.aliases),               // other ways the name is written (kept when two entries are merged)
                 addedAt: madeAt(data)
             }, binFields(data));
         });
@@ -245,6 +254,8 @@ async function loadInventory() {
                 sources: Array.isArray(data.sources) ? data.sources.map((s) => String(s)) : [],
                 reviewed: data.reviewed === true,
                 needsReview: data.reviewed === false,
+                barcode: String(data.barcode || ""),
+                aliases: asArray(data.aliases),
                 folder: cleanFolder(data.folder),
                 addedAt: madeAt(data)
             }, binFields(data));
@@ -276,7 +287,7 @@ async function loadInventory() {
     // a scanned product the FDA Philippines list confirms is approved by itself, together with its brand
     if (AUTO_APPROVE_FDA) {
         const fresh = everyProduct.filter((p) => p.needsReview && !p.binned && p.source === "scan" && fdaVerified(p) && p.ingredients.length > 0
-            && productScope(p.cosmeticType, p.name) !== "out" && everyBrand.some((b) => b.id === p.brandId && !b.binned));
+            && productScope(p.cosmeticType, p.name) === "makeup" && everyBrand.some((b) => b.id === p.brandId && !b.binned));
         if (fresh.length > 0) {
             const brandIds = new Set(fresh.map((p) => p.brandId));
             const freshBrands = everyBrand.filter((b) => brandIds.has(b.id) && b.needsReview);
@@ -344,7 +355,7 @@ function fillReviewFilter() {
     const asked = new URLSearchParams(window.location.search).get("show");
     const wanted = select.dataset.ready ? select.value : (asked === "review" || asked === "out" ? asked : "");
     select.dataset.ready = "1";
-    select.innerHTML = `<option value="">Everything</option><option value="review">Waiting for review (${reviewCount()})</option><option value="out">Not make-up or face (${outsideCount()})</option>`;
+    select.innerHTML = `<option value="">Everything</option><option value="review">Waiting for review (${reviewCount()})</option><option value="out">Not make-up (${outsideCount()})</option>`;
     select.value = wanted;
 }
 
@@ -370,16 +381,20 @@ function fillBrandSelects() {
 }
 
 const productsOf = (brandId) => products.filter((p) => p.brandId === brandId);
-/** Hair, body, nail, fragrance and the like: not what GlowUp lists. */
-const isOut = (product) => productScope(product.cosmeticType, product.name) === "out";
-/** A brand of such a category with nothing but such products (or none at all). */
+/** Skin care, hair, body, nail, fragrance and the like: not what GlowUp lists. */
+const isOut = (product) => notMakeup(product.cosmeticType, product.name);
+/** The rule cannot tell that it is make-up (or its kind is not decided yet): listed, but the app hides it. */
+const isUnclear = (product) => productScope(product.cosmeticType, product.name) === "unclear";
+/** A brand that is not a make-up brand and has nothing but such products (or none at all). */
 const brandOut = (brand) => categoryOutOfScope(brand.category) && productsOf(brand.id).every(isOut);
 const hasBrand = (product) => brands.some((b) => b.id === product.brandId);
 const brandOf = (product) => brands.find((b) => b.id === product.brandId) || null;
-/** The products the normal list shows: make-up and face products that are not in the bin. */
+/** The products the normal list shows: make-up (and what may be make-up) that is not in the bin. */
 const listed = () => products.filter((p) => !isOut(p));
 const outsideCount = () => products.filter(isOut).length + brands.filter(brandOut).length;
-const reviewCount = () => brands.filter((b) => b.needsReview && !brandOut(b)).length + listed().filter((p) => p.needsReview).length;
+/** Waiting for an admin: what the app or an import added, and products whose kind is not clear. */
+const waits = (p) => p.needsReview || isUnclear(p);
+const reviewCount = () => brands.filter((b) => b.needsReview && !brandOut(b)).length + listed().filter(waits).length;
 /** The brand or product a key of the organiser ("b:id" / "p:id") stands for, also when it is in the bin. */
 const itemOf = (key) => (key.startsWith("b:") ? everyBrand.find((b) => b.id === key.slice(2)) : everyProduct.find((p) => p.id === key.slice(2))) || null;
 
@@ -399,7 +414,8 @@ function notCurated(ingredientNames) {
 function attentionOf(p, brand) {
     const notes = [];
     let tone = "";
-    if (isOut(p)) { tone = "bad"; notes.push("Not make-up or a face product."); }
+    if (isOut(p)) { tone = "bad"; notes.push(`Not make-up: ${scopeWords(p.cosmeticType, p.name)}.`); }
+    else if (isUnclear(p)) { tone = "warn"; notes.push(`The app hides it: ${scopeWords(p.cosmeticType, p.name)}. Edit it and choose its kind.`); }
     if (p.needsReview) { tone = tone || "info"; notes.push("Waiting for review."); }
     if (p.ingredients.length === 0) { tone = tone || "warn"; notes.push("No ingredient list: the app cannot check it."); }
     if (brand && brand.status !== "Active") { tone = tone || "warn"; notes.push(`Its brand is ${brand.status}: the app hides it.`); }
@@ -408,7 +424,7 @@ function attentionOf(p, brand) {
 }
 /** How much a product needs attention (for "Needs attention first"). */
 function weightOf(p) {
-    return (isOut(p) ? 8 : 0) + (p.needsReview ? 4 : 0) + (p.ingredients.length === 0 ? 2 : 0) + (brandOf(p) && brandOf(p).status === "Active" ? 0 : 1);
+    return (isOut(p) ? 8 : 0) + (waits(p) ? 4 : 0) + (p.ingredients.length === 0 ? 2 : 0) + (brandOf(p) && brandOf(p).status === "Active" ? 0 : 1);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -427,10 +443,10 @@ function paintStats() {
     // the count tiles follow the brand that is chosen and the folder that is open
     set("statBrands", brand ? 1 : folder ? new Set(mine.map((p) => p.brandId)).size : brands.filter((b) => !brandOut(b)).length);
     set("statProducts", mine.length);
-    set("statReview", brand || folder ? mine.filter((p) => p.needsReview).length + (brand && brand.needsReview ? 1 : 0) : reviewCount());
+    set("statReview", brand || folder ? mine.filter(waits).length + (brand && brand.needsReview ? 1 : 0) : reviewCount());
     set("statOut", brand || folder ? products.filter((p) => isOut(p) && inFocus(p)).length : outsideCount());
     const where = brand ? brand.name : folder ? `"${folder}"` : "";
-    [["statBrands", "Brands"], ["statProducts", "Products"], ["statReview", "Waiting for review"], ["statOut", "Not make-up or face"]].forEach(([id, title]) => {
+    [["statBrands", "Brands"], ["statProducts", "Products"], ["statReview", "Waiting for review"], ["statOut", "Not make-up"]].forEach(([id, title]) => {
         const label = el(id).parentElement.querySelector(".stat-title");
         if (label) label.textContent = where ? `${title} · ${where}` : title;
     });
@@ -468,7 +484,7 @@ function setPagers(state, total, noun) {
 function renderList(now) {
     const body = el("inventoryTableBody");
     const typed = el("inventorySearchInput").value;
-    const term = sameKey(typed);
+    const term = sameKey(typed);                            // "" when nothing is searched for
     const brandFilter = el("brandFilterSelect").value;
     const show = el("reviewFilterSelect").value;            // "" | "review" | "out"
     const folder = now.kind === "folder" ? now.name : "";
@@ -485,16 +501,18 @@ function renderList(now) {
     }
 
     const base = (p) => (show === "out" ? isOut(p) : !isOut(p)) && (!folder || sameKey(p.folder) === sameKey(folder))
-        && (show !== "review" || p.needsReview) && (!quick || QUICK[quick].test(p));
-    const productMatches = (p) => sameKey(p.name).includes(term) || sameKey(p.cosmeticType).includes(term) || sameKey(p.description).includes(term);
-    const brandMatches = (b) => !!b && (sameKey(b.name).includes(term) || sameKey(b.category).includes(term) || sameKey(b.market).includes(term));
+        && (show !== "review" || waits(p)) && (!quick || QUICK[quick].test(p));
+    // Search: any letter case, with or without accents and punctuation, parts of words, several words in any order.
+    // A product is also found by its other names, its kind, its barcode and its brand ("maybelline lipstick").
+    const productMatches = (p) => matchesSearch(typed, [p.name, ...p.aliases, p.cosmeticType, p.description, p.barcode, (brandOf(p) || {}).name || p.brandName]);
+    const brandMatches = (b) => !!b && matchesSearch(typed, [b.name, ...b.aliases, b.category, b.market]);
     const order = sortNow().cmp;
     const html = [];
     let productsShown = 0;
 
     if (flat) {
         shownGroups = [];
-        const list = products.filter((p) => base(p) && (!brandFilter || p.brandId === brandFilter) && (!term || productMatches(p) || brandMatches(brandOf(p)))).sort(order);
+        const list = products.filter((p) => base(p) && (!brandFilter || p.brandId === brandFilter) && (!term || productMatches(p))).sort(order);
         productsShown = list.length;
         paginate(list, flatPage).forEach((p) => html.push(productRow(p, brandOf(p), true)));
         el("inventoryCountLine").textContent = list.length === 0 ? "" : many(list.length, "product", "products") + (folder ? ` in "${folder}"` : "");
@@ -546,7 +564,7 @@ function renderList(now) {
         : quick ? "No product like that. Click the chip above to show all again."
         : folder ? `"${escapeHtml(folder)}" is empty. Drag products onto its chip above.`
         : show === "review" ? "Nothing is waiting for review."
-        : show === "out" ? "Every listed product is make-up or a face product."
+        : show === "out" ? "Every listed product is make-up."
         : "Nothing to show.";
     body.innerHTML = html.length > 0 ? html.join("") : `<tr><td colspan="${columns}" class="table-message">${nothing}</td></tr>`;
 }
@@ -578,7 +596,7 @@ function brandRow(brand, productCount, columns) {
     buttons.push(actionButton("row-btn danger", "bin-brand", brand.id, BIN_ICON, "Recycle bin", "Remove this brand together with its products.", "They go to the Recycle bin and can be restored."));
     const fdaBrand = brand.source === "fdaph" || productsOf(brand.id).some(QUICK.fda.test);
     const flags = (fdaBrand ? `<span class="chip good" data-tip="Products of this brand were checked on the FDA Philippines list of notified cosmetics.">FDA Philippines</span>` : "") + (brand.needsReview ? `<span class="chip review" data-tip="${escapeHtml(originLabel(brand.source) || "Added automatically")}. Nobody has checked it yet.">needs review</span>` : "")
-        + (out ? `<span class="chip bad">not a make-up or face brand</span>` : "");
+        + (out ? `<span class="chip bad">not a make-up brand</span>` : "");
     return `
         <tr class="brand-row${out ? " out-row" : ""}" data-brand="${escapeHtml(brand.id)}" data-key="b:${escapeHtml(brand.id)}" data-drag>
             <td colspan="${columns}"><div class="brand-line">
@@ -598,7 +616,7 @@ function productRow(p, brand, flat) {
     const shadeCell = p.shades.length === 0 ? DASH
         : p.shades.slice(0, 5).map((s) => `<span class="swatch" style="background:${escapeHtml(s)}" title="${escapeHtml(s)}"></span>`).join("") + (p.shades.length > 5 ? `<span class="muted small">+${p.shades.length - 5}</span>` : "");
     const buttons = [];
-    if (p.needsReview && !isOut(p)) buttons.push(actionButton("row-btn approve", "approve-product", p.id, icon("check"), "Approve", "You have checked this product: set it to Active.", "It asks first. The app then uses it."));
+    if (p.needsReview && !isOut(p) && !isUnclear(p)) buttons.push(actionButton("row-btn approve", "approve-product", p.id, icon("check"), "Approve", "You have checked this product: set it to Active.", "It asks first. The app then uses it."));
     buttons.push(actionButton("row-btn danger", "bin-product", p.id, BIN_ICON, "Recycle bin", "Remove this product.", "It goes to the Recycle bin and can be restored."));
 
     return `
@@ -617,9 +635,11 @@ function productRow(p, brand, flat) {
 function detailRow(p, brand, columns) {
     const scope = productScope(p.cosmeticType, p.name);
     const kind = scope === "makeup" ? "Make-up. The app checks it and offers AR Try-On."
-        : scope === "skincare" ? "Skin care. The app only warns about harmful ingredients: no AR Try-On and no treatment advice."
-        : "Not make-up or a face product. GlowUp does not list it: remove it.";
+        : scope === "unclear" ? `The app hides it: ${scopeWords(p.cosmeticType, p.name)}. Press Edit and choose its kind; if it is not make-up, remove it.`
+        : `Not make-up (${scopeWords(p.cosmeticType, p.name)}). GlowUp does not list it: move it to the Recycle bin.`;
     const facts = [["Kind", escapeHtml(kind)]];
+    if (p.aliases.length > 0) facts.push(["Other names", escapeHtml(p.aliases.join(", "))]);
+    if (p.barcode) facts.push(["Barcode", `<code class="small">${escapeHtml(p.barcode)}</code>`]);
     if (!brand) facts.push(["Brand", `<span class="chip warn">its brand is gone: press Edit and choose a brand</span>`]);
     else facts.push(["Brand", escapeHtml(brand.name) + (brand.status !== "Active" ? ` <span class="chip warn">brand ${escapeHtml(brand.status.toLowerCase())}: the app hides its products</span>` : "")]);
 
@@ -640,7 +660,7 @@ function detailRow(p, brand, columns) {
 
     const button = (cls, act, iconHtml, label, tip) => `<button type="button" class="row-btn ${cls}" data-act="${act}" data-id="${escapeHtml(p.id)}" data-tip="${escapeHtml(tip)}">${iconHtml}${label}</button>`;
     const buttons = [button("main", "edit-product", icon("edit"), "Edit", "Change the name, brand, type, ingredients, shades or status.")];
-    if (p.needsReview && scope !== "out") buttons.push(button("approve", "approve-product", icon("check"), "Approve", "You have checked it: set it to Active."));
+    if (p.needsReview && scope === "makeup") buttons.push(button("approve", "approve-product", icon("check"), "Approve", "You have checked it: set it to Active."));
     buttons.push(button("", "folder-product", icon("folder"), "Folder", "Put it in a folder, or take it out."));
     buttons.push(`<span class="spacer"></span>`, button("danger", "bin-product", BIN_ICON, "Recycle bin", "Remove it. It can be restored from the Recycle bin."));
 
@@ -676,7 +696,7 @@ function renderBin() {
     shownGroups = [];
     el("inventoryTableHead").innerHTML = `<tr><th><span class="th-line">${pickAllBox("entry")}In the Recycle bin</span></th><th>Kind</th><th>Brand</th><th>Removed</th><th></th></tr>`;
     const all = binEntries();
-    const list = all.filter((entry) => !term || sameKey(entry.item.name).includes(term) || sameKey(entry.item.brandName).includes(term));
+    const list = all.filter((entry) => matchesSearch(typed, [entry.item.name, ...entry.item.aliases, entry.item.brandName, entry.item.binnedReason]));
     el("inventoryCountLine").textContent = all.length === 0 ? "" : many(list.length, "entry", "entries") + " · not used by the app";
     setPagers(binPage, list.length, "entries");
     if (list.length === 0) {
@@ -693,7 +713,7 @@ function renderBin() {
         ];
         return `
             <tr class="bin-row" data-key="${escapeHtml(entry.key)}" data-drag tabindex="0">
-                <td class="name-cell"><div class="name-line">${pickBox(item.name || "entry")}<span class="product-name">${escapeHtml(item.name || "Unnamed")}</span></div></td>
+                <td class="name-cell"><div class="name-line">${pickBox(item.name || "entry")}<span class="product-name">${escapeHtml(item.name || "Unnamed")}</span></div>${item.binnedReason ? `<div class="muted small bin-why">${escapeHtml(item.binnedReason)}</div>` : ""}</td>
                 <td>${kind}</td>
                 <td class="brand-ref">${brandName ? escapeHtml(brandName) : DASH}</td>
                 <td class="muted">${item.binnedAt ? escapeHtml(timeAgo(new Date(item.binnedAt))) : DASH}</td>
@@ -782,9 +802,9 @@ async function restoreFromBin(keys, folder) {
         if (!item.binned || seen.has(collectionName + "/" + item.id)) return;
         seen.add(collectionName + "/" + item.id);
         const status = STATUSES.includes(item.statusBeforeBin) ? item.statusBeforeBin : "Active";
-        const data = Object.assign({ binned: false, status, statusBeforeBin: "", binnedWith: "", updatedAt: serverTimestamp() }, extra);
+        const data = Object.assign({ binned: false, status, statusBeforeBin: "", binnedWith: "", binnedReason: "", updatedAt: serverTimestamp() }, extra);
         ops.push({ ref: doc(db, collectionName, item.id), data });
-        Object.assign(item, { binned: false, status, statusBeforeBin: "", binnedWith: "", binnedAt: 0 }, extra ? { folder: extra.folder } : null);
+        Object.assign(item, { binned: false, status, statusBeforeBin: "", binnedWith: "", binnedReason: "", binnedAt: 0 }, extra ? { folder: extra.folder } : null);
     };
     let riders = 0, withBrand = 0;
     b.forEach((brand) => { everyProduct.filter((x) => x.binned && x.binnedWith === brand.id).forEach((x) => { riders++; back(x, "products"); }); back(brand, "brands"); });
@@ -839,41 +859,168 @@ function showScopeHint() {
     const hint = el("productScopeHint");
     const type = el("productTypeInput").value === OTHER_TYPE ? el("productTypeOtherInput").value : el("productTypeInput").value;
     if (!type.trim()) { hint.textContent = ""; return; }
-    const scope = productScope(type, el("productNameInput").value);
+    const name = el("productNameInput").value, scope = productScope(type, name);
     hint.textContent = scope === "makeup" ? "Make-up: the app checks it and offers AR Try-On."
-        : scope === "skincare" ? "Skin care: the app only warns about harmful ingredients. No AR Try-On, no treatment advice."
-        : "Not make-up or a face product: it cannot be saved here.";
-    hint.className = scope === "out" ? "field-hint warn" : "field-hint";
+        : scope === "unclear" ? `The app cannot tell that this is make-up: ${scopeWords(type, name)}. It can only be saved as Pending, and the app hides it until its kind is clear.`
+        : `Not make-up (${scopeWords(type, name)}): it cannot be saved here.`;
+    hint.className = scope === "makeup" ? "field-hint" : "field-hint warn";
 }
 
-/** Deletes every listed product that is not make-up or a face product, and the brands of such a category that are left empty. */
+/** Moves every listed product that is not make-up, and the brands that are left without anything else, to the Recycle bin. */
 async function removeOutOfScope() {
     const gone = products.filter(isOut);
     const goneIds = new Set(gone.map((p) => p.id));
     const emptyBrands = brands.filter((b) => categoryOutOfScope(b.category) && productsOf(b.id).every((p) => goneIds.has(p.id)));
-    if (gone.length + emptyBrands.length === 0) { notify("Every listed product is make-up or a face product. Nothing to remove.", "ok"); return; }
+    if (gone.length + emptyBrands.length === 0) { notify("Every listed product is make-up. Nothing to remove.", "ok"); return; }
 
-    const names = gone.map((p) => `${p.brandName ? p.brandName + ": " : ""}${p.name} (${p.cosmeticType || "no type"})`).concat(emptyBrands.map((b) => `brand: ${b.name} (${b.category})`));
+    const names = gone.map((p) => `${p.brandName ? p.brandName + ": " : ""}${p.name} (${scopeWords(p.cosmeticType, p.name)})`).concat(emptyBrands.map((b) => `brand: ${b.name} (${b.category || "no category"})`));
     if (!(await askConfirm({
-        title: `Remove ${many(gone.length, "product", "products")} and ${many(emptyBrands.length, "brand", "brands")}?`,
-        message: "They are not make-up or face products. They are deleted from the database, and the app stops using them. This cannot be undone.",
-        items: names, confirmLabel: "Remove them", danger: true
+        title: `Move ${many(gone.length, "product", "products")} and ${many(emptyBrands.length, "brand", "brands")} to the Recycle bin?`,
+        message: "They are not make-up. The app stops using them at once. Nothing is deleted: they can be restored from the Recycle bin. \"Clean up\" in the same menu shows the same list with a reason for each one.",
+        items: names, confirmLabel: "Move them"
     }))) return;
 
     try {
-        await runBatches(gone.map((p) => ({ ref: doc(db, "products", p.id) })).concat(emptyBrands.map((b) => ({ ref: doc(db, "brands", b.id) }))));
-        notify(`${many(gone.length, "product", "products")} and ${many(emptyBrands.length, "brand", "brands")} removed.`, "ok");
+        const brandIds = new Set(emptyBrands.map((b) => b.id));
+        await applyChanges(emptyBrands.map((b) => ({ collection: "brands", docId: b.id, action: "bin", fields: { binnedWith: "" }, reason: "It has no make-up products." }))
+            .concat(gone.map((p) => ({ collection: "products", docId: p.id, action: "bin", fields: { binnedWith: brandIds.has(p.brandId) ? p.brandId : "" }, reason: `Not make-up: ${scopeWords(p.cosmeticType, p.name)}.` }))));
+        notify(`${many(gone.length, "product", "products")} and ${many(emptyBrands.length, "brand", "brands")} moved to the Recycle bin.`, "ok");
         el("reviewFilterSelect").value = "";
-        await loadInventory();
+        renderInventory();
     } catch (error) {
-        console.error("Error removing entries: ", error);
-        notify("Not everything was removed. " + describeError(error), "error");
-        await loadInventory();
+        console.error("Error moving entries to the Recycle bin: ", error);
+        notify("Not everything was moved. " + describeError(error), "error");
     }
 }
 
 // ---------------------------------------------------------------------------------------------
-// The FDA Philippines catalogue: face products gathered from the FDA's public Verification Portal
+// Writing a list of changes (from "Clean up", "Find duplicates" and "Remove what is not make-up")
+// ---------------------------------------------------------------------------------------------
+/**
+ * Writes changes as glowupCatalog.js describes them: { collection: "brands" | "products", docId, action: "bin" | "update",
+ * fields, reason }. "bin" moves the entry to the Recycle bin exactly as dragging it there does (it is switched off for
+ * the app and keeps the status it had, for Restore), and notes why. Nothing is deleted. The page then loads its data again.
+ */
+async function applyChanges(changes) {
+    const find = (change) => (change.collection === "brands" ? everyBrand : everyProduct).find((item) => item.id === change.docId);
+    const ops = [];
+    changes.forEach((change) => {
+        const item = find(change);
+        if (!item || (change.collection !== "brands" && change.collection !== "products")) return;
+        if (change.action === "bin") {
+            if (item.binned) return;
+            ops.push({ ref: doc(db, change.collection, item.id), data: {
+                binned: true, binnedAt: serverTimestamp(), statusBeforeBin: item.status, status: "Inactive", binnedWith: (change.fields && change.fields.binnedWith) || "",
+                binnedReason: String(change.reason || "").slice(0, 200), updatedAt: serverTimestamp() } });
+        } else if (change.action === "update" && change.fields) {
+            ops.push({ ref: doc(db, change.collection, item.id), data: Object.assign({}, change.fields, { updatedAt: serverTimestamp() }) });
+        }
+    });
+    if (ops.length === 0) return 0;
+    try { await runBatches(ops); }
+    finally { await loadInventory(); }           // also after a failure: the page then shows what is really there
+    return ops.length;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Clean up, and Find duplicates (the lists come from ../_Shared/glowupCatalog.js, the dialogs from adminCleanup.js)
+// ---------------------------------------------------------------------------------------------
+const CLEANUP_STEPS = ["notMakeup", "notMakeupCheck", "brands", "brandDuplicates", "productDuplicates", "types", "names"];
+
+function openCleanUp() {
+    openPlanDialog({
+        title: "Clean up the inventory",
+        intro: "GlowUp holds make-up only. These are the changes the rules propose for what is listed now. Open a step to see every entry, take the tick off what should stay, and apply the step. Nothing is deleted: what is removed goes to the Recycle bin.",
+        makePlan: () => cleanupPlan(everyBrand, everyProduct, [], { only: CLEANUP_STEPS }),
+        apply: (changes) => applyChanges(changes),
+        notes: (plan) => [
+            { title: "Products the rule cannot place", text: "Kinds that are not decided yet (lip balm, lip oil, skin tint, BB cream ...) or names that say nothing clear. The app hides them. Edit each one: give it its kind, or move it to the Recycle bin.",
+                items: plan.forReview.unclear.map((e) => `${e.product.name} (${brandNameOf(e.product)}): kind "${e.product.cosmeticType || "none"}"${e.judged.word ? `, the word "${e.judged.word}"` : ""}`),
+                action: { label: "Show them in the list", run: () => showOnly("review", true) } },
+            { title: "Kinds worth a second look", text: "The kind stored with these was often filled in by an import and may be wrong (a lip liner filed as Lipstick). The kind decides where AR Try-On puts the colour. Edit the ones that are wrong.",
+                items: plan.forReview.kinds.map((e) => `${e.product.name} (${brandNameOf(e.product)}): ${e.why}`) },
+            { title: "Possibly the same product", text: "The same brand and nearly the same name. Often these are real variants (a shade, a refill, a waterproof version).",
+                items: plan.forReview.possibleDuplicates.map((g) => g.items.map((p) => p.name).join("  /  ")),
+                action: { label: "Open Find duplicates", run: () => openDuplicates("products") } }
+        ]
+    });
+}
+const brandNameOf = (product) => (everyBrand.find((b) => b.id === product.brandId) || {}).name || product.brandName || "no brand";
+
+function openDuplicates(startWith) {
+    const when = (item) => (item.addedAt ? "added " + timeAgo(new Date(item.addedAt * 1000)) : "");
+    const origin = (item) => originLabel(item.source) || "Typed on this website";
+    const sections = [
+        {
+            id: "products", label: "Products",
+            find: (threshold) => productDuplicates(everyProduct, everyBrand, { threshold }),
+            describe: (p) => ({
+                title: p.name, badges: [{ text: p.status, tone: p.status === "Active" ? "good" : p.status === "Pending" ? "warn" : "" }].concat(p.needsReview ? [{ text: "needs review", tone: "review" }] : []),
+                lines: [`${brandNameOf(p)} · ${p.cosmeticType || "no kind"} · ${many(p.ingredients.length, "ingredient", "ingredients")} · ${many(p.scans, "scan", "scans")}${p.barcode ? " · barcode " + p.barcode : ""}`,
+                    [origin(p), when(p)].filter((t) => t).join(" · ")]
+            }),
+            explainMerge: (keep, others) => {
+                const merged = mergeProducts(keep, others), lines = [`"${keep.name}" (${brandNameOf(keep)}) is kept.`];
+                if (merged.keepChanges.aliases) lines.push(`It also answers to: ${merged.keepChanges.aliases.join(", ")}.`);
+                if (merged.keepChanges.scans !== undefined) lines.push(`Its scans become ${merged.keepChanges.scans} (the scans are added up).`);
+                if (merged.keepChanges.ingredients) lines.push(`It takes the ingredient list of a copy (${merged.keepChanges.ingredients.length} ingredients), because it has none.`);
+                if (merged.keepChanges.barcode) lines.push(`It takes the barcode ${merged.keepChanges.barcode}.`);
+                others.forEach((p) => lines.push(`"${p.name}" goes to the Recycle bin.`));
+                return lines;
+            },
+            merge: (keep, others) => {
+                const merged = mergeProducts(keep, others);
+                return applyChanges((Object.keys(merged.keepChanges).length > 0 ? [{ collection: "products", docId: keep.id, action: "update", fields: merged.keepChanges }] : [])
+                    .concat(merged.bin.map((gone) => ({ collection: "products", docId: gone.item.id, action: "bin", fields: { binnedWith: "" }, reason: gone.reason }))));
+            },
+            remove: (others, keep) => applyChanges(others.map((p) => ({ collection: "products", docId: p.id, action: "bin", fields: { binnedWith: "" }, reason: `Removed as a copy of "${keep.name}".` })))
+        },
+        {
+            id: "brands", label: "Brands",
+            find: () => ({ sure: brandDuplicates(everyBrand), possible: [] }),
+            describe: (b) => ({
+                title: b.name, badges: [{ text: b.status, tone: b.status === "Active" ? "good" : b.status === "Pending" ? "warn" : "" }],
+                lines: [`${b.category || "no category"} · ${many(productsOf(b.id).length, "product", "products")} · ${many(b.scans, "scan", "scans")}`, [origin(b), when(b)].filter((t) => t).join(" · ")]
+            }),
+            explainMerge: (keep, others) => {
+                const merged = mergeBrands(keep, others, products), lines = [`"${keep.name}" is kept.`];
+                if (merged.keepChanges.aliases) lines.push(`It also answers to: ${merged.keepChanges.aliases.join(", ")}.`);
+                if (merged.keepChanges.scans !== undefined) lines.push(`Its scans become ${merged.keepChanges.scans}.`);
+                if (merged.moveProducts.length > 0) lines.push(`${many(merged.moveProducts.length, "product moves", "products move")} to it.`);
+                others.forEach((b) => lines.push(`The entry "${b.name}" goes to the Recycle bin.`));
+                return lines;
+            },
+            merge: (keep, others) => {
+                const merged = mergeBrands(keep, others, products);
+                return applyChanges((Object.keys(merged.keepChanges).length > 0 ? [{ collection: "brands", docId: keep.id, action: "update", fields: merged.keepChanges }] : [])
+                    .concat(merged.moveProducts.map((move) => ({ collection: "products", docId: move.product.id, action: "update", fields: { brandId: move.brandId, brandName: move.brandName } })))
+                    .concat(merged.bin.map((gone) => ({ collection: "brands", docId: gone.item.id, action: "bin", fields: { binnedWith: "" }, reason: gone.reason }))));
+            }
+        }
+    ];
+    if (startWith === "brands") sections.reverse();
+    openDuplicatesDialog({
+        title: "Find duplicates",
+        intro: "Entries that are the same thing, or may be. Choose which one to keep, then merge the others into it. Nothing is merged or removed by itself, and nothing is deleted.",
+        threshold: 0.85, sections
+    });
+}
+
+/**
+ * A search box: the list follows a moment after the typing stops (not on every key), Esc or the X empties it.
+ */
+function wireSearch(input, clear, onChange) {
+    let timer = 0;
+    const show = () => { if (clear) clear.hidden = input.value.length === 0; };
+    const now = () => { window.clearTimeout(timer); show(); onChange(); };
+    input.addEventListener("input", () => { show(); window.clearTimeout(timer); timer = window.setTimeout(onChange, 160); });
+    input.addEventListener("keydown", (event) => { if (event.key === "Escape" && input.value) { event.stopPropagation(); input.value = ""; now(); } else if (event.key === "Enter") now(); });
+    if (clear) clear.addEventListener("click", () => { input.value = ""; now(); input.focus(); });
+    show();
+}
+
+// ---------------------------------------------------------------------------------------------
+// The FDA Philippines catalogue: make-up gathered from the FDA's public Verification Portal
 // (https://verification.fda.gov.ph), kept in ../_Shared/data/fdaCatalogue.json. Each entry carries its
 // notification number and, where Open Beauty Facts has it, its ingredient list. Nothing is added
 // until the admin confirms; what is in the inventory already (also in the Recycle bin) is left alone.
@@ -914,28 +1061,36 @@ async function importFdaCatalogue(byItself) {
         if (!answer.ok) throw new Error("the catalogue file was not found");
         catalogue = await answer.json();
     } catch (error) { if (!byItself) notify("The catalogue could not be read. " + error.message, "error"); return; }
-    const entries = (Array.isArray(catalogue.products) ? catalogue.products : []).filter((e) => e && e.name && e.brand && e.type && productScope(e.type, e.name) !== "out");
+    // make-up only. An entry whose kind is not clear is added too when an admin asks for the catalogue (as Pending, to be
+    // looked at); the automatic pass leaves it out.
+    const scopeOfEntry = (e) => productScope(e.type, e.name);
+    const entries = (Array.isArray(catalogue.products) ? catalogue.products : []).filter((e) => e && e.name && e.brand && e.type
+        && (scopeOfEntry(e) === "makeup" || (!byItself && scopeOfEntry(e) === "unclear")));
 
-    // brands: the ones already listed are used, the others are added
-    const brandIdOf = new Map(everyBrand.map((b) => [sameKey(b.name), b.id]));
+    // brands: the ones already listed are used (also under another spelling they are known by), the others are added.
+    // A listed brand wins over one that is in the Recycle bin.
+    const brandIdOf = new Map();
+    // (the last one set wins: first what is in the bin, then imported entries, then the ones typed or approved here)
+    const standing = (b) => (b.binned ? 0 : b.source && !b.reviewed ? 1 : b.source ? 2 : 3);
+    everyBrand.slice().sort((a, b) => standing(a) - standing(b)).forEach((b) => [b.name, ...b.aliases].forEach((known) => { if (compactName(known)) brandIdOf.set(compactName(known), b.id); }));
     const newBrands = new Map();
-    const have = new Set(everyProduct.map((p) => sameKey(p.brandName) + "|" + sameKey(p.name)));
+    // what is there already, also in the Recycle bin, under any of its names and with or without the brand in front:
+    // a product the clean-up renamed or merged must not come back as a new one
+    const keyOf = (brand, name) => compactName(brand) + "|" + compactName(nameWithoutBrand(name, brand));
+    const have = new Set();
+    everyProduct.forEach((p) => [p.name, ...p.aliases].forEach((known) => { have.add(keyOf(brandNameOf(p), known)); have.add(keyOf(p.brandName, known)); }));
     const fresh = [];
     entries.forEach((e) => {
-        if (have.has(sameKey(e.brand) + "|" + sameKey(e.name))) return;
-        have.add(sameKey(e.brand) + "|" + sameKey(e.name));
-        if (!brandIdOf.has(sameKey(e.brand))) {
-            if (!newBrands.has(sameKey(e.brand))) newBrands.set(sameKey(e.brand), { id: "fda_" + slug(e.brand), name: e.brand, makeup: 0, care: 0 });
-            const b = newBrands.get(sameKey(e.brand));
-            if (productScope(e.type, e.name) === "makeup") b.makeup++; else b.care++;
-        }
+        if (have.has(keyOf(e.brand, e.name))) return;
+        have.add(keyOf(e.brand, e.name));
+        if (!brandIdOf.has(compactName(e.brand)) && !newBrands.has(compactName(e.brand))) newBrands.set(compactName(e.brand), { id: "fda_" + slug(e.brand), name: e.brand });
         fresh.push(e);
     });
     if (fresh.length === 0) { if (!byItself) notify("Everything from the FDA Philippines catalogue is in the inventory already.", "ok"); return; }
     const withList = fresh.filter((e) => Array.isArray(e.ingredients) && e.ingredients.length > 0).length;
     if (!byItself && !(await askConfirm({
         title: `Add ${many(fresh.length, "product", "products")} and ${many(newBrands.size, "brand", "brands")}?`,
-        message: `They are on the FDA Philippines list of notified cosmetics (gathered ${catalogue.gathered || "recently"}). ${withList} come with an ingredient list; the others get theirs when a user scans them. They are added as Active, marked as coming from the FDA list.`,
+        message: `They are on the FDA Philippines list of notified cosmetics (gathered ${catalogue.gathered || "recently"}). ${withList} come with an ingredient list; the others get theirs when a user scans them. Make-up is added as Active, marked as coming from the FDA list; ${fresh.filter((e) => scopeOfEntry(e) === "unclear").length} whose kind is not clear are added as Pending for you to look at.`,
         items: fresh.slice(0, 12).map((e) => `${e.brand}: ${e.name} (${e.type})`).concat(fresh.length > 12 ? [`and ${fresh.length - 12} more`] : []),
         confirmLabel: "Add them"
     }))) return;
@@ -944,17 +1099,18 @@ async function importFdaCatalogue(byItself) {
         const portal = "FDA Philippines Verification Portal | https://verification.fda.gov.ph";
         const sets = [];
         newBrands.forEach((b) => {
-            brandIdOf.set(sameKey(b.name), b.id);
-            sets.push({ ref: doc(db, "brands", b.id), data: { name: b.name, category: b.makeup >= b.care ? "Makeup" : "Skincare", market: "Philippines", status: "Active", scans: 0, source: "fdaph", reviewed: true, createdAt: serverTimestamp() } });
+            brandIdOf.set(compactName(b.name), b.id);
+            sets.push({ ref: doc(db, "brands", b.id), data: { name: b.name, category: BRAND_CATEGORY, market: "Philippines", status: "Active", scans: 0, source: "fdaph", reviewed: true, createdAt: serverTimestamp() } });
         });
         fresh.forEach((e) => {
             const note = `FDA Philippines: notified as "${e.fdaName || e.name}" (${e.fdaNumber})` + (e.company ? `, by ${e.company}` : "") + "." + (e.validUntil ? ` Valid until ${e.validUntil}.` : "") + (e.note ? " " + e.note : "");
+            const clear = scopeOfEntry(e) === "makeup";          // a kind that is not clear waits as Pending for an admin
             sets.push({
                 ref: doc(db, "products", "fda_" + slug(e.fdaNumber || e.brand + "_" + e.name)),
                 data: {
-                    name: e.name, brandId: brandIdOf.get(sameKey(e.brand)), brandName: e.brand, cosmeticType: e.type, description: note,
-                    ingredients: Array.isArray(e.ingredients) ? e.ingredients.slice(0, 80) : [], shades: [], minAge: 0, status: "Active", scans: 0,
-                    source: "fdaph", reviewed: true, sources: [portal].concat(e.ingredientSource ? [e.ingredientSource] : []), fdaNumber: e.fdaNumber || "", createdAt: serverTimestamp()
+                    name: e.name, brandId: brandIdOf.get(compactName(e.brand)), brandName: e.brand, cosmeticType: e.type, description: note,
+                    ingredients: Array.isArray(e.ingredients) ? e.ingredients.slice(0, 80) : [], shades: [], minAge: 0, status: clear ? "Active" : "Pending", scans: 0,
+                    source: "fdaph", reviewed: clear, sources: [portal].concat(e.ingredientSource ? [e.ingredientSource] : []), fdaNumber: e.fdaNumber || "", createdAt: serverTimestamp()
                 }
             });
         });
@@ -981,7 +1137,7 @@ function openBrandForm(brand) {
     editingBrandId = brand ? brand.id : null;
     el("brandModalTitle").textContent = brand ? "Edit Brand" : "Add New Brand";
     el("brandNameInput").value = brand ? brand.name : "";
-    el("brandCategoryInput").value = brand ? brand.category : "";
+    el("brandCategoryInput").value = BRAND_CATEGORY;           // every brand is a make-up brand; saving one that had another category corrects it
     el("brandMarketInput").value = brand ? brand.market : "Global";
     el("brandStatusInput").value = brand && STATUSES.includes(brand.status) ? brand.status : "Active";
     showReviewNote(el("brandReviewNote"), brand, "brand");
@@ -995,15 +1151,13 @@ async function saveBrand(event) {
     if (saveButton.disabled) return;
 
     const name = el("brandNameInput").value.replace(/\s+/g, " ").trim();
-    const category = el("brandCategoryInput").value.replace(/\s+/g, " ").trim();
     const market = el("brandMarketInput").value.replace(/\s+/g, " ").trim() || "Global";
     const status = el("brandStatusInput").value;
 
     if (!name) { setFormError(form, "Type the brand name."); el("brandNameInput").focus(); return; }
     if (name.length < 2) { setFormError(form, "The brand name is too short."); el("brandNameInput").focus(); return; }
-    if (!category) { setFormError(form, "Type a category, for example Skincare or Makeup."); el("brandCategoryInput").focus(); return; }
-    if (categoryOutOfScope(category)) { setFormError(form, "GlowUp lists make-up and face brands only. Use a category such as Makeup or Skincare."); el("brandCategoryInput").focus(); return; }
-    const duplicate = everyBrand.find((b) => b.id !== editingBrandId && sameKey(b.name) === sameKey(name));
+    // the same brand written another way ("L'Oreal" / "LOREAL", an accent, a space) is the same brand
+    const duplicate = everyBrand.find((b) => b.id !== editingBrandId && [b.name, ...b.aliases].some((known) => compactName(known) === compactName(name)));
     if (duplicate) { setFormError(form, duplicate.binned ? `"${duplicate.name}" is in the Recycle bin. Restore it from there instead.` : `"${duplicate.name}" is already in the inventory.`); el("brandNameInput").focus(); return; }
     setFormError(form, "");
 
@@ -1015,14 +1169,14 @@ async function saveBrand(event) {
             const mine = renamed ? everyProduct.filter((p) => p.brandId === editingBrandId) : [];
 
             // the brand and (when it was renamed) the brand name stored on each of its products, together
-            const brandData = { name, category, market, status, updatedAt: serverTimestamp() };
+            const brandData = { name, category: BRAND_CATEGORY, market, status, updatedAt: serverTimestamp() };
             if (before && before.needsReview) { brandData.reviewed = true; brandData.reviewedAt = serverTimestamp(); }     // an admin who opens it and saves has checked it
             const writes = [{ ref: doc(db, "brands", editingBrandId), data: brandData }];
             mine.forEach((p) => writes.push({ ref: doc(db, "products", p.id), data: { brandName: name, updatedAt: serverTimestamp() } }));
             await runBatches(writes);
             notify(renamed && mine.length > 0 ? `Brand saved. Its ${many(mine.length, "product now shows", "products now show")} the new name.` : "Brand saved.", "ok");
         } else {
-            await addDoc(collection(db, "brands"), { name, category, market, status, scans: 0, createdAt: serverTimestamp() });
+            await addDoc(collection(db, "brands"), { name, category: BRAND_CATEGORY, market, status, scans: 0, createdAt: serverTimestamp() });
             notify("Brand added. Point at its row and press + to list its products.", "ok");
         }
         brandModal.close();
@@ -1175,10 +1329,12 @@ async function saveProduct(event) {
     if (!name) { setFormError(form, "Type the product name."); el("productNameInput").focus(); return; }
     if (!brand) { setFormError(form, "Choose the brand."); el("productBrandInput").focus(); return; }
     if (!cosmeticType) { setFormError(form, "Choose the cosmetic type."); el("productTypeInput").focus(); return; }
-    if (productScope(cosmeticType, name) === "out") { setFormError(form, "GlowUp lists make-up and face products only. Hair, body, nail and fragrance products cannot be added."); el("productTypeInput").focus(); return; }
+    const scope = productScope(cosmeticType, name);
+    if (scope === "skincare" || scope === "out") { setFormError(form, `GlowUp lists make-up only. This reads like ${scopeWords(cosmeticType, name)}, so it cannot be saved. If that is wrong, check the name and the kind.`); el("productTypeInput").focus(); return; }
+    if (scope === "unclear" && status === "Active") { setFormError(form, `The app cannot tell that this is make-up: ${scopeWords(cosmeticType, name)}. Set Status to Pending to keep it for later, or correct the name or the kind.`); el("productStatusInput").focus(); return; }
     if (ingredients.length === 0) { setFormError(form, "Paste the ingredient list. The app cannot check or recommend a product without it."); el("productIngredientsInput").focus(); return; }
     if (minAgeText !== "" && (!/^\d+$/.test(minAgeText) || minAge > 99)) { setFormError(form, "Minimum age must be a whole number from 0 to 99."); el("productMinAgeInput").focus(); return; }
-    const duplicate = everyProduct.find((p) => p.id !== editingProductId && p.brandId === brand.id && sameKey(p.name) === sameKey(name));
+    const duplicate = everyProduct.find((p) => p.id !== editingProductId && p.brandId === brand.id && [p.name, ...p.aliases].some((known) => compactName(known) === compactName(name)));
     if (duplicate) { setFormError(form, duplicate.binned ? `"${duplicate.name}" of ${brand.name} is in the Recycle bin. Restore it from there instead.` : `${brand.name} already has a product named "${duplicate.name}".`); el("productNameInput").focus(); return; }
     setFormError(form, "");
 
@@ -1234,7 +1390,7 @@ async function approveBrand(brand, button) {
 
 async function approveProduct(product, button) {
     const brand = brands.find((b) => b.id === product.brandId);
-    if (isOut(product)) { notify(`"${product.name}" is not make-up or a face product, so it cannot be approved. Correct its type with Edit, or remove it.`, "error"); return; }
+    if (isOut(product) || isUnclear(product)) { notify(`"${product.name}" cannot be approved: ${scopeWords(product.cosmeticType, product.name)}. Correct its kind with Edit, or remove it.`, "error"); return; }
     if (!brand) { notify(`"${product.name}" has no brand. Open it with Edit, choose its brand and save.`, "error"); return; }
     if (product.ingredients.length === 0) { notify(`"${product.name}" has no ingredient list, so the app cannot check it. Open it with Edit and paste the list.`, "error"); return; }
 
@@ -1316,9 +1472,9 @@ function registerHelpers() {
         if (!ready()) return [];
         const out = outsideCount(), review = reviewCount();
         const lines = [];
-        if (out > 0) lines.push({ tone: "bad", text: `${many(out, "entry is", "entries are")} not make-up or face products. GlowUp only lists face products.`, label: "Remove them", run: removeOutOfScope, tip: "You see the list and confirm first." });
+        if (out > 0) lines.push({ tone: "bad", text: `${many(out, "entry is", "entries are")} not make-up. GlowUp lists make-up only.`, label: "Clean up", run: openCleanUp, tip: "You see every entry with the reason, and apply one step at a time. Nothing is deleted." });
         if (review > 0) lines.push({ tone: "info", text: `Next: ${many(review, "entry waits", "entries wait")} for your review. The app does not use ${review === 1 ? "it" : "them"} until you approve ${review === 1 ? "it" : "them"}.`, label: reviewing() ? "Show all" : "Show them", run: () => showOnly("review") });
-        if (lines.length === 0) lines.push({ tone: "ok", text: "Everything listed is a face product and has been checked." });
+        if (lines.length === 0) lines.push({ tone: "ok", text: "Everything listed is make-up and has been checked." });
         // the brands that were checked on the FDA Philippines list
         const checked = brands.filter((b) => b.source === "fdaph" || productsOf(b.id).some(QUICK.fda.test));
         const onList = listed().filter(QUICK.fda.test).length;
@@ -1335,7 +1491,7 @@ function registerHelpers() {
         if (now.kind === "folder") parts.push(`folder "${now.name}"`);
         if (now.kind === "bin") parts.push("the Recycle bin");
         if (show === "review") parts.push("waiting for review");
-        if (show === "out") parts.push("not make-up or face");
+        if (show === "out") parts.push("not make-up");
         if (quick) parts.push(QUICK[quick].label.toLowerCase());
         if (parts.length > 0) return [{ tone: "info", text: `Showing only: ${parts.join(" · ")}.`, label: "Show everything", run: () => { el("inventorySearchInput").value = ""; el("brandFilterSelect").value = ""; el("reviewFilterSelect").value = ""; quick = ""; if (org.view.kind !== "all") org.show({ kind: "all" }); else fromFirstPage(); } }];
         return [
@@ -1369,7 +1525,7 @@ function registerHelpers() {
 // The data this page offers to data panels (lists, rows, grids and graphs; see adminWidgets.js)
 // ---------------------------------------------------------------------------------------------
 function registerData() {
-    const SCOPE_NAMES = { makeup: "Make-up", skincare: "Skin care", out: "Not make-up or face" };
+    const SCOPE_NAMES = { makeup: "Make-up", unclear: "Kind not clear", skincare: "Skin care (not listed)", out: "Hair, body, nail, fragrance (not listed)" };
     const toneOfStatus = (status) => (status === "Active" ? "ok" : status === "Pending" ? "warn" : "muted");
     /** A click on a group in a graph narrows the table to it. */
     const search = (text) => { el("reviewFilterSelect").value = ""; el("brandFilterSelect").value = ""; el("inventorySearchInput").value = text; quick = ""; if (org.view.kind !== "all") org.show({ kind: "all" }); else fromFirstPage(); };
@@ -1387,14 +1543,14 @@ function registerData() {
         items: () => products.filter(inFocus),                  // the brand that is chosen and the folder that is open narrow the data panels too
         map: (p) => ({
             id: p.id, title: p.name || "Unnamed Product", subtitle: [p.brandName, p.cosmeticType].filter((t) => t).join(" · "), meta: p.needsReview ? "needs review" : p.status,
-            tone: isOut(p) ? "bad" : p.needsReview ? "info" : toneOfStatus(p.status), value: p.scans, valueLabel: p.scans === 1 ? "scan" : "scans", swatches: p.shades
+            tone: isOut(p) ? "bad" : isUnclear(p) ? "warn" : p.needsReview ? "info" : toneOfStatus(p.status), value: p.scans, valueLabel: p.scans === 1 ? "scan" : "scans", swatches: p.shades
         }),
         dimensions: [
             { id: "type", label: "Cosmetic type", of: (p) => p.cosmeticType || null, none: "No type", pick: (k) => search(k === "No type" ? "" : k) },
             { id: "brand", label: "Brand", of: (p) => p.brandName || null, none: "No brand", pick: (k) => chooseBrand(k) },
             { id: "status", label: "Status", of: (p) => p.status, keys: STATUSES, tone: toneOfStatus },
-            { id: "scope", label: "Kind of product", of: (p) => productScope(p.cosmeticType, p.name), keys: ["makeup", "skincare", "out"], labelOf: (k) => SCOPE_NAMES[k] || k, tone: (k) => (k === "out" ? "bad" : null), pick: (k) => showOnly(k === "out" ? "out" : "", true) },
-            { id: "review", label: "Checked or not", of: (p) => (p.needsReview ? "Waiting for review" : "Checked"), keys: ["Waiting for review", "Checked"], tone: (k) => (k === "Checked" ? "ok" : "info"), pick: (k) => showOnly(k === "Checked" ? "" : "review", true) },
+            { id: "scope", label: "Make-up or not", of: (p) => productScope(p.cosmeticType, p.name), keys: ["makeup", "unclear", "skincare", "out"], labelOf: (k) => SCOPE_NAMES[k] || k, tone: (k) => (k === "out" || k === "skincare" ? "bad" : k === "unclear" ? "warn" : null), pick: (k) => showOnly(k === "out" || k === "skincare" ? "out" : k === "unclear" ? "review" : "", true) },
+            { id: "review", label: "Checked or not", of: (p) => (waits(p) ? "Waiting for review" : "Checked"), keys: ["Waiting for review", "Checked"], tone: (k) => (k === "Checked" ? "ok" : "info"), pick: (k) => showOnly(k === "Checked" ? "" : "review", true) },
             { id: "shades", label: "Has shades", of: (p) => (p.shades.length > 0 ? "With shades" : "No shades"), keys: ["With shades", "No shades"] },
             { id: "folder", label: "Folder", of: (p) => p.folder || null, none: "No folder", pick: (k) => org.show(k === "No folder" ? { kind: "all" } : { kind: "folder", name: k }) }
         ],
