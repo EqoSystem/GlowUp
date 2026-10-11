@@ -147,6 +147,11 @@ equal(twice.map((g) => ids(g.items)), [["ai_1", "i1"]], "the AI made an entry fo
 equal(twice[0].keep.id, "i1", "the admin's entry is kept");
 check(twice[0].aiCopy === true, "and it is marked as an AI copy");
 equal(c.mergeIngredients(ingredients[0], [ingredients[1]]).keepChanges, {}, "its names were known already: nothing to add");
+// the order of trust decides which entry is kept
+const trusted = (source, more) => ingredient("x", "Glycerin", "Glycerin", Object.assign({ source, reviewed: false }, more));
+equal([trusted(""), trusted("starter"), trusted("ai", { reviewed: true }), trusted("ai", { reviewed: true, autoApproved: true }), trusted("ai")].map(c.trustOf), [8, 6, 5, 2, 0], "typed here, starter, approved by a person, approved by itself, not checked");
+equal(c.pickKeeper([ingredient("ai_g", "Glycerine", "Glycerin", { source: "ai", reviewed: true, autoApproved: true }), ingredient("starter_g", "Glycerin", "Glycerin", { source: "starter", reviewed: false })]).id, "starter_g", "the app's own starter entry is kept, not an AI entry that approved itself");
+equal(c.ingredientLookalikes([ingredient("a", "Niacinamide", "Niacinamide"), ingredient("b", "Niacinamid", "Niacinamid"), ingredient("m", "Methylparaben", "Methylparaben"), ingredient("p", "Propylparaben", "Propylparaben")], 0.9).map((g) => ids(g.items)), [["a", "b"]], "a name one letter off is listed; another paraben is not");
 const use = c.ingredientUse(ingredients, products);
 equal([use.get("i2"), use.get("i6"), use.get("i1")], [1, 1, undefined], "how many product lists use an entry");
 

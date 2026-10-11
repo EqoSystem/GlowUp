@@ -33,7 +33,7 @@ import {
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
     statusPill, normalizeStatus, notify, describeError, setBusy, setFormError, originLabel, sourceLinks, COSMETIC_TYPES, STATUSES,
-    productScope, notMakeup, scopeWords, categoryOutOfScope, BRAND_CATEGORY
+    productScope, notMakeup, scopeWords, categoryOutOfScope, BRAND_CATEGORY, wireSearch
 } from "../_Shared/adminCommon.js";
 import { matchesSearch, compactName, barcodeKey } from "../_Shared/glowupRules.js";
 import { cleanupPlan, productDuplicates, brandDuplicates, mergeProducts, mergeBrands, nameWithoutBrand } from "../_Shared/glowupCatalog.js";
@@ -232,6 +232,7 @@ async function loadInventory() {
                 source: String(data.source || "").trim().toLowerCase(),
                 reviewed: data.reviewed === true,
                 needsReview: data.reviewed === false,         // only entries the app or an import added carry this mark
+                autoApproved: data.autoApproved === true,     // approved by this page itself (the FDA Philippines list confirmed it)
                 aliases: asArray(data.aliases),               // other ways the name is written (kept when two entries are merged)
                 addedAt: madeAt(data)
             }, binFields(data));
@@ -254,6 +255,7 @@ async function loadInventory() {
                 sources: Array.isArray(data.sources) ? data.sources.map((s) => String(s)) : [],
                 reviewed: data.reviewed === true,
                 needsReview: data.reviewed === false,
+                autoApproved: data.autoApproved === true,
                 barcode: String(data.barcode || ""),
                 aliases: asArray(data.aliases),
                 folder: cleanFolder(data.folder),
@@ -1004,19 +1006,6 @@ function openDuplicates(startWith) {
         intro: "Entries that are the same thing, or may be. Choose which one to keep, then merge the others into it. Nothing is merged or removed by itself, and nothing is deleted.",
         threshold: 0.85, sections
     });
-}
-
-/**
- * A search box: the list follows a moment after the typing stops (not on every key), Esc or the X empties it.
- */
-function wireSearch(input, clear, onChange) {
-    let timer = 0;
-    const show = () => { if (clear) clear.hidden = input.value.length === 0; };
-    const now = () => { window.clearTimeout(timer); show(); onChange(); };
-    input.addEventListener("input", () => { show(); window.clearTimeout(timer); timer = window.setTimeout(onChange, 160); });
-    input.addEventListener("keydown", (event) => { if (event.key === "Escape" && input.value) { event.stopPropagation(); input.value = ""; now(); } else if (event.key === "Enter") now(); });
-    if (clear) clear.addEventListener("click", () => { input.value = ""; now(); input.focus(); });
-    show();
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -24,9 +24,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
-    notify, describeError, setBusy, setFormError, renderChecks, readChecks, writeChecks, originLabel, sourceLinks,
+    notify, describeError, setBusy, setFormError, renderChecks, readChecks, writeChecks, originLabel, sourceLinks, wireSearch,
     ALLERGEN_FAMILIES, SKIN_TYPES, SKIN_CONDITIONS
 } from "../_Shared/adminCommon.js";
+import { matchesSearch } from "../_Shared/glowupRules.js";
+import { cleanupPlan, ingredientDuplicates, ingredientLookalikes, ingredientIssues, mergeIngredients } from "../_Shared/glowupCatalog.js";
+import { openPlanDialog, openDuplicatesDialog } from "../_Shared/adminCleanup.js";
 import { mountShell, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm } from "../_Shared/adminShell.js";
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
@@ -135,7 +138,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     setAssistPage("curator");
     registerHelpers();
 
-    el("ingredientSearchInput").addEventListener("input", fromFirstPage);
+    wireSearch(el("ingredientSearchInput"), el("ingredientSearchClear"), fromFirstPage);
+    el("moreMenuBtn").addEventListener("click", (event) => openMenu(event.currentTarget, [
+        { label: "Clean up", icon: "sparkle", description: "Entries that are notes, joined names or label text, and entries that are there twice. You see every change first.", run: openCleanUp },
+        { label: "Find duplicates", icon: "layers", description: "Entries that explain the same ingredient, or have nearly the same name. You choose which one to keep.", run: openDuplicates }
+    ]));
     el("ingredientSourceFilter").addEventListener("change", fromFirstPage);
     el("ingredientRiskFilter").addEventListener("change", fromFirstPage);
     el("curatorStats").addEventListener("click", (event) => {
@@ -209,6 +216,7 @@ async function loadIngredients() {
                 folder: cleanFolder(data.folder),
                 binned: data.binned === true,
                 binnedAt: since ? since.getTime() : 0,
+                binnedReason: String(data.binnedReason || ""),
                 addedAt: made ? Math.floor(made.getTime() / 1000) : toWholeNumber(data.addedAtUnix)
             };
         });
@@ -351,7 +359,9 @@ function renderIngredients() {
     el("ingredientQuick").innerHTML = quick && !inBin ? `<button type="button" class="filter-chip" data-tip="Showing only these ingredients. Click to show all again.">${escapeHtml(QUICK[quick].label)}${icon("x")}</button>` : "";
 
     if (!inBin && el("ingredientSourceFilter").value === FROM_PRODUCTS) { renderFromProducts(term, typed); return; }
-    const matches = (item) => !term || keysOf(item).some((k) => k.includes(term)) || sameKey(item.description).includes(term);
+    // Search: any letter case, with or without accents and punctuation, parts of words, several words in any order;
+    // it looks at the name, the label name, the other spellings and the definition.
+    const matches = (item) => matchesSearch(typed, [item.name, item.techName, ...item.aliases, item.description]);
     const pool = inBin ? binIngredients : ingredients;
     const shown = (inBin
         ? pool.filter(matches).sort((a, b) => b.binnedAt - a.binnedAt || byName(a, b))
@@ -386,7 +396,7 @@ function renderIngredients() {
 /** The ingredients the inventory's products list that have no entry yet: a card each, with the products that list it. */
 function renderFromProducts(term, typed) {
     const container = el("ingredientsList");
-    const shown = fromProducts.filter((x) => !term || x.key.includes(term));
+    const shown = fromProducts.filter((x) => matchesSearch(typed, [x.name]));
     el("ingredientCountLine").textContent = `${shown.length} listed by products, no entry yet`;
     renderPager(el("ingredientPager"), pageState, shown.length, renderIngredients, "ingredients");
     renderPager(el("ingredientPagerTop"), pageState, shown.length, renderIngredients, "ingredients");
@@ -473,7 +483,7 @@ function detailOf(item, inBin) {
     if (origin) facts.push(["Added", escapeHtml(origin) + (review ? ` <span class="chip review" data-tip="Until you approve it, the app uses this entry's warnings but never counts it as proof that the ingredient is safe.">needs review</span>` : item.autoApproved ? ` <span class="chip" data-tip="Approved by itself because it came with a credible source (the US FDA substance registry, or pages from a web search). Press Edit to correct it.">approved automatically</span>` : item.reviewed ? " · reviewed" : "")]);
     const proof = proofLines(item);
     if (proof.length > 0) facts.push(["Sources", `<span class="source-line">${proof.join("<br>")}</span>`]);
-    if (inBin && item.binnedAt) facts.push(["Removed", escapeHtml(timeAgo(new Date(item.binnedAt)))]);
+    if (inBin && item.binnedAt) facts.push(["Removed", escapeHtml(timeAgo(new Date(item.binnedAt))) + (item.binnedReason ? ` · ${escapeHtml(item.binnedReason)}` : "")]);
 
     const button = (cls, act, iconHtml, label, tip) => `<button type="button" class="row-btn ${cls}" data-act="${act}" data-id="${escapeHtml(item.id)}" data-tip="${escapeHtml(tip)}">${iconHtml}${label}</button>`;
     const buttons = inBin
@@ -546,9 +556,9 @@ async function moveToBin(keys) {
 async function restoreFromBin(keys, folder) {
     const list = pick(keys).filter((item) => item.binned);
     if (list.length === 0) throw friendly("Nothing to restore.");
-    list.forEach((item) => { item.binned = false; item.binnedAt = 0; if (folder) item.folder = folder; });
+    list.forEach((item) => { item.binned = false; item.binnedAt = 0; item.binnedReason = ""; if (folder) item.folder = folder; });
     afterChange();
-    await saveOrReload(list.map((item) => ({ ref: refOf(item), data: Object.assign({ binned: false, updatedAt: serverTimestamp() }, folder ? { folder } : null) })));
+    await saveOrReload(list.map((item) => ({ ref: refOf(item), data: Object.assign({ binned: false, binnedReason: "", updatedAt: serverTimestamp() }, folder ? { folder } : null) })));
     return { text: named(list) };
 }
 
@@ -575,6 +585,76 @@ async function purgeFromBin(keys) {
     }
     await loadIngredients();
     return true;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Clean up, and Find duplicates (the lists come from ../_Shared/glowupCatalog.js, the dialogs from adminCleanup.js)
+// ---------------------------------------------------------------------------------------------
+/**
+ * Writes changes as glowupCatalog.js describes them: { collection: "ingredients", docId, action: "bin" | "update", fields,
+ * reason }. "bin" moves the entry to the Recycle bin and notes why. Nothing is deleted. The page then loads its data again.
+ */
+async function applyChanges(changes) {
+    const ops = [];
+    changes.forEach((change) => {
+        const item = everyIngredient.find((x) => x.id === change.docId);
+        if (!item || change.collection !== "ingredients") return;
+        if (change.action === "bin") { if (!item.binned) ops.push({ ref: refOf(item), data: { binned: true, binnedAt: serverTimestamp(), binnedReason: String(change.reason || "").slice(0, 200), updatedAt: serverTimestamp() } }); }
+        else if (change.action === "update" && change.fields) ops.push({ ref: refOf(item), data: Object.assign({}, change.fields, { updatedAt: serverTimestamp() }) });
+    });
+    if (ops.length === 0) return 0;
+    await saveOrReload(ops);                 // after a failure the page shows what is really there, and the failure is passed on
+    await loadIngredients();
+    return ops.length;
+}
+
+function openCleanUp() {
+    openPlanDialog({
+        title: "Clean up the ingredients",
+        intro: "Entries that are not ingredients (notes, two names joined into one, label text), and entries that explain an ingredient that has an entry already. Open the step to see every entry, take the tick off what should stay, and apply it. Nothing is deleted: what is removed goes to the Recycle bin.",
+        makePlan: () => cleanupPlan([], [], everyIngredient, { only: ["ingredients"] }),
+        apply: (changes) => applyChanges(changes),
+        notes: () => [{
+            title: "Ingredient names that are nearly the same", text: "Chemical names can differ by one letter and still be different ingredients (methylparaben, ethylparaben), so these are only listed.",
+            items: ingredientLookalikes(everyIngredient, 0.93).map((group) => group.items.map(titleOf).join("  /  ")),
+            action: { label: "Open Find duplicates", run: openDuplicates }
+        }]
+    });
+}
+
+function openDuplicates() {
+    const origin = (item) => originLabel(item.source) || "Typed on this website";
+    openDuplicatesDialog({
+        title: "Find duplicate ingredients",
+        intro: "Entries that explain the same ingredient, or have nearly the same name. Most often the app's AI lookup made a new entry although one was there already. Choose which entry to keep; merging gives it the other names, so every product list is still explained. Chemical names can differ by one letter and be different ingredients: look before you merge.",
+        threshold: 0.93,
+        sections: [{
+            id: "ingredients", label: "Ingredients",
+            find: (threshold) => ({ sure: ingredientDuplicates(everyIngredient), possible: ingredientLookalikes(everyIngredient, threshold) }),
+            describe: (item) => ({
+                title: titleOf(item),
+                badges: (item.riskLevel ? [{ text: RISK_NAMES[item.riskLevel], tone: item.riskLevel === "safe" ? "good" : item.riskLevel === "caution" ? "warn" : "bad" }] : [])
+                    .concat(item.source === "ai" ? [{ text: needsReview(item) ? "found by the AI, not reviewed" : "found by the AI", tone: "review" }] : []),
+                lines: [item.techName && item.techName !== item.name ? `On labels: ${item.techName}` : "", item.aliases.length > 0 ? `Also: ${item.aliases.slice(0, 6).join(", ")}` : "",
+                    [origin(item), productUseKnown ? `in ${many(usedInProducts(item), "listed product", "listed products")}` : "", item.addedAt ? "added " + timeAgo(new Date(item.addedAt * 1000)) : ""].filter((t) => t).join(" · ")]
+            }),
+            explainMerge: (keep, others) => {
+                const merged = mergeIngredients(keep, others), lines = [`"${titleOf(keep)}" is kept, with its own wording and risk level.`];
+                if (merged.keepChanges.aliases) lines.push(`It also answers to: ${merged.keepChanges.aliases.join(", ")}.`);
+                else lines.push("It knows all the names of the others already.");
+                others.forEach((item) => lines.push(`"${titleOf(item)}" goes to the Recycle bin. What it said is not copied over.`));
+                return lines;
+            },
+            merge: (keep, others) => {
+                const merged = mergeIngredients(keep, others);
+                return applyChanges((Object.keys(merged.keepChanges).length > 0 ? [{ collection: "ingredients", docId: keep.id, action: "update", fields: merged.keepChanges }] : [])
+                    .concat(merged.bin.map((gone) => ({ collection: "ingredients", docId: gone.item.id, action: "bin", reason: gone.reason }))));
+            },
+            remove: (others, keep) => applyChanges(others.map((item) => ({ collection: "ingredients", docId: item.id, action: "bin", reason: `Removed as a copy of "${titleOf(keep)}".` }))),
+            // an entry that product lists still use must not simply disappear: its names have to move to the one that is kept
+            whyNotRemove: (item) => (productUseKnown && usedInProducts(item) > 0 ? `${many(usedInProducts(item), "listed product uses", "listed products use")} "${titleOf(item)}".` : "")
+        }]
+    });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -793,6 +873,8 @@ function registerHelpers() {
         const count = (name) => ingredients.filter(QUICK[name].test).length;
         const broken = everyIngredient.filter((item) => item.usesBroken).length, review = ingredients.filter(needsReview).length, noNote = count("noNote"), unused = count("unused");
         if (broken > 0) lines.push({ tone: "warn", text: `${many(broken, "entry has", "entries have")} unreadable text in "Used in" (an older build of the app wrote it). It is hidden here.`, label: "Clear it", run: clearBrokenUses, tip: "You see the list and confirm first. Only that box is emptied." });
+        const notReal = ingredientIssues(everyIngredient).length, twice = ingredientDuplicates(everyIngredient).length;
+        if (notReal + twice > 0) lines.push({ tone: "warn", text: [notReal > 0 ? `${many(notReal, "entry is", "entries are")} not an ingredient (a note, joined names or label text)` : "", twice > 0 ? `${many(twice, "ingredient has", "ingredients have")} more than one entry` : ""].filter((t) => t).join("; ") + ".", label: "Clean up", run: openCleanUp, tip: "You see every entry with the reason and confirm first. Nothing is deleted." });
         if (review > 0) lines.push({ tone: "info", text: `${many(review, "AI-found entry waits", "AI-found entries wait")} for review.`, label: showLabel(reviewing()), run: () => narrow(reviewing() ? "" : "review", "") });
         if (noNote > 0) lines.push({ tone: "warn", text: `${many(noNote, "flagged ingredient has", "flagged ingredients have")} no caution note, so app users see the warning without a reason.`, label: showLabel(quick === "noNote"), run: () => setQuick("noNote") });
         if (unused > 0) lines.push({ text: `${many(unused, "ingredient is", "ingredients are")} not in any listed product yet.`, label: showLabel(quick === "unused"), run: () => setQuick("unused") });

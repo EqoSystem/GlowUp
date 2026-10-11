@@ -36,7 +36,8 @@
                 <div class="toolbar">
                     <div class="search-container">
                         <i data-icon="search"></i>
-                        <input type="text" placeholder="Search ingredients" class="search-input" id="ingredientSearchInput" autocomplete="off">
+                        <input type="text" placeholder="Search ingredients" class="search-input" id="ingredientSearchInput" autocomplete="off" aria-label="Search ingredients">
+                        <button type="button" class="search-clear" id="ingredientSearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
                     </div>
                     <select id="ingredientSourceFilter" class="toolbar-select" aria-label="Show only the entries of one origin">
                         <option value="">All ingredients</option>
@@ -50,6 +51,7 @@
                     </select>
                     <button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most harmful, waiting for review, most used, or newest." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button>
                     <span class="spacer"></span>
+                    <button type="button" class="icon-btn" id="moreMenuBtn" aria-label="More" aria-haspopup="menu" data-tip-title="More" data-tip="Clean up entries that are not ingredients, and find duplicates."><i data-icon="more"></i></button>
                     <div class="btn-group">
                         <button type="button" class="primary-btn" id="addIngredientBtn" data-guide="Add an ingredient with its plain-words definition." data-guide-preview="Opens a form. Only the first three boxes are required."><i data-icon="plus"></i>Ingredient</button>
                     </div>

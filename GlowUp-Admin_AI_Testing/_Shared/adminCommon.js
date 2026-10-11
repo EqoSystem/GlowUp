@@ -175,6 +175,20 @@ export function sameKey(value) {
     return normalizeName(value);
 }
 
+/**
+ * A search box: the list follows a moment after the typing stops (not on every key), Enter searches at once,
+ * Esc or the X button empties it. `clear` = the X button inside the box (may be null).
+ */
+export function wireSearch(input, clear, onChange) {
+    let timer = 0;
+    const show = () => { if (clear) clear.hidden = input.value.length === 0; };
+    const now = () => { window.clearTimeout(timer); show(); onChange(); };
+    input.addEventListener("input", () => { show(); window.clearTimeout(timer); timer = window.setTimeout(onChange, 160); });
+    input.addEventListener("keydown", (event) => { if (event.key === "Escape" && input.value) { event.stopPropagation(); input.value = ""; now(); } else if (event.key === "Enter") now(); });
+    if (clear) clear.addEventListener("click", () => { input.value = ""; now(); input.focus(); });
+    show();
+}
+
 /** Always an array of text, whatever shape the field was saved in (array, or one comma-separated text). */
 export function asArray(value) {
     if (Array.isArray(value)) return value.map((v) => String(v).trim()).filter((v) => v.length > 0);

@@ -168,13 +168,25 @@ export function brandReport(brands, products) {
 // ---------------------------------------------------------------------------------------------
 //  2. The same thing twice
 // ---------------------------------------------------------------------------------------------
-/** Which entry of a group is the best one to keep: checked by an admin, with an ingredient list, Active, most scanned, oldest. */
+/**
+ * How far an entry is trusted, by where it came from (the order of trust the app uses too):
+ *   8 typed on the website   6 the app's starter list, the US FDA list, an import a person approved
+ *   5 found by the app (AI lookup, scan) and approved by a person   4 an import nobody looked at twice
+ *   2 found by the app and approved by itself   0 found by the app, not checked
+ */
+export function trustOf(item) {
+    const source = text(item.source);
+    if (!source || source === "admin") return 8;
+    if (source === "starter" || source === "fda") return 6;
+    const byTheApp = source === "ai" || source === "scan";
+    if (item.reviewed === true && item.autoApproved !== true) return byTheApp ? 5 : 6;
+    if (item.reviewed === true) return byTheApp ? 2 : 4;
+    return byTheApp ? 0 : 4;
+}
+
+/** Which entry of a group is the best one to keep: the most trusted, then with an ingredient list, Active, most scanned, oldest. */
 export function pickKeeper(items) {
-    const score = (item) =>
-        (item.reviewed === true || !text(item.source) ? 8 : 0) +               // typed on the website, or approved there
-        (list(item.ingredients).length > 0 ? 4 : 0) +
-        (text(item.status) === "Active" ? 2 : 0) +
-        (text(item.source) === "scan" || text(item.source) === "ai" ? 0 : 1);
+    const score = (item) => trustOf(item) * 10 + (list(item.ingredients).length > 0 ? 4 : 0) + (text(item.status) === "Active" ? 2 : 0);
     // between equals: the name written as separate words ("Cheek Powder", not "Cheekpowder"), then the older entry
     const words = (item) => normalizeName(item.name).split(" ").length;
     return items.slice().sort((a, b) => score(b) - score(a) || (Number(b.scans) || 0) - (Number(a.scans) || 0) || words(b) - words(a)
@@ -274,10 +286,36 @@ export function ingredientDuplicates(ingredients) {
         const keep = pickKeeper(group);
         return {
             reason: "The same name, label name or other spelling", items: group, keep,
-            // the most likely mistake: an entry the AI made although an entry an admin trusts was there already
+            // the most likely mistake: an entry the AI made although a trusted entry was there already
             aiCopy: group.some((ingredient) => ingredient !== keep && text(ingredient.source) === "ai") && text(keep.source) !== "ai"
         };
     });
+}
+
+/**
+ * Ingredient entries whose names are at least `threshold` alike (0 to 1) without being the same. These are for a person
+ * to look at: chemical names can differ by one letter and still be different ingredients (methylparaben, ethylparaben).
+ * Answers [{ reason, items[], keep, alike }].
+ */
+export function ingredientLookalikes(ingredients, threshold) {
+    const limit = typeof threshold === "number" ? threshold : 0.93;
+    const items = live(ingredients);
+    const same = new Map();                       // entries that are already one sure group are not listed again
+    ingredientDuplicates(items).forEach((group, index) => group.items.forEach((ingredient) => same.set(ingredient, index)));
+    const namesOf = (ingredient) => [ingredient.name, ingredient.techName].map(normalizeName).filter((key) => key.length >= 3 && !key.startsWith("hidden "));
+    const links = [], alikeOf = new Map();
+    for (let a = 0; a < items.length; a++)
+        for (let b = a + 1; b < items.length; b++) {
+            if (same.has(items[a]) && same.get(items[a]) === same.get(items[b])) continue;
+            let best = 0;
+            namesOf(items[a]).forEach((x) => namesOf(items[b]).forEach((y) => { best = Math.max(best, similarity(x, y)); }));
+            if (best < limit) continue;
+            links.push([items[a], items[b]]);
+            alikeOf.set(items[a], Math.max(alikeOf.get(items[a]) || 0, best)); alikeOf.set(items[b], Math.max(alikeOf.get(items[b]) || 0, best));
+        }
+    return groupsOf(items, links).map((group) => ({
+        reason: "Names that are nearly the same", items: group, keep: pickKeeper(group), alike: Math.min(...group.map((ingredient) => alikeOf.get(ingredient) || 0))
+    }));
 }
 
 // ---------------------------------------------------------------------------------------------

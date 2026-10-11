@@ -36,16 +36,16 @@ const status = (value) => { const s = String(value || "").trim(); return s ? s[0
 
 const brands = read("brands").map((d) => ({
     id: d["@id"], name: d.name || "", category: d.category || "", market: d.market || "", status: status(d.status), scans: Number(d.scans) || 0,
-    source: String(d.source || "").toLowerCase(), reviewed: d.reviewed === true, binned: d.binned === true, aliases: array(d.aliases), addedAt: seconds(d)
+    source: String(d.source || "").toLowerCase(), reviewed: d.reviewed === true, autoApproved: d.autoApproved === true, binned: d.binned === true, aliases: array(d.aliases), addedAt: seconds(d)
 }));
 const products = read("products").map((d) => ({
     id: d["@id"], name: d.name || d.productName || "", brandId: d.brandId || "", brandName: d.brandName || "", cosmeticType: d.cosmeticType || d.category || "",
     ingredients: array(d.ingredients), shades: array(d.shades), status: status(d.status), scans: Number(d.scans) || 0, source: String(d.source || "").toLowerCase(),
-    sources: array(d.sources), reviewed: d.reviewed === true, binned: d.binned === true, barcode: String(d.barcode || ""), aliases: array(d.aliases), addedAt: seconds(d)
+    sources: array(d.sources), reviewed: d.reviewed === true, autoApproved: d.autoApproved === true, binned: d.binned === true, barcode: String(d.barcode || ""), aliases: array(d.aliases), addedAt: seconds(d)
 }));
 const ingredients = read("ingredients").map((d) => ({
     id: d["@id"], name: d.name || "", techName: d.techName || "", aliases: array(d.aliases), source: String(d.source || "").toLowerCase(),
-    reviewed: d.reviewed === true || !("reviewed" in d), binned: d.binned === true, addedAt: seconds(d)
+    reviewed: d.reviewed === true, autoApproved: d.autoApproved === true, binned: d.binned === true, addedAt: seconds(d)
 }));
 
 // ---------------------------------------------------------------------------------------------
