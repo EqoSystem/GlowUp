@@ -152,7 +152,7 @@ const CARE_WORDS = [
     "treatment", "skincare", "skin care", "eye cream", "night cream", "day cream", "sleeping pack", "spot corrector"
 ];
 // Skin-care words that only count when the name holds no make-up word at all ("cream blush" is make-up).
-const WEAK_CARE_WORDS = ["cream", "gel", "balm", "mist", "spf", "water", "butter", "oil", "uv"];
+export const WEAK_CARE_WORDS = ["cream", "gel", "balm", "mist", "spf", "water", "butter", "oil", "uv"];
 
 // Checked first: these are never make-up, whatever else the name says.
 const NEVER_MAKEUP = [
