@@ -15,3 +15,7 @@ vercel.json.bak
 firebase.json
 .firebaserc
 firestore-debug.log
+
+# checks for developers (run with: node tests/rules.test.mjs): not part of the website
+tests
+tools

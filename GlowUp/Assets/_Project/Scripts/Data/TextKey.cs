@@ -110,6 +110,8 @@ namespace GlowUp.Data
             foreach (char c in apart ?? lower)
             {
                 if (c >= '\u0300' && c <= '\u036f') continue;                 // the accent itself
+                // a capital that only shows once its accent is off (the Turkish dotted capital I, which some systems do not lower-case)
+                if (c >= 'A' && c <= 'Z') { result.Append((char)(c + 32)); continue; }
                 if (Special.TryGetValue(c, out string replacement)) { result.Append(replacement); continue; }
                 if (apart == null)
                 {

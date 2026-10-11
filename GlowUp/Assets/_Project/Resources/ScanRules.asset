@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 826761ad3d36458b9b50ad792ae4413b, type: 3}
+  m_Name: ScanRules
+  m_EditorClassIdentifier: 
+  fuzzyMatchThreshold: 0.85
+  minimumCheckedShare: 0.5
+  longestIngredientName: 70
+  unknownIngredientsAllowed: 0
+  refreshMinutes: 10
+  fullDownloadEveryHours: 24
+  aiRecognitionsPerScanSession: 2
+  aiListLookUpsPerScanSession: 2
+  skipWebSearchMinutesAfterRefusal: 30

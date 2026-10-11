@@ -1,0 +1,142 @@
+# Examples for the rules the app and the admin website must share word for word:
+#   the app:      TextKey.cs and ProductIndex.cs (Assets/_Project/Scripts/Data)
+#   the website:  _Shared/glowupRules.js
+# Both are tested against this one list (SharedRuleCasesTests.cs in Unity, tests/rules.test.mjs on the website),
+# so the two can never drift apart. The make-up rule has its own list: MakeupScopeCases.txt.
+#
+# Each line: the name of the rule | what goes in | what must come out
+#   key        | a name                  | its comparable key
+#   slug       | a name                  | the key with _ between the words (used inside document ids)
+#   compact    | a name                  | the key without spaces
+#   same       | name 1 | name 2         | yes or no: do the two names give the same key?
+#   squashsame | name 1 | name 2         | yes or no: the same name once camera look-alikes are ignored (rn/m, 0/o, 1/l/i)?
+#   barcode    | what was read           | the barcode key (nothing = it cannot be a barcode)
+#   brands     | brand 1 | brand 2       | yes or no: do the two names mean the same brand?
+#   scanid     | brand | product name    | the id a product gets when the app adds it from a scan
+#   brandid    | brand                   | the id a brand gets when the app adds it from a scan
+#   stoplist   | a piece of label text   | the stoplist entry it holds (nothing = it holds none)
+#   shape      | a piece of label text   | ok or wrong: can it be an ingredient name at all?
+#
+# \uXXXX stands for one character given by its code: \u00e9 is an e with an acute accent, \u0020 is a space
+# (spaces at the ends of a column are cut off, so a space that matters is written as its code).
+# Lines that start with # are notes.
+
+# ---- the key: capitals, spaces and punctuation do not matter
+key | VITAMIN E | vitamin e
+key | vitamin e | vitamin e
+key | \u0020\u0020Vitamin\u0020\u0020\u0020E\u0020\u0020 | vitamin e
+key | Vitamin-E. | vitamin e
+key | Caprylic/Capric Triglyceride | caprylic capric triglyceride
+key | Fit Me! Matte + Poreless | fit me matte poreless
+key | PEG-10 Dimethicone | peg 10 dimethicone
+key | CI 77491 | ci 77491
+key | --- !! | 
+key | \u0020\u0020\u0020 | 
+
+# ---- the key: accents are removed
+key | L'Or\u00e9al Paris | l oreal paris
+key | L'OR\u00c9AL\u0020\u0020PARIS | l oreal paris
+key | L\u2019Oreal Paris | l oreal paris
+key | Lanc\u00f4me | lancome
+key | Ni\u00f1o | nino
+key | \u00dcber | uber
+key | Stra\u00dfe | strasse
+key | \u00c6on | aeon
+key | S\u00f8ren | soren
+key | \u0141\u00f3d\u017a | lodz
+key | \u0130stanbul | istanbul
+key | N\u00b05 | n 5
+
+# ---- the key: a name in another alphabet is kept as it is written; in a mixed name only the a-z part counts
+key | \uc124\ud654\uc218 | \uc124\ud654\uc218
+key | \u0020\uc124\ud654\uc218\u0020 | \uc124\ud654\uc218
+key | \uc124\ud654\uc218 Sulwhasoo | sulwhasoo
+key | \u039f\u0394\u039f\u03a3 | \u03bf\u03b4\u03bf\u03c3
+
+# ---- slug and compact
+slug | L'Or\u00e9al Paris | l_oreal_paris
+slug | \u0020Maybelline\u0020\u0020New York\u0020 | maybelline_new_york
+slug | !! | 
+compact | Maybelline New York | maybellinenewyork
+compact | MaybellineNewYork | maybellinenewyork
+compact | Super Stay | superstay
+
+# ---- same
+same | Fit Me! Matte + Poreless | fit me matte poreless | yes
+same | Fit Me | Fit Me Matte | no
+same | SuperStay | Super Stay | no
+same |  |  | no
+
+# ---- camera look-alikes
+squashsame | Niacinarnide | Niacinamide | yes
+squashsame | D1methicone | Dimethicone | yes
+squashsame | T0copherol | Tocopherol | yes
+squashsame | VVater | Water | yes
+squashsame | Super Stay | SuperStay | yes
+squashsame | Glycerin | Glycol | no
+squashsame | Mica | Silica | no
+
+# ---- barcodes: only the digits count, zeros at the front do not, 6 to 14 digits
+barcode | 0 12345 67890 5 | 12345678905
+barcode | 4800888141125 | 4800888141125
+barcode | 04800888141125 | 4800888141125
+barcode | EAN 4800-8881-41125 | 4800888141125
+barcode | 00000123 | 
+barcode | 12345 | 
+barcode | 123456789012345 | 
+barcode | no digits here | 
+barcode |  | 
+
+# ---- the same brand?
+brands | Maybelline | Maybelline New York | yes
+brands | maybelline new york | MAYBELLINE | yes
+brands | L'Or\u00e9al Paris | LOreal Paris | yes
+brands | MAC | Mac Cosmetics | yes
+brands | Revlon | Maybelline | no
+brands | Bo | Bobbi Brown | no
+brands |  | Maybelline | yes
+
+# ---- the ids the app gives what it adds from a scan
+scanid | Maybelline New York | Superstay Matte Ink | scan_maybelline_new_york__superstay_matte_ink
+scanid | L'Or\u00e9al Paris | Infallible 24H Fresh Wear! | scan_l_oreal_paris__infallible_24h_fresh_wear
+scanid |  | Velvet Tint | scan_nobrand__velvet_tint
+scanid | Maybelline |  | 
+scanid | Maybelline | !! | 
+brandid | L'Or\u00e9al Paris | scan_l_oreal_paris
+brandid | Happy  Skin | scan_happy_skin
+brandid | !! | 
+
+# ---- the stoplist: label text that is never part of an ingredient name (whole words only)
+stoplist | 30 ML | ml
+stoplist | Emulsifying Wax | 
+stoplist | Paraben-Free | free
+stoplist | MADE IN KOREA | made in
+stoplist | Net Wt. 3.5 g | net wt
+stoplist | www.maybelline.com | www
+stoplist | Dermatologist Tested | dermatologist tested
+stoplist | Batch No. L2304A | batch
+stoplist | Keep out of reach of children | keep out of reach
+stoplist | Red 7 Lake | 
+stoplist | Japan Wax | 
+stoplist | Glycerin | 
+stoplist | Titanium Dioxide | 
+stoplist | Parfum | 
+
+# ---- the shape of a piece: a number, a code, a phone number or a sentence cannot be an ingredient name
+shape | L2304A | wrong
+shape | 12345 | wrong
+shape | 0917 123 4567 | wrong
+shape | A | wrong
+shape | 30 g | wrong
+shape | EXP0126 | wrong
+shape | this is a whole sentence about how to use the product well | wrong
+shape | CI 77491 | ok
+shape | BHT | ok
+shape | Talc | ok
+shape | PEG-40 Hydrogenated Castor Oil | ok
+shape | C12-15 Alkyl Benzoate | ok
+shape | 1,2-Hexanediol | ok
+shape | Polysorbate 20 | ok
+shape | PENTAERYTHRITYL TETRA-DI-T-BUTYL HYDROXYHYDROCINNAMATE | ok
+shape | Acrylates/C10-30 Alkyl Acrylate Crosspolymer | ok
+shape | Iron Oxides (CI 77491) | ok
