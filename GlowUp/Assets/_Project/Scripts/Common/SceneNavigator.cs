@@ -12,6 +12,7 @@ namespace GlowUp.Common
     /// </summary>
     public static class SceneNames
     {
+        public const string Startup = "StartupScene";
         public const string Login = "LogInScene";
         public const string Onboarding1 = "OnboardingStep1Scene";
         public const string Onboarding2 = "OnboardingStep2Scene";
@@ -85,8 +86,8 @@ namespace GlowUp.Common
 
         static void Remember(string leaving, string next)
         {
-            // the loading screen and the sign-in pages are not places to come back to
-            if (string.IsNullOrEmpty(leaving) || leaving == next || leaving == SceneNames.Loading) return;
+            // the loading screen, the start-up animation and the sign-in pages are not places to come back to
+            if (string.IsNullOrEmpty(leaving) || leaving == next || leaving == SceneNames.Loading || leaving == SceneNames.Startup) return;
             if (next == SceneNames.Login) { history.Clear(); return; }
             history.Add(leaving);
             if (history.Count > HistoryLimit) history.RemoveAt(0);

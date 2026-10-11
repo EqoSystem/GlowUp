@@ -23,6 +23,7 @@ namespace GlowUp.EditorTools
 
         static readonly Step[] AccountScenes =
         {
+            new Step("Start-Up Animation", StartupSceneBuilder.Build),
             new Step("Login", LoginSceneBuilder.Build),
             new Step("Onboarding Step 1", OnboardingStep1Builder.Build),
             new Step("Onboarding Step 2", OnboardingTileBuilders.BuildStep2),
