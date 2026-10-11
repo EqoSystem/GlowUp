@@ -52,6 +52,18 @@ namespace GlowUp.Common
         /// <summary>The screen "back" would return to, or null.</summary>
         public static string Previous => history.Count > 0 ? history[history.Count - 1] : null;
 
+        /// <summary>
+        /// Raised just before another scene starts to load (its name is given). For things that must be let go of before
+        /// the next screen wakes up, such as the selfie camera of the finger signs when the scanner is opened.
+        /// </summary>
+        public static event Action<string> Leaving;
+
+        static void TellLeaving(string next)
+        {
+            try { Leaving?.Invoke(next); }
+            catch (Exception e) { Debug.LogException(e); }          // a listener's fault must never stop the screen change
+        }
+
         /// <summary>Opens a scene. Between two main screens the change slides in the direction of the bottom bar.</summary>
         public static void Go(string sceneName)
         {
@@ -95,6 +107,7 @@ namespace GlowUp.Common
 
         static void Load(string sceneName, int enterFrom)
         {
+            TellLeaving(sceneName);
             if (ScreenTransition.Instance != null && ScreenTransition.Instance.TryGo(sceneName, enterFrom)) return;
             SceneManager.LoadScene(sceneName);
         }
@@ -104,6 +117,7 @@ namespace GlowUp.Common
             PendingTarget = targetScene;
             PendingMessage = message;
             PendingWork = work;
+            TellLeaving(SceneNames.Loading);
             SceneManager.LoadScene(SceneNames.Loading);
         }
 

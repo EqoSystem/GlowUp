@@ -24,11 +24,12 @@ Having accurate information permits us to provide you with a smooth, efficient, 
 - Communicate with you regarding account updates, security alerts, and support messages.
 
 ## 4. Camera, Scans, and AR Try-On
-GlowUp asks for permission to use your camera for two features: reading the ingredient list on a product, and previewing shades on your face with AR Try-On.
+GlowUp asks for permission to use your camera for three features: scanning a product and its ingredient list, previewing shades on your face with AR Try-On, and (only if you switch it on in Settings) finger signs, which change screen when you hold 1 to 5 fingers up to the selfie camera.
 
 - The text on a product is read on your device. We do not record or store the live camera feed, and we keep no photos.
 - For a scan, only the text that was read, the product's name and the result are kept and analysed. When you are online, one still picture of the PRODUCT you are holding may be sent to our AI service provider so that the product can be recognised (see section 5). That picture is not saved by us.
 - For AR Try-On, the picture of your face is used only while the preview is on screen. It is not saved and it is never sent to us or to anyone else.
+- For finger signs, the selfie camera's picture is looked at on your device only, to count the fingers of the hand you hold up. It is not saved and it is never sent to us or to anyone else. Finger signs are off until you switch them on, and your phone shows its "camera in use" sign while they are on.
 
 You can withdraw camera permission at any time in your device settings. The scanning and try-on features will stop working until permission is given again, but you can still type ingredients in by hand.
 

@@ -125,6 +125,12 @@ namespace GlowUp.EditorTools
         const string BarcodeLine = "    implementation 'com.google.mlkit:barcode-scanning:17.2.0' // GlowUp: the phone's own barcode reader for the scan screen " +
                                    "(GlowUpBarcodeReader.java). Kept outside the Android Resolver block on purpose.";
 
+        // The hand finder of the finger signs. This exact version is chosen on purpose: later versions (0.10.13 and up) bring a
+        // newer "protobuf" library than Firebase's database works with. Do not raise it without checking that.
+        const string HandLibrary = "com.google.mediapipe:tasks-vision";
+        const string HandLine = "    implementation('com.google.mediapipe:tasks-vision:0.10.11') { exclude group: 'com.google.auto.value', module: 'auto-value' } " +
+                                "// GlowUp: the phone's own hand finder for finger signs (GlowUpHandReader.java). Kept outside the Android Resolver block on purpose.";
+
         /// <summary>Builds for ARMv7 + ARM64 and keeps the Gradle template right. Adds a note only for what it changed.</summary>
         public static bool SetArchitectures(List<string> notes)
         {
@@ -170,6 +176,12 @@ namespace GlowUp.EditorTools
                 int at = text.IndexOf("**DEPS**", StringComparison.Ordinal);
                 if (at >= 0) { text = text.Insert(at, BarcodeLine + newline); addedBarcode = true; }
             }
+            bool addedHand = false;
+            if (!text.Contains(HandLibrary))
+            {
+                int at = text.IndexOf("**DEPS**", StringComparison.Ordinal);
+                if (at >= 0) { text = text.Insert(at, HandLine + newline); addedHand = true; }
+            }
             var lines = new List<string>(text.Split('\n'));
             if (lines.RemoveAll(line => line.Contains("/lib/arm64-v8a/") && line.Contains("exclude")) > 0) { text = string.Join("\n", lines); keptWideLibraries = true; }
             if (text == original) return true;
@@ -178,6 +190,7 @@ namespace GlowUp.EditorTools
             AssetDatabase.ImportAsset(GradleTemplate);
             if (addedLibrary) notes?.Add("- Gradle template: the scan screen's text reader (Google ML Kit) was added to the libraries.");
             if (addedBarcode) notes?.Add("- Gradle template: the scan screen's barcode reader (Google ML Kit) was added to the libraries.");
+            if (addedHand) notes?.Add("- Gradle template: the hand finder for finger signs (Google MediaPipe) was added to the libraries.");
             if (keptWideLibraries) notes?.Add("- Gradle template: the line that removed the 64-bit libraries was taken out.");
             return true;
         }

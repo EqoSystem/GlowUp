@@ -16,7 +16,8 @@ namespace GlowUp.EditorTools
     ///    "This app isn't compatible with the latest version of Android" on new phones, and Google's
     ///    AR service closes it when live face tracking starts;
     ///  - the Gradle template lists the text reader the scan screen uses and keeps 64-bit libraries;
-    ///  - the start-up logo and the app icon (see BrandingSetup).
+    ///  - the start-up logo and the app icon (see BrandingSetup);
+    ///  - what finger signs need: the hand model, its library line and the launcher manifest (see FingerSignSetup).
     ///
     /// Just before an Android build the Gradle template is checked once more.
     /// </summary>
@@ -36,6 +37,7 @@ namespace GlowUp.EditorTools
             {
                 ArFaceTrackingSetup.SetArchitectures(notes);
                 BrandingSetup.Apply(notes);
+                FingerSignSetup.Apply(notes);
             }
             catch (Exception e) { Debug.LogWarning("[GlowUp] The project settings could not be checked: " + e.Message); }
             if (notes.Count > 0) Debug.Log("[GlowUp] Project settings updated:\n" + string.Join("\n", notes));
@@ -47,7 +49,7 @@ namespace GlowUp.EditorTools
         {
             if (report.summary.platform != BuildTarget.Android) return;
             var notes = new List<string>();
-            try { ArFaceTrackingSetup.FixGradleTemplate(notes); }
+            try { ArFaceTrackingSetup.FixGradleTemplate(notes); FingerSignSetup.Apply(notes); }
             catch (Exception e) { Debug.LogWarning("[GlowUp] The Gradle template could not be checked: " + e.Message); }
             if (notes.Count > 0) Debug.Log("[GlowUp] Before the build:\n" + string.Join("\n", notes));
 

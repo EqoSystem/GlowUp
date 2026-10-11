@@ -6,15 +6,16 @@ namespace GlowUp.AppSettings
 {
     /// <summary>
     /// One on/off switch of the Settings page that belongs to a choice kept in UiPreferences: tap
-    /// sounds, the air wave that changes screen, the light round the screen edge, the bright screen in
+    /// sounds, the finger signs that change screen, the light round the screen edge, the bright screen in
     /// the scanner and in AR Try-On, the flashlight, the screen light. Pick the choice under "Preference".
     /// The same choice can also be changed inside a screen (the sun button in the scanner, for
     /// example); the switch follows it.
     /// </summary>
     public class UiPreferenceToggle : MonoBehaviour
     {
-        // new choices go at the END of this list: the scenes remember a choice by its place in it
-        public enum Preference { TapSounds, ShakeToNavigate, EdgeLight, ScanBrightScreen, TryOnBrightScreen, AutoFlashlight, TryOnScreenLight, AirGestures }
+        // new choices go at the END of this list: the scenes remember a choice by its place in it.
+        // ShakeToNavigate and AirGestures are features that were removed: their places stay so the others keep theirs.
+        public enum Preference { TapSounds, ShakeToNavigate, EdgeLight, ScanBrightScreen, TryOnBrightScreen, AutoFlashlight, TryOnScreenLight, AirGestures, FingerSigns }
 
         [SerializeField] private Preference preference = Preference.TapSounds;
         [SerializeField] private Toggle toggle;
@@ -37,12 +38,13 @@ namespace GlowUp.AppSettings
                 switch (preference)
                 {
                     case Preference.TapSounds: return UiPreferences.TapSounds;
-                    case Preference.ShakeToNavigate: return UiPreferences.ShakeToNavigate;
+                    case Preference.ShakeToNavigate: return false;              // removed feature
+                    case Preference.AirGestures: return false;                  // removed feature
+                    case Preference.FingerSigns: return UiPreferences.FingerSigns;
                     case Preference.EdgeLight: return UiPreferences.BorderLight;
                     case Preference.ScanBrightScreen: return UiPreferences.ScanBrightScreen;
                     case Preference.TryOnBrightScreen: return UiPreferences.TryOnBrightScreen;
                     case Preference.AutoFlashlight: return UiPreferences.AutoFlashlight;
-                    case Preference.AirGestures: return UiPreferences.AirGestures;
                     default: return UiPreferences.TryOnScreenLight;
                 }
             }
@@ -51,12 +53,13 @@ namespace GlowUp.AppSettings
                 switch (preference)
                 {
                     case Preference.TapSounds: UiPreferences.TapSounds = value; break;
-                    case Preference.ShakeToNavigate: UiPreferences.ShakeToNavigate = value; break;
+                    case Preference.ShakeToNavigate: break;                     // removed feature
+                    case Preference.AirGestures: break;                         // removed feature
+                    case Preference.FingerSigns: UiPreferences.FingerSigns = value; break;
                     case Preference.EdgeLight: UiPreferences.BorderLight = value; break;
                     case Preference.ScanBrightScreen: UiPreferences.ScanBrightScreen = value; break;
                     case Preference.TryOnBrightScreen: UiPreferences.TryOnBrightScreen = value; break;
                     case Preference.AutoFlashlight: UiPreferences.AutoFlashlight = value; break;
-                    case Preference.AirGestures: UiPreferences.AirGestures = value; break;
                     default: UiPreferences.TryOnScreenLight = value; break;
                 }
             }

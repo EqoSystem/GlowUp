@@ -179,7 +179,7 @@ namespace GlowUp.EditorTools
             // =====================================================================================
             //  Sounds and motion: tap sounds, shake to change screen, the light round the screen edge
             // =====================================================================================
-            Transform sounds = TileSection(content, scroll, "SoundsMotionSection", "Sounds & Motion", "Tap sounds, air wave, edge light", IconFactory.Speaker, SettingsIconAnimator.Style.Pulse, 1);
+            Transform sounds = TileSection(content, scroll, "SoundsMotionSection", "Sounds & Motion", "Tap sounds, finger signs, edge light", IconFactory.Speaker, SettingsIconAnimator.Style.Pulse, 1);
             Toggle tapSounds = SwitchRow(sounds, "TapSoundsRow", "Tap sounds", "A short sound when you tap a button.", true);
             GameObject soundBlock = Block(sounds, "TapSoundBlock", 14);
             soundBlock.AddComponent<CanvasGroup>();
@@ -198,23 +198,45 @@ namespace GlowUp.EditorTools
             var soundPicker = SceneBuilderCore.Ensure<TapSoundPicker>(soundBlock);
             A.Set(soundPicker, "tabs", soundTabs); Kit.SetArray(soundPicker, "tabLabels", soundLabels); A.Set(soundPicker, "volumeSlider", volume);
             Divider(sounds);
-            // the air wave (AirGestureNavigator on UiServices) took the place of "shake to change screen"
-            PreferenceRow(sounds, "AirWaveRow", "Wave to change screen", "Wave a hand past the selfie camera: right or left for the screen beside this one, up to go back. Works on Home, Recent Scans and Settings.", false, UiPreferenceToggle.Preference.AirGestures);
-            // how easily the wave reacts: a slider the user sets (it fades while the wave is switched off)
-            GameObject waveBlock = Block(sounds, "AirWaveBlock", 6);
-            waveBlock.AddComponent<CanvasGroup>();
-            GameObject sensitivityRow = Row(waveBlock.transform, "SensitivityRow", 80);
-            TextMeshProUGUI sensitivityTitle = A.Label(sensitivityRow.transform, "Title", "Sensitivity", RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Left);
-            A.Size(sensitivityTitle, 190, -1);
-            Slider sensitivity = ArTryOnSceneBuilder.BuildSlider(sensitivityRow.transform, "SensitivitySlider");
-            A.Size(sensitivity, -1, 64, 1);
-            sensitivity.value = 0.5f;
-            TextMeshProUGUI sensitivityHint = A.Label(waveBlock.transform, "SensitivityHint", "Left: only a big, clear wave counts. Right: a small wave is enough.", RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            A.HintOnly(sensitivityHint);
-            var sensitivityLink = SceneBuilderCore.Ensure<AirSensitivitySlider>(sensitivity.gameObject);
-            A.Set(sensitivityLink, "slider", sensitivity);
-            Transform waveRow = sounds.Find("AirWaveRow");
-            if (waveRow != null) { var waveToggle = waveRow.GetComponentInChildren<UiPreferenceToggle>(true); if (waveToggle != null) A.Set(waveToggle, "onlyWhenOn", waveBlock.GetComponent<CanvasGroup>()); }
+            // finger signs (FingerSignNavigator on UiServices) took the place of "wave to change screen"
+            Toggle signsToggle = PreferenceRow(sounds, "FingerSignsRow", "Finger signs",
+                "Hold 1 to 5 fingers up to the selfie camera to open a screen. Works on Home, Recent Scans, Settings and a result.", false, UiPreferenceToggle.Preference.FingerSigns);
+            // which screen each number opens, and how long a sign is held (the block fades while finger signs are switched off)
+            GameObject signBlock = Block(sounds, "FingerSignsBlock", 8);
+            signBlock.AddComponent<CanvasGroup>();
+            string[] signScreens = { "Home", "AI Smart Scan", "Recent Scans", "AR Try-On", "Settings" };
+            var signButtons = new Button[5];
+            var signLabels = new TextMeshProUGUI[5];
+            for (int i = 0; i < 5; i++)
+            {
+                GameObject signRow = Row(signBlock.transform, "Fingers" + (i + 1) + "Row", 92);
+                TextMeshProUGUI signTitle = A.Label(signRow.transform, "Title", (i + 1) + (i == 0 ? " finger" : " fingers"), 34, ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.Left);
+                A.Size(signTitle, -1, -1, 1);
+                Button pick = A.PillButton(signRow.transform, "ScreenButton", signScreens[i], 31, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Swap);
+                A.Size(pick, 430, 80);
+                A.Outline(pick.transform, ThemeRole.Accent, 80f);
+                signButtons[i] = pick; signLabels[i] = A.LabelOf(pick);
+            }
+            GameObject holdRow = Row(signBlock.transform, "HoldRow", 80);
+            TextMeshProUGUI holdTitle = A.Label(holdRow.transform, "Title", "Hold for", RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Left);
+            A.Size(holdTitle, 150, -1);
+            Slider hold = ArTryOnSceneBuilder.BuildSlider(holdRow.transform, "HoldSlider");
+            A.Size(hold, -1, 64, 1);
+            hold.minValue = UiPreferences.ShortestFingerHold; hold.maxValue = UiPreferences.LongestFingerHold; hold.value = 0.9f;
+            TextMeshProUGUI holdValue = A.Label(holdRow.transform, "ValueText", "0.9 s", RowCaption, ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.Right);
+            A.Size(holdValue, 110, -1);
+            TextMeshProUGUI signStatus = A.Label(signBlock.transform, "StatusText",
+                "On. Hold your hand up to the selfie camera, about 30 cm away, and keep the sign still. The picture stays on this phone.",
+                RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            // a short label: a link is one line and must fit inside the card (the starting order is what the five rows show after a tap)
+            Button signReset = A.LinkButton(signBlock.transform, "ResetButton", "Reset the five numbers", 28, ThemeRole.AccentText);
+            SceneBuilderCore.ReplaceText(A.LabelOf(signReset), "m_text", "<u>Reset the five numbers</u>", "<u>Back to how it was: 1 Home, 2 Scan, 3 Recent, 4 Try-On, 5 Settings</u>");
+            A.Size(signReset, -1, 56);
+            var signSettings = Feature<FingerSignSettings>(features, "FingerSignSettings");
+            Kit.SetArray(signSettings, "screenButtons", signButtons); Kit.SetArray(signSettings, "screenLabels", signLabels);
+            A.Set(signSettings, "holdSlider", hold); A.Set(signSettings, "holdValueText", holdValue);
+            A.Set(signSettings, "resetButton", signReset); A.Set(signSettings, "statusText", signStatus);
+            A.Set(signsToggle.GetComponent<UiPreferenceToggle>(), "onlyWhenOn", signBlock.GetComponent<CanvasGroup>());
             Divider(sounds);
             PreferenceRow(sounds, "EdgeLightRow", "Edge light", "A light that runs round the edge of every screen.", true, UiPreferenceToggle.Preference.EdgeLight);
 

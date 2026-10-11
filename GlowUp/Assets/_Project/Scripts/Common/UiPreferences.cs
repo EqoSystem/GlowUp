@@ -4,8 +4,8 @@ using UnityEngine;
 namespace GlowUp.Common
 {
     /// <summary>
-    /// The user's choices for how the app feels (Settings page), saved on the phone: tap sounds, the air
-    /// wave that changes screen, the light that runs round the screen edge, and the camera helpers (bright
+    /// The user's choices for how the app feels (Settings page), saved on the phone: tap sounds, the finger
+    /// signs that change screen, the light that runs round the screen edge, and the camera helpers (bright
     /// screen, flashlight, screen light). Every script that offers one of these reads it here, so a switch on the
     /// Settings page and a button inside a screen always agree.
     /// </summary>
@@ -27,15 +27,65 @@ namespace GlowUp.Common
             set { PlayerPrefs.SetFloat("GlowUp.Ui.TapSoundVolume", Mathf.Clamp01(value)); Save(); }
         }
 
-        /// <summary>Old: shake the phone to change screen. The air wave below replaced it; kept so a scene that still has the old row keeps working.</summary>
-        public static bool ShakeToNavigate { get => Get("GlowUp.Ui.ShakeToNavigate", false); set => Set("GlowUp.Ui.ShakeToNavigate", value); }
-        /// <summary>Wave a hand past the selfie camera: to the right for the next screen, to the left to go back. Off until the user switches it on.</summary>
-        public static bool AirGestures { get => Get("GlowUp.Ui.AirGestures", false); set => Set("GlowUp.Ui.AirGestures", value); }
-        /// <summary>How easily the air wave reacts: 0 = only a big, clear wave, 1 = a small wave is enough. 0.5 is the middle.</summary>
-        public static float AirSensitivity
+        /// <summary>The old "shake to change screen" is gone. Always off; kept only so the old ShakeNavigator script still compiles.</summary>
+        public static bool ShakeToNavigate => false;
+
+        // ---- finger signs: hold 1 to 5 fingers up to the selfie camera to open a screen ----
+        /// <summary>Off until the user switches it on (it uses the selfie camera).</summary>
+        public static bool FingerSigns { get => Get("GlowUp.Ui.FingerSigns", false); set => Set("GlowUp.Ui.FingerSigns", value); }
+
+        /// <summary>How long a sign must be held before the screen changes, in seconds.</summary>
+        public static float FingerSignHoldSeconds
         {
-            get => PlayerPrefs.GetFloat("GlowUp.Ui.AirSensitivity", 0.5f);
-            set { PlayerPrefs.SetFloat("GlowUp.Ui.AirSensitivity", Mathf.Clamp01(value)); Save(); }
+            get => Mathf.Clamp(PlayerPrefs.GetFloat("GlowUp.Ui.FingerSignHold", 0.9f), ShortestFingerHold, LongestFingerHold);
+            set { PlayerPrefs.SetFloat("GlowUp.Ui.FingerSignHold", Mathf.Clamp(value, ShortestFingerHold, LongestFingerHold)); Save(); }
+        }
+        public const float ShortestFingerHold = 0.4f, LongestFingerHold = 2.5f;
+
+        /// <summary>The screens a finger sign can open, in the order the Settings page offers them. "" = this number of fingers does nothing.</summary>
+        public static readonly string[] FingerSignScreens = { SceneNames.Dashboard, SceneNames.AiSmartAnalysis, SceneNames.RecentScans, SceneNames.ArTryOn, SceneNames.Settings, "" };
+        /// <summary>What the user reads for each of those screens.</summary>
+        public static readonly string[] FingerSignScreenNames = { "Home", "AI Smart Scan", "Recent Scans", "AR Try-On", "Settings", "Nothing" };
+
+        /// <summary>The screen that `fingers` raised fingers (1 to 5) open. As delivered: 1 Home, 2 AI Smart Scan, 3 Recent Scans, 4 AR Try-On, 5 Settings.</summary>
+        public static string FingerSignScreen(int fingers)
+        {
+            if (fingers < 1 || fingers > 5) return "";
+            string saved = PlayerPrefs.GetString("GlowUp.Ui.FingerSign." + fingers, FingerSignScreens[fingers - 1]);
+            return System.Array.IndexOf(FingerSignScreens, saved) >= 0 ? saved : FingerSignScreens[fingers - 1];
+        }
+
+        public static void SetFingerSignScreen(int fingers, string scene)
+        {
+            if (fingers < 1 || fingers > 5 || System.Array.IndexOf(FingerSignScreens, scene ?? "") < 0) return;
+            PlayerPrefs.SetString("GlowUp.Ui.FingerSign." + fingers, scene ?? "");
+            Save();
+        }
+
+        /// <summary>The name the user reads for a screen ("Home" for the dashboard).</summary>
+        public static string FingerSignScreenName(string scene)
+        {
+            int at = System.Array.IndexOf(FingerSignScreens, scene ?? "");
+            return at >= 0 ? FingerSignScreenNames[at] : "Nothing";
+        }
+
+        /// <summary>Puts the five finger signs back to how the app was delivered.</summary>
+        public static void ResetFingerSigns()
+        {
+            for (int fingers = 1; fingers <= 5; fingers++) PlayerPrefs.DeleteKey("GlowUp.Ui.FingerSign." + fingers);
+            PlayerPrefs.DeleteKey("GlowUp.Ui.FingerSignHold");
+            Save();
+        }
+
+        /// <summary>
+        /// The "wave to change screen" and "shake to change screen" features are gone (finger signs took their place).
+        /// What an earlier version of the app saved for them is removed once; nothing else of the user's settings is touched.
+        /// </summary>
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        static void ForgetRemovedFeatures()
+        {
+            foreach (string key in new[] { "GlowUp.Ui.AirGestures", "GlowUp.Ui.AirSensitivity", "GlowUp.Ui.ShakeToNavigate" })
+                if (PlayerPrefs.HasKey(key)) PlayerPrefs.DeleteKey(key);
         }
         /// <summary>The light that travels round the edge of every screen.</summary>
         public static bool BorderLight { get => Get("GlowUp.Ui.BorderLight", true); set => Set("GlowUp.Ui.BorderLight", value); }
