@@ -64,7 +64,7 @@ namespace GlowUp.Scan
             foreach (string name in names)
             {
                 if (string.IsNullOrWhiteSpace(name)) continue;
-                IngredientData known = IngredientKnowledge.Resolve(name);
+                IngredientData known = IngredientTextParser.MatchEntry(name).data;
                 string key = IngredientKnowledge.Key(known != null && !string.IsNullOrEmpty(known.name) ? known.name : name);
                 if (key.Length > 0) keys.Add(key);
             }

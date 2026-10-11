@@ -147,6 +147,9 @@ namespace GlowUp.Scan
             if (techName.Length == 0) techName = query;
             if (name.Length == 0) name = techName;
             if (name.Length < 3 || description.Length < 10) return null;
+            // An entry is only made for ONE real ingredient. Two names in one ("Carbomer & Triethanolamine"), label
+            // wording or a code never becomes an ingredient entry, whatever the AI says about it.
+            if (!IsOneIngredientName(techName) || !IsOneIngredientName(name)) return null;
 
             // it must be an answer to something we asked (the AI must not add ingredients of its own)
             string queryKey = IngredientKnowledge.Key(query);
@@ -183,6 +186,18 @@ namespace GlowUp.Scan
                 if ((address.StartsWith("https://") || address.StartsWith("http://")) && data.sources.Count < 8 && !data.sources.Any(s => s.EndsWith(address)))
                     data.sources.Add(address);
             return data;
+        }
+
+        /// <summary>True when the text can be the name of one single ingredient: no joined names, nothing from the stoplist, the right shape.</summary>
+        public static bool IsOneIngredientName(string name)
+        {
+            string text = (name ?? "").Trim();
+            if (text.Length < 3) return false;
+            if (text.IndexOf(',') >= 0 || text.IndexOf(';') >= 0 || text.IndexOf('&') >= 0 || text.IndexOf('+') >= 0) return false;
+            string lower = " " + text.ToLowerInvariant() + " ";
+            if (lower.Contains(" and ") || lower.Contains(" / ") || lower.Contains(" or ")) return false;
+            if (IngredientKnowledge.IsExactName(text)) return true;
+            return IngredientStoplist.Hit(text) == null && !IngredientStoplist.WrongShape(text);
         }
 
         static string CleanNote(string note)

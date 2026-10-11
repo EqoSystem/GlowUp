@@ -57,8 +57,6 @@ namespace GlowUp.Dashboard
         [SerializeField] private string noteStandard = "No ingredients flagged for your profile. This is not medical advice.";
         [Tooltip("The same line for a user who saved a skin condition")]
         [SerializeField] private string noteWithCondition = "No ingredients flagged for your profile. This is not medical advice: ask a dermatologist about a flare-up.";
-        [Tooltip("For a user who saved a skin condition: a product is recommended only when the app knows every one of its ingredients. This many unknown ingredients are tolerated (0 = none).")]
-        [SerializeField] private int unknownIngredientsAllowedWithCondition = 0;
         [SerializeField] private string saveLabel = "Save";
         [SerializeField] private string savedLabel = "Saved";
 
@@ -161,9 +159,8 @@ namespace GlowUp.Dashboard
 
             // Only MAKE-UP whose ingredients are not flagged for this user. For a user who saved a skin condition the check is
             // stricter: the ingredient list must have a source and every ingredient must be known (see ProductRecommender).
-            // All of it is worked out on the phone.
+            // All of it is worked out on the phone. (How strict it is: Assets/_Project/Resources/ScanRules.asset)
             var who = profile ?? new UserProfileData();
-            ProductRecommender.UnknownAllowedWithCondition = Mathf.Max(0, unknownIngredientsAllowedWithCondition);
             foreach (ProductRecommender.Pick pick in ProductRecommender.For(who, products, maximumRecommendations))
             {
                 ProductData product = pick.product;

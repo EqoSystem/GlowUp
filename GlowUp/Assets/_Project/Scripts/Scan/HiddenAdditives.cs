@@ -61,9 +61,15 @@ namespace GlowUp.Scan
         /// </summary>
         public static bool Learn(string term, IEnumerable<string> substances, string note, IEnumerable<string> sources, bool webSearched, string model)
         {
+            if (string.IsNullOrWhiteSpace(term) || substances == null) return false;
+            // Only a word that really is an umbrella term the app knows ("Fragrance", "Parfum", "Aroma") gets a note. It is
+            // kept under the ingredient's own name, so "Parfum" and "Perfume" share one note and "may contain" gets none.
+            IngredientData umbrella = IngredientKnowledge.Resolve(term);
+            if (umbrella == null || !umbrella.umbrella || string.IsNullOrWhiteSpace(umbrella.name)) return false;
+            if (Find(term, umbrella.name, umbrella.techName) != null) return false;
+            term = umbrella.name;
             string key = IngredientKnowledge.Key(term);
-            if (key.Length < 2 || substances == null) return false;
-            if (Find(term) != null) return false;
+            if (key.Length < 2) return false;
 
             var names = new List<string>();
             foreach (string s in substances)

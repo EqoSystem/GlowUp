@@ -69,6 +69,7 @@ namespace GlowUp.Data
         public bool reviewed;                    // an admin has checked it on the website (only matters for source "ai")
         public List<string> sources = new List<string>();   // web pages the information came from
         public string fdaUnii;                   // the US FDA substance registry's code for it, when the FDA lists the substance
+        public bool generic;                     // only the ingredient's FAMILY was recognised ("... extract", a Colour Index number): shown, but never counted as checked
 
         /// <summary>
         /// True for an entry the AI lookup added that no admin has checked yet. Such an entry is shown to the
@@ -138,6 +139,8 @@ namespace GlowUp.Data
         public string source;                    // "scan" | "manual" | "recommendation"
         public long scannedAtUnix;
         public List<string> ingredients = new List<string>();
+        public List<string> unrecognized = new List<string>();        // names on the label that look like ingredients but match nothing the app knows: NOT part of the verdict
+        public List<string> mayContain = new List<string>();          // names that stood behind "may contain" or "+/-" on the label: they depend on the shade
         public List<string> harmfulIngredients = new List<string>();
         public List<IngredientFinding> findings = new List<IngredientFinding>();
         public List<string> keyActives = new List<string>();

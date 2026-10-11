@@ -21,46 +21,168 @@ namespace GlowUp.Scan
         // ---------------------------------------------------------------------------------------
         //  Lookup
         // ---------------------------------------------------------------------------------------
-        /// <summary>Best information available for a scanned ingredient name, or null when nothing is known.</summary>
-        public static IngredientData Resolve(string scannedName)
+        /// <summary>
+        /// How close a misread name must be to a known name to still count as that ingredient.
+        /// 1 = only exact matches. 0.85 = about one wrong letter in seven (two in fourteen). Lower = more forgiving, and
+        /// more wrong matches. Set from the Inspector (LoadingSceneController > Reading the ingredient list).
+        /// </summary>
+        public static float FuzzyThreshold = 0.85f;
+
+        /// <summary>How a name was recognised.</summary>
+        public enum MatchKind
         {
-            if (string.IsNullOrWhiteSpace(scannedName)) return null;
+            None,       // nothing the app knows
+            Exact,      // a known name or synonym, letter for letter
+            Close,      // a known name with a small reading mistake (see FuzzyThreshold)
+            Family      // only its family is known ("... paraben", "... extract", a Colour Index number)
+        }
+
+        public struct Match
+        {
+            public IngredientData data;
+            public MatchKind kind;
+            public bool Found => data != null;
+        }
+
+        /// <summary>
+        /// Looks a name from a label up. The order of trust stays: the website's entry (typed or reviewed by an admin), then
+        /// the app's built-in list, then an entry the AI lookup added (not reviewed), then nothing.
+        /// </summary>
+        public static Match Find(string scannedName)
+        {
+            if (string.IsNullOrWhiteSpace(scannedName)) return new Match();
             Ensure();
             string key = Key(scannedName);
+            if (key.Length == 0) return new Match();
 
-            IngredientData builtIn = FindBuiltIn(key);
-            IngredientData fromWebsite = IngredientRepository.Find(scannedName);
-            if (fromWebsite == null && builtIn != null)
-                fromWebsite = IngredientRepository.Find(builtIn.name) ?? IngredientRepository.Find(builtIn.techName);
+            // 1. the name as it is written
+            IngredientData data = Known(key, scannedName);
+            if (data != null) return new Match { data = data, kind = MatchKind.Exact };
 
-            // An entry the AI lookup added that no admin has reviewed yet never overrides what the app already knows.
-            if (fromWebsite != null && fromWebsite.IsUnreviewedAi())
-                return builtIn ?? Family(key, scannedName) ?? Clone(fromWebsite);
-            if (fromWebsite != null) return Merge(fromWebsite, builtIn);
-            return builtIn ?? Family(key, scannedName);
+            // 2. the same name once the camera's usual mistakes are evened out: spaces in other places ("SodiumHyaluronate"),
+            //    0 for o, 1 or l for i ("D1methicone", "Glycerln"), rn for m ("Niacinarnide")
+            string squashed = Squash(key);
+            if (squashed.Length >= 6 && SquashedKeys().TryGetValue(squashed, out string sameLetters) && sameLetters != key
+                && (data = Known(sameLetters, scannedName)) != null)
+                return new Match { data = data, kind = MatchKind.Close };
+
+            // 3. a close spelling of a known name (the camera often misreads a letter or two)
+            if (FuzzyThreshold < 0.999f)
+            {
+                string closest = null; int fewest = int.MaxValue;
+                foreach (string known in AllKeys())
+                {
+                    int edits = EditsBetween(key, known, FuzzyThreshold);
+                    if (edits > 0 && edits < fewest) { fewest = edits; closest = known; }
+                }
+                if (closest != null && (data = Known(closest, scannedName)) != null) return new Match { data = data, kind = MatchKind.Close };
+            }
+
+            // 4. its family
+            data = Family(key, scannedName);
+            return data != null ? new Match { data = data, kind = MatchKind.Family } : new Match();
         }
+
+        /// <summary>Best information available for a scanned ingredient name, or null when nothing is known.</summary>
+        public static IngredientData Resolve(string scannedName) => Find(scannedName).data;
 
         /// <summary>True when the name is a real ingredient we recognise (used to judge whether a camera read worked).</summary>
         public static bool IsKnown(string scannedName) => Resolve(scannedName) != null;
 
-        static IngredientData FindBuiltIn(string key)
-        {
-            if (byKey.TryGetValue(key, out var exact)) return exact;
+        /// <summary>True when this is, letter for letter, a name or synonym the app knows (a family match does not count).</summary>
+        public static bool IsExactName(string scannedName) => Find(scannedName).kind == MatchKind.Exact;
 
-            // the camera often misreads a letter or two: accept a very close spelling of a long name
-            if (key.Length >= 7)
+        /// <summary>What is known under exactly this key, in the order of trust. Null when nothing is.</summary>
+        static IngredientData Known(string key, string shownName)
+        {
+            IngredientData builtIn = byKey.TryGetValue(key, out var exact) ? exact : null;
+            IngredientData fromWebsite = IngredientRepository.FindByKey(key);
+            if (fromWebsite == null && builtIn != null)
+                fromWebsite = IngredientRepository.Find(builtIn.name) ?? IngredientRepository.Find(builtIn.techName);
+            if (fromWebsite != null && HiddenAdditives.IsFinding(fromWebsite)) fromWebsite = null;      // a note about a label word, not an ingredient
+
+            // An entry the AI lookup added that no admin has reviewed yet never overrides what the app already knows.
+            if (fromWebsite != null && fromWebsite.IsUnreviewedAi())
+                return builtIn ?? Family(key, shownName) ?? Clone(fromWebsite);
+            if (fromWebsite != null) return Merge(fromWebsite, builtIn);
+            return builtIn;
+        }
+
+        static List<string> allKeys;
+        static Dictionary<string, string> squashedKeys;
+        static int keysVersion = -1;
+
+        /// <summary>Every name key the app knows: the built-in list and the website's entries (rebuilt when the website's list changes).</summary>
+        static List<string> AllKeys()
+        {
+            int version = IngredientRepository.Version;
+            // Keys() builds the website's index on first use, which changes the version: read it again afterwards
+            if (allKeys != null && keysVersion == version) return allKeys;
+            var keys = new List<string>(byKey.Keys);
+            foreach (string key in IngredientRepository.Keys()) if (!byKey.ContainsKey(key)) keys.Add(key);
+            var squashed = new Dictionary<string, string>();
+            foreach (string key in keys) { string s = Squash(key); if (!squashed.ContainsKey(s)) squashed[s] = key; }
+            allKeys = keys; squashedKeys = squashed; keysVersion = IngredientRepository.Version;
+            return allKeys;
+        }
+
+        /// <summary>Each known key in its "squashed" form (see Squash), so a misread name finds it.</summary>
+        static Dictionary<string, string> SquashedKeys() { AllKeys(); return squashedKeys; }
+
+        /// <summary>
+        /// A key with the differences a camera cannot be trusted on taken out: no spaces, "rn" as "m", "vv" as "w", and
+        /// 0 / o as one letter, 1 / l / i as one letter. Two names with the same squashed form are the same name read
+        /// differently ("niacinarnide" and "niacinamide", "d1methicone" and "dimethicone").
+        /// </summary>
+        public static string Squash(string key)
+        {
+            var sb = new System.Text.StringBuilder(key.Length);
+            for (int i = 0; i < key.Length; i++)
             {
-                IngredientData best = null; int bestDistance = int.MaxValue;
-                int allowed = key.Length >= 14 ? 2 : 1;
-                foreach (var kv in byKey)
-                {
-                    if (Math.Abs(kv.Key.Length - key.Length) > allowed) continue;
-                    int d = Distance(key, kv.Key, allowed);
-                    if (d < bestDistance) { bestDistance = d; best = kv.Value; }
-                }
-                if (best != null && bestDistance <= allowed) return best;
+                char c = key[i];
+                if (c == ' ') continue;
+                if (c == 'r' && i + 1 < key.Length && key[i + 1] == 'n') { sb.Append('m'); i++; continue; }
+                if (c == 'v' && i + 1 < key.Length && key[i + 1] == 'v') { sb.Append('w'); i++; continue; }
+                if (c == '0') c = 'o';
+                else if (c == '1' || c == 'i') c = 'l';
+                sb.Append(c);
             }
-            return null;
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// How many letters differ between a read name and a known name, when they are close enough to be the same
+        /// ingredient; 0 when they are the same or NOT close enough. Compared word by word, with these safeguards against
+        /// taking one chemical for another: the number of words must be the same; a short word (under five letters) and
+        /// any digits must be exact ("Laureth-7" is not "Laureth-4"); the first letter of each word must be the same
+        /// ("Ethylparaben" is not "Methylparaben"); and at most three letters may differ in all.
+        /// </summary>
+        public static int EditsBetween(string readKey, string knownKey, float threshold)
+        {
+            if (readKey == knownKey || Math.Abs(readKey.Length - knownKey.Length) > 3) return 0;
+            string[] read = readKey.Split(' '), known = knownKey.Split(' ');
+            if (read.Length != known.Length) return 0;
+            int total = 0;
+            for (int i = 0; i < read.Length; i++)
+            {
+                string a = read[i], b = known[i];
+                if (a == b) continue;
+                if (a.Length < 5 || b.Length < 5 || a[0] != b[0] || DigitsOf(a) != DigitsOf(b)) return 0;
+                int longest = Math.Max(a.Length, b.Length);
+                int allowed = (int)Math.Floor((1f - threshold) * longest + 0.0001f);
+                if (allowed < 1) return 0;
+                int edits = Distance(a, b, allowed);
+                if (edits > allowed) return 0;
+                total += edits;
+            }
+            return total <= 3 ? total : 0;
+        }
+
+        static string DigitsOf(string word)
+        {
+            var digits = new System.Text.StringBuilder();
+            foreach (char c in word) if (c >= '0' && c <= '9') digits.Append(c);
+            return digits.ToString();
         }
 
         /// <summary>Ingredient families that can be recognised from part of the name.</summary>
@@ -81,10 +203,12 @@ namespace GlowUp.Scan
             if (key.Contains("sulfate") && (key.Contains("lauryl") || key.Contains("laureth") || key.Contains("coco")))
                 return Like("Sodium Laureth Sulfate", "A sulfate cleansing agent that makes the product foam.");
             if (key.Contains("alcohol denat") || key == "alcohol" || key == "ethanol") return Like("Alcohol Denat.");
+            // The two families below say what KIND of ingredient it is, but not whether this one suits the user: they are
+            // shown with that description and count as "not checked" (generic = true), never as cleared.
             if (key.StartsWith("ci ") && key.Length <= 9)
-                return new IngredientData { name = shownName, description = "A colourant, listed by its Colour Index number.", commonUses = "Makeup and tinted products", riskLevel = "safe" };
+                return new IngredientData { name = shownName, description = "A colourant, listed by its Colour Index number.", commonUses = "Makeup and tinted products", riskLevel = "safe", generic = true };
             if (key.EndsWith(" extract"))
-                return new IngredientData { name = shownName, description = "A plant extract. Plant extracts are usually well tolerated, but individual sensitivities vary.", commonUses = "Skincare and makeup", riskLevel = "safe" };
+                return new IngredientData { name = shownName, description = "A plant extract. Plant extracts are usually well tolerated, but individual sensitivities vary.", commonUses = "Makeup and skin care", riskLevel = "safe", generic = true };
             return null;
         }
 
@@ -118,21 +242,12 @@ namespace GlowUp.Scan
             avoidForConditions = new List<string>(s.avoidForConditions ?? new List<string>()),
             goodForSkinTypes = new List<string>(s.goodForSkinTypes ?? new List<string>()),
             goodForConditions = new List<string>(s.goodForConditions ?? new List<string>()),
-            source = s.source, reviewed = s.reviewed, fdaUnii = s.fdaUnii, sources = new List<string>(s.sources ?? new List<string>())
+            source = s.source, reviewed = s.reviewed, fdaUnii = s.fdaUnii, sources = new List<string>(s.sources ?? new List<string>()),
+            generic = s.generic
         };
 
-        public static string Key(string s)
-        {
-            var sb = new System.Text.StringBuilder();
-            bool space = false;
-            foreach (char raw in (s ?? "").Trim().ToLowerInvariant())
-            {
-                char c = raw;
-                if (char.IsLetterOrDigit(c)) { if (space && sb.Length > 0) sb.Append(' '); sb.Append(c); space = false; }
-                else space = true;
-            }
-            return sb.ToString();
-        }
+        /// <summary>The comparable key of a name: lower case, no accents, punctuation as single spaces (the same key the whole app uses: TextKey).</summary>
+        public static string Key(string s) => TextKey.Normalize(s);
 
         /// <summary>Edit distance, giving up early once it exceeds `max`.</summary>
         static int Distance(string a, string b, int max)

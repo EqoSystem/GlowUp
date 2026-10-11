@@ -14,8 +14,17 @@ namespace GlowUp.Scan
     /// </summary>
     public static class ProductAnalysisEngine
     {
+        /// <summary>
+        /// A result is called incomplete, and never "nothing flagged", when fewer than this share of the names on the label
+        /// could be checked (0.5 = at least half). Set in the Scan Rules asset.
+        /// </summary>
+        public static float MinimumCheckedShare = 0.5f;
+
+        /// <param name="unrecognized">names on the label that look like ingredients but match nothing the app knows: they are
+        /// not checked and not part of the verdict, but the result says how many there were</param>
         public static ScanRecord Analyse(List<string> ingredientNames, string rawLabelText, UserProfileData profile,
-            List<BrandData> brands = null, string productName = null, string brandName = null, string cosmeticType = null)
+            List<BrandData> brands = null, string productName = null, string brandName = null, string cosmeticType = null,
+            List<string> unrecognized = null)
         {
             profile = profile ?? new UserProfileData();
             var record = new ScanRecord
@@ -38,7 +47,7 @@ namespace GlowUp.Scan
             foreach (string raw in ingredientNames ?? new List<string>())
             {
                 if (string.IsNullOrWhiteSpace(raw)) continue;
-                IngredientData data = IngredientKnowledge.Resolve(raw);
+                IngredientData data = IngredientTextParser.MatchEntry(raw).data;          // "Water (Aqua)" and "Aqua/Water/Eau" are Water
                 string shown = data != null && !string.IsNullOrEmpty(data.name) ? data.name : raw.Trim();
                 if (!seen.Add(shown)) continue;                       // "Aqua" and "Water" are the same ingredient
 
@@ -112,6 +121,11 @@ namespace GlowUp.Scan
                 }
 
                 if (aiOnly && level == "safe") level = "unknown";   // unreviewed AI information may warn, but never clears an ingredient
+                if (data.generic && level == "safe")                 // only its family is known: said, but not counted as checked
+                {
+                    level = "unknown";
+                    f.description = (f.description.TrimEnd('.') + ". This exact one is not in our ingredient database yet, so it is not part of this result.").TrimStart('.', ' ');
+                }
                 f.level = level;
                 f.reason = string.Join(" ", reasons.Distinct());
                 if (level == "harmful") record.harmfulIngredients.Add(shown);
@@ -119,16 +133,28 @@ namespace GlowUp.Scan
                 record.findings.Add(f);
             }
 
+            // names the reader could not match with anything the app knows: kept apart, never part of the verdict
+            foreach (string name in unrecognized ?? new List<string>())
+                if (!string.IsNullOrWhiteSpace(name) && seen.Add(name.Trim())) record.unrecognized.Add(name.Trim());
+
             // ---------------- verdict ----------------
+            // It rests ONLY on the ingredients that could be checked. What could not be checked (an ingredient the app only
+            // knows the family of, an entry of the AI lookup nobody reviewed, a name it does not know at all) never makes
+            // a product "fine": the result says how many there were, and with too many of them it is called incomplete.
             int total = record.findings.Count;
             int unknown = record.findings.Count(x => x.level == "unknown");
             int harmful = record.findings.Count(x => x.level == "harmful");
             int caution = record.findings.Count(x => x.level == "caution");
+            int names = total + record.unrecognized.Count;                  // every name on the label
+            int notChecked = unknown + record.unrecognized.Count;
+            int checkedNames = names - notChecked;
+            bool incomplete = false;
 
-            if (total == 0 || unknown == total)
+            if (checkedNames == 0)
             {
                 record.status = "caution";
                 record.summary = "We could not identify these ingredients, so we cannot judge this product yet.";
+                incomplete = true;
             }
             else if (harmful > 0)
             {
@@ -140,11 +166,19 @@ namespace GlowUp.Scan
                 record.status = "caution";
                 record.summary = caution == 1 ? "1 ingredient to watch." : $"{caution} ingredients to watch.";
             }
+            else if (checkedNames < names * MinimumCheckedShare)
+            {
+                record.status = "caution";
+                record.summary = $"Only {checkedNames} of the {names} names on this label could be checked, so this result is incomplete.";
+                incomplete = true;
+            }
             else
             {
                 record.status = "safe";
                 record.summary = "No ingredients were flagged for your profile.";
             }
+            if (!incomplete && notChecked > 0)
+                record.summary += notChecked == 1 ? " 1 name on the label could not be checked." : $" {notChecked} names on the label could not be checked.";
 
             // ---------------- compatibility matrix ----------------
             if (skinType.Length == 0) record.skinTypeMatch = Item("unknown", "No skin type saved in your profile.");
@@ -171,19 +205,19 @@ namespace GlowUp.Scan
             MatchBrand(record, rawLabelText, brands);
             record.dermatologistAdvised = harmful > 0 || caution >= 2 || (conditions.Count > 0 && record.status != "safe");
             record.recommendedShades = ShadeAdvisor.Recommend(profile.skinTone, ShadeAdvisor.AreaFor(record.cosmeticType));
-            record.explanation = BuildExplanation(record, total, unknown, typePositives, conditionPositives, conditionPositiveNames, skinType);
+            record.explanation = BuildExplanation(record, names, notChecked, typePositives, conditionPositives, conditionPositiveNames, skinType);
             return record;
         }
 
         // ---------------------------------------------------------------------------------------
         //  "Why this result?"
         // ---------------------------------------------------------------------------------------
-        static string BuildExplanation(ScanRecord r, int total, int unknown, List<string> typePositives,
+        static string BuildExplanation(ScanRecord r, int names, int notChecked, List<string> typePositives,
             List<string> conditionPositives, List<string> conditionPositiveNames, string skinType)
         {
             var sb = new StringBuilder();
             sb.Append(r.summary).Append(' ');
-            sb.Append($"We read {Count(total, "ingredient")} and recognised {total - unknown} of them.");
+            sb.Append($"We read {Count(names, "name")} on the label and could check {names - notChecked} of them.");
 
             var bad = r.findings.Where(f => f.level == "harmful").ToList();
             if (bad.Count > 0)
@@ -208,10 +242,13 @@ namespace GlowUp.Scan
                 sb.Append("\n\n<b>Hidden ingredients</b>");
                 foreach (string a in r.hiddenAlerts.Distinct()) sb.Append("\n- ").Append(a);
             }
-            if (unknown > 0)
+            if (notChecked > 0)
             {
-                var names = r.findings.Where(f => f.level == "unknown").Select(f => f.name).ToList();
-                sb.Append($"\n\n<b>Not checked</b>\n- {Count(unknown, "ingredient")} not verified yet (new to our database, or only described by the AI lookup so far): {Join(names, 5)}.");
+                // ingredients the app only half knows, and names it does not know at all: neither is part of the result
+                var partly = r.findings.Where(f => f.level == "unknown").Select(f => f.name).ToList();
+                sb.Append("\n\n<b>Not checked</b>");
+                if (partly.Count > 0) sb.Append($"\n- {Count(partly.Count, "ingredient")} not verified yet (only the kind of ingredient is known, or it was only described by the AI lookup so far): {Join(partly, 6)}.");
+                if (r.unrecognized.Count > 0) sb.Append($"\n- {Count(r.unrecognized.Count, "name")} on the label not recognised, so not counted as ingredients: {Join(r.unrecognized, 6)}.");
             }
             sb.Append("\n\nThis is guidance, not a medical opinion. Patch-test any new product first.");
             return sb.ToString();

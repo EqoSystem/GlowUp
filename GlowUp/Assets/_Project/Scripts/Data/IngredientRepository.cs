@@ -82,11 +82,16 @@ namespace GlowUp.Data
             return holder ?? new IngredientCacheHolder();
         }
 
-        public static string Normalize(string s) => (s ?? "").Trim().ToLowerInvariant();
+        /// <summary>The comparable key of a name (the same rule as everywhere else: capitals, accents and punctuation do not matter).</summary>
+        public static string Normalize(string s) => TextKey.Normalize(s);
+
+        /// <summary>Goes up by one every time the list changes (so anything built from it knows when to rebuild).</summary>
+        public static int Version { get; private set; }
 
         static void Rebuild()
         {
             index = new Dictionary<string, IngredientData>();
+            Version++;
             if (holder == null) return;
             // first everything an admin typed or approved, then the unreviewed AI finds for names still free
             foreach (var i in holder.items) if (!i.IsUnreviewedAi()) AddToIndex(i);
@@ -101,10 +106,20 @@ namespace GlowUp.Data
         static void Add(string key, IngredientData d) { var k = Normalize(key); if (k.Length > 0 && !index.ContainsKey(k)) index[k] = d; }
 
         /// <summary>The website's entry for this ingredient name, or null.</summary>
-        public static IngredientData Find(string scannedName)
+        public static IngredientData Find(string scannedName) => FindByKey(Normalize(scannedName));
+
+        /// <summary>The website's entry under this name key (see Normalize), or null.</summary>
+        public static IngredientData FindByKey(string key)
         {
             if (index == null) Rebuild();
-            return index != null && index.TryGetValue(Normalize(scannedName), out var d) ? d : null;
+            return index != null && !string.IsNullOrEmpty(key) && index.TryGetValue(key, out var d) ? d : null;
+        }
+
+        /// <summary>Every name key the website's list answers to (names, label names and synonyms).</summary>
+        public static IEnumerable<string> Keys()
+        {
+            if (index == null) Rebuild();
+            return index != null ? (IEnumerable<string>)index.Keys : new string[0];
         }
 
         /// <summary>

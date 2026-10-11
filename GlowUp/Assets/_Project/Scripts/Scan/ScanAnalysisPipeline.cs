@@ -35,8 +35,10 @@ namespace GlowUp.Scan
             ScanSession.LastError = null;
 
             report(0, "Reading the ingredient list");
-            List<string> names = IngredientTextParser.Parse(ScanSession.PendingText);
-            if (names.Count == 0)
+            // the reader sorts the label text into known ingredients, names it does not know, and everything that is not
+            // an ingredient at all (thrown away): see IngredientTextParser
+            IngredientTextParser.ParsedList label = IngredientTextParser.Read(ScanSession.PendingText);
+            if (label.Count == 0)
             {
                 ScanSession.LastError = "We could not find an ingredient list in that. Try again with the list filling the frame, or type the ingredients in.";
                 SceneNavigator.Retarget(SceneNames.AiSmartAnalysis);
@@ -56,15 +58,23 @@ namespace GlowUp.Scan
 
             // ONLINE: ingredients nobody has described yet are looked up (AI + web search + the FDA's substance
             // registry) and added to the shared database, marked "AI, not reviewed". Offline they stay "not checked".
-            if (IngredientResearcher.Enabled && AiConfig != null && ConnectivityMonitor.Online)
+            // Only names that passed the reader's checks are ever shown to the AI: never raw label text.
+            if (IngredientResearcher.Enabled && AiConfig != null && ConnectivityMonitor.Online && label.unrecognized.Count > 0)
             {
-                try { await IngredientResearcher.ResearchUnknown(names, AiConfig, message => report(1, message)); }
+                try
+                {
+                    int learned = await IngredientResearcher.ResearchUnknown(label.unrecognized, AiConfig, message => report(1, message));
+                    if (learned > 0) label = IngredientTextParser.Read(ScanSession.PendingText);      // what was just learned is known now
+                }
                 catch (Exception e) { Debug.LogWarning("Ingredient lookup skipped: " + e.Message); }
             }
+            List<string> names = label.inOrder;         // every name on the label, known or not, in its order (for the inventory)
 
             report(2, "Comparing with your skin profile");
             UserProfileData profile = await UserProfileRepository.Load() ?? new UserProfileData();
-            ScanRecord record = ProductAnalysisEngine.Analyse(names, ScanSession.PendingText, profile, brands);
+            // the verdict rests on the KNOWN ingredients only; the names nobody knows are kept beside it
+            ScanRecord record = ProductAnalysisEngine.Analyse(label.ingredients, ScanSession.PendingText, profile, brands, null, null, null, label.unrecognized);
+            record.mayContain = new List<string>(label.mayContain);
             record.source = string.IsNullOrEmpty(ScanSession.PendingSource) ? "scan" : ScanSession.PendingSource;
             record.shadeHex = ScanSession.PendingShadeHex ?? "";
 

@@ -343,7 +343,7 @@ namespace GlowUp.Scan
                 if (isList)
                 {
                     ingredientText = text; ingredientSource = "scan"; sources.Clear(); listFrom = "pack"; listWebBacked = false;
-                    if (ingredientsCheck != null) ingredientsCheck.SetFound(string.Format(ingredientsFoundFormat, IngredientTextParser.Parse(text).Count));
+                    if (ingredientsCheck != null) ingredientsCheck.SetFound(string.Format(ingredientsFoundFormat, IngredientTextParser.Read(text).ingredients.Count));
                 }
 
                 if (phase == Phase.Ingredients)
@@ -383,11 +383,12 @@ namespace GlowUp.Scan
         bool LooksLikeIngredients(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return false;
-            List<string> names = IngredientTextParser.Parse(text);
-            // enough names AND the shape of a list (the word "Ingredients", or commas between the names): the front of a
-            // pack, with its brand and product name on lines of their own, is not an ingredient list
-            if (names.Count >= minimumListedNames && IngredientTextParser.HasListShape(text)) return true;
-            return IngredientTextParser.CountRecognised(names) >= minimumKnownIngredients;
+            IngredientTextParser.ParsedList list = IngredientTextParser.Read(text);
+            // enough ingredients the app knows...
+            if (list.ingredients.Count >= minimumKnownIngredients) return true;
+            // ...or at least one of them among enough names in the SHAPE of a list (the word "Ingredients", or commas between
+            // the names): the front of a pack, with its brand and product name on lines of their own, is not an ingredient list
+            return list.ingredients.Count >= 1 && list.Count >= minimumListedNames && IngredientTextParser.HasListShape(text);
         }
 
         // ---------------------------------------------------------------------------------------
