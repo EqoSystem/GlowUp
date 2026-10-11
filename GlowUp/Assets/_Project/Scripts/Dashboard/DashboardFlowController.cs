@@ -49,8 +49,16 @@ namespace GlowUp.Dashboard
         [SerializeField] private TextMeshProUGUI recommendationsEmptyText;
         [SerializeField] private int maximumRecommendations = 8;
         [SerializeField] private CosmeticTypeIcons typeIcons;
-        [SerializeField] private string msgLoading = "Looking for products that suit you...";
-        [SerializeField] private string msgNone = "No recommendations yet. Products that are safe for your skin will appear here as the catalogue grows.";
+        [SerializeField] private string msgLoading = "Looking for make-up that matches your profile...";
+        [Tooltip("Shown when no product passes the check. The app never falls back to showing a product that did not pass.")]
+        [SerializeField] private string msgNone = "No make-up products matched your profile yet. Scan a product to check it.";
+        [Tooltip("The small line under the heading that says what a recommendation means. Optional.")]
+        [SerializeField] private TextMeshProUGUI recommendationsNoteText;
+        [SerializeField] private string noteStandard = "No ingredients flagged for your profile. This is not medical advice.";
+        [Tooltip("The same line for a user who saved a skin condition")]
+        [SerializeField] private string noteWithCondition = "No ingredients flagged for your profile. This is not medical advice: ask a dermatologist about a flare-up.";
+        [Tooltip("For a user who saved a skin condition: a product is recommended only when the app knows every one of its ingredients. This many unknown ingredients are tolerated (0 = none).")]
+        [SerializeField] private int unknownIngredientsAllowedWithCondition = 0;
         [SerializeField] private string saveLabel = "Save";
         [SerializeField] private string savedLabel = "Saved";
 
@@ -151,19 +159,15 @@ namespace GlowUp.Dashboard
             foreach (var c in cards) if (c != null) Destroy(c);
             cards.Clear(); tiles.Clear();
 
+            // Only MAKE-UP whose ingredients are not flagged for this user. For a user who saved a skin condition the check is
+            // stricter: the ingredient list must have a source and every ingredient must be known (see ProductRecommender).
+            // All of it is worked out on the phone.
             var who = profile ?? new UserProfileData();
-            foreach (ProductData product in products)
+            ProductRecommender.UnknownAllowedWithCondition = Mathf.Max(0, unknownIngredientsAllowedWithCondition);
+            foreach (ProductRecommender.Pick pick in ProductRecommender.For(who, products, maximumRecommendations))
             {
-                if (cards.Count >= maximumRecommendations) break;
-                if (product.ingredients == null || product.ingredients.Count == 0) continue;
-                if (product.minAge > 0 && who.age > 0 && who.age < product.minAge) continue;              // age-appropriate only
-
-                ScanRecord record = ProductAnalysisEngine.Analyse(product.ingredients, "", who, null, product.name, product.brandName, product.cosmeticType);
-                if (record.status != "safe") continue;                                                   // only products marked safe for this user
-                record.source = "recommendation";
-                record.brandId = product.brandId;
-                record.productShades = new List<string>(product.shades ?? new List<string>());
-
+                ProductData product = pick.product;
+                ScanRecord record = pick.record;
                 if (recommendationTemplate == null || recommendationsContent == null) continue;
                 // the tile shows only the name, the brand and the kind; its arrow slides the Save / Try On / AI drawer down
                 ProductTileView tile = Instantiate(recommendationTemplate, recommendationsContent);
@@ -184,6 +188,12 @@ namespace GlowUp.Dashboard
             {
                 recommendationsEmptyText.gameObject.SetActive(cards.Count == 0);
                 recommendationsEmptyText.text = msgNone;
+            }
+            // what a recommendation means, and does not mean: said under the heading when there is something to show
+            if (recommendationsNoteText != null)
+            {
+                recommendationsNoteText.gameObject.SetActive(cards.Count > 0);
+                recommendationsNoteText.text = ProductScope.HasSkinCondition(who) ? noteWithCondition : noteStandard;
             }
         }
 

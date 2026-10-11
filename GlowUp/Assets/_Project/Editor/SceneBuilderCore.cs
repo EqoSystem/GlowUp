@@ -219,6 +219,24 @@ namespace GlowUp.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        /// <summary>
+        /// A text on a controller that survives rebuilds keeps whatever the scene has saved, so a new default wording in
+        /// the code would never reach an existing scene. This writes the new wording, but ONLY when the scene still holds
+        /// one of the earlier defaults (or nothing): wording the user typed in the Inspector themselves is left alone.
+        /// </summary>
+        public static void ReplaceText(Object target, string field, string newText, params string[] earlierDefaults)
+        {
+            var so = new SerializedObject(target);
+            var p = so.FindProperty(field);
+            if (p == null || p.propertyType != SerializedPropertyType.String) { Debug.LogWarning($"[SceneBuilder] {target.GetType().Name} has no text field '{field}'"); return; }
+            string current = p.stringValue ?? "";
+            bool replace = current.Length == 0;
+            foreach (string earlier in earlierDefaults) if (current == earlier) replace = true;
+            if (!replace || current == newText) return;
+            p.stringValue = newText;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         public static Color Hex(string hex) { ColorUtility.TryParseHtmlString(hex, out var c); return c; }
 
         /// <summary>ThemeProfile asset (created once).</summary>

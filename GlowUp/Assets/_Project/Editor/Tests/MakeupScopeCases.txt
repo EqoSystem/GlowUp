@@ -1,0 +1,117 @@
+# Examples for the make-up-only rule. The app (ProductScope.cs) and the admin website (productScope in
+# _Shared/glowupRules.js) are both tested against this one list, so they can never drift apart.
+#
+# Each line:  kind someone gave the product | product name | what the rule must say | the app's own word for the kind
+# The rule says one of:  makeup    it is make-up
+#                        skincare  it is skin care: not make-up
+#                        out       it is a hair, body, nail or fragrance product: not make-up
+#                        unclear   cannot tell, or a kind the project has not decided on yet (kept for review)
+# The last column is only checked for make-up. Lines that start with # are notes.
+
+# ---- make-up
+Lipstick | | makeup | Lipstick
+ | Superstay Matte Ink Liquid Lipstick | makeup | Lipstick
+Lipstick | Color Riche Intense Volume Matte | makeup | Lipstick
+Lip Gloss | Super Lustrous Glimmer Gloss | makeup | Lip Gloss
+ | Peripera Ink Velvet Tint | makeup | Lip Tint
+Blush | Cream Cheek | makeup | Blush
+Blush | Chubby Stick Cheek Color Balm | makeup | Blush
+Powder | Translucent Loose Setting Powder | makeup | Powder
+ | Complexion Blur Translucent Perfecting Powder | makeup | Powder
+Foundation | Studio Fix Powder Plus Foundation NC13 | makeup | Foundation
+ | Fit Me Matte + Poreless Cushion | makeup | Foundation
+ | Brow Pencil Natural Brown | makeup | Brow
+Brow | The Brow Multi-tasker | makeup | Brow
+ | Microblade Hair Stroke Brow Pen | makeup | Brow
+ | Lash Sensational Washable Mascara | makeup | Mascara
+ | Oil-Free Liquid Foundation SPF 15 | makeup | Foundation
+ | Fragrance-Free Pressed Powder | makeup | Powder
+ | Baby Pink Matte Lipstick | makeup | Lipstick
+ | Face & Body Foundation | makeup | Foundation
+ | Serum Foundation | makeup | Foundation
+ | All Nighter Setting Spray | makeup | Setting Spray
+Setting Spray | | makeup | Setting Spray
+Primer | Pure Canvas Primer Perfecting | makeup | Primer
+ | Eyeshadow Palette Nude | makeup | Eyeshadow
+ | Precision Liquid Eyeliner | makeup | Eyeliner
+ | Contour Stick | makeup | Contour
+ | Soap Brows | makeup | Brow
+Lipstick | Precision Lip Liner | makeup | Lipstick
+LIPSTICK | MATTE REVOLUTION | makeup | Lipstick
+ | Rouge Dior Lip Colour | makeup | Lipstick
+ | Cheek Tint Rosy | makeup | Blush
+ | Liquid Highlighter Champagne | makeup | Highlighter
+ | Sun Stalk'r Instant Warmth Bronzer | makeup | Bronzer
+
+# ---- not make-up: skin care
+Moisturizer | Hydrating Face Cream | skincare
+Sunscreen | Sun Expert SPF 60 PA+++ | skincare
+Cleanser | Daily Facial Cleanser | skincare
+Serum | Extra Repair Serum | skincare
+Mask | Garnier Moisture Bomb Refreshing Sheet Mask | skincare
+Skincare | | skincare
+Skin Care | Some Product | skincare
+Lipstick | Instant Eye And Lip Makeup Remover | skincare
+Lipstick | Lip + Eye Make Up Remover | skincare
+Mascara | False Lash Mascara Remover | skincare
+ | Take The Day Off Cleansing Balm | skincare
+ | Micellar Water | skincare
+ | Lip Sleeping Mask | skincare
+ | Pond's Cream | skincare
+ | Toner | skincare
+ | Peptide Lip Treatment | skincare
+
+# ---- not make-up: hair, body, nail, fragrance
+Shampoo | Elvive Shampoo Hyaluron Pure | out
+Conditioner | Sunsilk Longer & Stronger Conditioner 700mL | out
+Moisturizer | Nivea Body Lotion Rich 250mL | out
+Moisturizer | Vaseline Aloe Soothe Bodylotion | out
+ | Baby Powder | out
+Powder | Johnson's Baby Powder | out
+ | Hair Gloss Treatment | out
+ | Nail Polish Red | out
+ | Eau De Parfum 50ml | out
+ | Hair Mascara Root Touch Up | out
+Hair | Keratin Smooth | out
+Body | Glow Lotion | out
+Nail | Gel Color | out
+Fragrance | Bloom | out
+ | Deodorant Roll-On | out
+ | Hand Cream | out
+
+# ---- unclear: nothing to go on
+ | | unclear
+ | Absidy Beauty Base | unclear
+Unknown | | unclear
+
+# ---- unclear: kinds the project has not decided on yet (see ProductScope.Undecided)
+ | Tinted Moisturizer SPF 30 | unclear
+Foundation | Second Skin Tinted Moisturizer | unclear
+ | BB Cream Natural | unclear
+ | CC Cream | unclear
+Lip Balm | Classic Lip Balm | unclear
+ | Tinted Lip Balm | unclear
+Lip Gloss | Glossy Pout Lip Oil | unclear
+Foundation | All Day Matte Skin Tint | unclear
+Primer | Tinted Sunscreen Primer Stick Spf 50 | unclear
+
+# ---- unclear: the kind and the name do not agree
+Brow | Lathering Tube Soap | unclear
+Blush | Body Lotion | unclear
+Lipstick | Hair Color | unclear
+ | Primer Serum | unclear
+Brow | Hubba Brow Growth Serum | unclear
+Skin Care | Glow Foundation Serum | unclear
+
+# ---- the front of a pack, as the camera reads it (a careful check: only unmistakable words say "not make-up")
+@label | HEAD & SHOULDERS ANTI-DANDRUFF SHAMPOO 340ML | out
+@label | NIVEA BODY LOTION | out
+@label | MAYBELLINE FIT ME FOUNDATION WITH SUNSCREEN | makeup
+@label | SUPERSTAY MATTE INK | unclear
+@label | DOVE DEODORANT | out
+@label | BIORE MAKEUP REMOVER | skincare
+@label | JOHNSON'S BABY POWDER | out
+@label | WITH MOISTURIZER AND VITAMIN E | unclear
+@label | BB CREAM FACIAL WASH | unclear
+@label | CETAPHIL GENTLE FACIAL CLEANSER | skincare
+@label | | unclear

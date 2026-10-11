@@ -617,7 +617,7 @@ namespace GlowUp.EditorTools
             HStack(row, 10, 0, 0, 0, 0, TextAnchor.MiddleCenter);
             var icon = RawIcon(row.transform, "Icon", IconFactory.Check, fontSize, Color.white);
             Size(icon, fontSize, fontSize);
-            var label = RawLabel(row.transform, "Label", "Safe for you", fontSize, Color.white, FontRole.Button, TextAlignmentOptions.Center);
+            var label = RawLabel(row.transform, "Label", "Nothing flagged", fontSize, Color.white, FontRole.Button, TextAlignmentOptions.Center);
 
             var view = SceneBuilderCore.Ensure<StatusPillView>(bg.gameObject);
             Set(view, "background", bg); Set(view, "label", label); Set(view, "icon", icon);
@@ -772,7 +772,7 @@ namespace GlowUp.EditorTools
             HStack(levelLine, 12);
             var dot = RawPanel(levelLine.transform, "LevelDot", new Color32(94, 127, 75, 255), 20f);
             Size(dot, 22, 22);
-            var levelText = RawLabel(levelLine.transform, "LevelText", "Safe", 28, new Color32(94, 127, 75, 255), FontRole.Label);
+            var levelText = RawLabel(levelLine.transform, "LevelText", "Not flagged", 28, new Color32(94, 127, 75, 255), FontRole.Label);
             var description = Label(row.transform, "DescriptionText", "A form of vitamin B3 that helps even out skin tone and supports the skin barrier.",
                                     29, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             var uses = Label(row.transform, "UsesText", "Used in: serums, moisturisers, toners", 27, ThemeRole.SecondaryText, FontRole.Body,

@@ -15,8 +15,9 @@ namespace GlowUp.Scan
     ///   - the app does NOT recommend it to anyone until an admin approves it there.
     /// A product that is already listed (also while still Pending) is not added twice: the scan is
     /// counted on the existing entry instead.
-    /// GlowUp lists make-up and face products only: a hair, body, nail or fragrance product is never
-    /// added (ProductScope decides; the website and the database rules use the same rule).
+    /// GlowUp lists MAKE-UP ONLY. A product is added only when it is clearly make-up AND its kind is one of the
+    /// make-up kinds the app knows (ProductScope.MakeupType). Skin care, hair, body, nail and fragrance products
+    /// are never added, and neither is a product whose kind is unclear or was only guessed from the label text.
     /// Settings are Inspector fields on LoadingSceneController.
     /// </summary>
     public static class ScannedProductPublisher
@@ -30,7 +31,8 @@ namespace GlowUp.Scan
         /// (existing or newly added) so the caller can count the scan. Does nothing when the product cannot
         /// be added (not signed in to the cloud, too few ingredients, no name).
         /// </summary>
-        public static void PublishIfNew(ScanRecord record, List<string> labelIngredients)
+        /// <param name="kindIsKnown">false when the product's kind was only guessed from the label text: such a product is not added</param>
+        public static void PublishIfNew(ScanRecord record, List<string> labelIngredients, bool kindIsKnown = true)
         {
             if (!Enabled || record == null || !string.IsNullOrEmpty(record.productId)) return;
             if (labelIngredients == null || labelIngredients.Count < Mathf.Max(1, ProductMatcher.MinimumShared)) return;
@@ -43,11 +45,13 @@ namespace GlowUp.Scan
             if (string.IsNullOrEmpty(uid)) return;                               // the cloud only accepts additions from a signed-in user
             bool named = !string.IsNullOrWhiteSpace(record.productName);
             if (!named && RequireProductName) return;
-            if (ProductScope.Classify(record) == ProductScope.Kind.OutOfScope) return;      // not make-up or a face product: the inventory does not take it
+            // MAKE-UP ONLY: the inventory takes a product only when it is clearly make-up and of a kind the app knows.
+            // A kind that was merely guessed from the label text counts only when the product's own name says it too.
+            string type = ProductScope.MakeupType(kindIsKnown ? record.cosmeticType : "", record.productName);
+            if (type.Length == 0) return;
 
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             if (string.IsNullOrEmpty(record.id)) record.id = Guid.NewGuid().ToString("N");     // the inventory entry is named after the scan
-            string type = string.IsNullOrWhiteSpace(record.cosmeticType) ? "Skincare" : record.cosmeticType.Trim();
 
             // ---- the brand ----
             string brandId = record.brandId ?? "", brandName = (record.brandName ?? "").Trim();
@@ -61,7 +65,7 @@ namespace GlowUp.Scan
                     if (brandId.Length > 90) brandId = brandId.Substring(0, 90);
                     var brand = new ScannedBrandRecord
                     {
-                        name = Limit(brandName, 60), category = ShadeAdvisor.IsColourCosmetic(type) ? "Makeup" : "Skincare", market = "",
+                        name = Limit(brandName, 60), category = "Makeup", market = "",
                         status = "Pending", scans = 0, source = "scan", reviewed = false, addedBy = uid, addedAtUnix = now
                     };
                     SyncQueue.EnqueueSet("brands/" + brandId, brand);

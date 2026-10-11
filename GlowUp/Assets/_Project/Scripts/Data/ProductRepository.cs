@@ -12,6 +12,7 @@ namespace GlowUp.Data
     /// Document fields: name, brandId, brandName, cosmeticType (or category), description, status,
     /// minAge, scans, ingredients (array of text), shades (array of hex colours).
     /// Cached on the device so recommendations and alternatives also work offline.
+    /// The app only uses a product that is make-up, Active, not in the Recycle bin, and whose brand is Active.
     /// </summary>
     public static class ProductRepository
     {
@@ -58,8 +59,9 @@ namespace GlowUp.Data
                 {
                     if (!string.Equals((p.status ?? "").Trim(), "Active", StringComparison.OrdinalIgnoreCase)) continue;
                     if (BrandRepository.IsSwitchedOff(p.brandId)) continue;
-                    // GlowUp is about make-up and face products: a hair, body, nail or fragrance product is never recommended
-                    if (GlowUp.Scan.ProductScope.Classify(p.cosmeticType, p.name) == GlowUp.Scan.ProductScope.Kind.OutOfScope) continue;
+                    // GlowUp is about MAKE-UP ONLY: skin care, hair, body, nail and fragrance products are never shown or
+                    // recommended, and neither is a product whose kind is unclear (it waits for an admin to look at it)
+                    if (!GlowUp.Scan.ProductScope.IsMakeup(p.cosmeticType, p.name)) continue;
                     result.Add(p);
                 }
             return result;

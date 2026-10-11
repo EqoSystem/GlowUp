@@ -79,9 +79,15 @@ namespace GlowUp.Scan
                 catch (Exception e) { Debug.LogWarning("Product recognition skipped: " + e.Message); }
             }
 
-            ApplyRecognised(record, profile);
+            // Until here the product's kind is only a guess from the label text. It is KNOWN when the inventory, the scan
+            // screen (the AI, a barcode, the user's own choice) or the FDA's record says what the product is.
+            bool kindIsKnown = !string.IsNullOrEmpty(record.productId) && !string.IsNullOrWhiteSpace(record.cosmeticType);
+            if (ApplyRecognised(record, profile)) kindIsKnown = true;
             if (!string.IsNullOrEmpty(record.fdaStatus)) fdaSearch = null;                        // the inventory had the FDA record
             else if (fdaSearch == null) fdaSearch = StartFdaSearch(record.productName, record.brandName);
+
+            // MAKE-UP ONLY: a product that is clearly something else is not analysed, saved, counted or added to the inventory
+            if (StopIfNotMakeup(record, kindIsKnown)) return;
 
             // the FDA Philippines answer: taken now when it has arrived. Otherwise the result waits a few seconds for it and then
             // opens without it: its badge says "checking" and fills in by itself when the answer comes (FinishFdaLater).
@@ -89,7 +95,11 @@ namespace GlowUp.Scan
             {
                 if (!fdaSearch.IsCompleted) { report(2, "Checking the FDA Philippines list"); await WaitFor(fdaSearch, FdaExtraWaitSeconds); }
                 if (string.IsNullOrEmpty(record.id)) record.id = Guid.NewGuid().ToString("N");      // the late answer finds the saved scan by its id
-                if (fdaSearch.IsCompleted) UseFdaAnswer(record, fdaSearch);
+                if (fdaSearch.IsCompleted)
+                {
+                    if (UseFdaAnswer(record, fdaSearch, kindIsKnown)) kindIsKnown = true;
+                    if (StopIfNotMakeup(record, kindIsKnown)) return;                              // the FDA's record says what it is
+                }
                 else FinishFdaLater(record, fdaSearch);
             }
 
@@ -110,7 +120,7 @@ namespace GlowUp.Scan
             // ONLINE: a product the inventory does not have yet is added to it as "Pending" (see ScannedProductPublisher)
             if (ConnectivityMonitor.Online)
             {
-                try { ScannedProductPublisher.PublishIfNew(record, names); }
+                try { ScannedProductPublisher.PublishIfNew(record, names, kindIsKnown); }
                 catch (Exception e) { Debug.LogWarning("Adding the product to the inventory was skipped: " + e.Message); }
             }
             ScanHistoryRepository.Add(record);                       // every scan is saved to Recent Scans automatically
@@ -122,17 +132,37 @@ namespace GlowUp.Scan
             ScanSession.ClearPending();
         }
 
-        /// <summary>What phase 1 of the scan recognised (name, brand, kind, shade, texture) and where a looked-up ingredient list came from.</summary>
-        static void ApplyRecognised(ScanRecord record, UserProfileData profile)
+        /// <summary>
+        /// The scan is stopped when the product is clearly not make-up (its name, the AI, the inventory, the user or the
+        /// FDA's record says so). The user is sent back to the scan screen with the reason; nothing is saved or counted.
+        /// A kind that was only guessed from the label text never stops a scan.
+        /// </summary>
+        static bool StopIfNotMakeup(ScanRecord record, bool kindIsKnown)
         {
+            ProductScope.Verdict scope = ProductScope.Judge(kindIsKnown ? record.cosmeticType : "", record.productName);
+            if (!scope.IsNotMakeup) return false;
+            ScanSession.LastError = ProductScope.StopMessage(scope);
+            ScanSession.ClearPending();
+            SceneNavigator.Retarget(SceneNames.AiSmartAnalysis);
+            return true;
+        }
+
+        /// <summary>
+        /// What phase 1 of the scan recognised (name, brand, kind, shade, texture) and where a looked-up ingredient list came
+        /// from. Returns true when the scan screen said what KIND of product it is (that is more than a guess).
+        /// </summary>
+        static bool ApplyRecognised(ScanRecord record, UserProfileData profile)
+        {
+            bool kindGiven = false;
             if (string.IsNullOrEmpty(record.productId))               // a product from the inventory keeps the inventory's details
             {
                 if (string.IsNullOrWhiteSpace(record.productName) && !string.IsNullOrWhiteSpace(ScanSession.PendingProductName)) record.productName = ScanSession.PendingProductName.Trim();
                 if (string.IsNullOrWhiteSpace(record.brandName) && !string.IsNullOrWhiteSpace(ScanSession.PendingBrandName)) record.brandName = ScanSession.PendingBrandName.Trim();
-                if (!string.IsNullOrWhiteSpace(ScanSession.PendingCosmeticType) && (string.IsNullOrWhiteSpace(record.cosmeticType) || record.cosmeticType == "Skincare"))
+                if (!string.IsNullOrWhiteSpace(ScanSession.PendingCosmeticType))
                 {
-                    record.cosmeticType = ScanSession.PendingCosmeticType.Trim();
+                    record.cosmeticType = ScanSession.PendingCosmeticType.Trim();      // what was recognised replaces the guess
                     record.recommendedShades = ShadeAdvisor.Recommend(profile.skinTone, ShadeAdvisor.AreaFor(record.cosmeticType));
+                    kindGiven = true;
                 }
             }
             record.shadeName = ScanSession.PendingShadeName ?? "";
@@ -144,6 +174,7 @@ namespace GlowUp.Scan
             record.listFrom = !string.IsNullOrEmpty(ScanSession.PendingListFrom) ? ScanSession.PendingListFrom
                 : record.source == "manual" ? "typed" : record.source == "lookup" ? "web" : "pack";
             record.listWebBacked = ScanSession.PendingListWebBacked;
+            return kindGiven;
         }
 
         /// <summary>The scan is a known product: take its name, brand, type and shades from the inventory.</summary>
@@ -205,16 +236,20 @@ namespace GlowUp.Scan
         /// The FDA's answer arrived in time. It is kept on the scan in its own fields (the result screen shows it as a
         /// badge; it used to be a paragraph at the top of "Why this result?"), and what it says fills the gaps: name, brand, kind.
         /// </summary>
-        static void UseFdaAnswer(ScanRecord record, Task<PhFdaVerification.Result> search)
+        /// <returns>true when the FDA's record gave the product its kind</returns>
+        static bool UseFdaAnswer(ScanRecord record, Task<PhFdaVerification.Result> search, bool kindIsKnown)
         {
-            if (search.Status != TaskStatus.RanToCompletion || search.Result == null) { Debug.LogWarning("FDA Philippines check skipped: the search ended with a problem."); return; }
+            if (search.Status != TaskStatus.RanToCompletion || search.Result == null) { Debug.LogWarning("FDA Philippines check skipped: the search ended with a problem."); return false; }
             PhFdaVerification.Result fda = search.Result;
             ApplyFda(record, fda);
-            if (!fda.found) return;
+            if (!fda.found) return false;
             if (string.IsNullOrWhiteSpace(record.productName)) record.productName = Title(fda.productName);
             if (string.IsNullOrWhiteSpace(record.brandName)) record.brandName = Title(fda.brandName);
+            // the kind is taken from the FDA's record only when that record is clearly this product, and nobody has said the kind yet
             string kind = PhFdaVerification.TypeFromUse(fda.intendedUse);
-            if (kind.Length > 0 && string.IsNullOrEmpty(record.productId) && (string.IsNullOrWhiteSpace(record.cosmeticType) || record.cosmeticType == "Skincare")) record.cosmeticType = kind;
+            if (kind.Length == 0 || kindIsKnown || !fda.closeMatch || !string.IsNullOrEmpty(record.productId)) return false;
+            record.cosmeticType = kind;
+            return true;
         }
 
         /// <summary>

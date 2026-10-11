@@ -169,9 +169,9 @@ namespace GlowUp.EditorTools
             A.Glow(tryOn, 132);
 
             // ---- pop-ups ----
-            A.AppPopup alternativesPopup = A.Overlay(s, "AlternativesPanel", "Safer alternatives");
+            A.AppPopup alternativesPopup = A.Overlay(s, "AlternativesPanel", "Alternatives");
             A.Fill(alternativesPopup.box, 40, 40, 40, 150);
-            TextMeshProUGUI alternativesHint = A.Label(alternativesPopup.box, "AlternativesHintText", "Products of the same kind that are safe for your profile.", 29,
+            TextMeshProUGUI alternativesHint = A.Label(alternativesPopup.box, "AlternativesHintText", "Make-up of the same kind with no ingredients flagged for your profile. This is not medical advice.", 29,
                                                        ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             A.TopStrip(alternativesHint.transform, 114, 84, 48, 48);
             GameObject alternativesArea = A.Node(alternativesPopup.box, "ListArea");
@@ -179,7 +179,7 @@ namespace GlowUp.EditorTools
             AppTiles.GridScroll(alternativesArea.transform, "AlternativesScrollView", out RectTransform alternativesContent);
             ProductTileView alternativeTemplate = AppTiles.ProductTile(alternativesContent, "AlternativeTileTemplate", AppTiles.TileKind.Dashboard);
             TextMeshProUGUI alternativesEmpty = A.Label(alternativesArea.transform, "AlternativesEmptyText",
-                "No alternatives in the catalogue yet. They appear here as products are added.", 32, ThemeRole.SecondaryText, FontRole.Body,
+                "No make-up products matched your profile yet. Scan another product to check it.", 32, ThemeRole.SecondaryText, FontRole.Body,
                 TextAlignmentOptions.Center, true);
             A.Fill(alternativesEmpty.transform, 50, 0, 50, 0);
             alternativesEmpty.gameObject.SetActive(false);
@@ -222,6 +222,10 @@ namespace GlowUp.EditorTools
             A.Set(controller, "alternativesContent", alternativesContent); A.Set(controller, "alternativeTileTemplate", alternativeTemplate);
             A.Set(controller, "aiPanel", AppTiles.AiPanel(s));
             A.Set(controller, "alternativesEmptyText", alternativesEmpty);
+            // reworded for "make-up only" and "nothing flagged" (wording changed in the Inspector is kept)
+            SceneBuilderCore.ReplaceText(controller, "msgNoAlternatives", "No make-up products matched your profile yet. Scan another product to check it.",
+                "No alternatives in the catalogue yet. They appear here as products are added.");
+            SceneBuilderCore.ReplaceText(controller, "msgLoadingAlternatives", "Looking for make-up that matches your profile...", "Looking for safer alternatives...");
             A.Set(controller, "renameButton", rename); A.Set(controller, "renamePanel", renamePanel);
             A.Set(controller, "renameInput", renameInput); A.Set(controller, "renameSaveButton", renameSave);
             A.Set(controller, "backButton", s.back); A.Set(controller, "scanAnotherButton", scanAnother); A.Set(controller, "tryOnButton", tryOn);

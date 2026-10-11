@@ -16,7 +16,7 @@ namespace GlowUp.Views
         [SerializeField] private Image icon;
 
         [Header("Wording")]
-        [SerializeField] private string safeText = "Safe for you";
+        [SerializeField] private string safeText = "Nothing flagged";
         [SerializeField] private string cautionText = "Use with care";
         [SerializeField] private string avoidText = "Avoid";
 

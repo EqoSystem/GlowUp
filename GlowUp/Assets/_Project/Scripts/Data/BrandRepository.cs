@@ -30,7 +30,7 @@ namespace GlowUp.Data
                         var f = new FirestoreFields(doc);
                         h.items.Add(new BrandData
                         {
-                            id = f.Id, name = f.Str("name", "Unnamed Brand"), category = f.Str("category", "Skincare"),
+                            id = f.Id, name = f.Str("name", "Unnamed Brand"), category = f.Str("category"),
                             market = f.Str("market", "Global"), scans = f.Long("scans"),
                             status = f.Bool("binned") ? "Inactive" : f.Str("status", "Active")      // a brand in the website's Recycle bin is switched off
                         });

@@ -70,13 +70,14 @@ namespace GlowUp.EditorTools
             float listTop = 224 + panelHeight + 20;
             TextMeshProUGUI recommendedHeader = A.Label(card, "RecommendedHeaderText", "Recommended for you", 40, ThemeRole.Heading, FontRole.Heading);
             A.TopStrip(recommendedHeader.transform, listTop, 58, 48, 48);
-            TextMeshProUGUI recommendedHint = A.Label(card, "RecommendedHintText", "Checked against your profile", 26, ThemeRole.SecondaryText, FontRole.Body,
-                                                      TextAlignmentOptions.MidlineRight);
-            A.TopStrip(recommendedHint.transform, listTop, 58, 540, 48);
-            A.Shrink(recommendedHint, 20); A.HintOnly(recommendedHint);
+            // what a recommendation means, and does not mean (the app writes the line: it is longer for a user with a skin condition)
+            TextMeshProUGUI recommendedNote = A.Label(card, "RecommendedNoteText", "No ingredients flagged for your profile. This is not medical advice.", 25,
+                                                      ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            A.TopStrip(recommendedNote.transform, listTop + 56, 62, 48, 48);
+            A.ShrinkWrapped(recommendedNote, 20);
 
             GameObject listArea = A.Node(card, "RecommendationsArea");
-            A.Between(listArea.transform, listTop + 64, A.AboveBar);
+            A.Between(listArea.transform, listTop + 122, A.AboveBar);
             // square tiles, two per row: only the name, the brand and the kind; the arrow slides the Save / Try On / AI drawer down
             AppTiles.GridScroll(listArea.transform, "RecommendationsScrollView", out RectTransform content);
             ProductTileView template = AppTiles.ProductTile(content, "RecommendationTemplate", AppTiles.TileKind.Dashboard);
@@ -85,7 +86,7 @@ namespace GlowUp.EditorTools
             skeleton.SetActive(false);
 
             TextMeshProUGUI empty = A.Label(listArea.transform, "RecommendationsEmptyText",
-                "No recommendations yet. Products that are safe for your skin will appear here as the catalogue grows.",
+                "No make-up products matched your profile yet. Scan a product to check it.",
                 32, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center, true);
             A.Fill(empty.transform, 60, 0, 60, 0);
             empty.gameObject.SetActive(false);            // the app shows it when there is nothing to recommend
@@ -140,6 +141,11 @@ namespace GlowUp.EditorTools
             A.Set(controller, "allergensValue", allergens);
             A.Set(controller, "recommendationsContent", content); A.Set(controller, "recommendationTemplate", template);
             A.Set(controller, "recommendationsEmptyText", empty); A.Set(controller, "typeIcons", A.TypeIcons());
+            A.Set(controller, "recommendationsNoteText", recommendedNote);
+            // reworded for "make-up only" (wording changed in the Inspector is kept)
+            SceneBuilderCore.ReplaceText(controller, "msgNone", "No make-up products matched your profile yet. Scan a product to check it.",
+                "No recommendations yet. Products that are safe for your skin will appear here as the catalogue grows.");
+            SceneBuilderCore.ReplaceText(controller, "msgLoading", "Looking for make-up that matches your profile...", "Looking for products that suit you...");
             A.Set(controller, "avatarButton", avatar); A.Set(controller, "accountPanel", account.panel);
             A.Set(controller, "accountNameText", accountName); A.Set(controller, "accountEmailText", accountEmail);
             A.Set(controller, "signOutButton", signOut);

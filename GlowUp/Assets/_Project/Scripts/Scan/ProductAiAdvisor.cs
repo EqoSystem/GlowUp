@@ -129,7 +129,7 @@ namespace GlowUp.Scan
             var result = new Identity();
             if (!Available || jpegPhoto == null || jpegPhoto.Length == 0) return result;
             var q = new StringBuilder();
-            q.Append("The photo shows a cosmetic product held up to a phone camera. It may be shown with or without its packaging. Identify it.\n");
+            q.Append("The photo shows a product held up to a phone camera. It may be shown with or without its packaging. Identify it. This app checks MAKE-UP only, so say honestly when the product is something else.\n");
             q.Append("LOOK FIRST, READ SECOND: decide from what the pack looks like before you use any text. ");
             q.Append("Use everything the packaging shows, not only the words: the logo and its lettering, the colours and pattern of the pack, the shape of the tube, bottle, compact or box, and the cap. A well-known pack can be recognised by its look even when its text cannot be read.\n");
             if (KnownBrands != null && KnownBrands.Count > 0)
@@ -138,7 +138,7 @@ namespace GlowUp.Scan
                 q.Append("TEXT A TEXT READER FOUND ON IT (may contain mistakes):\n").Append(textOnProduct.Length > 600 ? textOnProduct.Substring(0, 600) : textOnProduct).Append('\n');
             q.Append("Reply with ONLY one JSON object, no markdown and no other text, in exactly this shape:\n");
             q.Append("{\"found\":true,\"productName\":\"the product's name as sold, without the brand\",\"brandName\":\"\",");
-            q.Append("\"cosmeticType\":\"one of: Lipstick, Lip Gloss, Lip Balm, Foundation, Concealer, Blush, Eyeshadow, Mascara, Moisturizer, Serum, Cleanser, Toner, Sunscreen, Mask, Skincare\",");
+            q.Append("\"cosmeticType\":\"").Append(ProductScope.AiTypeChoices).Append("\",");
             q.Append("\"shadeHex\":\"#RRGGBB of the PRODUCT'S OWN colour (the lipstick bullet, the powder, the liquid), never the packaging. Look at the product itself: the tip of the lipstick, the pan, the liquid. If only the packaging is visible, use the colour a shade name or shade number printed on it stands for, or a colour dot printed on it. A face powder (loose or pressed, not a blush, bronzer or eyeshadow) is always #FFFFFF. Empty when the product's own colour cannot be known\",");
             q.Append("\"shadeName\":\"the shade name or number printed on it, or empty\",");
             q.Append("\"finish\":\"the texture of the colour, one of: matte, satin, glossy, shimmer, metallic; empty when it cannot be seen\",");

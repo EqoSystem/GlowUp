@@ -300,18 +300,20 @@ namespace GlowUp.Scan
         // ---------------------------------------------------------------------------------------
         //  Product type and brand
         // ---------------------------------------------------------------------------------------
+        // words on a label that name a kind of make-up
         static readonly (string keyword, string type)[] TypeKeywords =
         {
-            ("lip gloss", "Lip Gloss"), ("lipgloss", "Lip Gloss"), ("lip balm", "Lip Balm"), ("lipstick", "Lipstick"), ("lip stick", "Lipstick"),
-            ("lip colour", "Lipstick"), ("lip color", "Lipstick"), ("lip tint", "Lipstick"),
+            ("lip gloss", "Lip Gloss"), ("lipgloss", "Lip Gloss"), ("lip tint", "Lip Tint"), ("lip liner", "Lip Liner"),
+            ("lipstick", "Lipstick"), ("lip stick", "Lipstick"), ("lip colour", "Lipstick"), ("lip color", "Lipstick"),
             ("foundation", "Foundation"), ("concealer", "Concealer"), ("blush", "Blush"), ("bronzer", "Bronzer"), ("highlighter", "Highlighter"),
-            ("eyeshadow", "Eyeshadow"), ("eye shadow", "Eyeshadow"), ("mascara", "Mascara"), ("eyeliner", "Eyeliner"),
-            ("sunscreen", "Sunscreen"), ("sun screen", "Sunscreen"), ("spf", "Sunscreen"),
-            ("cleanser", "Cleanser"), ("face wash", "Cleanser"), ("cleansing", "Cleanser"), ("shampoo", "Shampoo"), ("conditioner", "Conditioner"),
-            ("toner", "Toner"), ("serum", "Serum"), ("moisturizer", "Moisturizer"), ("moisturiser", "Moisturizer"), ("lotion", "Moisturizer"),
-            ("cream", "Moisturizer"), ("mask", "Mask"), ("powder", "Powder")
+            ("eyeshadow", "Eyeshadow"), ("eye shadow", "Eyeshadow"), ("mascara", "Mascara"), ("eyeliner", "Eyeliner"), ("primer", "Primer")
         };
 
+        /// <summary>
+        /// A GUESS at the kind of make-up, from the words of the label and from what the ingredients look like. It only
+        /// ever names a kind of make-up, and gives "" when it cannot tell: a guess is never a reason to call a product
+        /// "not make-up" (that takes the product's name, the AI, the inventory or the user: see ProductScope).
+        /// </summary>
         public static string GuessCosmeticType(string rawLabelText, List<string> ingredients)
         {
             string text = (rawLabelText ?? "").ToLowerInvariant();
@@ -321,14 +323,9 @@ namespace GlowUp.Scan
             bool pigment = all.Contains("iron oxide") || all.Contains("mica") || all.Contains("carmine") || all.Contains("ci 7") || all.Contains("ci 1");
             bool wax = all.Contains("wax") || all.Contains("castor oil") || all.Contains("polybutene");
             bool powder = all.Contains("talc") || all.Contains("silica") || all.Contains("kaolin");
-            bool wash = all.Contains("sulfate") || all.Contains("betaine") || all.Contains("isethionate") || all.Contains("glucoside");
-            bool sun = all.Contains("zinc oxide") || all.Contains("avobenzone") || all.Contains("octinoxate") || all.Contains("octocrylene") || all.Contains("homosalate") || all.Contains("oxybenzone");
             if (pigment && wax) return "Lipstick";
             if (pigment && powder) return "Powder";
-            if (pigment) return "Foundation";
-            if (sun) return "Sunscreen";
-            if (wash) return "Cleanser";
-            return "Skincare";
+            return "";
         }
 
         static void MatchBrand(ScanRecord record, string rawLabelText, List<BrandData> brands)

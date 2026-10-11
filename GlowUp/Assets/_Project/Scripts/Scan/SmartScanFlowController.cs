@@ -109,6 +109,8 @@ namespace GlowUp.Scan
         [SerializeField] private string startButtonLabel = "Start Scan";
         [SerializeField] private string readNowLabel = "Read Now";
         [SerializeField] private string finishLabel = "Finish";
+        [Tooltip("The main button after a scan was stopped because the product is not make-up")]
+        [SerializeField] private string scanAgainLabel = "Scan again";
         [SerializeField] private string hintProduct = "Show the front of the product and hold steady";
         [SerializeField] private string hintIngredients = "Now fit the ingredient list inside the frame";
         [Tooltip("{0} = how many ingredients were read")]
@@ -187,11 +189,11 @@ namespace GlowUp.Scan
         [SerializeField] private TMP_Dropdown manualTypeDropdown;
         [Tooltip("The first choice of the kind list, meaning: not chosen")]
         [SerializeField] private string manualTypeNone = "Cosmetic type";
-        [Tooltip("The kinds offered in the list (make-up and face products)")]
+        [Tooltip("The kinds offered in the list. GlowUp checks make-up only: a kind that is not make-up is left out of the list even when it is typed here.")]
         [SerializeField] private string[] manualTypes =
         {
-            "Lipstick", "Lip Gloss", "Lip Balm", "Lip Tint", "Foundation", "Concealer", "Primer", "Powder", "Blush", "Bronzer", "Highlighter",
-            "Eyeshadow", "Eyeliner", "Mascara", "Brow", "Moisturizer", "Serum", "Cleanser", "Toner", "Sunscreen", "Mask", "Skincare"
+            "Lipstick", "Lip Gloss", "Lip Tint", "Lip Liner", "Foundation", "Concealer", "Primer", "Powder", "Blush", "Bronzer", "Highlighter",
+            "Contour", "Eyeshadow", "Eyeliner", "Mascara", "Brow", "Setting Spray"
         };
         [SerializeField] private Button manualAnalyseButton;
         [SerializeField] private TextMeshProUGUI manualFeedbackText;
@@ -294,9 +296,9 @@ namespace GlowUp.Scan
                 steadyFor = motion < steadyMotionThreshold ? steadyFor + 0.2f : 0f;
 
                 // an answer of the AI may have arrived in the meantime
-                if (CollectAiAnswer() && TryLeavePhase1()) yield break;
+                if (CollectAiAnswer() && (StopIfNotMakeup() || TryLeavePhase1())) yield break;
                 // the AI looked several times without naming it: the FDA Philippines list is asked with what was read
-                if (CollectFdaAnswer(lastLabelText) && TryLeavePhase1()) yield break;
+                if (CollectFdaAnswer(lastLabelText) && (StopIfNotMakeup() || TryLeavePhase1())) yield break;
 
                 if (cameraFeed.MeasureBrightness() < 0.06f) { Say(msgTooDark); continue; }
 
@@ -362,7 +364,7 @@ namespace GlowUp.Scan
                 if (!isList) lastLabelText = text;                    // kept for the FDA Philippines search
                 if (picture != null) Destroy(picture);
                 ShowIdentity();
-                if (TryLeavePhase1()) yield break;
+                if (StopIfNotMakeup(isList ? null : text) || TryLeavePhase1()) yield break;
 
                 Guide(ScanGuideOverlay.State.Searching);
                 if (ingredientText != null)
@@ -392,6 +394,45 @@ namespace GlowUp.Scan
         //  Phase 1: recognising the product
         // ---------------------------------------------------------------------------------------
         bool ProductKnown => identity.productName.Length > 0 || (identity.brandName.Length > 0 && identity.cosmeticType.Length > 0);
+
+        /// <summary>
+        /// MAKE-UP ONLY. As soon as the scan knows the product is something else (the AI, the FDA's record or the inventory
+        /// said so, or the pack itself says "shampoo"), the scan stops: the user is told why, and can scan again or type
+        /// the name in when the app got it wrong. Nothing is saved or sent to the inventory. True = the scan was stopped.
+        /// </summary>
+        bool StopIfNotMakeup(string frontText = null)
+        {
+            if (leaving || !scanning) return false;
+            ProductScope.Verdict verdict = ProductScope.Judge(identity.cosmeticType, identity.productName);
+            // nothing recognised yet (offline, or the AI has not answered): only unmistakable words on the pack count
+            if (!verdict.IsNotMakeup && !string.IsNullOrWhiteSpace(frontText) && identity.productName.Length == 0 && identity.cosmeticType.Length == 0)
+                verdict = ProductScope.JudgeLabel(frontText);
+            if (!verdict.IsNotMakeup) return false;
+
+            StopScanning();
+            ResetScan();
+            if (idlePlaceholder != null) idlePlaceholder.SetActive(true);
+            if (guide != null) guide.SetState(ScanGuideOverlay.State.Hidden);
+            if (startScanLabel != null) startScanLabel.text = scanAgainLabel;
+            if (startScanButton != null) startScanButton.interactable = true;
+            Say(ProductScope.StopMessage(verdict));
+            return true;
+        }
+
+        /// <summary>Forgets everything the scan has found so far, so the next scan starts clean. (How often the AI was asked is kept.)</summary>
+        void ResetScan()
+        {
+            identity.found = false; identity.confidence = 0f;
+            identity.productName = identity.brandName = identity.cosmeticType = identity.shadeHex = identity.shadeName = identity.finish = "";
+            knownProduct = null; ingredientText = null; ingredientSource = "scan"; lastColour = "";
+            listFrom = ""; listWebBacked = false; sources.Clear();
+            barcode = ""; barcodeSeen = null;
+            aiTask = null; fdaTask = null; fdaAsked = false; lastLabelText = ""; lastLook = null;
+            readRequested = false; lookingUp = false; steadyFor = 0f; sinceLastRead = 0f;
+            phase = Phase.Product;
+            ResetChecklist();
+            SetWorking(false);
+        }
 
         /// <summary>Compares the text on the product with the brands and products the app knows (works offline).</summary>
         void RecogniseFromText(string text)
@@ -790,7 +831,8 @@ namespace GlowUp.Scan
             if (manualTypeDropdown != null)
             {
                 var options = new List<string> { manualTypeNone };
-                options.AddRange(manualTypes ?? new string[0]);
+                foreach (string kind in manualTypes ?? new string[0])
+                    if (ProductScope.IsMakeup(kind, "")) options.Add(kind);          // a scene built earlier may still list skin care kinds
                 int keep = manualTypeDropdown.options.Count == options.Count ? manualTypeDropdown.value : 0;
                 manualTypeDropdown.ClearOptions(); manualTypeDropdown.AddOptions(options);
                 int found = options.FindIndex(o => string.Equals(o, identity.cosmeticType, StringComparison.OrdinalIgnoreCase));

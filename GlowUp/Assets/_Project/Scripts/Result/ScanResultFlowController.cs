@@ -100,8 +100,9 @@ namespace GlowUp.Result
         [SerializeField] private AiInsightPanel aiPanel;
         [SerializeField] private string savedLabel = "Saved";
         [SerializeField] private TextMeshProUGUI alternativesEmptyText;
-        [SerializeField] private string msgNoAlternatives = "No alternatives in the catalogue yet. They appear here as products are added.";
-        [SerializeField] private string msgLoadingAlternatives = "Looking for safer alternatives...";
+        [Tooltip("Shown when no product passes the check. The app never falls back to showing a product that did not pass.")]
+        [SerializeField] private string msgNoAlternatives = "No make-up products matched your profile yet. Scan another product to check it.";
+        [SerializeField] private string msgLoadingAlternatives = "Looking for make-up that matches your profile...";
         [SerializeField] private int maximumAlternatives = 10;
 
         [Header("Rename (this device only)")]
@@ -361,24 +362,22 @@ namespace GlowUp.Result
             catch (Exception e) { Debug.LogWarning("Alternatives: " + e.Message); products = new List<ProductData>(); }
             if (this == null) return;
 
+            // Make-up of the same kind whose ingredients are not flagged for this user (the same check as the dashboard's
+            // recommendations: see ProductRecommender; stricter for a user who saved a skin condition). Worked out on the phone.
             var who = profile ?? new UserProfileData();
             string area = record != null ? ShadeAdvisor.AreaFor(record.cosmeticType) : "";
-            foreach (ProductData p in products)
+            bool SameKind(ProductData p)
             {
-                if (alternativeRows.Count >= maximumAlternatives) break;
-                if (p.ingredients == null || p.ingredients.Count == 0) continue;
-                if (record != null && string.Equals(p.name, record.productName, StringComparison.OrdinalIgnoreCase)) continue;
+                if (record == null) return true;
+                if (TextKey.Same(p.name, record.productName)) return false;            // not the product itself
                 // same kind of product: same type, or at least used on the same part of the face
-                bool sameKind = record == null || string.Equals(p.cosmeticType, record.cosmeticType, StringComparison.OrdinalIgnoreCase)
-                              || (ShadeAdvisor.IsColourCosmetic(p.cosmeticType) && ShadeAdvisor.IsColourCosmetic(record.cosmeticType) && ShadeAdvisor.AreaFor(p.cosmeticType) == area);
-                if (!sameKind) continue;
-                if (p.minAge > 0 && who.age > 0 && who.age < p.minAge) continue;
-
-                ScanRecord alt = ProductAnalysisEngine.Analyse(p.ingredients, "", who, null, p.name, p.brandName, p.cosmeticType);
-                if (alt.status != "safe") continue;
-                alt.source = "recommendation"; alt.brandId = p.brandId;
-                alt.productShades = new List<string>(p.shades ?? new List<string>());
-
+                return string.Equals(p.cosmeticType, record.cosmeticType, StringComparison.OrdinalIgnoreCase)
+                    || (ShadeAdvisor.IsColourCosmetic(p.cosmeticType) && ShadeAdvisor.IsColourCosmetic(record.cosmeticType) && ShadeAdvisor.AreaFor(p.cosmeticType) == area);
+            }
+            foreach (ProductRecommender.Pick pick in ProductRecommender.For(who, products, maximumAlternatives, SameKind))
+            {
+                ProductData p = pick.product;
+                ScanRecord alt = pick.record;
                 if (alternativeTileTemplate == null || alternativesContent == null) continue;
                 ProductTileView tile = Instantiate(alternativeTileTemplate, alternativesContent);
                 tile.gameObject.name = "Alternative_" + p.name;

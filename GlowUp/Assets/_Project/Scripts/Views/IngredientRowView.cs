@@ -22,7 +22,7 @@ namespace GlowUp.Views
         [SerializeField] private TextMeshProUGUI reasonText;
 
         [Header("Wording")]
-        [SerializeField] private string safeLabel = "Safe";
+        [SerializeField] private string safeLabel = "Not flagged";
         [SerializeField] private string cautionLabel = "Caution";
         [SerializeField] private string avoidLabel = "Avoid";
         [SerializeField] private string unknownLabel = "Not checked";
