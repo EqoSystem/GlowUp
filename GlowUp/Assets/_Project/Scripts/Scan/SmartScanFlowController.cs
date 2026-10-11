@@ -441,16 +441,19 @@ namespace GlowUp.Scan
             if (string.IsNullOrWhiteSpace(text)) return;
             string seen = " " + Plain(text) + " ";
             if (knownProduct == null)
-                foreach (ProductData product in products)
+            {
+                // the phone's look-up table finds the product whose whole name stands in the text (words in any order,
+                // small reading mistakes forgiven); no reading through the whole list
+                List<ProductIndex.Candidate> found = ProductRepository.Index.InText(text, 1);
+                if (found.Count > 0 && found[0].exactName && found[0].score >= ProductIndex.Sure)
                 {
-                    string name = Plain(product != null ? product.name : "");
-                    if (name.Length < 5 || !seen.Contains(" " + name + " ")) continue;
+                    ProductData product = found[0].product;
                     knownProduct = product;
                     identity.productName = product.name.Trim();
                     if (!string.IsNullOrWhiteSpace(product.brandName)) identity.brandName = product.brandName.Trim();
                     if (!string.IsNullOrWhiteSpace(product.cosmeticType)) identity.cosmeticType = product.cosmeticType.Trim();
-                    break;
                 }
+            }
             if (identity.brandName.Length == 0)
                 foreach (BrandData brand in brands)
                 {
@@ -702,9 +705,9 @@ namespace GlowUp.Scan
             string key = MlKitBarcodeReader.Key(seen);
             if (key.Length == 0) return false;
             barcode = seen.Trim();
-            foreach (ProductData p in products)
+            ProductData p = ProductRepository.Index.ByBarcode(barcode);            // the phone's look-up table: no reading through the list
+            if (p != null)
             {
-                if (p == null || string.IsNullOrWhiteSpace(p.name) || MlKitBarcodeReader.Key(p.barcode) != key) continue;
                 knownProduct = p;
                 identity.productName = p.name.Trim();
                 if (!string.IsNullOrWhiteSpace(p.brandName)) identity.brandName = p.brandName.Trim();
@@ -716,7 +719,6 @@ namespace GlowUp.Scan
                     UseLookedUpList(p.ingredients, ListPagesOf(p), "inventory", false);
                     return true;
                 }
-                break;
             }
             return false;
         }
@@ -728,23 +730,16 @@ namespace GlowUp.Scan
         /// </summary>
         ProductData InventoryProductFor(string productName, string brandName)
         {
-            string[] wanted = Plain(productName).Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-            string brand = Plain(brandName);
-            if (wanted.Length == 0) return null;
-            ProductData best = null; float bestScore = 0f;
-            foreach (ProductData p in products)
+            ProductIndex index = ProductRepository.Index;
+            ProductData exact = index.Exact(brandName, productName);
+            if (exact != null && exact.ingredients != null && exact.ingredients.Count >= 3) return exact;
+            // not written exactly alike: the closest names, as long as the index is sure and the brand agrees
+            ProductData best = exact;
+            foreach (ProductIndex.Candidate candidate in index.Search(brandName, productName, 3))
             {
-                if (p == null || string.IsNullOrWhiteSpace(p.name)) continue;
-                string itsBrand = Plain(p.brandName);
-                if (brand.Length > 0 && itsBrand.Length > 0 && itsBrand != brand && !itsBrand.Contains(brand) && !brand.Contains(itsBrand)) continue;
-                string[] its = Plain(p.name).Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                int shared = 0;
-                foreach (string word in its) if (word.Length > 1 && Array.IndexOf(wanted, word) >= 0) shared++;
-                int shorter = Mathf.Min(its.Length, wanted.Length);
-                if (shared < 2 || shared < shorter * 0.8f) continue;                       // nearly every word of the shorter name is in the longer one
-                bool hasList = p.ingredients != null && p.ingredients.Count >= 3;
-                float score = shared + (hasList ? 100f : 0f) - Mathf.Abs(its.Length - wanted.Length) * 0.1f;
-                if (score > bestScore) { bestScore = score; best = p; }
+                if (candidate.score < ProductIndex.Sure) break;
+                bool hasList = candidate.product.ingredients != null && candidate.product.ingredients.Count >= 3;
+                if (best == null || (hasList && (best.ingredients == null || best.ingredients.Count < 3))) best = candidate.product;
             }
             return best;
         }

@@ -54,10 +54,6 @@ namespace GlowUp.Common
         [Tooltip("At least this share of the scanned ingredients must belong to the listed product")]
         [Range(0.3f, 1f)] [SerializeField] private float minimumShareOfScan = 0.6f;
 
-        [Header("Keeping the ingredient list up to date")]
-        [Tooltip("While online, the ingredient list is downloaded from the website's database again after this many minutes. Offline, the copy saved on the phone is used.")]
-        [SerializeField] private float ingredientRefreshMinutes = 10f;
-
         [Header("Looking up unknown ingredients (online only)")]
         [Tooltip("When a scan has ingredients that are in neither the database nor the app's built-in list, ask the AI about them and add what it finds to the database, marked 'AI, not reviewed'.")]
         [SerializeField] private bool lookUpUnknownIngredients = true;
@@ -109,7 +105,6 @@ namespace GlowUp.Common
             ProductMatcher.MinimumShared = minimumSharedIngredients;
             ProductMatcher.MinimumShareOfProduct = minimumShareOfProduct;
             ProductMatcher.MinimumShareOfScan = minimumShareOfScan;
-            IngredientRepository.RefreshMinutes = ingredientRefreshMinutes;
             IngredientResearcher.Enabled = lookUpUnknownIngredients;
             IngredientResearcher.MaximumPerScan = maximumLookupsPerScan;
             IngredientResearcher.TimeoutSeconds = lookupTimeoutSeconds;

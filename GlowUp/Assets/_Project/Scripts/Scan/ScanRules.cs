@@ -65,6 +65,8 @@ namespace GlowUp.Scan
             ProductAnalysisEngine.MinimumCheckedShare = Mathf.Clamp01(minimumCheckedShare);
             IngredientStoplist.MaximumLength = Mathf.Max(20, longestIngredientName);
             ProductRecommender.UnknownAllowedWithCondition = Mathf.Max(0, unknownIngredientsAllowed);
+            CatalogSync.RefreshMinutes = Mathf.Max(0f, refreshMinutes);
+            CatalogSync.FullDownloadEveryHours = Mathf.Max(1f, fullDownloadEveryHours);
         }
 
         void OnValidate() { if (Application.isPlaying) Apply(); }

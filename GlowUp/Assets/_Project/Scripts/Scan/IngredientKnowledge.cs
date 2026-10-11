@@ -134,21 +134,7 @@ namespace GlowUp.Scan
         /// 0 / o as one letter, 1 / l / i as one letter. Two names with the same squashed form are the same name read
         /// differently ("niacinarnide" and "niacinamide", "d1methicone" and "dimethicone").
         /// </summary>
-        public static string Squash(string key)
-        {
-            var sb = new System.Text.StringBuilder(key.Length);
-            for (int i = 0; i < key.Length; i++)
-            {
-                char c = key[i];
-                if (c == ' ') continue;
-                if (c == 'r' && i + 1 < key.Length && key[i + 1] == 'n') { sb.Append('m'); i++; continue; }
-                if (c == 'v' && i + 1 < key.Length && key[i + 1] == 'v') { sb.Append('w'); i++; continue; }
-                if (c == '0') c = 'o';
-                else if (c == '1' || c == 'i') c = 'l';
-                sb.Append(c);
-            }
-            return sb.ToString();
-        }
+        public static string Squash(string key) => TextKey.Squash(key);
 
         /// <summary>
         /// How many letters differ between a read name and a known name, when they are close enough to be the same

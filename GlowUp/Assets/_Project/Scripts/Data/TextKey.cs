@@ -49,6 +49,28 @@ namespace GlowUp.Data
         /// <summary>The key without any spaces ("lorealparis"): "Maybelline New York" and "MaybellineNewYork" compare equal.</summary>
         public static string Compact(string text) => Normalize(text).Replace(" ", "");
 
+        /// <summary>
+        /// A key with the differences a camera cannot be trusted on taken out: no spaces, "rn" as "m", "vv" as "w", and
+        /// 0 / o as one letter, 1 / l / i as one letter. Two names with the same squashed form are the same name read
+        /// differently ("niacinarnide" and "niacinamide", "d1methicone" and "dimethicone"). `key` = a key from Normalize.
+        /// </summary>
+        public static string Squash(string key)
+        {
+            if (string.IsNullOrEmpty(key)) return "";
+            var sb = new StringBuilder(key.Length);
+            for (int i = 0; i < key.Length; i++)
+            {
+                char c = key[i];
+                if (c == ' ') continue;
+                if (c == 'r' && i + 1 < key.Length && key[i + 1] == 'n') { sb.Append('m'); i++; continue; }
+                if (c == 'v' && i + 1 < key.Length && key[i + 1] == 'v') { sb.Append('w'); i++; continue; }
+                if (c == '0') c = 'o';
+                else if (c == '1' || c == 'i') c = 'l';
+                sb.Append(c);
+            }
+            return sb.ToString();
+        }
+
         /// <summary>The words of the key, in order.</summary>
         public static string[] Words(string text)
         {

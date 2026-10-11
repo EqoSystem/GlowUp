@@ -77,15 +77,17 @@ namespace GlowUp.Data
         /// </summary>
         public bool IsUnreviewedAi() => source == "ai" && !reviewed;
     }
-    [Serializable] public class IngredientCacheHolder { public List<IngredientData> items = new List<IngredientData>(); public long savedAtUnix; }
+    [Serializable] public class IngredientCacheHolder { public List<IngredientData> items = new List<IngredientData>(); public long savedAtUnix; public CatalogSync.State sync = new CatalogSync.State(); }
 
     [Serializable]
     public class BrandData
     {
         public string id, name, category, market, status;
         public long scans;
+        public bool binned;                      // in the website's Recycle bin: never used, but known, so it is not added a second time
+        public List<string> aliases = new List<string>();             // other names the brand is known under
     }
-    [Serializable] public class BrandCacheHolder { public List<BrandData> items = new List<BrandData>(); public long savedAtUnix; }
+    [Serializable] public class BrandCacheHolder { public List<BrandData> items = new List<BrandData>(); public long savedAtUnix; public CatalogSync.State sync = new CatalogSync.State(); }
 
     /// <summary>A catalogue product ('products' collection): used for recommendations, alternatives and AR Try-On.</summary>
     [Serializable]
@@ -101,8 +103,10 @@ namespace GlowUp.Data
         public List<string> shades = new List<string>();              // hex colours, e.g. #C24B62
         public List<string> sources = new List<string>();             // pages the entry's details came from, each as "page title | address" (written on the website)
         public string fdaNumber;                 // the FDA Philippines notification number the website keeps with the product ("" = none on file)
+        public bool binned;                      // in the website's Recycle bin: never used, but known, so it is not added a second time
+        public List<string> aliases = new List<string>();             // other names the product is known under (old names, misspellings)
     }
-    [Serializable] public class ProductCacheHolder { public List<ProductData> items = new List<ProductData>(); public long savedAtUnix; }
+    [Serializable] public class ProductCacheHolder { public List<ProductData> items = new List<ProductData>(); public long savedAtUnix; public CatalogSync.State sync = new CatalogSync.State(); }
 
     /// <summary>What the analysis found for one ingredient of a scanned product, for THIS user.</summary>
     [Serializable]

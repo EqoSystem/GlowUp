@@ -14,11 +14,7 @@ namespace GlowUp.Scan
         /// <summary>The digits of a barcode, without spaces and without the zeros in front ("" = not a barcode). UPC and EAN numbers of one product compare equal this way.</summary>
         public static string Key(string code)
         {
-            if (string.IsNullOrWhiteSpace(code)) return "";
-            var digits = new System.Text.StringBuilder();
-            foreach (char c in code) if (c >= '0' && c <= '9') digits.Append(c);
-            string key = digits.ToString().TrimStart('0');
-            return key.Length >= 6 && key.Length <= 14 ? key : "";
+            return GlowUp.Data.ProductIndex.BarcodeKey(code);          // one rule for barcodes in the whole app
         }
 
 #if UNITY_ANDROID && !UNITY_EDITOR

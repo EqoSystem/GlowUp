@@ -13,8 +13,11 @@ namespace GlowUp.Scan
     /// Everything it adds has status "Pending", source "scan" and "not reviewed", so:
     ///   - it shows on the website at once, marked as added by a scan and waiting for review;
     ///   - the app does NOT recommend it to anyone until an admin approves it there.
-    /// A product that is already listed (also while still Pending) is not added twice: the scan is
-    /// counted on the existing entry instead.
+    /// A product that is already listed (also while still Pending, switched off or in the Recycle bin) is
+    /// NOT added twice: the scan is counted on the existing entry instead. It is looked for by its barcode,
+    /// by its brand and name (capitals, accents and punctuation do not matter; aliases count), and by its
+    /// ingredient list. A new entry gets an id made from its brand and name ("scan_maybelline__superstay_matte_ink"),
+    /// so even two phones scanning the same new product at the same moment end up on ONE entry.
     /// GlowUp lists MAKE-UP ONLY. A product is added only when it is clearly make-up AND its kind is one of the
     /// make-up kinds the app knows (ProductScope.MakeupType). Skin care, hair, body, nail and fragrance products
     /// are never added, and neither is a product whose kind is unclear or was only guessed from the label text.
@@ -35,15 +38,21 @@ namespace GlowUp.Scan
         public static void PublishIfNew(ScanRecord record, List<string> labelIngredients, bool kindIsKnown = true)
         {
             if (!Enabled || record == null || !string.IsNullOrEmpty(record.productId)) return;
-            if (labelIngredients == null || labelIngredients.Count < Mathf.Max(1, ProductMatcher.MinimumShared)) return;
+            bool named = !string.IsNullOrWhiteSpace(record.productName);
 
-            // already listed but not Active yet (waiting for review, or switched off)? count the scan there
-            ProductData listed = ProductMatcher.Find(labelIngredients, ProductRepository.All(), null);
+            // ---- already listed (also when it is not Active: waiting for review, switched off, in the Recycle bin)? ----
+            // Then the scan is counted there and nothing is added. Looked for by barcode, by brand and name, by ingredients.
+            ProductIndex every = ProductRepository.Every;
+            ProductData listed = every.ByBarcode(record.barcode);
+            if (listed == null && named) listed = every.Exact(record.brandName, record.productName);
+            if (listed == null && named) listed = every.ById(ProductIndex.ScanId(record.brandName, record.productName));
+            if (listed == null && labelIngredients != null && labelIngredients.Count >= Mathf.Max(1, ProductMatcher.MinimumShared))
+                listed = ProductMatcher.Find(labelIngredients, ProductRepository.All(), null);
             if (listed != null) { record.productId = listed.id; return; }
 
+            if (labelIngredients == null || labelIngredients.Count < Mathf.Max(1, ProductMatcher.MinimumShared)) return;   // too short a list to add
             string uid = UserProfileRepository.CurrentUid;
             if (string.IsNullOrEmpty(uid)) return;                               // the cloud only accepts additions from a signed-in user
-            bool named = !string.IsNullOrWhiteSpace(record.productName);
             if (!named && RequireProductName) return;
             // MAKE-UP ONLY: the inventory takes a product only when it is clearly make-up and of a kind the app knows.
             // A kind that was merely guessed from the label text counts only when the product's own name says it too.
@@ -61,8 +70,7 @@ namespace GlowUp.Scan
                 if (known != null) { brandId = known.id; brandName = known.name; }
                 else
                 {
-                    brandId = "scan_" + IngredientKnowledge.Key(brandName).Replace(' ', '_');
-                    if (brandId.Length > 90) brandId = brandId.Substring(0, 90);
+                    brandId = ProductIndex.ScanBrandId(brandName);          // always the same id for the same brand name
                     var brand = new ScannedBrandRecord
                     {
                         name = Limit(brandName, 60), category = "Makeup", market = "",
@@ -83,7 +91,10 @@ namespace GlowUp.Scan
             foreach (string ingredient in labelIngredients)
                 if (!string.IsNullOrWhiteSpace(ingredient) && ingredients.Count < 80) ingredients.Add(Limit(ingredient.Trim(), 120));
 
-            string productId = "scan_" + record.id;
+            // the id is made from the brand and the name, so the same product always lands on the same entry
+            // (a product without a name keeps an id of its own)
+            string productId = named ? ProductIndex.ScanId(brandName, name) : "scan_" + record.id;
+            if (productId.Length == 0) productId = "scan_" + record.id;
             var product = new ScannedProductRecord
             {
                 name = Limit(name, 100), brandId = brandId, brandName = Limit(brandName, 60), cosmeticType = Limit(type, 40),

@@ -10,9 +10,9 @@ namespace GlowUp.Data
     /// <summary>
     /// Ingredient database shared with the admin website ('ingredients' collection).
     ///
-    /// ONLINE: the list is downloaded from Cloud Firestore and saved on the phone. While the app stays
-    /// open it is downloaded again every <see cref="RefreshMinutes"/> minutes (and straight away the
-    /// first time the phone is online), so changes made on the website reach the app.
+    /// ONLINE: the list is downloaded from Cloud Firestore once and saved on the phone. After that only the
+    /// entries that CHANGED are downloaded (see CatalogSync), and a copy that was checked a few minutes ago is
+    /// used as it is, so changes made on the website reach the app without downloading the whole list each time.
     /// OFFLINE: the copy saved on the phone is used, so scanning keeps working without a connection.
     ///
     /// Lookup matches techName / name / aliases, whatever the capital letters. The website writes name,
@@ -26,60 +26,92 @@ namespace GlowUp.Data
         const string CacheKey = "ingredients";
         static IngredientCacheHolder holder;
         static Dictionary<string, IngredientData> index;
-        static float lastServerSync = -1f;          // Time.realtimeSinceStartup of the last successful download (this run of the app)
+        static float lastCheck = -1f;               // Time.realtimeSinceStartup of the last look at the database that got an answer
+        static Task running;                        // one look at a time: whoever asks meanwhile waits for the same one
 
-        /// <summary>How long a downloaded list counts as fresh, in minutes. Set from LoadingSceneController's Inspector.</summary>
-        public static float RefreshMinutes = 10f;
-
-        public static async Task<IngredientCacheHolder> LoadAll(bool forceRefresh = false)
+        /// <param name="everything">download the whole list now, whatever its age (Settings > Download now)</param>
+        public static async Task<IngredientCacheHolder> LoadAll(bool everything = false)
         {
             // 1. the copy saved on the phone (instant, works offline)
-            if (holder == null && OfflineCache.TryLoad(CacheKey, out IngredientCacheHolder cached)) { holder = cached; Rebuild(); }
+            FromPhone();
 
-            // 2. a fresh copy from the cloud, when online and the one we have is not recent
-            bool recent = lastServerSync >= 0f && Time.realtimeSinceStartup - lastServerSync < Mathf.Max(0f, RefreshMinutes) * 60f;
-            if (holder != null && recent && !forceRefresh) return holder;
-
-            if (ConnectivityMonitor.Reachable && await FirebaseBootstrap.Ready)
+            // 2. what changed in the cloud, when online and the copy has not been checked for a while
+            if (everything || holder == null || !CatalogSync.IsFresh(lastCheck))
             {
-                try
+                if (running != null)
                 {
-                    // with a copy on the phone the wait is short: a slow connection must not hold up a scan
-                    var snap = await FirebaseFirestore.DefaultInstance.Collection("ingredients").GetSnapshotAsync()
-                        .OrTimeout(holder != null ? 8f : 25f, "Downloading the ingredient list");
-                    TaskLimits.RefuseStale(snap, holder != null);
-                    var fresh = new IngredientCacheHolder { savedAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds() };
-                    var ids = new HashSet<string>();
-                    foreach (var doc in snap.Documents)
-                    {
-                        var f = new FirestoreFields(doc);
-                        ids.Add(f.Id);
-                        if (f.Bool("binned")) continue;                  // in the website's Recycle bin: the app's built-in knowledge is used instead
-                        fresh.items.Add(new IngredientData
-                        {
-                            id = f.Id, name = f.Str("name"), techName = f.Str("techName"), description = f.Str("description"),
-                            riskLevel = f.Str("riskLevel"), cautionNote = f.Str("cautionNote"), commonUses = f.Str("commonUses"),
-                            minAge = f.Int("minAge"), keyActive = f.Bool("keyActive"), umbrella = f.Bool("umbrella"),
-                            aliases = f.List("aliases"), allergenTags = f.List("allergenTags"),
-                            avoidForSkinTypes = f.List("avoidForSkinTypes"), avoidForConditions = f.List("avoidForConditions"),
-                            goodForSkinTypes = f.List("goodForSkinTypes"), goodForConditions = f.List("goodForConditions"),
-                            source = f.Str("source"), reviewed = f.Bool("reviewed"), sources = f.List("sources"), fdaUnii = f.Str("fdaUnii")
-                        });
-                    }
-                    GlowUp.Notifications.IngredientRuleWatcher.OnDownloaded(fresh.items);     // tells the user when an admin changed the rules
-                    // entries this phone's AI lookup found that have not reached the cloud yet stay available
-                    if (holder != null)
-                        foreach (var mine in holder.items)
-                            if (mine.source == "ai" && !string.IsNullOrEmpty(mine.id) && !ids.Contains(mine.id)) fresh.items.Add(mine);
-
-                    holder = fresh;
-                    lastServerSync = Time.realtimeSinceStartup;
-                    OfflineCache.Save(CacheKey, holder);
+                    try { await running; } catch (Exception) { }
+                    if (everything) { running = Sync(true); try { await running; } finally { running = null; } }
                 }
-                catch (Exception e) { TaskLimits.NoteFailure(e); Debug.LogWarning("Ingredient sync failed, using the saved copy: " + e.Message); }
+                else
+                {
+                    running = Sync(everything);
+                    try { await running; } finally { running = null; }
+                }
             }
-            Rebuild();
+            if (index == null) Rebuild();
             return holder ?? new IngredientCacheHolder();
+        }
+
+        /// <summary>How the copy on the phone stands: for the Settings page.</summary>
+        public static CatalogSync.State SyncState { get { FromPhone(); return holder != null && holder.sync != null ? holder.sync : new CatalogSync.State(); } }
+
+        static void FromPhone()
+        {
+            if (holder != null) return;
+            if (OfflineCache.TryLoad(CacheKey, out IngredientCacheHolder saved) && saved != null)
+            {
+                holder = saved;
+                if (holder.items == null) holder.items = new List<IngredientData>();
+                if (holder.sync == null) holder.sync = new CatalogSync.State();
+                Rebuild();
+            }
+        }
+
+        static async Task Sync(bool everything)
+        {
+            if (!ConnectivityMonitor.Reachable || !await FirebaseBootstrap.Ready) return;
+            try
+            {
+                bool haveCopy = holder != null && holder.items.Count > 0;
+                CatalogSync.State state = holder != null && holder.sync != null ? holder.sync.Clone() : new CatalogSync.State();
+                // with a copy on the phone the wait is short: a slow connection must not hold up a scan
+                CatalogSync.Pull pull = await CatalogSync.Fetch("ingredients", state, haveCopy, everything, "Downloading the ingredient list");
+                if (!pull.happened) return;
+
+                var next = new IngredientCacheHolder { savedAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds(), sync = state };
+                var arrived = new HashSet<string>();
+                if (!pull.full && holder != null) next.items.AddRange(holder.items);
+                foreach (DocumentSnapshot document in pull.documents)
+                {
+                    var f = new FirestoreFields(document);
+                    arrived.Add(f.Id);
+                    next.items.RemoveAll(i => i.id == f.Id);         // the new version replaces the old one
+                    if (f.Bool("binned")) continue;                  // in the website's Recycle bin: the app's built-in knowledge is used instead
+                    next.items.Add(new IngredientData
+                    {
+                        id = f.Id, name = f.Str("name"), techName = f.Str("techName"), description = f.Str("description"),
+                        riskLevel = f.Str("riskLevel"), cautionNote = f.Str("cautionNote"), commonUses = f.Str("commonUses"),
+                        minAge = f.Int("minAge"), keyActive = f.Bool("keyActive"), umbrella = f.Bool("umbrella"),
+                        aliases = f.List("aliases"), allergenTags = f.List("allergenTags"),
+                        avoidForSkinTypes = f.List("avoidForSkinTypes"), avoidForConditions = f.List("avoidForConditions"),
+                        goodForSkinTypes = f.List("goodForSkinTypes"), goodForConditions = f.List("goodForConditions"),
+                        source = f.Str("source"), reviewed = f.Bool("reviewed"), sources = f.List("sources"), fdaUnii = f.Str("fdaUnii")
+                    });
+                }
+                // entries this phone's AI lookup found that are still on their way to the cloud stay available
+                if (pull.full && holder != null)
+                    foreach (IngredientData mine in holder.items)
+                        if (mine.source == "ai" && !string.IsNullOrEmpty(mine.id) && !arrived.Contains(mine.id) && SyncQueue.HasPending("ingredients/" + mine.id))
+                            next.items.Add(mine);
+
+                holder = next;
+                lastCheck = Time.realtimeSinceStartup;
+                OfflineCache.Save(CacheKey, holder);
+                Rebuild();
+                GlowUp.Notifications.IngredientRuleWatcher.OnDownloaded(holder.items);     // tells the user when an admin changed the rules
+            }
+            catch (Exception e) { TaskLimits.NoteFailure(e); Debug.LogWarning("Ingredient sync failed, using the saved copy: " + e.Message); }
         }
 
         /// <summary>The comparable key of a name (the same rule as everywhere else: capitals, accents and punctuation do not matter).</summary>
@@ -129,6 +161,7 @@ namespace GlowUp.Data
         public static void AddLocal(IngredientData found)
         {
             if (found == null || string.IsNullOrWhiteSpace(found.name)) return;
+            FromPhone();
             if (holder == null) holder = new IngredientCacheHolder();
             holder.items.RemoveAll(i => !string.IsNullOrEmpty(found.id) && i.id == found.id);
             holder.items.Add(found);
