@@ -42,7 +42,9 @@ namespace GlowUp.Scan
             var last = new Answer { error = "No AI model is configured." };
             if (config == null || string.IsNullOrEmpty(apiKey) || config.ModelChain == null) return last;
 
-            bool searchOffered = searchTheWeb;                          // switched off for the rest of this question once the service refuses it
+            // switched off for the rest of this question once the service refuses it, and not even tried for a while after a
+            // refusal (the key does not offer web search: asking with it first would waste a request on every question)
+            bool searchOffered = searchTheWeb && AiBudget.WebSearchWorthTrying;
             foreach (string model in config.ModelChain)
             {
                 bool[] modes = searchOffered ? new[] { true, false } : new[] { false };
@@ -72,7 +74,7 @@ namespace GlowUp.Scan
                         if (status == 404) break;                        // this model is gone: next model
                         if (status == 0) return last;                    // no connection / timed out
                         // 400 or 429 with web search usually means "search is not offered on this key or plan": ask again without it
-                        if (withSearch && (status == 400 || status == 429)) searchOffered = false;
+                        if (withSearch && (status == 400 || status == 429)) { searchOffered = false; AiBudget.WebSearchRefused(); }
                     }
                 }
             }

@@ -78,8 +78,7 @@ namespace GlowUp.Scan
         [SerializeField] private GeminiApiConfig aiConfig;
         [Tooltip("On = the AI looks at the picture to recognise the product")]
         [SerializeField] private bool aiRecognisesProduct = true;
-        [Tooltip("At most this many pictures are shown to the AI in one scan")]
-        [SerializeField] private int maximumAiLooks = 4;
+        [Tooltip("The AI looks at a picture at most every this many seconds. How MANY times it may look in one visit of this screen is set in the Scan Rules asset (GlowUp > Open Scan Rules).")]
         [SerializeField] private float secondsBetweenAiLooks = 3.5f;
         [Tooltip("JPG quality of the picture the AI gets (lower = smaller and faster)")]
         [Range(40, 95)] [SerializeField] private int aiPictureQuality = 80;
@@ -122,6 +121,10 @@ namespace GlowUp.Scan
         [SerializeField] private string msgStarting = "Starting the camera...";
         [SerializeField] private string msgPhase1 = "Step 1: show the front of the product. Hold steady.";
         [SerializeField] private string msgProductNotYet = "Still looking for the product's name. Move closer and avoid glare, or tap Skip.";
+        [Tooltip("Shown when the AI has looked as often as it may in one visit of this screen and still has no name")]
+        [SerializeField] private string msgAiLimit = "The AI could not name this product. Type its name instead, or tap Skip and scan the ingredient list.";
+        [Tooltip("Shown when the ingredient list was looked up online as often as it may be in one visit of this screen")]
+        [SerializeField] private string msgLookUpLimit = "This product's list was already looked up. Scan the list on the pack, or type it in.";
         [SerializeField] private string msgAiLooking = "Recognising the product...";
         [SerializeField] private string msgPhase2 = "Step 2: now show the ingredient list.";
         [SerializeField] private string msgListFirst = "Ingredients read. Show the front of the product to name it, or tap Finish.";
@@ -146,6 +149,7 @@ namespace GlowUp.Scan
         [SerializeField] private string loadingMessage = "Scanning and analysing your product";
 
         bool scanning, leaving, readRequested, lookingUp;
+        bool aiLimitReached;                      // the AI has used its looks for this visit: the user is asked to type the name
         float steadyFor, sinceLastRead, readerWait, lastAiLook = -100f;
         int aiLooks;
         Phase phase = Phase.Product;
@@ -200,6 +204,7 @@ namespace GlowUp.Scan
 
         async void Start()
         {
+            AiBudget.NewSession();                           // the AI's few looks are counted per visit of this screen
             OcrService.Shared.Initialise();                  // loads in the background while the user reads the instructions
             if (guide != null) guide.SetState(ScanGuideOverlay.State.Hidden);
             if (idlePlaceholder != null) idlePlaceholder.SetActive(true);
@@ -374,7 +379,7 @@ namespace GlowUp.Scan
                 }
                 else
                 {
-                    Say(aiTask != null ? msgAiLooking : msgProductNotYet);
+                    Say(aiTask != null ? msgAiLooking : aiLimitReached ? msgAiLimit : msgProductNotYet);
                     if (aiTask == null) cameraFeed.Refocus();
                 }
             }
@@ -481,10 +486,13 @@ namespace GlowUp.Scan
         void AskAi(Texture2D picture, string text)
         {
             if (!aiRecognisesProduct || aiTask != null || ProductKnown && identity.shadeHex.Length > 0) return;
-            if (aiLooks >= maximumAiLooks || Time.unscaledTime - lastAiLook < secondsBetweenAiLooks) return;
+            if (Time.unscaledTime - lastAiLook < secondsBetweenAiLooks) return;
             if (!ConnectivityMonitor.Online || !ProductAiAdvisor.Available) return;
+            // the AI may only look a few times in one visit of this screen (re-scans share the same few looks)
+            if (!AiBudget.CanRecognise) { aiLimitReached = true; return; }
             byte[] jpeg;
             try { jpeg = picture.EncodeToJPG(aiPictureQuality); } catch (Exception e) { Debug.LogWarning("Scan: " + e.Message); return; }
+            AiBudget.TakeRecognition();
             aiLooks++; lastAiLook = Time.unscaledTime;
             SetWorking(true);
             aiTask = ProductAiAdvisor.Identify(jpeg, text);
@@ -502,7 +510,9 @@ namespace GlowUp.Scan
         {
             if (fdaTask == null)
             {
-                if (fdaAsked || ProductKnown || aiTask != null || aiLooks < Mathf.Max(1, fdaAfterAiLooks) || !ConnectivityMonitor.Online || string.IsNullOrWhiteSpace(text)) return false;
+                // after the AI's looks (all it may have, or as many as set here) without a name
+                int looksFirst = Mathf.Max(1, Mathf.Min(fdaAfterAiLooks, AiBudget.RecognitionsPerSession));
+                if (fdaAsked || ProductKnown || aiTask != null || aiLooks < looksFirst || !ConnectivityMonitor.Online || string.IsNullOrWhiteSpace(text)) return false;
                 fdaAsked = true;
                 SetWorking(true);
                 fdaTask = PhFdaVerification.FindInText(text);
@@ -653,8 +663,9 @@ namespace GlowUp.Scan
                     return;
                 }
 
-                // 2. online, from credible sources
+                // 2. online, from credible sources (a few times per visit of this screen at most)
                 if (!ConnectivityMonitor.Online || !ProductAiAdvisor.Available) { Say(msgLookUpOffline); return; }
+                if (!AiBudget.TakeLookUp()) { Say(msgLookUpLimit); return; }
                 ProductAiAdvisor.IngredientLookup found = await ProductAiAdvisor.FindIngredients(identity.productName, identity.brandName, identity.cosmeticType);
                 if (this == null || leaving) return;
                 if (found == null || !found.found) { await SayWhatFdaKnows(); return; }

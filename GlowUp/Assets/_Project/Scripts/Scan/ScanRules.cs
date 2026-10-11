@@ -67,6 +67,9 @@ namespace GlowUp.Scan
             ProductRecommender.UnknownAllowedWithCondition = Mathf.Max(0, unknownIngredientsAllowed);
             CatalogSync.RefreshMinutes = Mathf.Max(0f, refreshMinutes);
             CatalogSync.FullDownloadEveryHours = Mathf.Max(1f, fullDownloadEveryHours);
+            AiBudget.RecognitionsPerSession = Mathf.Max(0, aiRecognitionsPerScanSession);
+            AiBudget.ListLookUpsPerSession = Mathf.Max(0, aiListLookUpsPerScanSession);
+            AiBudget.SkipWebSearchMinutes = Mathf.Max(0f, skipWebSearchMinutesAfterRefusal);
         }
 
         void OnValidate() { if (Application.isPlaying) Apply(); }
