@@ -55,9 +55,7 @@ namespace GlowUp.EditorTools
             A.At(glow.transform, A.MC, new Vector2(-whole / 2f + glowWidth / 2f, 0), new Vector2(glowWidth + 12, WordHeight));
             A.At(up.transform, A.MC, new Vector2(whole / 2f - upWidth / 2f, 0), new Vector2(upWidth + 12, WordHeight));
 
-            // ---- the little star that flashes when they join (top right of the word, as in the logo) ----
-            Image sparkle = A.Icon(stage.transform, "Sparkle", IconFactory.Star4, 96, ThemeRole.Gold);
-            A.At(sparkle.transform, A.MC, Middle + new Vector2(whole / 2f + 36, WordHeight * 0.36f), new Vector2(96, 96));
+            // (the little gold star beside the word was taken out on 12 October 2026: the project owner asked for it to go)
 
             // ---- the plate that knocks the word off ----
             // It ends in the middle of the screen. In Edit mode it is parked at the left, outside the screen, so the finished
@@ -75,7 +73,7 @@ namespace GlowUp.EditorTools
             var controller = A.Controller<StartupIntroController>("StartupIntroController");
             A.Set(controller, "wordmark", (RectTransform)mark.transform);
             A.Set(controller, "glowWord", glow.rectTransform); A.Set(controller, "upWord", up.rectTransform);
-            A.Set(controller, "aura", aura); A.Set(controller, "sparkle", sparkle);
+            A.Set(controller, "aura", aura);
             A.Set(controller, "plate", plate.rectTransform); A.Set(controller, "plateText", plateText);
             A.Set(controller, "stage", stage.GetComponent<CanvasGroup>());
 
@@ -87,7 +85,6 @@ namespace GlowUp.EditorTools
             SerializedProperty rest = so.FindProperty("plateRest");
             if (rest != null) { rest.vector2Value = Middle; so.ApplyModifiedPropertiesWithoutUndo(); }
             plate.rectTransform.anchoredPosition = new Vector2(-1500f, Middle.y);
-            sparkle.color = new Color(sparkle.color.r, sparkle.color.g, sparkle.color.b, 1f);
             SceneBuilderCore.Save(s.scene);
 
             BuildSettingsSync.PutFirst(SceneNames.Startup);
