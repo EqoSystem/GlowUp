@@ -134,6 +134,7 @@ namespace GlowUp.Onboarding
             if (suppress) return;
             int year = DateTime.Today.Year - yearDropdown.value;
             viewMonth = new DateTime(year, monthDropdown.value + 1, 1);
+            KeepDayInNewMonth();
             Refresh();
         }
 
@@ -143,7 +144,31 @@ namespace GlowUp.Onboarding
             if (next > new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1)) return;
             if (next.Year < DateTime.Today.Year - yearsBack) return;
             viewMonth = next;
+            KeepDayInNewMonth();
             Refresh();
+        }
+
+        /// <summary>
+        /// A birthday is chosen already and the user changes the month or the year: the same day of that month becomes the
+        /// birthday at once (the last day when the month is shorter), so the field and the age follow without the day
+        /// having to be tapped again. The calendar stays open. Nothing happens before a first day was chosen.
+        /// </summary>
+        void KeepDayInNewMonth()
+        {
+            if (!hasSelection) return;
+            if (viewMonth > new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1)) return;      // a month that has not begun: nothing to choose there
+            DateTime moved = DayIn(viewMonth, selected.Day, DateTime.Today);
+            if (moved == selected.Date) return;
+            selected = moved;
+            onPicked?.Invoke(selected);
+        }
+
+        /// <summary>The given day in the month of `month`: the last day when the month is shorter, and never later than `latest`.</summary>
+        public static DateTime DayIn(DateTime month, int day, DateTime latest)
+        {
+            int last = DateTime.DaysInMonth(month.Year, month.Month);
+            var date = new DateTime(month.Year, month.Month, Mathf.Clamp(day, 1, last));
+            return date > latest.Date ? latest.Date : date;
         }
 
         void Refresh()
