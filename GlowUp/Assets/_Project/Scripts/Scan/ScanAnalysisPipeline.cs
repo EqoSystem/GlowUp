@@ -29,6 +29,11 @@ namespace GlowUp.Scan
         /// more seconds for it; after that the result opens and its FDA badge fills in by itself when the answer arrives.
         /// </summary>
         public static float FdaExtraWaitSeconds = 4f;
+        /// <summary>
+        /// Open Beauty Facts is asked for a second opinion on the ingredient list (by the barcode) beside the other steps.
+        /// When they are done, the result waits at most this many more seconds for it; a later answer is not used.
+        /// </summary>
+        public static float SecondOpinionWaitSeconds = 3f;
 
         public static async Task Run(Action<int, string> report)
         {
@@ -53,6 +58,8 @@ namespace GlowUp.Scan
             // such a product usually carries its FDA record already, see ApplyCatalogueProduct.)
             Task<PhFdaVerification.Result> fdaSearch = ScanSession.PendingListFrom == "inventory" ? null
                 : StartFdaSearch(ScanSession.PendingProductName, ScanSession.PendingBrandName);
+            // ONLINE: a second opinion on the list itself (Open Beauty Facts, by the barcode). It starts now as well.
+            Task<OpenBeautyFacts.Result> secondOpinion = StartSecondOpinion(ScanSession.PendingBarcode);
 
             report(1, "Checking our ingredient database");
             await IngredientRepository.LoadAll();
@@ -106,6 +113,15 @@ namespace GlowUp.Scan
 
             // MAKE-UP ONLY: a product that is clearly something else is not analysed, saved, counted or added to the inventory
             if (StopIfNotMakeup(record, kindIsKnown)) return;
+
+            // the colourants behind "may contain": said in "Why this result?" as what they are, a maybe that depends on the shade
+            if (record.mayContain != null && record.mayContain.Count > 0)
+                record.explanation = ((record.explanation ?? "").TrimEnd() + "\n\n<b>May contain, depending on the shade</b>\n" + string.Join(", ", record.mayContain)
+                                      + ". The pack lists these for the whole range of shades; your shade may hold only some of them.").Trim();
+
+            // is there a SECOND place that has this product's list, and does it say the same?
+            try { await CheckOtherSources(record, label, secondOpinion); }
+            catch (Exception e) { Debug.LogWarning("The list was not checked against a second source: " + e.Message); }
 
             // the FDA Philippines answer: taken now when it has arrived. Otherwise the result waits a few seconds for it and then
             // opens without it: its badge says "checking" and fills in by itself when the answer comes (FinishFdaLater).
@@ -250,6 +266,74 @@ namespace GlowUp.Scan
                     : PhFdaVerification.FindInText(ScanSession.PendingText);
             }
             catch (Exception e) { Debug.LogWarning("FDA Philippines check skipped: " + e.Message); return null; }
+        }
+
+        static Task<OpenBeautyFacts.Result> StartSecondOpinion(string barcode)
+        {
+            if (!ConnectivityMonitor.Online || !OpenBeautyFacts.Enabled || OpenBeautyFacts.Digits(barcode).Length == 0) return null;
+            try { return OpenBeautyFacts.Find(barcode); }
+            catch (Exception e) { Debug.LogWarning("Open Beauty Facts check skipped: " + e.Message); return null; }
+        }
+
+        /// <summary>
+        /// "MATCHED 2 SOURCES", or what differs. The list that was analysed (its base formula: without the "may contain"
+        /// names and the colour numbers, which depend on the shade) is compared with the other places that have a list of
+        /// this product: the GlowUp product list (when the list did not come from there) and Open Beauty Facts. The list
+        /// that is shown stays the shown one: it came from the more trusted place. Nothing here changes the verdict.
+        /// </summary>
+        static async Task CheckOtherSources(ScanRecord record, IngredientTextParser.ParsedList label, Task<OpenBeautyFacts.Result> secondOpinion)
+        {
+            // when the list is from: now, for a list read, typed or looked up in this scan (the inventory does not say when its list was written)
+            record.listDateUnix = record.listFrom == "inventory" ? 0 : DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            record.listCheck = ""; record.listCheckKind = ""; record.listCheckSource = ""; record.listCheckDateUnix = 0; record.listDifferCount = 0;
+            record.listOnlyHere = new List<string>(); record.listOnlyThere = new List<string>();
+
+            var others = new List<ListSources.Other>();
+            if (record.listFrom != "inventory")
+            {
+                ProductIndex index = ProductRepository.Index;
+                ProductData stored = index.ById(record.productId) ?? index.Exact(record.brandName, record.productName);
+                if (stored != null && stored.ingredients != null && stored.ingredients.Count >= ListSources.MinimumToCompare)
+                {
+                    IngredientTextParser.ParsedList its = IngredientTextParser.Read(string.Join(", ", stored.ingredients));
+                    others.Add(new ListSources.Other { kind = ListSources.Kind.Inventory, names = ListSources.BaseList(its.inOrder, its.mayContain) });
+                }
+            }
+            bool listIsFromThere = false;
+            foreach (string source in record.ingredientSources ?? new List<string>())
+                if (ListSources.KindOf(source, record.brandName) == ListSources.Kind.OpenBeautyFacts) listIsFromThere = true;
+            if (secondOpinion != null && listIsFromThere)
+            {
+                // the list itself is Open Beauty Facts' (nothing better had it): its date is the day of that entry's last edit
+                await WaitFor(secondOpinion, SecondOpinionWaitSeconds);
+                if (secondOpinion.Status == TaskStatus.RanToCompletion && secondOpinion.Result != null && secondOpinion.Result.lastEditedUnix > 0)
+                    record.listDateUnix = secondOpinion.Result.lastEditedUnix;
+            }
+            if (secondOpinion != null && !listIsFromThere)
+            {
+                await WaitFor(secondOpinion, SecondOpinionWaitSeconds);
+                if (secondOpinion.Status == TaskStatus.RanToCompletion && secondOpinion.Result != null && secondOpinion.Result.found)
+                {
+                    OpenBeautyFacts.Result there = secondOpinion.Result;
+                    IngredientTextParser.ParsedList its = IngredientTextParser.Read(there.ingredientText);
+                    others.Add(new ListSources.Other
+                    {
+                        kind = ListSources.Kind.OpenBeautyFacts, source = there.Source, dateUnix = there.lastEditedUnix, names = ListSources.BaseList(its.inOrder, its.mayContain)
+                    });
+                }
+            }
+            if (others.Count == 0) return;
+
+            ListSources.Check check = ListSources.Decide(ListSources.BaseList(label.inOrder, label.mayContain), others);
+            if (check.outcome.Length == 0) return;
+            record.listCheck = check.outcome;
+            record.listCheckKind = check.with.kind == ListSources.Kind.Inventory ? "inventory" : "obf";
+            record.listCheckSource = check.with.source ?? ""; record.listCheckDateUnix = check.with.dateUnix;
+            if (check.outcome == ListSources.Differs)
+            {
+                record.listDifferCount = check.comparison.onlyInFirstCount + check.comparison.onlyInSecondCount;
+                record.listOnlyHere = new List<string>(check.comparison.onlyInFirst); record.listOnlyThere = new List<string>(check.comparison.onlyInSecond);
+            }
         }
 
         /// <summary>Waits until the task has ended, but not longer than `seconds`.</summary>

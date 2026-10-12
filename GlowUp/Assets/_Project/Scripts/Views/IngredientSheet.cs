@@ -43,6 +43,8 @@ namespace GlowUp.Views
         [SerializeField] private string sourceFormat = "Source: {0}";
         [SerializeField] private string sourceCurator = "GlowUp ingredient list (checked by the GlowUp team)";
         [SerializeField] private string sourceAi = "AI look-up, not checked by the GlowUp team yet";
+        [Tooltip("Put in front of the description of an ingredient that stood behind \"may contain\" or \"+/-\" on the pack")]
+        [SerializeField] private string mayContainNote = "May contain, depending on the shade.";
 
         readonly List<GameObject> rows = new List<GameObject>();
         bool hooked;
@@ -70,13 +72,18 @@ namespace GlowUp.Views
                 .OrderBy(f => focusIngredient != null && string.Equals(f.name, focusIngredient, System.StringComparison.OrdinalIgnoreCase) ? 0 : 1)
                 .ThenBy(Rank).ToList();
 
+            // names behind "may contain": the pack lists them for the whole range of shades, this shade may hold only some
+            var maybe = new HashSet<string>(record.mayContain ?? new List<string>(), System.StringComparer.OrdinalIgnoreCase);
             if (rowTemplate != null && listContent != null)
                 foreach (var finding in ordered)
                 {
                     var row = Instantiate(rowTemplate, listContent);
                     row.gameObject.name = "Ingredient_" + finding.name;
                     row.gameObject.SetActive(true);
-                    row.Bind(ForDisplay(finding));
+                    IngredientFinding shown = ForDisplay(finding);
+                    if (maybe.Contains(finding.name ?? "") && !string.IsNullOrWhiteSpace(mayContainNote))
+                        shown.description = (mayContainNote + " " + (shown.description ?? "")).Trim();
+                    row.Bind(shown);
                     rows.Add(row.gameObject);
                 }
 

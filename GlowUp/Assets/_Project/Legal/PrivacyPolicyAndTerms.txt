@@ -35,7 +35,7 @@ GlowUp asks for permission to use your camera for three features: scanning a pro
 You can withdraw camera permission at any time in your device settings. The scanning and try-on features will stop working until permission is given again, but you can still type ingredients in by hand.
 
 ## 5. AI-Assisted Analysis
-Part of each analysis is produced automatically. When you are online, the following may be sent to our AI service provider: up to four still pictures of the product, the text read from it, the product's name, and ingredient names. This is used to recognise the product, to find its published ingredient list, and to describe ingredients that are not yet in our database. The product's name may also be sent to the FDA Philippines verification site to check whether the product is registered.
+Part of each analysis is produced automatically. When you are online, the following may be sent to our AI service provider: up to four still pictures of the product, the text read from it, the product's name, and ingredient names. This is used to recognise the product, to find its published ingredient list, and to describe ingredients that are not yet in our database. The product's name may also be sent to the FDA Philippines verification site to check whether the product is registered. When the camera read the product's barcode, that barcode (and nothing else) may be sent to Open Beauty Facts, a public list of cosmetics, to compare its ingredient list with the one the app has.
 
 Your profile is never sent to the AI service. Your name, email address, password, age, skin type, skin tone, skin conditions, and allergens stay out of every such request: the comparison between a product and your profile is made on your device.
 

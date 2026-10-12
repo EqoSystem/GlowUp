@@ -68,6 +68,31 @@ namespace GlowUp.Result
         [Tooltip("Looked up by the AI without a live web search: the page is one the AI named, not one that was opened")]
         [SerializeField] private string listFromWebUnchecked = "Ingredient list looked up by the AI without a live web search (not web-backed). Check it against your pack.";
         [SerializeField] private string listTyped = "Ingredient list typed in by you.";
+        [Tooltip("The list itself came from Open Beauty Facts (no better place had it)")]
+        [SerializeField] private string listFromOpenBeautyFacts = "Ingredient list from Open Beauty Facts, a public list that anybody can edit.";
+        [Tooltip("Added to that line when the list was not read from the user's own pack")]
+        [SerializeField] private string listMayDiffer = "It may differ from the product in your hand after a reformulation, or in another country.";
+        [Tooltip("Added when the day the list was looked up is known. {0} = the day")]
+        [SerializeField] private string listLookedUpOn = "Looked up {0}.";
+
+        [Header("A second place that has the list (\"Matched 2 sources\")")]
+        [Tooltip("The line under \"where the list came from\": hidden when there was nothing to compare the list with")]
+        [SerializeField] private TextMeshProUGUI listCheckText;
+        [Tooltip("{0} = where the shown list came from, {1} = the second place")]
+        [SerializeField] private string listMatched = "Matched 2 sources: {0} and {1}.";
+        [Tooltip("{0} = where the shown list came from, {1} = the second place, {2} = how many names differ, {3} = what differs")]
+        [SerializeField] private string listDiffers = "{1} lists this product differently ({2} ingredients differ{3}). The list from {0} is shown.";
+        [Tooltip("{0} = names only the shown list has")]
+        [SerializeField] private string listOnlyHereFormat = "; only here: {0}";
+        [Tooltip("{0} = names only the second place has")]
+        [SerializeField] private string listOnlyThereFormat = "; only there: {0}";
+        [Tooltip("Added for Open Beauty Facts, which anybody can edit. {0} = the day of its last edit")]
+        [SerializeField] private string listSecondEdited = "That entry was last edited {0}.";
+        [SerializeField] private string nameOfPack = "your pack";
+        [SerializeField] private string nameOfInventory = "the GlowUp product list";
+        [SerializeField] private string nameOfWeb = "the page it was looked up on";
+        [SerializeField] private string nameOfTyped = "what you typed";
+        [SerializeField] private string nameOfOpenBeautyFacts = "Open Beauty Facts";
 
         [Header("Why this result?")]
         [Tooltip("The long text. It stays behind the \"Why this result?\" button (the ExpandableSection on WhyCard opens it)")]
@@ -163,8 +188,16 @@ namespace GlowUp.Result
         }
 
         // the FDA Philippines search can end a few seconds after this screen opened: the badge then fills in by itself
-        void OnEnable() { PhFdaVerification.CheckEnded += OnFdaCheckEnded; }
-        void OnDisable() { PhFdaVerification.CheckEnded -= OnFdaCheckEnded; }
+        void OnEnable() { PhFdaVerification.CheckEnded += OnFdaCheckEnded; if (fdaBadge != null) fdaBadge.SimilarAnswered += OnFdaSimilarAnswered; }
+        void OnDisable() { PhFdaVerification.CheckEnded -= OnFdaCheckEnded; if (fdaBadge != null) fdaBadge.SimilarAnswered -= OnFdaSimilarAnswered; }
+
+        /// <summary>The FDA has a SIMILAR record and the user said whether it is their product: the scan is saved with that answer.</summary>
+        void OnFdaSimilarAnswered(bool isMyProduct)
+        {
+            if (record == null || !PhFdaVerification.ConfirmSimilar(record, isMyProduct)) return;
+            try { ScanHistoryRepository.Update(record); } catch (Exception e) { Debug.LogWarning("Result: " + e.Message); }
+            ShowProof();
+        }
         void OnFdaCheckEnded(string scanId) { if (record != null && record.id == scanId) ShowProof(); }
 
         async void Start()
@@ -265,18 +298,36 @@ namespace GlowUp.Result
                 listSourceText.gameObject.SetActive(has);
                 // a scan saved before "web-backed" was kept is not called "not web-backed": that is simply not known
                 bool backedOrUnknown = has && (record.listWebBacked || string.IsNullOrEmpty(record.listFrom));
-                listSourceText.text = from == "typed" ? listTyped : from == "inventory" ? listFromInventory
-                                    : from == "web" ? (backedOrUnknown ? listFromWeb : listFromWebUnchecked) : listFromPack;
+                string line = from == "typed" ? listTyped : from == "inventory" ? listFromInventory
+                            : from == "web" ? (backedOrUnknown ? listFromWeb : listFromWebUnchecked) : listFromPack;
+                // a list that was not read from the user's own pack: when it was looked up, and that it may differ
+                bool fromOpenBeautyFacts = has && from == "web" && record.ingredientSources != null && record.ingredientSources.Count > 0
+                                           && ListSources.KindOf(record.ingredientSources[0], record.brandName) == ListSources.Kind.OpenBeautyFacts;
+                if (fromOpenBeautyFacts)
+                {
+                    line = listFromOpenBeautyFacts;
+                    if (record.listDateUnix > 0) line += " " + string.Format(listSecondEdited, DayOf(record.listDateUnix));
+                }
+                else if (has && from == "web" && record.listDateUnix > 0) line += " " + string.Format(listLookedUpOn, DayOf(record.listDateUnix));
+                if (has && (from == "web" || from == "inventory") && !string.IsNullOrWhiteSpace(listMayDiffer)) line += " " + listMayDiffer;
+                listSourceText.text = line;
             }
+            ShowListCheck(from);
 
             // the pages the list came from, as buttons (never the FDA's page: that one holds no ingredient lists)
             int shown = 0;
-            if (has && sourceLinkTemplate != null && sourceLinksContent != null && (from == "web" || from == "inventory"))
+            if (has && sourceLinkTemplate != null && sourceLinksContent != null)
             {
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (string source in record.ingredientSources ?? new List<string>())
+                // the pages the list came from (a looked-up or stored list), then the page of the second place it was checked against
+                var pages = new List<string>();
+                if (from == "web" || from == "inventory") pages.AddRange(record.ingredientSources ?? new List<string>());
+                if (!string.IsNullOrWhiteSpace(record.listCheckSource)) pages.Add(record.listCheckSource);
+                int most = Mathf.Max(1, maximumSourceLinks) + (string.IsNullOrWhiteSpace(record.listCheckSource) ? 0 : 1);
+                foreach (string source in pages)
                 {
-                    if (shown >= Mathf.Max(1, maximumSourceLinks)) break;
+                    if (shown >= most) break;
+                    if (shown >= Mathf.Max(1, maximumSourceLinks) && source != record.listCheckSource) continue;      // keep the last place for the second source
                     string address = SourceLinkButton.AddressIn(source);
                     if (address.Length == 0 || address.IndexOf("verification.fda.gov.ph", StringComparison.OrdinalIgnoreCase) >= 0 || !seen.Add(address)) continue;
                     SourceLinkButton link = Instantiate(sourceLinkTemplate, sourceLinksContent);
@@ -289,6 +340,37 @@ namespace GlowUp.Result
             }
             if (sourceLinksContent != null) sourceLinksContent.gameObject.SetActive(shown > 0);
         }
+
+        /// <summary>"12 Oct 2026" for a time kept in Unix seconds.</summary>
+        static string DayOf(long unixSeconds) => DateTimeOffset.FromUnixTimeSeconds(unixSeconds).ToLocalTime().DateTime.ToString("d MMM yyyy");
+
+        /// <summary>
+        /// "MATCHED 2 SOURCES", or what a second place lists differently. The line is hidden when the analysis found no
+        /// second place to compare the list with (offline, no barcode, a product nobody else lists).
+        /// </summary>
+        void ShowListCheck(string from)
+        {
+            if (listCheckText == null) return;
+            string outcome = record != null ? (record.listCheck ?? "") : "";
+            bool show = outcome == ListSources.Matched || outcome == ListSources.Differs;
+            listCheckText.gameObject.SetActive(show);
+            if (!show) return;
+            string shown = from == "typed" ? nameOfTyped : from == "inventory" ? nameOfInventory : from == "web" ? nameOfWeb : nameOfPack;
+            string other = record.listCheckKind == "inventory" ? nameOfInventory : nameOfOpenBeautyFacts;
+            string line;
+            if (outcome == ListSources.Matched) line = string.Format(listMatched, shown, other);
+            else
+            {
+                string what = "";
+                if (record.listOnlyHere != null && record.listOnlyHere.Count > 0) what += string.Format(listOnlyHereFormat, string.Join(", ", record.listOnlyHere));
+                if (record.listOnlyThere != null && record.listOnlyThere.Count > 0) what += string.Format(listOnlyThereFormat, string.Join(", ", record.listOnlyThere));
+                line = string.Format(listDiffers, shown, Capital(other), Mathf.Max(1, record.listDifferCount), what);
+            }
+            if (record.listCheckKind != "inventory" && record.listCheckDateUnix > 0) line += " " + string.Format(listSecondEdited, DayOf(record.listCheckDateUnix));
+            listCheckText.text = line;
+        }
+
+        static string Capital(string text) => string.IsNullOrEmpty(text) ? "" : char.ToUpperInvariant(text[0]) + text.Substring(1);
 
         /// <summary>
         /// Where a scan's ingredient list came from: "pack", "inventory", "web" or "typed". A scan saved before this was

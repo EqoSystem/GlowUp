@@ -111,6 +111,9 @@ namespace GlowUp.EditorTools
             // where the list came from: one short line, and the pages as buttons (not a paragraph with web addresses in it)
             TextMeshProUGUI listSource = A.Label(ingredients.transform, "ListSourceText", "Ingredient list looked up online. Check it against your pack when you can.", 27,
                                                  ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            // a second place that has the same product's list: "Matched 2 sources", or what it lists differently
+            TextMeshProUGUI listCheck = A.Label(ingredients.transform, "ListCheckText", "Matched 2 sources: your pack and Open Beauty Facts. That entry was last edited 3 May 2026.", 27,
+                                                ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             GameObject links = A.Node(ingredients.transform, "SourceLinks", typeof(GridLayoutGroup));
             var linkGrid = links.GetComponent<GridLayoutGroup>();
             linkGrid.cellSize = new Vector2(412, 68); linkGrid.spacing = new Vector2(16, 12);
@@ -217,7 +220,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "allIngredientsButton", allIngredients); A.Set(controller, "allIngredientsLabel", A.LabelOf(allIngredients));
             A.Set(controller, "ingredientSheet", sheet);
             A.Set(controller, "explanationText", explanation);
-            A.Set(controller, "fdaBadge", fdaBadge); A.Set(controller, "listSourceText", listSource);
+            A.Set(controller, "fdaBadge", fdaBadge); A.Set(controller, "listSourceText", listSource); A.Set(controller, "listCheckText", listCheck);
             A.Set(controller, "sourceLinksContent", links.transform); A.Set(controller, "sourceLinkTemplate", linkTemplate);
             A.Set(controller, "shadeCard", shade); Kit.SetArray(controller, "shadeSwatches", swatches); A.Set(controller, "shadeCaption", shadeCaption);
             A.Set(controller, "dermatologistCard", specialist); A.Set(controller, "dermatologistText", specialistText); A.Set(controller, "dermatologistButton", specialistButton);
@@ -272,6 +275,18 @@ namespace GlowUp.EditorTools
                 "The FDA Philippines list shows which cosmetics are registered (notified) for sale. It holds no ingredient lists, and a record does not prove that the item in your hand is genuine or safe.",
                 26, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             moreText.lineSpacing = 4;
+            // a SIMILAR record: the user says whether it is their product (shown for a similar record only)
+            GameObject confirm = A.Node(more.transform, "ConfirmRow");
+            A.VStack(confirm, 10);
+            A.Label(confirm.transform, "QuestionText", "Is this record your product?", 28, ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.TopLeft, true);
+            GameObject confirmButtons = A.Node(confirm.transform, "Buttons");
+            A.HStack(confirmButtons, 16, 0, 0, 0, 0, TextAnchor.MiddleLeft);
+            A.Size(confirmButtons.transform, -1, 76);
+            Button confirmNo = A.PillButton(confirmButtons.transform, "NotMineButton", "No, it is not", 27, ThemeRole.SurfaceAlt, ThemeRole.MainText);
+            A.Size(confirmNo, -1, 76, 1);
+            A.Outline(confirmNo.transform, ThemeRole.Accent, 76f);
+            Button confirmYes = A.PillButton(confirmButtons.transform, "IsMineButton", "Yes, it is", 27, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Check);
+            A.Size(confirmYes, -1, 76, 1);
             Button site = A.PillButton(more.transform, "FdaSiteButton", "Open the FDA Philippines site", 28, ThemeRole.InputBackground, ThemeRole.MainText, IconFactory.Arrow);
             A.Size(site, -1, 76);
             A.Outline(site.transform, ThemeRole.Accent, 76f);
@@ -279,6 +294,7 @@ namespace GlowUp.EditorTools
             var view = SceneBuilderCore.Ensure<FdaBadgeView>(holder);
             A.Set(view, "icon", icon); A.Set(view, "iconBackground", disc); A.Set(view, "titleLabel", title); A.Set(view, "detailLabel", detail);
             A.Set(view, "moreText", moreText); A.Set(view, "portalButton", site);
+            A.Set(view, "confirmRow", confirm); A.Set(view, "confirmYesButton", confirmYes); A.Set(view, "confirmNoButton", confirmNo);
             A.Set(view, "registeredIcon", IconFactory.Check); A.Set(view, "similarIcon", IconFactory.Info); A.Set(view, "expiredIcon", IconFactory.Warning);
             A.Set(view, "noneIcon", IconFactory.Info); A.Set(view, "unavailableIcon", IconFactory.Info); A.Set(view, "checkingIcon", IconFactory.Sync);
 

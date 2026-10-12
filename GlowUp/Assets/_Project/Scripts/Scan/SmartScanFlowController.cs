@@ -1226,7 +1226,13 @@ namespace GlowUp.Scan
                 if (!AiBudget.TakeLookUp()) { Say(msgLookUpLimit); return; }
                 ProductAiAdvisor.IngredientLookup found = await ProductAiAdvisor.FindIngredients(identity.productName, identity.brandName, identity.cosmeticType);
                 if (this == null || stage == Stage.Leaving) return;
-                if (found == null || !found.found) { await SayWhatFdaKnows(); return; }
+                if (found == null || !found.found)
+                {
+                    // the last place a list may come from: Open Beauty Facts, by the barcode (its last edit is shown with the result)
+                    if (await UseOpenBeautyFacts()) return;
+                    await SayWhatFdaKnows();
+                    return;
+                }
 
                 // additives that hide behind words like "Fragrance": kept on the phone and sent to the shared database
                 foreach (ProductAiAdvisor.HiddenAdditive hidden in found.hidden)
@@ -1251,6 +1257,22 @@ namespace GlowUp.Scan
                     if (ingredientsCheck != null) ingredientsCheck.SetWorking(false);
                 }
             }
+        }
+
+        /// <summary>
+        /// No trustworthy page had the list. When the scan read the product's barcode, Open Beauty Facts is asked: a public
+        /// list that anybody can edit, so it comes last. True = it had the list, and the scan goes on with it.
+        /// </summary>
+        async Task<bool> UseOpenBeautyFacts()
+        {
+            if (barcode.Length == 0 || !OpenBeautyFacts.Enabled || !ConnectivityMonitor.Online) return false;
+            OpenBeautyFacts.Result there = await OpenBeautyFacts.Find(barcode);
+            if (this == null || stage == Stage.Leaving || ingredientText != null) return true;      // left, or the list was read from the pack in the meantime
+            if (there == null || !there.found) return false;
+            IngredientTextParser.ParsedList list = IngredientTextParser.Read(there.ingredientText);
+            if (list.inOrder.Count < 3) return false;
+            UseLookedUpList(new List<string>(list.inOrder), new List<string> { there.Source }, "web", true);
+            return true;
         }
 
         /// <summary>

@@ -37,6 +37,12 @@ namespace GlowUp.Views
         [SerializeField] private Button portalButton;
         [SerializeField] private string portalUrl = PhFdaVerification.Portal;
 
+        [Header("A similar record: is it the user's product?")]
+        [Tooltip("The question with its two buttons, in the block that opens under the badge. Shown for a similar record only.")]
+        [SerializeField] private GameObject confirmRow;
+        [SerializeField] private Button confirmYesButton;
+        [SerializeField] private Button confirmNoButton;
+
         [Header("Wording: the two lines of the badge")]
         [SerializeField] private string registeredTitle = "Registered with FDA Philippines";
         [Tooltip("{0} = the date the record is valid until")]
@@ -85,9 +91,15 @@ namespace GlowUp.Views
         [Tooltip("Which answer is shown in the Editor and before a product is loaded: registered, similar, expired, none or unavailable")]
         [SerializeField] private string state = PhFdaVerification.Registered;
 
+        /// <summary>Raised when the user answered "is this record your product?" for a similar record: true = yes.</summary>
+        public event System.Action<bool> SimilarAnswered;
+
         void Awake()
         {
             if (portalButton != null) portalButton.onClick.AddListener(() => { if (!string.IsNullOrWhiteSpace(portalUrl)) Application.OpenURL(portalUrl); });
+            if (confirmYesButton != null) confirmYesButton.onClick.AddListener(() => SimilarAnswered?.Invoke(true));
+            if (confirmNoButton != null) confirmNoButton.onClick.AddListener(() => SimilarAnswered?.Invoke(false));
+            if (confirmRow != null) confirmRow.SetActive(state == PhFdaVerification.Similar);
             Paint();
         }
 
@@ -119,6 +131,7 @@ namespace GlowUp.Views
             }
             if (titleLabel != null) titleLabel.text = title;
             if (detailLabel != null) { detailLabel.text = detail; detailLabel.gameObject.SetActive(detail.Length > 0); }
+            if (confirmRow != null) confirmRow.SetActive(state == PhFdaVerification.Similar && record != null);
 
             if (moreText != null)
             {
