@@ -50,7 +50,28 @@ namespace GlowUp.Scan
             if (picture == null || picture.width < 16 || picture.height < 16) return null;
             Color32[] pixels;
             try { pixels = picture.GetPixels32(); } catch (Exception) { return null; }
-            int w = picture.width, h = picture.height;
+            return SignatureOf(pixels, picture.width, picture.height);
+        }
+
+        /// <summary>
+        /// The same for a picture given as plain numbers (hold-to-scan): one ARGB number per pixel, row by row from the
+        /// TOP. Only the first width x height numbers are used.
+        /// </summary>
+        public static Look SignatureOf(int[] argb, int width, int height)
+        {
+            if (argb == null || width < 16 || height < 16 || argb.Length < width * height) return null;
+            // a texture counts its rows from the bottom: the rows are turned round so both ways give the same look
+            var pixels = new Color32[width * height];
+            for (int y = 0; y < height; y++)
+            {
+                int from = (height - 1 - y) * width, to = y * width;
+                for (int x = 0; x < width; x++) { int p = argb[from + x]; pixels[to + x] = new Color32((byte)(p >> 16), (byte)(p >> 8), (byte)p, 255); }
+            }
+            return SignatureOf(pixels, width, height);
+        }
+
+        static Look SignatureOf(Color32[] pixels, int w, int h)
+        {
             var look = new Look();
 
             // colours: the middle of the picture counts (the edges are mostly the hand and the background)

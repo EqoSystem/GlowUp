@@ -124,18 +124,31 @@ namespace GlowUp.Scan
         /// Shows the AI a photo of the product (JPG) and the text the text reader found on it.
         /// Returns what it recognised; `found` is false when it could not tell.
         /// </summary>
-        public static async Task<Identity> Identify(byte[] jpegPhoto, string textOnProduct)
+        public static Task<Identity> Identify(byte[] jpegPhoto, string textOnProduct)
+        {
+            return Identify(jpegPhoto != null && jpegPhoto.Length > 0 ? new List<byte[]> { jpegPhoto } : null, textOnProduct);
+        }
+
+        /// <summary>
+        /// The same with SEVERAL photos of ONE product (its front, its back, its bottom ...), sent together in one request:
+        /// hold-to-scan asks the AI once, at the end, with the best picture of each side and all the text that was read.
+        /// </summary>
+        public static async Task<Identity> Identify(IList<byte[]> jpegPhotos, string textOnProduct)
         {
             var result = new Identity();
-            if (!Available || jpegPhoto == null || jpegPhoto.Length == 0) return result;
+            int photos = 0;
+            if (jpegPhotos != null) foreach (byte[] one in jpegPhotos) if (one != null && one.Length > 0) photos++;
+            if (!Available || photos == 0) return result;
             var q = new StringBuilder();
-            q.Append("The photo shows a product held up to a phone camera. It may be shown with or without its packaging. Identify it. This app checks MAKE-UP only, so say honestly when the product is something else.\n");
+            q.Append(photos > 1
+                ? "The " + photos + " photos show ONE product held up to a phone camera, from different sides (its front, its back, its bottom). It may be shown with or without its packaging. Identify it. This app checks MAKE-UP only, so say honestly when the product is something else.\n"
+                : "The photo shows a product held up to a phone camera. It may be shown with or without its packaging. Identify it. This app checks MAKE-UP only, so say honestly when the product is something else.\n");
             q.Append("LOOK FIRST, READ SECOND: decide from what the pack looks like before you use any text. ");
             q.Append("Use everything the packaging shows, not only the words: the logo and its lettering, the colours and pattern of the pack, the shape of the tube, bottle, compact or box, and the cap. A well-known pack can be recognised by its look even when its text cannot be read.\n");
             if (KnownBrands != null && KnownBrands.Count > 0)
                 q.Append("BRANDS THIS APP ALREADY LISTS (when the pack is one of these, write the brand exactly like this): ").Append(string.Join(", ", KnownBrands.GetRange(0, Mathf.Min(80, KnownBrands.Count)))).Append("\n");
             if (!string.IsNullOrWhiteSpace(textOnProduct))
-                q.Append("TEXT A TEXT READER FOUND ON IT (may contain mistakes):\n").Append(textOnProduct.Length > 600 ? textOnProduct.Substring(0, 600) : textOnProduct).Append('\n');
+                q.Append("TEXT A TEXT READER FOUND ON IT (may contain mistakes):\n").Append(textOnProduct.Length > 900 ? textOnProduct.Substring(0, 900) : textOnProduct).Append('\n');
             q.Append("Reply with ONLY one JSON object, no markdown and no other text, in exactly this shape:\n");
             q.Append("{\"found\":true,\"productName\":\"the product's name as sold, without the brand\",\"brandName\":\"\",");
             q.Append("\"cosmeticType\":\"").Append(ProductScope.AiTypeChoices).Append("\",");
@@ -146,7 +159,7 @@ namespace GlowUp.Scan
             q.Append("confidence is 0 to 1. Do not guess a name or a brand that you can neither read nor clearly recognise: leave it empty instead. ");
             q.Append("If the photo shows no cosmetic product, reply {\"found\":false}.");
 
-            AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), false, TimeoutSeconds, jpegPhoto);
+            AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), false, TimeoutSeconds, jpegPhotos);
             if (answer == null || !answer.ok) { Debug.LogWarning("AI product recognition: " + (answer != null ? answer.error : "no answer")); return result; }
             Dictionary<string, object> json = AiResearchClient.JsonObjectIn(answer.text);
             if (json == null) return result;

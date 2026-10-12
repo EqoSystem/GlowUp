@@ -33,11 +33,17 @@ namespace GlowUp.Scan
 
         public static Task<Answer> Ask(GeminiApiConfig config, string apiKey, string question, bool searchTheWeb, float timeoutSeconds)
         {
-            return Ask(config, apiKey, question, searchTheWeb, timeoutSeconds, null);
+            return Ask(config, apiKey, question, searchTheWeb, timeoutSeconds, (IList<byte[]>)null);
         }
 
         /// <param name="jpegPicture">A JPG picture the question is about (a photo of a product), or null.</param>
-        public static async Task<Answer> Ask(GeminiApiConfig config, string apiKey, string question, bool searchTheWeb, float timeoutSeconds, byte[] jpegPicture)
+        public static Task<Answer> Ask(GeminiApiConfig config, string apiKey, string question, bool searchTheWeb, float timeoutSeconds, byte[] jpegPicture)
+        {
+            return Ask(config, apiKey, question, searchTheWeb, timeoutSeconds, jpegPicture != null && jpegPicture.Length > 0 ? new List<byte[]> { jpegPicture } : null);
+        }
+
+        /// <param name="jpegPictures">JPG pictures the question is about (the sides of one product), sent together in ONE request. Null or empty = none.</param>
+        public static async Task<Answer> Ask(GeminiApiConfig config, string apiKey, string question, bool searchTheWeb, float timeoutSeconds, IList<byte[]> jpegPictures)
         {
             var last = new Answer { error = "No AI model is configured." };
             if (config == null || string.IsNullOrEmpty(apiKey) || config.ModelChain == null) return last;
@@ -52,7 +58,7 @@ namespace GlowUp.Scan
                 {
                     using (var request = new UnityWebRequest(config.BuildUrl(model), "POST"))
                     {
-                        request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(Body(question, withSearch, jpegPicture)));
+                        request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(Body(question, withSearch, jpegPictures)));
                         request.downloadHandler = new DownloadHandlerBuffer();
                         request.SetRequestHeader("Content-Type", "application/json");
                         request.SetRequestHeader("x-goog-api-key", apiKey);
@@ -81,12 +87,15 @@ namespace GlowUp.Scan
             return last;
         }
 
-        static string Body(string question, bool withSearch, byte[] jpegPicture)
+        static string Body(string question, bool withSearch, IList<byte[]> jpegPictures)
         {
-            string picture = jpegPicture != null && jpegPicture.Length > 0 ? Convert.ToBase64String(jpegPicture) : null;
-            var sb = new StringBuilder(question.Length + 200 + (picture != null ? picture.Length : 0));
+            int size = 0;
+            if (jpegPictures != null) foreach (byte[] one in jpegPictures) if (one != null) size += one.Length * 4 / 3 + 80;
+            var sb = new StringBuilder(question.Length + 200 + size);
             sb.Append("{\"contents\":[{\"role\":\"user\",\"parts\":[");
-            if (picture != null) sb.Append("{\"inline_data\":{\"mime_type\":\"image/jpeg\",\"data\":\"").Append(picture).Append("\"}},");
+            if (jpegPictures != null)
+                foreach (byte[] one in jpegPictures)
+                    if (one != null && one.Length > 0) sb.Append("{\"inline_data\":{\"mime_type\":\"image/jpeg\",\"data\":\"").Append(Convert.ToBase64String(one)).Append("\"}},");
             sb.Append("{\"text\":\"").Append(Escape(question)).Append("\"}]}],");
             if (withSearch) sb.Append("\"tools\":[{\"google_search\":{}}],");
             sb.Append("\"generationConfig\":{\"temperature\":0.1}}");

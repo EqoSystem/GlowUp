@@ -19,6 +19,8 @@ namespace GlowUp.Scan
         public List<Line> lines = new List<Line>();
         /// <summary>The digits under a barcode in the picture, or "".</summary>
         public string barcode = "";
+        /// <summary>Where that barcode is in the picture (0 to 1, from the top-left corner). All 0 = not known.</summary>
+        public float barcodeLeft, barcodeTop, barcodeRight, barcodeBottom;
 
         /// <summary>The lines the reader is at least this sure of, one per line of text.</summary>
         public string Text(float minimumConfidence = 0f)
