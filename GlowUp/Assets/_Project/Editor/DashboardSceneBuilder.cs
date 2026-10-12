@@ -78,11 +78,12 @@ namespace GlowUp.EditorTools
 
             GameObject listArea = A.Node(card, "RecommendationsArea");
             A.Between(listArea.transform, listTop + 122, A.AboveBar);
-            // square tiles, two per row: only the name, the brand and the kind; the arrow slides the Save / Try On / AI drawer down
-            AppTiles.GridScroll(listArea.transform, "RecommendationsScrollView", out RectTransform content);
-            ProductTileView template = AppTiles.ProductTile(content, "RecommendationTemplate", AppTiles.TileKind.Dashboard);
-            // grey placeholder tiles for the time the list loads (inactive here: the app switches them on)
-            GameObject skeleton = AppTiles.SkeletonTiles(listArea.transform, "RecommendationsSkeleton", 4);
+            // long rows, one product each: closed they show the kind's icon, the name and the brand; a tap makes the row
+            // longer and shows Save / Try On / AI (the user's choice of 12 October 2026: a long list must not overwhelm)
+            AppTiles.ListScroll(listArea.transform, "RecommendationsScrollView", out RectTransform content);
+            ProductTileView template = AppTiles.ExpandingRow(content, "RecommendationTemplate", AppTiles.TileKind.Dashboard);
+            // grey placeholder rows for the time the list loads (inactive here: the app switches them on)
+            GameObject skeleton = AppTiles.SkeletonRows(listArea.transform, "RecommendationsSkeleton", 5);
             skeleton.SetActive(false);
 
             TextMeshProUGUI empty = A.Label(listArea.transform, "RecommendationsEmptyText",
@@ -172,7 +173,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "settingsButton", settings);
 
             A.Finish(s);
-            Debug.Log("[GlowUp] UserDashboardScene built. RecommendationTemplate is the pattern tile (its Drawer is parked above it); RecommendationsSkeleton and AiInsightPanel are inactive until needed; AccountPanel is inactive until the avatar is tapped. The gear opens the Settings page.");
+            Debug.Log("[GlowUp] UserDashboardScene built. RecommendationTemplate is the pattern row (left open in the Hierarchy so its buttons can be styled; the app closes every row); RecommendationsSkeleton and AiInsightPanel are inactive until needed; AccountPanel is inactive until the avatar is tapped. The gear opens the Settings page.");
         }
 
         /// <summary>One tile of the quick summary: a small caption and the value under it. Two tiles per line.</summary>

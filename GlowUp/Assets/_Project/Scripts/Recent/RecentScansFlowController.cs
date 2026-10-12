@@ -12,8 +12,9 @@ using UnityEngine.UI;
 namespace GlowUp.Recent
 {
     /// <summary>
-    /// Recent Scans: the saved products as square tiles, two per row. A tile shows only the product's
-    /// name, brand and kind, with "Try On" and "AI". Tapping a tile opens its full result.
+    /// Recent Scans: the saved products as long rows, one under the other. A row shows only the kind's icon, the
+    /// product's name and its brand. Tapping a row makes it longer and shows "Result" (the full result), "Try On"
+    /// and "AI"; tapping it again closes it, and only one row is open at a time.
     ///
     /// Removing works like app icons on a phone's home screen: press and hold a tile and all tiles start
     /// to shake; a shadow over the left half of the screen shows where to drag. A tile can be dragged anywhere
@@ -159,6 +160,7 @@ namespace GlowUp.Recent
                     tile.TryOnClicked += t => { if (!shaking) { ScanSession.TryOn = t.Data as ScanRecord; SceneNavigator.Go(tryOnScene); } };
                     tile.AiClicked += t => { if (!shaking && aiPanel != null) aiPanel.Show(t.Data as ScanRecord); };
                     tile.RenameClicked += t => BeginRename(t.Data as ScanRecord);
+                    tile.DrawerOpening += CloseOtherRows;
                     if (tile.TryGetComponent(out HoldToRemoveTile hold))
                     {
                         if (removeZone != null) hold.SetRemoveArea((RectTransform)removeZone.transform);
@@ -221,11 +223,18 @@ namespace GlowUp.Recent
                 if (tile == null) continue;
                 if (tile.TryGetComponent(out HoldToRemoveTile hold)) hold.SetShaking(shaking);
                 tile.ShowRename(shaking);
+                tile.SetExpandLocked(shaking);          // delete mode comes first: a shaking row does not open, and an open one closes
             }
             if (doneButton != null) doneButton.gameObject.SetActive(shaking);
             if (sortButton != null) sortButton.gameObject.SetActive(!shaking);
             if (clearAllButton != null) clearAllButton.gameObject.SetActive(!shaking && tiles.Count > 0);
             zoneTarget = shaking ? zoneAlphaWaiting : 0f;
+        }
+
+        /// <summary>One row open at a time, so the list stays calm.</summary>
+        void CloseOtherRows(ProductTileView opened)
+        {
+            foreach (ProductTileView tile in tiles) if (tile != null && tile != opened) tile.SetDrawer(false);
         }
 
         void OnDragEnded(HoldToRemoveTile hold, bool remove)

@@ -12,9 +12,10 @@ using Kit = GlowUp.EditorTools.OnboardingKit;
 namespace GlowUp.EditorTools
 {
     /// <summary>
-    /// Building blocks for the square product tiles and what belongs to them: the two-column tile grid,
-    /// the pattern tile (Recent Scans and Dashboard versions), the grey placeholder tiles shown while a
-    /// list loads, the "AI" pop-up, and the sideways-drag navigation between the main screens.
+    /// Building blocks for product lists: the long rows that open downwards (dashboard recommendations and Recent
+    /// Scans), the square tiles in a two-column grid (the product picker of AR Try-On, the alternatives on a result),
+    /// the grey placeholders shown while a list loads, the "AI" pop-up, and the sideways-drag navigation between
+    /// the main screens.
     /// Product tiles are compact, with smooth round corners, and carry their own buttons; pink is kept for
     /// the main button. A tap plays the selection animation of the Onboarding tiles (Steps 2 and 3).
     /// </summary>
@@ -40,6 +41,142 @@ namespace GlowUp.EditorTools
             return scroll;
         }
 
+        // =====================================================================================
+        //  Rows that open downwards (dashboard "Recommended for you", Recent Scans)
+        // =====================================================================================
+        public const float RowHeight = 128f;            // a closed row
+        public const float RowActionsHeight = 96f;      // what an open row is taller by: the strip with its buttons
+        public const float RowGap = 14f;
+
+        /// <summary>A vertical scroll list of rows, one product per row.</summary>
+        public static ScrollRect ListScroll(Transform parent, string name, out RectTransform content)
+        {
+            return A.Scroll(parent, name, out content, RowGap, 0, 18, 4, 28);
+        }
+
+        /// <summary>
+        /// The pattern ROW: long and low, one product. Closed it shows only the kind's icon, the product's name and its
+        /// brand (and a small arrow). A tap makes it longer downwards and uncovers the strip "Actions" with its buttons:
+        /// Save, Try On and AI on the dashboard; Result, Try On and AI in Recent Scans. A second tap closes it.
+        ///
+        /// Row (its place in the list; its Layout Element is what gets taller) > Visual (everything that is seen; in Recent
+        /// Scans it shakes and is dragged) with the texts and Actions > Buttons. In the Hierarchy the pattern row is left
+        /// OPEN, so the buttons can be seen and styled; the app closes every row when it makes the list.
+        /// </summary>
+        public static ProductTileView ExpandingRow(Transform content, string name, TileKind kind)
+        {
+            var root = A.Node(content, name);
+            LayoutElement rowLayout = A.Size(root.transform, -1, RowHeight + RowActionsHeight);
+            rowLayout.flexibleHeight = 0;
+
+            var visual = A.Node(root.transform, "Visual", typeof(Image), typeof(Button), typeof(CanvasGroup));
+            A.Fill(visual.transform);
+            var background = visual.GetComponent<Image>();
+            Kit.StyleRounded(background); Kit.SetRadius(background, TileRadius); background.raycastTarget = true; background.color = Color.white;
+            SceneBuilderCore.Themed(visual, ThemeRole.InputBackground);
+            var rowButton = visual.GetComponent<Button>(); rowButton.targetGraphic = background; rowButton.transition = Selectable.Transition.None;
+            A.Outline(visual.transform, ThemeRole.SurfaceAlt, TileRadius);
+
+            // ---- what a closed row shows: the kind's icon, the name, the brand ----
+            Image chipImage = A.Panel(visual.transform, "TypeChip", ThemeRole.SurfaceAlt, 1f, 26f);
+            A.At(chipImage.transform, A.TL, new Vector2(20, -20), new Vector2(88, 88));
+            Image typeIcon = A.Icon(chipImage.transform, "TypeIcon", IconFactory.Bottle, 54, ThemeRole.MainText);
+            Image statusDot = A.RawPanel(visual.transform, "StatusDot", new Color32(94, 127, 75, 255), 18f);
+            A.At(statusDot.transform, A.TL, new Vector2(94, -14), new Vector2(18, 18));
+            statusDot.gameObject.SetActive(false);                 // shown only when the controller's "Show Status Dot" is on
+
+            TextMeshProUGUI nameText = A.Label(visual.transform, "NameText", "Product name", 33, ThemeRole.MainText, FontRole.Heading);
+            A.TopStrip(nameText.transform, 22, 46, 130, 104); A.Shrink(nameText, 25);
+            TextMeshProUGUI brandText = A.Label(visual.transform, "BrandText", "Brand name", 27, ThemeRole.SecondaryText, FontRole.Label);
+            A.TopStrip(brandText.transform, 70, 38, 130, 104); A.Shrink(brandText, 21);
+
+            // the small arrow at the right end: it says "there is more", and turns upside down while the row is open
+            Image chevron = A.Icon(visual.transform, "Chevron", IconFactory.ChevronDown, 40, ThemeRole.SecondaryText);
+            var chevronRect = chevron.rectTransform;
+            chevronRect.anchorMin = chevronRect.anchorMax = new Vector2(1, 1); chevronRect.pivot = new Vector2(0.5f, 0.5f);
+            chevronRect.anchoredPosition = new Vector2(-52, -RowHeight * 0.5f); chevronRect.sizeDelta = new Vector2(40, 40);
+
+            var view = SceneBuilderCore.Ensure<ProductTileView>(root);
+            A.Set(view, "nameText", nameText); A.Set(view, "brandText", brandText);
+            A.Set(view, "typeIcon", typeIcon); A.Set(view, "statusDot", statusDot); A.Set(view, "tileButton", rowButton);
+            A.Set(view, "popTarget", (RectTransform)visual.transform); A.Set(view, "popGroup", visual.GetComponent<CanvasGroup>());
+
+            // ---- the strip that is uncovered when the row opens: it hangs under the closed row and is cut off at its own edge ----
+            var actions = A.Node(visual.transform, "Actions", typeof(RectMask2D), typeof(CanvasGroup));
+            var actionsRect = (RectTransform)actions.transform;
+            actionsRect.anchorMin = new Vector2(0, 1); actionsRect.anchorMax = new Vector2(1, 1); actionsRect.pivot = new Vector2(0.5f, 1);
+            actionsRect.anchoredPosition = new Vector2(0, -RowHeight); actionsRect.sizeDelta = new Vector2(0, RowActionsHeight);
+            var buttons = A.Node(actions.transform, "Buttons");
+            var buttonsRect = (RectTransform)buttons.transform;
+            buttonsRect.anchorMin = new Vector2(0, 1); buttonsRect.anchorMax = new Vector2(1, 1); buttonsRect.pivot = new Vector2(0.5f, 1);
+            buttonsRect.anchoredPosition = new Vector2(0, -4); buttonsRect.sizeDelta = new Vector2(0, 72);
+            A.HStack(buttons, 14, 20, 20, 0, 0, TextAnchor.MiddleCenter);
+
+            if (kind == TileKind.RecentScan)
+            {
+                Button result = RowButton(buttons.transform, "ResultButton", "Result", IconFactory.Document, true, 1.2f);
+                Button tryOn = RowButton(buttons.transform, "TryOnButton", "Try On", IconFactory.Sparkle, false, 1.2f);
+                Button ai = RowButton(buttons.transform, "AiButton", "AI", IconFactory.Ai, false, 0.8f);
+                A.Set(view, "resultButton", result); A.Set(view, "tryOnButton", tryOn); A.Set(view, "aiButton", ai);
+
+                // the pencil appears while the rows shake (press and hold): rename on this phone only. It takes the arrow's place.
+                Button rename = A.IconButton(visual.transform, "RenameButton", IconFactory.Pencil, 62, 34, ThemeRole.MainText, ThemeRole.SurfaceAlt);
+                var renameRect = (RectTransform)rename.transform;
+                renameRect.anchorMin = renameRect.anchorMax = new Vector2(1, 1); renameRect.pivot = new Vector2(0.5f, 0.5f);
+                renameRect.anchoredPosition = new Vector2(-52, -RowHeight * 0.5f); renameRect.sizeDelta = new Vector2(62, 62);
+                rename.gameObject.SetActive(false);
+                A.Set(view, "renameButton", rename);
+
+                // press and hold, then drag to the shadow to remove; the Visual gets its own drawing layer so it can pass over everything
+                var layer = SceneBuilderCore.Ensure<Canvas>(visual);
+                SceneBuilderCore.Ensure<GraphicRaycaster>(visual);
+                var hold = SceneBuilderCore.Ensure<HoldToRemoveTile>(root);
+                A.Set(hold, "visual", (RectTransform)visual.transform); A.Set(hold, "visualCanvas", layer);
+            }
+            else
+            {
+                Button save = RowButton(buttons.transform, "SaveButton", "Save", IconFactory.Plus, false, 1f);
+                Button tryOn = RowButton(buttons.transform, "TryOnButton", "Try On", IconFactory.Sparkle, true, 1.3f);
+                Button ai = RowButton(buttons.transform, "AiButton", "AI", IconFactory.Ai, false, 0.8f);
+                A.Set(view, "saveButton", save); A.Set(view, "saveLabel", A.LabelOf(save));
+                A.Set(view, "tryOnButton", tryOn); A.Set(view, "aiButton", ai);
+            }
+
+            A.Set(view, "actions", actionsRect); A.Set(view, "actionsGroup", actions.GetComponent<CanvasGroup>());
+            A.Set(view, "rowLayout", rowLayout); A.Set(view, "chevron", chevronRect);
+            A.Set(view, "closedHeight", RowHeight); A.Set(view, "actionsHeight", RowActionsHeight);
+            return view;
+        }
+
+        /// <summary>A button of an open row: they share the row's width (`share` = how much of it this one takes).</summary>
+        static Button RowButton(Transform row, string name, string label, Sprite icon, bool primary, float share)
+        {
+            Button button = A.PillButton(row, name, label, 27, primary ? ThemeRole.ButtonFill : ThemeRole.SurfaceAlt, primary ? ThemeRole.ButtonText : ThemeRole.MainText, icon);
+            A.Shrink(A.LabelOf(button), 19);
+            A.Size(button, 120, 70, share);
+            return button;
+        }
+
+        /// <summary>Grey placeholder rows shown in the place of a row list while it loads (skeleton loading).</summary>
+        public static GameObject SkeletonRows(Transform parent, string name, int count)
+        {
+            var holder = A.Node(parent, name, typeof(SkeletonShimmer), typeof(CanvasGroup));
+            A.Fill(holder.transform);
+            A.VStack(holder, RowGap, 0, 18, 4, 0);
+            for (int i = 0; i < count; i++)
+            {
+                var row = A.Node(holder.transform, "Placeholder" + (i + 1), typeof(Image));
+                var img = row.GetComponent<Image>(); Kit.StyleRounded(img); Kit.SetRadius(img, TileRadius); img.raycastTarget = false; img.color = new Color(1, 1, 1, 0.7f);
+                SceneBuilderCore.Themed(row, ThemeRole.SurfaceAlt);
+                A.Size(img, -1, RowHeight);
+            }
+            holder.GetComponent<CanvasGroup>().blocksRaycasts = false;
+            return holder;
+        }
+
+        // =====================================================================================
+        //  Square tiles (the product picker of AR Try-On, the alternatives on a result)
+        // =====================================================================================
         /// <summary>
         /// The pattern tile. Tile (its place in the grid) > Visual (everything that is seen; it shakes and is
         /// dragged) with NeonOutline (the glow of the selection animation), the texts, the buttons, and

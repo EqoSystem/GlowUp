@@ -45,9 +45,10 @@ namespace GlowUp.EditorTools
             // ---- the tiles ----
             GameObject listArea = A.Node(card, "ScanListArea");
             A.Between(listArea.transform, 282, A.AboveBar);
-            AppTiles.GridScroll(listArea.transform, "ScanHistoryList", out RectTransform content);
-            content.GetComponent<GridLayoutGroup>().padding = new RectOffset(0, 18, 4, 140);       // room for the restore bar under the last row
-            ProductTileView template = AppTiles.ProductTile(content, "ScanTileTemplate", AppTiles.TileKind.RecentScan);
+            // long rows, one scan each: a tap makes the row longer and shows Result / Try On / AI
+            AppTiles.ListScroll(listArea.transform, "ScanHistoryList", out RectTransform content);
+            content.GetComponent<VerticalLayoutGroup>().padding = new RectOffset(0, 18, 4, 140);   // room for the restore bar under the last row
+            ProductTileView template = AppTiles.ExpandingRow(content, "ScanTileTemplate", AppTiles.TileKind.RecentScan);
 
             // ---- the shadow over the left half: "drag a tile here to remove it" (invisible until the tiles shake) ----
             GameObject zone = A.Node(listArea.transform, "RemoveZone", typeof(Image), typeof(CanvasGroup));
@@ -123,7 +124,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "deleteSound", deleteSound);
 
             A.Finish(s);
-            Debug.Log("[GlowUp] RecentScanActivitiesScene built. ScanTileTemplate is the pattern tile; RemoveZone is invisible until the tiles shake (set its CanvasGroup's Alpha to 1 to see it); " +
+            Debug.Log("[GlowUp] RecentScanActivitiesScene built. ScanTileTemplate is the pattern row (left open in the Hierarchy so its buttons can be styled); RemoveZone is invisible until the tiles shake (set its CanvasGroup's Alpha to 1 to see it); " +
                       "EmptyState, DoneButton, RenamePanel and AiInsightPanel are inactive until needed.");
         }
     }

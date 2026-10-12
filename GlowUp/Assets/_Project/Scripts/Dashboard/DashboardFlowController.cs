@@ -176,7 +176,7 @@ namespace GlowUp.Dashboard
                 ProductData product = pick.product;
                 ScanRecord record = pick.record;
                 if (recommendationTemplate == null || recommendationsContent == null) continue;
-                // the tile shows only the name, the brand and the kind; its arrow slides the Save / Try On / AI drawer down
+                // a long row with the kind's icon, the name and the brand; a tap makes it longer and shows Save / Try On / AI
                 ProductTileView tile = Instantiate(recommendationTemplate, recommendationsContent);
                 tile.gameObject.name = "Recommendation_" + product.name;
                 tile.gameObject.SetActive(true);
@@ -204,7 +204,7 @@ namespace GlowUp.Dashboard
             }
         }
 
-        // one drawer at a time
+        // one row open at a time, so the list stays calm
         void CloseOtherDrawers(ProductTileView opened)
         {
             foreach (ProductTileView tile in tiles) if (tile != null && tile != opened) tile.SetDrawer(false);

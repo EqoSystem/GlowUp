@@ -6,14 +6,16 @@ using UnityEngine.UI;
 namespace GlowUp.Views
 {
     /// <summary>
-    /// One compact product tile with round corners: the product's name, its brand and its kind, a small
-    /// icon, and its own buttons along the bottom edge.
+    /// One product in a list. It comes in two shapes, built by AppTiles:
     ///
-    ///  - Recent Scans: "Try On" and "AI". Tapping the tile opens the result.
-    ///  - Dashboard: "Save", "Try On" and "AI". Tapping the tile marks it as the chosen one.
-    ///
-    /// A tap plays the selection animation of the Onboarding tiles (Steps 2 and 3): the diagonal pixel
-    /// sweep and the glowing outline. Their settings are on this object's PixelSweepTileAnimator.
+    ///  - A ROW THAT OPENS DOWNWARDS (dashboard "Recommended for you", Recent Scans; the user's choice of 12 October
+    ///    2026, so a long list does not overwhelm). Closed, the long row shows only the kind's icon, the product's name
+    ///    and its brand. A tap makes it longer and shows its buttons under it (dashboard: Save, Try On, AI; Recent
+    ///    Scans: Result, Try On, AI); a second tap closes it. The controller keeps one row open at a time. In
+    ///    Performance Mode (reduced effects) it opens at once, without the short growing.
+    ///  - A SQUARE TILE (the product picker of AR Try-On, the alternatives on a result): name, brand, kind and its
+    ///    buttons on the tile; a tap plays the selection animation of the Onboarding tiles (pixel sweep and glowing
+    ///    outline, set on this object's PixelSweepTileAnimator).
     ///
     /// The tile only shows things and reports taps; the scene's controller decides what a tap does.
     /// The pattern tile in the scene is copied once per product: restyle that one object.
@@ -63,6 +65,23 @@ namespace GlowUp.Views
         [Tooltip("On = tapping the tile opens and closes the drawer too")]
         [SerializeField] private bool tileTapTogglesDrawer = true;
 
+        [Header("A row that opens downwards (leave empty for a square tile)")]
+        [Tooltip("The strip under the row that holds the buttons. It has no height until the row is tapped.")]
+        [SerializeField] private RectTransform actions;
+        [SerializeField] private CanvasGroup actionsGroup;
+        [Tooltip("The row's own height setting: the row gets taller while it opens")]
+        [SerializeField] private LayoutElement rowLayout;
+        [Tooltip("The row's height while it is closed")]
+        [SerializeField] private float closedHeight = 128f;
+        [Tooltip("How much taller the row is when it is open (the height of the strip with the buttons)")]
+        [SerializeField] private float actionsHeight = 96f;
+        [Tooltip("Seconds the row takes to open or close. In Performance Mode (reduced effects) it opens at once.")]
+        [SerializeField] private float openSeconds = 0.16f;
+        [Tooltip("The small arrow at the right end of the row: it turns upside down while the row is open")]
+        [SerializeField] private RectTransform chevron;
+        [Tooltip("Recent Scans: the button in the opened part that opens the full result")]
+        [SerializeField] private Button resultButton;
+
         [Header("Pop (when the tile is removed)")]
         [SerializeField] private RectTransform popTarget;
         [SerializeField] private CanvasGroup popGroup;
@@ -71,7 +90,11 @@ namespace GlowUp.Views
         [SerializeField] private float popScale = 1.16f;
 
         public object Data { get; private set; }
+        /// <summary>True when this is a row that opens downwards (and not a square tile).</summary>
+        public bool IsRow => actions != null;
+        /// <summary>True while the row is open (its buttons show).</summary>
         public bool DrawerOpen { get; private set; }
+        bool expandLocked;
         public event Action<ProductTileView> Clicked, TryOnClicked, AiClicked, SaveClicked, RenameClicked;
         /// <summary>Raised when this tile's drawer starts to open (the controller closes the other tiles' drawers).</summary>
         public event Action<ProductTileView> DrawerOpening;
@@ -87,6 +110,7 @@ namespace GlowUp.Views
             if (tryOnButton != null) tryOnButton.onClick.AddListener(() => TryOnClicked?.Invoke(this));
             if (aiButton != null) aiButton.onClick.AddListener(() => AiClicked?.Invoke(this));
             if (saveButton != null) saveButton.onClick.AddListener(() => SaveClicked?.Invoke(this));
+            if (resultButton != null) resultButton.onClick.AddListener(() => Clicked?.Invoke(this));       // "open this": what a tap on a square tile does
             if (renameButton != null) { renameButton.onClick.AddListener(() => RenameClicked?.Invoke(this)); renameButton.gameObject.SetActive(false); }
             if (statusDot != null) statusDot.gameObject.SetActive(false);
             if (popTarget != null) popBase = popTarget.localScale;
@@ -95,6 +119,12 @@ namespace GlowUp.Views
 
         void OnTileTapped()
         {
+            if (IsRow)
+            {
+                // a row: a tap opens or closes it and does nothing else (and nothing at all while it is locked: delete mode)
+                if (!expandLocked && tileTapTogglesDrawer) ToggleDrawer();
+                return;
+            }
             PlaySelect();
             if (drawer != null && tileTapTogglesDrawer) { ToggleDrawer(); return; }
             if (tapDelaySeconds > 0f && isActiveAndEnabled) { CancelInvoke(nameof(RaiseClicked)); Invoke(nameof(RaiseClicked), tapDelaySeconds); }
@@ -150,12 +180,29 @@ namespace GlowUp.Views
         public void ShowRename(bool show) { if (renameButton != null) renameButton.gameObject.SetActive(show); }
 
         public void ToggleDrawer() { SetDrawer(!DrawerOpen); }
+
+        /// <summary>Opens or closes the row (or the old sliding drawer). A locked row does not open.</summary>
         public void SetDrawer(bool open)
         {
-            if (drawer == null || DrawerOpen == open) return;
+            if ((drawer == null && actions == null) || DrawerOpen == open) return;
+            if (open && expandLocked) return;
             DrawerOpen = open;
             if (open) DrawerOpening?.Invoke(this);
         }
+
+        /// <summary>
+        /// Locked = the row cannot be opened and closes if it is open (Recent Scans while the tiles shake: delete mode
+        /// comes first). Its small arrow is hidden meanwhile, because the pencil for renaming takes that place.
+        /// </summary>
+        public void SetExpandLocked(bool locked)
+        {
+            expandLocked = locked;
+            if (locked) SetDrawer(false);
+            if (chevron != null) chevron.gameObject.SetActive(!locked);
+        }
+
+        /// <summary>Shows the open or closed state at once, without the short growing (used when a list is built).</summary>
+        public void SnapDrawer() { drawerK = DrawerOpen ? 1f : 0f; ApplyDrawer(drawerK); }
 
         /// <summary>The tile swells, fades and bursts; `done` is called when it is gone.</summary>
         public void PlayPop(Action done)
@@ -167,12 +214,15 @@ namespace GlowUp.Views
 
         void Update()
         {
-            if (drawer != null)
+            if (drawer != null || actions != null)
             {
                 float target = DrawerOpen ? 1f : 0f;
                 if (!Mathf.Approximately(drawerK, target))
                 {
-                    drawerK = Mathf.MoveTowards(drawerK, target, Time.unscaledDeltaTime / Mathf.Max(0.01f, drawerSeconds));
+                    // a row grows for a moment; with reduced effects (Performance Mode) it is simply open or closed
+                    bool atOnce = IsRow && (openSeconds <= 0.01f || GlowUp.Performance.PerformanceSettings.ReduceEffects);
+                    float seconds = IsRow ? openSeconds : drawerSeconds;
+                    drawerK = atOnce ? target : Mathf.MoveTowards(drawerK, target, Time.unscaledDeltaTime / Mathf.Max(0.01f, seconds));
                     ApplyDrawer(drawerK);
                 }
             }
@@ -190,6 +240,16 @@ namespace GlowUp.Views
 
         void ApplyDrawer(float k)
         {
+            if (actions != null)
+            {
+                // the row gets longer downwards and the strip with the buttons is uncovered with it
+                float open = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(k));
+                float extra = Mathf.Max(0f, actionsHeight) * open;
+                actions.sizeDelta = new Vector2(actions.sizeDelta.x, extra);
+                if (rowLayout != null) { rowLayout.minHeight = closedHeight + extra; rowLayout.preferredHeight = closedHeight + extra; }
+                if (actionsGroup != null) { actionsGroup.alpha = Mathf.Clamp01(open * 1.3f); actionsGroup.blocksRaycasts = k > 0.6f; actionsGroup.interactable = k > 0.6f; }
+                if (chevron != null) chevron.localEulerAngles = new Vector3(0f, 0f, 180f * open);
+            }
             if (drawer == null) return;
             float eased = drawerCurve != null ? drawerCurve.Evaluate(k) : k;
             float bounce = DrawerOpen ? Mathf.Sin(Mathf.Clamp01(k) * Mathf.PI) * drawerBounce : 0f;
