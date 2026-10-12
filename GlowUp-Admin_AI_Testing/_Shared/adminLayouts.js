@@ -360,7 +360,7 @@ async function hidePanel(id, hidden) {
     const page = pageData(true);
     page.hidden = page.hidden.filter((x) => x !== id);
     if (hidden) page.hidden.push(id);
-    commit(hidden ? `"${labelOf(id)}" is hidden. Bring it back with Customise > Panel.` : null);
+    commit(hidden ? `"${labelOf(id)}" is hidden. Bring it back with Layout & Style > Panel.` : null);
 }
 
 /** A combined panel with fewer than two panels left is no combined panel: its last one goes back to the page. */
@@ -376,7 +376,7 @@ function tidyGroups(page) {
 }
 
 async function removePanel(id) {
-    const sure = await askConfirm({ title: `Remove "${labelOf(id)}"?`, message: "Only the panel goes; its data stays. You can add it again with Customise > Panel.", confirmLabel: "Remove panel", danger: true });
+    const sure = await askConfirm({ title: `Remove "${labelOf(id)}"?`, message: "Only the panel goes; its data stays. You can add it again with Layout & Style > Panel.", confirmLabel: "Remove panel", danger: true });
     if (!sure) return;
     capture();
     const page = pageData(true);
@@ -747,9 +747,9 @@ function buildDrawer() {
     const drawer = document.createElement("aside");
     drawer.className = "drawer";
     drawer.id = "customiseDrawer";
-    drawer.setAttribute("aria-label", "Customise the display");
+    drawer.setAttribute("aria-label", "Layout and style of the display");
     drawer.innerHTML = `
-        <h3>${icon("sliders")}<span style="flex:1">Customise</span><button type="button" class="icon-btn small" id="drawerClose" aria-label="Close">${icon("x")}</button></h3>
+        <h3>${icon("sliders")}<span style="flex:1">Layout &amp; Style</span><button type="button" class="icon-btn small" id="drawerClose" aria-label="Close">${icon("x")}</button></h3>
 
         <div class="drawer-section first">
             <h4>${icon("user")}Layout ${guideBadge("Layouts", "One sign-in, several people: pick your name to get your own arrangement, panels, font and colours. Up to " + MAX_PROFILES + " layouts are kept in this browser.", "Default layout is the fixed starting point. It cannot be changed.")}</h4>
