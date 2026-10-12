@@ -26,22 +26,14 @@ namespace GlowUp.Onboarding
             if (backButton != null) backButton.onClick.AddListener(GoBack);
         }
 
-        /// <summary>Back: Step 1 for a new account; the Settings page when the quiz is being retaken (nothing is changed).</summary>
+        /// <summary>
+        /// Back: Step 1 for a new account. For a Google / Facebook account, and while the quiz is retaken from Settings,
+        /// this is the first page, so Back leaves: the user is asked first, and what happens then is in OnboardingLeaveGuard
+        /// (a retake returns to Settings with the saved profile untouched; a Google / Facebook account is signed out again).
+        /// </summary>
         void GoBack()
         {
-            if (OnboardingSession.Retake && !string.IsNullOrEmpty(OnboardingSession.RetakeReturnScene))
-            {
-                string scene = OnboardingSession.RetakeReturnScene;
-                OnboardingSession.EndRetake();
-                SceneNavigator.Go(scene);
-            }
-            else if (OnboardingSession.Social)
-            {
-                // signed in with Google / Facebook and backing out of the quiz: sign out, or the login page would send them straight back here
-                GlowUp.Data.UserProfileRepository.SignOut();
-                OnboardingSession.Clear();
-                SceneNavigator.Go(SceneNames.Login);
-            }
+            if (OnboardingSession.Retake || OnboardingSession.Social) OnboardingLeaveGuard.RequestLeave();
             else SceneNavigator.Go(previousScene);
         }
 

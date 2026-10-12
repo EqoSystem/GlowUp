@@ -144,6 +144,7 @@ namespace GlowUp.EditorTools
             var popup = OnboardingStep1Builder.BuildDatePopup(c.card);
             var field = SceneBuilderCore.Ensure<DatePickerField>(bday.gameObject);
             SceneBuilderCore.SetField(field, "popup", popup);
+            SceneBuilderCore.SetField(c.leave, "calendar", popup);          // the phone's back key closes the calendar before anything else
 
             var go = SceneBuilderCore.EnsureRoot("OnboardingStep5FlowController");
             var ctl = SceneBuilderCore.Ensure<OnboardingStep5FlowController>(go);

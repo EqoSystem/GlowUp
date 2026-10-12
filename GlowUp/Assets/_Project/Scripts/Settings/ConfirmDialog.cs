@@ -8,7 +8,7 @@ using UnityEngine.UI;
 namespace GlowUp.AppSettings
 {
     /// <summary>
-    /// The one "Are you sure?" pop-up of the Settings page. Other scripts call Ask(...) with their own
+    /// The "Are you sure?" pop-up (the Settings page has one; the sign-up pages use it for "Leave sign-up?"). Other scripts call Ask(...) with their own
     /// wording; the pop-up shows it and runs their action only when the user confirms.
     /// A dangerous action (log out, delete) paints the confirm button in the warning colour.
     /// </summary>
@@ -31,6 +31,12 @@ namespace GlowUp.AppSettings
 
         Action onConfirm;
         bool danger;
+
+        /// <summary>True while the question is on the screen.</summary>
+        public bool IsOpen => panel != null && panel.IsOpen;
+
+        /// <summary>Puts the question away without doing anything (the same as its Cancel button).</summary>
+        public void Close() { if (panel != null) panel.Hide(); }
 
         void Awake()
         {

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using GlowUp.AppSettings;
 using GlowUp.Auth;
 using GlowUp.Common;
 using GlowUp.Onboarding;
@@ -44,6 +45,8 @@ namespace GlowUp.EditorTools
             public Button back, cont;
             public ContinueButtonGlowAnimator anim;
             public TextMeshProUGUI feedback, title, subtitle;
+            /// <summary>"Leave sign-up?": the X at the top right, its pop-up and the script that asks.</summary>
+            public OnboardingLeaveGuard leave;
         }
 
         // =====================================================================================
@@ -162,7 +165,57 @@ namespace GlowUp.EditorTools
 
             var unused = card.Find("ContentArea");      // empty helper object from an earlier layout
             if (unused != null && unused.childCount == 0) Object.DestroyImmediate(unused.gameObject);
+
+            c.leave = AddLeaveGuard(c);
             return c;
+        }
+
+        /// <summary>
+        /// "Leave sign-up?" on every sign-up page (the user's rule of 12 October 2026): the X at the top right of the card
+        /// (LeaveButton), the pop-up that asks (LeaveSignUpPanel: switched off in the Hierarchy, tick it active to see and
+        /// style it) and the root object OnboardingLeaveGuard, whose Inspector holds the wording and survives rebuilds.
+        /// The X and the pop-up are generated objects: they are rebuilt on every run.
+        /// </summary>
+        public static OnboardingLeaveGuard AddLeaveGuard(Chrome c)
+        {
+            foreach (string generated in new[] { "LeaveSignUpPanel", "LeaveButton" })
+            {
+                Transform old = Loose(c.canvas, generated);
+                if (old != null) Object.DestroyImmediate(old.gameObject);
+            }
+
+            // the X mirrors the Back arrow: same size, same distance from the corner
+            Button leave = AppKit.IconButton(c.card, "LeaveButton", IconFactory.Close, 92, 48, ThemeRole.MainText);
+            AppKit.At(leave.transform, AppKit.TR, new Vector2(-28, -28), new Vector2(92, 92));
+
+            AppKit.AppPopup popup = AppKit.Overlay(new AppKit.AppScreen { canvas = c.canvas }, "LeaveSignUpPanel", "Leave sign-up?");
+            AppKit.At(popup.box, AppKit.MC, new Vector2(0, 60), new Vector2(900, 520));
+            TextMeshProUGUI message = AppKit.Label(popup.box, "MessageText",
+                "You are about to leave the sign-up. What you typed and selected will be discarded, and you go back to the log-in page.",
+                32, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            AppKit.Fill(message.transform, 48, 190, 48, 130);
+            AppKit.ShrinkWrapped(message, 26);
+            Button stay = AppKit.PillButton(popup.box, "StayButton", "Stay", 36, ThemeRole.SurfaceAlt, ThemeRole.MainText);
+            AppKit.BottomStrip(stay.transform, 44, 108, 48, 462);
+            Button confirmLeave = AppKit.PillButton(popup.box, "LeaveConfirmButton", "Leave", 36, ThemeRole.ButtonFill, ThemeRole.ButtonText);
+            AppKit.BottomStrip(confirmLeave.transform, 44, 108, 462, 48);
+            // ConfirmDialog paints this button itself (the warning colour: leaving discards what was typed)
+            Object.DestroyImmediate(confirmLeave.GetComponent<ThemedGraphic>());
+            Object.DestroyImmediate(AppKit.LabelOf(confirmLeave).GetComponent<ThemedGraphic>());
+
+            GameObject holder = SceneBuilderCore.EnsureRoot("OnboardingLeaveGuard");
+            var dialog = SceneBuilderCore.Ensure<ConfirmDialog>(holder);
+            SceneBuilderCore.SetField(dialog, "panel", popup.panel); SceneBuilderCore.SetField(dialog, "titleText", popup.title);
+            SceneBuilderCore.SetField(dialog, "messageText", message);
+            SceneBuilderCore.SetField(dialog, "confirmButton", confirmLeave); SceneBuilderCore.SetField(dialog, "confirmLabel", AppKit.LabelOf(confirmLeave));
+            SceneBuilderCore.SetField(dialog, "cancelButton", stay); SceneBuilderCore.SetField(dialog, "cancelLabel", AppKit.LabelOf(stay));
+            SceneBuilderCore.SetField(dialog, "defaultCancelText", "Stay");
+
+            var guard = SceneBuilderCore.Ensure<OnboardingLeaveGuard>(holder);
+            SceneBuilderCore.SetField(guard, "confirm", dialog);
+            SceneBuilderCore.SetField(guard, "leaveButton", leave);
+            SceneBuilderCore.SetField(guard, "backButton", c.back);
+            return guard;
         }
 
         static Button BuildContinue(Transform card, Transform canvas, string label, out ContinueButtonGlowAnimator anim)

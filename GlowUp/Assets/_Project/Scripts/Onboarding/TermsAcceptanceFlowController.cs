@@ -100,7 +100,13 @@ namespace GlowUp.Onboarding
             bool ready = reachedBottom && readToggle != null && readToggle.isOn && !busy;
             if (continueAnimator != null) continueAnimator.SetReady(ready);
             else if (continueButton != null) continueButton.interactable = ready;
+            // while the account is being created nobody may walk away from this page: going back or leaving in the middle
+            // would empty the sign-up details that are about to be saved as the profile
+            if (backButton != null) backButton.interactable = !busy;
+            OnboardingLeaveGuard.Locked = busy;
         }
+
+        void OnDestroy() { OnboardingLeaveGuard.Locked = false; }
 
         async Task Create()
         {

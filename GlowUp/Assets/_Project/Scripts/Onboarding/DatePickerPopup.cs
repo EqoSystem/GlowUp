@@ -90,6 +90,9 @@ namespace GlowUp.Onboarding
 
         public void Close() { if (panelRoot != null) panelRoot.SetActive(false); }
 
+        /// <summary>True while the calendar is on the screen.</summary>
+        public bool IsOpen => panelRoot != null && panelRoot.activeInHierarchy;
+
         void BuildOnce()
         {
             if (built) return;

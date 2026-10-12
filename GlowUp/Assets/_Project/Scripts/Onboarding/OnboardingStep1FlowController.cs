@@ -52,7 +52,6 @@ namespace GlowUp.Onboarding
 
         [Header("Scenes")]
         [SerializeField] private string nextScene = SceneNames.Onboarding2;
-        [SerializeField] private string previousScene = SceneNames.Login;
 
         [Header("Messages")]
         [SerializeField] private string msgFillAll = "Please complete every required field.";
@@ -117,11 +116,13 @@ namespace GlowUp.Onboarding
             if (emailFromAccount) { email.readOnly = true; email.interactable = false; }
         }
 
+        /// <summary>
+        /// Back on the first page leaves the sign-up, so the user is asked first ("Leave sign-up?"). Leaving discards
+        /// what was typed and signs a Google / Facebook account out again: see OnboardingLeaveGuard.
+        /// </summary>
         void OnBack()
         {
-            // leaving sign-up after a Google / Facebook sign-in also signs out, or the login page would send the user straight back here
-            if (OnboardingSession.Social) { GlowUp.Data.UserProfileRepository.SignOut(); OnboardingSession.Clear(); }
-            SceneNavigator.Go(previousScene);
+            OnboardingLeaveGuard.RequestLeave();
         }
 
         static void Limit(TMP_InputField f, int n) { if (f != null) f.characterLimit = n; }
