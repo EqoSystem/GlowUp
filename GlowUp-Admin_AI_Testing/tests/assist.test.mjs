@@ -119,6 +119,57 @@ process.env.GROQ_API_KEY = "groq-test";
     delete process.env.GROQ_API_KEY;
 }
 
+// ---- the order: Gemini first, Groq when Gemini has run out, Mistral when Groq has run out too
+equal(handler.helpers.order(), ["Gemini", "Groq", "Mistral", "OpenRouter"], "the fixed order: Gemini, Groq, Mistral (OpenRouter last, only with a key)");
+function chain({ gemini = 429, groq = 429, mistral = 429, openrouter = 429, keys = ["GROQ_API_KEY", "MISTRAL_API_KEY"] } = {}) {
+    process.env.GEMINI_API_KEY = "test-key";
+    keys.forEach((k) => { process.env[k] = k.toLowerCase() + "-test"; });
+    const asked = [];
+    const who = (url) => (url.includes("generativelanguage") ? "Gemini" : url.includes("api.groq.com") ? "Groq" : url.includes("api.mistral.ai") ? "Mistral" : url.includes("openrouter.ai") ? "OpenRouter" : "");
+    globalThis.fetch = async (url, options = {}) => {
+        url = String(url);
+        const reply = (status, json) => ({ ok: status >= 200 && status < 300, status, json: async () => json, headers: { get: () => null } });
+        if (url.includes("accounts:lookup")) return reply(200, { users: [{ localId: "admin1" }] });
+        if (url.includes("/documents/admins/")) return reply(200, {});
+        const name = who(url);
+        if (!name) return reply(404, {});
+        if (asked[asked.length - 1] !== name) asked.push(name);
+        const status = { Gemini: gemini, Groq: groq, Mistral: mistral, OpenRouter: openrouter }[name];
+        if (status !== 200) return reply(status, {});
+        return name === "Gemini" ? reply(200, { candidates: [{ content: { parts: [{ text: GOOD }] } }] }) : reply(200, { choices: [{ message: { content: GOOD } }] });
+    };
+    return new Promise((done) => {
+        const res = { statusCode: 0, setHeader() {}, end: (text) => { keys.forEach((k) => delete process.env[k]); done({ status: res.statusCode, body: JSON.parse(text), asked }); } };
+        handler({ method: "POST", headers: { authorization: "Bearer good" }, body: { name: "Mica" } }, res);
+    });
+}
+r = await chain({ gemini: 200 });
+equal(r.asked, ["Gemini"], "Gemini answers: Groq and Mistral are not asked at all");
+r = await chain({ groq: 200 });
+equal(r.asked, ["Gemini", "Groq"], "Gemini has run out: Groq is asked next, and Mistral is not needed");
+check(/Groq/.test(r.body.model) && r.body.notes.some((n) => /Gemini.*quota/.test(n)), "the draft says Groq wrote it, and that Gemini's quota was used up");
+r = await chain({ mistral: 200 });
+equal(r.asked, ["Gemini", "Groq", "Mistral"], "Gemini and Groq have run out: Mistral is asked last");
+check(r.status === 200 && /Mistral/.test(r.body.model) && r.body.searched === false && r.body.sources.length === 0, "the draft says Mistral wrote it, without a search and without sources");
+check(r.body.notes.some((n) => /Gemini.*quota/.test(n)) && r.body.notes.some((n) => /^Groq: free quota used up/.test(n)), "the notes name Gemini and Groq as used up, in that order");
+check(r.body.notes.findIndex((n) => /^Groq/.test(n)) > r.body.notes.findIndex((n) => /^Gemini/.test(n)), "Gemini's note stands before Groq's");
+r = await chain();
+check(r.status === 502 && /Gemini/.test(r.body.error) && /Groq/.test(r.body.error) && /Mistral/.test(r.body.error), "all three have run out: said plainly, naming each");
+equal(r.asked, ["Gemini", "Groq", "Mistral"], "all three were asked, in the order Gemini, Groq, Mistral");
+equal(r.body.error, "Every AI that is set up said no: Gemini: free quota used up; Groq: free quota used up; Mistral: free quota used up. Try again later, or write the entry by hand.", "one short reason per AI, in the order they were asked");
+r = await chain({ keys: ["MISTRAL_API_KEY"], mistral: 200 });
+equal(r.asked, ["Gemini", "Mistral"], "no Groq key: Groq is passed over and Mistral is asked");
+r = await chain({ keys: ["OPENROUTER_API_KEY", "MISTRAL_API_KEY", "GROQ_API_KEY"], openrouter: 200 });
+equal(r.asked, ["Gemini", "Groq", "Mistral", "OpenRouter"], "an OpenRouter key, if ever added, comes after Mistral");
+
+// ---- the time: a slow Gemini leaves time for Groq and Mistral (Vercel stops the function at 60 seconds)
+const { share } = handler.helpers;
+equal(share(50, 0), 40, "Gemini alone may take 40 seconds a call");
+equal(share(50, 2), 30, "with Groq and Mistral behind it, Gemini may take 30 of the 50 seconds");
+check(share(20, 2) < 3, "when Gemini has used up its part, no further Gemini call is started");
+equal(share(20, 1), 10, "Groq then has 10 seconds, with 10 kept for Mistral");
+equal(share(10, 0), 10, "and Mistral has the last 10");
+
 console.log("checks made: " + checks);
 console.log(failed === 0 ? "ALL PASSED" : failed + " FAILED");
 process.exit(failed === 0 ? 0 : 1);

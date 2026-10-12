@@ -10,12 +10,16 @@
 // The answer is a DRAFT. Nothing is saved here: the page fills the form, the admin reads it against the sources and saves.
 //
 // Optional environment variables: GEMINI_MODELS (comma-separated, tried in order), and BACKUP services used only when Gemini
-// cannot answer (a free quota used up): GROQ_API_KEY, OPENROUTER_API_KEY, MISTRAL_API_KEY (and GROQ_MODEL, OPENROUTER_MODEL,
-// MISTRAL_MODEL to change the model). A backup cannot search the web, so its draft has no sources.
+// cannot answer (a free quota used up). The order is fixed: Gemini, then Groq (GROQ_API_KEY), then Mistral (MISTRAL_API_KEY);
+// OpenRouter (OPENROUTER_API_KEY) comes last and only when a key for it is ever added. GROQ_MODEL, MISTRAL_MODEL and
+// OPENROUTER_MODEL change the model. A backup cannot search the web, so its draft has no sources.
 
 const PROJECT = "glowup-admin-portal";
 const FIREBASE_WEB_KEY = "AIzaSyAkb23xQ69a2Q4tpucGty9yDEoH0ab1JDM";      // the website's public Firebase key (it is in every page); NOT the AI key
-const AI_SECONDS = 40;
+const AI_SECONDS = 40;              // the longest ONE call to an AI may take
+const TOTAL_SECONDS = 50;           // all the calls together: Vercel stops this function at 60 seconds, the answer must be out before that
+const BACKUP_SECONDS = 10;          // kept back for each service that is still to come, so a slow Gemini cannot use up the time of Groq and Mistral
+const LEAST_SECONDS = 3;            // with less time than this left for it, a call is not started
 
 const RISK = ["safe", "caution", "harmful"];
 const ALLERGENS = ["fragrance", "paraben", "sulfate", "formaldehyde", "lanolin", "essentialoil", "nut"];
@@ -155,28 +159,37 @@ async function sourcesOf(candidate) {
 }
 
 // ---- the AI services, in the order they are tried -----------------------------------------------------------------
-// 1. Gemini WITH web search (the only one that can name the pages it used), over each model in GEMINI_MODELS;
-// 2. Gemini WITHOUT web search (a quota for search can be used up while plain answers still work);
-// 3. any backup service whose key is set (GROQ_API_KEY, OPENROUTER_API_KEY, MISTRAL_API_KEY). These cannot search the
-//    web: their answer comes from the model's memory, and the page says so and gives no sources. Nothing is ever
-//    invented as a source.
+// 1. GEMINI first. WITH web search (the only one that can name the pages it used), over each model in GEMINI_MODELS;
+//    then WITHOUT web search (a quota for search can be used up while plain answers still work);
+// 2. GROQ, when Gemini has run out;
+// 3. MISTRAL, when Groq has run out too;
+// 4. OpenRouter last, and only when a key for it is ever added (the project owner asked for Gemini, Groq, Mistral).
+// A service without a key is passed over. The backups cannot search the web: their answer comes from the model's
+// memory, and the page says so and gives no sources. Nothing is ever invented as a source.
 const BACKUPS = [
     { id: "groq", label: "Groq", key: "GROQ_API_KEY", url: "https://api.groq.com/openai/v1/chat/completions", model: () => process.env.GROQ_MODEL || "llama-3.3-70b-versatile" },
-    { id: "openrouter", label: "OpenRouter", key: "OPENROUTER_API_KEY", url: "https://openrouter.ai/api/v1/chat/completions", model: () => process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct:free" },
-    { id: "mistral", label: "Mistral", key: "MISTRAL_API_KEY", url: "https://api.mistral.ai/v1/chat/completions", model: () => process.env.MISTRAL_MODEL || "mistral-small-latest" }
+    { id: "mistral", label: "Mistral", key: "MISTRAL_API_KEY", url: "https://api.mistral.ai/v1/chat/completions", model: () => process.env.MISTRAL_MODEL || "mistral-small-latest" },
+    { id: "openrouter", label: "OpenRouter", key: "OPENROUTER_API_KEY", url: "https://openrouter.ai/api/v1/chat/completions", model: () => process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct:free" }
 ];
 
-async function askGemini(key, name, withSearch, notes) {
+/** How many seconds the next call may take: what is left of the whole time, less what is kept back for each service still to come. */
+function share(secondsLeft, stillToCome) {
+    return Math.min(AI_SECONDS, secondsLeft - stillToCome * BACKUP_SECONDS);
+}
+
+async function askGemini(key, name, withSearch, notes, time) {
     const models = String(process.env.GEMINI_MODELS || "gemini-flash-latest,gemini-3.6-flash,gemini-3.5-flash").split(",").map((m) => m.trim()).filter(Boolean);
     for (const model of models) {
+        const seconds = time();
+        if (seconds < LEAST_SECONDS) { notes.push(`Gemini${withSearch ? " with search" : ""}: no time left for it`); break; }
         let answer;
         try {
             answer = await withTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "x-goog-api-key": key },
                 body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: question(name) }] }], ...(withSearch ? { tools: [{ google_search: {} }] } : {}), generationConfig: { temperature: 0.1 } })
-            }, AI_SECONDS);
-        } catch (error) { notes.push(`Gemini ${model}: no answer in ${AI_SECONDS} seconds`); continue; }
+            }, seconds);
+        } catch (error) { notes.push(`Gemini ${model}: no answer in ${Math.round(seconds)} seconds`); continue; }
         if (answer.status === 429) { notes.push(`Gemini ${model}${withSearch ? " with search" : ""}: free quota used up`); continue; }
         if (!answer.ok) { notes.push(`Gemini ${model}: error ${answer.status}`); continue; }
         const body = await answer.json();
@@ -189,17 +202,18 @@ async function askGemini(key, name, withSearch, notes) {
     return null;
 }
 
-async function askBackup(service, name, notes) {
+async function askBackup(service, name, notes, seconds) {
     const key = process.env[service.key];
     if (!key) return null;
+    if (seconds < LEAST_SECONDS) { notes.push(`${service.label}: no time left for it`); return null; }
     let answer;
     try {
         answer = await withTimeout(service.url, {
             method: "POST",
             headers: { "Content-Type": "application/json", Authorization: "Bearer " + key },
             body: JSON.stringify({ model: service.model(), temperature: 0.1, messages: [{ role: "user", content: question(name) }] })
-        }, AI_SECONDS);
-    } catch (error) { notes.push(`${service.label}: no answer in ${AI_SECONDS} seconds`); return null; }
+        }, seconds);
+    } catch (error) { notes.push(`${service.label}: no answer in ${Math.round(seconds)} seconds`); return null; }
     if (answer.status === 429) { notes.push(`${service.label}: free quota used up`); return null; }
     if (!answer.ok) { notes.push(`${service.label}: error ${answer.status}`); return null; }
     const body = await answer.json();
@@ -221,18 +235,33 @@ function lookupLinks(name) {
 
 async function ask(key, name) {
     const notes = [];
+    const until = Date.now() + TOTAL_SECONDS * 1000;
+    const left = () => (until - Date.now()) / 1000;
+    const backups = BACKUPS.filter((b) => process.env[b.key]);                 // in their fixed order: Groq, Mistral, (OpenRouter)
     if (key) {
-        const withSearch = await askGemini(key, name, true, notes);
+        const time = () => share(left(), backups.length);
+        const withSearch = await askGemini(key, name, true, notes, time);
         if (withSearch) return { ...withSearch, notes };
-        const plain = await askGemini(key, name, false, notes);
+        const plain = await askGemini(key, name, false, notes, time);
         if (plain) return { ...plain, notes };
     }
-    for (const service of BACKUPS) {
-        const got = await askBackup(service, name, notes);
+    for (let i = 0; i < backups.length; i++) {
+        const got = await askBackup(backups[i], name, notes, share(left(), backups.length - 1 - i));
         if (got) return { ...got, notes };
     }
-    const error = new Error(notes.length > 0 ? "Every AI that is set up said no: " + notes.join("; ") + ". Try again later, or write the entry by hand." : "No AI is set up.");
+    const error = new Error(notes.length > 0 ? "Every AI that is set up said no: " + brief(notes) + ". Try again later, or write the entry by hand." : "No AI is set up.");
     throw error;
+}
+
+/** The notes as one short reason per service, in the order they were asked: "Gemini: free quota used up; Groq: error 401". */
+function brief(notes) {
+    const by = new Map();
+    notes.forEach((note) => {
+        const at = note.indexOf(": "), service = note.split(/[ :]/)[0], why = at < 0 ? note : note.slice(at + 2);
+        if (!by.has(service)) by.set(service, new Set());
+        by.get(service).add(why);
+    });
+    return [...by].map(([service, whys]) => `${service}: ${[...whys].join(", ")}`).join("; ");
 }
 
 module.exports = async (req, res) => {
@@ -255,9 +284,9 @@ module.exports = async (req, res) => {
         const credible = sources.filter((s) => s.credible).length;
         return send(res, 200, { found: true, draft: tidy(object, name), sources, lookups, credibleSources: credible, model, searched, notes });
     } catch (error) {
-        return send(res, 502, { error: text(error && error.message, 200) || "Assist with AI failed." });
+        return send(res, 502, { error: text(error && error.message, 300) || "Assist with AI failed." });
     }
 };
 
 // for the checks in tests/ (pure helpers; no network)
-module.exports.helpers = { firstObject, tidy, isCredible, hostOf, question, lookupLinks };
+module.exports.helpers = { firstObject, tidy, isCredible, hostOf, question, lookupLinks, share, order: () => ["Gemini"].concat(BACKUPS.map((b) => b.label)) };
