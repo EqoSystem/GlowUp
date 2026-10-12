@@ -18,6 +18,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const message = document.getElementById("loginMessage");
     let signingIn = false;
 
+    // the eye in the password box: shows what was typed, and hides it again. The password is hidden again when the form is sent.
+    const eye = document.getElementById("passwordEye");
+    const showPassword = (show) => {
+        passwordInput.type = show ? "text" : "password";
+        eye.classList.toggle("on", show);
+        eye.setAttribute("aria-pressed", String(show));
+        eye.setAttribute("aria-label", show ? "Hide the password" : "Show the password");
+        eye.title = show ? "Hide the password" : "Show the password";
+    };
+    if (eye) {
+        eye.addEventListener("click", () => { showPassword(passwordInput.type === "password"); passwordInput.focus(); });
+        loginForm.addEventListener("submit", () => showPassword(false));
+    }
+
     function say(text) {
         message.textContent = text || "";
         message.style.display = text ? "block" : "none";
