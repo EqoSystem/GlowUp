@@ -16,8 +16,9 @@ namespace GlowUp.Recent
     /// name, brand and kind, with "Try On" and "AI". Tapping a tile opens its full result.
     ///
     /// Removing works like app icons on a phone's home screen: press and hold a tile and all tiles start
-    /// to shake; a shadow over the left half of the screen shows where to drag; drag a tile to the left and
-    /// let go, and it pops and is removed (it can still be brought back from the bar at the bottom).
+    /// to shake; a shadow over the left half of the screen shows where to drag. A tile can be dragged anywhere
+    /// and stays exactly under the finger; while the finger is inside the shadow the shadow turns red, and letting
+    /// go there pops the tile and removes it (it can still be brought back from the bar at the bottom).
     /// While the tiles shake each one shows a small pencil for renaming it (on this phone only), and
     /// "Done" stops the shaking. The Sort button changes the order of the tiles.
     /// </summary>
@@ -49,12 +50,15 @@ namespace GlowUp.Recent
         [Header("Press, hold and drag to remove")]
         [Tooltip("The button that stops the tiles shaking")]
         [SerializeField] private Button doneButton;
-        [Tooltip("The shadow over the left half of the screen that shows where to drag a tile")]
+        [Tooltip("The shadow over the left half of the screen that shows where to drag a tile. Letting go with the finger inside it removes the tile.")]
         [SerializeField] private CanvasGroup removeZone;
-        [Tooltip("How visible the shadow is while the tiles shake, and when a tile is dragged all the way")]
+        [Tooltip("How visible the shadow is while the tiles shake, and while the finger is inside it with a tile")]
         [Range(0f, 1f)] [SerializeField] private float zoneAlphaWaiting = 0.55f;
         [Range(0f, 1f)] [SerializeField] private float zoneAlphaAtRemove = 1f;
         [SerializeField] private float zoneFadeSpeed = 7f;
+        [Tooltip("The shadow's colour while it waits, and while a dragged tile's finger is inside it (it turns red: letting go removes)")]
+        [SerializeField] private Color zoneColorWaiting = new Color(0.16f, 0.11f, 0.13f, 1f);
+        [SerializeField] private Color zoneColorInside = new Color32(181, 47, 47, 255);
         [Tooltip("The freezing sound of a removal: once per removal, at the moment the tile starts to pop (the user can switch it off in Settings)")]
         [SerializeField] private DeleteSoundPlayer deleteSound;
 
@@ -90,8 +94,9 @@ namespace GlowUp.Recent
         readonly List<ProductTileView> tiles = new List<ProductTileView>();
         ScanRecord renaming;
         SortOrder order;
-        bool shaking, popping;
+        bool shaking, popping, fingerInZone;
         float zoneTarget;
+        Image zoneImage;
 
         void Awake()
         {
@@ -104,7 +109,12 @@ namespace GlowUp.Recent
             if (sortButton != null) sortButton.onClick.AddListener(NextSort);
             if (doneButton != null) { doneButton.onClick.AddListener(() => SetShaking(false)); doneButton.gameObject.SetActive(false); }
             if (backButton != null) backButton.onClick.AddListener(() => { if (shaking) SetShaking(false); else SceneNavigator.Go(backScene); });
-            if (removeZone != null) { removeZone.alpha = 0f; removeZone.blocksRaycasts = false; removeZone.interactable = false; }
+            if (removeZone != null)
+            {
+                removeZone.alpha = 0f; removeZone.blocksRaycasts = false; removeZone.interactable = false;
+                zoneImage = removeZone.GetComponent<Image>();
+                if (zoneImage != null) zoneImage.color = zoneColorWaiting;
+            }
         }
 
         async void Start()
@@ -121,6 +131,8 @@ namespace GlowUp.Recent
         {
             if (removeZone == null) return;
             removeZone.alpha = Mathf.MoveTowards(removeZone.alpha, zoneTarget, zoneFadeSpeed * Time.unscaledDeltaTime);
+            // dark while it waits, red while the finger is inside it with a tile, dark again when the finger leaves
+            if (zoneImage != null) zoneImage.color = Color.Lerp(zoneImage.color, fingerInZone ? zoneColorInside : zoneColorWaiting, Mathf.Clamp01(zoneFadeSpeed * 2f * Time.unscaledDeltaTime));
         }
 
         // ---------------------------------------------------------------------------------------
@@ -149,8 +161,9 @@ namespace GlowUp.Recent
                     tile.RenameClicked += t => BeginRename(t.Data as ScanRecord);
                     if (tile.TryGetComponent(out HoldToRemoveTile hold))
                     {
+                        if (removeZone != null) hold.SetRemoveArea((RectTransform)removeZone.transform);
                         hold.HoldStarted += _ => SetShaking(true);
-                        hold.Dragging += (_, progress) => zoneTarget = Mathf.Lerp(zoneAlphaWaiting, zoneAlphaAtRemove, progress);
+                        hold.Dragging += (_, inZone) => { fingerInZone = inZone >= 0.5f; zoneTarget = fingerInZone ? zoneAlphaAtRemove : zoneAlphaWaiting; };
                         hold.DragEnded += OnDragEnded;
                     }
                     tiles.Add(tile);
@@ -217,6 +230,7 @@ namespace GlowUp.Recent
 
         void OnDragEnded(HoldToRemoveTile hold, bool remove)
         {
+            fingerInZone = false;
             zoneTarget = shaking ? zoneAlphaWaiting : 0f;
             if (!remove || popping || hold == null) return;
             if (!hold.TryGetComponent(out ProductTileView tile) || !(tile.Data is ScanRecord record)) return;

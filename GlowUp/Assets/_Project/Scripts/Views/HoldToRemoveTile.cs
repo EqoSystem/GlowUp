@@ -10,8 +10,11 @@ namespace GlowUp.Views
     /// "Press and hold, then drag away" for a tile, the way app icons are removed on a phone's home screen.
     ///
     ///  - Press and hold a tile: all tiles start to shake (the controller switches the others on).
-    ///  - While they shake, drag a tile to the LEFT. Past the distance below it is removed when let go;
-    ///    let go earlier and it springs back.
+    ///  - While they shake, a tile can be dragged ANYWHERE on the screen. It stays exactly under the finger: the point
+    ///    that was touched stays under the finger, nothing is smoothed or delayed, and the tile is drawn above the list
+    ///    and everything else (it is not cut off at the list's edge).
+    ///  - Let go while the FINGER is inside the remove area (the shadow the controller shows): the tile is removed.
+    ///    Let go anywhere else: it glides back from the exact spot where it was let go.
     ///  - A drag that starts before the hold time is an ordinary scroll and is passed on to the list.
     ///
     /// The tile itself stays in its place in the grid; only its "Visual" child shakes and moves.
@@ -37,30 +40,38 @@ namespace GlowUp.Views
         [Tooltip("Tilts per second")]
         [SerializeField] private float shakeSpeed = 9f;
 
+        [Tooltip("On = the tiles do not tilt in Performance Mode (reduced effects); the pencils and the Done button still show the mode")]
+        [SerializeField] private bool stillInPerformanceMode = true;
+
         [Header("Drag to remove")]
-        [Tooltip("Dragging this far to the left (canvas units) removes the tile when it is let go")]
+        [Tooltip("Only used when the controller gives no remove area: dragging this far to the left (canvas units) removes the tile")]
         [SerializeField] private float removeDistance = 230f;
-        [Tooltip("How much the tile follows the finger up and down (0 = only sideways)")]
-        [Range(0f, 1f)] [SerializeField] private float followUpDown = 0.35f;
-        [Tooltip("Seconds the tile takes to spring back")]
+        [Tooltip("Seconds the tile takes to glide back")]
         [SerializeField] private float returnSeconds = 0.18f;
-        [Tooltip("The tile shrinks to this size at the remove distance")]
+        [Tooltip("The tile shrinks to this size while the finger is inside the remove area (it shrinks around the finger)")]
         [Range(0.5f, 1f)] [SerializeField] private float scaleAtRemove = 0.86f;
+        [Tooltip("How fast it shrinks and grows back (per second)")]
+        [SerializeField] private float scaleSpeed = 9f;
 
         /// <summary>The finger has rested long enough: the tiles should start to shake.</summary>
         public event Action<HoldToRemoveTile> HoldStarted;
-        /// <summary>The tile is being dragged; the number is 0 to 1 (1 = far enough to be removed).</summary>
+        /// <summary>The tile is being dragged; the number is 1 while the finger is inside the remove area and 0 while it is not.</summary>
         public event Action<HoldToRemoveTile, float> Dragging;
-        /// <summary>The drag ended; true = the tile was let go past the remove distance.</summary>
+        /// <summary>The drag ended; true = the tile was let go with the finger inside the remove area.</summary>
         public event Action<HoldToRemoveTile, bool> DragEnded;
 
         public bool Shaking { get; private set; }
 
         ScrollRect scroll;
         Canvas rootCanvas;
-        bool pressed, holdFired, dragging, forwarding, returning;
-        float pressedFor, returnT, phase;
-        Vector2 pressAt, offset, returnFrom;
+        RectTransform removeArea;
+        bool pressed, holdFired, dragging, forwarding, returning, inside;
+        float pressedFor, returnT, phase, shrink = 1f;
+        Vector2 pressAt, fingerNow, grab, returnFrom;
+        Vector3 returnScale = Vector3.one;
+
+        /// <summary>The area in which letting go removes the tile (the controller's shadow). "Inside" is decided by the finger.</summary>
+        public void SetRemoveArea(RectTransform area) { removeArea = area; }
 
         void Awake()
         {
@@ -77,7 +88,14 @@ namespace GlowUp.Views
             ResetVisual();
         }
 
-        float Scale => rootCanvas != null && rootCanvas.scaleFactor > 0.001f ? rootCanvas.scaleFactor : 1f;
+        Camera Eye => rootCanvas != null && rootCanvas.renderMode != RenderMode.ScreenSpaceOverlay ? rootCanvas.worldCamera : null;
+
+        /// <summary>A place on the screen, as a place in the tile's own space (the Visual's parent). The tile does not move while it is dragged.</summary>
+        Vector2 InTile(Vector2 screenPoint)
+        {
+            RectTransformUtility.ScreenPointToLocalPointInRectangle((RectTransform)visual.parent, screenPoint, Eye, out Vector2 local);
+            return local;
+        }
 
         /// <summary>The controller switches the shaking of every tile on and off.</summary>
         public void SetShaking(bool on)
@@ -111,34 +129,65 @@ namespace GlowUp.Views
                 if (scroll != null) scroll.OnBeginDrag(e);
                 return;
             }
-            dragging = true; returning = false; offset = Vector2.zero;
+            if (visual == null) return;
+            dragging = true; returning = false; inside = false;
             SwipeSceneNavigator.Suppressed = true;
-            if (visualCanvas != null) { visualCanvas.overrideSorting = true; visualCanvas.sortingOrder = 40; }
+            // where the finger holds the tile: kept for the whole drag, so the tile never snaps its middle or a corner to the finger
+            fingerNow = e.pressPosition;
+            grab = (Vector2)visual.localPosition - InTile(e.pressPosition);
+            shrink = visual.localScale.x;
+            // a top layer of its own: above the list, the bars and the shadow, and not cut off at the list's edge
+            if (visualCanvas != null)
+            {
+                visualCanvas.overrideSorting = true; visualCanvas.sortingOrder = 40;
+                foreach (MaskableGraphic graphic in visual.GetComponentsInChildren<MaskableGraphic>(true)) graphic.RecalculateClipping();
+            }
+            Follow(e.position);
         }
 
         public void OnDrag(PointerEventData e)
         {
             if (forwarding) { if (scroll != null) scroll.OnDrag(e); return; }
             if (!dragging || visual == null) return;
-            offset += e.delta / Scale;
-            float k = Progress();
-            visual.anchoredPosition = new Vector2(Mathf.Min(offset.x, 40f), offset.y * followUpDown);
-            visual.localScale = Vector3.one * Mathf.Lerp(1f, scaleAtRemove, k);
-            Dragging?.Invoke(this, k);
+            Follow(e.position);
+        }
+
+        /// <summary>Puts the tile under the finger (in screen coordinates, on every move) and says whether the finger is in the remove area.</summary>
+        void Follow(Vector2 finger)
+        {
+            fingerNow = finger;
+            inside = InRemoveArea(finger);
+            Place();
+            Dragging?.Invoke(this, inside ? 1f : 0f);
+        }
+
+        /// <summary>The touched point of the tile stays under the finger, also while the tile shrinks or grows.</summary>
+        void Place()
+        {
+            Vector2 at = InTile(fingerNow) + grab * shrink;
+            visual.localPosition = new Vector3(at.x, at.y, visual.localPosition.z);
+            visual.localScale = Vector3.one * shrink;
+        }
+
+        bool InRemoveArea(Vector2 finger)
+        {
+            if (removeArea != null) return removeArea.gameObject.activeInHierarchy && RectTransformUtility.RectangleContainsScreenPoint(removeArea, finger, Eye);
+            // no area given (an older scene): as before, far enough to the left
+            return InTile(finger).x - InTile(pressAt).x <= -Mathf.Max(1f, removeDistance);
         }
 
         public void OnEndDrag(PointerEventData e)
         {
             if (forwarding) { forwarding = false; if (scroll != null) scroll.OnEndDrag(e); return; }
             if (!dragging) return;
+            if (visual != null) Follow(e.position);
             dragging = false; pressed = false;
             SwipeSceneNavigator.Suppressed = false;
-            bool remove = Progress() >= 1f;
-            if (!remove) { returning = true; returnT = 0f; returnFrom = visual != null ? visual.anchoredPosition : Vector2.zero; }
+            bool remove = inside;
+            // not removed: it glides back from exactly where it was let go
+            if (!remove && visual != null) { returning = true; returnT = 0f; returnFrom = visual.anchoredPosition; returnScale = visual.localScale; }
             DragEnded?.Invoke(this, remove);
         }
-
-        float Progress() => Mathf.Clamp01(-offset.x / Mathf.Max(1f, removeDistance));
 
         void Update()
         {
@@ -152,17 +201,33 @@ namespace GlowUp.Views
             }
 
             if (visual == null) return;
+            if (dragging)
+            {
+                // smaller while the finger is in the remove area, back to full size outside it; the finger keeps its place on the tile
+                float wanted = inside ? scaleAtRemove : 1f;
+                if (!Mathf.Approximately(shrink, wanted)) { shrink = Mathf.MoveTowards(shrink, wanted, Mathf.Max(0.1f, scaleSpeed) * Time.unscaledDeltaTime); Place(); }
+                return;                 // the tilt it had when it was picked up is kept, so nothing jumps
+            }
             if (returning)
             {
                 returnT = returnSeconds <= 0.01f ? 1f : Mathf.Min(1f, returnT + Time.unscaledDeltaTime / returnSeconds);
                 float k = 1f - Mathf.Pow(1f - returnT, 3f);
                 visual.anchoredPosition = Vector2.Lerp(returnFrom, Vector2.zero, k);
-                visual.localScale = Vector3.Lerp(visual.localScale, Vector3.one, k);
-                if (returnT >= 1f) { returning = false; if (visualCanvas != null) visualCanvas.overrideSorting = false; }
+                visual.localScale = Vector3.Lerp(returnScale, Vector3.one, k);
+                if (returnT >= 1f)
+                {
+                    returning = false;
+                    if (visualCanvas != null)
+                    {
+                        visualCanvas.overrideSorting = false;
+                        foreach (MaskableGraphic graphic in visual.GetComponentsInChildren<MaskableGraphic>(true)) graphic.RecalculateClipping();
+                    }
+                }
             }
-            if (Shaking && !dragging)
+            bool tilt = Shaking && !(stillInPerformanceMode && GlowUp.Performance.PerformanceSettings.ReduceEffects);
+            if (tilt)
                 visual.localEulerAngles = new Vector3(0f, 0f, Mathf.Sin(Time.unscaledTime * shakeSpeed * Mathf.PI * 2f + phase) * shakeDegrees);
-            else if (!Shaking && visual.localEulerAngles.z != 0f)
+            else if (visual.localEulerAngles.z != 0f)
                 visual.localEulerAngles = Vector3.zero;
         }
     }
