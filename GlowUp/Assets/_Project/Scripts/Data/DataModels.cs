@@ -169,6 +169,14 @@ namespace GlowUp.Data
         public string listFrom;                  // where the ingredient list came from: "pack" (read by the camera) | "inventory" | "web" (looked up online) | "typed"
         public bool listWebBacked;               // "web" only: true when the look-up came with pages a live web search really opened
         public List<string> ingredientSources = new List<string>();   // pages the ingredient list came from when it was looked up, not read from the label
+        public long listDateUnix;                // when the ingredient list was read or looked up (0 = not known)
+        public string listCheck;                 // a SECOND place that has this product's list: "matched" (the same list) | "differs" | "" (none found, or not checked)
+        public string listCheckKind;             // what that second place is: "inventory" | "obf" (Open Beauty Facts)
+        public string listCheckSource;           // its page as "name | address" ("" for the GlowUp product list)
+        public long listCheckDateUnix;           // when that second place was last edited (0 = not known)
+        public int listDifferCount;              // "differs": how many names only one of the two lists has
+        public List<string> listOnlyHere = new List<string>();        // "differs": a few names only the shown list has
+        public List<string> listOnlyThere = new List<string>();       // "differs": a few names only the second place has
         public List<string> productShades = new List<string>();
         public List<string> recommendedShades = new List<string>();
         public bool dermatologistAdvised;

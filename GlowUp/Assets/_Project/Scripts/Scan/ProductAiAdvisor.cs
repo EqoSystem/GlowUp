@@ -210,8 +210,10 @@ namespace GlowUp.Scan
             if (!string.IsNullOrWhiteSpace(type)) q.Append(" (").Append(type.Trim()).Append(')');
             q.Append("\nSTART WITH THE BRAND'S OFFICIAL WEBSITE: search for this product's own page there and take the list from it. ");
             q.Append("Only when the official website does not publish the list, go on to the next sources. In \"sources\" put the page the list really came from first.");
-            q.Append("\nUse credible sources only, most trusted first: the brand's official website; the product pages of large retailers; ");
-            q.Append("regulators and reference databases (").Append(string.Join("; ", IngredientResearcher.PreferredSources)).Append("); INCIDecoder; Open Beauty Facts.\n");
+            q.Append("\nUse credible sources only, most trusted first: the brand's official website or official store page; the product pages of large retailers ");
+            q.Append("that reproduce the list printed on the pack; Open Beauty Facts. ");
+            q.Append("Ingredient DATABASES (INCIDecoder, EWG Skin Deep, CosDNA, CosIng) explain what an ingredient is: do NOT take this product's list from them. ");
+            q.Append("The list must be a copy of what is printed on the pack: never reconstruct it from memory or from a similar product.\n");
             q.Append("Also list EXTRA ADDITIVES AND HIDDEN INGREDIENTS: substances such a product contains that the label does not list one by one, ");
             q.Append("because they sit behind an umbrella term (Fragrance / Parfum, Flavor / Aroma, 'may contain' colourants, a preservative system) ");
             q.Append("or are known impurities. List one only when a credible source supports it.\n");
@@ -237,11 +239,17 @@ namespace GlowUp.Scan
                     if (additive.term.Length >= 2 && additive.substances.Count > 0 && result.hidden.Count < 8) result.hidden.Add(additive);
                 }
             // pages the web search really opened come first; the pages the AI only named follow
-            result.sources.AddRange(answer.sources);
+            var named = new List<string>(answer.sources);
             foreach (string s in Texts(json, "sources"))
-                if (s.Contains("http") && !result.sources.Contains(s) && result.sources.Count < 8) result.sources.Add(s);
+                if (s.Contains("http") && !named.Contains(s) && named.Count < 8) named.Add(s);
+            // A LIST IS ONLY ACCEPTED WITH A SOURCE THE APP CAN SHOW. Pages that can be opened and are not ingredient
+            // databases stay, the most trusted first (the brand's site, a retailer, Open Beauty Facts ...). When none is
+            // left, the answer is "not found": an AI-written list is never shown as if it were the pack's list.
+            result.sources = ListSources.Usable(named, brand);
             bool said = json.TryGetValue("found", out object f) && f is bool b && b;
-            result.found = said && result.ingredients.Count >= 3;
+            result.found = said && result.ingredients.Count >= 3 && result.sources.Count > 0;
+            if (said && result.ingredients.Count >= 3 && result.sources.Count == 0)
+                Debug.LogWarning("AI ingredient lookup: a list came without a source that can be shown, so it was not accepted.");
             return result;
         }
 

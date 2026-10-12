@@ -262,6 +262,23 @@ namespace GlowUp.Scan
             return record.fdaChecked ? None : Unavailable;
         }
 
+        /// <summary>
+        /// The user looked at a SIMILAR record and said whether it is their product. Yes: the scan counts as registered
+        /// (or expired, by the record's date). No: that record is taken off the scan, which then says "no record found".
+        /// Returns false when the scan had no similar record to answer about.
+        /// </summary>
+        public static bool ConfirmSimilar(ScanRecord record, bool isMyProduct)
+        {
+            if (record == null || StatusOf(record) != Similar) return false;
+            if (isMyProduct) record.fdaStatus = Past(ValidUntilOf(record)) ? Expired : Registered;
+            else
+            {
+                record.fdaStatus = None; record.fdaChecked = true;
+                record.fdaNumber = ""; record.fdaLine = ""; record.fdaProductName = ""; record.fdaCompany = ""; record.fdaValidUntil = "";
+            }
+            return true;
+        }
+
         /// <summary>Until when the FDA's record is valid, as it was written down ("" when not known).</summary>
         public static string ValidUntilOf(ScanRecord record)
         {
