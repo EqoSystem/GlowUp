@@ -179,7 +179,7 @@ namespace GlowUp.EditorTools
             // =====================================================================================
             //  Sounds and motion: tap sounds, shake to change screen, the light round the screen edge
             // =====================================================================================
-            Transform sounds = TileSection(content, scroll, "SoundsMotionSection", "Sounds & Motion", "Tap sounds, finger signs, edge light", IconFactory.Speaker, SettingsIconAnimator.Style.Pulse, 1);
+            Transform sounds = TileSection(content, scroll, "SoundsMotionSection", "Sounds & Motion", "Tap and delete sounds, finger signs, edge light", IconFactory.Speaker, SettingsIconAnimator.Style.Pulse, 1);
             Toggle tapSounds = SwitchRow(sounds, "TapSoundsRow", "Tap sounds", "A short sound when you tap a button.", true);
             GameObject soundBlock = Block(sounds, "TapSoundBlock", 14);
             soundBlock.AddComponent<CanvasGroup>();
@@ -197,6 +197,9 @@ namespace GlowUp.EditorTools
             A.Set(tapSounds.GetComponent<UiPreferenceToggle>(), "playSoundWhenTurnedOn", true);
             var soundPicker = SceneBuilderCore.Ensure<TapSoundPicker>(soundBlock);
             A.Set(soundPicker, "tabs", soundTabs); Kit.SetArray(soundPicker, "tabLabels", soundLabels); A.Set(soundPicker, "volumeSlider", volume);
+            Divider(sounds);
+            // the freezing sound when a scan is removed in Recent Scans (DeleteSoundPlayer in that scene); on until switched off
+            PreferenceRow(sounds, "DeleteSoundRow", "Delete sound", "A freezing sound when you remove a scan in Recent Scans.", true, UiPreferenceToggle.Preference.DeleteSound);
             Divider(sounds);
             // finger signs (FingerSignNavigator on UiServices) took the place of "wave to change screen"
             Toggle signsToggle = PreferenceRow(sounds, "FingerSignsRow", "Finger signs",

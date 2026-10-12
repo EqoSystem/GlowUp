@@ -55,6 +55,8 @@ namespace GlowUp.Recent
         [Range(0f, 1f)] [SerializeField] private float zoneAlphaWaiting = 0.55f;
         [Range(0f, 1f)] [SerializeField] private float zoneAlphaAtRemove = 1f;
         [SerializeField] private float zoneFadeSpeed = 7f;
+        [Tooltip("The freezing sound of a removal: once per removal, at the moment the tile starts to pop (the user can switch it off in Settings)")]
+        [SerializeField] private DeleteSoundPlayer deleteSound;
 
         [Header("Clear / restore")]
         [SerializeField] private Button clearAllButton;
@@ -219,6 +221,7 @@ namespace GlowUp.Recent
             if (!remove || popping || hold == null) return;
             if (!hold.TryGetComponent(out ProductTileView tile) || !(tile.Data is ScanRecord record)) return;
             popping = true;
+            if (deleteSound != null) deleteSound.Play();        // once per removal; not when the tile is dropped outside the shadow (that never gets here)
             tile.PlayPop(() =>
             {
                 ScanHistoryRepository.Remove(record.id);       // into the trash: the Restore bar can bring it back

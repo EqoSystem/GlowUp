@@ -108,6 +108,20 @@ namespace GlowUp.EditorTools
             A.Set(controller, "aiPanel", aiPanel);
             A.Set(controller, "backButton", s.back);
 
+            // ---- the freezing sound of a removal: one player for this screen, on its own object so its settings survive rebuilds ----
+            var deleteSound = A.Controller<DeleteSoundPlayer>("DeleteSoundPlayer");
+            var deleteSource = SceneBuilderCore.Ensure<AudioSource>(deleteSound.gameObject);
+            deleteSource.playOnAwake = false; deleteSource.loop = false; deleteSource.spatialBlend = 0f;
+            var deleteClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Project/Audio/Delete_FreezingCold.mp3");
+            var deleteSoundObject = new SerializedObject(deleteSound);
+            if (deleteSoundObject.FindProperty("clip").objectReferenceValue == null && deleteClip != null)      // a clip the user put there themselves is kept
+            {
+                deleteSoundObject.FindProperty("clip").objectReferenceValue = deleteClip;
+                deleteSoundObject.ApplyModifiedPropertiesWithoutUndo();
+            }
+            if (deleteClip == null) Debug.LogWarning("[GlowUp] Assets/_Project/Audio/Delete_FreezingCold.mp3 was not found: removing a scan stays silent until a clip is set on DeleteSoundPlayer.");
+            A.Set(controller, "deleteSound", deleteSound);
+
             A.Finish(s);
             Debug.Log("[GlowUp] RecentScanActivitiesScene built. ScanTileTemplate is the pattern tile; RemoveZone is invisible until the tiles shake (set its CanvasGroup's Alpha to 1 to see it); " +
                       "EmptyState, DoneButton, RenamePanel and AiInsightPanel are inactive until needed.");

@@ -6,7 +6,7 @@ namespace GlowUp.AppSettings
 {
     /// <summary>
     /// One on/off switch of the Settings page that belongs to a choice kept in UiPreferences: tap
-    /// sounds, the finger signs that change screen, the light round the screen edge, the bright screen in
+    /// sounds, the delete sound, the finger signs that change screen, the light round the screen edge, the bright screen in
     /// the scanner and in AR Try-On, the flashlight, the screen light. Pick the choice under "Preference".
     /// The same choice can also be changed inside a screen (the sun button in the scanner, for
     /// example); the switch follows it.
@@ -15,7 +15,7 @@ namespace GlowUp.AppSettings
     {
         // new choices go at the END of this list: the scenes remember a choice by its place in it.
         // ShakeToNavigate and AirGestures are features that were removed: their places stay so the others keep theirs.
-        public enum Preference { TapSounds, ShakeToNavigate, EdgeLight, ScanBrightScreen, TryOnBrightScreen, AutoFlashlight, TryOnScreenLight, AirGestures, FingerSigns }
+        public enum Preference { TapSounds, ShakeToNavigate, EdgeLight, ScanBrightScreen, TryOnBrightScreen, AutoFlashlight, TryOnScreenLight, AirGestures, FingerSigns, DeleteSound }
 
         [SerializeField] private Preference preference = Preference.TapSounds;
         [SerializeField] private Toggle toggle;
@@ -41,6 +41,7 @@ namespace GlowUp.AppSettings
                     case Preference.ShakeToNavigate: return false;              // removed feature
                     case Preference.AirGestures: return false;                  // removed feature
                     case Preference.FingerSigns: return UiPreferences.FingerSigns;
+                    case Preference.DeleteSound: return UiPreferences.DeleteSound;
                     case Preference.EdgeLight: return UiPreferences.BorderLight;
                     case Preference.ScanBrightScreen: return UiPreferences.ScanBrightScreen;
                     case Preference.TryOnBrightScreen: return UiPreferences.TryOnBrightScreen;
@@ -56,6 +57,7 @@ namespace GlowUp.AppSettings
                     case Preference.ShakeToNavigate: break;                     // removed feature
                     case Preference.AirGestures: break;                         // removed feature
                     case Preference.FingerSigns: UiPreferences.FingerSigns = value; break;
+                    case Preference.DeleteSound: UiPreferences.DeleteSound = value; break;
                     case Preference.EdgeLight: UiPreferences.BorderLight = value; break;
                     case Preference.ScanBrightScreen: UiPreferences.ScanBrightScreen = value; break;
                     case Preference.TryOnBrightScreen: UiPreferences.TryOnBrightScreen = value; break;

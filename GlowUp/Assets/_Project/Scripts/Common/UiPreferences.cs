@@ -27,6 +27,9 @@ namespace GlowUp.Common
             set { PlayerPrefs.SetFloat("GlowUp.Ui.TapSoundVolume", Mathf.Clamp01(value)); Save(); }
         }
 
+        /// <summary>The freezing sound when a scan is removed in Recent Scans (on until the user switches it off). See DeleteSoundPlayer.</summary>
+        public static bool DeleteSound { get => Get("GlowUp.Ui.DeleteSound", true); set => Set("GlowUp.Ui.DeleteSound", value); }
+
         /// <summary>The old "shake to change screen" is gone. Always off; kept only so the old ShakeNavigator script still compiles.</summary>
         public static bool ShakeToNavigate => false;
 
