@@ -118,7 +118,13 @@ namespace GlowUp.Common
         {
             if (!ready) return;
             MeasureSlots();
-            if (!dragging) target = current >= 0 ? SlotX(current) : target;
+            if (!dragging && current >= 0)
+            {
+                target = SlotX(current);
+                // the bar changed size (the screen was just laid out, or turned): the pill is simply put where it belongs.
+                // It must not slide there as if the user had moved it. (On its way in from the last screen it keeps going.)
+                if (!arriving) { x = target; velocity = stretch = stretchVelocity = 0f; }
+            }
             redraws = 2;
         }
 
