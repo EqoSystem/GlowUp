@@ -25,6 +25,13 @@ namespace GlowUp.Common
         [Tooltip("If you leave the pop-up active while designing, it still starts hidden when the app runs")]
         [SerializeField] private bool hideWhenSceneStarts = true;
 
+        [Header("Sideways drag to another screen")]
+        [Tooltip("Off (the usual): while this pop-up is open, dragging sideways does not change screen. On = it still does. For a pop-up that opens by itself when the screen opens (AR Try-On's product picker), so the user can go straight back.")]
+        [SerializeField] private bool letsSidewaysSwipesThrough = false;
+
+        /// <summary>True when a sideways drag that starts on this pop-up may still change the screen (SwipeSceneNavigator asks).</summary>
+        public bool LetsSidewaysSwipesThrough => letsSidewaysSwipesThrough;
+
         public bool IsOpen { get; private set; }
         public event Action Closed;
 

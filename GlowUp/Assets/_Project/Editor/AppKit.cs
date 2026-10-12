@@ -32,6 +32,7 @@ namespace GlowUp.EditorTools
         public const float Pad = 40;                        // space between the card edge and its content
         public const float HeaderBottom = 160;              // first free unit under the back button / title row
         public const float BarBottom = 28, BarHeight = 176; // the bottom action bar
+        public const float BarIconY = 26, BarPill = 108;    // the line its icons stand on (above the bar's middle) and the size of the pink pill behind one of them
         public const float AboveBar = BarBottom + BarHeight + 20;
 
         public static readonly Vector2 TL = new Vector2(0, 1), TC = new Vector2(0.5f, 1), TR = new Vector2(1, 1),
@@ -507,10 +508,11 @@ namespace GlowUp.EditorTools
         // =====================================================================================
         /// <summary>
         /// The bar's buttons have NO tap animation (no bounce, no scaling, no colour fade): a tap changes the screen at once.
-        /// Which screen the user is on is shown without movement: the soft drop behind that screen's icon and its darker
-        /// icon and label. The drop only moves while the user drags sideways to another screen (LiquidTabBar).
+        /// Which screen the user is on is shown by the PINK PILL behind an icon: Recent Scans = the left icon, the
+        /// dashboard = the middle one (Start Scan), AR Try-On = the right one. While the user drags the page sideways the
+        /// pill slides along, stretches like liquid and snaps to the icon of the screen that opens (LiquidTabBar).
         /// </summary>
-        /// <param name="current">0 = none, 1 = Recent, 2 = Scan, 3 = Try On (the screen this bar is on)</param>
+        /// <param name="current">0 = none (the dashboard), 1 = Recent, 2 = Scan, 3 = Try On (the screen this bar is on)</param>
         public static BottomActionBar BottomBar(AppScreen s, int current)
         {
             var bar = Panel(s.card, "BottomActionBar", ThemeRole.SurfaceAlt, 0.94f, BarHeight);
@@ -518,30 +520,24 @@ namespace GlowUp.EditorTools
             BottomStrip(bar.transform, BarBottom, BarHeight, 28, 28);
             Outline(bar.transform, ThemeRole.Accent, BarHeight, 0.55f);
 
-            // the liquid drop behind the icon of the current screen; LiquidTabBar makes it flow while the user drags to another screen
-            Image drop = RawPanel(bar.transform, "LiquidDrop", new Color(1, 1, 1, 0f), 132f);
+            // the button the pill rests behind on this screen: 0 = Recent, 1 = the middle (the dashboard), 2 = Try On
+            int pillSlot = current == 1 ? 0 : current == 3 ? 2 : 1;
+
+            // the pink pill: created before the buttons, so it is drawn BEHIND their icons. In Edit mode it stands where it
+            // rests; LiquidTabBar moves and stretches it while the app runs.
+            Image drop = Panel(bar.transform, "LiquidDrop", ThemeRole.ButtonFill, 1f, BarPill);
             float third = (Kit.CardWidth - 56f) / 3f;
-            At(drop.transform, MC, new Vector2((Mathf.Max(current, 1) - 2) * third, 6), new Vector2(168, 132));
+            At(drop.transform, MC, new Vector2((pillSlot - 1) * third, BarIconY), new Vector2(BarPill, BarPill));
 
-            Button recent = BarButton(bar.transform, "RecentScansButton", "Recent", IconFactory.History, 0f, 1f / 3f, current == 1);
-            Button tryOn = BarButton(bar.transform, "TryOnButton", "Try On", IconFactory.Sparkle, 2f / 3f, 1f, current == 3);
-
-            // the middle button stands out: a filled dusty-pink disc
-            var mid = Node(bar.transform, "StartScanButton", typeof(Image), typeof(Button));
-            Share(mid.transform, 1f / 3f, 2f / 3f);
-            var hit = mid.GetComponent<Image>(); Kit.StyleRounded(hit); hit.color = new Color(1, 1, 1, 0.004f);
-            var disc = Panel(mid.transform, "Disc", ThemeRole.ButtonFill, 1f, 110f);
-            At(disc.transform, MC, new Vector2(0, 26), new Vector2(108, 108));
-            Icon(disc.transform, "Icon", IconFactory.Scan, 60, ThemeRole.ButtonText);
-            var midLabel = Label(mid.transform, "Label", "Start Scan", 26, current == 2 ? ThemeRole.Heading : ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.Center);
-            BottomStrip(midLabel.transform, 12, 40, 0, 0);
-            var scan = mid.GetComponent<Button>(); scan.targetGraphic = disc;
-            scan.transition = Selectable.Transition.None;       // no tap animation on the bar: the screen simply changes
+            Button recent = BarButton(bar.transform, "RecentScansButton", "Recent", IconFactory.History, 0f, 1f / 3f, current == 1, pillSlot == 0);
+            Button scan = BarButton(bar.transform, "StartScanButton", "Start Scan", IconFactory.Scan, 1f / 3f, 2f / 3f, current == 2, pillSlot == 1);
+            Button tryOn = BarButton(bar.transform, "TryOnButton", "Try On", IconFactory.Sparkle, 2f / 3f, 1f, current == 3, pillSlot == 2);
 
             var liquid = SceneBuilderCore.Ensure<LiquidTabBar>(bar.gameObject);
             Set(liquid, "drop", drop.rectTransform); Set(liquid, "dropImage", drop);
-            Kit.SetArray(liquid, "slots", new Object[] { recent.transform, mid.transform, tryOn.transform });
-            Set(liquid, "current", current - 1);
+            Kit.SetArray(liquid, "slots", new Object[] { recent.transform, scan.transform, tryOn.transform });
+            Kit.SetArray(liquid, "slotIcons", new Object[] { recent.targetGraphic, scan.targetGraphic, tryOn.targetGraphic });
+            Set(liquid, "current", pillSlot);
 
             var view = SceneBuilderCore.Ensure<BottomActionBar>(bar.gameObject);
             Set(view, "recentButton", recent); Set(view, "scanButton", scan); Set(view, "tryOnButton", tryOn);
@@ -549,16 +545,18 @@ namespace GlowUp.EditorTools
             return view;
         }
 
-        static Button BarButton(Transform bar, string name, string label, Sprite icon, float from, float to, bool isCurrent)
+        /// <param name="isCurrent">this button belongs to the screen the bar is on (its label is darker)</param>
+        /// <param name="underPill">the pink pill rests behind this button's icon (the icon takes the colour of text on pink)</param>
+        static Button BarButton(Transform bar, string name, string label, Sprite icon, float from, float to, bool isCurrent, bool underPill)
         {
             var go = Node(bar, name, typeof(Image), typeof(Button));
             Share(go.transform, from, to);
             var hit = go.GetComponent<Image>(); Kit.StyleRounded(hit); hit.color = new Color(1, 1, 1, 0.004f);
-            ThemeRole role = isCurrent ? ThemeRole.Heading : ThemeRole.MainText;
-            var ic = Icon(go.transform, "Icon", icon, 60, role);
-            ic.rectTransform.anchoredPosition = new Vector2(0, 18);
-            var text = Label(go.transform, "Label", label, 26, role, FontRole.Label, TextAlignmentOptions.Center);
-            BottomStrip(text.transform, 18, 40, 0, 0);
+            // all three icons stand on one line: the line the pill travels along
+            var ic = Icon(go.transform, "Icon", icon, 60, underPill ? ThemeRole.ButtonText : ThemeRole.MainText);
+            ic.rectTransform.anchoredPosition = new Vector2(0, BarIconY);
+            var text = Label(go.transform, "Label", label, 26, isCurrent ? ThemeRole.Heading : ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.Center);
+            BottomStrip(text.transform, 12, 40, 0, 0);
             var b = go.GetComponent<Button>(); b.targetGraphic = ic;
             b.transition = Selectable.Transition.None;          // no tap animation on the bar: the screen simply changes
             return b;

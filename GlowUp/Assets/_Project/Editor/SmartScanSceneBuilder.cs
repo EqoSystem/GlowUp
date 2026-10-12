@@ -353,7 +353,9 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.ReplaceText(controller, "msgAiLimit", "The AI has been asked as often as it may be for now. Type the product's name, or tap Finish anyway.",
                 "The AI could not name this product. Type its name instead, or tap Skip and scan the ingredient list.");
 
-            AppTiles.SwipeNavigation(s, null);               // drag sideways: Dashboard on one side, AR Try-On on the other
+            // The scanner is NOT in the row of screens a sideways drag moves through: it is left with its back button
+            // (to the dashboard). The SwipeNavigation object is kept in the Hierarchy and does nothing on this screen.
+            AppTiles.SwipeNavigation(s, null);
 
             A.Finish(s);
             Debug.Log("[GlowUp] AiSmartAnalysisScene built. ScanGuide > Frame is the area that gets read; HoldToScan holds the round button (HoldToScanButton) and its ring of five segments " +
