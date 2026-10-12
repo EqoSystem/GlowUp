@@ -329,7 +329,7 @@ namespace GlowUp.Scan
             Say(string.IsNullOrEmpty(ScanSession.LastError) ? statusIdle : ScanSession.LastError);
             ScanSession.LastError = null;
             ShowButtons();
-            if (ring != null) ring.Show(evidence);
+            ShowRing();
 
             // what the app already knows (also offline): the ingredient database, the brands and the product inventory
             try
@@ -572,15 +572,40 @@ namespace GlowUp.Scan
             ShowProgress(filled);
             // FINISH BY ITSELF, also while the button is still held. (Not after nobody could name the product: then the
             // user decides between typing the name, starting over and "Finish anyway".)
-            if (evidence.AllFull && !finishUnnamed) FinishAttempt();
+            if ((evidence.AllFull || RingComplete) && !finishUnnamed) FinishAttempt();
         }
+
+        // ---------------------------------------------------------------------------------------
+        //  The ring: what was DETECTED (brand, product name, cosmetic type, barcode, ingredient list)
+        // ---------------------------------------------------------------------------------------
+        bool Held => stage == Stage.Scanning && holdButton != null && holdButton.IsHeld;
+
+        /// <summary>The five segments, 0 to 1 each, in the ring's order.</summary>
+        float[] RingParts()
+        {
+            return new[]
+            {
+                identity.brandName.Length > 0 ? 1f : 0f,
+                identity.productName.Length > 0 ? 1f : 0f,
+                identity.cosmeticType.Length > 0 ? 1f : 0f,
+                barcode.Length > 0 || evidence.Barcode.Length > 0 ? 1f : 0f,
+                ingredientText != null ? 1f : evidence.Progress(ScanZone.Ingredients)
+            };
+        }
+
+        int RingCount { get { int n = 0; foreach (float part in RingParts()) if (part >= 1f) n++; return n; } }
+
+        /// <summary>Brand, name, kind and ingredient list are all detected. (The barcode lights up only when one is visible; a pack without one is still complete.)</summary>
+        bool RingComplete { get { float[] p = RingParts(); return p[0] >= 1f && p[1] >= 1f && p[2] >= 1f && p[4] >= 1f; } }
+
+        void ShowRing() { if (ring != null) ring.ShowParts(RingParts(), Held); }
 
         static void Merge(bool[] into, bool[] more) { for (int i = 0; i < into.Length && i < more.Length; i++) into[i] |= more[i]; }
 
         /// <summary>The ring, the checklist and the buttons after a picture; a buzz for each segment that became full.</summary>
         void ShowProgress(bool[] filledNow)
         {
-            if (ring != null) ring.Show(evidence);
+            ShowRing();
             ShowIdentity();
             if (ingredientsCheck != null && ingredientText == null)
             {
@@ -613,6 +638,7 @@ namespace GlowUp.Scan
         // ---------------------------------------------------------------------------------------
         void ShowGuidance()
         {
+            if (ring != null) ring.SetHeld(Held);              // the segments are bright only while the button is held
             if (stage == Stage.Leaving || stage == Stage.Recognising) return;
             bool held = stage == Stage.Scanning && holdButton != null && holdButton.IsHeld;
             if (holdLabel != null) holdLabel.text = held ? (holdButton.IsLocked ? holdLockedLabel : holdActiveLabel) : holdIdleLabel;
@@ -635,7 +661,7 @@ namespace GlowUp.Scan
         string StatusNow()
         {
             bool held = stage == Stage.Scanning && holdButton != null && holdButton.IsHeld;
-            return ScanGuidance.Status(words, held, evidence.Pictures > 0, evidence.FullZones, false);
+            return ScanGuidance.Status(words, held, evidence.Pictures > 0, RingCount, false);
         }
 
         /// <summary>
@@ -900,6 +926,31 @@ namespace GlowUp.Scan
             barcode = seen.Trim();
             ProductData p = ProductRepository.Index.ByBarcode(barcode);            // the phone's look-up table: no reading through the list
             if (p != null) Adopt(p);
+            else NameFromBarcode(barcode);
+        }
+
+        /// <summary>
+        /// A barcode the inventory does not know: Open Beauty Facts is asked what product carries it (only the barcode's
+        /// digits are sent). Its answer fills in the name and the brand ONLY where the scan has read nothing itself, so
+        /// what is printed on the user's own pack always comes first. The ingredient list is not taken here: the pack is
+        /// still being read, and the look-up (which also gets the barcode) follows the order of trust.
+        /// </summary>
+        async void NameFromBarcode(string code)
+        {
+            try
+            {
+                if (!OpenBeautyFacts.Enabled || !ConnectivityMonitor.Online) return;
+                OpenBeautyFacts.Result there = await OpenBeautyFacts.Find(code);
+                if (this == null || stage != Stage.Scanning || barcode != code || there == null || !there.found) return;
+                bool changed = false;
+                if (identity.productName.Length == 0 && !string.IsNullOrWhiteSpace(there.productName)) { identity.productName = there.productName.Trim(); changed = true; }
+                if (identity.brandName.Length == 0 && !string.IsNullOrWhiteSpace(there.brandName)) { identity.brandName = there.brandName.Trim(); changed = true; }
+                if (!changed) return;
+                if (StopIfNotMakeup()) return;
+                if (ProductKnown && !evidence.IsFull(ScanZone.Front)) evidence.ProductKnown();
+                ShowProgress(null);
+            }
+            catch (Exception e) { Debug.LogWarning("Barcode look-up: " + e.Message); }
         }
 
         /// <summary>
@@ -973,7 +1024,7 @@ namespace GlowUp.Scan
             ResetChecklist();
             SetWorking(false);
             if (ring != null) ring.Clear();
-            if (keep) { evidence.ProductKnown(); ShowIdentity(); if (ring != null) ring.Show(evidence); }
+            if (keep) { evidence.ProductKnown(); ShowIdentity(); ShowRing(); }
             ShowButtons();
             if (!string.IsNullOrEmpty(message)) Say(message);
             ShowGuidance();
@@ -1183,7 +1234,7 @@ namespace GlowUp.Scan
             stage = Stage.Leaving;
             if (holdButton != null) holdButton.Usable = false;
             ShowButtons();
-            if (ring != null) ring.Show(evidence);
+            ShowRing();
             if (guide != null) guide.SetState(ScanGuideOverlay.State.Detected);
             if (vibrate) Haptics.Tick(60);
             Say(statusDone);
@@ -1226,7 +1277,7 @@ namespace GlowUp.Scan
                 // 2. online, from credible sources (a few times per visit of this screen at most)
                 if (!ConnectivityMonitor.Online || !ProductAiAdvisor.Available) { Say(msgLookUpOffline); return; }
                 if (!AiBudget.TakeLookUp()) { Say(msgLookUpLimit); return; }
-                ProductAiAdvisor.IngredientLookup found = await ProductAiAdvisor.FindIngredients(identity.productName, identity.brandName, identity.cosmeticType);
+                ProductAiAdvisor.IngredientLookup found = await ProductAiAdvisor.FindIngredients(identity.productName, identity.brandName, identity.cosmeticType, barcode);
                 if (this == null || stage == Stage.Leaving) return;
                 if (found == null || !found.found)
                 {
@@ -1336,7 +1387,7 @@ namespace GlowUp.Scan
             sources = new List<string>(from ?? new List<string>());
             if (ingredientsCheck != null) ingredientsCheck.SetFound(string.Format(ingredientsLookedUpFormat, ingredients.Count));
             evidence.ListKnown();
-            if (ring != null) ring.Show(evidence);
+            ShowRing();
             if (holdButton != null) holdButton.LetGo();
             // the list is there: a product that has a name goes straight on; otherwise the usual end (the AI is asked once)
             if (ProductKnown) Finish(); else FinishAttempt();

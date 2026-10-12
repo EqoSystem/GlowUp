@@ -23,7 +23,7 @@ namespace GlowUp.EditorTools
     {
         const float BottomBlock = 730;          // space under the camera view for the checklist, the status line and the hold button
         const float RingSize = 264, HoldSize = 190, RingBottom = 24;
-        static readonly string[] ZoneNames = { "Front", "Ingredients", "Codes", "Shade", "OtherSides" };
+        static readonly string[] ZoneNames = { "Brand", "ProductName", "CosmeticType", "Barcode", "Ingredients" };
 
         [MenuItem("GlowUp/Build Scene/10 AI Smart Scan", false, 120)]
         public static void Build()

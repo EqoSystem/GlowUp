@@ -334,6 +334,9 @@ namespace GlowUp.EditorTools
         {
             Image img = A.RawIcon(face, name, sprite, width, sample);
             img.preserveAspect = false;
+            // the colour tints the camera picture under it and keeps the skin's texture (looks worn, not painted on)
+            Material worn = ArFaceTrackingSetup.PreviewShapeMaterial();
+            if (worn != null) img.material = worn;
             var rt = img.rectTransform;
             rt.anchorMin = rt.anchorMax = new Vector2(across, up); rt.pivot = A.MC;
             rt.anchoredPosition = Vector2.zero; rt.sizeDelta = new Vector2(width, height);

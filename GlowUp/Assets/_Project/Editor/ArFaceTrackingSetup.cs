@@ -34,6 +34,7 @@ namespace GlowUp.EditorTools
     {
         const string MaskFolder = "Assets/_Project/Textures/FaceMakeup/";
         const string MaterialFolder = "Assets/_Project/Materials/";
+        const string ShaderFolder = "Assets/_Project/Shaders/";
         const string ArCoreLoaderType = "UnityEngine.XR.ARCore.ARCoreLoader";
         const string ArCoreSettingsType = "UnityEditor.XR.ARCore.ARCoreSettings";
         const string ArCoreSettingsPath = "Assets/XR/Settings/ARCoreSettings.asset";
@@ -356,7 +357,7 @@ namespace GlowUp.EditorTools
                 lips = Layer("ArMakeup_4_Lips", "face_mask_lips", 3, new Color(0.78f, 0.26f, 0.36f, 0f))
             };
             // the highlight of the finishes (satin, glossy, shimmer, metallic): white, drawn on top; its mask is swapped to the part that is shown
-            layers.shine = Layer("ArMakeup_5_Shine", "face_shine_lips", 4, new Color(1f, 1f, 1f, 0f));
+            layers.shine = Layer("ArMakeup_5_Shine", "face_shine_lips", 4, new Color(1f, 1f, 1f, 0f), false);
             layers.shineMasks = new[] { Mask("face_shine_face"), Mask("face_shine_cheeks"), Mask("face_shine_eyes"), Mask("face_shine_lips") };
             bool complete = layers.face != null && layers.cheeks != null && layers.eyes != null && layers.lips != null;
             notes?.Add(complete ? "- Face layers: the four masks and materials are in place (Assets/_Project/Textures/FaceMakeup, Assets/_Project/Materials)."
@@ -364,10 +365,29 @@ namespace GlowUp.EditorTools
             return layers;
         }
 
-        static Material Layer(string materialName, string maskName, int order, Color colour)
+        /// <summary>The material of the guided preview's colour shapes: the same "worn, not painted" blend as on the tracked face.</summary>
+        public static Material PreviewShapeMaterial()
+        {
+            Shader shader = AssetDatabase.LoadAssetAtPath<Shader>(ShaderFolder + "UiMakeupBlend.shader");
+            if (shader == null) return null;
+            Directory.CreateDirectory(MaterialFolder);
+            string path = MaterialFolder + "ArMakeup_PreviewShape.mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null) { material = new Material(shader); AssetDatabase.CreateAsset(material, path); }
+            if (material.shader != shader) { material.shader = shader; EditorUtility.SetDirty(material); }
+            return material;
+        }
+
+        /// <summary>
+        /// `worn` = the colour TINTS the skin and keeps its texture and light (shader GlowUp/FaceMakeupBlend); false = a plain
+        /// see-through layer (the highlight of a finish, and every layer when that shader is missing).
+        /// </summary>
+        static Material Layer(string materialName, string maskName, int order, Color colour, bool worn = true)
         {
             Texture2D mask = Mask(maskName);
-            Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+            Shader plain = Shader.Find("Universal Render Pipeline/Unlit");
+            Shader tinting = worn ? AssetDatabase.LoadAssetAtPath<Shader>(ShaderFolder + "FaceMakeupBlend.shader") : null;
+            Shader shader = tinting != null ? tinting : plain;
             if (mask == null || shader == null) return null;
 
             string path = MaterialFolder + materialName + ".mat";

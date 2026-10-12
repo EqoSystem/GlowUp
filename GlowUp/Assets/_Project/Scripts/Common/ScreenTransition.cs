@@ -5,7 +5,9 @@ using UnityEngine.SceneManagement;
 namespace GlowUp.Common
 {
     /// <summary>
-    /// The change from one screen to the next. A sheet in the page colour glides across (or fades in) with
+    /// The change from one screen to the next. Since 12 October 2026 it is SKELETON LOADING by default (the project
+    /// owner's choice, the same as the website): no animation, grey placeholder shapes until the next screen is ready.
+    /// The earlier look is still here behind the switch "Skeleton Loading": a sheet in the page colour glides across (or fades in) with
     /// a soft shadow at its edges and a small turning sparkle in its middle; the next scene is loaded
     /// behind it, and the sheet glides on and uncovers the new screen.
     ///
@@ -61,6 +63,12 @@ namespace GlowUp.Common
         [Tooltip("On = the next screen starts loading while the sheet is still coming in (shorter wait)")]
         [SerializeField] private bool loadWhileCovering = true;
 
+        [Header("Skeleton loading (the way the website loads a page)")]
+        [Tooltip("On = NO animation between screens: grey placeholder shapes with a moving shine stand in for the next screen until it is ready, then the real screen is there. Off = the sliding sheet with the sparkle, as before.")]
+        [SerializeField] private bool skeletonLoading = true;
+        [Tooltip("The placeholder shapes give way to the real screen in this many seconds (0 = at once)")]
+        [SerializeField] private float skeletonLeaveSeconds = 0.1f;
+
         [Header("Style")]
         [Tooltip("On = the sheet slides in from the side the next screen is on. Off = it always fades.")]
         [SerializeField] private bool slide = true;
@@ -113,6 +121,7 @@ namespace GlowUp.Common
         IEnumerator Run(string sceneName, int enterFrom)
         {
             busy = true; busySince = Time.unscaledTime;
+            if (skeletonLoading && skeletonGroup != null) { yield return RunSkeleton(sceneName); yield break; }
             bool calm = fadeOnlyInPerformanceMode && GlowUp.Performance.PerformanceSettings.ReduceEffects;
             bool sliding = slide && enterFrom != 0 && !calm;
             overlayCanvas.gameObject.SetActive(true);
@@ -158,6 +167,43 @@ namespace GlowUp.Common
 
             // 5. uncover the new screen: the sheet carries on in the same direction
             yield return Move(sliding, 0f, -enterFrom * width, 1f, 0f, calm ? revealSeconds * 0.6f : revealSeconds, revealEase);
+            Finish();
+        }
+
+        /// <summary>
+        /// Skeleton loading: the placeholder shapes are there AT ONCE (nothing slides, fades in or spins), the next screen
+        /// loads behind them, and when it is ready and draws smoothly they give way to it.
+        /// </summary>
+        IEnumerator RunSkeleton(string sceneName)
+        {
+            overlayCanvas.gameObject.SetActive(true);
+            sheet.anchoredPosition = Vector2.zero;
+            if (sheetGroup != null) sheetGroup.alpha = 1f;
+            if (markGroup != null) markGroup.alpha = 0f;
+            skeletonGroup.alpha = 1f;
+            ThreadPriority priorityBefore = Application.backgroundLoadingPriority;
+            Application.backgroundLoadingPriority = ThreadPriority.High;
+            yield return null;                                   // the shapes are drawn before the loading starts to take time
+
+            AsyncOperation loading = SceneManager.LoadSceneAsync(sceneName);
+            while (loading != null && !loading.isDone) yield return null;
+            Application.backgroundLoadingPriority = priorityBefore;
+
+            // the new screen sets itself up in its first frames: wait until the phone draws smoothly again
+            yield return null;
+            for (int i = 0; i < Mathf.Max(1, settleFrames); i++)
+            {
+                yield return null;
+                if (Time.unscaledDeltaTime <= smoothFrameSeconds) break;
+            }
+
+            float leave = Mathf.Max(0f, skeletonLeaveSeconds);
+            for (float t = 0f; t < leave; t += Mathf.Min(Time.unscaledDeltaTime, Mathf.Max(0.01f, longestFrameStep)))
+            {
+                if (sheetGroup != null) sheetGroup.alpha = 1f - t / leave;
+                yield return null;
+            }
+            skeletonGroup.alpha = 0f;
             Finish();
         }
 

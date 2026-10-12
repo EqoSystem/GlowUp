@@ -10,6 +10,9 @@ namespace GlowUp.AR
     /// material whose picture (a "mask") says where on the face it shows; this script only sets each
     /// layer's colour and strength.
     ///
+    /// Since 12 October 2026 the colour layers TINT the skin (shader GlowUp/FaceMakeupBlend): the skin's own texture,
+    /// light and shadow stay visible under the colour, so it looks worn and not like a flat coloured shape.
+    ///
     /// What to show (which part, which shade, how strong, which finish) is read from the
     /// FallbackMakeupOverlay, so the tabs, swatches and strength slider work the same in the guided
     /// preview and in live tracking. The numbers of each finish (matte, satin, glossy, shimmer,
@@ -39,6 +42,10 @@ namespace GlowUp.AR
         [SerializeField] private float blendSpeed = 10f;
         [Tooltip("Live tracking sits exactly on the face, so it can be a little stronger or weaker than the guided preview. 1 = the same.")]
         [Range(0.3f, 1.5f)] [SerializeField] private float strengthScale = 1f;
+        [Tooltip("The colour bare LIPS are assumed to have. Lip colour is worked out against it: lips of this colour become exactly the shade, and the lines and light of the real lips stay visible.")]
+        [SerializeField] private Color lipsUnderneath = new Color(0.72f, 0.45f, 0.45f, 1f);
+        [Tooltip("The colour bare SKIN is assumed to have (cheeks, eyelids, whole face). Set it nearer to the user's skin if a shade looks too dark or too light.")]
+        [SerializeField] private Color skinUnderneath = new Color(0.78f, 0.60f, 0.52f, 1f);
         [Tooltip("Tick this only if the colour shows upside down on the face (for example lip colour on the forehead)")]
         [SerializeField] private bool flipMasksUpsideDown = false;
         [Tooltip("The colour setting of the layer materials (do not change unless the materials use another shader)")]
@@ -65,6 +72,7 @@ namespace GlowUp.AR
                     layers[i] = new Material(originals[i]) { name = originals[i].name + " (this scene)" };
                     if (i < shown.Length) shown[i] = new Color(1f, 1f, 1f, 0f);
                     layers[i].SetColor(colourProperty, new Color(1f, 1f, 1f, 0f));          // nothing shows until a shade is chosen
+                    if (layers[i].HasProperty("_SkinBase")) layers[i].SetColor("_SkinBase", i == 3 ? lipsUnderneath : skinUnderneath);
                     if (flipMasksUpsideDown && layers[i].HasProperty(maskProperty))
                     {
                         layers[i].SetTextureScale(maskProperty, new Vector2(1f, -1f));

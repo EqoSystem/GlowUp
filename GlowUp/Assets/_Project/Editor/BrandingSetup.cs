@@ -24,7 +24,8 @@ namespace GlowUp.EditorTools
     public static class BrandingSetup
     {
         const string Folder = "Assets/_Project/Branding/";
-        static readonly Color Pearl = new Color32(255, 250, 246, 255);
+        /// <summary>The background of Unity's original start screen.</summary>
+        static readonly Color UnityDark = new Color(0.1372549f, 0.1215686f, 0.1254902f, 1f);
 
         [MenuItem("GlowUp/Set Up Start-Up Logo And App Icon", false, 210)]
         static void RunFromMenu()
@@ -32,8 +33,6 @@ namespace GlowUp.EditorTools
             var notes = new List<string>();
             bool ready = Apply(notes);
             if (notes.Count == 0) notes.Add(ready ? "The start-up logo and the app icon were already set." : "Nothing could be set.");
-            if (!Application.HasProLicense())
-                notes.Add("\nUnity's own small logo stays under the Glow Up logo: Unity 2022 with a Personal licence does not allow switching it off (Unity Pro or Unity 6 does).");
             EditorUtility.DisplayDialog("GlowUp: start-up logo and icon", string.Join("\n", notes), "OK");
         }
 
@@ -41,54 +40,41 @@ namespace GlowUp.EditorTools
         public static bool Apply(List<string> notes)
         {
             notes = notes ?? new List<string>();
-            var logo = Load<Sprite>("GlowUpLogo.png", true);
-            var splash = Load<Texture2D>("GlowUpSplash.png", false);
             var icon = Load<Texture2D>("GlowUpIcon.png", false);
             var iconBackground = Load<Texture2D>("GlowUpIcon_Background.png", false);
             var iconForeground = Load<Texture2D>("GlowUpIcon_Foreground.png", false);
-            if (logo == null && icon == null) { notes.Add("- Start-up logo: the pictures in " + Folder + " are missing."); return false; }
+            if (icon == null) notes.Add("- App icon: the pictures in " + Folder + " are missing.");
 
-            // ---- Unity's start-up screen: the Glow Up logo on the app's pearl white ----
-            if (logo != null)
+            // ---- Unity's start-up screen: Unity's OWN original one (its logo, its colours, its movement), nothing of the app on it.
+            //      The app's own start-up is the animation of StartupScene, which follows it; a Glow Up logo here as well
+            //      made two start-up logos in a row (the project owner's note of 12 October 2026).
             {
                 bool changed = false;
                 PlayerSettings.SplashScreenLogo[] logos = PlayerSettings.SplashScreen.logos;
-                if (logos == null || logos.Length != 1 || logos[0].logo != logo)
-                {
-                    PlayerSettings.SplashScreen.logos = new[] { PlayerSettings.SplashScreenLogo.Create(2.5f, logo) };
-                    changed = true;
-                }
-                if (PlayerSettings.SplashScreen.backgroundColor != Pearl) { PlayerSettings.SplashScreen.backgroundColor = Pearl; changed = true; }
-                if (PlayerSettings.SplashScreen.unityLogoStyle != PlayerSettings.SplashScreen.UnityLogoStyle.DarkOnLight)
-                { PlayerSettings.SplashScreen.unityLogoStyle = PlayerSettings.SplashScreen.UnityLogoStyle.DarkOnLight; changed = true; }
-                if (PlayerSettings.SplashScreen.drawMode != PlayerSettings.SplashScreen.DrawMode.UnityLogoBelow)
-                { PlayerSettings.SplashScreen.drawMode = PlayerSettings.SplashScreen.DrawMode.UnityLogoBelow; changed = true; }
-                if (PlayerSettings.SplashScreen.animationMode != PlayerSettings.SplashScreen.AnimationMode.Static)
-                { PlayerSettings.SplashScreen.animationMode = PlayerSettings.SplashScreen.AnimationMode.Static; changed = true; }
-                if (Application.HasProLicense() && PlayerSettings.SplashScreen.showUnityLogo) { PlayerSettings.SplashScreen.showUnityLogo = false; changed = true; }
-                if (changed) notes.Add("- Start-up screen: shows the Glow Up logo on the app's pearl white" +
-                                       (Application.HasProLicense() ? ", without Unity's logo." : " (Unity's small logo sits under it; a Personal licence cannot remove it)."));
-            }
+                if (logos != null && logos.Length > 0) { PlayerSettings.SplashScreen.logos = new PlayerSettings.SplashScreenLogo[0]; changed = true; }
+                if (PlayerSettings.SplashScreen.backgroundColor != UnityDark) { PlayerSettings.SplashScreen.backgroundColor = UnityDark; changed = true; }
+                if (PlayerSettings.SplashScreen.unityLogoStyle != PlayerSettings.SplashScreen.UnityLogoStyle.LightOnDark)
+                { PlayerSettings.SplashScreen.unityLogoStyle = PlayerSettings.SplashScreen.UnityLogoStyle.LightOnDark; changed = true; }
+                if (PlayerSettings.SplashScreen.drawMode != PlayerSettings.SplashScreen.DrawMode.AllSequential)
+                { PlayerSettings.SplashScreen.drawMode = PlayerSettings.SplashScreen.DrawMode.AllSequential; changed = true; }
+                if (PlayerSettings.SplashScreen.animationMode != PlayerSettings.SplashScreen.AnimationMode.Dolly)
+                { PlayerSettings.SplashScreen.animationMode = PlayerSettings.SplashScreen.AnimationMode.Dolly; changed = true; }
+                if (!PlayerSettings.SplashScreen.showUnityLogo) { PlayerSettings.SplashScreen.showUnityLogo = true; changed = true; }
+                if (changed) notes.Add("- Start-up screen: Unity's own original one. The Glow Up animation (StartupScene) follows it.");
 
-            // ---- Android's own picture, shown the moment the app is tapped ----
-            if (splash != null)
-            {
-                bool changed = false;
+                // Android's own picture before that: none, so the Glow Up logo is not shown a second time
                 Object[] settings = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/ProjectSettings.asset");
                 if (settings != null && settings.Length > 0 && settings[0] != null)
                 {
                     var serialized = new SerializedObject(settings[0]);
                     SerializedProperty picture = serialized.FindProperty("androidSplashScreen");
-                    if (picture != null && picture.objectReferenceValue != splash)
+                    if (picture != null && picture.objectReferenceValue != null)
                     {
-                        picture.objectReferenceValue = splash;
+                        picture.objectReferenceValue = null;
                         serialized.ApplyModifiedPropertiesWithoutUndo();
-                        changed = true;
+                        notes.Add("- Android start picture: none (the Glow Up logo is shown by the app's own animation).");
                     }
                 }
-                if (PlayerSettings.Android.splashScreenScale != AndroidSplashScreenScale.ScaleToFill)
-                { PlayerSettings.Android.splashScreenScale = AndroidSplashScreenScale.ScaleToFill; changed = true; }
-                if (changed) notes.Add("- Android start picture: the Glow Up logo (Player > Splash Image > Static Splash Image).");
             }
 
             // ---- the app icon ----

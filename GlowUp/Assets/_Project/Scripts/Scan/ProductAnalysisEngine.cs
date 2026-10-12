@@ -49,7 +49,10 @@ namespace GlowUp.Scan
                 if (string.IsNullOrWhiteSpace(raw)) continue;
                 IngredientData data = IngredientTextParser.MatchEntry(raw).data;          // "Water (Aqua)" and "Aqua/Water/Eau" are Water
                 string shown = data != null && !string.IsNullOrEmpty(data.name) ? data.name : raw.Trim();
-                if (!seen.Add(shown)) continue;                       // "Aqua" and "Water" are the same ingredient
+                // "Aqua" and "Water" are the same ingredient (one database entry), and so are two READINGS of one name:
+                // "Dimethicone" and "Dirnethicone", "CI 77491" and "Ci77491" (the camera cannot be trusted on rn/m, 0/o, 1/l, spaces)
+                string sameAs = data != null && !string.IsNullOrEmpty(data.id) ? "id:" + data.id : "read:" + TextKey.Squash(TextKey.Normalize(shown));
+                if (!seen.Add(sameAs) | !seen.Add("name:" + TextKey.Normalize(shown))) continue;
 
                 var f = new IngredientFinding { name = shown };
                 record.ingredients.Add(shown);

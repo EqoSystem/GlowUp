@@ -57,3 +57,11 @@ HOW TO REPLACE A SOUND
     RecentScanActivitiesScene (a clip you set there yourself is kept when the scene is built again), and set how much
     of it is heard with Start At Seconds / Play Seconds / Fade Out Seconds. In the clip's import settings switch
     "Preload Audio Data" off, so it is only loaded while the user's switch is on.
+
+Delete_Drop_Made.wav
+    The short sound of the DROP: played once when a scan (or a gathered group) is let go inside the remove area.
+    0.4 seconds: a low knock, a burst of bright splinters, a glassy ring.
+    Where it comes from: made for this app on 12 October 2026 by the small program Source~/make_drop_sound.py.
+    Licence: the project's own, free to use. NOT LISTENED TO YET (see Delete_Freeze_Made.wav).
+    Since the same day the freezing sound KEEPS PLAYING while a row is carried by the finger and stops when it is let
+    go ("Keep Playing While Carried" on DeleteSoundPlayer; untick it for the earlier behaviour).

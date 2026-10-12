@@ -142,6 +142,13 @@ namespace GlowUp.EditorTools
                 deleteSoundObject.FindProperty("ownClip").objectReferenceValue = ownDeleteClip;
                 deleteSoundObject.ApplyModifiedPropertiesWithoutUndo();
             }
+            // the short sound of the drop (made by Audio/Source~/make_drop_sound.py); a clip set by hand is kept
+            var dropClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Project/Audio/Delete_Drop_Made.wav");
+            if (deleteSoundObject.FindProperty("dropClip").objectReferenceValue == null && dropClip != null)
+            {
+                deleteSoundObject.FindProperty("dropClip").objectReferenceValue = dropClip;
+                deleteSoundObject.ApplyModifiedPropertiesWithoutUndo();
+            }
             if (deleteClip == null) Debug.LogWarning("[GlowUp] Assets/_Project/Audio/Delete_FreezingCold.mp3 was not found: removing a scan stays silent until a clip is set on DeleteSoundPlayer.");
             A.Set(controller, "deleteSound", deleteSound);
             A.Set(controller, "selectButton", select); A.Set(controller, "selectionBar", selectionBar); A.Set(controller, "selectionText", selectionText);

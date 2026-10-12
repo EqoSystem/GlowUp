@@ -199,15 +199,25 @@ namespace GlowUp.Scan
         }
 
         /// <summary>Looks for the product's published ingredient list. `found` is false when no credible list turned up.</summary>
-        public static async Task<IngredientLookup> FindIngredients(string name, string brand, string type)
+        /// <summary>`barcode` = the digits under the pack's barcode when the camera read them ("" = not read): they name ONE product exactly, so the search can make sure a page is about this very product and size.</summary>
+        public static async Task<IngredientLookup> FindIngredients(string name, string brand, string type, string barcode = "")
         {
             var result = new IngredientLookup();
-            if (!Available || string.IsNullOrWhiteSpace(name)) return result;
+            barcode = OpenBeautyFacts.Digits(barcode);
+            if (!Available || (string.IsNullOrWhiteSpace(name) && barcode.Length == 0)) return result;
+            name = name ?? "";
             var q = new StringBuilder();
             q.Append("Find the full ingredient (INCI) list of this cosmetic product as its maker publishes it.\nPRODUCT: ");
             if (!string.IsNullOrWhiteSpace(brand)) q.Append(brand.Trim()).Append(' ');
             q.Append(name.Trim());
             if (!string.IsNullOrWhiteSpace(type)) q.Append(" (").Append(type.Trim()).Append(')');
+            if (barcode.Length > 0)
+            {
+                q.Append("\nBARCODE (GTIN / EAN / UPC) printed on the pack: ").Append(barcode);
+                q.Append("\nThe barcode names exactly one product and size. Search for the barcode number as well as for the name, and prefer a page ");
+                q.Append("that shows this barcode: then the list is that of this very product and not of a similar one. ");
+                q.Append("If the name above is empty or looks misread, take the product's name from the pages that show this barcode.");
+            }
             q.Append("\nSTART WITH THE BRAND'S OFFICIAL WEBSITE: search for this product's own page there and take the list from it. ");
             q.Append("Only when the official website does not publish the list, go on to the next sources. In \"sources\" put the page the list really came from first.");
             q.Append("\nUse credible sources only, most trusted first: the brand's official website or official store page; the product pages of large retailers ");

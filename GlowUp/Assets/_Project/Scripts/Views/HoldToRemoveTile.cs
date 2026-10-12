@@ -53,6 +53,12 @@ namespace GlowUp.Views
         [Tooltip("How fast it shrinks and grows back (per second)")]
         [SerializeField] private float scaleSpeed = 9f;
 
+        [Header("Gathered into a group")]
+        [Tooltip("Seconds a selected row takes to fly to the finger when its group is picked up")]
+        [SerializeField] private float gatherSeconds = 0.22f;
+        [Tooltip("How much a gathered row is turned, in degrees, so the pile looks like a pile")]
+        [SerializeField] private float gatherTilt = 2.5f;
+
         /// <summary>The finger has rested long enough: the tiles should start to shake.</summary>
         public event Action<HoldToRemoveTile> HoldStarted;
         /// <summary>The tile is being dragged; the number is 1 while the finger is inside the remove area and 0 while it is not.</summary>
@@ -70,6 +76,37 @@ namespace GlowUp.Views
         Vector2 pressAt, fingerNow, grab, returnFrom;
         Vector3 returnScale = Vector3.one;
 
+        RectTransform leader;           // the Visual of the row under the finger, while this row is gathered behind it
+        Vector2 gatherOffset;
+        float gatherT, gatherTurn;
+
+        /// <summary>True while this row lies in the pile behind the row that is carried.</summary>
+        public bool Gathered => leader != null;
+
+        /// <summary>
+        /// A group is picked up: this row flies to the row under the finger (`lead`) and then stays in the pile behind
+        /// it, `offset` away (in the leader's own units), wherever on the screen the finger goes. `order` = its layer.
+        /// </summary>
+        public void GatherBehind(HoldToRemoveTile lead, Vector2 offset, int order, float turn)
+        {
+            if (visual == null || lead == null || lead == this || lead.visual == null) return;
+            leader = lead.visual; gatherOffset = offset; gatherT = 0f; gatherTurn = turn; returning = false;
+            if (visualCanvas != null)
+            {
+                visualCanvas.overrideSorting = true; visualCanvas.sortingOrder = order;
+                foreach (MaskableGraphic graphic in visual.GetComponentsInChildren<MaskableGraphic>(true)) graphic.RecalculateClipping();
+            }
+        }
+
+        /// <summary>The group was let go outside the remove area: this row glides back to its place in the list.</summary>
+        public void LeavePile()
+        {
+            if (leader == null) return;
+            leader = null;
+            if (visual == null) return;
+            returning = true; returnT = 0f; returnFrom = visual.anchoredPosition; returnScale = visual.localScale;
+        }
+
         /// <summary>The area in which letting go removes the tile (the controller's shadow). "Inside" is decided by the finger.</summary>
         public void SetRemoveArea(RectTransform area) { removeArea = area; }
 
@@ -84,7 +121,7 @@ namespace GlowUp.Views
         void OnDisable()
         {
             if (dragging) SwipeSceneNavigator.Suppressed = false;
-            pressed = dragging = forwarding = returning = false; Shaking = false;
+            pressed = dragging = forwarding = returning = false; Shaking = false; leader = null;
             ResetVisual();
         }
 
@@ -201,6 +238,18 @@ namespace GlowUp.Views
             }
 
             if (visual == null) return;
+            if (leader != null)
+            {
+                // in the pile: fly to the carried row, then stay with it (same size, a little turned)
+                gatherT = gatherSeconds <= 0.01f ? 1f : Mathf.Min(1f, gatherT + Time.unscaledDeltaTime / gatherSeconds);
+                Vector3 there = visual.parent.InverseTransformPoint(leader.TransformPoint(gatherOffset));
+                there.z = visual.localPosition.z;
+                float k = 1f - Mathf.Pow(1f - gatherT, 3f);
+                visual.localPosition = gatherT >= 1f ? there : Vector3.Lerp(visual.localPosition, there, k);
+                visual.localScale = Vector3.Lerp(visual.localScale, leader.localScale, k);
+                visual.localEulerAngles = new Vector3(0f, 0f, gatherTurn * gatherTilt * k);
+                return;
+            }
             if (dragging)
             {
                 // smaller while the finger is in the remove area, back to full size outside it; the finger keeps its place on the tile

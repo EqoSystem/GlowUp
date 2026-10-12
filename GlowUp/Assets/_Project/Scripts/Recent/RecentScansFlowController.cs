@@ -25,8 +25,9 @@ namespace GlowUp.Recent
     ///
     /// SEVERAL AT ONCE: the Delete button at the top right starts selection mode. The rows shake, a tap on a row
     /// selects it or takes it out again (a check mark and "3 selected" show it), with "Select all" and "Cancel".
-    /// Dragging ANY selected row moves the whole group: that row carries a small number, the others fade, and the same
-    /// drag, shadow and finger-following are used as for one row. Let go inside the shadow: every selected scan is
+    /// Dragging ANY selected row moves the whole group: that row carries a small number, the other selected rows fly to
+    /// the finger and lie in a pile behind it, and the pile can be carried anywhere on the screen with the same drag,
+    /// shadow and finger-following as for one row. Let go inside the shadow: every selected scan is
     /// removed in one save, with one sound. Let go outside: they return to their places, still selected. A row that is
     /// not selected is dragged alone. Press-and-hold works as before; it simply has no selection.
     /// </summary>
@@ -67,7 +68,7 @@ namespace GlowUp.Recent
         [Tooltip("The shadow's colour while it waits, and while a dragged tile's finger is inside it (it turns red: letting go removes)")]
         [SerializeField] private Color zoneColorWaiting = new Color(0.16f, 0.11f, 0.13f, 1f);
         [SerializeField] private Color zoneColorInside = new Color32(181, 47, 47, 255);
-        [Tooltip("The freezing sound of a removal: once per removal, at the moment the tile starts to pop (the user can switch it off in Settings)")]
+        [Tooltip("The sounds of a removal: the freezing sound keeps playing while a row is carried, and a second sound is played when it is dropped into the shadow (the user can switch both off in Settings)")]
         [SerializeField] private DeleteSoundPlayer deleteSound;
 
         [Header("Selecting several to remove them together")]
@@ -81,6 +82,10 @@ namespace GlowUp.Recent
         [Tooltip("{0} = how many are selected")]
         [SerializeField] private string selectedFormat = "{0} selected";
         [SerializeField] private string selectedNone = "Tap scans to select them";
+        [Tooltip("When a group is picked up, each gathered row lies this far from the one before it (canvas units)")]
+        [SerializeField] private Vector2 pileStep = new Vector2(10f, -14f);
+        [Tooltip("How many rows of the pile are seen one under the other; the rest lie under the last")]
+        [SerializeField] private int pileShown = 3;
 
         [Header("Clear / restore")]
         [SerializeField] private Button clearAllButton;
@@ -193,6 +198,7 @@ namespace GlowUp.Recent
                         hold.HoldStarted += _ => SetShaking(true);
                         hold.Dragging += (h, inZone) =>
                         {
+                            if (deleteSound != null) deleteSound.BeginCarry();      // the freezing sound keeps playing while a row is carried
                             fingerInZone = inZone >= 0.5f; zoneTarget = fingerInZone ? zoneAlphaAtRemove : zoneAlphaWaiting;
                             // a selected row is dragged: the whole selection moves as one group under the finger
                             if (!groupShown && h.TryGetComponent(out ProductTileView draggedTile) && DragsGroup(draggedTile)) ShowGroup(draggedTile, true);
@@ -288,15 +294,26 @@ namespace GlowUp.Recent
             if (countText != null) countText.gameObject.SetActive(!selecting);
         }
 
-        /// <summary>One selected row is under the finger for all of them: it carries the number, the others fade.</summary>
+        /// <summary>
+        /// One selected row is under the finger for all of them: it carries the number, and the other selected rows FLY TO
+        /// THE FINGER and stay in a small pile behind it, wherever on the screen the finger goes. Let go outside the
+        /// shadow (`show` false): they glide back to their places.
+        /// </summary>
         void ShowGroup(ProductTileView dragged, bool show)
         {
             groupShown = show;
+            HoldToRemoveTile lead = dragged != null && dragged.TryGetComponent(out HoldToRemoveTile found) ? found : null;
+            int placed = 0;
             foreach (ProductTileView tile in tiles)
             {
                 if (tile == null) continue;
-                if (tile == dragged) tile.ShowGroupCount(show ? selected.Count : 0);
-                else if (tile.Selected) tile.SetDimmed(show);
+                if (tile == dragged) { tile.ShowGroupCount(show ? selected.Count : 0); continue; }
+                if (!tile.Selected || !tile.TryGetComponent(out HoldToRemoveTile hold)) continue;
+                if (!show) { hold.LeavePile(); continue; }
+                if (lead == null) continue;
+                // the first few lie a little lower each, like cards; the rest lie under the last of them
+                int step = Mathf.Min(++placed, Mathf.Max(1, pileShown));
+                hold.GatherBehind(lead, pileStep * step, 39 - Mathf.Min(placed, 30), placed % 2 == 0 ? 1f : -1f);
             }
             if (!show && dragged != null) dragged.ShowGroupCount(0);
         }
@@ -334,10 +351,19 @@ namespace GlowUp.Recent
             zoneTarget = shaking ? zoneAlphaWaiting : 0f;
             ProductTileView tile = hold != null && hold.TryGetComponent(out ProductTileView found) ? found : null;
             bool group = DragsGroup(tile);
-            if (groupShown) ShowGroup(tile, false);             // let go: the others are fully there again (outside the shadow they stay selected)
-            if (!remove || popping || tile == null || !(tile.Data is ScanRecord record)) return;
+            if (deleteSound != null) deleteSound.EndCarry();    // let go, anywhere: the carried sound ends
+            bool removing = remove && !popping && tile != null && tile.Data is ScanRecord;
+            if (groupShown && !removing) ShowGroup(tile, false);    // let go outside the shadow: the pile glides back (the rows stay selected)
+            if (!removing) return;
+            var record = (ScanRecord)tile.Data;
             popping = true;
-            if (deleteSound != null) deleteSound.Play();        // ONCE per removal, for one scan or a whole group; not when it is dropped outside the shadow
+            // the DROP has a sound of its own, once for one scan or a whole group (the freezing sound once, when there is no drop sound)
+            if (deleteSound != null && !deleteSound.PlayDrop()) deleteSound.Play();
+            // a group: the whole pile bursts with the row that was carried
+            if (groupShown)
+                foreach (ProductTileView other in tiles)
+                    if (other != null && other != tile && other.TryGetComponent(out HoldToRemoveTile pile) && pile.Gathered) other.PlayPop(null);
+            groupShown = false;
             // a group: every selected scan; otherwise the one that was dragged (a row that is not selected is always dragged alone)
             var ids = group ? new List<string>(selected) : new List<string> { record.id };
             tile.PlayPop(() =>

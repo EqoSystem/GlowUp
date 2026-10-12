@@ -3,8 +3,11 @@ using UnityEngine;
 namespace GlowUp.Common
 {
     /// <summary>
-    /// The "freezing" sound of Recent Scans: played ONCE each time a scan (or a group of scans) is removed by
-    /// dragging it into the shadow, at the moment the tile starts to pop.
+    /// The sounds of removing a scan in Recent Scans (the project owner's note of 12 October 2026):
+    ///   - the "freezing" sound KEEPS PLAYING while a row (or a gathered group of rows) is carried by the finger
+    ///     (BeginCarry / EndCarry);
+    ///   - a second, short sound is played once when it is dropped into the remove area (PlayDrop).
+    /// Play() is the earlier way (the freezing sound once, at the drop); it is kept for "Keep Playing While Carried" off.
     ///
     ///   - One player for the screen. A new request while the sound is still playing is ignored, so it never
     ///     repeats, overlaps or stacks when the user removes quickly.
@@ -33,6 +36,16 @@ namespace GlowUp.Common
         [Tooltip("Tick this to play the app's own sound in place of the one above. Listen to both first: click each file in Assets/_Project/Audio.")]
         [SerializeField] private bool useOwnSound = false;
 
+        [Tooltip("The short sound of the DROP: played once when the row (or the group) is let go inside the remove area. Made by Audio/Source~/make_drop_sound.py.")]
+        [SerializeField] private AudioClip dropClip;
+        [Range(0f, 1f)] [SerializeField] private float dropVolume = 1f;
+
+        [Header("While a row is carried")]
+        [Tooltip("On = the freezing sound plays again and again for as long as a row is carried by the finger, and stops when it is let go")]
+        [SerializeField] private bool keepPlayingWhileCarried = true;
+        [Tooltip("The carried sound fades out in this many seconds when the row is let go")]
+        [SerializeField] private float carryFadeSeconds = 0.12f;
+
         [Header("Which piece of the clip is heard")]
         [Tooltip("On = the silence at the start of the file is skipped")]
         [SerializeField] private bool skipSilenceAtStart = true;
@@ -60,6 +73,9 @@ namespace GlowUp.Common
         AudioClip Chosen => useOwnSound && ownClip != null ? ownClip : clip;
 
         AudioSource source;
+        AudioSource dropSource;         // a second voice, so the drop is heard over the last of the freezing sound
+        bool carrying;
+        float carryFade = -1f;
         AudioClip piece;                // the short, ready-made piece that is played
         float endsAt = -1f;
 
@@ -72,6 +88,47 @@ namespace GlowUp.Common
         {
             source = GetComponent<AudioSource>();
             source.playOnAwake = false; source.loop = false; source.spatialBlend = 0f;
+            dropSource = gameObject.AddComponent<AudioSource>();
+            dropSource.playOnAwake = false; dropSource.loop = false; dropSource.spatialBlend = 0f;
+        }
+
+        float Loudness => Mathf.Clamp01(volume * (followSoundVolumeSetting ? UiPreferences.TapSoundVolume : 1f));
+
+        /// <summary>
+        /// A row was picked up to be removed: the freezing sound starts and KEEPS playing until EndCarry (it is played
+        /// round and round; its own fade-out makes each round end softly). Calling it again while it plays does nothing.
+        /// </summary>
+        public bool BeginCarry()
+        {
+            if (!keepPlayingWhileCarried || carrying) return carrying;
+            if (!UiPreferences.DeleteSound || source == null || !isActiveAndEnabled) return false;
+            if (quietWhenPhoneIsSilent && PhoneIsSilent()) return false;
+            Prepare();
+            if (piece == null) return false;
+            source.clip = piece; source.loop = true; source.volume = Loudness; source.time = 0f;
+            source.Play();
+            carrying = true; carryFade = -1f; endsAt = -1f;
+            return true;
+        }
+
+        /// <summary>The row was let go (anywhere): the carried sound fades out quickly.</summary>
+        public void EndCarry()
+        {
+            if (!carrying) return;
+            carrying = false;
+            carryFade = Mathf.Max(0.01f, carryFadeSeconds);
+        }
+
+        /// <summary>True while the freezing sound is kept playing for a carried row.</summary>
+        public bool IsCarrying => carrying;
+
+        /// <summary>The row was DROPPED into the remove area: one short sound of its own. Returns true when it started.</summary>
+        public bool PlayDrop()
+        {
+            if (!UiPreferences.DeleteSound || dropSource == null || dropClip == null || !isActiveAndEnabled) return false;
+            if (quietWhenPhoneIsSilent && PhoneIsSilent()) return false;
+            dropSource.PlayOneShot(dropClip, Mathf.Clamp01(dropVolume * Loudness));
+            return true;
         }
 
         void OnEnable() { UiPreferences.Changed += Prepare; Prepare(); }
@@ -102,6 +159,8 @@ namespace GlowUp.Common
         void Release()
         {
             if (source != null && source.isPlaying) source.Stop();
+            if (source != null) source.loop = false;
+            carrying = false; carryFade = -1f;
             endsAt = -1f;
             if (piece != null) Destroy(piece);
             piece = null;
@@ -113,13 +172,13 @@ namespace GlowUp.Common
         /// </summary>
         public bool Play()
         {
-            if (!UiPreferences.DeleteSound || source == null || !isActiveAndEnabled || IsPlaying) return false;
+            if (!UiPreferences.DeleteSound || source == null || !isActiveAndEnabled || IsPlaying || carrying) return false;
             if (quietWhenPhoneIsSilent && PhoneIsSilent()) return false;
             Prepare();
             if (piece == null) return false;                // not ready: better no sound than a late one
-            source.clip = piece;
-            source.volume = Mathf.Clamp01(volume * (followSoundVolumeSetting ? UiPreferences.TapSoundVolume : 1f));
-            source.time = 0f;
+            source.clip = piece; source.loop = false;
+            source.volume = Loudness;
+            source.time = 0f; carryFade = -1f;
             source.Play();
             endsAt = Time.unscaledTime + piece.length;
             return true;
@@ -183,6 +242,12 @@ namespace GlowUp.Common
         void Update()
         {
             if (endsAt > 0f && Time.unscaledTime >= endsAt) endsAt = -1f;
+            if (carryFade > 0f && source != null)
+            {
+                // the carried sound dies away quickly; then the voice is free again
+                source.volume = Mathf.MoveTowards(source.volume, 0f, Loudness * Time.unscaledDeltaTime / carryFade);
+                if (source.volume <= 0.001f) { source.Stop(); source.loop = false; carryFade = -1f; }
+            }
         }
 
         /// <summary>Android: the ringer is on silent or vibrate. Elsewhere, and when the phone will not say: false.</summary>
