@@ -64,6 +64,11 @@ namespace GlowUp.EditorTools
             AppTiles.ListScroll(listArea.transform, "ScanHistoryList", out RectTransform content);
             content.GetComponent<VerticalLayoutGroup>().padding = new RectOffset(0, 18, 4, 140);   // room for the restore bar under the last row
             ProductTileView template = AppTiles.ExpandingRow(content, "ScanTileTemplate", AppTiles.TileKind.RecentScan);
+            // placeholder rows for the time the saved scans are fetched (inactive here: TextSkeleton switches them on), and
+            // the real rows kept out of sight meanwhile
+            GameObject listSkeleton = AppTiles.SkeletonRows(listArea.transform, "ScanListSkeleton", 5);
+            listSkeleton.SetActive(false);
+            CanvasGroup listGroup = SceneBuilderCore.Ensure<CanvasGroup>(content.gameObject);
 
             // ---- the shadow over the left half: "drag a tile here to remove it" (invisible until the tiles shake) ----
             GameObject zone = A.Node(listArea.transform, "RemoveZone", typeof(Image), typeof(CanvasGroup));
@@ -90,6 +95,7 @@ namespace GlowUp.EditorTools
             TextMeshProUGUI emptyText = A.Label(empty.transform, "EmptyBodyText", "Products you scan are saved here, so you can check them again at any time.",
                                                 32, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center, true);
             A.TopStrip(emptyText.transform, 254, 130, 0, 0);
+            CanvasGroup emptyGroup = SceneBuilderCore.Ensure<CanvasGroup>(empty);       // out of sight while the scans are still being fetched
             empty.SetActive(false);                       // the app shows it when the list is empty
 
             // ---- the bar that brings removed items back ----
@@ -153,6 +159,9 @@ namespace GlowUp.EditorTools
             A.Set(controller, "deleteSound", deleteSound);
             A.Set(controller, "selectButton", select); A.Set(controller, "selectionBar", selectionBar); A.Set(controller, "selectionText", selectionText);
             A.Set(controller, "selectAllButton", selectAll); A.Set(controller, "cancelSelectionButton", cancelSelection);
+
+            // while the saved scans are fetched: the title, the count and the hint are bars, the list is placeholder rows
+            AppTiles.WordSkeleton(s, new[] { listSkeleton }, new[] { listGroup, emptyGroup });
 
             A.Finish(s);
             Debug.Log("[GlowUp] RecentScanActivitiesScene built. ScanTileTemplate is the pattern row (left open in the Hierarchy so its buttons can be styled); RemoveZone is invisible until the tiles shake (set its CanvasGroup's Alpha to 1 to see it); " +

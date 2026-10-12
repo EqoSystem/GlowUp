@@ -237,6 +237,9 @@ namespace GlowUp.EditorTools
             A.Set(controller, "backButton", s.back); A.Set(controller, "scanAnotherButton", scanAnother); A.Set(controller, "tryOnButton", tryOn);
             A.Set(controller, "scanAgainPanel", scanAgain.panel); A.Set(controller, "sameProductButton", sameProduct); A.Set(controller, "differentProductButton", differentProduct);
 
+            // while the profile is fetched (the shades that suit the user need it): the result's titles, labels and subtitles are bars
+            AppTiles.WordSkeleton(s);
+
             A.Finish(s);
             Debug.Log("[GlowUp] AiSmartAnalysisResultScene built. ChipTemplate, SourceLinkTemplate and AlternativeTileTemplate are pattern objects; ExplanationText and FdaDetails open with their buttons; the pop-ups (ScanAgainPanel among them) are inactive until opened.");
         }

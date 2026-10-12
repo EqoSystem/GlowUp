@@ -150,8 +150,11 @@ namespace GlowUp.Recent
         async void Start()
         {
             Refresh();
-            // make sure the profile is known (the history belongs to the signed-in account), then show it again
+            // make sure the profile is known (the history belongs to the signed-in account), then show it again.
+            // Until then the title, the count and the list are bars and placeholder rows (skeleton loading, as on the website).
+            TextSkeleton.Waiting(this);
             try { await UserProfileRepository.Load(); } catch (Exception e) { Debug.LogWarning("Recent scans: " + e.Message); }
+            TextSkeleton.Ready(this);
             if (this != null) Refresh();
         }
 

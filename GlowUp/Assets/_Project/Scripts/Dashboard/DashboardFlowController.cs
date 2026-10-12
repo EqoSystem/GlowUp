@@ -105,8 +105,11 @@ namespace GlowUp.Dashboard
             if (recommendationsSkeleton != null) recommendationsSkeleton.SetActive(true);
             if (recommendationsEmptyText != null) { recommendationsEmptyText.gameObject.SetActive(recommendationsSkeleton == null); recommendationsEmptyText.text = msgLoading; }
 
+            // the greeting and the summary are bars until the profile is here (skeleton loading, as on the website)
+            TextSkeleton.Waiting(this);
             try { profile = await UserProfileRepository.Load(); }
             catch (Exception e) { Debug.LogWarning("Dashboard: profile not loaded: " + e.Message); }
+            TextSkeleton.Ready(this);
             if (this == null) return;                       // the scene was left while loading
             ShowProfile(profile);
 

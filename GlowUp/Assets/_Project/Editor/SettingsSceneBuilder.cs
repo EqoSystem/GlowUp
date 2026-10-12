@@ -412,6 +412,9 @@ namespace GlowUp.EditorTools
             A.Set(controller, "backButton", s.back); A.Set(controller, "list", scroll);
             Kit.SetArray(controller, "popups", new Object[] { confirmPopup.panel, deletePopup.panel, legalPopup.panel, supportPopup.panel });
 
+            // while the account and the profile are fetched: the page's titles, labels and subtitles are bars
+            AppTiles.WordSkeleton(s);
+
             A.Finish(s);
             Debug.Log("[GlowUp] SettingsScene built. The pop-ups (ConfirmPanel, DeleteAccountPanel, LegalPanel, SupportPanel) are inactive until used. " +
                       "Set the support address on SettingsFeatures > SupportFeedbackForm > Support Email.");

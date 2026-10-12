@@ -31,8 +31,10 @@ namespace GlowUp.AppSettings
         {
             Show(null);
             UserProfileData profile = null;
+            GlowUp.Common.TextSkeleton.Waiting(this);       // the page's words are bars until the profile is here
             try { profile = await UserProfileRepository.Load(); }
             catch (Exception e) { Debug.LogWarning("Settings: profile not loaded: " + e.Message); }
+            GlowUp.Common.TextSkeleton.Ready(this);
             if (this == null) return;
             Show(profile);
         }

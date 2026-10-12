@@ -1,3 +1,4 @@
+using System.IO;
 using GlowUp.Common;
 using GlowUp.Theme;
 using TMPro;
@@ -139,6 +140,10 @@ namespace GlowUp.EditorTools
             var shapes = new System.Collections.Generic.List<Object>();
             foreach (Transform t in skeleton.transform) if (t.name != "Panel") shapes.Add(t.GetComponent<Image>());
             OnboardingKit.SetArray(shimmer, "shapes", shapes.ToArray());
+            // the shapes shine the way the website's do (and the way the bars of TextSkeleton do on the screen that follows)
+            Material shine = SkeletonMaterial();
+            SceneBuilderCore.SetField(shimmer, "shine", shine);
+            if (shine != null) foreach (Object shape in shapes) ((Image)shape).material = shine;
 
             SceneBuilderCore.SetField(transition, "overlayCanvas", canvas);
             SceneBuilderCore.SetField(transition, "sheet", (RectTransform)sheet.transform);
@@ -221,6 +226,25 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.Themed(go, colour);
             var themedFont = SceneBuilderCore.Ensure<ThemedFont>(go); themedFont.Role = font; themedFont.KeepRole = true;
             return t;
+        }
+
+        const string SkeletonShaderPath = "Assets/_Project/Shaders/SkeletonShine.shader", SkeletonMaterialFolder = "Assets/_Project/Materials/";
+
+        /// <summary>
+        /// The one material of every "skeleton" shape of the app (shader GlowUp/SkeletonShine): a blush base with a rose-to-gold
+        /// shine travelling across, the look of the admin website. Made once in Assets/_Project/Materials; its speed, width
+        /// and tilt can be changed there. Null when the shader file is missing (the shapes then keep their plain look).
+        /// </summary>
+        public static Material SkeletonMaterial()
+        {
+            Shader shader = AssetDatabase.LoadAssetAtPath<Shader>(SkeletonShaderPath);
+            if (shader == null) { Debug.LogWarning("[GlowUp] " + SkeletonShaderPath + " was not found: skeleton shapes are drawn without the travelling shine."); return null; }
+            Directory.CreateDirectory(SkeletonMaterialFolder);
+            string path = SkeletonMaterialFolder + "SkeletonShine.mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null) { material = new Material(shader); AssetDatabase.CreateAsset(material, path); }
+            if (material.shader != shader) { material.shader = shader; EditorUtility.SetDirty(material); }
+            return material;
         }
 
         static void EdgeShade(Transform sheet, string name, bool left)

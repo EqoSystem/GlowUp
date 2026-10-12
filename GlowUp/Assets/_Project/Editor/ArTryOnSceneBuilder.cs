@@ -286,6 +286,9 @@ namespace GlowUp.EditorTools
             A.Set(controller, "typeIcons", A.TypeIcons());
             A.Set(controller, "backButton", s.back);
 
+            // while the profile and the product are fetched: the screen's titles and labels are bars
+            AppTiles.WordSkeleton(s);
+
             A.Finish(s);
             Debug.Log("[GlowUp] ARTryOnScene built. GuidedPreview > AfterClip > FaceGuide holds the colour shapes of the guided preview (the tints you see in the Editor are samples); " +
                       "CompareSplit > SplitVisuals (the before/after line) and ScreenLight (the white face light; set its CanvasGroup's Alpha to 1 to see it) are hidden until used; " +

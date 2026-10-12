@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using GlowUp.Common;
 using GlowUp.Scanning;
 using GlowUp.Theme;
@@ -171,21 +172,67 @@ namespace GlowUp.EditorTools
             return button;
         }
 
-        /// <summary>Grey placeholder rows shown in the place of a row list while it loads (skeleton loading).</summary>
+        /// <summary>Placeholder rows shown in the place of a row list while it loads (skeleton loading, with the website's travelling shine).</summary>
         public static GameObject SkeletonRows(Transform parent, string name, int count)
         {
             var holder = A.Node(parent, name, typeof(SkeletonShimmer), typeof(CanvasGroup));
             A.Fill(holder.transform);
             A.VStack(holder, RowGap, 0, 18, 4, 0);
+            Material shine = UiEffectsKit.SkeletonMaterial();
             for (int i = 0; i < count; i++)
             {
                 var row = A.Node(holder.transform, "Placeholder" + (i + 1), typeof(Image));
                 var img = row.GetComponent<Image>(); Kit.StyleRounded(img); Kit.SetRadius(img, TileRadius); img.raycastTarget = false; img.color = new Color(1, 1, 1, 0.7f);
                 SceneBuilderCore.Themed(row, ThemeRole.SurfaceAlt);
+                if (shine != null) img.material = shine;
                 A.Size(img, -1, RowHeight);
             }
+            A.Set(holder.GetComponent<SkeletonShimmer>(), "shine", shine);
             holder.GetComponent<CanvasGroup>().blocksRaycasts = false;
             return holder;
+        }
+
+        /// <summary>
+        /// Adds the object "TextSkeleton" over the screen's card: while the screen fetches its data, its titles, labels and
+        /// subtitles are bars with a travelling shine, the way the admin website loads. Call it LAST, when every text of the
+        /// card has been built.
+        ///
+        /// Which texts: every text of the card that can be seen in the Hierarchy at this moment, EXCEPT the one word on a
+        /// button (a tile that is a button and carries a title and a subtitle does get bars), the words of switches, sliders
+        /// and text boxes, the bottom bar, and the rows of lists (a list has its own placeholder rows: `showWhileLoading`;
+        /// the real list can be kept out of sight meanwhile: `hideWhileLoading`). The list is on the object afterwards and
+        /// can be changed in the Inspector.
+        /// </summary>
+        public static TextSkeleton WordSkeleton(A.AppScreen s, GameObject[] showWhileLoading = null, CanvasGroup[] hideWhileLoading = null)
+        {
+            var words = new List<Object>();
+            foreach (TMP_Text text in s.card.GetComponentsInChildren<TMP_Text>(true))
+            {
+                if (!text.gameObject.activeInHierarchy) continue;                              // an empty state, a closed part: no bar
+                Selectable owner = text.GetComponentInParent<Selectable>(true);
+                if (owner != null)
+                {
+                    if (!(owner is Button)) continue;                                           // a text box, a switch, a slider, a drop-down: its own words
+                    if (owner.GetComponentsInChildren<TMP_Text>(true).Length < 2) continue;     // a button with one word on it: the word stays
+                }
+                if (text.GetComponentInParent<BottomActionBar>(true) != null) continue;
+                if (text.GetComponentInParent<ProductTileView>(true) != null) continue;         // a row of a list
+                words.Add(text);
+            }
+
+            var holder = A.Node(s.card, "TextSkeleton", typeof(CanvasRenderer), typeof(TextSkeleton));
+            A.Fill(holder.transform);
+            holder.transform.SetAsLastSibling();                                                // drawn over everything on the card
+            var skeleton = holder.GetComponent<TextSkeleton>();
+            skeleton.raycastTarget = false;
+            Material shine = UiEffectsKit.SkeletonMaterial();
+            if (shine != null) skeleton.material = shine;
+            A.Set(skeleton, "roundSprite", IconFactory.Pill);
+            Kit.SetArray(skeleton, "texts", words.ToArray());
+            Kit.SetArray(skeleton, "showWhileLoading", showWhileLoading ?? new Object[0]);
+            Kit.SetArray(skeleton, "hideWhileLoading", hideWhileLoading ?? new Object[0]);
+            EditorUtility.SetDirty(skeleton);
+            return skeleton;
         }
 
         // =====================================================================================
@@ -312,12 +359,15 @@ namespace GlowUp.EditorTools
             var grid = holder.GetComponent<GridLayoutGroup>();
             grid.cellSize = new Vector2(Cell, CellHeight); grid.spacing = new Vector2(Gap, Gap); grid.padding = new RectOffset(0, 18, 4, 0);
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount; grid.constraintCount = 2;
+            Material shine = UiEffectsKit.SkeletonMaterial();
             for (int i = 0; i < count; i++)
             {
                 var tile = A.Node(holder.transform, "Placeholder" + (i + 1), typeof(Image));
                 var img = tile.GetComponent<Image>(); Kit.StyleRounded(img); Kit.SetRadius(img, TileRadius); img.raycastTarget = false; img.color = new Color(1, 1, 1, 0.7f);
                 SceneBuilderCore.Themed(tile, ThemeRole.SurfaceAlt);
+                if (shine != null) img.material = shine;
             }
+            A.Set(holder.GetComponent<SkeletonShimmer>(), "shine", shine);
             holder.GetComponent<CanvasGroup>().blocksRaycasts = false;
             return holder;
         }

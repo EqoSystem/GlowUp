@@ -172,6 +172,10 @@ namespace GlowUp.EditorTools
             A.Set(controller, "signOutConfirm", signOutConfirm);
             A.Set(controller, "settingsButton", settings);
 
+            // while the profile is fetched: the greeting, the summary's labels and values and the subtitles are bars (TextSkeleton).
+            // The list under "Recommended for you" has its own placeholder rows, which the controller switches on and off.
+            AppTiles.WordSkeleton(s);
+
             A.Finish(s);
             Debug.Log("[GlowUp] UserDashboardScene built. RecommendationTemplate is the pattern row (left open in the Hierarchy so its buttons can be styled; the app closes every row); RecommendationsSkeleton and AiInsightPanel are inactive until needed; AccountPanel is inactive until the avatar is tapped. The gear opens the Settings page.");
         }
