@@ -59,9 +59,11 @@ namespace GlowUp.EditorTools
 
             // ---- email ----
             var emailLabel = LabelRow(content, Loose(ct, "EmailAddressText"), "EmailAddressText", "Email");
-            var email = FieldRow(content, Loose(ct, "EmailAddressInputField"), "EmailAddressInputField", "name@gmail.com", 64, type: TMP_InputField.ContentType.EmailAddress);
-            AddSpaceGuard(email, c.feedback, "Spaces are not allowed in the email.");
-            InfoBadge(content, emailLabel, "EmailHelperText", "Needed. A Gmail, Hotmail or Yahoo address that includes @.");
+            var email = FieldRow(content, Loose(ct, "EmailAddressInputField"), "EmailAddressInputField", "name@example.com", EmailLimit, type: TMP_InputField.ContentType.EmailAddress);
+            AddSpaceGuard(email, c.feedback, "Spaces are not allowed in the email.", EmailLimit);
+            // any real mail domain may sign up (12 October 2026): well-known providers at once, others after an online check
+            InfoBadge(content, emailLabel, "EmailHelperText", "Needed. Your own email: Gmail, Outlook, Yahoo, iCloud, or a school or work address. Other addresses are checked online to make sure they receive email. Temporary addresses are not accepted.");
+            var emailCheck = AddEmailCheck(email, content);
 
             // ---- password ----
             var passwordLabel = LabelRow(content, Loose(ct, "PasswordText"), "PasswordText", "Password");
@@ -90,12 +92,13 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(ctl, "firstName", first); SceneBuilderCore.SetField(ctl, "middleName", middle); SceneBuilderCore.SetField(ctl, "lastName", last);
             SceneBuilderCore.SetField(ctl, "birthday", field); SceneBuilderCore.SetField(ctl, "age", age);
             SceneBuilderCore.SetField(ctl, "email", email); SceneBuilderCore.SetField(ctl, "password", pw); SceneBuilderCore.SetField(ctl, "retypePassword", retype);
+            SceneBuilderCore.SetField(ctl, "emailCheck", emailCheck);
             SceneBuilderCore.SetField(ctl, "pwUpper", pReq[0]); SceneBuilderCore.SetField(ctl, "pwLower", pReq[1]);
             SceneBuilderCore.SetField(ctl, "pwNumber", pReq[2]); SceneBuilderCore.SetField(ctl, "pwSpecial", pReq[3]);
             SceneBuilderCore.SetField(ctl, "pwLength", pReq[4]); SceneBuilderCore.SetField(ctl, "pwMatch", mReq[0]);
             SceneBuilderCore.SetField(ctl, "continueButton", c.cont); SceneBuilderCore.SetField(ctl, "continueAnimator", c.anim);
             SceneBuilderCore.SetField(ctl, "backButton", c.back); SceneBuilderCore.SetField(ctl, "feedbackText", c.feedback);
-            SceneBuilderCore.SetField(ctl, "emailMax", 64);
+            SceneBuilderCore.SetField(ctl, "emailMax", EmailLimit);
 
             FinishScene();
             SceneBuilderCore.Save(scene);

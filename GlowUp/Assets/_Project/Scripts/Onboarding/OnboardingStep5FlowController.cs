@@ -26,6 +26,8 @@ namespace GlowUp.Onboarding
         [SerializeField] private TMP_InputField lastName;
         [SerializeField] private DatePickerField birthday;
         [SerializeField] private TMP_InputField email;
+        [Tooltip("Decides whether an edited email may be used (the same rule as on Step 1). Its settings and messages are on the email editor.")]
+        [SerializeField] private EmailFieldVerifier emailCheck;
         [SerializeField] private TMP_Dropdown skinType;
         [SerializeField] private TMP_Dropdown skinTone;
         [Tooltip("Comma-separated, e.g. Acne, Eczema")]
@@ -53,7 +55,8 @@ namespace GlowUp.Onboarding
 
         [Header("Rules")]
         [SerializeField] private int minimumAge = 13;
-        [SerializeField] private string[] allowedEmailDomains = { "gmail.com", "hotmail.com", "yahoo.com" };
+        [SerializeField] private int emailMax = 100;
+        [SerializeField] private string msgNoEmail = "Enter your email address.";
 
         [Header("Scenes")]
         [SerializeField] private string termsScene = SceneNames.Terms;
@@ -75,6 +78,8 @@ namespace GlowUp.Onboarding
             if (generateButton != null) generateButton.onClick.AddListener(OnGenerate);
             if (editButton != null) editButton.onClick.AddListener(() => SetEditing(!editing));
             if (backButton != null) backButton.onClick.AddListener(() => SceneNavigator.Go(previousScene));
+            emailCheck = EmailFieldVerifier.On(gameObject, emailCheck);
+            if (emailCheck != null) emailCheck.Changed += Refresh;
         }
 
         static void Fill(TMP_Dropdown d, string[] options)
@@ -93,6 +98,7 @@ namespace GlowUp.Onboarding
             Pick(skinType, skinTypeOptions, OnboardingSession.SkinType); Pick(skinTone, skinToneOptions, OnboardingSession.SkinTone);
             Set(conditions, string.Join(", ", OnboardingSession.SkinConditions)); Set(allergens, string.Join(", ", OnboardingSession.Allergens));
             if (feedbackText != null) feedbackText.text = "";
+            if (email != null) email.characterLimit = emailMax;
             SetEditing(false);
             Refresh();
         }
@@ -128,7 +134,12 @@ namespace GlowUp.Onboarding
             // Signed in with Google / Facebook: Step 1 was skipped, so a birthday is welcome here but not needed, and the
             // email is the account's own. What IS filled in still has to follow the rules.
             bool social = OnboardingSession.Social;
-            if (!social && !InputRules.IsValidEmail(T(email), allowedEmailDomains)) { reason = "Enter a valid Gmail, Hotmail or Yahoo email."; return false; }
+            // the email: a well-known provider, or a domain that was checked online (an answer Step 1 already has is used again)
+            if (!social && (emailCheck == null || !emailCheck.Look(T(email))))
+            {
+                reason = emailCheck != null && emailCheck.Message.Length > 0 ? emailCheck.Message : msgNoEmail;
+                return false;
+            }
             bool hasBirthday = birthday != null && birthday.Value.HasValue;
             if (hasBirthday ? InputRules.CalculateAge(birthday.Value.Value) < minimumAge : !social) { reason = $"You must be at least {minimumAge} years old."; return false; }
             return true;

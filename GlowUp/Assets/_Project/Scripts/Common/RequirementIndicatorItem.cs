@@ -88,18 +88,11 @@ namespace GlowUp.Common
         public static bool HasDigit(string s) { foreach (char c in s) if (c >= '0' && c <= '9') return true; return false; }
         public static bool HasSpecial(string s) { foreach (char c in s) if (!char.IsLetterOrDigit(c) && !char.IsWhiteSpace(c)) return true; return false; }
 
-        static readonly string[] AllowedDomains = { "gmail.com", "hotmail.com", "yahoo.com" };
-
-        /// <summary>Must contain exactly one @ and a Gmail/Hotmail/Yahoo domain (pass your own list to change it).</summary>
-        public static bool IsValidEmail(string email, string[] allowedDomains = null)
-        {
-            if (string.IsNullOrEmpty(email) || email.Length > 254) return false;
-            int at = email.IndexOf('@');
-            if (at <= 0 || at != email.LastIndexOf('@') || at == email.Length - 1) return false;
-            string domain = email.Substring(at + 1).ToLowerInvariant();
-            foreach (var d in allowedDomains ?? AllowedDomains) if (domain == d) return true;
-            return false;
-        }
+        /// <summary>
+        /// True when the text is written like an email address. Whether its mail domain may sign up (a well-known provider,
+        /// or one that was checked online) is decided by EmailDomains and the EmailFieldVerifier on the field.
+        /// </summary>
+        public static bool IsValidEmail(string email) => EmailDomains.WellFormed(email);
 
         public static int CalculateAge(System.DateTime dob, System.DateTime? today = null)
         {

@@ -649,14 +649,48 @@ namespace GlowUp.EditorTools
             return img;
         }
 
-        /// <summary>Stops space characters and enforces the 64-character limit on an input; the message shows in `message`.</summary>
-        public static void AddSpaceGuard(TMP_InputField f, TextMeshProUGUI message, string text)
+        /// <summary>Stops space characters and enforces the length limit (64 unless said otherwise) on an input; the message shows in `message`.</summary>
+        public static void AddSpaceGuard(TMP_InputField f, TextMeshProUGUI message, string text, int maxLength = 64)
         {
             if (f == null) return;
             var g = SceneBuilderCore.Ensure<InputSpaceGuard>(f.gameObject);
             SceneBuilderCore.SetField(g, "messageText", message);
             SceneBuilderCore.SetField(g, "message", text);
-            SceneBuilderCore.SetField(g, "maxLength", 64);
+            SceneBuilderCore.SetField(g, "maxLength", maxLength);
+        }
+
+        /// <summary>The longest email the sign-up pages take (a school or work address can be long).</summary>
+        public const int EmailLimit = 100;
+
+        /// <summary>
+        /// Puts the email rule on an input (the EmailFieldVerifier script: well-known provider, or a domain checked online).
+        /// With `content` given, the line the script writes in ("Checking that ... receives email") is placed right under
+        /// the field as EmailCheckText. The line is switched off while it has nothing to say, so it leaves no gap:
+        /// tick it active in the Hierarchy to see and restyle it. `host` = the object that carries the script when the field
+        /// itself is switched off part of the time (the script waits and tries again in Update, so it needs an object that stays on).
+        /// </summary>
+        public static EmailFieldVerifier AddEmailCheck(TMP_InputField field, Transform content = null, GameObject host = null)
+        {
+            if (field == null) return null;
+            var check = SceneBuilderCore.Ensure<EmailFieldVerifier>(host != null ? host : field.gameObject);
+            if (content == null) return check;
+
+            Transform existing = Loose(content, "EmailCheckText");
+            TextMeshProUGUI line = existing != null ? existing.GetComponent<TextMeshProUGUI>() : null;
+            if (line == null) line = NewText(content, "EmailCheckText", "Checking that example.com receives email...");
+            SetText(line, null, HelperSize, TextAlignmentOptions.TopLeft);
+            line.margin = new Vector4(14, 0, 14, 0); line.overflowMode = TextOverflowModes.Overflow; line.raycastTarget = false;
+            if (line.transform.parent != content) line.transform.SetParent(content, false);
+            if (field.transform.parent == content)
+            {
+                line.transform.SetAsLastSibling();                                        // out of the way first, so the field's own place does not shift
+                line.transform.SetSiblingIndex(field.transform.GetSiblingIndex() + 1);
+            }
+            var le = SceneBuilderCore.Ensure<LayoutElement>(line.gameObject);
+            le.minHeight = HelperHeight - 8; le.preferredHeight = -1; le.flexibleHeight = 0;      // one line, or two when the message is long
+            SceneBuilderCore.SetField(check, "statusText", line);
+            line.gameObject.SetActive(false);
+            return check;
         }
 
         /// <summary>

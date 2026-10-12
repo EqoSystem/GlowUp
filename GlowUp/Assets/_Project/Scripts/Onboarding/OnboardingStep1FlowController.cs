@@ -21,6 +21,8 @@ namespace GlowUp.Onboarding
         [SerializeField] private DatePickerField birthday;
         [SerializeField] private TMP_InputField age;
         [SerializeField] private TMP_InputField email;
+        [Tooltip("Decides whether the typed email may be used (well-known provider, or a domain that was checked online). Its settings and messages are on the email field.")]
+        [SerializeField] private EmailFieldVerifier emailCheck;
         [SerializeField] private TMP_InputField password;
         [SerializeField] private TMP_InputField retypePassword;
 
@@ -40,13 +42,13 @@ namespace GlowUp.Onboarding
 
         [Header("Limits (industry standard defaults)")]
         [SerializeField] private int nameMaxLength = 50;
-        [SerializeField] private int emailMax = 64;
+        [Tooltip("Long enough for a school or work address")]
+        [SerializeField] private int emailMax = 100;
         [SerializeField] private int passwordMin = 8;
         [SerializeField] private int passwordMax = 64;
         [SerializeField] private int minimumAge = 13;
         [Tooltip("First and last name are needed: together with the middle name they identify the user's record in the database")]
         [SerializeField] private bool requireFirstAndLastName = true;
-        [SerializeField] private string[] allowedEmailDomains = { "gmail.com", "hotmail.com", "yahoo.com" };
 
         [Header("Scenes")]
         [SerializeField] private string nextScene = SceneNames.Onboarding2;
@@ -55,7 +57,6 @@ namespace GlowUp.Onboarding
         [Header("Messages")]
         [SerializeField] private string msgFillAll = "Please complete every required field.";
         [SerializeField] private string msgUnderAge = "You must be at least {0} years old to use Glow Up.";
-        [SerializeField] private string msgBadEmail = "Enter a Gmail, Hotmail or Yahoo address that includes @.";
 
         void Awake()
         {
@@ -69,6 +70,9 @@ namespace GlowUp.Onboarding
             if (continueButton != null) continueButton.onClick.AddListener(OnContinue);
             if (backButton != null) backButton.onClick.AddListener(OnBack);
             if (age != null) { age.readOnly = true; age.interactable = false; }
+            // any real mail domain may sign up now (12 October 2026); the verifier says when a checked domain has its answer
+            emailCheck = EmailFieldVerifier.On(gameObject, emailCheck);
+            if (emailCheck != null) emailCheck.Changed += Validate;
             HideRemovedUsernameRows();
         }
 
@@ -92,6 +96,7 @@ namespace GlowUp.Onboarding
             Set(lastName, OnboardingSession.LastName); Set(email, OnboardingSession.Email);
             if (DateTime.TryParse(OnboardingSession.BirthdayIso, out var dob)) { birthday.SetValue(dob); SetAge(dob); }
             if (OnboardingSession.Social) UseSocialAccount();
+            Limit(email, emailMax);          // once more after every script on the field has started: theirs is the older, shorter limit in a scene that was not rebuilt
             Show("");
             Validate();
         }
@@ -141,7 +146,7 @@ namespace GlowUp.Onboarding
             pwMatch?.SetMet(match);
             if (OnboardingSession.Social) { pwOk = true; match = true; }        // a Google / Facebook account has no password here
 
-            bool emailOk = emailFromAccount || InputRules.IsValidEmail(T(email), allowedEmailDomains);
+            bool emailOk = emailFromAccount || (emailCheck != null && emailCheck.Look(T(email)));
             bool namesOk = !requireFirstAndLastName || (T(firstName).Length > 0 && T(lastName).Length > 0);
             bool dobOk = birthday != null && birthday.Value.HasValue && InputRules.CalculateAge(birthday.Value.Value) >= minimumAge;
 
@@ -150,7 +155,7 @@ namespace GlowUp.Onboarding
             else if (continueButton != null) continueButton.interactable = ready;
 
             if (birthday != null && birthday.Value.HasValue && !dobOk) Show(string.Format(msgUnderAge, minimumAge));
-            else if (T(email).Length > 0 && !emailOk) Show(msgBadEmail);
+            else if (!emailOk && emailCheck != null && !emailCheck.ShowsOwnMessages) Show(emailCheck.Message);      // a rebuilt scene says it right under the field
             else Show("");
         }
 

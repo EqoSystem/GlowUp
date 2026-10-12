@@ -131,8 +131,11 @@ namespace GlowUp.EditorTools
             var bdayRow = NewRow(content, "Birthday", "Birthday", rows); var bday = AddInput(bdayRow, "Tap to choose", 30);
             var ageRow = NewRow(content, "Age", "Age", rows);
             SceneBuilderCore.SetField(ageRow, "editable", false);                       // calculated from the birthday
-            var emailRow = NewRow(content, "Email", "Email", rows); var email = AddInput(emailRow, "name@gmail.com", 64, TMP_InputField.ContentType.EmailAddress);
-            AddSpaceGuard(email, c.feedback, "Spaces are not allowed in the email.");
+            var emailRow = NewRow(content, "Email", "Email", rows); var email = AddInput(emailRow, "name@example.com", EmailLimit, TMP_InputField.ContentType.EmailAddress);
+            AddSpaceGuard(email, c.feedback, "Spaces are not allowed in the email.", EmailLimit);
+            // the same email rule as Step 1; its messages show in the message line of this page. The script sits on the row,
+            // which is always on (the editor inside it is switched off until Edit)
+            var emailCheck = AddEmailCheck(email, host: emailRow.gameObject);
             var typeRow = NewRow(content, "SkinType", "Skin Type", rows); var skinType = AddDropdown(typeRow);
             var toneRow = NewRow(content, "SkinTone", "Skin Tone", rows); var skinTone = AddDropdown(toneRow);
             var condRow = NewRow(content, "Conditions", "Conditions", rows); var conditions = AddInput(condRow, "e.g. Acne, Eczema", 200);
@@ -148,7 +151,8 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(ctl, "ageRow", ageRow);
             SceneBuilderCore.SetField(ctl, "firstName", first); SceneBuilderCore.SetField(ctl, "middleName", middle); SceneBuilderCore.SetField(ctl, "lastName", last);
             SceneBuilderCore.SetField(ctl, "birthday", field);
-            SceneBuilderCore.SetField(ctl, "email", email); SceneBuilderCore.SetField(ctl, "skinType", skinType); SceneBuilderCore.SetField(ctl, "skinTone", skinTone);
+            SceneBuilderCore.SetField(ctl, "email", email); SceneBuilderCore.SetField(ctl, "emailCheck", emailCheck); SceneBuilderCore.SetField(ctl, "emailMax", EmailLimit);
+            SceneBuilderCore.SetField(ctl, "skinType", skinType); SceneBuilderCore.SetField(ctl, "skinTone", skinTone);
             SceneBuilderCore.SetField(ctl, "conditions", conditions); SceneBuilderCore.SetField(ctl, "allergens", allergens);
             SceneBuilderCore.SetField(ctl, "editButton", edit); SceneBuilderCore.SetField(ctl, "editButtonLabel", editLabel);
             SceneBuilderCore.SetField(ctl, "scroll", scrollRt.GetComponent<ScrollRect>());
