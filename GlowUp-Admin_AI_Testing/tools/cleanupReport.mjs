@@ -178,7 +178,7 @@ ${stepHtml}
 
 <section><h2>A person must decide these (the clean-up does not touch them)</h2>
 <h3>Products the rule cannot place: ${plan.forReview.unclear.length}</h3>
-<p>Some are kinds the project has not decided on yet (tinted moisturizer, skin tint, BB and CC cream, lip balm, lip oil, tinted sunscreen). The others have a name and a kind that say nothing clear. The app does not show or recommend any of them until they are decided. They are grouped by the word that made them unclear.</p>
+<p>Some are care and colour at once (a tinted lip balm, a tinted lip oil), which no source places clearly. The others have a name and a kind that say nothing clear. The app does not show or recommend any of them until they are decided. They are grouped by the word that made them unclear.</p>
 ${unclearHtml || "<p>None.</p>"}
 <h3>Make-up whose stored kind deserves a second look: ${plan.forReview.kinds.length}</h3>
 <p>The kind stored with a product was often filled in by an import, not by a person, and some are wrong (a lip liner filed as "Lipstick", a tinted sunscreen base filed as "Lip Tint"). The kind decides where AR Try-On puts the colour. Nothing is changed for these: an admin corrects the ones that are wrong.</p>

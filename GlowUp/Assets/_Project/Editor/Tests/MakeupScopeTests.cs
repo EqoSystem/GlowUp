@@ -68,11 +68,19 @@ namespace GlowUp.Tests
         }
 
         [Test]
-        public void KindsNotDecidedYetStayUnclear()
+        public void TheEdgeCasesAreDecidedByHowTheyAreSold()
         {
-            // The project owner has not decided on these yet. When they do, move the words in ProductScope (and on the
-            // website) and change the expectation here and in MakeupScopeCases.txt.
-            foreach (string name in new[] { "Tinted Moisturizer", "BB Cream", "CC Cream", "Lip Balm", "Lip Oil", "Skin Tint", "Tinted Sunscreen" })
+            // Decided on 12 October 2026 ("if sources consider them skin care, they are out"). Tinted bases are face make-up:
+            foreach (string name in new[] { "Tinted Moisturizer", "BB Cream", "CC Cream", "Skin Tint" })
+            {
+                Assert.AreEqual(ProductScope.Kind.Makeup, ProductScope.Classify("", name), name);
+                Assert.AreEqual("Foundation", ProductScope.MakeupType("", name), name + " is filed with the foundations");
+            }
+            // lip care and sun care are not:
+            foreach (string name in new[] { "Lip Balm", "Lip Oil", "Tinted Sunscreen" })
+                Assert.AreEqual(ProductScope.Kind.SkinCare, ProductScope.Classify("", name), name);
+            // care and colour at once: no source places it clearly, so an admin decides per product
+            foreach (string name in new[] { "Tinted Lip Balm", "Tinted Lip Oil" })
                 Assert.AreEqual(ProductScope.Kind.Unclear, ProductScope.Classify("", name), name);
         }
 

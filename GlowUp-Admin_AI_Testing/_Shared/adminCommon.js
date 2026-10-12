@@ -49,7 +49,7 @@ export const BRAND_CATEGORY = "Makeup";
  *   "makeup"   - the app checks it, recommends it and offers AR Try-On
  *   "skincare" - not make-up: not listed
  *   "out"      - hair, body, nail, fragrance, make-up tools: not listed
- *   "unclear"  - the rule cannot tell, or the kind is not decided yet (lip balm, BB cream ...): it waits for an admin
+ *   "unclear"  - the rule cannot tell, or the kind is care and colour at once (a tinted lip balm): it waits for an admin
  */
 export const productScope = (cosmeticType, productName) => judgeProduct(cosmeticType, productName).kind;
 /** True for a product that is clearly something else than make-up. */

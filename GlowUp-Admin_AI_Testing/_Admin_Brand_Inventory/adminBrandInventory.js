@@ -936,7 +936,7 @@ function openCleanUp() {
         makePlan: () => cleanupPlan(everyBrand, everyProduct, [], { only: CLEANUP_STEPS }),
         apply: (changes) => applyChanges(changes),
         notes: (plan) => [
-            { title: "Products the rule cannot place", text: "Kinds that are not decided yet (lip balm, lip oil, skin tint, BB cream ...) or names that say nothing clear. The app hides them. Edit each one: give it its kind, or move it to the Recycle bin.",
+            { title: "Products the rule cannot place", text: "Kinds that are care and colour at once (a tinted lip balm, a tinted lip oil) or names that say nothing clear. The app hides them. Edit each one: give it its kind, or move it to the Recycle bin.",
                 items: plan.forReview.unclear.map((e) => `${e.product.name} (${brandNameOf(e.product)}): kind "${e.product.cosmeticType || "none"}"${e.judged.word ? `, the word "${e.judged.word}"` : ""}`),
                 action: { label: "Show them in the list", run: () => showOnly("review", true) } },
             { title: "Kinds worth a second look", text: "The kind stored with these was often filled in by an import and may be wrong (a lip liner filed as Lipstick). The kind decides where AR Try-On puts the colour. Edit the ones that are wrong.",

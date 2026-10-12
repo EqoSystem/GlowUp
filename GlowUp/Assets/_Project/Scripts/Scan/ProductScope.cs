@@ -59,7 +59,10 @@ namespace GlowUp.Scan
             "eyebrow", "brow pencil", "brow gel", "brow pomade", "brow powder", "brow mascara", "brow pen", "brow liner", "brow tint", "brow wax",
             "brow definer", "brow soap", "soap brow", "kajal", "kohl", "face powder", "pressed powder", "loose powder", "compact powder",
             "setting powder", "finishing powder", "powder foundation", "cushion", "contour", "highlighter", "bronzer", "makeup", "make up",
-            "cheek tint", "cheek stain", "cheek color", "cheek colour", "setting spray", "fixing spray", "setting mist", "fixing mist"
+            "cheek tint", "cheek stain", "cheek color", "cheek colour", "setting spray", "fixing spray", "setting mist", "fixing mist",
+            // Decided on 12 October 2026 by how they are sold and regulated: BB and CC creams, tinted moisturizers and skin tints are
+            // face make-up (shops list them under Makeup > Face; the ASEAN list of cosmetics has "tinted bases")
+            "bb cream", "cc cream", "tinted moisturizer", "tinted moisturiser", "skin tint"
         };
         /// <summary>Words that mean make-up unless another word says otherwise ("baby powder", "hair gloss", "primer serum").</summary>
         static readonly string[] Generic = { "powder", "primer", "gloss", "tint", "liner", "brow", "palette", "glitter", "shimmer", "corrector", "illuminator", "rouge", "stain" };
@@ -85,19 +88,21 @@ namespace GlowUp.Scan
         static readonly string[] NeverMakeup =
         {
             "makeup remover", "make up remover", "remover", "cleansing", "micellar", "lip scrub", "lip mask", "lip treatment", "lip care",
-            "lip serum", "lip conditioner", "brow serum", "lash serum", "eyelash serum", "lash conditioner", "brow conditioner"
+            "lip serum", "lip conditioner", "brow serum", "lash serum", "eyelash serum", "lash conditioner", "brow conditioner",
+            // decided on 12 October 2026: lip balms and lip oils are lip CARE, and a tinted sunscreen is a sunscreen (sun care)
+            "lip balm", "lip oil", "tinted sunscreen", "tinted sunblock", "tinted sun screen", "tinted sun block"
         };
         static readonly string[] NeverMakeupOther = { "hair mascara", "nail polish", "nail lacquer", "makeup brush", "make up brush", "brush cleaner", "makeup sponge", "make up sponge" };
 
         /// <summary>
-        /// Kinds the project has NOT decided on yet. Until it has, they count as unclear: kept for review, not shown, not
-        /// recommended and not added by the phone. To decide one, move its words to <see cref="Strong"/> (it is make-up)
-        /// or to <see cref="NeverMakeup"/> (it is not), here and on the website.
+        /// Kinds that are care and colour at once, which no source places clearly. They count as unclear: kept for an
+        /// admin to look at, not shown, not recommended and not added by the phone. They are looked for BEFORE the
+        /// "never make-up" words (a tinted lip balm is not simply a lip balm). To decide one, move its words to
+        /// <see cref="Strong"/> (it is make-up) or to <see cref="NeverMakeup"/> (it is not), here and on the website.
+        /// (BB and CC cream, tinted moisturizer, skin tint, lip balm, lip oil and tinted sunscreen were decided on
+        /// 12 October 2026: see those two lists.)
         /// </summary>
-        public static readonly string[] Undecided =
-        {
-            "tinted moisturizer", "tinted moisturiser", "skin tint", "bb cream", "cc cream", "lip balm", "lip oil", "tinted sunscreen"
-        };
+        public static readonly string[] Undecided = { "tinted lip balm", "tinted lip oil", "lip balm tint", "lip oil tint" };
 
         /// <summary>
         /// Product words that are unmistakable on the front of a pack. Used when all the app has is the text the camera
@@ -144,12 +149,12 @@ namespace GlowUp.Scan
                 return Result(declared == "skin care" ? Kind.SkinCare : Kind.OutOfScope, declared, typeKey);
             }
 
-            string word = Has(text, NeverMakeup);
+            string word = Has(text, Undecided);
+            if (word != null) return Result(Kind.Unclear, "", word);
+            word = Has(text, NeverMakeup);
             if (word != null) return Result(Kind.SkinCare, "skin care", word);
             word = Has(text, NeverMakeupOther);
             if (word != null) return Result(Kind.OutOfScope, word.StartsWith("hair") ? "hair" : word.StartsWith("nail") ? "nail" : "make-up tool", word);
-            word = Has(text, Undecided);
-            if (word != null) return Result(Kind.Unclear, "", word);
 
             string strong = Has(text, Strong), generic = Has(text, Generic);
             bool browOrLash = Has(text, new[] { "brow", "eyebrow", "lash", "eyelash" }) != null;
@@ -217,7 +222,7 @@ namespace GlowUp.Scan
             new[] { "Lipstick", "lipstick", "lip stick", "lip cream", "lip lacquer", "liquid lip", "lip colour", "lip color", "lip crayon", "lip mousse", "lip matte", "lip paint" },
             new[] { "Setting Spray", "setting spray", "fixing spray", "setting mist", "fixing mist" },
             new[] { "Brow", "eyebrow", "brow" },
-            new[] { "Foundation", "powder foundation", "foundation", "cushion" },
+            new[] { "Foundation", "powder foundation", "foundation", "cushion", "bb cream", "cc cream", "tinted moisturizer", "tinted moisturiser", "skin tint" },
             new[] { "Concealer", "concealer", "corrector" },
             new[] { "Primer", "primer" },
             new[] { "Eyeshadow", "eyeshadow", "eye shadow" },

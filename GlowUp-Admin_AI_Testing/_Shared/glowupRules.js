@@ -153,7 +153,10 @@ const STRONG = [
     "eyebrow", "brow pencil", "brow gel", "brow pomade", "brow powder", "brow mascara", "brow pen", "brow liner", "brow tint", "brow wax",
     "brow definer", "brow soap", "soap brow", "kajal", "kohl", "face powder", "pressed powder", "loose powder", "compact powder",
     "setting powder", "finishing powder", "powder foundation", "cushion", "contour", "highlighter", "bronzer", "makeup", "make up",
-    "cheek tint", "cheek stain", "cheek color", "cheek colour", "setting spray", "fixing spray", "setting mist", "fixing mist"
+    "cheek tint", "cheek stain", "cheek color", "cheek colour", "setting spray", "fixing spray", "setting mist", "fixing mist",
+    // decided on 12 October 2026 by how they are sold and regulated: BB and CC creams, tinted moisturizers and skin tints are
+    // face make-up (shops list them under Makeup > Face; the ASEAN list of cosmetics has "tinted bases")
+    "bb cream", "cc cream", "tinted moisturizer", "tinted moisturiser", "skin tint"
 ];
 // Words that mean make-up unless another word says otherwise ("baby powder", "hair gloss", "primer serum").
 const GENERIC = ["powder", "primer", "gloss", "tint", "liner", "brow", "palette", "glitter", "shimmer", "corrector", "illuminator", "rouge", "stain"];
@@ -176,15 +179,20 @@ export const WEAK_CARE_WORDS = ["cream", "gel", "balm", "mist", "spf", "water", 
 // Checked first: these are never make-up, whatever else the name says.
 const NEVER_MAKEUP = [
     "makeup remover", "make up remover", "remover", "cleansing", "micellar", "lip scrub", "lip mask", "lip treatment", "lip care",
-    "lip serum", "lip conditioner", "brow serum", "lash serum", "eyelash serum", "lash conditioner", "brow conditioner"
+    "lip serum", "lip conditioner", "brow serum", "lash serum", "eyelash serum", "lash conditioner", "brow conditioner",
+    // decided on 12 October 2026: lip balms and lip oils are lip CARE, and a tinted sunscreen is a sunscreen (sun care)
+    "lip balm", "lip oil", "tinted sunscreen", "tinted sunblock", "tinted sun screen", "tinted sun block"
 ];
 const NEVER_MAKEUP_OTHER = ["hair mascara", "nail polish", "nail lacquer", "makeup brush", "make up brush", "brush cleaner", "makeup sponge", "make up sponge"];
 
 /**
- * Kinds the project has NOT decided on yet. Until it has, they count as unclear: kept for review, not shown, not
- * recommended. To decide one, move its words to STRONG (it is make-up) or to NEVER_MAKEUP (it is not), here and in the app.
+ * Kinds that are care and colour at once, which no source places clearly. They count as unclear: kept for an admin to
+ * look at, not shown, not recommended. They are looked for BEFORE the "never make-up" words (a tinted lip balm is not
+ * simply a lip balm). To decide one, move its words to STRONG (it is make-up) or to NEVER_MAKEUP (it is not), here and in
+ * the app. (BB and CC cream, tinted moisturizer, skin tint, lip balm, lip oil and tinted sunscreen were decided on
+ * 12 October 2026: see those two lists.)
  */
-export const UNDECIDED_KINDS = ["tinted moisturizer", "tinted moisturiser", "skin tint", "bb cream", "cc cream", "lip balm", "lip oil", "tinted sunscreen"];
+export const UNDECIDED_KINDS = ["tinted lip balm", "tinted lip oil", "lip balm tint", "lip oil tint"];
 
 // Product words that are unmistakable on the front of a pack (used for text a camera read).
 const LABEL_NOT_MAKEUP = [
@@ -258,12 +266,12 @@ export function judgeProduct(cosmeticType, productName) {
         return verdict(declared === "skin care" ? "skincare" : "out", declared, typeKey);
     }
 
-    let word = has(text, NEVER_MAKEUP);
+    let word = has(text, UNDECIDED_KINDS);
+    if (word !== null) return verdict("unclear", "", word);
+    word = has(text, NEVER_MAKEUP);
     if (word !== null) return verdict("skincare", "skin care", word);
     word = has(text, NEVER_MAKEUP_OTHER);
     if (word !== null) return verdict("out", word.startsWith("hair") ? "hair" : word.startsWith("nail") ? "nail" : "make-up tool", word);
-    word = has(text, UNDECIDED_KINDS);
-    if (word !== null) return verdict("unclear", "", word);
 
     const strong = has(text, STRONG), generic = has(text, GENERIC);
     const browOrLash = has(text, ["brow", "eyebrow", "lash", "eyelash"]) !== null;
@@ -326,7 +334,7 @@ const TYPE_WORDS = [
     ["Lipstick", "lipstick", "lip stick", "lip cream", "lip lacquer", "liquid lip", "lip colour", "lip color", "lip crayon", "lip mousse", "lip matte", "lip paint"],
     ["Setting Spray", "setting spray", "fixing spray", "setting mist", "fixing mist"],
     ["Brow", "eyebrow", "brow"],
-    ["Foundation", "powder foundation", "foundation", "cushion"],
+    ["Foundation", "powder foundation", "foundation", "cushion", "bb cream", "cc cream", "tinted moisturizer", "tinted moisturiser", "skin tint"],
     ["Concealer", "concealer", "corrector"],
     ["Primer", "primer"],
     ["Eyeshadow", "eyeshadow", "eye shadow"],

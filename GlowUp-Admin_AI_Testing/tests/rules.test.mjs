@@ -98,9 +98,14 @@ equal(rules.productScope("", ""), "unclear", "a product without a name and a kin
 equal(rules.productScope(null, undefined), "unclear", "a product with nothing at all");
 check(!rules.isMakeup("", "Absidy Beauty Base"), "a name without any make-up word is not make-up");
 
-// kinds the project has not decided on yet stay unclear (change this together with the app when they are decided)
-for (const name of ["Tinted Moisturizer", "BB Cream", "CC Cream", "Lip Balm", "Lip Oil", "Skin Tint", "Tinted Sunscreen"])
-    equal(rules.productScope("", name), "unclear", name);
+// the edge cases, decided on 12 October 2026 by how they are sold ("if sources consider them skin care, they are out")
+for (const name of ["Tinted Moisturizer", "BB Cream", "CC Cream", "Skin Tint"]) {
+    equal(rules.productScope("", name), "makeup", name + " is face make-up");
+    equal(rules.makeupType("", name), "Foundation", name + " is filed with the foundations");
+}
+for (const name of ["Lip Balm", "Lip Oil", "Tinted Sunscreen"]) equal(rules.productScope("", name), "skincare", name + " is care, not make-up");
+// care and colour at once: no source places it clearly, so an admin decides per product
+for (const name of ["Tinted Lip Balm", "Tinted Lip Oil"]) equal(rules.productScope("", name), "unclear", name);
 
 check(rules.isMakeup("", "All Nighter Setting Spray"), "a setting spray is make-up");
 equal(rules.makeupType("", "Makeup Fixing Spray"), "Setting Spray", "the kind of a fixing spray");

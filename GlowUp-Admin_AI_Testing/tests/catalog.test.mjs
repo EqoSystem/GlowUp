@@ -48,7 +48,7 @@ const products = [
     product("p10", "b_sun", "Sunny Care", "Spf 50", "Sunscreen"),
     product("p11", "b_mix", "Happy Skin", "Clear Setting Gel", "Moisturizer"),
     product("p12", "b_mix", "Happy Skin", "Lip Mallow Mousse", "Lip Cream"),
-    product("p13", "b_balm", "Balm Co", "Classic Lip Balm", "Lip Balm"),
+    product("p13", "b_balm", "Balm Co", "Tinted Lip Balm", "Lip Balm"),
     product("p14", "b_gone", "Old Brand", "Old Lipstick", "Lipstick", { binned: true }),
     product("p15", "b_lor", "L'Oreal Paris", "Precision Lip Liner", "Lipstick")
 ];
@@ -91,7 +91,7 @@ equal(c.nameWithoutBrand("Clinique - Pop Lip Colour", "Clinique"), "Pop Lip Colo
 const scope = c.scopeReport(products);
 equal(ids(scope.out.map((e) => e.product)), ["p8"], "the shampoo is out");
 equal(ids(scope.skincare.map((e) => e.product)), ["p10", "p11", "p9"], "skin care");
-equal(ids(scope.unclear.map((e) => e.product)), ["p13"], "a lip balm is not decided yet");
+equal(ids(scope.unclear.map((e) => e.product)), ["p13"], "a tinted lip balm is care and colour at once: an admin decides");
 check(!scope.makeup.some((e) => e.product.id === "p14"), "what is in the Recycle bin is left out");
 const sure = (id) => scope.skincare.concat(scope.out).find((e) => e.product.id === id).sure;
 check(sure("p9") === true, "a cleanser says so in its name: sure");
@@ -174,7 +174,7 @@ equal(step("types").map((ch) => [ch.docId, ch.fields.cosmeticType]), [["p12", "L
 equal(step("names").map((ch) => [ch.docId, ch.fields.name]), [["p7", "Voluminous Mascara"]], "the brand comes off the front of a name");
 equal(step("names")[0].fields.aliases, ["L'Oréal Paris Voluminous Mascara"], "and the old name is kept as an alias");
 equal(step("ingredients").filter((ch) => ch.action === "bin").map((ch) => ch.docId).sort(), ["ai_1", "ai_2", "ai_3", "ai_4"], "ingredient entries that go to the bin");
-equal(ids(plan.forReview.unclear.map((e) => e.product)), ["p13"], "the lip balm waits for a decision");
+equal(ids(plan.forReview.unclear.map((e) => e.product)), ["p13"], "the tinted lip balm waits for a decision");
 equal(plan.forReview.brands.map((e) => e.brand.id), ["b_balm"], "and so does its brand");
 equal(plan.after, { brands: 4, products: 8, ingredients: 6, makeup: 7 }, "what is left afterwards");
 equal(c.planTotals(plan).bin, 13, "entries to the Recycle bin in all");

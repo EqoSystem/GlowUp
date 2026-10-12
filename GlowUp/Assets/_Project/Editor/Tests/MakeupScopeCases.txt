@@ -85,15 +85,15 @@ Fragrance | Bloom | out
 Unknown | | unclear
 
 # ---- unclear: kinds the project has not decided on yet (see ProductScope.Undecided)
- | Tinted Moisturizer SPF 30 | unclear
-Foundation | Second Skin Tinted Moisturizer | unclear
- | BB Cream Natural | unclear
- | CC Cream | unclear
-Lip Balm | Classic Lip Balm | unclear
+ | Tinted Moisturizer SPF 30 | makeup | Foundation
+Foundation | Second Skin Tinted Moisturizer | makeup | Foundation
+ | BB Cream Natural | makeup | Foundation
+ | CC Cream | makeup | Foundation
+Lip Balm | Classic Lip Balm | skincare
  | Tinted Lip Balm | unclear
-Lip Gloss | Glossy Pout Lip Oil | unclear
-Foundation | All Day Matte Skin Tint | unclear
-Primer | Tinted Sunscreen Primer Stick Spf 50 | unclear
+Lip Gloss | Glossy Pout Lip Oil | skincare
+Foundation | All Day Matte Skin Tint | makeup | Foundation
+Primer | Tinted Sunscreen Primer Stick Spf 50 | skincare
 
 # ---- unclear: the kind and the name do not agree
 Brow | Lathering Tube Soap | unclear
@@ -112,6 +112,6 @@ Skin Care | Glow Foundation Serum | unclear
 @label | BIORE MAKEUP REMOVER | skincare
 @label | JOHNSON'S BABY POWDER | out
 @label | WITH MOISTURIZER AND VITAMIN E | unclear
-@label | BB CREAM FACIAL WASH | unclear
+@label | BB CREAM FACIAL WASH | makeup
 @label | CETAPHIL GENTLE FACIAL CLEANSER | skincare
 @label | | unclear
