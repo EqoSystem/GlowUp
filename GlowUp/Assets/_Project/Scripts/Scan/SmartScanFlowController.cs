@@ -27,9 +27,13 @@ namespace GlowUp.Scan
     ///  - A product the app already knows (by its barcode, its name or the look of its pack) finishes as soon as it is
     ///    recognised: its ingredient list is stored. A new product needs the whole ring; "Finish" is offered as soon as
     ///    the product's front and its ingredient list are read.
-    ///  - The AI is asked ONCE per scan, at the end and only when the app could not name the product itself: it gets
-    ///    the best picture of each side and all the text. When it cannot tell either, the user can type the name, scan
-    ///    again or finish without a name; there is never a dead end.
+    ///  - RECOGNISING, fastest first: the barcode, then the whole name read on the pack (both name the product at
+    ///    once), then the look of a pack this phone has scanned before (the app asks "Is this ...?" and the user says
+    ///    yes or no), then a shortlist "Is it one of these?" of products whose name can partly be read, with a box to
+    ///    type the name. The app never guesses: what it is not sure of, it asks.
+    ///  - The AI is asked ONCE per scan, at the end and only when none of that named the product: it gets the best
+    ///    picture of each side and all the text. When it cannot tell either, the shortlist opens again with the ways
+    ///    on: type the name, scan again or finish without a name; there is never a dead end.
     ///  - GlowUp checks make-up only: as soon as the product is known to be something else, the scan stops and says so.
     ///
     /// "Start over" offers "the same product again" (the name is kept, the pictures are taken anew) and "a different
@@ -87,6 +91,19 @@ namespace GlowUp.Scan
         [SerializeField] private TextMeshProUGUI lookUpLabel;
         [SerializeField] private string lookUpIdleLabel = "Look it up";
         [SerializeField] private string lookUpWorkingLabel = "Looking it up...";
+
+        [Header("Recognising a product without the AI")]
+        [Tooltip("The question on the camera picture, \"Is this ...?\", for a pack this phone has scanned before")]
+        [SerializeField] private ScanProductQuestion productQuestion;
+        [Tooltip("The pop-up \"Is it one of these?\" with its search box")]
+        [SerializeField] private ScanShortlistView shortlist;
+        [SerializeField] private string shortlistTitle = "Is it one of these?";
+        [SerializeField] private string shortlistMessage = "We are not sure which product this is. Tap it, or type its name.";
+        [SerializeField] private string shortlistNoneLabel = "None of these";
+        [Tooltip("The title of that pop-up after the AI could not name the product either, and when a list is to be looked up for a product without a name")]
+        [SerializeField] private string notSureTitle = "Which product is it?";
+        [SerializeField] private string notSureNoneLabel = "Finish without a name";
+        [SerializeField] private string msgLookUpWhich = "Which product should we look up? Tap it, or type its name.";
 
         [Header("AI (asked once, at the end, only when the app cannot name the product itself)")]
         [Tooltip("The project's AI settings. Empty = the ones the loading scene uses.")]
@@ -160,7 +177,8 @@ namespace GlowUp.Scan
 
         [Header("Messages")]
         [SerializeField] private string msgStarting = "Starting the camera...";
-        [SerializeField] private string msgAiLooking = "Recognising the product...";
+        [Tooltip("Said while the AI is asked. Honest about the wait: a product the app has never seen takes the slow way the first time.")]
+        [SerializeField] private string msgAiLooking = "This product is new to GlowUp. Recognising it takes a little longer the first time...";
         [Tooltip("The app and the AI could not name the product")]
         [SerializeField] private string msgNotSure = "We could not name this product. Type its name, start over, or tap Finish anyway.";
         [Tooltip("The AI has been asked as often as it may be in one visit of this screen")]
@@ -239,7 +257,10 @@ namespace GlowUp.Scan
         readonly ProductAiAdvisor.Identity identity = new ProductAiAdvisor.Identity();
         ProductData knownProduct;
         ScanRecord rescanOf;                      // "Scan the same product again": the saved scan this one takes the place of
-        PackagingMemory.Look lastLook;            // what the front of the pack looked like
+        readonly List<PackagingMemory.Match> lookMatches = new List<PackagingMemory.Match>();     // packs this phone remembers that look like this one
+        readonly HashSet<string> declined = new HashSet<string>();       // products the user said "no" to in this scan
+        bool shortlistAnswered;                   // the shortlist was shown in this attempt and the user said "none of these"
+        string frontChecked = "";                 // the text of the front the product list was last asked about
         string barcode = "";
         string ingredientText, ingredientSource = "scan";
         string listFrom = "";                     // where the ingredient list came from: "pack", "inventory", "web" or "typed"
@@ -262,6 +283,7 @@ namespace GlowUp.Scan
             if (backButton != null) backButton.onClick.AddListener(() => { StopCamera(); SceneNavigator.Go(backScene); });
             if (cameraFeed != null) cameraFeed.Started += OnCameraStarted;
             if (aiConfig != null) ProductAiAdvisor.Config = aiConfig;
+            if (shortlist != null) shortlist.Search = (name, brand) => ScanShortlist.Typed(ProductRepository.Index, name, brand);
             CopyWords();
         }
 
@@ -394,8 +416,9 @@ namespace GlowUp.Scan
             bool held = holdButton != null && holdButton.IsHeld;
             if (!held)
             {
-                // PAUSE, DON'T RESET: the ring keeps what it has. Only a long pause puts the scan back to the start.
-                pausedFor += Time.unscaledDeltaTime;
+                // PAUSE, DON'T RESET: the ring keeps what it has. Only a long pause puts the scan back to the start
+                // (the time a pop-up is open does not count: the user is reading or typing).
+                if (!PopupOpen) pausedFor += Time.unscaledDeltaTime;
                 if (pausedFor > pauseResetSeconds)
                 {
                     bool hadSomething = evidence.Pictures > 0;
@@ -500,8 +523,16 @@ namespace GlowUp.Scan
 
             // ---- the barcode: a product of the inventory is recognised at once
             if (barcode.Length == 0 && evidence.Barcode.Length > 0) TakeBarcode(evidence.Barcode);
-            // ---- the look of the pack: a product this phone has scanned before is known again (also offline)
-            if (!ProductKnown && result.zones[(int)ScanZone.Front]) RecogniseFromLook(text);
+            bool showsPack = result.zones[(int)ScanZone.Front] || (result.zones[(int)ScanZone.Around] && !result.zones[(int)ScanZone.Ingredients]);
+            // ---- the whole name, read in pieces: the brand in one picture, the product's name in the next
+            if (!ProductKnown && result.zones[(int)ScanZone.Front])
+            {
+                ProductData whole = ProductInFront();
+                if (whole != null) Adopt(whole);
+            }
+            // ---- the look of the pack: a product this phone has scanned before. The app ASKS ("Is this ...?"), it does not decide.
+            if (!ProductKnown && showsPack) RecogniseFromLook();
+            if (ProductKnown && productQuestion != null && productQuestion.IsOpen) productQuestion.Hide();
             if (identity.shadeName.Length == 0 && evidence.ShadeText.Length > 0) identity.shadeName = evidence.ShadeText;
 
             bool[] filled = result.filledNow;
@@ -510,9 +541,11 @@ namespace GlowUp.Scan
             // ---- make-up only: stop as soon as the product is known to be something else
             if (StopIfNotMakeup(result.zones[(int)ScanZone.Ingredients] ? null : text)) return;
 
-            // ---- a product of the inventory brings its ingredient list with it: nothing more to scan
+            // ---- a product of the inventory brings its ingredient list with it: nothing more to scan.
+            //      (A list that was read from this very pack comes first: it says what is in the user's own product.)
             if (knownProduct != null && knownProduct.ingredients != null && knownProduct.ingredients.Count >= 3)
             {
+                if (evidence.IsFull(ScanZone.Ingredients)) { ShowProgress(filled); FinishAttempt(); return; }
                 Merge(filled, evidence.ListKnown());
                 ShowProgress(filled);
                 UseLookedUpList(knownProduct.ingredients, ListPagesOf(knownProduct), "inventory", false);
@@ -680,20 +713,141 @@ namespace GlowUp.Scan
             return false;
         }
 
-        /// <summary>Compares the picture with the packagings this phone remembers; fills in the product when it knows it.</summary>
-        void RecogniseFromLook(string text)
+        /// <summary>The lines of a text, each once (the front of a pack is read many times while it is held up).</summary>
+        static string DistinctLines(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return "";
+            var once = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var sb = new System.Text.StringBuilder();
+            foreach (string line in text.Split('\n'))
+            {
+                string trimmed = line.Trim();
+                if (trimmed.Length > 0 && once.Add(trimmed)) sb.Append(trimmed).Append('\n');
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// The product whose whole name stands in ALL the text read on the front so far, or null. Asked again only when
+        /// that text has changed.
+        /// </summary>
+        ProductData ProductInFront()
+        {
+            string all = DistinctLines(evidence.FrontText);
+            if (all.Length == 0 || all == frontChecked) return null;
+            frontChecked = all;
+            return ProductIn(all);
+        }
+
+        /// <summary>
+        /// Compares the picture with the packs this phone remembers. A strong likeness, or a medium one together with a
+        /// word of the product's name read on the pack, is worth a question: "Is this ...?". The user's answer decides;
+        /// the look alone never does (two products of one line can look the same). What is less alike than that is kept
+        /// for the shortlist at the end.
+        /// </summary>
+        void RecogniseFromLook()
         {
             if (!PackagingMemory.Enabled || pixels == null) return;
-            lastLook = PackagingMemory.SignatureOf(pixels, pixelsW, pixelsH);
-            if (lastLook == null) return;
-            PackagingMemory.Look known = PackagingMemory.Recall(lastLook, text);
-            if (known == null) return;
-            if (identity.productName.Length == 0) identity.productName = known.productName;
-            if (identity.brandName.Length == 0) identity.brandName = known.brandName;
-            if (identity.cosmeticType.Length == 0) identity.cosmeticType = known.cosmeticType;
-            if (identity.shadeHex.Length == 0) identity.shadeHex = known.shadeHex;
-            if (identity.shadeName.Length == 0) identity.shadeName = known.shadeName;
-            if (identity.finish.Length == 0) identity.finish = known.finish;
+            PackagingMemory.Look look = PackagingMemory.SignatureOf(pixels, pixelsW, pixelsH);
+            if (look == null) return;
+            foreach (PackagingMemory.Match match in PackagingMemory.Matches(look, DistinctLines(evidence.FrontText), ScanShortlist.Maximum))
+            {
+                // each remembered product once, with the best likeness seen in this scan
+                int at = lookMatches.FindIndex(other => other.look == match.look
+                    || (string.Equals(other.look.productName, match.look.productName, StringComparison.OrdinalIgnoreCase) && string.Equals(other.look.brandName, match.look.brandName, StringComparison.OrdinalIgnoreCase)));
+                if (at < 0) lookMatches.Add(match);
+                else if (match.strength > lookMatches[at].strength || (match.strength == lookMatches[at].strength && (match.wordSeen && !lookMatches[at].wordSeen || match.score > lookMatches[at].score)))
+                {
+                    match.wordSeen |= lookMatches[at].wordSeen;
+                    lookMatches[at] = match;
+                }
+            }
+            if (productQuestion == null || productQuestion.IsOpen || PopupOpen) return;
+            foreach (ScanShortlist.Entry entry in ScanShortlist.For(ProductRepository.Index, "", lookMatches.FindAll(match => match.WorthAsking), declined, 1))
+            {
+                ScanShortlist.Entry asked = entry;
+                productQuestion.Ask(asked.productName, asked.brandName,
+                    () => { TakeEntry(asked); Named(ContinueScanning); },
+                    () => declined.Add(asked.Key));
+            }
+        }
+
+        /// <summary>The product the user chose (from the question or from the shortlist) becomes the product of this scan.</summary>
+        void TakeEntry(ScanShortlist.Entry entry)
+        {
+            if (entry.product != null) { Adopt(entry.product); return; }
+            // a product only this phone remembers. Its shade is NOT taken from memory: the shades of one line look alike,
+            // so the shade is read from this pack (its printed name, or its colour).
+            identity.productName = entry.productName.Trim();
+            if (entry.brandName.Trim().Length > 0) identity.brandName = entry.brandName.Trim();
+            if (entry.cosmeticType.Trim().Length > 0) identity.cosmeticType = entry.cosmeticType.Trim();
+        }
+
+        /// <summary>The user typed the product's name (and perhaps its brand). A product of the inventory with exactly that name is taken as it is.</summary>
+        void TakeTyped(string productName, string brandName)
+        {
+            ProductData exact = ProductRepository.Index.Exact(brandName, productName);
+            if (exact != null) { Adopt(exact); return; }
+            knownProduct = null;
+            identity.productName = (productName ?? "").Trim();
+            if (!string.IsNullOrWhiteSpace(brandName)) identity.brandName = brandName.Trim();
+        }
+
+        /// <summary>
+        /// The product has just been named by the user's answer. The first segment of the ring is full, the make-up check
+        /// runs, and then `next` goes on (scanning, finishing, or looking the list up).
+        /// </summary>
+        void Named(Action next)
+        {
+            if (productQuestion != null) productQuestion.Hide();
+            finishUnnamed = false;
+            bool[] filled = evidence.ProductKnown();
+            if (stage == Stage.Idle || stage == Stage.Scanning) { if (StopIfNotMakeupNow()) return; }
+            ShowProgress(filled);
+            next?.Invoke();
+        }
+
+        /// <summary>After "Yes, it is this product" during the scan: a product of the inventory with a stored list needs nothing more.</summary>
+        void ContinueScanning()
+        {
+            if (knownProduct == null || knownProduct.ingredients == null || knownProduct.ingredients.Count < 3 || (listFrom != "" && listFrom != "pack")) return;
+            if (evidence.IsFull(ScanZone.Ingredients)) { FinishAttempt(); return; }      // the list of this very pack was read: that one is used
+            bool[] filled = evidence.ListKnown();
+            ShowProgress(filled);
+            UseLookedUpList(knownProduct.ingredients, ListPagesOf(knownProduct), "inventory", false);
+        }
+
+        bool PopupOpen => (shortlist != null && shortlist.IsOpen) || (startOverPanel != null && startOverPanel.IsOpen) || (manualPanel != null && manualPanel.IsOpen);
+
+        /// <summary>What the app's own lists suggest for this scan: by the words read on the front, and by the look of the pack.</summary>
+        List<ScanShortlist.Entry> Suggestions()
+        {
+            return ScanShortlist.For(ProductRepository.Index, DistinctLines(evidence.FrontText), lookMatches, declined);
+        }
+
+        /// <summary>
+        /// Opens "Is it one of these?". `named` runs after the user chose or typed a product, `noneOfThese` when they said
+        /// none fits. "Scan again" starts a fresh ring.
+        /// </summary>
+        void OpenShortlist(string title, string message, string noneLabel, Action named, Action noneOfThese)
+        {
+            if (shortlist == null) { noneOfThese?.Invoke(); return; }
+            if (holdButton != null) holdButton.LetGo();
+            if (productQuestion != null) productQuestion.Hide();
+            shortlist.Show(title, message, Suggestions(), noneLabel,
+                (entry, typedName) =>
+                {
+                    TakeEntry(entry);
+                    // the name the user typed for it is remembered on this phone: next time it finds the product at once
+                    if (entry.product != null && !string.IsNullOrWhiteSpace(typedName))
+                    {
+                        try { LocalAliases.Learn(typedName, entry.product); } catch (Exception e) { Debug.LogWarning("Scan: the typed name was not kept: " + e.Message); }
+                    }
+                    Named(named);
+                },
+                (typedName, typedBrand) => { TakeTyped(typedName, typedBrand); Named(named); },
+                noneOfThese,
+                () => StartOver(false, msgStartedOver));
         }
 
         /// <summary>
@@ -716,6 +870,12 @@ namespace GlowUp.Scan
         bool StopIfNotMakeup(string frontText = null)
         {
             if (stage == Stage.Leaving || stage == Stage.Idle) return false;
+            return StopIfNotMakeupNow(frontText);
+        }
+
+        /// <summary>The same check, also while the camera is off (the user named the product in a pop-up).</summary>
+        bool StopIfNotMakeupNow(string frontText = null)
+        {
             ProductScope.Verdict verdict = ProductScope.Judge(identity.cosmeticType, identity.productName);
             // nothing recognised yet (offline, or the AI has not been asked): only unmistakable words on the pack count
             if (!verdict.IsNotMakeup && !string.IsNullOrWhiteSpace(frontText) && identity.productName.Length == 0 && identity.cosmeticType.Length == 0)
@@ -750,7 +910,9 @@ namespace GlowUp.Scan
             evidence.Reset();
             for (int i = 0; i < best.Length; i++) best[i] = null;
             ingredientText = null; ingredientSource = "scan"; listFrom = ""; listWebBacked = false; sources.Clear();
-            barcode = ""; lastColour = ""; lastLook = null;
+            barcode = ""; lastColour = "";
+            lookMatches.Clear(); declined.Clear(); shortlistAnswered = false; frontChecked = "";
+            if (productQuestion != null) productQuestion.Hide();
             fault = FrameQuality.Fault.None; blurrySkips = 0; differentSeen = 0; sinceProgress = 0f; stalledSaid = false; pausedFor = 0f;
             finishUnnamed = false; lookingUp = false; shownStatus = null; messageOver = null; lastHint = "";
             lock (answerLock) { answerWaiting = false; answerReading = null; }
@@ -790,17 +952,18 @@ namespace GlowUp.Scan
         void FinishAttempt()
         {
             if (stage == Stage.Leaving || stage == Stage.Recognising) return;
-            if (ingredientText == null)
-            {
-                string read = evidence.Text.IngredientText();
-                if (evidence.Text.Counted < 2 || read.Length == 0) { Say(msgNeedList); return; }
-                ingredientText = read; ingredientSource = "scan"; listFrom = "pack"; listWebBacked = false; sources.Clear();
-                if (ingredientsCheck != null) ingredientsCheck.SetFound(string.Format(ingredientsFoundFormat, evidence.Text.Counted));
-            }
+            if (!TakePackList()) { Say(msgNeedList); return; }
             if (holdButton != null) holdButton.LetGo();
 
             if (!ProductKnown && !finishUnnamed)
             {
+                // 1. what the app's own lists suggest: the user chooses, and no AI is needed
+                if (!shortlistAnswered && shortlist != null && Suggestions().Count > 0)
+                {
+                    OpenShortlist(shortlistTitle, shortlistMessage, shortlistNoneLabel, FinishAttempt, () => { shortlistAnswered = true; FinishAttempt(); });
+                    return;
+                }
+                // 2. the AI, once
                 bool canAsk = aiRecognisesProduct && ConnectivityMonitor.Online && ProductAiAdvisor.Available && HasPictures();
                 if (canAsk && AiBudget.CanRecognise) { StartCoroutine(RecogniseThenFinish()); return; }
                 // online, but the AI has been asked as often as it may be: say so, and offer the other ways on
@@ -811,6 +974,20 @@ namespace GlowUp.Scan
         }
 
         bool HasPictures() { foreach (Kept kept in best) if (kept != null) return true; return false; }
+
+        /// <summary>
+        /// Takes the ingredient list as the camera has read it SO FAR (so a list that grew after an earlier try is not
+        /// cut short). A list that was looked up stays as it is. False = there is no list to analyse yet.
+        /// </summary>
+        bool TakePackList()
+        {
+            if (ingredientText != null && listFrom != "pack") return true;
+            string read = evidence.Text.IngredientText();
+            if (evidence.Text.Counted < 2 || read.Length == 0) return ingredientText != null;
+            ingredientText = read; ingredientSource = "scan"; listFrom = "pack"; listWebBacked = false; sources.Clear();
+            if (ingredientsCheck != null) ingredientsCheck.SetFound(string.Format(ingredientsFoundFormat, evidence.Text.Counted));
+            return true;
+        }
 
         /// <summary>The app's own lists could not name the product: the AI is shown the best pictures, ONCE.</summary>
         IEnumerator RecogniseThenFinish()
@@ -863,12 +1040,14 @@ namespace GlowUp.Scan
             if (holdButton != null) holdButton.Usable = true;
             if (StopIfNotMakeup()) yield break;              // the AI says it is not make-up
             if (!ProductKnown) { NotSure(msgNotSure); yield break; }
-            // the product has a name now: remember what its packaging looks like for next time
-            if (lastLook != null) { PackagingMemory.Remember(lastLook, identity.productName, identity.brandName, identity.cosmeticType, identity.shadeHex, identity.shadeName, identity.finish); lastLook = null; }
             Finish();
         }
 
-        /// <summary>Nobody could name the product: never a dead end. The user types the name, scans again, or finishes without a name.</summary>
+        /// <summary>
+        /// Nobody could name the product: never a dead end. The shortlist opens with whatever the app's lists suggest, a
+        /// box to type the name, "Scan again" and "Finish without a name". The same choices stay on the screen behind it
+        /// (Start over, Type the product in, Finish anyway) when the pop-up is closed.
+        /// </summary>
         void NotSure(string message)
         {
             finishUnnamed = true;
@@ -876,6 +1055,28 @@ namespace GlowUp.Scan
             if (holdButton != null) holdButton.Usable = true;
             ShowButtons();
             Say(message);
+            if (shortlist != null) OpenShortlist(notSureTitle, message, notSureNoneLabel, FinishAttempt, Finish);
+        }
+
+        /// <summary>
+        /// The product has a name: what its pack looks like is remembered on this phone, its front and one other side, so
+        /// it is known again next time. Only a few numbers per side are kept (colours and a light/dark pattern), no picture.
+        /// </summary>
+        void RememberLooks()
+        {
+            if (!ProductKnown || !PackagingMemory.Enabled) return;
+            try
+            {
+                Kept front = best[(int)ScanZone.Front], side = best[(int)ScanZone.Around];
+                string id = knownProduct != null ? knownProduct.id ?? "" : "";
+                foreach (Kept kept in new[] { front, side != null && (front == null || side.pixels != front.pixels) ? side : null })
+                {
+                    if (kept == null) continue;
+                    PackagingMemory.Look look = PackagingMemory.SignatureOf(kept.pixels, kept.width, kept.height);
+                    if (look != null) PackagingMemory.Remember(look, identity.productName, identity.brandName, identity.cosmeticType, "", "", "", id, kept == front ? "front" : "side");
+                }
+            }
+            catch (Exception e) { Debug.LogWarning("Scan: the look of the pack was not kept: " + e.Message); }
         }
 
         /// <summary>A kept picture as a JPG for the AI: made smaller first, so it travels fast.</summary>
@@ -907,9 +1108,10 @@ namespace GlowUp.Scan
         /// <summary>Hands the scan over to the analysis.</summary>
         void Finish()
         {
-            if (stage == Stage.Leaving || ingredientText == null) return;
-            // the look of a product that was named by the app's own lists is remembered as well
-            if (lastLook != null && ProductKnown) { PackagingMemory.Remember(lastLook, identity.productName, identity.brandName, identity.cosmeticType, identity.shadeHex, identity.shadeName, identity.finish); lastLook = null; }
+            if (stage == Stage.Leaving) return;
+            TakePackList();
+            if (ingredientText == null) return;
+            RememberLooks();
             ScanSession.PendingText = ingredientText; ScanSession.PendingSource = ingredientSource;
             ScanSession.PendingShadeHex = identity.shadeHex.Length > 0 ? identity.shadeHex : evidence.ShadeHex.Length > 0 ? evidence.ShadeHex : lastColour;
             ScanSession.PendingProductName = identity.productName; ScanSession.PendingBrandName = identity.brandName;
@@ -942,7 +1144,14 @@ namespace GlowUp.Scan
         async void LookUp()
         {
             if (stage == Stage.Leaving || stage == Stage.Recognising || lookingUp) return;
-            if (identity.productName.Length == 0) { Say(msgLookUpNeedsName); return; }
+            if (identity.productName.Length == 0)
+            {
+                // A WORN PRODUCT, or one without its pack: the name cannot be read. The user picks it from what little
+                // could be read, or types it; after that the list is looked up like for any product.
+                if (shortlist != null) OpenShortlist(notSureTitle, msgLookUpWhich, shortlistNoneLabel, LookUp, () => Say(msgLookUpNeedsName));
+                else Say(msgLookUpNeedsName);
+                return;
+            }
             lookingUp = true;
             if (lookUpButton != null) lookUpButton.interactable = false;
             if (lookUpLabel != null) lookUpLabel.text = lookUpWorkingLabel;

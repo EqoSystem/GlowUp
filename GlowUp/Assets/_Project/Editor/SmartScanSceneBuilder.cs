@@ -16,8 +16,8 @@ namespace GlowUp.EditorTools
     /// The camera view with the scan guide (corner brackets, guiding mesh, sweeping line, the outlines
     /// round the text that was read), the sun and flashlight buttons, the checklist of what was found with
     /// its gold check marks, the status line, the round HOLD-TO-SCAN button inside its ring of five
-    /// segments, "Start over" and "Finish" beside it, and the pop-ups ("type it in", "the same product or a
-    /// different one?").
+    /// segments, "Start over" and "Finish" beside it, the question "Is this ...?" on the camera picture, and
+    /// the pop-ups ("type it in", "the same product or a different one?", "Is it one of these?").
     /// </summary>
     public static class SmartScanSceneBuilder
     {
@@ -122,6 +122,25 @@ namespace GlowUp.EditorTools
                 "The flashlight is not available right now: the phone may be hot, or another app is using the camera. The screen was made brighter instead.",
                 "This phone cannot use the flashlight while the camera is on. The screen was made brighter instead.");
 
+            // ---- "Is this ...?": asked on the camera picture when the pack looks like one this phone has scanned before ----
+            GameObject questionHolder = A.Node(viewport.transform, "ProductQuestion", typeof(ScanProductQuestion));
+            A.Fill(questionHolder.transform);
+            Image questionBanner = A.RawPanel(questionHolder.transform, "QuestionBanner", new Color(0, 0, 0, 0.78f), 44f);
+            questionBanner.raycastTarget = true;
+            A.BottomStrip(questionBanner.transform, 168, 196, 40, 40);
+            TextMeshProUGUI questionText = A.RawLabel(questionBanner.transform, "QuestionText", "Is this Fit Me Matte + Poreless Foundation by Maybelline?", 30, Color.white, FontRole.Label,
+                                                      TextAlignmentOptions.Center, true);
+            A.TopStrip(questionText.transform, 14, 92, 28, 28);
+            A.ShrinkWrapped(questionText, 22);
+            Button questionYes = A.PillButton(questionBanner.transform, "YesButton", "Yes, it is", 28, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Check);
+            A.At(questionYes.transform, A.BC, new Vector2(150, 16), new Vector2(270, 68));
+            Button questionNo = A.PillButton(questionBanner.transform, "NoButton", "No", 28, ThemeRole.SurfaceAlt, ThemeRole.MainText);
+            A.At(questionNo.transform, A.BC, new Vector2(-150, 16), new Vector2(270, 68));
+            questionBanner.gameObject.SetActive(false);      // appears when there is something to ask
+            var productQuestion = questionHolder.GetComponent<ScanProductQuestion>();
+            A.Set(productQuestion, "banner", questionBanner.gameObject); A.Set(productQuestion, "questionText", questionText);
+            A.Set(productQuestion, "yesButton", questionYes); A.Set(productQuestion, "noButton", questionNo);
+
             // ---- what was found: the product on the left, its ingredient list on the right ----
             Image list = A.Panel(card, "ScanChecklist", ThemeRole.SurfaceAlt, Kit.PanelAlpha, 48f);
             A.BottomStrip(list.transform, 446, 276);
@@ -200,6 +219,65 @@ namespace GlowUp.EditorTools
             A.AppPopup startOverPopup = ScanAgainPopup(s, "StartOverPanel", "Keeps the product's name; the pictures are taken anew.",
                                                        "Forgets everything that was read.", out Button sameProduct, out Button differentProduct);
 
+            // ---- "Is it one of these?": up to three products the scan may be about, and a box to type the name ----
+            A.AppPopup pick = A.Overlay(s, "ShortlistPanel", "Is it one of these?");
+            A.At(pick.box, A.MC, new Vector2(0, 170), new Vector2(940, 1240));
+            TextMeshProUGUI pickMessage = A.Label(pick.box, "MessageText", "We are not sure which product this is. Tap it, or type its name.", 28, ThemeRole.SecondaryText, FontRole.Body,
+                                                  TextAlignmentOptions.TopLeft, true);
+            A.TopStrip(pickMessage.transform, 124, 84, 48, 48);
+            A.ShrinkWrapped(pickMessage, 22);
+            var pickRows = new Button[3]; var pickNames = new TextMeshProUGUI[3]; var pickDetails = new TextMeshProUGUI[3];
+            string[] sampleNames = { "Fit Me Matte + Poreless Foundation", "Fit Me Concealer", "Superstay Lumi-Matte Foundation" };
+            string[] sampleDetails = { "Maybelline, Foundation (scanned on this phone before)", "Maybelline, Concealer", "Maybelline, Foundation" };
+            for (int i = 0; i < 3; i++)
+            {
+                Image row = A.Panel(pick.box, "Candidate_" + (i + 1), ThemeRole.SurfaceAlt, 1f, 40f);
+                row.raycastTarget = true;
+                A.TopStrip(row.transform, 222 + i * 130, 118, 48, 48);
+                pickRows[i] = row.gameObject.AddComponent<Button>();
+                pickRows[i].targetGraphic = row;
+                SceneBuilderCore.Ensure<ButtonPressFeedback>(row.gameObject);
+                pickNames[i] = A.Label(row.transform, "NameText", sampleNames[i], 31, ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.BottomLeft);
+                A.TopStrip(pickNames[i].transform, 12, 50, 34, 84);
+                A.Shrink(pickNames[i], 22);
+                pickDetails[i] = A.Label(row.transform, "DetailText", sampleDetails[i], 24, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft);
+                A.TopStrip(pickDetails[i].transform, 64, 40, 34, 84);
+                A.Shrink(pickDetails[i], 18);
+                Image arrow = A.Icon(row.transform, "Arrow", IconFactory.ChevronRight, 34, ThemeRole.AccentText);
+                A.At(arrow.transform, A.MR, new Vector2(-28, 0), new Vector2(34, 34));
+            }
+            TextMeshProUGUI pickEmpty = A.Label(pick.box, "EmptyText", "No product of our list fits what the camera read. Type its name below.", 29, ThemeRole.SecondaryText, FontRole.Body,
+                                                TextAlignmentOptions.Center, true);
+            A.TopStrip(pickEmpty.transform, 222, 378, 70, 70);
+            pickEmpty.gameObject.SetActive(false);           // shown in the place of the rows when there is nothing to offer
+            TextMeshProUGUI pickTypeTitle = A.Label(pick.box, "TypeItTitle", "Not in the list? Type it:", 28, ThemeRole.Heading, FontRole.Label);
+            A.TopStrip(pickTypeTitle.transform, 624, 44, 52, 48);
+            TMP_InputField pickName = SceneBuilderCore.MakeInput(pick.box, "NameField", "Product name", A.TC, Vector2.zero, new Vector2(800, 100));
+            A.TopStrip(pickName.transform, 676, 100, 48, 48);
+            Kit.StyleInput(pickName, "Product name", ThemeRole.InputBackground);
+            A.Set(SceneBuilderCore.Ensure<InputFieldBehaviour>(pickName.gameObject), "characterLimit", 80);
+            TMP_InputField pickBrand = SceneBuilderCore.MakeInput(pick.box, "BrandField", "Brand (if you know it)", A.TC, Vector2.zero, new Vector2(800, 100));
+            A.TopStrip(pickBrand.transform, 788, 100, 48, 48);
+            Kit.StyleInput(pickBrand, "Brand (if you know it)", ThemeRole.InputBackground);
+            A.Set(SceneBuilderCore.Ensure<InputFieldBehaviour>(pickBrand.gameObject), "characterLimit", 60);
+            Button pickUse = A.PillButton(pick.box, "UseTypedButton", "Type the name above", 29, ThemeRole.InputBackground, ThemeRole.MainText, IconFactory.Check);
+            A.TopStrip(pickUse.transform, 904, 92, 48, 48);
+            A.Outline(pickUse.transform, ThemeRole.Gold, 92f);
+            A.Shrink(A.LabelOf(pickUse), 20);
+            Button pickAgain = A.PillButton(pick.box, "ScanAgainButton", "Scan again", 34, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Scan);
+            A.BottomStrip(pickAgain.transform, 44, 112, 48, 486);
+            A.Outline(pickAgain.transform, ThemeRole.Accent, 112f);
+            Button pickNone = A.PillButton(pick.box, "NoneButton", "None of these", 34, ThemeRole.ButtonFill, ThemeRole.ButtonText);
+            A.BottomStrip(pickNone.transform, 44, 112, 486, 48);
+            A.Shrink(A.LabelOf(pickNone), 22);
+            var shortlistView = SceneBuilderCore.Ensure<ScanShortlistView>(pick.root);
+            A.Set(shortlistView, "panel", pick.panel); A.Set(shortlistView, "titleText", pick.title); A.Set(shortlistView, "messageText", pickMessage);
+            Kit.SetArray(shortlistView, "rows", pickRows); Kit.SetArray(shortlistView, "rowNames", pickNames); Kit.SetArray(shortlistView, "rowDetails", pickDetails);
+            A.Set(shortlistView, "emptyText", pickEmpty);
+            A.Set(shortlistView, "nameInput", pickName); A.Set(shortlistView, "brandInput", pickBrand);
+            A.Set(shortlistView, "useTypedButton", pickUse); A.Set(shortlistView, "useTypedLabel", A.LabelOf(pickUse));
+            A.Set(shortlistView, "noneButton", pickNone); A.Set(shortlistView, "noneLabel", A.LabelOf(pickNone)); A.Set(shortlistView, "scanAgainButton", pickAgain);
+
             // ---- type-it-in pop-up (for labels the camera cannot read) ----
             A.AppPopup manual = A.Overlay(s, "ManualEntryPanel", "Type it in");
             A.TopStrip(manual.box, 110, 1240, 40, 40);
@@ -254,6 +332,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "holdButton", holdButton); A.Set(controller, "holdLabel", holdLabel); A.Set(controller, "ring", ring);
             A.Set(controller, "finishButton", finish); A.Set(controller, "finishText", A.LabelOf(finish)); A.Set(controller, "startOverButton", startOver);
             A.Set(controller, "startOverPanel", startOverPopup.panel);
+            A.Set(controller, "productQuestion", productQuestion); A.Set(controller, "shortlist", shortlistView);
             A.Set(controller, "sameProductButton", sameProduct); A.Set(controller, "differentProductButton", differentProduct);
             A.Set(controller, "manualEntryButton", manualEntry); A.Set(controller, "backButton", s.back);
             A.Set(controller, "statusText", status);
@@ -269,6 +348,7 @@ namespace GlowUp.EditorTools
             if (aiConfig != null) A.Set(controller, "aiConfig", aiConfig);
             A.Set(lightAssistant, "cameraFeed", camera);
             // texts of the earlier two-step scan that would name buttons which are gone (wording changed in the Inspector is kept)
+            SceneBuilderCore.ReplaceText(controller, "msgAiLooking", "This product is new to GlowUp. Recognising it takes a little longer the first time...", "Recognising the product...");
             SceneBuilderCore.ReplaceText(controller, "hintIngredients", "Turn to the back: show the ingredient list", "Now fit the ingredient list inside the frame");
             SceneBuilderCore.ReplaceText(controller, "msgAiLimit", "The AI has been asked as often as it may be for now. Type the product's name, or tap Finish anyway.",
                 "The AI could not name this product. Type its name instead, or tap Skip and scan the ingredient list.");
@@ -277,7 +357,7 @@ namespace GlowUp.EditorTools
 
             A.Finish(s);
             Debug.Log("[GlowUp] AiSmartAnalysisScene built. ScanGuide > Frame is the area that gets read; HoldToScan holds the round button (HoldToScanButton) and its ring of five segments " +
-                      "(ScanRing: Fill_Front, Fill_Ingredients, Fill_Codes, Fill_Shade, Fill_OtherSides start empty and fill while scanning). ManualEntryPanel, StartOverPanel, " +
+                      "(ScanRing: Fill_Front, Fill_Ingredients, Fill_Codes, Fill_Shade, Fill_OtherSides start empty and fill while scanning). ManualEntryPanel, StartOverPanel, ShortlistPanel, CameraViewport > ProductQuestion > QuestionBanner, " +
                       "LightAssistant > LightPrompt and ShadeSwatch are inactive until needed; StartOverButton and FinishButton are shown here and hidden by the controller until they can be used. " +
                       "The numbers of the ring and of the picture check are in GlowUp > Open Scan Rules.");
         }
