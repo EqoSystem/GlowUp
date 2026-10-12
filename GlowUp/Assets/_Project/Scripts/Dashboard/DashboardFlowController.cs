@@ -67,6 +67,16 @@ namespace GlowUp.Dashboard
         [SerializeField] private TextMeshProUGUI accountEmailText;
         [SerializeField] private Button signOutButton;
 
+        [Header("Log out: asked first (the same question as on the Settings page)")]
+        [SerializeField] private GlowUp.AppSettings.ConfirmDialog signOutConfirm;
+        [SerializeField] private string signOutTitle = "Log out?";
+        [SerializeField] private string signOutMessage = "You can sign back in at any time with your email and password.";
+        [Tooltip("Added in front when changes are still waiting to be sent. {0} = how many")]
+        [SerializeField] private string signOutMessageWithPending = "{0} change(s) have not been sent to your account yet. They stay on this phone and are sent the next time you sign in online.";
+        [SerializeField] private string signOutConfirmLabel = "Log Out";
+        [Tooltip("The phone's back key (Android) closes the question or the account pop-up")]
+        [SerializeField] private bool phoneBackKeyClosesPopups = true;
+
         [Header("Settings")]
         [Tooltip("The gear in the top right corner")]
         [SerializeField] private Button settingsButton;
@@ -84,7 +94,7 @@ namespace GlowUp.Dashboard
         {
             if (recommendationTemplate != null) recommendationTemplate.gameObject.SetActive(false);
             if (avatarButton != null) avatarButton.onClick.AddListener(() => { if (accountPanel != null) accountPanel.Show(); });
-            if (signOutButton != null) signOutButton.onClick.AddListener(SignOut);
+            if (signOutButton != null) signOutButton.onClick.AddListener(AskSignOut);
             if (settingsButton != null) settingsButton.onClick.AddListener(() => SceneNavigator.Go(settingsScene));
         }
 
@@ -210,6 +220,26 @@ namespace GlowUp.Dashboard
         {
             if (tile.Data is ScanRecord record && string.IsNullOrEmpty(record.id)) ScanHistoryRepository.Add(record);   // lands in Recent Scans
             tile.SetSaveLabel(savedLabel, false);
+        }
+
+        /// <summary>
+        /// "Log out?" with Cancel / Log Out. Nothing happens unless the user confirms; a tap beside the box and the phone's
+        /// back key cancel. Changes that have not been sent yet are mentioned (they stay on the phone and are sent later).
+        /// </summary>
+        void AskSignOut()
+        {
+            if (signOutConfirm == null) { SignOut(); return; }          // a scene built before the question existed
+            int waiting = SyncQueue.PendingCount;
+            string message = waiting > 0 ? string.Format(signOutMessageWithPending, waiting) + "\n\n" + signOutMessage : signOutMessage;
+            if (accountPanel != null) accountPanel.Hide();
+            signOutConfirm.Ask(signOutTitle, message, signOutConfirmLabel, SignOut, true);
+        }
+
+        void Update()
+        {
+            if (!phoneBackKeyClosesPopups || !Input.GetKeyDown(KeyCode.Escape)) return;
+            if (signOutConfirm != null && signOutConfirm.IsOpen) signOutConfirm.Close();
+            else if (accountPanel != null && accountPanel.IsOpen) accountPanel.Hide();
         }
 
         void SignOut()

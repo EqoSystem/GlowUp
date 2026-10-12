@@ -127,8 +127,27 @@ namespace GlowUp.EditorTools
             TextMeshProUGUI accountNote = A.Label(account.box, "AccountNoteText", "You can sign back in at any time with your email and password.",
                                                   27, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center, true);
             A.TopStrip(accountNote.transform, 414, 74, 60, 60);
-            Button signOut = A.PillButton(account.box, "SignOutButton", "Sign Out", 40, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.SignOut);
+            Button signOut = A.PillButton(account.box, "SignOutButton", "Log Out", 40, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.SignOut);
             A.BottomStrip(signOut.transform, 44, 120, 48, 48);
+
+            // ---- "Log out?" : asked before anything happens (the same question as on the Settings page) ----
+            A.AppPopup signOutPopup = A.Overlay(s, "SignOutConfirmPanel", "Log out?");
+            A.At(signOutPopup.box, A.MC, new Vector2(0, 60), new Vector2(900, 600));
+            TextMeshProUGUI signOutMessage = A.Label(signOutPopup.box, "MessageText", "You can sign back in at any time with your email and password.",
+                                                     32, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            A.Fill(signOutMessage.transform, 48, 190, 48, 130);
+            A.ShrinkWrapped(signOutMessage, 26);
+            Button signOutCancel = A.PillButton(signOutPopup.box, "CancelButton", "Cancel", 36, ThemeRole.SurfaceAlt, ThemeRole.MainText);
+            A.BottomStrip(signOutCancel.transform, 44, 108, 48, 462);
+            Button signOutOk = A.PillButton(signOutPopup.box, "ConfirmButton", "Log Out", 36, ThemeRole.ButtonFill, ThemeRole.ButtonText);
+            A.BottomStrip(signOutOk.transform, 44, 108, 462, 48);
+            // ConfirmDialog paints this button itself (the warning colour for logging out)
+            Object.DestroyImmediate(signOutOk.GetComponent<ThemedGraphic>());
+            Object.DestroyImmediate(A.LabelOf(signOutOk).GetComponent<ThemedGraphic>());
+            var signOutConfirm = A.Controller<GlowUp.AppSettings.ConfirmDialog>("DashboardFlowController");       // on the controller object, so it survives rebuilds
+            A.Set(signOutConfirm, "panel", signOutPopup.panel); A.Set(signOutConfirm, "titleText", signOutPopup.title); A.Set(signOutConfirm, "messageText", signOutMessage);
+            A.Set(signOutConfirm, "confirmButton", signOutOk); A.Set(signOutConfirm, "confirmLabel", A.LabelOf(signOutOk));
+            A.Set(signOutConfirm, "cancelButton", signOutCancel); A.Set(signOutConfirm, "cancelLabel", A.LabelOf(signOutCancel));
 
             AiInsightPanel aiPanel = AppTiles.AiPanel(s);
 
@@ -149,6 +168,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "avatarButton", avatar); A.Set(controller, "accountPanel", account.panel);
             A.Set(controller, "accountNameText", accountName); A.Set(controller, "accountEmailText", accountEmail);
             A.Set(controller, "signOutButton", signOut);
+            A.Set(controller, "signOutConfirm", signOutConfirm);
             A.Set(controller, "settingsButton", settings);
 
             A.Finish(s);
