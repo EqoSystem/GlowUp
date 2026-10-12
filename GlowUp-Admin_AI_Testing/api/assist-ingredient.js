@@ -9,7 +9,9 @@
 //
 // The answer is a DRAFT. Nothing is saved here: the page fills the form, the admin reads it against the sources and saves.
 //
-// Optional environment variables: GEMINI_MODELS (comma-separated, tried in order; default "gemini-flash-latest").
+// Optional environment variables: GEMINI_MODELS (comma-separated, tried in order), and BACKUP services used only when Gemini
+// cannot answer (a free quota used up): GROQ_API_KEY, OPENROUTER_API_KEY, MISTRAL_API_KEY (and GROQ_MODEL, OPENROUTER_MODEL,
+// MISTRAL_MODEL to change the model). A backup cannot search the web, so its draft has no sources.
 
 const PROJECT = "glowup-admin-portal";
 const FIREBASE_WEB_KEY = "AIzaSyAkb23xQ69a2Q4tpucGty9yDEoH0ab1JDM";      // the website's public Firebase key (it is in every page); NOT the AI key
@@ -152,35 +154,92 @@ async function sourcesOf(candidate) {
     return pages.filter((p) => p.url && !seen.has(p.url) && seen.add(p.url)).sort((a, b) => Number(b.credible) - Number(a.credible)).slice(0, 8);
 }
 
-async function askGemini(key, name) {
-    const models = String(process.env.GEMINI_MODELS || "gemini-flash-latest").split(",").map((m) => m.trim()).filter(Boolean);
-    let last = "No AI model answered.";
+// ---- the AI services, in the order they are tried -----------------------------------------------------------------
+// 1. Gemini WITH web search (the only one that can name the pages it used), over each model in GEMINI_MODELS;
+// 2. Gemini WITHOUT web search (a quota for search can be used up while plain answers still work);
+// 3. any backup service whose key is set (GROQ_API_KEY, OPENROUTER_API_KEY, MISTRAL_API_KEY). These cannot search the
+//    web: their answer comes from the model's memory, and the page says so and gives no sources. Nothing is ever
+//    invented as a source.
+const BACKUPS = [
+    { id: "groq", label: "Groq", key: "GROQ_API_KEY", url: "https://api.groq.com/openai/v1/chat/completions", model: () => process.env.GROQ_MODEL || "llama-3.3-70b-versatile" },
+    { id: "openrouter", label: "OpenRouter", key: "OPENROUTER_API_KEY", url: "https://openrouter.ai/api/v1/chat/completions", model: () => process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct:free" },
+    { id: "mistral", label: "Mistral", key: "MISTRAL_API_KEY", url: "https://api.mistral.ai/v1/chat/completions", model: () => process.env.MISTRAL_MODEL || "mistral-small-latest" }
+];
+
+async function askGemini(key, name, withSearch, notes) {
+    const models = String(process.env.GEMINI_MODELS || "gemini-flash-latest,gemini-3.6-flash,gemini-3.5-flash").split(",").map((m) => m.trim()).filter(Boolean);
     for (const model of models) {
         let answer;
         try {
             answer = await withTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-                body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: question(name) }] }], tools: [{ google_search: {} }], generationConfig: { temperature: 0.1 } })
+                body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: question(name) }] }], ...(withSearch ? { tools: [{ google_search: {} }] } : {}), generationConfig: { temperature: 0.1 } })
             }, AI_SECONDS);
-        } catch (error) { last = "The AI took longer than " + AI_SECONDS + " seconds."; continue; }
-        if (answer.status === 429) { last = "The AI's quota is used up for now. Try again in a minute, or tomorrow."; continue; }
-        if (!answer.ok) { last = "The AI service answered with error " + answer.status + "."; continue; }
+        } catch (error) { notes.push(`Gemini ${model}: no answer in ${AI_SECONDS} seconds`); continue; }
+        if (answer.status === 429) { notes.push(`Gemini ${model}${withSearch ? " with search" : ""}: free quota used up`); continue; }
+        if (!answer.ok) { notes.push(`Gemini ${model}: error ${answer.status}`); continue; }
         const body = await answer.json();
         const candidate = (body.candidates || [])[0];
         const said = candidate && candidate.content && Array.isArray(candidate.content.parts) ? candidate.content.parts.map((p) => p.text || "").join("") : "";
         const object = firstObject(said);
-        if (!object) { last = "The AI's answer could not be read."; continue; }
-        return { object, sources: await sourcesOf(candidate), model };
+        if (!object) { notes.push(`Gemini ${model}: the answer could not be read`); continue; }
+        return { object, sources: withSearch ? await sourcesOf(candidate) : [], model: "Gemini " + model, searched: withSearch };
     }
-    throw new Error(last);
+    return null;
+}
+
+async function askBackup(service, name, notes) {
+    const key = process.env[service.key];
+    if (!key) return null;
+    let answer;
+    try {
+        answer = await withTimeout(service.url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + key },
+            body: JSON.stringify({ model: service.model(), temperature: 0.1, messages: [{ role: "user", content: question(name) }] })
+        }, AI_SECONDS);
+    } catch (error) { notes.push(`${service.label}: no answer in ${AI_SECONDS} seconds`); return null; }
+    if (answer.status === 429) { notes.push(`${service.label}: free quota used up`); return null; }
+    if (!answer.ok) { notes.push(`${service.label}: error ${answer.status}`); return null; }
+    const body = await answer.json();
+    const said = body.choices && body.choices[0] && body.choices[0].message ? String(body.choices[0].message.content || "") : "";
+    const object = firstObject(said);
+    if (!object) { notes.push(`${service.label}: the answer could not be read`); return null; }
+    return { object, sources: [], model: `${service.label} ${service.model()}`, searched: false };
+}
+
+/** Search links the admin can open to check an entry. They are NOT pages the AI used: they only start a search on a credible site. */
+function lookupLinks(name) {
+    const q = encodeURIComponent(name);
+    return [
+        { title: "PubChem (NIH): search for it", url: `https://pubchem.ncbi.nlm.nih.gov/#query=${q}` },
+        { title: "Cosmetic Ingredient Review: search its site", url: `https://www.google.com/search?q=${encodeURIComponent("site:cir-safety.org " + name)}` },
+        { title: "EU CosIng and SCCS: search their sites", url: `https://www.google.com/search?q=${encodeURIComponent("site:europa.eu " + name + " cosmetic ingredient")}` }
+    ];
+}
+
+async function ask(key, name) {
+    const notes = [];
+    if (key) {
+        const withSearch = await askGemini(key, name, true, notes);
+        if (withSearch) return { ...withSearch, notes };
+        const plain = await askGemini(key, name, false, notes);
+        if (plain) return { ...plain, notes };
+    }
+    for (const service of BACKUPS) {
+        const got = await askBackup(service, name, notes);
+        if (got) return { ...got, notes };
+    }
+    const error = new Error(notes.length > 0 ? "Every AI that is set up said no: " + notes.join("; ") + ". Try again later, or write the entry by hand." : "No AI is set up.");
+    throw error;
 }
 
 module.exports = async (req, res) => {
     try {
         if (req.method !== "POST") return send(res, 405, { error: "Use POST." });
         const key = process.env.GEMINI_API_KEY;
-        if (!key) return send(res, 503, { error: "The AI is not set up yet: add GEMINI_API_KEY in Vercel > Project > Settings > Environment Variables, then deploy again." });
+        if (!key && !BACKUPS.some((b) => process.env[b.key])) return send(res, 503, { error: "The AI is not set up yet: add GEMINI_API_KEY in Vercel > Project > Settings > Environment Variables, then deploy again." });
 
         const header = String(req.headers.authorization || "");
         const uid = await adminUid(header.startsWith("Bearer ") ? header.slice(7) : "");
@@ -190,14 +249,15 @@ module.exports = async (req, res) => {
         const name = text(body.name, 120);
         if (name.length < 2 || !/[a-z0-9]/i.test(name)) return send(res, 400, { error: "No ingredient name was sent." });
 
-        const { object, sources, model } = await askGemini(key, name);
-        if (object.notFound === true) return send(res, 200, { found: false, sources, model, message: "The AI found nothing credible about this name. It may be a misread label or a trade name." });
+        const { object, sources, model, searched, notes } = await ask(key, name);
+        const lookups = lookupLinks(name);
+        if (object.notFound === true) return send(res, 200, { found: false, sources, lookups, model, searched, notes, message: "The AI found nothing credible about this name. It may be a misread label or a trade name." });
         const credible = sources.filter((s) => s.credible).length;
-        return send(res, 200, { found: true, draft: tidy(object, name), sources, credibleSources: credible, model });
+        return send(res, 200, { found: true, draft: tidy(object, name), sources, lookups, credibleSources: credible, model, searched, notes });
     } catch (error) {
         return send(res, 502, { error: text(error && error.message, 200) || "Assist with AI failed." });
     }
 };
 
 // for the checks in tests/ (pure helpers; no network)
-module.exports.helpers = { firstObject, tidy, isCredible, hostOf, question };
+module.exports.helpers = { firstObject, tidy, isCredible, hostOf, question, lookupLinks };

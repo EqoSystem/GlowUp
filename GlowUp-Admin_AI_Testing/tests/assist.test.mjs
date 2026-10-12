@@ -78,6 +78,47 @@ check(r.status === 502 && /quota/i.test(r.body.error), "a used-up quota is said 
 r = await call({ gemini: (reply) => reply(200, { candidates: [{ content: { parts: [{ text: '{"notFound":true}' }] } }] }) });
 check(r.status === 200 && r.body.found === false, "nothing credible found: no draft, no made-up entry");
 
+// ---- backups: Gemini out of quota -> Gemini without search -> another free service
+const GOOD = '{"name":"Mica","techName":"Mica","description":"A shiny mineral.","riskLevel":"safe","confidence":"medium"}';
+r = await call({ body: { name: "Mica" }, gemini: (reply) => reply(429, {}) });
+check(r.status === 502 && /quota/i.test(r.body.error) && /Gemini/.test(r.body.error), "Gemini out of quota and no backup key: said plainly, naming what was tried");
+
+// search quota used up, plain Gemini still answers
+let calls = 0;
+r = await call({ body: { name: "Mica" }, gemini: (reply) => (JSON.parse("{}"), (calls++ < 3 ? reply(429, {}) : reply(200, { candidates: [{ content: { parts: [{ text: GOOD }] } }] }))) });
+check(r.status === 200 && r.body.found === true && r.body.searched === false && r.body.sources.length === 0, "search quota used up: Gemini answers without search, and says so (no sources)");
+check(r.body.notes.some((n) => /with search/.test(n)), "the notes say why search was skipped");
+
+// Gemini all out: a backup service answers
+process.env.GROQ_API_KEY = "groq-test";
+{
+    const holder = { asked: null };
+    const inner = globalThis.fetch;
+    r = await new Promise(async (done) => {
+        process.env.GEMINI_API_KEY = "test-key";
+        const sent = [];
+        globalThis.fetch = async (url, options = {}) => {
+            sent.push({ url: String(url), options });
+            const reply = (status, json) => ({ ok: status >= 200 && status < 300, status, json: async () => json, headers: { get: () => null } });
+            if (String(url).includes("accounts:lookup")) return reply(200, { users: [{ localId: "admin1" }] });
+            if (String(url).includes("/documents/admins/")) return reply(200, {});
+            if (String(url).includes("generativelanguage")) return reply(429, {});
+            if (String(url).includes("api.groq.com")) return reply(200, { choices: [{ message: { content: GOOD } }] });
+            return reply(404, {});
+        };
+        const res = { statusCode: 0, setHeader() {}, end: (text) => done({ status: res.statusCode, body: JSON.parse(text), sent }) };
+        handler({ method: "POST", headers: { authorization: "Bearer good" }, body: { name: "Mica" } }, res);
+    });
+    const toGroq = r.sent.find((x) => x.url.includes("api.groq.com"));
+    check(r.status === 200 && r.body.found === true && /Groq/.test(r.body.model) && r.body.searched === false, "Gemini out of quota: the backup service answers");
+    check(r.body.sources.length === 0, "a backup draft names no sources (none are invented)");
+    check(r.body.lookups.length === 3 && r.body.lookups.every((l) => /^https:\/\//.test(l.url)), "search links for checking it by hand are given");
+    check(toGroq.options.headers.Authorization === "Bearer groq-test" && !toGroq.url.includes("groq-test"), "the backup key goes in a header, never in the address");
+    check(toGroq.options.body.includes("Mica") && !toGroq.options.body.includes("admin1"), "the backup AI is sent the ingredient's name only");
+    check(JSON.stringify(r.body).indexOf("groq-test") < 0 && JSON.stringify(r.body).indexOf("test-key") < 0, "no key is ever in the answer");
+    delete process.env.GROQ_API_KEY;
+}
+
 console.log("checks made: " + checks);
 console.log(failed === 0 ? "ALL PASSED" : failed + " FAILED");
 process.exit(failed === 0 ? 0 : 1);

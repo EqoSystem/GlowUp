@@ -600,10 +600,14 @@ async function assistWithAi(name) {
         writeFit(el("skinTypesFit"), d.avoidForSkinTypes, d.goodForSkinTypes);
         writeFit(el("conditionsFit"), d.avoidForConditions, d.goodForConditions);
         assisted = { sources: body.sources || [], model: body.model || "" };
+        const backupNote = body.notes && body.notes.length > 0 ? `<br><span class="field-hint">Before it answered: ${escapeHtml(body.notes.join("; "))}.</span>` : "";
         const sure = { high: "The AI is fairly sure of this draft.", medium: "The AI is only partly sure of this draft.", low: "The AI is NOT sure of this draft." }[d.confidence] || "";
         say(`<b>This is a draft the AI wrote. Nothing is saved yet.</b> ${sure} Read every box against the sources, correct what is wrong, then press Save.`
             + (body.credibleSources === 0 ? " <b>None of its pages is on the list of credible sources: check with extra care.</b>" : "")
-            + `<br><b>Sources:</b><br>${assistSources(body.sources)}`);
+            + (body.searched === false ? `<br><b>This draft was written WITHOUT a web search (by ${escapeHtml(body.model || "a backup AI")}), from the AI's memory. It names no sources, so every box is unchecked: check it with the links below.</b>` : "")
+            + `<br><b>Sources:</b><br>${assistSources(body.sources)}`
+            + `<br><b>Check it yourself:</b> ` + (body.lookups || []).map((l) => `<a class="source-link" href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.title)}</a>`).join(" · ")
+            + backupNote);
     } catch (error) {
         const why = error && error.name === "AbortError" ? "The AI took too long." : (error && error.message) || "Something went wrong.";
         say(`<b>Assist with AI did not work.</b> ${escapeHtml(why)} You can still write the entry by hand.`);
