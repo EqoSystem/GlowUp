@@ -164,7 +164,7 @@ namespace GlowUp.Result
             if (alternativeTileTemplate != null) alternativeTileTemplate.gameObject.SetActive(false);
             if (sourceLinkTemplate != null) sourceLinkTemplate.gameObject.SetActive(false);
             if (backButton != null) backButton.onClick.AddListener(() => SceneNavigator.Go(string.IsNullOrEmpty(ScanSession.ResultBackScene) ? defaultBackScene : ScanSession.ResultBackScene));
-            if (scanAnotherButton != null) scanAnotherButton.onClick.AddListener(() => { if (scanAgainPanel != null && record != null) scanAgainPanel.Show(); else ScanAgain(false); });
+            if (scanAnotherButton != null) scanAnotherButton.onClick.AddListener(() => { if (scanAgainPanel != null && record != null) scanAgainPanel.Show(); else StartNewScan(); });
             if (sameProductButton != null) sameProductButton.onClick.AddListener(() => ScanAgain(true));
             if (differentProductButton != null) differentProductButton.onClick.AddListener(() => ScanAgain(false));
             if (tryOnButton != null) tryOnButton.onClick.AddListener(() => { ScanSession.TryOn = record; SceneNavigator.Go(tryOnScene); });
@@ -176,14 +176,25 @@ namespace GlowUp.Result
         }
 
         /// <summary>
-        /// Opens the scanner again. `sameProduct`: the product keeps its name and the new result takes the place of this
-        /// one (no second entry in Recent Scans, and the scan is not counted twice). Otherwise it is a new scan and this
-        /// result stays as it is.
+        /// Opens the scanner again, and the new result takes the place of this one either way (the user's decision of
+        /// 12 October 2026). `sameProduct`: the product keeps its name, there is no second entry in Recent Scans and the
+        /// scan is not counted twice. A different product: the user changed their mind about this scan, so it leaves
+        /// Recent Scans when the new product's result is saved (it can still be brought back there).
         /// </summary>
         void ScanAgain(bool sameProduct)
         {
-            ScanSession.RescanOf = sameProduct ? record : null;
+            ScanSession.RescanOf = record;
+            ScanSession.RescanSameProduct = sameProduct;
             ScanSession.KeepLightChoice = true;             // a flashlight the user switched on comes back on
+            SceneNavigator.Go(scanScene);
+        }
+
+        /// <summary>A scan that replaces nothing (a scene without the "Scan again" question, or no saved result on the screen).</summary>
+        void StartNewScan()
+        {
+            ScanSession.RescanOf = null;
+            ScanSession.RescanSameProduct = true;
+            ScanSession.KeepLightChoice = true;
             SceneNavigator.Go(scanScene);
         }
 

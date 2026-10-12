@@ -191,7 +191,7 @@ namespace GlowUp.EditorTools
             IngredientSheet sheet = A.IngredientSheetPopup(s);
             // "Scan again": the same product, or a different one?
             A.AppPopup scanAgain = SmartScanSceneBuilder.ScanAgainPopup(s, "ScanAgainPanel", "The new result takes the place of this one.",
-                                                                        "A new scan. This result stays in Recent Scans.", out Button sameProduct, out Button differentProduct);
+                                                                        "The new product takes this one's place. This one can be restored in Recent Scans.", out Button sameProduct, out Button differentProduct);
 
             // ---- ingredient safety alert: opens by itself when the scan contains a trigger the user switched on in Settings ----
             A.AppPopup alertPopup = A.Overlay(s, "SafetyAlertPanel", "Safety alert");

@@ -33,6 +33,12 @@ namespace GlowUp.Scan
         /// keeps its place in Recent Scans, and the scan counters are not added to a second time. Null = a new scan.
         /// </summary>
         public static ScanRecord PendingReplaces;
+        /// <summary>
+        /// True = it is the same product scanned again (the result keeps the earlier scan's id, name and count).
+        /// False = "Scan a different product": the user changed their mind, so the earlier scan leaves Recent Scans and
+        /// the new product's scan is saved as a scan of its own (the earlier one can still be brought back there).
+        /// </summary>
+        public static bool PendingReplacesSame = true;
 
         /// <summary>Forgets what is waiting to be analysed.</summary>
         public static void ClearPending()
@@ -41,14 +47,16 @@ namespace GlowUp.Scan
             PendingProductName = PendingBrandName = PendingCosmeticType = PendingShadeName = PendingFinish = PendingBarcode = "";
             PendingSources = new System.Collections.Generic.List<string>();
             PendingListFrom = ""; PendingListWebBacked = false;
-            PendingReplaces = null;
+            PendingReplaces = null; PendingReplacesSame = true;
         }
 
         /// <summary>
-        /// "Scan the same product again" was chosen on the result screen: the saved scan that is being done again. The scan
-        /// screen takes it over when it opens (the product keeps its name, the pictures are taken anew) and empties this.
+        /// "Scan again" was chosen on the result screen: the saved scan the new one takes the place of. The scan screen
+        /// takes it over when it opens and empties this. For the same product the name is kept and the pictures are taken anew.
         /// </summary>
         public static ScanRecord RescanOf;
+        /// <summary>With RescanOf: true = "Scan the same product again", false = "Scan a different product" (it replaces that scan too).</summary>
+        public static bool RescanSameProduct = true;
 
         /// <summary>The product the result scene shows.</summary>
         public static ScanRecord Current;

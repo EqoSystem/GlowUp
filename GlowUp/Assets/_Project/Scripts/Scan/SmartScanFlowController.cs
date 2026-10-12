@@ -256,7 +256,8 @@ namespace GlowUp.Scan
         // what has been found so far
         readonly ProductAiAdvisor.Identity identity = new ProductAiAdvisor.Identity();
         ProductData knownProduct;
-        ScanRecord rescanOf;                      // "Scan the same product again": the saved scan this one takes the place of
+        ScanRecord rescanOf;                      // "Scan again" on a result: the saved scan this one takes the place of
+        bool rescanSame = true;                   // ... true = the same product again, false = a different product (it replaces that scan too)
         readonly List<PackagingMemory.Match> lookMatches = new List<PackagingMemory.Match>();     // packs this phone remembers that look like this one
         readonly HashSet<string> declined = new HashSet<string>();       // products the user said "no" to in this scan
         PackEmbedder embedder;                    // the phone's picture model (null when the phone or the build has none)
@@ -311,12 +312,13 @@ namespace GlowUp.Scan
             ResetChecklist();
             if (ring != null) ring.Clear();
 
-            // "Scan the same product again" on the result screen: the product keeps its name, the pictures are taken anew,
-            // and the new result will take the place of that scan (no second entry in Recent Scans, no second count)
-            rescanOf = ScanSession.RescanOf;
-            ScanSession.RescanOf = null;
+            // "Scan again" on the result screen: the new result will take the place of that scan. For the SAME product it
+            // keeps its name and the pictures are taken anew (no second entry in Recent Scans, no second count); for a
+            // DIFFERENT product nothing is taken over, and that scan leaves Recent Scans when the new one is saved.
+            rescanOf = ScanSession.RescanOf; rescanSame = ScanSession.RescanSameProduct;
+            ScanSession.RescanOf = null; ScanSession.RescanSameProduct = true;
             ScanSession.ClearPending();
-            if (rescanOf != null)
+            if (rescanOf != null && rescanSame)
             {
                 identity.productName = (rescanOf.productName ?? "").Trim(); identity.brandName = (rescanOf.brandName ?? "").Trim();
                 identity.cosmeticType = (rescanOf.cosmeticType ?? "").Trim();
@@ -965,7 +967,7 @@ namespace GlowUp.Scan
                 identity.found = false; identity.confidence = 0f;
                 identity.productName = identity.brandName = identity.cosmeticType = identity.shadeHex = identity.shadeName = identity.finish = "";
                 knownProduct = null;
-                rescanOf = null;                 // a different product is a new scan: nothing is replaced
+                rescanSame = false;              // a different product: it still takes the place of the scan this one was started from
             }
             else { identity.shadeHex = identity.shadeName = identity.finish = ""; }
             ResetChecklist();
@@ -1172,7 +1174,7 @@ namespace GlowUp.Scan
             ScanSession.PendingSources = new List<string>(sources);
             ScanSession.PendingBarcode = barcode;
             ScanSession.PendingListFrom = listFrom; ScanSession.PendingListWebBacked = listWebBacked;
-            ScanSession.PendingReplaces = rescanOf;
+            ScanSession.PendingReplaces = rescanOf; ScanSession.PendingReplacesSame = rescanSame;
             StartCoroutine(Recognised());
         }
 
@@ -1392,7 +1394,7 @@ namespace GlowUp.Scan
             ScanSession.PendingCosmeticType = typedType.Length > 0 ? typedType : identity.cosmeticType;
             ScanSession.PendingShadeName = identity.shadeName; ScanSession.PendingFinish = identity.finish;
             ScanSession.PendingBarcode = barcode;
-            ScanSession.PendingReplaces = rescanOf;
+            ScanSession.PendingReplaces = rescanOf; ScanSession.PendingReplacesSame = rescanSame;
             SceneNavigator.GoViaLoading(resultScene, loadingMessage, ScanAnalysisPipeline.Run);
         }
     }

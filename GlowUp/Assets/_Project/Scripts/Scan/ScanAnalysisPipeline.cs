@@ -46,7 +46,8 @@ namespace GlowUp.Scan
             if (label.Count == 0)
             {
                 ScanSession.LastError = "We could not find an ingredient list in that. Try again with the list filling the frame, or type the ingredients in.";
-                ScanSession.RescanOf = ScanSession.PendingReplaces;     // still the same product: the next try takes the same place
+                ScanSession.RescanOf = ScanSession.PendingReplaces;     // the next try takes the same place
+                ScanSession.RescanSameProduct = ScanSession.PendingReplacesSame;
                 ScanSession.KeepLightChoice = true;                     // and a flashlight the user switched on comes back on
                 SceneNavigator.Retarget(SceneNames.AiSmartAnalysis);
                 return;
@@ -89,8 +90,12 @@ namespace GlowUp.Scan
 
             // "SCAN THE SAME PRODUCT AGAIN": this result takes the place of the earlier one (the same id), so the product
             // is in Recent Scans once and its scan is counted once. (An earlier scan that is no longer kept: a new scan.)
+            // "SCAN A DIFFERENT PRODUCT" also replaces the earlier scan, but as a scan of its own: a new id, its own count,
+            // and the earlier scan leaves Recent Scans once this one is saved (see `changedMind` below).
             ScanRecord earlier = ScanSession.PendingReplaces;
             if (earlier != null && ScanHistoryRepository.Find(earlier.id) == null) earlier = null;
+            ScanRecord changedMind = earlier != null && !ScanSession.PendingReplacesSame ? earlier : null;
+            if (changedMind != null) earlier = null;
             if (earlier != null) record.id = earlier.id;
 
             // is it a product from the website's inventory? (its ingredient list is nearly the same)
@@ -160,6 +165,9 @@ namespace GlowUp.Scan
             // every scan is saved to Recent Scans automatically; a scan that was done again takes the earlier one's place
             bool replaced = earlier != null && ScanHistoryRepository.Replace(earlier.id, record);
             if (!replaced) ScanHistoryRepository.Add(record);
+            // the user chose "Scan a different product" on the earlier result: that scan is taken out of Recent Scans now
+            // that the new one is safely saved. It goes to the removed scans, so "Restore" there can still bring it back.
+            if (changedMind != null && changedMind.id != record.id) ScanHistoryRepository.Remove(changedMind.id);
             // the scan counters on the admin website: ONCE per scan. A scan that was done again only counts for a brand
             // or a product the earlier attempt did not count (it was recognised differently this time).
             if (!string.IsNullOrEmpty(record.brandId) && !(replaced && earlier.brandId == record.brandId)) BrandRepository.RecordScan(record.brandId);
