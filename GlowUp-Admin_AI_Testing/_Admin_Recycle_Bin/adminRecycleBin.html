@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en" class="auth-pending">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GlowUp Admin - Recycle Bin</title>
+    <script>
+        // dark or light before anything is drawn: the person's choice, else the computer's own setting
+        (function () {
+            var t = null;
+            try { t = localStorage.getItem("glowup.theme"); } catch (e) { }
+            if (t !== "light" && t !== "dark") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+            document.documentElement.dataset.theme = t;
+        })();
+        // if the sign-in check never answers (no internet), say so instead of leaving a blank page
+        setTimeout(function () {
+            if (document.documentElement.classList.contains("auth-pending")) document.documentElement.classList.add("auth-stuck");
+        }, 10000);
+    </script>
+    <!-- the files this page needs are fetched side by side, not one after the other as each one names the next -->
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js">
+    <link rel="modulepreload" href="../_Database/firebase-console.js">
+    <link rel="modulepreload" href="../_Shared/adminCommon.js">
+    <link rel="modulepreload" href="../_Shared/adminStore.js">
+    <link rel="modulepreload" href="../_Shared/adminShell.js">
+    <link rel="modulepreload" href="../_Shared/adminLayouts.js">
+    <link rel="modulepreload" href="../_Shared/adminWidgets.js">
+    <link rel="modulepreload" href="../_Shared/adminAssist.js">
+    <link rel="modulepreload" href="../_Shared/glowupRules.js">
+    <link rel="stylesheet" href="../_Shared/adminCommon.css">
+    <link rel="stylesheet" href="../_Admin_Recycle_Bin/adminRecycleBin.css">
+</head>
+<body>
+
+    <main class="main-content" data-title="Recycle Bin" data-subtitle="What was removed: bring it back, or delete it for good">
+        <!-- draws the menu and the top bar with the first picture: see pageFrame.js -->
+        <script src="../_Shared/pageFrame.js"></script>
+        <div class="board">
+
+            <!-- which kind of entry, and the search -->
+            <section class="panel" data-panel="tools" data-label="Kind and search" data-w="12">
+                <div class="toolbar">
+                    <div class="segmented" id="binTabs" role="tablist" aria-label="What to show">
+                        <button type="button" class="seg" role="tab" data-kind="ingredients"><i data-icon="flask"></i>Ingredients <span class="tab-count" id="countIngredients"></span></button>
+                        <button type="button" class="seg" role="tab" data-kind="brands"><i data-icon="tag"></i>Brands <span class="tab-count" id="countBrands"></span></button>
+                        <button type="button" class="seg" role="tab" data-kind="products"><i data-icon="lipstick"></i>Products <span class="tab-count" id="countProducts"></span></button>
+                    </div>
+                    <div class="search-container">
+                        <i data-icon="search"></i>
+                        <input type="text" placeholder="Search the Recycle bin" class="search-input" id="binSearchInput" autocomplete="off" aria-label="Search the Recycle bin">
+                        <button type="button" class="search-clear" id="binSearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
+                    </div>
+                    <span class="spacer"></span>
+                    <button type="button" class="guide-badge" data-tip-title="How the Recycle bin works" data-tip="Removing an entry puts it here: the app stops using it at once, and nothing is lost. Restore gives it back the status it had. Delete permanently takes it out of the database: that cannot be undone, so a copy is saved to your computer first.">i</button>
+                </div>
+            </section>
+
+            <!-- the removed entries -->
+            <section class="panel" data-panel="list" data-label="Removed entries" data-w="12">
+                <div class="panel-head">
+                    <button type="button" class="pick" id="binPickAll" role="checkbox" aria-checked="false" aria-label="Select all shown" data-tip="Select every entry shown here."></button>
+                    <h3 class="panel-title" id="binTitle">Removed ingredients</h3>
+                    <span class="panel-count" id="binCountLine"></span>
+                    <span class="spacer"></span>
+                    <div class="pager" id="binPagerTop"></div>
+                </div>
+                <!-- shows while entries are picked -->
+                <div class="w-bar sel-bar" id="binBar" hidden>
+                    <b id="binBarCount">0 selected</b>
+                    <span class="spacer"></span>
+                    <button type="button" class="btn" id="restoreSelectedBtn"><i data-icon="undo"></i>Restore selected</button>
+                    <button type="button" class="btn danger" id="deleteSelectedBtn"><i data-icon="trash"></i>Delete selected permanently</button>
+                    <button type="button" class="btn" id="clearSelectedBtn">Cancel</button>
+                </div>
+                <div class="table-container">
+                    <table class="admin-table bin-table">
+                        <thead>
+                            <tr><th class="pick-col"></th><th>Name</th><th>Removed</th><th>Why it is here</th><th>Status before <span id="binStatusGuide"></span></th><th></th></tr>
+                        </thead>
+                        <tbody id="binTableBody">
+                            <tr><td colspan="6"><div class="sk-list"><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div></div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty-state" id="binEmpty" hidden>
+                    <p class="empty-message" id="binEmptyMessage">The Recycle bin is empty.</p>
+                    <span class="empty-hint" id="binEmptyHint">Entries you remove on the other pages come here.</span>
+                </div>
+                <div class="table-foot"><span class="spacer"></span><div class="pager" id="binPager"></div></div>
+            </section>
+        </div>
+    </main>
+
+    <script type="module" src="../_Admin_Recycle_Bin/adminRecycleBin.js"></script>
+</body>
+</html>
