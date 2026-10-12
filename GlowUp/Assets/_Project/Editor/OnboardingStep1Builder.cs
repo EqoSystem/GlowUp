@@ -64,6 +64,9 @@ namespace GlowUp.EditorTools
             // any real mail domain may sign up (12 October 2026): well-known providers at once, others after an online check
             InfoBadge(content, emailLabel, "EmailHelperText", "Needed. Your own email: Gmail, Outlook, Yahoo, iCloud, or a school or work address. Other addresses are checked online to make sure they receive email. Temporary addresses are not accepted.");
             var emailCheck = AddEmailCheck(email, content);
+            // "Use another email": a small link under the email's line. It shows once the sign-up has its account (from then
+            // on the email is fixed); switched off in the Hierarchy until then.
+            Button useAnotherEmail = UseAnotherEmailLink(content);
 
             // ---- password ----
             var passwordLabel = LabelRow(content, Loose(ct, "PasswordText"), "PasswordText", "Password");
@@ -87,6 +90,10 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(field, "popup", popup);
             SceneBuilderCore.SetField(c.leave, "calendar", popup);          // the phone's back key closes the calendar before anything else
 
+            // ---- "Confirm your email": the pop-up that waits until the link in the message was tapped ----
+            OverlayPanel confirmPanel = BuildConfirmEmailPanel(ct, out TextMeshProUGUI confirmMessage, out TextMeshProUGUI confirmStatus,
+                                                               out Button confirmedButton, out Button sendAgainButton, out Button changeEmailButton);
+
             // ---- controller ----
             var go = SceneBuilderCore.EnsureRoot("OnboardingStep1FlowController");
             var ctl = SceneBuilderCore.Ensure<OnboardingStep1FlowController>(go);
@@ -100,10 +107,71 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(ctl, "continueButton", c.cont); SceneBuilderCore.SetField(ctl, "continueAnimator", c.anim);
             SceneBuilderCore.SetField(ctl, "backButton", c.back); SceneBuilderCore.SetField(ctl, "feedbackText", c.feedback);
             SceneBuilderCore.SetField(ctl, "emailMax", EmailLimit);
+            SceneBuilderCore.SetField(ctl, "confirmPanel", confirmPanel);
+            SceneBuilderCore.SetField(ctl, "confirmMessageText", confirmMessage); SceneBuilderCore.SetField(ctl, "confirmStatusText", confirmStatus);
+            SceneBuilderCore.SetField(ctl, "confirmedButton", confirmedButton);
+            SceneBuilderCore.SetField(ctl, "sendAgainButton", sendAgainButton); SceneBuilderCore.SetField(ctl, "sendAgainLabel", AppKit.LabelOf(sendAgainButton));
+            SceneBuilderCore.SetField(ctl, "changeEmailButton", changeEmailButton); SceneBuilderCore.SetField(ctl, "useAnotherEmailButton", useAnotherEmail);
+            // "Use another email?" is asked with the same pop-up as "Leave sign-up?"
+            SceneBuilderCore.SetField(ctl, "questionDialog", c.leave != null ? c.leave.GetComponent<GlowUp.AppSettings.ConfirmDialog>() : null);
 
             FinishScene();
             SceneBuilderCore.Save(scene);
             Debug.Log("[GlowUp] OnboardingStep1Scene built. Everything is inside FormPanel > FormScrollView > Viewport > Content; Continue is outside the panel.");
+        }
+
+        /// <summary>The link "Use another email" as a row of the form, right under the email's own line (a generated object: rebuilt on every run).</summary>
+        static Button UseAnotherEmailLink(Transform content)
+        {
+            Transform old = Loose(content, "UseAnotherEmailButton");
+            if (old != null) Object.DestroyImmediate(old.gameObject);
+            Button link = AppKit.LinkButton(content, "UseAnotherEmailButton", "Use another email", 28, ThemeRole.AccentText);
+            AppKit.Size(link, -1, 52);
+            TextMeshProUGUI label = AppKit.LabelOf(link);
+            label.alignment = TextAlignmentOptions.MidlineLeft; label.margin = new Vector4(14, 0, 0, 0);
+            Transform line = Loose(content, "EmailCheckText");
+            if (line != null && line.parent == content) link.transform.SetSiblingIndex(line.GetSiblingIndex() + 1);
+            link.gameObject.SetActive(false);
+            return link;
+        }
+
+        /// <summary>
+        /// ConfirmEmailPanel: what the user sees after Continue on a correctly filled page. The app has sent the "confirm your
+        /// email" message; this pop-up says so, waits, and goes on by itself once the link was tapped. Its texts are examples:
+        /// the real wording is on OnboardingStep1FlowController (Messages: confirming the email). A generated object, switched
+        /// off in the Hierarchy: tick it active to see and style it.
+        /// </summary>
+        static OverlayPanel BuildConfirmEmailPanel(Transform canvas, out TextMeshProUGUI message, out TextMeshProUGUI status,
+                                                   out Button confirmed, out Button sendAgain, out Button changeEmail)
+        {
+            Transform old = Loose(canvas, "ConfirmEmailPanel");
+            if (old != null) Object.DestroyImmediate(old.gameObject);
+
+            AppKit.AppPopup p = AppKit.Overlay(new AppKit.AppScreen { canvas = canvas }, "ConfirmEmailPanel", "Confirm your email");
+            AppKit.At(p.box, AppKit.MC, new Vector2(0, 40), new Vector2(900, 940));
+
+            Image disc = AppKit.Panel(p.box, "MailDisc", ThemeRole.SurfaceAlt, 1f, 120f);
+            AppKit.At(disc.transform, AppKit.TC, new Vector2(0, -128), new Vector2(120, 120));
+            AppKit.Icon(disc.transform, "Icon", IconFactory.Mail, 64, ThemeRole.MainText);
+
+            message = AppKit.Label(p.box, "MessageText",
+                "We sent a message to name@example.com. Open it and tap the link in it, then come back here. This page goes on by itself once the email is confirmed.",
+                31, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            AppKit.TopStrip(message.transform, 270, 200, 48, 48);
+            AppKit.ShrinkWrapped(message, 24);
+
+            status = AppKit.Label(p.box, "StatusText", "Not confirmed yet. Open the message and tap its link (look in the spam folder too).",
+                                  27, ThemeRole.AccentText, FontRole.Body, TextAlignmentOptions.Top, true);
+            AppKit.TopStrip(status.transform, 478, 96, 48, 48);
+            AppKit.ShrinkWrapped(status, 21);
+
+            confirmed = AppKit.PillButton(p.box, "ConfirmedButton", "I have confirmed", 36, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Check);
+            AppKit.BottomStrip(confirmed.transform, 232, 116, 48, 48);
+            sendAgain = AppKit.PillButton(p.box, "SendAgainButton", "Send again", 32, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Mail);
+            AppKit.BottomStrip(sendAgain.transform, 116, 100, 48, 48);
+            changeEmail = AppKit.LinkButton(p.box, "ChangeEmailButton", "Use another email", 28, ThemeRole.AccentText);
+            AppKit.BottomStrip(changeEmail.transform, 34, 64, 48, 48);
+            return p.panel;
         }
 
         /// <summary>Takes every object that belonged to the username out of the scene (label, field, reminder line, checklist rows).</summary>

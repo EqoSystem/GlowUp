@@ -108,6 +108,12 @@ namespace GlowUp.Onboarding
         {
             editing = value;
             if (rows != null) foreach (var r in rows) if (r != null) r.SetEditing(value);
+            // the email belongs to the account (confirmed on Step 1, or Google / Facebook's own): it is not changed here
+            if (value && (OnboardingSession.Social || OnboardingSession.HasAccount) && email != null)
+            {
+                SummaryRow emailRow = email.GetComponentInParent<SummaryRow>(true);
+                if (emailRow != null) emailRow.SetEditing(false);
+            }
             if (birthday != null) birthday.SetPickerEnabled(value);
             if (editButtonLabel != null) editButtonLabel.text = value ? doneLabel : editLabel;
             if (scroll != null) scroll.verticalNormalizedPosition = 1f;
@@ -134,8 +140,9 @@ namespace GlowUp.Onboarding
             // Signed in with Google / Facebook: Step 1 was skipped, so a birthday is welcome here but not needed, and the
             // email is the account's own. What IS filled in still has to follow the rules.
             bool social = OnboardingSession.Social;
+            bool hasAccount = OnboardingSession.HasAccount;        // its email was confirmed on Step 1 and is fixed
             // the email: a well-known provider, or a domain that was checked online (an answer Step 1 already has is used again)
-            if (!social && (emailCheck == null || !emailCheck.Look(T(email))))
+            if (!social && !hasAccount && (emailCheck == null || !emailCheck.Look(T(email))))
             {
                 reason = emailCheck != null && emailCheck.Message.Length > 0 ? emailCheck.Message : msgNoEmail;
                 return false;
@@ -157,7 +164,7 @@ namespace GlowUp.Onboarding
         {
             if (!Valid(out string reason)) { if (feedbackText != null) feedbackText.text = reason; return; }
             OnboardingSession.FirstName = T(firstName); OnboardingSession.MiddleName = T(middleName); OnboardingSession.LastName = T(lastName);
-            OnboardingSession.Email = T(email).ToLowerInvariant();
+            if (!OnboardingSession.Social && !OnboardingSession.HasAccount) OnboardingSession.Email = T(email).ToLowerInvariant();     // an account's email stays the account's
             if (birthday != null && birthday.Value.HasValue)
             {
                 var dob = birthday.Value.Value;

@@ -215,6 +215,7 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(guard, "confirm", dialog);
             SceneBuilderCore.SetField(guard, "leaveButton", leave);
             SceneBuilderCore.SetField(guard, "backButton", c.back);
+            SceneBuilderCore.SetField(guard, "statusText", c.feedback);         // "Leaving the sign-up..." for the moment that takes
             return guard;
         }
 

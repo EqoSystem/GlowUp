@@ -8,7 +8,7 @@ namespace GlowUp.Onboarding
     /// <summary>
     /// Everything the user enters during onboarding, shared by all five steps and the Terms scene.
     /// Non-secret fields are mirrored to PlayerPrefs so a restart mid-onboarding doesn't lose them.
-    /// The PASSWORD IS KEPT IN MEMORY ONLY and is sent to Firebase Auth once, at account creation.
+    /// The PASSWORD IS KEPT IN MEMORY ONLY and is sent to Firebase Auth once, at account creation (on Step 1).
     /// </summary>
     public static class OnboardingSession
     {
@@ -40,6 +40,34 @@ namespace GlowUp.Onboarding
         /// profile. Kept in memory only (the login page sets it again if the app was closed in between).
         /// </summary>
         public static bool Social;
+
+        /// <summary>
+        /// The account this sign-up already has, by its id ("" = none yet). Since 12 October 2026 the account is made on
+        /// Step 1, so that the "confirm your email" message can be sent; it is also set when somebody logs in with an
+        /// account that has no profile yet. With an account, Step 1 asks for no password any more, the email cannot be
+        /// changed without dropping the account, and the Terms page only saves the profile. Kept with the draft (an id
+        /// is not a secret), so a sign-up that was interrupted carries on with the same account.
+        /// </summary>
+        public static string AccountUid = "";
+        /// <summary>True when that account was made during THIS sign-up: leaving the sign-up removes it again, so the email stays free.</summary>
+        public static bool AccountMadeHere;
+        public static bool HasAccount => !string.IsNullOrEmpty(AccountUid);
+
+        /// <summary>The sign-up goes on without its account (it was removed, or nobody is signed in to it any more).</summary>
+        public static void ForgetAccount()
+        {
+            AccountUid = ""; AccountMadeHere = false; Password = "";
+            SaveDraft();
+        }
+
+        /// <summary>Starts the sign-up steps for somebody who logged in with an account that has no profile yet.</summary>
+        public static void BeginExisting(string uid, string email)
+        {
+            Clear();
+            AccountUid = uid ?? ""; AccountMadeHere = false;
+            Email = (email ?? "").Trim().ToLowerInvariant();
+            SaveDraft();
+        }
 
         /// <summary>Starts the sign-up steps for a Google / Facebook account: the email and name come from that account.</summary>
         public static void BeginSocial(string email, string displayName)
@@ -80,6 +108,8 @@ namespace GlowUp.Onboarding
             PlayerPrefs.SetString(Prefix + "Tone", SkinTone);
             PlayerPrefs.SetString(Prefix + "Cond", string.Join("|", SkinConditions));
             PlayerPrefs.SetString(Prefix + "Allergens", string.Join("|", Allergens));
+            PlayerPrefs.SetString(Prefix + "Account", AccountUid ?? "");
+            PlayerPrefs.SetInt(Prefix + "AccountMadeHere", AccountMadeHere ? 1 : 0);
             PlayerPrefs.Save();
         }
 
@@ -96,15 +126,17 @@ namespace GlowUp.Onboarding
             SkinTone = PlayerPrefs.GetString(Prefix + "Tone", SkinTone);
             SkinConditions = Split(PlayerPrefs.GetString(Prefix + "Cond", ""));
             Allergens = Split(PlayerPrefs.GetString(Prefix + "Allergens", ""));
+            AccountUid = PlayerPrefs.GetString(Prefix + "Account", AccountUid ?? "");
+            AccountMadeHere = PlayerPrefs.GetInt(Prefix + "AccountMadeHere", AccountMadeHere ? 1 : 0) == 1;
         }
 
         public static void Clear()
         {
-            Social = false;
+            Social = false; AccountUid = ""; AccountMadeHere = false;
             FirstName = MiddleName = LastName = Username = Email = BirthdayIso = SkinType = SkinTone = Password = "";
             Age = 0; SkinConditions = new List<string>(); Allergens = new List<string>();
             CustomConditions = new List<string>(); CustomAllergens = new List<string>();
-            foreach (var k in new[] { "First", "Middle", "Last", "User", "Email", "Birthday", "Age", "Type", "Tone", "Cond", "Allergens" })
+            foreach (var k in new[] { "First", "Middle", "Last", "User", "Email", "Birthday", "Age", "Type", "Tone", "Cond", "Allergens", "Account", "AccountMadeHere" })
                 PlayerPrefs.DeleteKey(Prefix + k);
             PlayerPrefs.Save();
         }

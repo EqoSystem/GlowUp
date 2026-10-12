@@ -17,9 +17,10 @@ namespace GlowUp.Onboarding
     /// <summary>
     /// Privacy Policy / Terms scene. The document is a scroll view: the checkbox stays locked until the
     /// user has scrolled from the top to the very bottom, and Continue stays locked until the box is ticked.
-    /// Continue then creates the Firebase account (real password over TLS), saves the profile
-    /// (Firestore + offline cache), stores an Argon2id verifier for offline sign-in, queues any
-    /// custom conditions/allergens for review, and opens the dashboard.
+    /// Continue then saves the profile (Firestore + offline cache) to the account that Step 1 made when the
+    /// email was confirmed (or to the Google / Facebook account), stores an Argon2id verifier for offline sign-in,
+    /// queues any custom conditions/allergens for review, and opens the dashboard. Only a scene flow built before
+    /// 12 October 2026 (no confirmation on Step 1) still creates the account here.
     /// </summary>
     public class TermsAcceptanceFlowController : MonoBehaviour
     {
@@ -44,6 +45,7 @@ namespace GlowUp.Onboarding
         [Tooltip("How long to wait for the account to be created before asking the user to try again (seconds)")]
         [SerializeField] private float createWaitSeconds = 30f;
         [SerializeField] private string msgSessionLost = "Your sign-up details were lost. Please start again.";
+        [SerializeField] private string msgConfirmFirst = "Your email is not confirmed yet. Go back to Step 1 and tap Continue there.";
 
         bool reachedBottom, busy;
         bool watching;          // false until the document has been laid out, so nothing unlocks by accident while the scene opens
@@ -113,7 +115,8 @@ namespace GlowUp.Onboarding
             if (busy) return;
             if (!reachedBottom) { Say(msgScrollFirst); return; }
             bool social = OnboardingSession.Social;        // signed in with Google / Facebook: the account exists, only the profile is saved
-            if (!social && (string.IsNullOrEmpty(OnboardingSession.Email) || string.IsNullOrEmpty(OnboardingSession.Password))) { Say(msgSessionLost); return; }
+            bool hasAccount = OnboardingSession.HasAccount; // Step 1 made the account when the email was confirmed: the same
+            if (!social && !hasAccount && (string.IsNullOrEmpty(OnboardingSession.Email) || string.IsNullOrEmpty(OnboardingSession.Password))) { Say(msgSessionLost); return; }
             if (!ConnectivityMonitor.Online) { Say(msgNeedInternet); return; }
 
             busy = true; Refresh(); Say(msgCreating);
@@ -121,10 +124,18 @@ namespace GlowUp.Onboarding
             try
             {
                 await FirebaseBootstrap.Ready;
-                if (social)
+                if (social || hasAccount)
                 {
                     FirebaseUser signedIn = FirebaseAuth.DefaultInstance.CurrentUser;
-                    if (signedIn == null) { Say(msgSessionLost); busy = false; Refresh(); return; }
+                    if (signedIn == null || (hasAccount && signedIn.UserId != OnboardingSession.AccountUid)) { Say(msgSessionLost); busy = false; Refresh(); return; }
+                    if (hasAccount && !signedIn.IsEmailVerified)
+                    {
+                        // the phone's copy of the account can be older than the confirmation: ask once before saying no
+                        try { await signedIn.ReloadAsync().OrTimeout(createWaitSeconds, "Checking the confirmation"); }
+                        catch (Exception e) { Debug.LogWarning("Sign-up: the confirmation could not be checked: " + e.Message); }
+                        signedIn = FirebaseAuth.DefaultInstance.CurrentUser ?? signedIn;
+                        if (!signedIn.IsEmailVerified) { Say(msgConfirmFirst); busy = false; Refresh(); return; }
+                    }
                     uid = signedIn.UserId;
                 }
                 else
@@ -162,7 +173,9 @@ namespace GlowUp.Onboarding
             catch (Exception e) { Debug.LogWarning("Sign-up: the profile will be sent later: " + e.Message); }
             try
             {
-                if (!social) OfflineCredentialStore.Remember(OnboardingSession.Email, OnboardingSession.Password);   // Argon2id verifier for offline sign-in (runs in the background)
+                // Argon2id verifier for offline sign-in (runs in the background). The password is only in memory: after the app was
+                // closed in the middle of a sign-up it is gone, and the verifier is made at the next log-in instead.
+                if (!social && !string.IsNullOrEmpty(OnboardingSession.Password)) OfflineCredentialStore.Remember(OnboardingSession.Email, OnboardingSession.Password);
                 if (!social) SavedAccounts.Remember(OnboardingSession.Email);       // only the email, for the list on the log-in page
                 QueueSuggestions(uid);
                 PlayerPrefs.SetInt("IsOnboarded", 1);

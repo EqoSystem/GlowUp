@@ -1,5 +1,9 @@
 using System;
+using System.Threading.Tasks;
+using GlowUp.Auth;
 using GlowUp.Common;
+using GlowUp.Data;
+using GlowUp.Net;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -11,6 +15,13 @@ namespace GlowUp.Onboarding
     /// checklists, calculates age from the birthday, and only enables (and animates) Continue
     /// when everything is valid. All limits and messages are Inspector fields.
     /// There is no username any more (removed on 11 October 2026): the dashboard greets the user by first name.
+    ///
+    /// THE EMAIL IS CONFIRMED HERE (the user's decision of 12 October 2026). Once every field meets its conditions and the
+    /// user continues, the account is made (that is what lets Firebase send its "confirm your email" message), the
+    /// message is sent, and the pop-up "Confirm your email" waits until the link in it was tapped. The app looks by itself
+    /// every few seconds and when the user comes back from the mail app, so nothing has to be typed. Only then does the
+    /// sign-up go on to Step 2. From that moment the email and the password are fixed; "Use another email" drops the
+    /// account and lets the user start that part again. A Google / Facebook account is confirmed by its provider.
     /// </summary>
     public class OnboardingStep1FlowController : MonoBehaviour
     {
@@ -40,6 +51,26 @@ namespace GlowUp.Onboarding
         [SerializeField] private Button backButton;
         [SerializeField] private TextMeshProUGUI feedbackText;
 
+        [Header("Confirm the email (empty in a scene built before 12 October 2026: then nothing is confirmed)")]
+        [Tooltip("The pop-up \"Confirm your email\"")]
+        [SerializeField] private OverlayPanel confirmPanel;
+        [SerializeField] private TextMeshProUGUI confirmMessageText;
+        [Tooltip("The line in the pop-up that says what is going on (sent again, not confirmed yet ...)")]
+        [SerializeField] private TextMeshProUGUI confirmStatusText;
+        [SerializeField] private Button confirmedButton;
+        [SerializeField] private Button sendAgainButton;
+        [SerializeField] private TextMeshProUGUI sendAgainLabel;
+        [Tooltip("In the pop-up: \"Use another email\"")]
+        [SerializeField] private Button changeEmailButton;
+        [Tooltip("The small link under the email field that shows once the account exists: \"Use another email\"")]
+        [SerializeField] private Button useAnotherEmailButton;
+        [Tooltip("Asks before the sign-up for the old email is dropped")]
+        [SerializeField] private GlowUp.AppSettings.ConfirmDialog questionDialog;
+        [Tooltip("Seconds before the confirmation message may be sent again")]
+        [SerializeField] private float sendAgainAfterSeconds = 60f;
+        [Tooltip("While the pop-up is open the app looks every so many seconds whether the email was confirmed")]
+        [SerializeField] private float lookEverySeconds = 4f;
+
         [Header("Limits (industry standard defaults)")]
         [SerializeField] private int nameMaxLength = 50;
         [Tooltip("Long enough for a school or work address")]
@@ -57,6 +88,24 @@ namespace GlowUp.Onboarding
         [SerializeField] private string msgFillAll = "Please complete every required field.";
         [SerializeField] private string msgUnderAge = "You must be at least {0} years old to use Glow Up.";
 
+        [Header("Messages: confirming the email ({0} = the email)")]
+        [SerializeField] private string msgNeedInternet = "Connect to the internet to confirm your email.";
+        [SerializeField] private string msgSending = "Sending the confirmation email...";
+        [TextArea(2, 4)] [SerializeField] private string msgConfirmBody = "We sent a message to {0}. Open it and tap the link in it, then come back here. This page goes on by itself once the email is confirmed.";
+        [SerializeField] private string msgNotYet = "Not confirmed yet. Open the message and tap its link (look in the spam folder too).";
+        [SerializeField] private string msgSentAgain = "Sent again. It can take a minute to arrive.";
+        [SerializeField] private string msgEmailInUse = "This email already has an account. Log in on the log-in page, or use \"Forgot Password?\" there.";
+        [SerializeField] private string msgTooManyTries = "Too many tries. Wait a few minutes, then try again.";
+        [SerializeField] private string msgCouldNot = "That did not work. Check the internet connection and try again.";
+        [SerializeField] private string msgConfirmed = "Email confirmed.";
+        [SerializeField] private string msgWaiting = "Waiting for you to confirm this email.";
+        [SerializeField] private string sendAgainText = "Send again";
+        [Tooltip("{0} = seconds left")]
+        [SerializeField] private string sendAgainWaitText = "Send again in {0} s";
+        [SerializeField] private string changeTitle = "Use another email?";
+        [TextArea(2, 4)] [SerializeField] private string changeMessage = "The sign-up for {0} is dropped and you can type another email and password. Everything else you filled in stays.";
+        [SerializeField] private string changeConfirm = "Use another";
+
         void Awake()
         {
             OnboardingSession.LoadDraft();
@@ -64,7 +113,7 @@ namespace GlowUp.Onboarding
             Limit(email, emailMax); Limit(password, passwordMax); Limit(retypePassword, passwordMax);
 
             foreach (var f in new[] { firstName, middleName, lastName, email, password, retypePassword })
-                if (f != null) f.onValueChanged.AddListener(_ => Validate());
+                if (f != null) f.onValueChanged.AddListener(_ => { flowMessage = ""; Validate(); });
             if (birthday != null) birthday.DateChanged += OnBirthday;
             if (continueButton != null) continueButton.onClick.AddListener(OnContinue);
             if (backButton != null) backButton.onClick.AddListener(OnBack);
@@ -72,6 +121,10 @@ namespace GlowUp.Onboarding
             // any real mail domain may sign up now (12 October 2026); the verifier says when a checked domain has its answer
             emailCheck = EmailFieldVerifier.On(gameObject, emailCheck);
             if (emailCheck != null) emailCheck.Changed += Validate;
+            if (confirmedButton != null) confirmedButton.onClick.AddListener(() => { _ = LookWhetherConfirmed(true); });
+            if (sendAgainButton != null) sendAgainButton.onClick.AddListener(() => { _ = SendAgain(); });
+            if (changeEmailButton != null) changeEmailButton.onClick.AddListener(AskUseAnotherEmail);
+            if (useAnotherEmailButton != null) { useAnotherEmailButton.onClick.AddListener(AskUseAnotherEmail); useAnotherEmailButton.gameObject.SetActive(false); }
             HideRemovedUsernameRows();
         }
 
@@ -94,26 +147,63 @@ namespace GlowUp.Onboarding
             Set(firstName, OnboardingSession.FirstName); Set(middleName, OnboardingSession.MiddleName);
             Set(lastName, OnboardingSession.LastName); Set(email, OnboardingSession.Email);
             if (DateTime.TryParse(OnboardingSession.BirthdayIso, out var dob)) { birthday.SetValue(dob); SetAge(dob); }
-            if (OnboardingSession.Social) UseSocialAccount();
+            if (OnboardingSession.Social || OnboardingSession.HasAccount) UseAccountEmail();
             Limit(email, emailMax);          // once more after every script on the field has started: theirs is the older, shorter limit in a scene that was not rebuilt
             Show("");
             Validate();
+            if (OnboardingSession.HasAccount) _ = CheckAccountIsStillThere();
         }
 
-        bool emailFromAccount;
+        bool emailFromAccount, busy;
+        string flowMessage = "";            // what the confirming last said in the page's message line (cleared when the user types)
+        float sentAt = -1f, nextLook;
 
         /// <summary>
-        /// Signed in with Google or Facebook: the account exists already, so everything about the password is
-        /// hidden and the email comes from that account (it stays editable only when the account has none).
+        /// The sign-up has its account already (Google / Facebook, or the one this page made to confirm the email):
+        /// everything about the password is hidden and the email is the account's own (it stays editable only for a
+        /// Google / Facebook account that has none).
         /// </summary>
-        void UseSocialAccount()
+        void UseAccountEmail()
         {
-            if (password != null && password.transform.parent != null)
-                foreach (Transform row in password.transform.parent)
-                    if (row.name.StartsWith("Password", StringComparison.Ordinal) || row.name.StartsWith("Retype", StringComparison.Ordinal))
-                        row.gameObject.SetActive(false);
+            ShowPasswordRows(false);
             emailFromAccount = email != null && T(email).Length > 0;
             if (emailFromAccount) { email.readOnly = true; email.interactable = false; }
+            if (OnboardingSession.HasAccount)
+            {
+                if (useAnotherEmailButton != null) useAnotherEmailButton.gameObject.SetActive(true);
+                if (emailCheck != null) emailCheck.SetNote(SignUpAccount.ConfirmedSoFar ? msgConfirmed : msgWaiting, SignUpAccount.ConfirmedSoFar);
+            }
+        }
+
+        void ShowPasswordRows(bool show)
+        {
+            if (password == null || password.transform.parent == null) return;
+            foreach (Transform row in password.transform.parent)
+                if (row.name.StartsWith("Password", StringComparison.Ordinal) || row.name.StartsWith("Retype", StringComparison.Ordinal))
+                    row.gameObject.SetActive(show);
+        }
+
+        /// <summary>The draft says this sign-up has an account, but nobody is signed in to it any more (signed out, removed): the sign-up starts that part again.</summary>
+        async Task CheckAccountIsStillThere()
+        {
+            bool there = await FirebaseBootstrap.Ready && SignUpAccount.SignedInAs(OnboardingSession.AccountUid);
+            if (this == null || there || !OnboardingSession.HasAccount) return;
+            DropAccountFromThePage();
+        }
+
+        /// <summary>The page as it is without an account: the email can be typed, the password is asked for.</summary>
+        void DropAccountFromThePage()
+        {
+            OnboardingSession.ForgetAccount();
+            emailFromAccount = false; sentAt = -1f;
+            if (email != null) { email.readOnly = false; email.interactable = true; }
+            if (password != null) password.SetTextWithoutNotify("");
+            if (retypePassword != null) retypePassword.SetTextWithoutNotify("");
+            ShowPasswordRows(true);
+            if (useAnotherEmailButton != null) useAnotherEmailButton.gameObject.SetActive(false);
+            if (emailCheck != null) emailCheck.SetNote("", false);
+            if (confirmPanel != null && confirmPanel.IsOpen) confirmPanel.Hide();
+            Validate();
         }
 
         /// <summary>
@@ -145,35 +235,210 @@ namespace GlowUp.Onboarding
             bool pwOk = pw.Length >= passwordMin && pw.Length <= passwordMax && InputRules.HasUpper(pw) && InputRules.HasLower(pw) && InputRules.HasDigit(pw) && InputRules.HasSpecial(pw);
             bool match = pwOk && re.Length > 0 && re == pw;
             pwMatch?.SetMet(match);
-            if (OnboardingSession.Social) { pwOk = true; match = true; }        // a Google / Facebook account has no password here
+            if (OnboardingSession.Social || OnboardingSession.HasAccount) { pwOk = true; match = true; }     // the account exists: no password is asked for here
 
             bool emailOk = emailFromAccount || (emailCheck != null && emailCheck.Look(T(email)));
             bool namesOk = !requireFirstAndLastName || (T(firstName).Length > 0 && T(lastName).Length > 0);
             bool dobOk = birthday != null && birthday.Value.HasValue && InputRules.CalculateAge(birthday.Value.Value) >= minimumAge;
 
-            bool ready = pwOk && match && emailOk && namesOk && dobOk;
+            bool ready = pwOk && match && emailOk && namesOk && dobOk && !busy;
             if (continueAnimator != null) continueAnimator.SetReady(ready);
             else if (continueButton != null) continueButton.interactable = ready;
 
             if (birthday != null && birthday.Value.HasValue && !dobOk) Show(string.Format(msgUnderAge, minimumAge));
             else if (!emailOk && emailCheck != null && !emailCheck.ShowsOwnMessages) Show(emailCheck.Message);      // a rebuilt scene says it right under the field
-            else Show("");
+            else Show(flowMessage);
         }
 
 
         void OnContinue()
         {
+            if (busy) return;
             if (continueButton != null && !continueButton.interactable) { Show(msgFillAll); return; }
             OnboardingSession.FirstName = T(firstName); OnboardingSession.MiddleName = T(middleName); OnboardingSession.LastName = T(lastName);
             OnboardingSession.Username = "";                                                                      // no longer asked for
             OnboardingSession.Email = T(email).ToLowerInvariant();
-            OnboardingSession.Password = OnboardingSession.Social || password == null ? "" : password.text;      // memory only
+            // memory only. With an account the password field is hidden: what was typed when the account was made is kept as it is.
+            if (OnboardingSession.Social) OnboardingSession.Password = "";
+            else if (!OnboardingSession.HasAccount && password != null) OnboardingSession.Password = password.text;
             var dob = birthday.Value.Value;
             OnboardingSession.BirthdayIso = dob.ToString("yyyy-MM-dd");
             OnboardingSession.Age = InputRules.CalculateAge(dob);
             OnboardingSession.SaveDraft();
+
+            // a Google / Facebook email is confirmed by its provider; a scene built before the confirmation existed goes on as before
+            if (OnboardingSession.Social || confirmPanel == null) { SceneNavigator.Go(nextScene); return; }
+            _ = ConfirmThenGoOn();
+        }
+
+        // =====================================================================================
+        //  Confirming the email
+        // =====================================================================================
+        /// <summary>
+        /// Everything on the page is right: the account is made (once), the confirmation message is sent (once per visit),
+        /// and the pop-up waits for the user to tap the link. An email that is confirmed already goes straight on.
+        /// </summary>
+        async Task ConfirmThenGoOn()
+        {
+            SetBusy(true);
+            try
+            {
+                if (!ConnectivityMonitor.Online) { Say(msgNeedInternet); return; }
+                Say(msgSending);
+
+                if (!OnboardingSession.HasAccount)
+                {
+                    SignUpAccount.Result made = await SignUpAccount.CreateOrSignIn(OnboardingSession.Email, OnboardingSession.Password);
+                    if (this == null) return;
+                    if (!made.Ok) { Say(WordsFor(made)); return; }
+                    if (!made.madeNew)
+                    {
+                        // this email and password had an account already. It may be a sign-up that was not finished (no profile:
+                        // it carries on), but an account WITH a profile is somebody's finished account and is never signed up again.
+                        UserProfileData existing = null;
+                        try { existing = await UserProfileRepository.Load(); }
+                        catch (Exception e) { Debug.LogWarning("Sign-up: the profile check failed: " + e.Message); }
+                        if (this == null) return;
+                        if (existing != null || !UserProfileRepository.NoProfileInCloud)
+                        {
+                            UserProfileRepository.SignOut();
+                            Say(existing != null ? msgEmailInUse : msgCouldNot);
+                            return;
+                        }
+                    }
+                    OnboardingSession.AccountUid = made.uid; OnboardingSession.AccountMadeHere = made.madeNew;
+                    OnboardingSession.SaveDraft();
+                    UseAccountEmail();
+                }
+
+                SignUpAccount.Result check = await SignUpAccount.CheckConfirmed();
+                if (this == null) return;
+                if (check.outcome == SignUpAccount.Outcome.NotSignedIn) { DropAccountFromThePage(); Say(msgCouldNot); return; }
+                if (check.Ok && check.confirmed) { GoOnConfirmed(); return; }
+                if (!check.Ok) { Say(WordsFor(check)); return; }
+
+                string status = "";
+                if (sentAt < 0f)
+                {
+                    SignUpAccount.Result sent = await SignUpAccount.SendConfirmation();
+                    if (this == null) return;
+                    if (sent.Ok) sentAt = Time.unscaledTime;
+                    else status = WordsFor(sent);               // the pop-up still opens: an earlier message may be in the inbox already
+                }
+                Say("");
+                OpenConfirmPanel(status);
+            }
+            finally { if (this != null) SetBusy(false); }
+        }
+
+        void OpenConfirmPanel(string status)
+        {
+            if (confirmMessageText != null) confirmMessageText.text = string.Format(msgConfirmBody, OnboardingSession.Email);
+            if (confirmStatusText != null) confirmStatusText.text = status ?? "";
+            if (emailCheck != null) emailCheck.SetNote(msgWaiting, false);
+            nextLook = Time.unscaledTime + Mathf.Max(1f, lookEverySeconds);
+            ShowSendAgain();
+            if (confirmPanel != null) confirmPanel.Show();
+        }
+
+        /// <summary>Asks whether the email was confirmed. `said` = the user tapped "I have confirmed" (then "not yet" is said too).</summary>
+        async Task LookWhetherConfirmed(bool said)
+        {
+            if (busy || !OnboardingSession.HasAccount) return;
+            busy = true;                        // the page's Continue stays as it is: only a second look is held back
+            try
+            {
+                SignUpAccount.Result check = await SignUpAccount.CheckConfirmed();
+                if (this == null) return;
+                if (check.Ok && check.confirmed) { busy = false; GoOnConfirmed(); return; }
+                if (said && confirmStatusText != null) confirmStatusText.text = check.Ok ? msgNotYet : WordsFor(check);
+            }
+            finally { if (this != null) { busy = false; nextLook = Time.unscaledTime + Mathf.Max(1f, lookEverySeconds); } }
+        }
+
+        async Task SendAgain()
+        {
+            if (busy || SignUpAccount.SecondsUntilSendAgain(sentAt, Time.unscaledTime, sendAgainAfterSeconds) > 0) return;
+            busy = true;
+            try
+            {
+                if (confirmStatusText != null) confirmStatusText.text = msgSending;
+                SignUpAccount.Result sent = await SignUpAccount.SendConfirmation();
+                if (this == null) return;
+                if (sent.Ok) sentAt = Time.unscaledTime;
+                if (confirmStatusText != null) confirmStatusText.text = sent.Ok ? msgSentAgain : WordsFor(sent);
+            }
+            finally { if (this != null) { busy = false; ShowSendAgain(); } }
+        }
+
+        void GoOnConfirmed()
+        {
+            if (emailCheck != null) emailCheck.SetNote(msgConfirmed, true);
+            if (confirmPanel != null && confirmPanel.IsOpen) confirmPanel.Hide();
             SceneNavigator.Go(nextScene);
         }
+
+        void ShowSendAgain()
+        {
+            int left = SignUpAccount.SecondsUntilSendAgain(sentAt, Time.unscaledTime, sendAgainAfterSeconds);
+            if (sendAgainButton != null) sendAgainButton.interactable = left == 0;
+            if (sendAgainLabel != null) sendAgainLabel.text = left == 0 ? sendAgainText : string.Format(sendAgainWaitText, left);
+        }
+
+        void Update()
+        {
+            if (confirmPanel == null || !confirmPanel.IsOpen) return;
+            ShowSendAgain();
+            // the app looks by itself, so the user only has to tap the link in the message
+            if (!busy && Time.unscaledTime >= nextLook) _ = LookWhetherConfirmed(false);
+        }
+
+        // back from the mail app: look at once
+        void OnApplicationFocus(bool focused) { if (focused && confirmPanel != null && confirmPanel.IsOpen && !busy) _ = LookWhetherConfirmed(false); }
+        void OnApplicationPause(bool paused) { if (!paused && confirmPanel != null && confirmPanel.IsOpen && !busy) _ = LookWhetherConfirmed(false); }
+
+        /// <summary>"Use another email": asked first, because the sign-up for the old email is dropped.</summary>
+        void AskUseAnotherEmail()
+        {
+            if (busy || !OnboardingSession.HasAccount) return;
+            string question = string.Format(changeMessage, OnboardingSession.Email);
+            if (questionDialog != null) questionDialog.Ask(changeTitle, question, changeConfirm, () => { _ = UseAnotherEmail(); }, true);
+            else _ = UseAnotherEmail();
+        }
+
+        async Task UseAnotherEmail()
+        {
+            if (busy) return;
+            SetBusy(true);
+            try
+            {
+                // the account this sign-up made has no profile yet: removed, so that email stays free. When it cannot be removed
+                // now (no internet), it is left signed out: the same email and password carry on with it another time.
+                if (OnboardingSession.AccountMadeHere) await SignUpAccount.Delete(OnboardingSession.AccountUid, 10f);
+                if (this == null) return;
+                UserProfileRepository.SignOut();
+                DropAccountFromThePage();
+                Say("");
+            }
+            finally { if (this != null) SetBusy(false); }
+        }
+
+        string WordsFor(SignUpAccount.Result result)
+        {
+            switch (result.outcome)
+            {
+                case SignUpAccount.Outcome.Offline: return msgNeedInternet;
+                case SignUpAccount.Outcome.EmailInUse: return msgEmailInUse;
+                case SignUpAccount.Outcome.TooManyTries: return msgTooManyTries;
+                case SignUpAccount.Outcome.WeakPassword:
+                case SignUpAccount.Outcome.BadEmail: return string.IsNullOrEmpty(result.detail) ? msgCouldNot : result.detail;
+                default: return msgCouldNot;
+            }
+        }
+
+        void SetBusy(bool on) { busy = on; Validate(); }
+        /// <summary>A line of the confirming in the page's message line; it stays until the user types again.</summary>
+        void Say(string m) { flowMessage = m ?? ""; Show(flowMessage); }
 
         void Show(string m) { if (feedbackText != null) feedbackText.text = m; }
     }

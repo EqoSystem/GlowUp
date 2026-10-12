@@ -1,6 +1,9 @@
+using System.Threading.Tasks;
 using GlowUp.AppSettings;
+using GlowUp.Auth;
 using GlowUp.Common;
 using GlowUp.Data;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -17,7 +20,9 @@ namespace GlowUp.Onboarding
     ///   - the phone's back key, through the Back arrow: it does what the arrow does, and closes this question when it is open.
     ///
     /// Leaving discards the sign-up draft (also the copy that survives a restart), signs a Google / Facebook account
-    /// out again, and opens the log-in page. While a signed-in user retakes the skin quiz from Settings, leaving only
+    /// out again, and opens the log-in page. The account that Step 1 made to confirm the email has no profile yet: it
+    /// is removed, so the email is free again (when it cannot be removed just now, the same email and password simply
+    /// carry on with it at the next sign-up). While a signed-in user retakes the skin quiz from Settings, leaving only
     /// drops the new answers and returns to Settings: the saved skin profile is not touched.
     /// </summary>
     public class OnboardingLeaveGuard : MonoBehaviour
@@ -31,6 +36,8 @@ namespace GlowUp.Onboarding
         [SerializeField] private Button backButton;
         [Tooltip("The calendar of this page, if it has one: the phone's back key closes it first")]
         [SerializeField] private DatePickerPopup calendar;
+        [Tooltip("The page's message line: it says \"Leaving the sign-up...\" for the moment that takes")]
+        [SerializeField] private TextMeshProUGUI statusText;
 
         [Header("Behaviour")]
         [Tooltip("The phone's back key (Android) does the same as the Back arrow")]
@@ -43,6 +50,9 @@ namespace GlowUp.Onboarding
         [TextArea(2, 4)] [SerializeField] private string socialMessage = "You are about to leave the sign-up. What you selected will be discarded, and you are signed out of this app again.";
         [SerializeField] private string leaveLabel = "Leave";
         [SerializeField] private string stayLabel = "Stay";
+        [SerializeField] private string msgLeaving = "Leaving the sign-up...";
+        [Tooltip("The longest the removal of the unfinished account may hold the leaving up (seconds)")]
+        [SerializeField] private float removeWaitSeconds = 8f;
 
         [Header("Wording: leaving the skin quiz (retaken from Settings)")]
         [SerializeField] private string retakeTitle = "Leave the skin quiz?";
@@ -95,10 +105,29 @@ namespace GlowUp.Onboarding
                 SceneNavigator.Go(back);
                 return;
             }
-            // signed in with Google / Facebook: sign out, or the log-in page would send the user straight back into the sign-up
-            if (OnboardingSession.Social) UserProfileRepository.SignOut();
-            OnboardingSession.Clear();
-            SceneNavigator.Go(string.IsNullOrEmpty(loginScene) ? SceneNames.Login : loginScene);
+            _ = LeaveSignUp(string.IsNullOrEmpty(loginScene) ? SceneNames.Login : loginScene);
+        }
+
+        static async Task LeaveSignUp(string loginScene)
+        {
+            if (Locked) return;
+            Locked = true;                  // nothing else may start while the account is being removed
+            try
+            {
+                // the account Step 1 made for THIS sign-up has no profile yet: removed, so the email is free again. Never longer
+                // than a few seconds, and never an error: an account that cannot be removed now is carried on with later.
+                if (OnboardingSession.HasAccount && OnboardingSession.AccountMadeHere)
+                {
+                    if (current != null && current.statusText != null) current.statusText.text = current.msgLeaving;
+                    float wait = current != null ? current.removeWaitSeconds : 8f;
+                    await SignUpAccount.Delete(OnboardingSession.AccountUid, wait);
+                }
+                // signed in (Google / Facebook, or the sign-up's own account): sign out, or the log-in page would send the user straight back here
+                if (OnboardingSession.Social || OnboardingSession.HasAccount) UserProfileRepository.SignOut();
+                OnboardingSession.Clear();
+            }
+            finally { Locked = false; }
+            SceneNavigator.Go(loginScene);
         }
 
         void Update()

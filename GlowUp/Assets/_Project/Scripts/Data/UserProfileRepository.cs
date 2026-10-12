@@ -68,9 +68,17 @@ namespace GlowUp.Data
             return OfflineCache.TryLoad(CacheKey, out UserProfileData cached) && cached != null && Belongs(cached, uid) ? cached : null;
         }
 
+        /// <summary>
+        /// True when the last Load() got an answer FROM THE CLOUD that says: this account has no profile. False when a
+        /// profile was found, and also when the cloud could not be asked (offline, too slow): then nobody knows, and an
+        /// account must not be treated as new.
+        /// </summary>
+        public static bool NoProfileInCloud { get; private set; }
+
         public static async Task<UserProfileData> Load()
         {
             string uid = CurrentUid;
+            NoProfileInCloud = false;
             if (Current != null && Belongs(Current, uid)) return Current;
             Current = null;
 
@@ -87,6 +95,7 @@ namespace GlowUp.Data
                         .OrTimeout(Current != null ? 6f : 20f, "Loading your profile");
                     bool fromCloud = !snap.Metadata.IsFromCache;
                     if (fromCloud) ConnectivityMonitor.ReportAnswer();
+                    NoProfileInCloud = fromCloud && !snap.Exists;
                     // an answer from the phone's own store (no answer from the cloud) only counts when there is nothing better
                     if (snap.Exists && (fromCloud || Current == null)) { Current = FromSnapshot(snap); Current.uid = uid; OfflineCache.Save(CacheKey, Current); }
                 }

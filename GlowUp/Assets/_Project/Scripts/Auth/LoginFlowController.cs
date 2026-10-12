@@ -48,6 +48,7 @@ namespace GlowUp.Auth
         [SerializeField] private string msgEnterEmail = "Please enter your email address.";
         [SerializeField] private string msgEnterPassword = "Please enter your password.";
         [SerializeField] private string msgBadCredentials = "Email or password is incorrect.";
+        [SerializeField] private string msgProfileNotLoaded = "You are signed in, but your profile could not be loaded. Check the internet connection and tap Log-In again.";
         [Tooltip("How long to wait for the sign-in service before checking the email and password on this phone instead (seconds)")]
         [SerializeField] private float signInWaitSeconds = 20f;
         [SerializeField] private string msgOfflineNoRecord = "You are offline and this account hasn't been used on this device yet.";
@@ -101,6 +102,14 @@ namespace GlowUp.Auth
                     }
                     // a Google or Facebook account that never finished the skin quiz carries on with it
                     if (!HasSkinProfile(profile) && SocialSignIn.ProviderOf(user) != SocialSignIn.Password) { StartSocialSignUp(user); return; }
+                    // a sign-up that was begun on this phone and not finished (Step 1 made its account to confirm the email) carries on there
+                    OnboardingSession.LoadDraft();
+                    if (profile == null && OnboardingSession.HasAccount && OnboardingSession.AccountUid == user.UserId)
+                    {
+                        ContextualHintController.MarkNewUser(true);
+                        SceneNavigator.Go(onboardingScene);
+                        return;
+                    }
                     SceneNavigator.Go(dashboardScene);
                     return;
                 }
@@ -149,6 +158,21 @@ namespace GlowUp.Auth
                     try { profile = await UserProfileRepository.Load(); }
                     catch (Exception e) { Debug.LogWarning("Sign-in: the profile could not be loaded yet: " + e.Message); }
                     if (this == null) return;
+                    if (profile == null && !UserProfileRepository.NoProfileInCloud)
+                    {
+                        // nobody knows whether this account has a profile (the cloud did not answer): it is NOT sent through
+                        // the sign-up, which would write a new profile over the real one
+                        Fail(msgProfileNotLoaded);
+                        return;
+                    }
+                    if (profile == null)
+                    {
+                        // an account without a profile (a sign-up that was not finished): the sign-up continues WITH this account,
+                        // so Step 1 asks for no second password and makes no second account
+                        FirebaseUser signedIn = FirebaseAuth.DefaultInstance.CurrentUser;
+                        if (signedIn != null) OnboardingSession.BeginExisting(signedIn.UserId, signedIn.Email);
+                        ContextualHintController.MarkNewUser(true);
+                    }
                     SceneNavigator.Go(profile != null ? dashboardScene : onboardingScene);
                 }
                 else if (OfflineCredentialStore.HasCredential(email) && await OfflineCredentialStore.CheckAsync(email, pw))
@@ -181,6 +205,9 @@ namespace GlowUp.Auth
         void SignUp()
         {
             OnboardingSession.Social = false;
+            // "Sign Up" always starts a sign-up of its own: an account left in the draft by an earlier, abandoned one is not taken over
+            // (nobody is signed in to it here; Step 1 would notice that too)
+            if (OnboardingSession.HasAccount) OnboardingSession.ForgetAccount();
             ContextualHintController.MarkNewUser(true);
             SceneNavigator.Go(onboardingScene);
         }

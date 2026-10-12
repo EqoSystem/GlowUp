@@ -59,7 +59,8 @@ namespace GlowUp.Common
         /// <summary>A running check has finished (or the connection came back and a new one started).</summary>
         public event Action Changed;
 
-        string looked = "", domain = "";
+        string looked = "", domain = "", note = "";
+        bool noteGood;
         int ticket;
         float actAt;
         bool checkedOnline;
@@ -76,6 +77,16 @@ namespace GlowUp.Common
         }
 
         void Awake() { EmailDomainCheck.Prepare(); Paint(); }
+
+        /// <summary>
+        /// A line from the page itself, shown under the field in place of this script's own for as long as it is set
+        /// ("Email confirmed.", "Waiting for you to confirm this email."). "" = this script's own line again.
+        /// </summary>
+        public void SetNote(string text, bool good)
+        {
+            note = text ?? ""; noteGood = good;
+            Paint();
+        }
 
         protected override void ApplyPalette(ThemeProfile.Palette p)
         {
@@ -159,9 +170,9 @@ namespace GlowUp.Common
             if (statusText == null) return;
             if (!Application.isPlaying) { statusText.color = busyColor; return; }      // in the Editor only the colour is previewed: the sample wording stays
             // a domain that was checked online gets a short "it works" line; a well-known provider needs no comment
-            string line = Now == State.Good && checkedOnline ? string.Format(msgGood, domain) : Message;
+            string line = note.Length > 0 ? note : Now == State.Good && checkedOnline ? string.Format(msgGood, domain) : Message;
             statusText.text = line;
-            statusText.color = Now == State.Good ? goodColor : Busy ? busyColor : problemColor;
+            statusText.color = note.Length > 0 ? (noteGood ? goodColor : busyColor) : Now == State.Good ? goodColor : Busy ? busyColor : problemColor;
             if (statusText.gameObject.activeSelf != (line.Length > 0)) statusText.gameObject.SetActive(line.Length > 0);
         }
     }

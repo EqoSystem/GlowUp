@@ -17,6 +17,7 @@ We collect information that you voluntarily provide to us when registering for a
 Having accurate information permits us to provide you with a smooth, efficient, and customized experience. Specifically, we use information collected via GlowUp to:
 
 - Create and secure your user account using Google Firebase Authentication.
+- Confirm that the email address is yours. When you sign up with an email and password, your account is created as soon as the first sign-up page is filled in, and Google Firebase Authentication sends a message with a link to that address. The sign-up goes on once you have tapped the link. If you leave the sign-up before finishing it, that unfinished account is removed again.
 - Make sure the email address you sign up with can really receive email. For an address that is not from a well-known provider, the app asks a public internet directory (DNS, run by Google or Cloudflare) whether the part after the @ (for example "school.edu.ph") has a mail server. Only that part is sent, never your name or the whole address. Temporary ("throw-away") email addresses cannot be used to sign up.
 - Store and retrieve your profile preferences securely using Google Cloud Firestore.
 - Personalize cosmetic ingredient safety assessments and filter recommendations based on your registered skin type, skin conditions, age, and allergies.
