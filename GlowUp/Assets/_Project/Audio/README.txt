@@ -11,10 +11,16 @@ Delete_FreezingCold.mp3
     silence and is a quiet recording: the app skips the silence, plays the next 1.1 seconds, makes that piece louder
     and fades it out (all of this can be changed on DeleteSoundPlayer in the Inspector).
     Where it comes from: given by the project owner on 12 October 2026 (it was "Freezing Cold - Sound Effect.mp3"
-    on their Desktop). The file was converted from a video file and carries NO information about its author or licence.
-    Licence: NOT CONFIRMED. Before the app is published or handed in, the team must find out where the sound is from
-    and that its licence allows use in an app, and write the answer here (name of the author or site, the licence,
-    the link). If that cannot be confirmed, replace it with a sound whose licence is known.
+    on their Desktop). The owner says it was taken from YOUTUBE. Which video (its address and who uploaded it) is not
+    written down yet; the file itself carries no information about its author or licence.
+    Licence: NOT CONFIRMED. "From YouTube" is where it was found, not a permission: a sound in a YouTube video belongs
+    to whoever made it, unless the video or its description says it may be reused (for example "Creative Commons",
+    "free to use", or a sound from YouTube's own Audio Library). Before the app is published or handed in, write here:
+        the video's address: ...
+        who uploaded it: ...
+        what the video or its description says about reusing the sound: ...
+    If it does not say that reuse is allowed, replace the sound with one whose licence is known (YouTube's Audio
+    Library, freesound.org with a CC0 licence, or a sound the team records itself).
     Played by: Scripts/Common/DeleteSoundPlayer.cs (the DeleteSoundPlayer object in RecentScanActivitiesScene).
     The user's switch: Settings > Sounds & Motion > Delete sound.
 
