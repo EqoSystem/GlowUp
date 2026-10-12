@@ -4,7 +4,6 @@ using System.Threading.Tasks;
 using Firebase.Auth;
 using GlowUp.Data;
 using GlowUp.Performance;
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -16,23 +15,29 @@ namespace GlowUp.Common
     ///   1. the word "Glow" comes DOWN to the middle of the screen with a glowing aura round it,
     ///      while the word "Up" comes UP to the middle, next to it;
     ///   2. the two join into "GlowUp" with a burst of light;
-    ///   3. a "Made with Unity" plate shoots in and knocks the word off the screen;
+    ///   3. the finished word ASCENDS: it rises out through the top of the screen, slowly at first and then faster,
+    ///      getting smaller and dissolving into a soft light, like something going to heaven;
     ///   4. the app opens: the dashboard for someone who is signed in, otherwise the log-in page.
+    ///
+    /// (Until 13 October 2026 step 3 was a "Made with Unity" plate that knocked the word off the screen. The project
+    /// owner asked for it to go; the plate is no longer built and this script no longer knows it.)
     ///
     /// About Unity's own start-up screen: a Unity Personal licence always shows the engine's "Made with Unity" screen
     /// FIRST, before any scene, and that cannot be changed or animated. This animation plays right after it.
     ///
-    /// Every text, timing, distance and curve below is an Inspector field. The scene is built in its END position
+    /// Every timing, distance and curve below is an Inspector field. The scene is built in its END position
     /// (the finished word in the middle), so it looks right in Edit mode; the script moves the words to their starting
-    /// places when the app runs. A tap skips the animation. With "reduce effects" on (Performance Mode) only a short
-    /// fade is shown.
+    /// places when the app runs. A tap skips the animation ("Tap Skips"). With "reduce effects" on (Performance Mode)
+    /// only a short fade is shown.
     /// </summary>
     public class StartupIntroController : MonoBehaviour
     {
-        public enum Ending { KnockedOffByMadeWithUnity, FadeOut }
+        // The first entry keeps the number of the old "knocked off" ending, so a scene that was built with that ending
+        // ascends now without being touched.
+        public enum Ending { AscendLikeGoingToHeaven, FadeOut }
 
         [Header("The words")]
-        [Tooltip("The object that holds both words (it is what gets knocked off the screen)")]
+        [Tooltip("The object that holds both words (it is what rises at the end)")]
         [SerializeField] private RectTransform wordmark;
         [SerializeField] private RectTransform glowWord;
         [SerializeField] private RectTransform upWord;
@@ -48,29 +53,35 @@ namespace GlowUp.Common
         [Tooltip("Small star that flashes when the words join. Optional.")]
         [SerializeField] private Image sparkle;
 
-        [Header("The plate that knocks the word off")]
-        [SerializeField] private RectTransform plate;
-        [SerializeField] private TextMeshProUGUI plateText;
-        [SerializeField] private string plateWords = "Made with Unity";
-        [Tooltip("Where the plate waits before it shoots in (canvas units from the middle of the screen)")]
-        [SerializeField] private Vector2 plateStart = new Vector2(-1500f, 70f);
-        [Tooltip("Where the plate comes to rest (canvas units from the middle of the screen). The scene builder sets it to the place of the word.")]
-        [SerializeField] private Vector2 plateRest = new Vector2(0f, 70f);
-
         [Header("How the animation ends")]
-        [SerializeField] private Ending ending = Ending.KnockedOffByMadeWithUnity;
+        [SerializeField] private Ending ending = Ending.AscendLikeGoingToHeaven;
+
+        [Header("The ascent (the finished word rises like going to heaven)")]
+        [Tooltip("How far the word rises, in canvas units (the screen is 1920 high; 1250 carries it out through the top)")]
+        [SerializeField] private float ascendDistance = 1250f;
+        [Tooltip("0 to 1 over the ascent: how far up the word is. It lifts off slowly and gets faster.")]
+        [SerializeField] private AnimationCurve ascendCurve = new AnimationCurve(
+            new Keyframe(0f, 0f, 0f, 0f), new Keyframe(0.4f, 0.1f, 0.6f, 0.6f), new Keyframe(1f, 1f, 2.3f, 0f));
+        [Tooltip("The size of the word when it has risen (1 = unchanged; smaller = it looks further away)")]
+        [Range(0.3f, 1.2f)] [SerializeField] private float ascendEndScale = 0.7f;
+        [Tooltip("The share of the ascent after which the word begins to dissolve into the light")]
+        [Range(0f, 0.95f)] [SerializeField] private float dissolveFrom = 0.4f;
+        [Tooltip("How much bigger the aura grows while it carries the word up")]
+        [SerializeField] private float ascendAuraScale = 1.45f;
+        [Tooltip("The soft light at the top of the screen that the word rises into (its colour is the colour of that Image). Optional.")]
+        [SerializeField] private Image heavenLight;
+        [Tooltip("How strong that light gets (0 = none)")]
+        [Range(0f, 1f)] [SerializeField] private float heavenLightStrength = 0.9f;
 
         [Header("Timing (seconds)")]
         [SerializeField] private float startDelay = 0.1f;
         [Tooltip("How long the two words travel to the middle")]
         [SerializeField] private float travelSeconds = 0.85f;
         [SerializeField] private float joinSeconds = 0.35f;
-        [Tooltip("How long the finished word stays before the plate comes")]
+        [Tooltip("How long the finished word stays before it rises")]
         [SerializeField] private float holdSeconds = 0.45f;
-        [SerializeField] private float plateEnterSeconds = 0.24f;
-        [Tooltip("How long the knocked word flies before it is gone")]
-        [SerializeField] private float flightSeconds = 0.7f;
-        [SerializeField] private float plateHoldSeconds = 0.6f;
+        [Tooltip("How long the word takes to rise out of sight")]
+        [SerializeField] private float ascendSeconds = 1.3f;
         [SerializeField] private float fadeSeconds = 0.25f;
 
         [Header("Movement")]
@@ -81,13 +92,6 @@ namespace GlowUp.Common
             new Keyframe(0f, 0f, 0f, 2.2f), new Keyframe(0.72f, 1.06f, 0.4f, 0.4f), new Keyframe(1f, 1f, 0f, 0f));
         [Tooltip("How much the word swells for a moment when the two parts join (0.12 = 12 percent)")]
         [Range(0f, 0.4f)] [SerializeField] private float joinPunch = 0.12f;
-        [Tooltip("The speed the word is knocked away with (canvas units a second: right, up)")]
-        [SerializeField] private Vector2 knockVelocity = new Vector2(1700f, 950f);
-        [Tooltip("How fast the knocked word falls (canvas units a second, every second)")]
-        [SerializeField] private float gravity = 4600f;
-        [SerializeField] private float spinDegreesPerSecond = -520f;
-        [Tooltip("How far the plate slides past the middle before it settles (canvas units)")]
-        [SerializeField] private float plateOvershoot = 46f;
 
         [Header("After the animation")]
         [SerializeField] private string loginScene = SceneNames.Login;
@@ -96,6 +100,7 @@ namespace GlowUp.Common
         [SerializeField] private bool signedInGoesToDashboard = true;
         [Tooltip("The animation never waits longer than this for the sign-in check")]
         [SerializeField] private float longestSignInCheckSeconds = 2.5f;
+        [Tooltip("On = a tap anywhere skips the animation (no words on the screen say so)")]
         [SerializeField] private bool tapSkips = true;
         [Tooltip("Everything that fades out at the end (the whole stage)")]
         [SerializeField] private CanvasGroup stage;
@@ -107,7 +112,6 @@ namespace GlowUp.Common
         void Start()
         {
             startedAt = Time.unscaledTime;
-            if (plateText != null && !string.IsNullOrWhiteSpace(plateWords)) plateText.text = plateWords;
             whereNext = DecideWhereNext();
             bool calm = PerformanceSettings.ReduceEffects || wordmark == null || glowWord == null || upWord == null;
             StartCoroutine(calm ? PlayCalm() : Play());
@@ -128,10 +132,9 @@ namespace GlowUp.Common
             Vector2 glowFrom = glowHome + Vector2.up * startDistance, upFrom = upHome + Vector2.down * startDistance;
             Vector3 auraHome = aura != null ? aura.rectTransform.localScale : Vector3.one;
 
-            // ---- the starting picture: both words out of sight, no light, the plate waiting at the side
+            // ---- the starting picture: both words out of sight, no light
             glowWord.anchoredPosition = glowFrom; upWord.anchoredPosition = upFrom;
-            SetAlpha(aura, 0f); SetAlpha(sparkle, 0f);
-            if (plate != null) { plate.gameObject.SetActive(ending == Ending.KnockedOffByMadeWithUnity); plate.anchoredPosition = plateStart; }
+            SetAlpha(aura, 0f); SetAlpha(sparkle, 0f); SetAlpha(heavenLight, 0f);
             if (stage != null) stage.alpha = 1f;
             yield return Wait(startDelay);
 
@@ -171,37 +174,39 @@ namespace GlowUp.Common
             // ---- the finished word stays for a moment, its aura breathing
             for (float t = 0f; t < holdSeconds; t += Time.unscaledDeltaTime) { Breathe(auraHome); yield return null; }
 
-            if (ending == Ending.KnockedOffByMadeWithUnity && plate != null)
+            if (ending == Ending.AscendLikeGoingToHeaven)
             {
-                // ---- 3. the plate shoots in ...
-                Vector2 past = plateRest + (plateRest - plateStart).normalized * plateOvershoot;
-                for (float t = 0f; t < plateEnterSeconds; t += Time.unscaledDeltaTime)
+                // ---- 3. the word ascends: it lifts off slowly, rises faster and faster, gets smaller and dissolves into the
+                //         light at the top; its aura goes up with it
+                Graphic[] letters = wordmark.GetComponentsInChildren<Graphic>(true);
+                var shown = new float[letters.Length];
+                for (int i = 0; i < letters.Length; i++) shown[i] = letters[i].color.a;
+
+                for (float t = 0f; t < ascendSeconds; t += Time.unscaledDeltaTime)
                 {
-                    float k = Mathf.Clamp01(t / Mathf.Max(0.01f, plateEnterSeconds));
-                    plate.anchoredPosition = Vector2.Lerp(plateStart, past, k * k);            // faster and faster
-                    Breathe(auraHome);
+                    float k = Mathf.Clamp01(t / Mathf.Max(0.01f, ascendSeconds));
+                    float risen = ascendCurve != null && ascendCurve.length > 1 ? ascendCurve.Evaluate(k) : k * k;
+                    wordmark.anchoredPosition = markHome + Vector2.up * (ascendDistance * risen);
+                    wordmark.localScale = Vector3.one * Mathf.LerpUnclamped(1f, ascendEndScale, risen);
+                    float left = 1f - Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(dissolveFrom, 1f, k));      // how much of the word is still there
+                    for (int i = 0; i < letters.Length; i++) SetAlpha(letters[i], shown[i] * left);
+                    if (aura != null)
+                    {
+                        aura.rectTransform.position = wordmark.position;
+                        aura.rectTransform.localScale = auraHome * Mathf.Lerp(1f, ascendAuraScale, Mathf.Sin(k * Mathf.PI * 0.5f));
+                        SetAlpha(aura, Mathf.Lerp(auraStrength, 1f, Mathf.Clamp01(k * 3f)) * Mathf.Lerp(1f, 0f, Mathf.InverseLerp(0.55f, 1f, k)));
+                    }
+                    SetAlpha(heavenLight, heavenLightStrength * Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(k / 0.6f)));
                     yield return null;
                 }
-                // ---- ... and knocks the word off: it flies away turning, the light goes out, the plate settles
-                Vector2 velocity = knockVelocity;
-                float turned = 0f;
-                for (float t = 0f; t < flightSeconds; t += Time.unscaledDeltaTime)
-                {
-                    float dt = Time.unscaledDeltaTime, k = Mathf.Clamp01(t / Mathf.Max(0.01f, flightSeconds));
-                    velocity.y -= gravity * dt;
-                    wordmark.anchoredPosition += velocity * dt;
-                    turned += spinDegreesPerSecond * dt;
-                    wordmark.localRotation = Quaternion.Euler(0f, 0f, turned);
-                    SetAlpha(aura, Mathf.Lerp(auraStrength, 0f, k * 3f));
-                    plate.anchoredPosition = Vector2.Lerp(past, plateRest, Mathf.SmoothStep(0f, 1f, k * 2.5f));
-                    yield return null;
-                }
+
+                // gone: the word is put back as it was (in case the scene is shown again), but stays out of sight
                 wordmark.gameObject.SetActive(false);
-                plate.anchoredPosition = plateRest;
-                yield return Wait(plateHoldSeconds);
+                for (int i = 0; i < letters.Length; i++) SetAlpha(letters[i], shown[i]);
+                wordmark.localScale = Vector3.one;
+                SetAlpha(aura, 0f);
             }
 
-            // put back what was moved, in case the scene is shown again
             wordmark.anchoredPosition = markHome;
             yield return FadeAndLeave();
         }
@@ -209,8 +214,7 @@ namespace GlowUp.Common
         /// <summary>Performance Mode ("reduce effects"): the finished word simply fades in and out.</summary>
         IEnumerator PlayCalm()
         {
-            if (plate != null) plate.gameObject.SetActive(false);
-            SetAlpha(sparkle, 0f);
+            SetAlpha(sparkle, 0f); SetAlpha(heavenLight, 0f);
             if (stage != null)
             {
                 for (float t = 0f; t < 0.35f; t += Time.unscaledDeltaTime) { stage.alpha = Mathf.Clamp01(t / 0.35f); yield return null; }

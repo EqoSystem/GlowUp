@@ -11,11 +11,14 @@ namespace GlowUp.EditorTools
     /// <summary>
     /// Menu: GlowUp > Build Scene > 0 Start-Up Animation.
     /// Builds StartupScene, the first scene of the app: the word "Glow" comes down with a glowing aura, "Up" comes up,
-    /// they join into "GlowUp", then a "Made with Unity" plate knocks the word off the screen and the app opens.
+    /// they join into "GlowUp", then the finished word ascends out through the top of the screen into a soft light
+    /// (like going to heaven) and the app opens.
     ///
-    /// The scene is built in its END position (the finished word in the middle, the plate parked at the left outside the
-    /// screen), so it looks right in Edit mode. Texts, timings, distances and the way it ends are on the
-    /// StartupIntroController object.
+    /// The scene is built in its END position (the finished word in the middle), so it looks right in Edit mode. Timings,
+    /// distances and the way it ends are on the StartupIntroController object.
+    ///
+    /// Taken out on 13 October 2026 because the project owner asked: the "Made with Unity" plate that knocked the word
+    /// off the screen, and the words "Tap to skip" (a tap still skips; StartupIntroController > Tap Skips).
     ///
     /// The builder also puts StartupScene FIRST in File > Build Settings, because the app starts with the first scene of
     /// that list. Unity's own "Made with Unity" start-up screen still comes before it: a Personal licence cannot remove it.
@@ -57,38 +60,33 @@ namespace GlowUp.EditorTools
 
             // (the little gold star beside the word was taken out on 12 October 2026: the project owner asked for it to go)
 
-            // ---- the plate that knocks the word off ----
-            // It ends in the middle of the screen. In Edit mode it is parked at the left, outside the screen, so the finished
-            // word can be seen; the app puts it at its starting place itself (StartupIntroController > Plate Start).
-            Image plate = A.Panel(stage.transform, "MadeWithUnityPlate", ThemeRole.Heading, 1f, 130f);
-            A.At(plate.transform, A.MC, Middle, new Vector2(760, 150));
-            TextMeshProUGUI plateText = A.Label(plate.transform, "PlateText", "Made with Unity", 62, ThemeRole.Surface, FontRole.Heading, TextAlignmentOptions.Center);
-            A.Fill(plateText.transform, 30, 0, 30, 0);
-            A.Shrink(plateText, 40);
-
-            TextMeshProUGUI skip = A.Label(stage.transform, "SkipHintText", "Tap to skip", 28, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center);
-            A.BottomStrip(skip.transform, 70, 44);
+            // ---- the light the word rises into ----
+            // A soft, pale warm glow under the top edge of the card, behind the words. It cannot be seen in Edit mode (the
+            // scene shows the moment BEFORE the word rises); the app fades it in during the ascent
+            // (StartupIntroController > Heaven Light Strength). Its colour is this Image's own colour: a pale gold, light
+            // enough to read as light on the pale page (the theme's gold is a darker metal colour and looked brown here).
+            Image light = A.RawIcon(stage.transform, "HeavenLight", IconFactory.SoftDisc, 900, new Color32(255, 224, 160, 0));
+            A.At(light.transform, A.TC, new Vector2(0, 40), new Vector2(980, 900));
+            light.preserveAspect = false;
+            light.transform.SetSiblingIndex(aura.transform.GetSiblingIndex());
 
             // ---- controller ----
             var controller = A.Controller<StartupIntroController>("StartupIntroController");
             A.Set(controller, "wordmark", (RectTransform)mark.transform);
             A.Set(controller, "glowWord", glow.rectTransform); A.Set(controller, "upWord", up.rectTransform);
             A.Set(controller, "aura", aura);
-            A.Set(controller, "plate", plate.rectTransform); A.Set(controller, "plateText", plateText);
+            A.Set(controller, "heavenLight", light);
             A.Set(controller, "stage", stage.GetComponent<CanvasGroup>());
 
             A.Finish(s);
 
-            // after the shared finish (which may restyle things): the plate waits outside the screen in Edit mode. Its END
-            // place, the middle, is what the script reads when the app starts, so it is kept on the script.
-            SerializedObject so = new SerializedObject(controller);
-            SerializedProperty rest = so.FindProperty("plateRest");
-            if (rest != null) { rest.vector2Value = Middle; so.ApplyModifiedPropertiesWithoutUndo(); }
-            plate.rectTransform.anchoredPosition = new Vector2(-1500f, Middle.y);
+            // after the shared finish (which may restyle things): the light is there but cannot be seen until the word rises
+            Color hidden = light.color; hidden.a = 0f; light.color = hidden;
+            EditorUtility.SetDirty(light);
             SceneBuilderCore.Save(s.scene);
 
             BuildSettingsSync.PutFirst(SceneNames.Startup);
-            Debug.Log("[GlowUp] StartupScene built and put first in Build Settings. It is shown in its end position; the plate waits at the left outside the screen. Timings and the ending are on the StartupIntroController object.");
+            Debug.Log("[GlowUp] StartupScene built and put first in Build Settings. It is shown in its end position (the finished word in the middle). Timings and the ascent are on the StartupIntroController object.");
         }
 
         /// <summary>The width a word needs at its font size (a guess when the font cannot be measured here).</summary>
