@@ -117,10 +117,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     await requireAdmin();
 
     renderChecks(el("allergenTagsChecks"), "allergenTags", ALLERGEN_FAMILIES);
-    renderChecks(el("avoidSkinTypesChecks"), "avoidForSkinTypes", SKIN_TYPES);
-    renderChecks(el("goodSkinTypesChecks"), "goodForSkinTypes", SKIN_TYPES);
-    renderChecks(el("avoidConditionsChecks"), "avoidForConditions", SKIN_CONDITIONS);
-    renderChecks(el("goodConditionsChecks"), "goodForConditions", SKIN_CONDITIONS);
+    renderFit(el("skinTypesFit"), "skinType", SKIN_TYPES);
+    renderFit(el("conditionsFit"), "condition", SKIN_CONDITIONS);
 
     modal = setupModal(el("addIngredientModal"), () => { editingIngredientId = null; });
 
@@ -506,6 +504,41 @@ function toggleDetails(id) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// "Avoid / no effect / Good" rows of the form: one row per skin type or condition
+// ---------------------------------------------------------------------------------------------
+/** Draws one row per option with three choices. `group` keeps the radio buttons of one row together. */
+function renderFit(container, group, options) {
+    container.innerHTML = options.map((o, i) => {
+        const name = `fit_${group}_${i}`;
+        const choice = (value, label, cls, tip) => `<label class="fit-choice ${cls}" title="${tip}"><input type="radio" name="${name}" value="${value}"${value === "" ? " checked" : ""}><span>${label}</span></label>`;
+        return `<div class="fit-row" data-value="${escapeHtml(o.value)}"><span class="fit-name">${escapeHtml(o.label)}</span><span class="fit-choices">`
+            + choice("avoid", "Avoid", "avoid", "The app warns users with this") + choice("", "&ndash;", "none", "No effect either way") + choice("good", "Good", "good", "The app counts it as a plus for users with this")
+            + `</span></div>`;
+    }).join("");
+}
+
+/** What the rows say: { avoid: [...], good: [...] } (the values as they are stored). */
+function readFit(container) {
+    const result = { avoid: [], good: [] };
+    container.querySelectorAll(".fit-row").forEach((row) => {
+        const picked = row.querySelector("input:checked");
+        if (picked && result[picked.value]) result[picked.value].push(row.dataset.value);
+    });
+    return result;
+}
+
+/** Sets the rows from the two stored lists (capital letters do not matter; a name in both lists counts as "avoid"). */
+function writeFit(container, avoid, good) {
+    const lower = (list) => new Set((Array.isArray(list) ? list : []).map((v) => String(v).toLowerCase()));
+    const no = lower(avoid), yes = lower(good);
+    container.querySelectorAll(".fit-row").forEach((row) => {
+        const key = row.dataset.value.toLowerCase();
+        const want = no.has(key) ? "avoid" : yes.has(key) ? "good" : "";
+        row.querySelectorAll("input").forEach((input) => { input.checked = input.value === want; });
+    });
+}
+
+// ---------------------------------------------------------------------------------------------
 // Folders and the Recycle bin (what adminOrganizer.js asks this page to save)
 // ---------------------------------------------------------------------------------------------
 async function saveOrReload(ops) {
@@ -689,10 +722,8 @@ function openIngredientForm(item) {
     el("ingredientKeyActiveInput").checked = item ? item.keyActive : false;
     el("ingredientUmbrellaInput").checked = item ? item.umbrella : false;
     writeChecks(el("allergenTagsChecks"), item ? item.allergenTags : []);
-    writeChecks(el("avoidSkinTypesChecks"), item ? item.avoidForSkinTypes : []);
-    writeChecks(el("goodSkinTypesChecks"), item ? item.goodForSkinTypes : []);
-    writeChecks(el("avoidConditionsChecks"), item ? item.avoidForConditions : []);
-    writeChecks(el("goodConditionsChecks"), item ? item.goodForConditions : []);
+    writeFit(el("skinTypesFit"), item ? item.avoidForSkinTypes : [], item ? item.goodForSkinTypes : []);
+    writeFit(el("conditionsFit"), item ? item.avoidForConditions : [], item ? item.goodForConditions : []);
     modal.open();
 }
 
@@ -709,19 +740,14 @@ async function saveIngredient(event) {
     const aliases = toList(el("ingredientAliasesInput").value).filter((a) => sameKey(a) !== sameKey(name) && sameKey(a) !== sameKey(techName));
     const minAgeText = el("ingredientMinAgeInput").value.trim();
     const minAge = toWholeNumber(minAgeText);
-    const avoidTypes = readChecks(el("avoidSkinTypesChecks"));
-    const goodTypes = readChecks(el("goodSkinTypesChecks"));
-    const avoidConditions = readChecks(el("avoidConditionsChecks"));
-    const goodConditions = readChecks(el("goodConditionsChecks"));
+    // one choice per skin type and per condition, so a name can never be both "avoid" and "good"
+    const types = readFit(el("skinTypesFit")), conditions = readFit(el("conditionsFit"));
+    const avoidTypes = types.avoid, goodTypes = types.good, avoidConditions = conditions.avoid, goodConditions = conditions.good;
 
     if (!name) { setFormError(form, "Type the ingredient name."); el("ingredientNameInput").focus(); return; }
     if (!techName) { setFormError(form, "Type the technical / scientific name (the name printed on labels)."); el("ingredientTechInput").focus(); return; }
     if (!description) { setFormError(form, "Write a short user-friendly definition."); el("ingredientDescInput").focus(); return; }
     if (minAgeText !== "" && (!/^\d+$/.test(minAgeText) || minAge > 99)) { setFormError(form, "Minimum age must be a whole number from 0 to 99."); el("ingredientMinAgeInput").focus(); return; }
-    const bothTypes = avoidTypes.find((t) => goodTypes.includes(t));
-    if (bothTypes) { setFormError(form, `"${bothTypes}" skin is ticked under both Avoid and Good. Choose one.`); return; }
-    const bothConditions = avoidConditions.find((t) => goodConditions.includes(t));
-    if (bothConditions) { setFormError(form, `"${labelOf(SKIN_CONDITIONS, bothConditions)}" is ticked under both Avoid and Good. Choose one.`); return; }
 
     // the same ingredient must not be in the list twice (any of its names matching any name of another entry)
     const myKeys = new Set([name, techName, ...aliases].map(sameKey));

@@ -159,39 +159,31 @@
 
                     <div class="field">
                         <span class="field-label">Highlights</span>
-                        <div class="checks">
-                            <label class="check"><input type="checkbox" id="ingredientKeyActiveInput"> <span>Key active (show it as a highlighted chip in results)</span></label>
-                            <label class="check"><input type="checkbox" id="ingredientUmbrellaInput"> <span>Umbrella term that can hide other ingredients (like "Fragrance")</span></label>
+                        <div class="checks pills">
+                            <label class="check" title="The app shows it as a highlighted chip in results."><input type="checkbox" id="ingredientKeyActiveInput"> <span>Key active</span></label>
+                            <label class="check" title="A word that can hide other ingredients, like Fragrance."><input type="checkbox" id="ingredientUmbrellaInput"> <span>Umbrella term</span></label>
                         </div>
                     </div>
 
                     <div class="field">
                         <span class="field-label">Allergen Family</span>
-                        <div class="checks" id="allergenTagsChecks"></div>
+                        <div class="checks pills" id="allergenTagsChecks"></div>
                         <span class="field-hint">A user who picked that allergen in the app is warned about this ingredient.</span>
                     </div>
 
+                    <!-- ONE row per skin type and per condition, with three choices: Avoid, no effect, Good. (Before, each name
+                         stood twice, in an "Avoid" list and in a "Good" list, and could be ticked in both.) -->
                     <div class="form-row">
                         <div class="field">
-                            <span class="field-label">Avoid For Skin Types</span>
-                            <div class="checks" id="avoidSkinTypesChecks"></div>
+                            <span class="field-label">Skin Types</span>
+                            <div class="fit-list" id="skinTypesFit"></div>
                         </div>
                         <div class="field">
-                            <span class="field-label">Good For Skin Types</span>
-                            <div class="checks" id="goodSkinTypesChecks"></div>
+                            <span class="field-label">Skin Conditions</span>
+                            <div class="fit-list" id="conditionsFit"></div>
                         </div>
                     </div>
-
-                    <div class="form-row">
-                        <div class="field">
-                            <span class="field-label">Avoid For Skin Conditions</span>
-                            <div class="checks" id="avoidConditionsChecks"></div>
-                        </div>
-                        <div class="field">
-                            <span class="field-label">Good For Skin Conditions</span>
-                            <div class="checks" id="goodConditionsChecks"></div>
-                        </div>
-                    </div>
+                    <span class="field-hint">Choose <b>Avoid</b> or <b>Good</b> only where this ingredient matters; leave the rest on the dash.</span>
                 </div>
 
                 <p class="form-error" role="alert"></p>
