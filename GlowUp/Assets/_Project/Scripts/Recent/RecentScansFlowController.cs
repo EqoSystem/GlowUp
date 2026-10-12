@@ -155,7 +155,7 @@ namespace GlowUp.Recent
             if (this != null) Refresh();
         }
 
-        void OnDisable() { SwipeSceneNavigator.Suppressed = false; }
+        void OnDisable() { SwipeSceneNavigator.Suppressed = false; if (deleteSound != null) deleteSound.SetShaking(false); }
 
         void Update()
         {
@@ -337,6 +337,7 @@ namespace GlowUp.Recent
             if (sortButton != null) sortButton.gameObject.SetActive(!shaking);
             if (clearAllButton != null) clearAllButton.gameObject.SetActive(!shaking && tiles.Count > 0);
             zoneTarget = shaking ? zoneAlphaWaiting : 0f;
+            if (deleteSound != null) deleteSound.SetShaking(shaking);       // the freezing sound runs, softly, for as long as the rows shake
         }
 
         /// <summary>One row open at a time, so the list stays calm.</summary>

@@ -26,6 +26,41 @@ namespace GlowUp.Scan
             public string codes = "Show the barcode (on the bottom or the back)";
             public string shade = "Show the shade's name or number";
             public string around = "Turn the product slowly to show its other sides";
+            // what the RING still misses (brand, product name, kind, ingredient list, barcode): HintForRing
+            public string brandMissing = "The brand is not read yet: show the brand name on the front";
+            public string nameMissing = "Now the product's name: hold the front steady, with the name inside the frame";
+            public string kindMissing = "Show where the pack says what it is (lipstick, foundation, powder...)";
+            public string barcodeOptional = "Almost done. Show the barcode too if the pack has one";
+        }
+
+        /// <summary>What the ring holds, for the hint: which of its five things were detected.</summary>
+        public struct Ring
+        {
+            public bool brand, name, kind, barcode;
+            /// <summary>0 = no ingredient seen yet, 1 = the list is complete.</summary>
+            public float list;
+        }
+
+        /// <summary>
+        /// The hint that goes with the ring of five (brand, product name, kind, barcode, ingredient list). A fault of the
+        /// picture comes first; then the first thing that is still missing, in the order a pack is naturally shown: the
+        /// front (brand, name, kind), then the ingredient list, and last the barcode, which is optional. "" = all there.
+        /// </summary>
+        public static string HintForRing(Words words, FrameQuality.Fault fault, Ring ring)
+        {
+            switch (fault)
+            {
+                case FrameQuality.Fault.Dark: return words.dark;
+                case FrameQuality.Fault.Moving: return words.moving;
+                case FrameQuality.Fault.Glare: return words.glare;
+                case FrameQuality.Fault.Blurry: return words.blurry;
+            }
+            if (!ring.brand && !ring.name) return words.front;
+            if (!ring.brand) return words.brandMissing;
+            if (!ring.name) return words.nameMissing;
+            if (!ring.kind) return words.kindMissing;
+            if (ring.list < 1f) return ring.list > 0f ? words.ingredientsMore : words.ingredients;
+            return ring.barcode ? "" : words.barcodeOptional;
         }
 
         /// <summary>The status line. `held` = the button is down now; `started` = the ring holds anything at all.</summary>

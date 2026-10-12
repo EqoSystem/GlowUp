@@ -491,5 +491,31 @@ namespace GlowUp.Tests
                 ScanRules.Current.Apply();           // the numbers in force again, for the tests that follow
             }
         }
+        [Test]
+        public void The_hint_follows_the_ring_of_five()
+        {
+            var words = new ScanGuidance.Words();
+            var ring = new ScanGuidance.Ring();
+            Assert.AreEqual(words.front, ScanGuidance.HintForRing(words, FrameQuality.Fault.None, ring), "nothing read: show the front");
+            Assert.AreEqual(words.glare, ScanGuidance.HintForRing(words, FrameQuality.Fault.Glare, ring), "a fault of the picture comes first");
+            ring.name = true;
+            Assert.AreEqual(words.brandMissing, ScanGuidance.HintForRing(words, FrameQuality.Fault.None, ring));
+            ring.brand = true; ring.name = false;
+            Assert.AreEqual(words.nameMissing, ScanGuidance.HintForRing(words, FrameQuality.Fault.None, ring));
+            ring.name = true;
+            Assert.AreEqual(words.kindMissing, ScanGuidance.HintForRing(words, FrameQuality.Fault.None, ring));
+            ring.kind = true;
+            Assert.AreEqual(words.ingredients, ScanGuidance.HintForRing(words, FrameQuality.Fault.None, ring));
+            ring.list = 0.4f;
+            Assert.AreEqual(words.ingredientsMore, ScanGuidance.HintForRing(words, FrameQuality.Fault.None, ring));
+            ring.list = 1f;
+            Assert.AreEqual(words.barcodeOptional, ScanGuidance.HintForRing(words, FrameQuality.Fault.None, ring), "the barcode comes last and is optional");
+            ring.barcode = true;
+            Assert.AreEqual("", ScanGuidance.HintForRing(words, FrameQuality.Fault.None, ring));
+            // a hint never mentions the shade or the other sides: the ring does not show them
+            foreach (string hint in new[] { words.front, words.brandMissing, words.nameMissing, words.kindMissing, words.ingredients, words.ingredientsMore, words.barcodeOptional })
+                StringAssert.DoesNotContain("shade", hint.ToLowerInvariant());
+        }
+
     }
 }

@@ -168,6 +168,11 @@ namespace GlowUp.Scan
         [SerializeField] private string hintShade = "Show the shade's name or number";
         [SerializeField] private string hintAround = "Turn the product slowly to show its other sides";
         [SerializeField] private string hintAllDone = "Everything is read";
+        [Tooltip("The hints for what the ring still misses")]
+        [SerializeField] private string hintBrand = "The brand is not read yet: show the brand name on the front";
+        [SerializeField] private string hintName = "Now the product's name: hold the front steady, with the name inside the frame";
+        [SerializeField] private string hintKind = "Show where the pack says what it is (lipstick, foundation, powder...)";
+        [SerializeField] private string hintBarcode = "Almost done. Show the barcode too if the pack has one";
 
         [Header("Labels of the checklist")]
         [Tooltip("{0} = how many ingredients were read")]
@@ -300,6 +305,7 @@ namespace GlowUp.Scan
             words.dark = hintDark; words.moving = hintMoving; words.glare = hintGlare; words.blurry = hintBlurry;
             words.front = hintFront; words.ingredients = hintIngredients; words.ingredientsMore = hintIngredientsMore;
             words.codes = hintCodes; words.shade = hintShade; words.around = hintAround;
+            words.brandMissing = hintBrand; words.nameMissing = hintName; words.kindMissing = hintKind; words.barcodeOptional = hintBarcode;
         }
 
         async void Start()
@@ -652,7 +658,10 @@ namespace GlowUp.Scan
                 if (statusText != null) statusText.text = status;
                 shownStatus = status;
             }
-            string hint = held ? ScanGuidance.Hint(words, fault, evidence) : ScanGuidance.Hint(words, FrameQuality.Fault.None, evidence);
+            // the hint follows the RING (brand, name, kind, ingredient list, barcode), so it never asks for something the ring does not show
+            float[] parts = RingParts();
+            var ringNow = new ScanGuidance.Ring { brand = parts[0] >= 1f, name = parts[1] >= 1f, kind = parts[2] >= 1f, barcode = parts[3] >= 1f, list = parts[4] };
+            string hint = ScanGuidance.HintForRing(words, held ? fault : FrameQuality.Fault.None, ringNow);
             if (hint.Length == 0) hint = hintAllDone;
             if (hint != lastHint && guide != null) { lastHint = hint; guide.SetHint(hint); }
         }

@@ -4,8 +4,8 @@ namespace GlowUp.Common
 {
     /// <summary>
     /// The sounds of removing a scan in Recent Scans (the project owner's note of 12 October 2026):
-    ///   - the "freezing" sound KEEPS PLAYING while a row (or a gathered group of rows) is carried by the finger
-    ///     (BeginCarry / EndCarry);
+    ///   - the "freezing" sound KEEPS PLAYING while the rows shake (softer; SetShaking) and while a row or a gathered
+    ///     group of rows is carried by the finger (full loudness; BeginCarry / EndCarry);
     ///   - a second, short sound is played once when it is dropped into the remove area (PlayDrop).
     /// Play() is the earlier way (the freezing sound once, at the drop); it is kept for "Keep Playing While Carried" off.
     ///
@@ -43,6 +43,10 @@ namespace GlowUp.Common
         [Header("While a row is carried")]
         [Tooltip("On = the freezing sound plays again and again for as long as a row is carried by the finger, and stops when it is let go")]
         [SerializeField] private bool keepPlayingWhileCarried = true;
+        [Tooltip("On = the freezing sound also plays, softer, for as long as the rows SHAKE (delete mode), before one is picked up")]
+        [SerializeField] private bool playWhileShaking = true;
+        [Tooltip("How loud it is while the rows only shake, as a share of the carried loudness")]
+        [Range(0f, 1f)] [SerializeField] private float loudnessWhileShaking = 0.45f;
         [Tooltip("The carried sound fades out in this many seconds when the row is let go")]
         [SerializeField] private float carryFadeSeconds = 0.12f;
 
@@ -74,7 +78,7 @@ namespace GlowUp.Common
 
         AudioSource source;
         AudioSource dropSource;         // a second voice, so the drop is heard over the last of the freezing sound
-        bool carrying;
+        bool carrying, shaking, looping;
         float carryFade = -1f;
         AudioClip piece;                // the short, ready-made piece that is played
         float endsAt = -1f;
@@ -95,29 +99,58 @@ namespace GlowUp.Common
         float Loudness => Mathf.Clamp01(volume * (followSoundVolumeSetting ? UiPreferences.TapSoundVolume : 1f));
 
         /// <summary>
-        /// A row was picked up to be removed: the freezing sound starts and KEEPS playing until EndCarry (it is played
+        /// The rows started or stopped SHAKING (delete mode). While they shake the freezing sound plays round and round,
+        /// softer than while a row is carried ("Loudness While Shaking"); it stops when the shaking stops.
+        /// </summary>
+        public void SetShaking(bool on)
+        {
+            if (shaking == on) return;
+            shaking = on;
+            if (on) StartLoop(); else if (!carrying) StopLoop();
+        }
+
+        /// <summary>
+        /// A row was picked up to be removed: the freezing sound plays at full loudness until EndCarry (it is played
         /// round and round; its own fade-out makes each round end softly). Calling it again while it plays does nothing.
         /// </summary>
         public bool BeginCarry()
         {
-            if (!keepPlayingWhileCarried || carrying) return carrying;
-            if (!UiPreferences.DeleteSound || source == null || !isActiveAndEnabled) return false;
-            if (quietWhenPhoneIsSilent && PhoneIsSilent()) return false;
-            Prepare();
-            if (piece == null) return false;
-            source.clip = piece; source.loop = true; source.volume = Loudness; source.time = 0f;
-            source.Play();
-            carrying = true; carryFade = -1f; endsAt = -1f;
-            return true;
+            if (!keepPlayingWhileCarried) return false;
+            carrying = true;
+            return StartLoop();
         }
 
-        /// <summary>The row was let go (anywhere): the carried sound fades out quickly.</summary>
+        /// <summary>The row was let go (anywhere): back to the softer shaking sound, or silence when nothing shakes.</summary>
         public void EndCarry()
         {
             if (!carrying) return;
             carrying = false;
+            if (!shaking || !playWhileShaking) StopLoop();
+        }
+
+        bool StartLoop()
+        {
+            if (!carrying && !(shaking && playWhileShaking)) return false;
+            if (looping) { carryFade = -1f; return true; }
+            if (!UiPreferences.DeleteSound || source == null || !isActiveAndEnabled) return false;
+            if (quietWhenPhoneIsSilent && PhoneIsSilent()) return false;
+            Prepare();
+            if (piece == null) return false;
+            source.clip = piece; source.loop = true; source.volume = LoopLoudness; source.time = 0f;
+            source.Play();
+            looping = true; carryFade = -1f; endsAt = -1f;
+            return true;
+        }
+
+        void StopLoop()
+        {
+            if (!looping) return;
+            looping = false;
             carryFade = Mathf.Max(0.01f, carryFadeSeconds);
         }
+
+        /// <summary>How loud the looping sound is right now: full while a row is carried, softer while the rows only shake.</summary>
+        float LoopLoudness => Loudness * (carrying ? 1f : Mathf.Clamp01(loudnessWhileShaking));
 
         /// <summary>True while the freezing sound is kept playing for a carried row.</summary>
         public bool IsCarrying => carrying;
@@ -160,7 +193,7 @@ namespace GlowUp.Common
         {
             if (source != null && source.isPlaying) source.Stop();
             if (source != null) source.loop = false;
-            carrying = false; carryFade = -1f;
+            carrying = false; looping = false; carryFade = -1f;
             endsAt = -1f;
             if (piece != null) Destroy(piece);
             piece = null;
@@ -172,7 +205,7 @@ namespace GlowUp.Common
         /// </summary>
         public bool Play()
         {
-            if (!UiPreferences.DeleteSound || source == null || !isActiveAndEnabled || IsPlaying || carrying) return false;
+            if (!UiPreferences.DeleteSound || source == null || !isActiveAndEnabled || IsPlaying || looping) return false;
             if (quietWhenPhoneIsSilent && PhoneIsSilent()) return false;
             Prepare();
             if (piece == null) return false;                // not ready: better no sound than a late one
@@ -242,6 +275,8 @@ namespace GlowUp.Common
         void Update()
         {
             if (endsAt > 0f && Time.unscaledTime >= endsAt) endsAt = -1f;
+            // the loop glides between its two loudnesses (shaking, softer; carried, full)
+            if (looping && source != null) source.volume = Mathf.MoveTowards(source.volume, LoopLoudness, 3f * Time.unscaledDeltaTime);
             if (carryFade > 0f && source != null)
             {
                 // the carried sound dies away quickly; then the voice is free again
