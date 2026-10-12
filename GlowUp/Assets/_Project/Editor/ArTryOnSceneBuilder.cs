@@ -189,7 +189,7 @@ namespace GlowUp.EditorTools
 
             // ---- saved-product picker ----
             A.AppPopup picker = A.Overlay(s, "ProductPickerPanel", "Choose a product");
-            // the picker opens by itself when Try On is opened without a product: a drag to the left must still lead back to the dashboard
+            // the picker opens by itself when Try On is opened without a product: a sideways drag must still lead back to the dashboard
             A.Set(picker.panel, "letsSidewaysSwipesThrough", true);
             A.Fill(picker.box, 40, 40, 40, 190);
             TextMeshProUGUI pickerHint = A.Label(picker.box, "PickerHintText", "Pick a saved product, or search the product list.", 29, ThemeRole.SecondaryText, FontRole.Body);

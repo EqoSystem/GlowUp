@@ -9,11 +9,12 @@ namespace GlowUp.Common
 {
     /// <summary>
     /// Drag the screen sideways to jump to the neighbouring main screen. The screens stand in the row "Swipe Row", in
-    /// the order of the bottom bar: Recent Scans | the dashboard | AR Try-On. A drag goes to the screen on THAT side:
+    /// the order of the bottom bar: Recent Scans | the dashboard | AR Try-On. The page follows the finger like a page
+    /// being turned, so a drag PULLS IN the screen from the other side (the project owner's drawing of 13 October 2026):
     ///
-    ///   on the dashboard:   drag LEFT = Recent Scans,   drag RIGHT = AR Try-On
-    ///   on Recent Scans:    drag RIGHT = back to the dashboard
-    ///   on AR Try-On:       drag LEFT = back to the dashboard
+    ///   on the dashboard:   drag RIGHT = Recent Scans,   drag LEFT = AR Try-On
+    ///   on Recent Scans:    drag LEFT = back to the dashboard
+    ///   on AR Try-On:       drag RIGHT = back to the dashboard
     ///
     /// The scanner and the Settings page are NOT in the row: they are opened with their buttons and left with their
     /// back button, so a sideways drag never lands in the camera by accident. On a screen that is not in the row this
@@ -37,8 +38,9 @@ namespace GlowUp.Common
         [SerializeField] private string[] swipeRow = DefaultRow;
         [Tooltip("The bottom bar button of each screen in the row above (-1 = that screen has no button)")]
         [SerializeField] private int[] barSlotOfRow = { 0, 1, 2 };
-        [Tooltip("On = dragging right opens the NEXT screen of the row. Off = the other way round.")]
-        [SerializeField] private bool dragRightOpensNext = true;
+        // (this switch has a new name on purpose: a scene built with the earlier one, which went the other way, takes this default)
+        [Tooltip("On = the page follows the finger like a page being turned: dragging to the LEFT opens the NEXT screen of the row (the one on the right in the bottom bar), dragging to the RIGHT the one before. Off = the other way round.")]
+        [SerializeField] private bool dragLeftOpensNext = true;
 
         [Header("References")]
         [Tooltip("The page that follows the finger (the scene's card)")]
@@ -92,17 +94,17 @@ namespace GlowUp.Common
 
         int Index => System.Array.IndexOf(swipeRow, SceneManager.GetActiveScene().name);
 
-        int TargetIndex(float dx) => Neighbour(swipeRow, SceneManager.GetActiveScene().name, dx > 0f, dragRightOpensNext);
+        int TargetIndex(float dx) => Neighbour(swipeRow, SceneManager.GetActiveScene().name, dx > 0f, dragLeftOpensNext);
 
         /// <summary>
         /// The place in `row` a sideways drag leads to from the screen `current`; -1 = nowhere (there is no screen on that
         /// side, or `current` is not in the row at all: the scanner, Settings).
         /// </summary>
-        public static int Neighbour(string[] row, string current, bool dragToTheRight, bool dragRightOpensNext = true)
+        public static int Neighbour(string[] row, string current, bool dragToTheRight, bool dragLeftOpensNext = true)
         {
             int index = row != null ? System.Array.IndexOf(row, current) : -1;
             if (index < 0) return -1;
-            int target = index + (dragToTheRight == dragRightOpensNext ? 1 : -1);
+            int target = index + (dragToTheRight != dragLeftOpensNext ? 1 : -1);
             return target >= 0 && target < row.Length ? target : -1;
         }
 

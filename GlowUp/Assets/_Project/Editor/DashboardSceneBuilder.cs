@@ -113,7 +113,7 @@ namespace GlowUp.EditorTools
             noticePill.gameObject.SetActive(false);
 
             BottomActionBar bar = A.BottomBar(s, 0);
-            AppTiles.SwipeNavigation(s, bar);       // drag the dashboard left: Recent Scans; right: AR Try-On (the scanner is opened with its button only)
+            AppTiles.SwipeNavigation(s, bar);       // drag the dashboard right: Recent Scans comes in; left: AR Try-On (the scanner is opened with its button only)
 
             // ---- account pop-up (opens from the avatar) ----
             A.AppPopup account = A.Overlay(s, "AccountPanel", "Your account");
