@@ -259,6 +259,12 @@ namespace GlowUp.Scan
         ScanRecord rescanOf;                      // "Scan the same product again": the saved scan this one takes the place of
         readonly List<PackagingMemory.Match> lookMatches = new List<PackagingMemory.Match>();     // packs this phone remembers that look like this one
         readonly HashSet<string> declined = new HashSet<string>();       // products the user said "no" to in this scan
+        PackEmbedder embedder;                    // the phone's picture model (null when the phone or the build has none)
+        readonly object lookLock = new object();
+        PackagingMemory.Look lookWaiting;         // a look the picture model has finished (written on its thread, taken over in Update)
+        int lookWaitingFor, scanNumber;           // which scan that look belongs to: a look of the scan before is thrown away
+        bool lookOut; float lookSentAt;
+        class LookBox { public volatile bool done; public volatile string numbers; }
         bool shortlistAnswered;                   // the shortlist was shown in this attempt and the user said "none of these"
         string frontChecked = "";                 // the text of the front the product list was last asked about
         string barcode = "";
@@ -299,6 +305,7 @@ namespace GlowUp.Scan
         {
             AiBudget.NewSession();                           // the AI's few questions are counted per visit of this screen
             reader = FrameReader.Create();                   // loads in the background while the user reads the instructions
+            embedder = PackEmbedder.Begin();                 // so does the picture model that knows a pack again (not on every phone)
             if (guide != null) guide.SetState(ScanGuideOverlay.State.Hidden);
             if (idlePlaceholder != null) idlePlaceholder.SetActive(true);
             ResetChecklist();
@@ -344,6 +351,7 @@ namespace GlowUp.Scan
         {
             if (cameraFeed != null) cameraFeed.Started -= OnCameraStarted;
             if (holdButton != null) { holdButton.Pressed -= OnHoldPressed; holdButton.Released -= OnHoldReleased; }
+            if (embedder != null) embedder.Close();          // the picture model leaves the phone's memory
         }
 
         // ---------------------------------------------------------------------------------------
@@ -411,6 +419,8 @@ namespace GlowUp.Scan
         {
             if (stage != Stage.Scanning) return;
             TakeAnswer();                                    // the text reader may have finished a picture (also while paused)
+            if (stage != Stage.Scanning) return;
+            TakeLook();                                      // and so may the picture model
             if (stage != Stage.Scanning) return;
 
             bool held = holdButton != null && holdButton.IsHeld;
@@ -750,6 +760,34 @@ namespace GlowUp.Scan
             if (!PackagingMemory.Enabled || pixels == null) return;
             PackagingMemory.Look look = PackagingMemory.SignatureOf(pixels, pixelsW, pixelsH);
             if (look == null) return;
+            if (embedder != null && embedder.Ready)
+            {
+                // the picture model looks at the newest pack picture whenever it is free; its answer comes back in Update
+                if (lookOut && Time.unscaledTime - lookSentAt > ReaderAnswerSeconds) lookOut = false;
+                if (lookOut || embedder.Busy) return;
+                PackagingMemory.Look sent = look; int forScan = scanNumber;
+                lookOut = embedder.Embed(pixels, pixelsW, pixelsH, numbers =>
+                {
+                    sent.embedding = numbers ?? "";
+                    lock (lookLock) { lookWaiting = sent; lookWaitingFor = forScan; }
+                });
+                if (lookOut) { lookSentAt = Time.unscaledTime; return; }
+            }
+            MatchLook(look);
+        }
+
+        /// <summary>The picture model has finished a picture of the pack: is it a pack this phone remembers?</summary>
+        void TakeLook()
+        {
+            PackagingMemory.Look look; int forScan;
+            lock (lookLock) { look = lookWaiting; forScan = lookWaitingFor; lookWaiting = null; }
+            if (look == null) return;
+            lookOut = false;
+            if (forScan == scanNumber && !ProductKnown) MatchLook(look);
+        }
+
+        void MatchLook(PackagingMemory.Look look)
+        {
             foreach (PackagingMemory.Match match in PackagingMemory.Matches(look, DistinctLines(evidence.FrontText), ScanShortlist.Maximum))
             {
                 // each remembered product once, with the best likeness seen in this scan
@@ -912,6 +950,8 @@ namespace GlowUp.Scan
             ingredientText = null; ingredientSource = "scan"; listFrom = ""; listWebBacked = false; sources.Clear();
             barcode = ""; lastColour = "";
             lookMatches.Clear(); declined.Clear(); shortlistAnswered = false; frontChecked = "";
+            scanNumber++;                        // a look of the pack that is still on its way belongs to the scan before
+            lock (lookLock) { lookWaiting = null; }
             if (productQuestion != null) productQuestion.Hide();
             fault = FrameQuality.Fault.None; blurrySkips = 0; differentSeen = 0; sinceProgress = 0f; stalledSaid = false; pausedFor = 0f;
             finishUnnamed = false; lookingUp = false; shownStatus = null; messageOver = null; lastHint = "";
@@ -1060,23 +1100,36 @@ namespace GlowUp.Scan
 
         /// <summary>
         /// The product has a name: what its pack looks like is remembered on this phone, its front and one other side, so
-        /// it is known again next time. Only a few numbers per side are kept (colours and a light/dark pattern), no picture.
+        /// it is known again next time. Only numbers are kept (the picture model's answer, the colours and a light/dark
+        /// pattern), never a picture. It takes a moment at most: the picture model gets a second and a half per side.
         /// </summary>
-        void RememberLooks()
+        IEnumerator RememberLooks()
         {
-            if (!ProductKnown || !PackagingMemory.Enabled) return;
-            try
+            if (!ProductKnown || !PackagingMemory.Enabled) yield break;
+            Kept front = best[(int)ScanZone.Front], side = best[(int)ScanZone.Around];
+            string id = knownProduct != null ? knownProduct.id ?? "" : "";
+            foreach (Kept kept in new[] { front, side != null && (front == null || side.pixels != front.pixels) ? side : null })
             {
-                Kept front = best[(int)ScanZone.Front], side = best[(int)ScanZone.Around];
-                string id = knownProduct != null ? knownProduct.id ?? "" : "";
-                foreach (Kept kept in new[] { front, side != null && (front == null || side.pixels != front.pixels) ? side : null })
+                if (kept == null) continue;
+                PackagingMemory.Look look = null;
+                try { look = PackagingMemory.SignatureOf(kept.pixels, kept.width, kept.height); }
+                catch (Exception e) { Debug.LogWarning("Scan: the look of the pack was not kept: " + e.Message); }
+                if (look == null) continue;
+
+                if (embedder != null && embedder.Ready)
                 {
-                    if (kept == null) continue;
-                    PackagingMemory.Look look = PackagingMemory.SignatureOf(kept.pixels, kept.width, kept.height);
-                    if (look != null) PackagingMemory.Remember(look, identity.productName, identity.brandName, identity.cosmeticType, "", "", "", id, kept == front ? "front" : "side");
+                    float until = Time.unscaledTime + 1.5f;                 // EVERY LONG STEP HAS A TIME LIMIT
+                    while (embedder.Busy && Time.unscaledTime < until) yield return null;
+                    var box = new LookBox();
+                    if (embedder.Embed(kept.pixels, kept.width, kept.height, numbers => { box.numbers = numbers; box.done = true; }))
+                    {
+                        while (!box.done && Time.unscaledTime < until) yield return null;
+                        if (box.done && !string.IsNullOrEmpty(box.numbers)) look.embedding = box.numbers;
+                    }
                 }
+                try { PackagingMemory.Remember(look, identity.productName, identity.brandName, identity.cosmeticType, "", "", "", id, kept == front ? "front" : "side"); }
+                catch (Exception e) { Debug.LogWarning("Scan: the look of the pack was not kept: " + e.Message); }
             }
-            catch (Exception e) { Debug.LogWarning("Scan: the look of the pack was not kept: " + e.Message); }
         }
 
         /// <summary>A kept picture as a JPG for the AI: made smaller first, so it travels fast.</summary>
@@ -1111,7 +1164,6 @@ namespace GlowUp.Scan
             if (stage == Stage.Leaving) return;
             TakePackList();
             if (ingredientText == null) return;
-            RememberLooks();
             ScanSession.PendingText = ingredientText; ScanSession.PendingSource = ingredientSource;
             ScanSession.PendingShadeHex = identity.shadeHex.Length > 0 ? identity.shadeHex : evidence.ShadeHex.Length > 0 ? evidence.ShadeHex : lastColour;
             ScanSession.PendingProductName = identity.productName; ScanSession.PendingBrandName = identity.brandName;
@@ -1133,7 +1185,9 @@ namespace GlowUp.Scan
             if (guide != null) guide.SetState(ScanGuideOverlay.State.Detected);
             if (vibrate) Haptics.Tick(60);
             Say(statusDone);
-            yield return new WaitForSecondsRealtime(recognisedHoldSeconds);
+            float leaveAt = Time.unscaledTime + recognisedHoldSeconds;
+            yield return RememberLooks();                    // while "Got it" is on screen anyway
+            while (Time.unscaledTime < leaveAt) yield return null;
             if (cameraFeed != null) cameraFeed.StopCamera();
             SceneNavigator.GoViaLoading(resultScene, loadingMessage, ScanAnalysisPipeline.Run);
         }

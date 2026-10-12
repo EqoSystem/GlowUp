@@ -38,6 +38,7 @@ namespace GlowUp.EditorTools
                 ArFaceTrackingSetup.SetArchitectures(notes);
                 BrandingSetup.Apply(notes);
                 FingerSignSetup.Apply(notes);
+                PackRecognitionSetup.Apply(notes);
             }
             catch (Exception e) { Debug.LogWarning("[GlowUp] The project settings could not be checked: " + e.Message); }
             if (notes.Count > 0) Debug.Log("[GlowUp] Project settings updated:\n" + string.Join("\n", notes));
@@ -49,7 +50,7 @@ namespace GlowUp.EditorTools
         {
             if (report.summary.platform != BuildTarget.Android) return;
             var notes = new List<string>();
-            try { ArFaceTrackingSetup.FixGradleTemplate(notes); FingerSignSetup.Apply(notes); }
+            try { ArFaceTrackingSetup.FixGradleTemplate(notes); FingerSignSetup.Apply(notes); PackRecognitionSetup.Apply(notes); }
             catch (Exception e) { Debug.LogWarning("[GlowUp] The Gradle template could not be checked: " + e.Message); }
             if (notes.Count > 0) Debug.Log("[GlowUp] Before the build:\n" + string.Join("\n", notes));
 

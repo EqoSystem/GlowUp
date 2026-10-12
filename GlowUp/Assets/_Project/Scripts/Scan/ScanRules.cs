@@ -77,6 +77,14 @@ namespace GlowUp.Scan
         [Tooltip("The list is complete when this many pictures of it in a row brought no new name")]
         [Range(1, 6)] public int quietPicturesForDone = 2;
 
+        [Header("Knowing a pack again by its look (compared on the phone)")]
+        [Tooltip("How alike a pack must be to one the phone remembers for the question \"Is this ...?\" to be asked at once (1 = the same picture). Higher = asked less often, and wrong less often.")]
+        [Range(0.5f, 0.95f)] public float packStrongLikeness = 0.70f;
+        [Tooltip("From this likeness on the question is asked when a word of the product's or the brand's name was read on the pack as well")]
+        [Range(0.3f, 0.9f)] public float packMediumLikeness = 0.55f;
+        [Tooltip("The share of the camera picture, round its middle, that is compared (the edges are mostly the hand and the background)")]
+        [Range(0.5f, 1f)] public float packPictureMiddle = 0.8f;
+
         /// <summary>The rules in force (the asset, or the defaults above when the asset is missing).</summary>
         public static ScanRules Current
         {
@@ -116,6 +124,10 @@ namespace GlowUp.Scan
             ScanEvidence.MinimumIngredients = Mathf.Max(1, minimumIngredients);
             ScanTextMerger.SeenToCount = Mathf.Max(1, picturesForAnUnknownName);
             ScanTextMerger.QuietFramesForDone = Mathf.Max(1, quietPicturesForDone);
+
+            PackagingMemory.StrongLikeness = Mathf.Clamp01(packStrongLikeness);
+            PackagingMemory.MediumLikeness = Mathf.Clamp(packMediumLikeness, 0f, PackagingMemory.StrongLikeness);
+            PackEmbedder.Middle = Mathf.Clamp(packPictureMiddle, 0.3f, 1f);
         }
 
         void OnValidate() { if (Application.isPlaying) Apply(); }

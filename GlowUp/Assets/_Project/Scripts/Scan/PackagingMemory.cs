@@ -9,10 +9,15 @@ namespace GlowUp.Scan
     /// Remembers what a product's PACKAGING looks like, on this phone, so the scanner knows it again at once
     /// the next time it is held up to the camera (also offline, and before any text has been read).
     ///
-    /// When a scan has named a product, the look of the picture is kept as a small "signature":
-    ///   - its colours (how much of the picture each of 64 colours takes), and
-    ///   - its pattern of light and dark (a 64-point fingerprint of the picture's layout).
-    /// Several sides of one product are kept (its front, another side), each as its own signature.
+    /// When a scan has named a product, the look of the picture is kept as numbers, not as a picture:
+    ///   - the answer of the phone's small picture model (PackEmbedder: about a thousand numbers, one byte each).
+    ///     Two pictures of the same pack give numbers that point the same way, also in other light or from another
+    ///     angle. In a desktop check with 76 public pack photos, each changed the way a second photo differs from the
+    ///     first, this found the same pack again in 94 of 100 tries, against 1 in 100 for the simple signature below;
+    ///   - and a simple "signature" every phone can make: the pack's colours (the share of each of 64 colours) and
+    ///     its pattern of light and dark (64 points). It is used when the picture model is not there (Android 6,
+    ///     the Editor, a build without the model).
+    /// Several sides of one product are kept (its front, another side), up to six looks per product.
     ///
     /// A new picture is compared with all of them. A STRONG match is worth asking the user about at once ("Is this
     /// ...?"); a MEDIUM match only when a word of the product's or the brand's name was read on the pack as well;
@@ -33,6 +38,18 @@ namespace GlowUp.Scan
         public static float StrongColourMatch = 0.93f;
         /// <summary>... and at most this many of the 64 light/dark points differ.</summary>
         public static int StrongPatternDifference = 7;
+        /// <summary>
+        /// With the picture model's numbers: how alike two looks must be for a STRONG and for a MEDIUM match (1 = the same
+        /// picture, 0 = nothing in common). In the desktop check 0.70 found the same pack in 68 of 100 tries and took
+        /// another pack for it in 4 of 1000 (packs of one line that really look alike); 0.55 found 94 of 100 and was
+        /// wrong in 16 of 1000, which is why a medium match also needs a word of the name read on the pack.
+        /// The numbers of the check are from pictures changed by a program, not from a phone: tune them in Scan Rules.
+        /// </summary>
+        public static float StrongLikeness = 0.70f, MediumLikeness = 0.55f;
+        /// <summary>Two looks of one product that are this alike are the same view: the newer one takes the older one's place.</summary>
+        public static float SameViewLikeness = 0.9f;
+        /// <summary>How many looks are kept of one product at most (the oldest go first).</summary>
+        public const int LooksPerProduct = 6;
         const string CacheKey = "packaging_memory";
         const int Limit = 400;
 
@@ -46,7 +63,40 @@ namespace GlowUp.Scan
             public string side = "";
             public float[] colours = new float[64];
             public long pattern;
+            /// <summary>The picture model's numbers, one byte each, as Base64 text ("" = the phone could not make them).</summary>
+            public string embedding = "";
             public long seenAtUnix;
+
+            [NonSerialized] sbyte[] numbers;
+            [NonSerialized] float length;
+            [NonSerialized] string numbersOf;
+
+            /// <summary>The picture model's numbers, unpacked once (null when there are none or the text is damaged), and their length.</summary>
+            internal sbyte[] Numbers(out float vectorLength)
+            {
+                if (numbersOf != embedding)
+                {
+                    numbersOf = embedding; numbers = null; length = 0f;
+                    if (!string.IsNullOrEmpty(embedding))
+                    {
+                        try
+                        {
+                            byte[] bytes = Convert.FromBase64String(embedding);
+                            if (bytes.Length >= 16)
+                            {
+                                numbers = new sbyte[bytes.Length];
+                                double sum = 0;
+                                for (int i = 0; i < bytes.Length; i++) { numbers[i] = unchecked((sbyte)bytes[i]); sum += numbers[i] * numbers[i]; }
+                                length = (float)Math.Sqrt(sum);
+                                if (length <= 0f) numbers = null;
+                            }
+                        }
+                        catch (FormatException) { numbers = null; }
+                    }
+                }
+                vectorLength = length;
+                return numbers;
+            }
         }
 
         public enum Strength { None, Medium, Strong }
@@ -152,6 +202,10 @@ namespace GlowUp.Scan
             // the same product seen again from nearly the same side replaces its older look
             items.RemoveAll(old => SameProduct(old, look) && Alike(old, look));
             items.Add(look);
+            // a product keeps its newest few looks
+            int ofThisProduct = items.FindAll(old => SameProduct(old, look)).Count;
+            for (int i = 0; i < items.Count && ofThisProduct > LooksPerProduct; i++)
+                if (SameProduct(items[i], look)) { items.RemoveAt(i--); ofThisProduct--; }
             while (items.Count > Limit) items.RemoveAt(0);
             OfflineCache.Save(CacheKey, H());
         }
@@ -171,14 +225,25 @@ namespace GlowUp.Scan
             foreach (Look known in remembered)
             {
                 if (known == null) continue;
-                float colours = ColourOverlap(known, seen);
-                int differ = Differences(known.pattern, seen.pattern);
-                if (colours < ColourMatch || differ > PatternDifference) continue;
-                var match = new Match
+                Match match;
+                float likeness = Likeness(known, seen);
+                if (likeness > -1f)
                 {
-                    look = known, score = Mathf.Clamp01(colours - differ * 0.004f),
-                    strength = colours >= StrongColourMatch && differ <= StrongPatternDifference ? Strength.Strong : Strength.Medium
-                };
+                    // both looks carry the picture model's numbers: they decide
+                    if (likeness < MediumLikeness) continue;
+                    match = new Match { look = known, score = Mathf.Clamp01(likeness), strength = likeness >= StrongLikeness ? Strength.Strong : Strength.Medium };
+                }
+                else
+                {
+                    float colours = ColourOverlap(known, seen);
+                    int differ = Differences(known.pattern, seen.pattern);
+                    if (colours < ColourMatch || differ > PatternDifference) continue;
+                    match = new Match
+                    {
+                        look = known, score = Mathf.Clamp01(colours - differ * 0.004f),
+                        strength = colours >= StrongColourMatch && differ <= StrongPatternDifference ? Strength.Strong : Strength.Medium
+                    };
+                }
                 foreach (string word in (Plain(known.productName) + " " + Plain(known.brandName)).Split(' '))
                     if (word.Length >= 4 && text.Contains(" " + word + " ")) { match.wordSeen = true; break; }
                 // each product once: its best side
@@ -227,7 +292,25 @@ namespace GlowUp.Scan
             return null;
         }
 
-        static bool Alike(Look a, Look b) => ColourOverlap(a, b) >= ColourMatch && Differences(a.pattern, b.pattern) <= PatternDifference;
+        static bool Alike(Look a, Look b)
+        {
+            float likeness = Likeness(a, b);
+            return likeness > -1f ? likeness >= SameViewLikeness : ColourOverlap(a, b) >= ColourMatch && Differences(a.pattern, b.pattern) <= PatternDifference;
+        }
+
+        /// <summary>
+        /// How alike two looks are by the picture model's numbers: 1 = the same picture, about 0 = nothing in common.
+        /// -1 when one of them has no such numbers (then the colour-and-pattern signature is compared instead).
+        /// </summary>
+        public static float Likeness(Look a, Look b)
+        {
+            if (a == null || b == null) return -1f;
+            sbyte[] x = a.Numbers(out float lengthX), y = b.Numbers(out float lengthY);
+            if (x == null || y == null || x.Length != y.Length) return -1f;
+            long dot = 0;
+            for (int i = 0; i < x.Length; i++) dot += x[i] * y[i];
+            return dot / (lengthX * lengthY);
+        }
 
         static float ColourOverlap(Look a, Look b)
         {

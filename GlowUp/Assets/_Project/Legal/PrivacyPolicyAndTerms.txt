@@ -28,6 +28,7 @@ GlowUp asks for permission to use your camera for three features: scanning a pro
 
 - The text on a product is read on your device. We do not record or store the live camera feed, and we keep no photos.
 - For a scan, only the text that was read, the product's name and the result are kept and analysed. When you are online and the app cannot name the product by itself, a few still pictures of the PRODUCT you are holding (its front, back or bottom; four at most, once per scan) may be sent to our AI service provider so that the product can be recognised (see section 5). Those pictures are not saved by us.
+- So that the app knows a product again the next time you scan it, it keeps what its pack looks like as a set of numbers (not a picture; the picture cannot be rebuilt from them), together with any other name you typed for the product. These stay on your device only and are removed when you clear the app's data or uninstall the app.
 - For AR Try-On, the picture of your face is used only while the preview is on screen. It is not saved and it is never sent to us or to anyone else.
 - For finger signs, the selfie camera's picture is looked at on your device only, to count the fingers of the hand you hold up. It is not saved and it is never sent to us or to anyone else. Finger signs are off until you switch them on, and your phone shows its "camera in use" sign while they are on.
 

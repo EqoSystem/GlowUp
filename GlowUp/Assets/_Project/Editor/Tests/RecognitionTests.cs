@@ -19,6 +19,7 @@ namespace GlowUp.Tests
             PackagingMemory.Enabled = true;
             PackagingMemory.ColourMatch = 0.88f; PackagingMemory.PatternDifference = 12;
             PackagingMemory.StrongColourMatch = 0.93f; PackagingMemory.StrongPatternDifference = 7;
+            PackagingMemory.StrongLikeness = 0.70f; PackagingMemory.MediumLikeness = 0.55f; PackagingMemory.SameViewLikeness = 0.9f;
             ScanShortlist.Maximum = 3; ScanShortlist.LookStrong = 0.9f; ScanShortlist.LookMedium = 0.6f;
             ScanShortlist.WordBonus = 0.15f; ScanShortlist.BothBonus = 0.1f;
         }
@@ -118,6 +119,64 @@ namespace GlowUp.Tests
             Assert.AreEqual(PackagingMemory.Strength.Strong, found[0].strength, "its best side counts");
             Assert.AreEqual("p5", found[1].look.productId);
             Assert.AreEqual(1, PackagingMemory.MatchesAmong(new[] { side, other, front }, Base(), "", 1).Count);
+        }
+
+        // ------------------------------------------------------------------------------------ the picture model's numbers
+        /// <summary>
+        /// What the phone's picture model would answer, made by hand: 80 numbers as Base64 text, 16 of them not zero. The
+        /// first `agree` of those are the same in every such answer, the rest stand in a block that belongs to `own` alone
+        /// (0 to 3). So two answers with different `own` are alike by (the smaller `agree`) / 16.
+        /// </summary>
+        static string Numbers(int agree, int own)
+        {
+            var bytes = new byte[80];
+            for (int i = 0; i < 16; i++) if (i < agree) bytes[i] = 100;
+            for (int i = agree; i < 16; i++) bytes[16 + own * 16 + i] = 100;
+            return System.Convert.ToBase64String(bytes);
+        }
+
+        static PackagingMemory.Look WithNumbers(PackagingMemory.Look look, string numbers) { look.embedding = numbers; return look; }
+
+        [Test]
+        public void ThePictureModelsNumbersSayHowAlikeTwoPacksAre()
+        {
+            PackagingMemory.Look a = WithNumbers(Base(), Numbers(16, 0)), same = WithNumbers(Base(), Numbers(16, 1));
+            Assert.AreEqual(1f, PackagingMemory.Likeness(a, same), 0.001f, "the same numbers: the same picture");
+            // 12 of 16 numbers agree: the likeness is 12/16
+            Assert.AreEqual(0.75f, PackagingMemory.Likeness(WithNumbers(Base(), Numbers(12, 0)), WithNumbers(Base(), Numbers(12, 1))), 0.001f);
+            Assert.AreEqual(0f, PackagingMemory.Likeness(WithNumbers(Base(), Numbers(0, 0)), WithNumbers(Base(), Numbers(0, 1))), 0.001f, "nothing in common");
+
+            // a look without numbers, or with damaged ones, cannot be compared this way
+            Assert.AreEqual(-1f, PackagingMemory.Likeness(a, Base()));
+            Assert.AreEqual(-1f, PackagingMemory.Likeness(a, WithNumbers(Base(), "not base64 !!")));
+            Assert.AreEqual(-1f, PackagingMemory.Likeness(a, null));
+        }
+
+        [Test]
+        public void WithThePictureModelTheNumbersDecideNotTheColours()
+        {
+            // the colours and the pattern of these looks are identical (Base()): only the picture model's numbers differ
+            PackagingMemory.Look strong = Named(WithNumbers(Base(), Numbers(12, 1)), "Fit Me Concealer", "Maybelline", "p2");          // 0.75 alike
+            PackagingMemory.Look medium = Named(WithNumbers(Base(), Numbers(10, 2)), "Oil Control Blush On", "Careline", "p5");       // 0.625 alike ...
+            PackagingMemory.Look unlike = Named(WithNumbers(Base(), Numbers(4, 3)), "Phenomenal Velvet Lipstick", "Vice Cosmetics", "p6");
+            PackagingMemory.Look seen = WithNumbers(Base(), Numbers(12, 0));
+            // ... measured against what is seen: they share 10 of their 16 numbers -> 10 / 16 = 0.625
+
+            List<PackagingMemory.Match> found = PackagingMemory.MatchesAmong(new[] { unlike, medium, strong }, seen, "");
+            Assert.AreEqual(2, found.Count, "the pack that is not alike is left out although its colours are the same");
+            Assert.AreEqual("p2", found[0].look.productId);
+            Assert.AreEqual(PackagingMemory.Strength.Strong, found[0].strength);
+            Assert.AreEqual(0.75f, found[0].score, 0.001f);
+            Assert.AreEqual("p5", found[1].look.productId);
+            Assert.AreEqual(PackagingMemory.Strength.Medium, found[1].strength);
+            Assert.IsFalse(found[1].WorthAsking);
+            Assert.IsTrue(PackagingMemory.MatchesAmong(new[] { medium }, seen, "CARELINE blush")[0].WorthAsking, "medium and a word of the name: worth asking");
+
+            // a look kept before the phone had the picture model is still compared by its colours and pattern
+            PackagingMemory.Look older = Named(Base(), "Complexion Blur Translucent Perfecting Powder", "Absidy", "p4");
+            found = PackagingMemory.MatchesAmong(new[] { older }, seen, "");
+            Assert.AreEqual(1, found.Count);
+            Assert.AreEqual(PackagingMemory.Strength.Strong, found[0].strength);
         }
 
         // ------------------------------------------------------------------------------------ the shortlist
