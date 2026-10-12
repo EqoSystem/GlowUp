@@ -99,8 +99,10 @@ namespace GlowUp.EditorTools
             if (oldInstagram != null) Object.DestroyImmediate(oldInstagram.gameObject);
             var google = Social(ct, "GoogleSignInButton", IconFactory.Google);
             var facebook = Social(ct, "FacebookSignInButton", IconFactory.Facebook);
-            var privacy = SceneBuilderCore.MakeButton(ct, "PrivacyPolicyLink", "Privacy Policy", SmallFont, new Vector2(0.5f, 0), Vector2.zero, new Vector2(330, 70), new Color(0, 0, 0, 0));
-            var terms = SceneBuilderCore.MakeButton(ct, "TermsAndConditionsLink", "Terms & Conditions", SmallFont, new Vector2(0.5f, 0), Vector2.zero, new Vector2(400, 70), new Color(0, 0, 0, 0));
+            // the two links at the very bottom ("Privacy Policy", "Terms & Conditions") were removed on request (12 October 2026);
+            // the sentence above them still names the Terms and Conditions
+            foreach (string gone in new[] { "PrivacyPolicyLink", "TermsAndConditionsLink" })
+            { var old = Kit.Loose(ct, gone); if (old != null) Object.DestroyImmediate(old.gameObject); }
 
             var forgotBtn = MakeClickable(forgot); var signUpBtn = MakeClickable(signUp);
             Button signInBtn = signIn != null ? SceneBuilderCore.Ensure<Button>(signIn.gameObject) : null;
@@ -153,9 +155,7 @@ namespace GlowUp.EditorTools
                 TopAt(social[i].transform, card, (i - (social.Length - 1) / 2f) * (SocialSize + SocialGap), y, SocialSize, SocialSize);
 
             // legal text + links: anchored to the panel bottom
-            BottomAt(privacy.transform, card, -200, 36, 330, 70, SmallFont);
-            BottomAt(terms.transform, card, 190, 36, 400, 70, SmallFont);
-            BottomAt(termsText, card, 0, 110, Inner, 70, 28);
+            BottomAt(termsText, card, 0, 56, Inner, 70, 28);
 
             // ----- theme roles -----
             Role(bg, ThemeRole.Background); Role(card, ThemeRole.Surface);
@@ -166,7 +166,6 @@ namespace GlowUp.EditorTools
             Role(orText.transform, ThemeRole.SecondaryText);
             Role(signIn, ThemeRole.ButtonFill); RoleLabel(signIn, ThemeRole.ButtonText);
             foreach (var s in social) Role(s.transform, ThemeRole.InputBackground);
-            RoleLabel(privacy.transform, ThemeRole.SecondaryText); RoleLabel(terms.transform, ThemeRole.SecondaryText);
 
             // ----- the app's own list of emails used on this phone -----
             BuildSavedAccounts(card, emailInput, pwInput, fb, savedListY);
@@ -181,8 +180,6 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(flow, "signUpButton", signUpBtn);
             SceneBuilderCore.SetField(flow, "googleButton", google);
             SceneBuilderCore.SetField(flow, "facebookButton", facebook);
-            SceneBuilderCore.SetField(flow, "privacyPolicyButton", privacy);
-            SceneBuilderCore.SetField(flow, "termsButton", terms);
 
             ThemeKit.FinishScene();       // canvas scaler, paper background, input text, round shapes, fonts, colours
             SceneBuilderCore.Save(scene);
