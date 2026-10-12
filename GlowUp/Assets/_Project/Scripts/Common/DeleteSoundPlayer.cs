@@ -18,15 +18,20 @@ namespace GlowUp.Common
     ///     volume and does not stop the user's music. With "Quiet When Phone Is Silent" it also stays quiet while
     ///     the phone is on silent or vibrate.
     ///
-    /// The clip is Assets/_Project/Audio/Delete_FreezingCold.mp3 (see the README in that folder for where it came from).
-    /// What was measured on it (12 October 2026): 6.7 seconds, the first 0.4 seconds silent, and quiet throughout
-    /// (its loudest point is about a fifth of full loudness).
+    /// There are two recordings to choose from (see the README in Assets/_Project/Audio for where each came from):
+    ///   Clip      Delete_FreezingCold.mp3, the one the project owner chose (taken from a YouTube video; credited in the app).
+    ///             Measured on 12 October 2026: 6.7 seconds, the first 0.4 seconds silent, and quiet throughout.
+    ///   Own Clip  Delete_Freeze_Made.wav, made for this app by a small program; tick "Use Own Sound" to play it instead.
     /// </summary>
     [RequireComponent(typeof(AudioSource))]
     public class DeleteSoundPlayer : MonoBehaviour
     {
         [Tooltip("The sound. Import settings: Load Type 'Decompress On Load' and 'Preload Audio Data' off, so it is only loaded while the switch in Settings is on.")]
         [SerializeField] private AudioClip clip;
+        [Tooltip("The app's OWN freezing sound, made by a small program (Audio/Source~/make_freeze_sound.py): it belongs to the project, so there is no question about its licence.")]
+        [SerializeField] private AudioClip ownClip;
+        [Tooltip("Tick this to play the app's own sound in place of the one above. Listen to both first: click each file in Assets/_Project/Audio.")]
+        [SerializeField] private bool useOwnSound = false;
 
         [Header("Which piece of the clip is heard")]
         [Tooltip("On = the silence at the start of the file is skipped")]
@@ -51,6 +56,9 @@ namespace GlowUp.Common
         [Tooltip("No sound while the phone is on silent or vibrate (Android)")]
         [SerializeField] private bool quietWhenPhoneIsSilent = true;
 
+        /// <summary>The recording the piece is cut from: the app's own sound when that is chosen (and there), otherwise the other one.</summary>
+        AudioClip Chosen => useOwnSound && ownClip != null ? ownClip : clip;
+
         AudioSource source;
         AudioClip piece;                // the short, ready-made piece that is played
         float endsAt = -1f;
@@ -73,6 +81,7 @@ namespace GlowUp.Common
         void Prepare()
         {
             if (!UiPreferences.DeleteSound) { Release(); return; }
+            AudioClip clip = Chosen;
             if (piece != null || clip == null) return;
             try
             {

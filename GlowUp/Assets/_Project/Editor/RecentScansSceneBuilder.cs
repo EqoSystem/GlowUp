@@ -135,6 +135,13 @@ namespace GlowUp.EditorTools
                 deleteSoundObject.FindProperty("clip").objectReferenceValue = deleteClip;
                 deleteSoundObject.ApplyModifiedPropertiesWithoutUndo();
             }
+            // the app's own freezing sound sits beside it; "Use Own Sound" on DeleteSoundPlayer chooses it (the tick is kept across rebuilds)
+            var ownDeleteClip = AssetDatabase.LoadAssetAtPath<AudioClip>("Assets/_Project/Audio/Delete_Freeze_Made.wav");
+            if (deleteSoundObject.FindProperty("ownClip").objectReferenceValue == null && ownDeleteClip != null)
+            {
+                deleteSoundObject.FindProperty("ownClip").objectReferenceValue = ownDeleteClip;
+                deleteSoundObject.ApplyModifiedPropertiesWithoutUndo();
+            }
             if (deleteClip == null) Debug.LogWarning("[GlowUp] Assets/_Project/Audio/Delete_FreezingCold.mp3 was not found: removing a scan stays silent until a clip is set on DeleteSoundPlayer.");
             A.Set(controller, "deleteSound", deleteSound);
             A.Set(controller, "selectButton", select); A.Set(controller, "selectionBar", selectionBar); A.Set(controller, "selectionText", selectionText);

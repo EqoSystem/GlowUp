@@ -2,7 +2,8 @@ THE SOUNDS OF THE APP (all of them are in this folder)
 
 UiTap_1_SoftTap.wav, UiTap_2_Pop.wav, UiTap_3_Click.wav, UiTap_4_Bubble.wav, UiTap_5_Chime.wav
     The five tap sounds the user can choose from in Settings > Sounds & Motion.
-    Where they come from: made for this app by a small program (simple tones, no recording of anything).
+    Where they come from: made for this app by the small program Source~/make_tap_sounds.py (simple tones, no
+    recording of anything).
     Licence: the project's own, free to use.
     Played by: Scripts/Common/UiSoundPlayer.cs (on the UiServices object, in every scene).
 
@@ -29,8 +30,26 @@ Delete_FreezingCold.mp3
     Before the app is PUBLISHED (a store, a public download), replace it with a sound whose licence is known: YouTube's
     own Audio Library, freesound.org with a CC0 licence, a sound the team records itself, or one made by a program
     like the tap sounds.
-    Played by: Scripts/Common/DeleteSoundPlayer.cs (the DeleteSoundPlayer object in RecentScanActivitiesScene).
+    Credited in the app: Privacy Policy and Terms, section 17 "Credits" (Assets/_Project/Legal/PrivacyPolicyAndTerms.txt).
+    Played by: Scripts/Common/DeleteSoundPlayer.cs (the DeleteSoundPlayer object in RecentScanActivitiesScene), as "Clip".
     The user's switch: Settings > Sounds & Motion > Delete sound.
+
+Delete_Freeze_Made.wav
+    The app's OWN freezing sound for the same moment: 1.2 seconds of bright ticks (ice forming), a glassy shimmer, a
+    soft hiss, a tone that climbs, and one small glass bell near the end.
+    Where it comes from: made for this app on 12 October 2026 by the small program Source~/make_freeze_sound.py.
+    Nothing is recorded or copied; the sound is worked out from numbers.
+    Licence: the project's own, free to use. No credit is needed.
+    NOT LISTENED TO YET: the program can measure the sound but not hear it. Click the file in Unity's Project window
+    to play it and decide whether it fits. To change it, change the numbers in the program and run it again:
+        python Source~/make_freeze_sound.py .          (in this folder; only Python is needed)
+    To use it: in RecentScanActivitiesScene select DeleteSoundPlayer and tick "Use Own Sound" (the tick is kept when
+    the scene is built again). Then take the first line out of section 17 "Credits" of the Privacy Policy and Terms,
+    because the YouTube sound is no longer in use.
+
+THE FOLDER Source~
+    The small programs that made the app's own sounds. Unity leaves folders whose name ends in ~ alone, so they are
+    not part of the app; they are kept so that anybody can see how the sounds were made and make them again.
 
 HOW TO REPLACE A SOUND
     Put the new file in this folder. For a tap sound: keep the old file name, or drag the new clip into the list on
