@@ -72,6 +72,8 @@ namespace GlowUp.Scan
         public bool IsFrontCamera { get; private set; }
         /// <summary>Raised once: true + "" when the camera is running, false + reason when it cannot start.</summary>
         public event Action<bool, string> Started;
+        /// <summary>Raised when the camera was running and is closed (its flashlight goes out with it).</summary>
+        public event Action Stopped;
 
         WebCamTexture cam;
         Color32[] buffer;
@@ -159,9 +161,15 @@ namespace GlowUp.Scan
         public void StopCamera()
         {
             StopAllCoroutines();
+            bool wasOpen = cam != null;
             if (cam != null) { if (cam.isPlaying) cam.Stop(); Destroy(cam); cam = null; }
             if (display != null) display.texture = null;
             lastAngle = -1; steadyPrevious = null; refocusUntil = 0f;
+            if (wasOpen)
+            {
+                GlowUp.Common.Flashlight.CameraStopped();
+                Stopped?.Invoke();
+            }
         }
 
         void OnDisable() { StopCamera(); }
@@ -378,6 +386,123 @@ namespace GlowUp.Scan
                                    Mathf.Max(min.x, max.x) - v.xMin, Mathf.Max(min.y, max.y) - v.yMin);
         }
 
+        // ---------------------------------------------------------------------------------------
+        //  Pictures for hold-to-scan: several a second, as plain numbers (no texture, no JPG)
+        // ---------------------------------------------------------------------------------------
+        /// <summary>
+        /// Takes the camera's newest picture into memory. The three methods below (Brightness and movement, GreyPictures,
+        /// UprightArgb) all look at this one picture, so a look at the camera costs one copy. Returns false when the camera
+        /// is not running or has no new picture since the last call.
+        /// </summary>
+        public bool Grab()
+        {
+            if (!IsPlaying || !cam.didUpdateThisFrame) return false;
+            MeasureMotion();
+            return true;
+        }
+
+        /// <summary>How much the picture changed between the last two looks (see MeasureMotion).</summary>
+        public float LastMotion { get; private set; } = 1f;
+
+        // the part of the upright picture that lies inside a frame of the viewport
+        struct Crop { public int w, h, angle, x0, y0, cropW, cropH; public bool mirrored; }
+
+        bool CropOf(RectTransform frame, out Crop c)
+        {
+            c = default;
+            if (cam == null || viewport == null || buffer == null) return false;
+            c.w = cam.width; c.h = cam.height;
+            if (buffer.Length != c.w * c.h) return false;
+            c.angle = Angle; c.mirrored = Mirrored;
+            bool sideways = c.angle == 90 || c.angle == 270;
+            int upW = sideways ? c.h : c.w, upH = sideways ? c.w : c.h;
+            Vector2 view = viewport.rect.size;
+            float scale = Mathf.Max(view.x / upW, view.y / upH);
+            Rect f = frame != null ? RectInViewport(frame) : new Rect(0, 0, view.x, view.y);
+            float offX = (view.x - upW * scale) * 0.5f, offY = (view.y - upH * scale) * 0.5f;
+            c.x0 = Mathf.Clamp(Mathf.FloorToInt((f.xMin - offX) / scale), 0, upW - 1);
+            c.y0 = Mathf.Clamp(Mathf.FloorToInt((f.yMin - offY) / scale), 0, upH - 1);
+            int x1 = Mathf.Clamp(Mathf.CeilToInt((f.xMax - offX) / scale), c.x0 + 1, upW);
+            int y1 = Mathf.Clamp(Mathf.CeilToInt((f.yMax - offY) / scale), c.y0 + 1, upH);
+            c.cropW = x1 - c.x0; c.cropH = y1 - c.y0;
+            return c.cropW > 0 && c.cropH > 0;
+        }
+
+        /// <summary>The place in the camera's own picture of the upright pixel (ux, uy), uy counted from the BOTTOM (the same sums as CaptureUpright).</summary>
+        static int SourceIndex(in Crop c, int ux, int uy)
+        {
+            int sx, sy;
+            switch (c.angle)
+            {
+                case 90: sx = c.w - 1 - uy; sy = ux; break;
+                case 180: sx = c.w - 1 - ux; sy = c.h - 1 - uy; break;
+                case 270: sx = uy; sy = c.h - 1 - ux; break;
+                default: sx = ux; sy = uy; break;
+            }
+            if (c.mirrored) sy = c.h - 1 - sy;
+            if (sx < 0) sx = 0; else if (sx >= c.w) sx = c.w - 1;
+            if (sy < 0) sy = 0; else if (sy >= c.h) sy = c.h - 1;
+            return sy * c.w + sx;
+        }
+
+        /// <summary>
+        /// The upright picture of what is inside `frame`, as one ARGB number per pixel, row by row FROM THE TOP (the way
+        /// the phone's text reader wants it). `pixels` is made (or made bigger) when needed and reused. The longer side is
+        /// at most `maxSide`. Call Grab() first. Returns false when there is no picture.
+        /// </summary>
+        public bool UprightArgb(RectTransform frame, int maxSide, ref int[] pixels, out int width, out int height)
+        {
+            width = height = 0;
+            if (!CropOf(frame, out Crop c)) return false;
+            float shrink = Mathf.Max(1f, Mathf.Max(c.cropW, c.cropH) / (float)Mathf.Max(64, maxSide));
+            int outW = Mathf.Max(8, Mathf.RoundToInt(c.cropW / shrink)), outH = Mathf.Max(8, Mathf.RoundToInt(c.cropH / shrink));
+            if (pixels == null || pixels.Length < outW * outH) pixels = new int[outW * outH];
+            var columns = new int[outW];
+            for (int ox = 0; ox < outW; ox++) columns[ox] = c.x0 + Mathf.Min(c.cropW - 1, (int)(ox * shrink));
+            for (int row = 0; row < outH; row++)
+            {
+                int uy = c.y0 + Mathf.Min(c.cropH - 1, (int)((outH - 1 - row) * shrink));        // row 0 is the top
+                int at = row * outW;
+                for (int ox = 0; ox < outW; ox++)
+                {
+                    Color32 p = buffer[SourceIndex(c, columns[ox], uy)];
+                    pixels[at + ox] = unchecked((int)0xFF000000) | (p.r << 16) | (p.g << 8) | p.b;
+                }
+            }
+            width = outW; height = outH;
+            return true;
+        }
+
+        /// <summary>
+        /// Two small grey pictures of what is inside `frame`, for the quality gate (FrameQuality): `overview` = the whole
+        /// frame made small (overviewWidth x overviewHeight), `detail` = a square patch from the middle of the frame at
+        /// the camera's own sharpness (detailSize x detailSize). One number 0 to 255 per pixel. Call Grab() first.
+        /// </summary>
+        public bool GreyPictures(RectTransform frame, ref byte[] overview, int overviewWidth, int overviewHeight, ref byte[] detail, int detailSize)
+        {
+            if (!CropOf(frame, out Crop c)) return false;
+            if (overview == null || overview.Length != overviewWidth * overviewHeight) overview = new byte[overviewWidth * overviewHeight];
+            for (int y = 0; y < overviewHeight; y++)
+            {
+                int uy = c.y0 + Mathf.Min(c.cropH - 1, (int)((y + 0.5f) / overviewHeight * c.cropH));
+                for (int x = 0; x < overviewWidth; x++)
+                {
+                    Color32 p = buffer[SourceIndex(c, c.x0 + Mathf.Min(c.cropW - 1, (int)((x + 0.5f) / overviewWidth * c.cropW)), uy)];
+                    overview[y * overviewWidth + x] = (byte)((p.r * 77 + p.g * 150 + p.b * 29) >> 8);
+                }
+            }
+            int size = Mathf.Min(detailSize, Mathf.Min(c.cropW, c.cropH));
+            if (detail == null || detail.Length != detailSize * detailSize) detail = new byte[detailSize * detailSize];
+            int startX = c.x0 + (c.cropW - size) / 2, startY = c.y0 + (c.cropH - size) / 2;
+            for (int y = 0; y < detailSize; y++)
+                for (int x = 0; x < detailSize; x++)
+                {
+                    Color32 p = buffer[SourceIndex(c, startX + Mathf.Min(size - 1, x), startY + Mathf.Min(size - 1, y))];
+                    detail[y * detailSize + x] = (byte)((p.r * 77 + p.g * 150 + p.b * 29) >> 8);
+                }
+            return true;
+        }
+
         /// <summary>
         /// How much the picture changed since the last call: 0 = perfectly still, higher = moving.
         /// Used to wait until the user holds the phone steady before reading text.
@@ -404,6 +529,7 @@ namespace GlowUp.Scan
                 motion = sum / current.Length;
             }
             steadyPrevious = current;
+            LastMotion = motion;
             return motion;
         }
 

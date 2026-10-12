@@ -28,6 +28,12 @@ namespace GlowUp.Scan
         /// <summary>A list that was looked up online: true when it came with pages a live web search really opened.</summary>
         public static bool PendingListWebBacked;
 
+        /// <summary>
+        /// The saved scan the one waiting to be analysed takes the place of ("Scan the same product again"). The new result
+        /// keeps its place in Recent Scans, and the scan counters are not added to a second time. Null = a new scan.
+        /// </summary>
+        public static ScanRecord PendingReplaces;
+
         /// <summary>Forgets what is waiting to be analysed.</summary>
         public static void ClearPending()
         {
@@ -35,7 +41,14 @@ namespace GlowUp.Scan
             PendingProductName = PendingBrandName = PendingCosmeticType = PendingShadeName = PendingFinish = PendingBarcode = "";
             PendingSources = new System.Collections.Generic.List<string>();
             PendingListFrom = ""; PendingListWebBacked = false;
+            PendingReplaces = null;
         }
+
+        /// <summary>
+        /// "Scan the same product again" was chosen on the result screen: the saved scan that is being done again. The scan
+        /// screen takes it over when it opens (the product keeps its name, the pictures are taken anew) and empties this.
+        /// </summary>
+        public static ScanRecord RescanOf;
 
         /// <summary>The product the result scene shows.</summary>
         public static ScanRecord Current;
@@ -44,6 +57,11 @@ namespace GlowUp.Scan
 
         /// <summary>The product chosen for AR Try-On. Null = let the user pick one from their saved scans.</summary>
         public static ScanRecord TryOn;
+
+        /// <summary>The flashlight on the scan screen: what the user chose with its button in the last visit (0 = nothing, 1 = on, -1 = off).</summary>
+        public static int LightChoice;
+        /// <summary>True when the next visit of the scan screen is the same scan done again: the user's flashlight choice is kept for it.</summary>
+        public static bool KeepLightChoice;
 
         /// <summary>A message for the scan scene to show when an analysis could not be done.</summary>
         public static string LastError;
