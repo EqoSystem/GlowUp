@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Text;
 using System.Threading.Tasks;
 using GlowUp.Common;
 using GlowUp.Data;
@@ -14,123 +13,166 @@ using UnityEngine.UI;
 namespace GlowUp.Scan
 {
     /// <summary>
-    /// AI Smart Scan scene. A scan has two phases, shown as a checklist with gold check marks:
+    /// AI Smart Scan scene: HOLD TO SCAN.
     ///
-    ///  Phase 1, the product: the user shows the front of the product. The text on it is read and
-    ///     compared with the brands and products the app knows; when the phone is online the AI also
-    ///     looks at the picture. Found one by one: product name, brand, kind of cosmetic, shade and
-    ///     texture. "Skip" goes on without it.
-    ///  Phase 2, the ingredients: the user shows the ingredient list and it is read. If the product
-    ///     has no list on it (or no packaging), "No list on it? Look it up" finds the product's
-    ///     published ingredient list: first in the app's own inventory (works offline), then online
-    ///     from credible sources. Hidden additives found on the way are saved for later scans.
+    /// The user holds the round button and shows the product; the camera gives several pictures a second and a ring of
+    /// five segments round the button fills as the app sees the product's front, its ingredient list, its barcode (or a
+    /// registration or batch code), its shade and its other sides. Nobody has to tap once per side. Letting go only
+    /// pauses: the ring keeps what it has.
     ///
-    ///  The user may also show the ingredient list first: its check mark lights up and the main
-    ///  button becomes "Finish".
+    ///  - A picture that is too dark, blurred, burnt out by glare or taken while the phone moves is thrown away before
+    ///    it is read (FrameQuality). The hint on the camera picture says what to do ("Hold steadier").
+    ///  - What the pictures show is put together (ScanEvidence, ScanTextMerger): each line of text in its best reading,
+    ///    the ingredient list in the order of the label, even when it passes the camera in pieces.
+    ///  - A product the app already knows (by its barcode, its name or the look of its pack) finishes as soon as it is
+    ///    recognised: its ingredient list is stored. A new product needs the whole ring; "Finish" is offered as soon as
+    ///    the product's front and its ingredient list are read.
+    ///  - The AI is asked ONCE per scan, at the end and only when the app could not name the product itself: it gets
+    ///    the best picture of each side and all the text. When it cannot tell either, the user can type the name, scan
+    ///    again or finish without a name; there is never a dead end.
+    ///  - GlowUp checks make-up only: as soon as the product is known to be something else, the scan stops and says so.
     ///
-    /// Before Start Scan the camera is off. "Type the ingredients instead" opens a box for labels the
-    /// camera cannot read. Every text, threshold and timing below is an Inspector field.
+    /// "Start over" offers "the same product again" (the name is kept, the pictures are taken anew) and "a different
+    /// product" (everything is forgotten). "Type the product in instead" is for packs the camera cannot read, and
+    /// "Look it up" finds the ingredient list of a product that has none on it.
+    /// Every text, limit and timing below is an Inspector field; the numbers of the quality gate and the ring are in
+    /// the Scan Rules asset (GlowUp > Open Scan Rules).
     /// </summary>
     public class SmartScanFlowController : MonoBehaviour
     {
-        enum Phase { Product, Ingredients }
+        enum Stage { Idle, Starting, Scanning, Recognising, Leaving }
 
         [Header("Camera")]
         [SerializeField] private CameraFeedController cameraFeed;
         [SerializeField] private ScanGuideOverlay guide;
-        [Tooltip("Shown in the camera area before Start Scan is tapped")]
+        [Tooltip("Shown in the camera area while the camera is off")]
         [SerializeField] private GameObject idlePlaceholder;
         [Tooltip("Draws an outline round each line of text that was read. Optional.")]
         [SerializeField] private TextOutlineOverlay textOutlines;
 
+        [Header("The hold button and its ring")]
+        [SerializeField] private HoldToScanButton holdButton;
+        [Tooltip("The words under the icon of the hold button")]
+        [SerializeField] private TextMeshProUGUI holdLabel;
+        [SerializeField] private ScanRingView ring;
+        [Tooltip("A short buzz when a segment of the ring becomes full, and a longer one when the scan is done")]
+        [SerializeField] private bool vibrate = true;
+
         [Header("Buttons and texts")]
-        [SerializeField] private Button startScanButton;
-        [SerializeField] private TextMeshProUGUI startScanLabel;
+        [Tooltip("Appears when the product's front and its ingredient list are read: goes on without the rest of the ring")]
+        [SerializeField] private Button finishButton;
+        [SerializeField] private TextMeshProUGUI finishText;
+        [Tooltip("Appears once the ring holds anything: scan again from the start")]
+        [SerializeField] private Button startOverButton;
         [SerializeField] private Button manualEntryButton;
         [SerializeField] private Button backButton;
         [SerializeField] private TextMeshProUGUI statusText;
 
-        [Header("Phase 1: the product")]
+        [Header("\"Start over\": the same product, or a different one?")]
+        [SerializeField] private OverlayPanel startOverPanel;
+        [SerializeField] private Button sameProductButton;
+        [SerializeField] private Button differentProductButton;
+
+        [Header("What was found (the checklist)")]
         [SerializeField] private ScanCheckItem productCheck;
         [SerializeField] private ScanCheckItem brandCheck;
         [SerializeField] private ScanCheckItem typeCheck;
         [SerializeField] private ScanCheckItem shadeCheck;
         [Tooltip("A small dot that takes the colour of the shade that was found")]
         [SerializeField] private Image shadeSwatch;
-        [Tooltip("The phase's part of the checklist (it fades a little while the other phase is busy)")]
-        [SerializeField] private CanvasGroup phase1Group;
-        [Tooltip("Goes on to the ingredients without knowing the product")]
-        [SerializeField] private Button skipButton;
-
-        [Header("Phase 2: the ingredients")]
         [SerializeField] private ScanCheckItem ingredientsCheck;
-        [SerializeField] private CanvasGroup phase2Group;
         [Tooltip("For a product without an ingredient list on it: looks the list up")]
         [SerializeField] private Button lookUpButton;
         [Tooltip("The words on that button (they change while it is working)")]
         [SerializeField] private TextMeshProUGUI lookUpLabel;
         [SerializeField] private string lookUpIdleLabel = "Look it up";
         [SerializeField] private string lookUpWorkingLabel = "Looking it up...";
-        [Range(0f, 1f)] [SerializeField] private float idlePhaseAlpha = 0.5f;
 
-        [Header("AI (used when the phone is online)")]
+        [Header("AI (asked once, at the end, only when the app cannot name the product itself)")]
         [Tooltip("The project's AI settings. Empty = the ones the loading scene uses.")]
         [SerializeField] private GeminiApiConfig aiConfig;
-        [Tooltip("On = the AI looks at the picture to recognise the product")]
+        [Tooltip("On = the AI is shown the best pictures when the app's own lists could not name the product")]
         [SerializeField] private bool aiRecognisesProduct = true;
-        [Tooltip("The AI looks at a picture at most every this many seconds. How MANY times it may look in one visit of this screen is set in the Scan Rules asset (GlowUp > Open Scan Rules).")]
-        [SerializeField] private float secondsBetweenAiLooks = 3.5f;
-        [Tooltip("JPG quality of the picture the AI gets (lower = smaller and faster)")]
+        [Tooltip("How many pictures the AI gets at most (the best one of each side)")]
+        [Range(1, 4)] [SerializeField] private int aiPictures = 3;
+        [Tooltip("Longest side, in pixels, of a picture the AI gets (smaller = faster and cheaper)")]
+        [SerializeField] private int aiPictureSize = 900;
+        [Tooltip("JPG quality of those pictures (lower = smaller and faster)")]
         [Range(40, 95)] [SerializeField] private int aiPictureQuality = 80;
         [Tooltip("The AI's answer counts when it is at least this sure (0 to 1)")]
         [Range(0f, 1f)] [SerializeField] private float minimumAiConfidence = 0.45f;
 
         [Header("Reading")]
-        [Tooltip("The phone counts as steady below this amount of picture change (0 = frozen)")]
-        [Range(0.001f, 0.1f)] [SerializeField] private float steadyMotionThreshold = 0.018f;
-        [Tooltip("How long the phone must stay steady before a read is tried")]
-        [SerializeField] private float steadySeconds = 0.6f;
-        [SerializeField] private float secondsBetweenReads = 1.6f;
-        [Tooltip("A read counts as an ingredient list when at least this many ingredients we know are found")]
-        [SerializeField] private int minimumKnownIngredients = 2;
-        [Tooltip("...or when at least this many ingredient-like names are found")]
-        [SerializeField] private int minimumListedNames = 5;
+        [Tooltip("How many pictures a second are looked at while the button is held (the text reader takes the newest one whenever it is free)")]
+        [Range(2f, 10f)] [SerializeField] private float looksPerSecond = 6f;
         [Tooltip("Longest side, in pixels, of the picture given to the text reader (smaller = faster)")]
         [SerializeField] private int readPictureSize = 1100;
-        [Tooltip("How long the 'recognised' message stays before the loading scene opens")]
+        [Tooltip("After this many pictures in a row that looked out of focus, one is read anyway (and the camera is asked to focus again): the text reader then decides")]
+        [SerializeField] private int blurrySkipsBeforeReadingAnyway = 6;
+        [Tooltip("A paused scan is forgotten after this many seconds, and the camera is switched off")]
+        [SerializeField] private float pauseResetSeconds = 30f;
+        [Tooltip("Held this long without the ring moving on: the user is offered to start over or type the product in")]
+        [SerializeField] private float stallSeconds = 12f;
+        [Tooltip("How long the 'Got it' message stays before the loading scene opens")]
         [SerializeField] private float recognisedHoldSeconds = 1.1f;
+
+        [Header("Barcode")]
+        [Tooltip("On = the camera also looks for the product's barcode (on the phone itself, no internet). A product whose barcode is in the inventory is recognised at once, with its saved ingredient list.")]
+        [SerializeField] private bool readBarcode = true;
 
         [Header("Scenes")]
         [SerializeField] private string resultScene = SceneNames.AiResult;
         [SerializeField] private string backScene = SceneNames.Dashboard;
 
-        [Header("Labels and hints")]
-        [SerializeField] private string startButtonLabel = "Start Scan";
-        [SerializeField] private string readNowLabel = "Read Now";
-        [SerializeField] private string finishLabel = "Finish";
-        [Tooltip("The main button after a scan was stopped because the product is not make-up")]
-        [SerializeField] private string scanAgainLabel = "Scan again";
-        [SerializeField] private string hintProduct = "Show the front of the product and hold steady";
-        [SerializeField] private string hintIngredients = "Now fit the ingredient list inside the frame";
+        [Header("The hold button's words")]
+        [SerializeField] private string holdIdleLabel = "Hold to scan";
+        [SerializeField] private string holdActiveLabel = "Scanning";
+        [SerializeField] private string holdLockedLabel = "Tap to pause";
+        [SerializeField] private string finishNormalLabel = "Finish";
+        [Tooltip("The Finish button's words after nobody could name the product (it must stay short: the button is narrow)")]
+        [SerializeField] private string finishUnnamedLabel = "Finish anyway";
+
+        [Header("Status line")]
+        [Tooltip("{0} = how many of the five parts are done")]
+        [SerializeField] private string statusHolding = "Holding, {0} of 5";
+        [SerializeField] private string statusPaused = "Paused at {0} of 5. Hold the button to go on.";
+        [SerializeField] private string statusIdle = "Hold the button and show the product. A quick tap keeps it scanning.";
+        [SerializeField] private string statusDone = "Got it! Analysing the product now...";
+
+        [Header("Hints on the camera picture")]
+        [SerializeField] private string hintDark = "It is too dark. Turn on the flashlight or move to the light.";
+        [SerializeField] private string hintMoving = "Hold steadier";
+        [SerializeField] private string hintGlare = "Tilt slightly, there is glare";
+        [SerializeField] private string hintBlurry = "Move a little back so the text is sharp";
+        [SerializeField] private string hintFront = "Show the front: the brand and the product's name";
+        [SerializeField] private string hintIngredients = "Turn to the back: show the ingredient list";
+        [SerializeField] private string hintIngredientsMore = "Keep the list in view, moving slowly along it";
+        [SerializeField] private string hintCodes = "Show the barcode (on the bottom or the back)";
+        [SerializeField] private string hintShade = "Show the shade's name or number";
+        [SerializeField] private string hintAround = "Turn the product slowly to show its other sides";
+        [SerializeField] private string hintAllDone = "Everything is read";
+
+        [Header("Labels of the checklist")]
         [Tooltip("{0} = how many ingredients were read")]
         [SerializeField] private string ingredientsFoundFormat = "{0} ingredients read";
+        [SerializeField] private string ingredientsReadingFormat = "{0} ingredients so far";
         [SerializeField] private string ingredientsLookedUpFormat = "{0} ingredients found";
 
         [Header("Messages")]
-        [SerializeField] private string msgBeforeStart = "Tap Start Scan, then show the front of the product.";
         [SerializeField] private string msgStarting = "Starting the camera...";
-        [SerializeField] private string msgPhase1 = "Step 1: show the front of the product. Hold steady.";
-        [SerializeField] private string msgProductNotYet = "Still looking for the product's name. Move closer and avoid glare, or tap Skip.";
-        [Tooltip("Shown when the AI has looked as often as it may in one visit of this screen and still has no name")]
-        [SerializeField] private string msgAiLimit = "The AI could not name this product. Type its name instead, or tap Skip and scan the ingredient list.";
+        [SerializeField] private string msgAiLooking = "Recognising the product...";
+        [Tooltip("The app and the AI could not name the product")]
+        [SerializeField] private string msgNotSure = "We could not name this product. Type its name, start over, or tap Finish anyway.";
+        [Tooltip("The AI has been asked as often as it may be in one visit of this screen")]
+        [SerializeField] private string msgAiLimit = "The AI has been asked as often as it may be for now. Type the product's name, or tap Finish anyway.";
         [Tooltip("Shown when the ingredient list was looked up online as often as it may be in one visit of this screen")]
         [SerializeField] private string msgLookUpLimit = "This product's list was already looked up. Scan the list on the pack, or type it in.";
-        [SerializeField] private string msgAiLooking = "Recognising the product...";
-        [SerializeField] private string msgPhase2 = "Step 2: now show the ingredient list.";
-        [SerializeField] private string msgListFirst = "Ingredients read. Show the front of the product to name it, or tap Finish.";
-        [SerializeField] private string msgTooDark = "It is too dark, or the lens is covered.";
-        [SerializeField] private string msgNotYet = "Could not read the list yet. Move closer, avoid glare and hold steady.";
-        [SerializeField] private string msgDone = "Got it! Analysing the product now...";
+        [SerializeField] private string msgNeedList = "The ingredient list is not read yet. Show it to the camera, or tap Look it up.";
+        [SerializeField] private string msgStalled = "Not getting further? Tap Start over, or type the product in instead.";
+        [SerializeField] private string msgPauseReset = "The scan was paused for a while, so it was put back to the start.";
+        [SerializeField] private string msgDifferentProduct = "That is a different product: a new scan was started for it.";
+        [SerializeField] private string msgSameAgain = "Scanning the same product again. Its name is kept.";
+        [SerializeField] private string msgStartedOver = "Ready for a new product.";
         [SerializeField] private string msgReaderLoading = "Getting the text reader ready...";
         [SerializeField] private string msgReaderMissing = "The text reader is not available on this device. Type the ingredients instead.";
         [SerializeField] private string msgNeedIngredients = "Type or paste at least two ingredients, separated by commas.";
@@ -147,42 +189,6 @@ namespace GlowUp.Scan
         [SerializeField] private string fdaSaysSimilar = "FDA Philippines has a similar record: check the name.";
         [SerializeField] private string fdaSaysNone = "No FDA Philippines record was found either.";
         [SerializeField] private string loadingMessage = "Scanning and analysing your product";
-
-        bool scanning, leaving, readRequested, lookingUp;
-        bool aiLimitReached;                      // the AI has used its looks for this visit: the user is asked to type the name
-        float steadyFor, sinceLastRead, readerWait, lastAiLook = -100f;
-        int aiLooks;
-        Phase phase = Phase.Product;
-
-        // what has been found so far
-        readonly ProductAiAdvisor.Identity identity = new ProductAiAdvisor.Identity();
-        ProductData knownProduct;
-
-        [Header("Barcode")]
-        [Tooltip("On = while scanning, the camera also looks for the product's barcode (on the phone itself, no internet). A product whose barcode is in the inventory is recognised at once, with its saved ingredient list.")]
-        [SerializeField] private bool readBarcode = true;
-        MlKitBarcodeReader barcodeReader; bool barcodeReaderAsked;
-        string barcode = "";                      // the number under the barcode, once the camera has seen it
-        volatile string barcodeSeen;              // set by the barcode reader (not on Unity's thread); TakeBarcode() takes it over
-        string ingredientText, ingredientSource = "scan", lastColour = "";
-        string listFrom = "";                     // where the ingredient list came from: "pack", "inventory", "web" or "typed"
-        bool listWebBacked;                       // a list looked up online came with pages a live web search really opened
-        List<string> sources = new List<string>();
-        Task<ProductAiAdvisor.Identity> aiTask;
-        List<BrandData> brands = new List<BrandData>();
-        List<ProductData> products = new List<ProductData>();
-
-        void Awake()
-        {
-            if (startScanButton != null) startScanButton.onClick.AddListener(OnMainButton);
-            if (manualEntryButton != null) manualEntryButton.onClick.AddListener(OpenManual);
-            if (manualAnalyseButton != null) manualAnalyseButton.onClick.AddListener(AnalyseManual);
-            if (skipButton != null) skipButton.onClick.AddListener(Skip);
-            if (lookUpButton != null) lookUpButton.onClick.AddListener(LookUp);
-            if (backButton != null) backButton.onClick.AddListener(() => { StopScanning(); SceneNavigator.Go(backScene); });
-            if (cameraFeed != null) cameraFeed.Started += OnCameraStarted;
-            if (aiConfig != null) ProductAiAdvisor.Config = aiConfig;
-        }
 
         [Header("Type-it-in box")]
         [SerializeField] private OverlayPanel manualPanel;
@@ -202,26 +208,104 @@ namespace GlowUp.Scan
         [SerializeField] private Button manualAnalyseButton;
         [SerializeField] private TextMeshProUGUI manualFeedbackText;
 
+        // ---------------------------------------------------------------------------------------
+        Stage stage = Stage.Idle;
+        FrameReader reader;
+        readonly ScanEvidence evidence = new ScanEvidence();
+        readonly ScanGuidance.Words words = new ScanGuidance.Words();
+
+        // the picture that is being looked at
+        int[] pixels; int pixelsW, pixelsH;
+        byte[] overview, overviewBefore, detail;
+        const int OverviewW = 64, OverviewH = 48, DetailSize = 160;
+        float nextLook, pausedFor, sinceProgress, sentSharpness, sentAt;
+        int blurrySkips, differentSeen;
+        bool readingOut, stalledSaid, finishUnnamed, lookingUp;
+        FrameQuality.Fault fault = FrameQuality.Fault.None;
+        string lastColour = "", lastHint = "";
+        string shownStatus;       // the status line that is on screen (null = a message is there instead)
+        string messageOver;       // a message was said while this status held: it stays until the status changes
+        const float ReaderAnswerSeconds = 5f;     // a picture the text reader has not answered after this long is given up
+
+        // the answer of the text reader (written on its own thread, taken over in Update)
+        readonly object answerLock = new object();
+        FrameReading answerReading; bool answerWaiting;
+
+        // the best picture of each zone (for the AI, when it is needed at the end)
+        class Kept { public int[] pixels; public int width, height; public float score; }
+        readonly Kept[] best = new Kept[ScanZones.Count];
+
+        // what has been found so far
+        readonly ProductAiAdvisor.Identity identity = new ProductAiAdvisor.Identity();
+        ProductData knownProduct;
+        ScanRecord rescanOf;                      // "Scan the same product again": the saved scan this one takes the place of
+        PackagingMemory.Look lastLook;            // what the front of the pack looked like
+        string barcode = "";
+        string ingredientText, ingredientSource = "scan";
+        string listFrom = "";                     // where the ingredient list came from: "pack", "inventory", "web" or "typed"
+        bool listWebBacked;                       // a list looked up online came with pages a live web search really opened
+        List<string> sources = new List<string>();
+        List<BrandData> brands = new List<BrandData>();
+
+        bool ProductKnown => identity.productName.Length > 0 || (identity.brandName.Length > 0 && identity.cosmeticType.Length > 0);
+
+        void Awake()
+        {
+            if (holdButton != null) { holdButton.Pressed += OnHoldPressed; holdButton.Released += OnHoldReleased; }
+            if (finishButton != null) finishButton.onClick.AddListener(OnFinishTapped);
+            if (startOverButton != null) startOverButton.onClick.AddListener(OnStartOverTapped);
+            if (sameProductButton != null) sameProductButton.onClick.AddListener(() => { ClosePanel(startOverPanel); StartOver(true, msgSameAgain); });
+            if (differentProductButton != null) differentProductButton.onClick.AddListener(() => { ClosePanel(startOverPanel); StartOver(false, msgStartedOver); });
+            if (manualEntryButton != null) manualEntryButton.onClick.AddListener(OpenManual);
+            if (manualAnalyseButton != null) manualAnalyseButton.onClick.AddListener(AnalyseManual);
+            if (lookUpButton != null) lookUpButton.onClick.AddListener(LookUp);
+            if (backButton != null) backButton.onClick.AddListener(() => { StopCamera(); SceneNavigator.Go(backScene); });
+            if (cameraFeed != null) cameraFeed.Started += OnCameraStarted;
+            if (aiConfig != null) ProductAiAdvisor.Config = aiConfig;
+            CopyWords();
+        }
+
+        void CopyWords()
+        {
+            words.holding = statusHolding; words.paused = statusPaused; words.notStarted = statusIdle; words.done = statusDone;
+            words.dark = hintDark; words.moving = hintMoving; words.glare = hintGlare; words.blurry = hintBlurry;
+            words.front = hintFront; words.ingredients = hintIngredients; words.ingredientsMore = hintIngredientsMore;
+            words.codes = hintCodes; words.shade = hintShade; words.around = hintAround;
+        }
+
         async void Start()
         {
-            AiBudget.NewSession();                           // the AI's few looks are counted per visit of this screen
-            OcrService.Shared.Initialise();                  // loads in the background while the user reads the instructions
+            AiBudget.NewSession();                           // the AI's few questions are counted per visit of this screen
+            reader = FrameReader.Create();                   // loads in the background while the user reads the instructions
             if (guide != null) guide.SetState(ScanGuideOverlay.State.Hidden);
             if (idlePlaceholder != null) idlePlaceholder.SetActive(true);
-            if (startScanLabel != null) startScanLabel.text = startButtonLabel;
-            ScanSession.ClearPending();
             ResetChecklist();
+            if (ring != null) ring.Clear();
 
-            // coming back from a scan that could not be analysed
-            Say(string.IsNullOrEmpty(ScanSession.LastError) ? msgBeforeStart : ScanSession.LastError);
+            // "Scan the same product again" on the result screen: the product keeps its name, the pictures are taken anew,
+            // and the new result will take the place of that scan (no second entry in Recent Scans, no second count)
+            rescanOf = ScanSession.RescanOf;
+            ScanSession.RescanOf = null;
+            ScanSession.ClearPending();
+            if (rescanOf != null)
+            {
+                identity.productName = (rescanOf.productName ?? "").Trim(); identity.brandName = (rescanOf.brandName ?? "").Trim();
+                identity.cosmeticType = (rescanOf.cosmeticType ?? "").Trim();
+                if (ProductKnown) { evidence.ProductKnown(); ShowIdentity(); }
+            }
+
+            // coming back from a scan that could not be analysed, or that was stopped because the product is not make-up
+            Say(string.IsNullOrEmpty(ScanSession.LastError) ? statusIdle : ScanSession.LastError);
             ScanSession.LastError = null;
+            ShowButtons();
+            if (ring != null) ring.Show(evidence);
 
             // what the app already knows (also offline): the ingredient database, the brands and the product inventory
             try
             {
                 _ = IngredientRepository.LoadAll();
                 brands = await BrandRepository.LoadActive() ?? new List<BrandData>();
-                products = await ProductRepository.LoadActive() ?? new List<ProductData>();
+                List<ProductData> products = await ProductRepository.LoadActive() ?? new List<ProductData>();
                 // the text reader must never take a brand or a product name for an ingredient
                 var labelNames = new List<string>();
                 foreach (BrandData b in brands) if (b != null) labelNames.Add(b.name);
@@ -234,322 +318,309 @@ namespace GlowUp.Scan
             catch (Exception e) { Debug.LogWarning("Scan: brands and products could not be loaded: " + e.Message); }
         }
 
-        void OnDestroy() { if (cameraFeed != null) cameraFeed.Started -= OnCameraStarted; }
+        void OnDestroy()
+        {
+            if (cameraFeed != null) cameraFeed.Started -= OnCameraStarted;
+            if (holdButton != null) { holdButton.Pressed -= OnHoldPressed; holdButton.Released -= OnHoldReleased; }
+        }
 
         // ---------------------------------------------------------------------------------------
-        //  Buttons
+        //  The hold button
         // ---------------------------------------------------------------------------------------
-        void OnMainButton()
+        void OnHoldPressed()
         {
-            if (leaving) return;
-            if (!scanning)
+            if (stage == Stage.Idle)
             {
-                scanning = true; steadyFor = 0f; sinceLastRead = 0f; readerWait = 0f;
+                // the first press switches the camera on; holding on (or the tap that locked the button) then scans
+                stage = Stage.Starting;
                 Say(msgStarting);
-                if (startScanButton != null) startScanButton.interactable = false;
                 if (cameraFeed != null) cameraFeed.StartCamera(); else OnCameraStarted(false, "No camera view in this scene.");
             }
-            else if (ingredientText != null) Finish();          // the list is already read: go on without the product's name
-            else readRequested = true;
+            pausedFor = 0f; sinceProgress = 0f; stalledSaid = false;
+            ShowButtons();
+            ShowGuidance();
         }
 
-        void Skip()
-        {
-            if (leaving || !scanning || phase != Phase.Product) return;
-            if (ingredientText != null) Finish(); else EnterIngredients();
-        }
+        /// <summary>The button was let go: the scan pauses, and Finish is offered when there is a list to finish with.</summary>
+        void OnHoldReleased() { ShowButtons(); ShowGuidance(); }
 
         void OnCameraStarted(bool ok, string message)
         {
-            if (startScanButton != null) startScanButton.interactable = true;
+            if (stage != Stage.Starting) return;
             if (!ok)
             {
-                scanning = false;
-                Say(message + " You can type the ingredients instead.");
+                stage = Stage.Idle;
+                if (holdButton != null) holdButton.LetGo();
+                Say(message + " You can type the product in instead.");
                 return;
             }
             if (idlePlaceholder != null) idlePlaceholder.SetActive(false);
-            if (startScanLabel != null) startScanLabel.text = readNowLabel;
-            phase = Phase.Product;
-            ShowPhase();
-            Guide(ScanGuideOverlay.State.Searching);
-            Say(msgPhase1);
-            StartCoroutine(ReadLoop());
+            if (guide != null) guide.SetState(ScanGuideOverlay.State.Searching);
+            stage = Stage.Scanning;
+            nextLook = 0f; pausedFor = 0f; sinceProgress = 0f;
+            ShowGuidance();
         }
 
-        void StopScanning()
+        void StopCamera()
         {
-            scanning = false;
             StopAllCoroutines();
             if (textOutlines != null) textOutlines.Clear();
             if (cameraFeed != null) cameraFeed.StopCamera();
+            lock (answerLock) { answerWaiting = false; answerReading = null; }
+            readingOut = false;
         }
 
-        // ---------------------------------------------------------------------------------------
-        //  Reading
-        // ---------------------------------------------------------------------------------------
-        IEnumerator ReadLoop()
+        /// <summary>The camera goes off and the screen waits for the next press (the ring keeps what it has unless it is cleared separately).</summary>
+        void BackToIdle()
         {
-            var tick = new WaitForSecondsRealtime(0.2f);
-            while (scanning && !leaving)
-            {
-                yield return tick;
-                if (cameraFeed == null || !cameraFeed.IsPlaying) continue;
-
-                float motion = cameraFeed.MeasureMotion();
-                sinceLastRead += 0.2f;
-                steadyFor = motion < steadyMotionThreshold ? steadyFor + 0.2f : 0f;
-
-                // an answer of the AI may have arrived in the meantime
-                if (CollectAiAnswer() && (StopIfNotMakeup() || TryLeavePhase1())) yield break;
-                // the AI looked several times without naming it: the FDA Philippines list is asked with what was read
-                if (CollectFdaAnswer(lastLabelText) && (StopIfNotMakeup() || TryLeavePhase1())) yield break;
-
-                if (cameraFeed.MeasureBrightness() < 0.06f) { Say(msgTooDark); continue; }
-
-                bool timeToRead = readRequested || (steadyFor >= steadySeconds && sinceLastRead >= secondsBetweenReads);
-                if (!timeToRead) continue;
-
-                if (!OcrService.Shared.Ready)
-                {
-                    readerWait += 0.2f; readRequested = false;
-                    Say(readerWait > 12f || !string.IsNullOrEmpty(OcrService.Shared.Error) ? msgReaderMissing : msgReaderLoading);
-                    continue;
-                }
-
-                readRequested = false; sinceLastRead = 0f; steadyFor = 0f;
-                Guide(ScanGuideOverlay.State.Reading);
-                yield return null;                           // let the "Reading..." state show before the read
-
-                Texture2D picture = cameraFeed.CaptureUpright(guide != null ? guide.Frame : null, readPictureSize);
-                string colour = cameraFeed.DominantColourHex();
-                if (!string.IsNullOrEmpty(colour)) lastColour = colour;
-                string text = "";
-                // APPEARANCE FIRST: while the text reader is still working, the look of the pack is compared with what this
-                // phone remembers, and the picture goes to the AI. A pack that is known by its look needs no text at all.
-                if (picture != null && phase == Phase.Product && !ProductKnown)
-                {
-                    RecogniseFromLook(picture, "");
-                    if (ProductKnown) ShowIdentity(); else AskAi(picture, "");
-                }
-                if (picture != null) LookForBarcode(picture);
-                if (picture != null)
-                {
-                    OcrRead read = OcrService.Shared.Read(picture);
-                    float waitedForReader = 0f;
-                    while (!read.Done && waitedForReader < 12f) { waitedForReader += Time.unscaledDeltaTime; yield return null; }
-                    text = read.Text;
-                    if (!scanning || leaving) { Destroy(picture); yield break; }
-                    if (textOutlines != null) textOutlines.Show(read.Boxes);
-                }
-                if (TakeBarcode()) { if (picture != null) Destroy(picture); yield break; }      // the barcode gave the product AND its saved list
-
-                bool isList = LooksLikeIngredients(text);
-                if (isList)
-                {
-                    ingredientText = text; ingredientSource = "scan"; sources.Clear(); listFrom = "pack"; listWebBacked = false;
-                    if (ingredientsCheck != null) ingredientsCheck.SetFound(string.Format(ingredientsFoundFormat, IngredientTextParser.Read(text).ingredients.Count));
-                }
-
-                if (phase == Phase.Ingredients)
-                {
-                    if (picture != null) Destroy(picture);
-                    if (isList) { Finish(); yield break; }
-                    Guide(ScanGuideOverlay.State.Searching);
-                    Say(msgNotYet);
-                    cameraFeed.Refocus();                    // nothing readable yet: the picture may be out of focus
-                    continue;
-                }
-
-                // ---- phase 1: who made this, and what is it? ----
-                RecogniseFromText(text);
-                // the look of the packaging: a product this phone has scanned before is known again at once (also offline)
-                if (!isList && picture != null) RecogniseFromLook(picture, text);
-                if (!isList && picture != null) AskAi(picture, text);
-                if (!isList) lastLabelText = text;                    // kept for the FDA Philippines search
-                if (picture != null) Destroy(picture);
-                ShowIdentity();
-                if (StopIfNotMakeup(isList ? null : text) || TryLeavePhase1()) yield break;
-
-                Guide(ScanGuideOverlay.State.Searching);
-                if (ingredientText != null)
-                {
-                    if (startScanLabel != null) startScanLabel.text = finishLabel;
-                    Say(msgListFirst);
-                }
-                else
-                {
-                    Say(aiTask != null ? msgAiLooking : aiLimitReached ? msgAiLimit : msgProductNotYet);
-                    if (aiTask == null) cameraFeed.Refocus();
-                }
-            }
-        }
-
-        bool LooksLikeIngredients(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text)) return false;
-            IngredientTextParser.ParsedList list = IngredientTextParser.Read(text);
-            // enough ingredients the app knows...
-            if (list.ingredients.Count >= minimumKnownIngredients) return true;
-            // ...or at least one of them among enough names in the SHAPE of a list (the word "Ingredients", or commas between
-            // the names): the front of a pack, with its brand and product name on lines of their own, is not an ingredient list
-            return list.ingredients.Count >= 1 && list.Count >= minimumListedNames && IngredientTextParser.HasListShape(text);
-        }
-
-        // ---------------------------------------------------------------------------------------
-        //  Phase 1: recognising the product
-        // ---------------------------------------------------------------------------------------
-        bool ProductKnown => identity.productName.Length > 0 || (identity.brandName.Length > 0 && identity.cosmeticType.Length > 0);
-
-        /// <summary>
-        /// MAKE-UP ONLY. As soon as the scan knows the product is something else (the AI, the FDA's record or the inventory
-        /// said so, or the pack itself says "shampoo"), the scan stops: the user is told why, and can scan again or type
-        /// the name in when the app got it wrong. Nothing is saved or sent to the inventory. True = the scan was stopped.
-        /// </summary>
-        bool StopIfNotMakeup(string frontText = null)
-        {
-            if (leaving || !scanning) return false;
-            ProductScope.Verdict verdict = ProductScope.Judge(identity.cosmeticType, identity.productName);
-            // nothing recognised yet (offline, or the AI has not answered): only unmistakable words on the pack count
-            if (!verdict.IsNotMakeup && !string.IsNullOrWhiteSpace(frontText) && identity.productName.Length == 0 && identity.cosmeticType.Length == 0)
-                verdict = ProductScope.JudgeLabel(frontText);
-            if (!verdict.IsNotMakeup) return false;
-
-            StopScanning();
-            ResetScan();
+            StopCamera();
+            stage = Stage.Idle;
+            if (holdButton != null) { holdButton.Usable = true; holdButton.LetGo(); }
             if (idlePlaceholder != null) idlePlaceholder.SetActive(true);
             if (guide != null) guide.SetState(ScanGuideOverlay.State.Hidden);
-            if (startScanLabel != null) startScanLabel.text = scanAgainLabel;
-            if (startScanButton != null) startScanButton.interactable = true;
-            Say(ProductScope.StopMessage(verdict));
-            return true;
+            messageOver = null;
+            ShowButtons();
         }
 
-        /// <summary>Forgets everything the scan has found so far, so the next scan starts clean. (How often the AI was asked is kept.)</summary>
-        void ResetScan()
+        // ---------------------------------------------------------------------------------------
+        //  While scanning: one look at the camera after another
+        // ---------------------------------------------------------------------------------------
+        void Update()
         {
-            identity.found = false; identity.confidence = 0f;
-            identity.productName = identity.brandName = identity.cosmeticType = identity.shadeHex = identity.shadeName = identity.finish = "";
-            knownProduct = null; ingredientText = null; ingredientSource = "scan"; lastColour = "";
-            listFrom = ""; listWebBacked = false; sources.Clear();
-            barcode = ""; barcodeSeen = null;
-            aiTask = null; fdaTask = null; fdaAsked = false; lastLabelText = ""; lastLook = null;
-            readRequested = false; lookingUp = false; steadyFor = 0f; sinceLastRead = 0f;
-            phase = Phase.Product;
-            ResetChecklist();
-            SetWorking(false);
-        }
+            if (stage != Stage.Scanning) return;
+            TakeAnswer();                                    // the text reader may have finished a picture (also while paused)
+            if (stage != Stage.Scanning) return;
 
-        /// <summary>Compares the text on the product with the brands and products the app knows (works offline).</summary>
-        void RecogniseFromText(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text)) return;
-            string seen = " " + Plain(text) + " ";
-            if (knownProduct == null)
+            bool held = holdButton != null && holdButton.IsHeld;
+            if (!held)
             {
-                // the phone's look-up table finds the product whose whole name stands in the text (words in any order,
-                // small reading mistakes forgiven); no reading through the whole list
-                List<ProductIndex.Candidate> found = ProductRepository.Index.InText(text, 1);
-                if (found.Count > 0 && found[0].exactName && found[0].score >= ProductIndex.Sure)
+                // PAUSE, DON'T RESET: the ring keeps what it has. Only a long pause puts the scan back to the start.
+                pausedFor += Time.unscaledDeltaTime;
+                if (pausedFor > pauseResetSeconds)
                 {
-                    ProductData product = found[0].product;
-                    knownProduct = product;
-                    identity.productName = product.name.Trim();
-                    if (!string.IsNullOrWhiteSpace(product.brandName)) identity.brandName = product.brandName.Trim();
-                    if (!string.IsNullOrWhiteSpace(product.cosmeticType)) identity.cosmeticType = product.cosmeticType.Trim();
+                    bool hadSomething = evidence.Pictures > 0;
+                    if (hadSomething) StartOver(false, msgPauseReset);
+                    BackToIdle();
+                    if (!hadSomething) Say(statusIdle);
                 }
+                return;
             }
-            if (identity.brandName.Length == 0)
-                foreach (BrandData brand in brands)
+            pausedFor = 0f;
+            sinceProgress += Time.unscaledDeltaTime;
+            if (!stalledSaid && sinceProgress > stallSeconds) { stalledSaid = true; Say(msgStalled); ShowButtons(); }
+
+            if (cameraFeed == null || !cameraFeed.IsPlaying) return;
+            if (reader == null || !reader.Available) { if (shownStatus != msgReaderMissing) { Say(msgReaderMissing); shownStatus = msgReaderMissing; } return; }
+            if (readingOut && Time.unscaledTime - sentAt > ReaderAnswerSeconds) readingOut = false;      // the reader never answered: go on with the next picture
+            if (readingOut || Time.unscaledTime < nextLook || reader.Busy) return;       // always the newest picture, never a queue
+            if (!cameraFeed.Grab()) return;                  // the camera has no new picture in this frame: next frame
+            nextLook = Time.unscaledTime + 1f / Mathf.Max(1f, looksPerSecond);
+            Look();
+            ShowGuidance();
+        }
+
+        /// <summary>One look: is the picture good enough (the quality gate)? Then it goes to the text reader.</summary>
+        void Look()
+        {
+            RectTransform frame = guide != null ? guide.Frame : null;
+            if (!cameraFeed.GreyPictures(frame, ref overview, OverviewW, OverviewH, ref detail, DetailSize)) return;
+            FrameQuality.Measure measure = FrameQuality.Of(overview, OverviewW, OverviewH, overviewBefore, detail, DetailSize, DetailSize);
+            if (overviewBefore == null || overviewBefore.Length != overview.Length) overviewBefore = new byte[overview.Length];
+            Buffer.BlockCopy(overview, 0, overviewBefore, 0, overview.Length);
+            fault = FrameQuality.Judge(measure);
+
+            // too dark or moving: nothing in it can be trusted. (The flashlight helper of this screen deals with the dark.)
+            if (fault == FrameQuality.Fault.Dark || fault == FrameQuality.Fault.Moving) { blurrySkips = 0; return; }
+            if (fault == FrameQuality.Fault.Blurry)
+            {
+                // out of focus: skipped. After several in a row one is read anyway and the camera is asked to focus again,
+                // so a phone whose camera never looks "sharp" to this check can still scan (the text reader then decides).
+                if (++blurrySkips < Mathf.Max(1, blurrySkipsBeforeReadingAnyway)) return;
+                blurrySkips = 0;
+                cameraFeed.Refocus();
+            }
+            else blurrySkips = 0;
+            // glare: the picture is read; lines the reader is not sure of count for nothing (ScanEvidence), and the hint stays
+
+            if (!cameraFeed.UprightArgb(frame, readPictureSize, ref pixels, out pixelsW, out pixelsH)) return;
+            string colour = cameraFeed.DominantColourHex();
+            if (!string.IsNullOrEmpty(colour)) lastColour = colour;
+            sentSharpness = measure.sharpness; sentAt = Time.unscaledTime;
+            readingOut = reader.Read(pixels, pixelsW, pixelsH, readBarcode && barcode.Length == 0, OnReaderAnswer);
+        }
+
+        // called on the text reader's own thread: only the answer is stored
+        void OnReaderAnswer(FrameReading reading, string problem)
+        {
+            if (problem != null) Debug.LogWarning("[Scan] Could not read this picture: " + problem);
+            lock (answerLock) { answerReading = reading ?? new FrameReading(); answerWaiting = true; }
+        }
+
+        void TakeAnswer()
+        {
+            FrameReading reading;
+            lock (answerLock)
+            {
+                if (!answerWaiting) return;
+                answerWaiting = false; reading = answerReading; answerReading = null;
+            }
+            readingOut = false;
+            if (reading != null) OnReading(reading);
+        }
+
+        /// <summary>A picture was read: what does it show, and what does it do for the ring?</summary>
+        void OnReading(FrameReading reading)
+        {
+            if (textOutlines != null) textOutlines.Show(FrameReader.BoxesOf(reading, ScanEvidence.UsableLine));
+            string text = reading.Text(ScanEvidence.UsableLine);
+
+            // ---- what the app's own lists know in this picture (works offline)
+            var known = new ScanEvidence.Known { colourHex = lastColour };
+            ProductData seen = ProductIn(text);
+            if (seen != null)
+            {
+                if (knownProduct != null && seen.id != knownProduct.id && evidence.Pictures > 0)
                 {
-                    string name = Plain(brand != null ? brand.name : "");
-                    if (name.Length < 3 || !seen.Contains(" " + name + " ")) continue;
-                    identity.brandName = brand.name.Trim();
-                    break;
+                    // A DIFFERENT PRODUCT is in front of the camera now (seen twice, so one misreading never resets a scan)
+                    if (++differentSeen >= 2)
+                    {
+                        StartOver(false, msgDifferentProduct);
+                        Adopt(seen);
+                        known.productSeen = true;
+                    }
                 }
-        }
-
-        /// <summary>Lower case, with everything that is not a letter or a digit turned into single spaces.</summary>
-        static string Plain(string text)
-        {
-            var sb = new StringBuilder((text ?? "").Length);
-            bool space = true;
-            foreach (char c in text ?? "")
-            {
-                if (char.IsLetterOrDigit(c)) { sb.Append(char.ToLowerInvariant(c)); space = false; }
-                else if (!space) { sb.Append(' '); space = true; }
+                else { differentSeen = 0; if (knownProduct == null) Adopt(seen); known.productSeen = knownProduct != null && seen.id == knownProduct.id; }
             }
-            return sb.ToString().Trim();
-        }
+            else differentSeen = 0;
+            known.brandSeen = BrandIn(text);
+            known.noShadeNeeded = identity.cosmeticType.Length > 0 && !ShadeAdvisor.IsColourCosmetic(identity.cosmeticType);
 
-        /// <summary>Shows the picture to the AI (online only, a few times per scan at most). The answer is picked up by CollectAiAnswer.</summary>
-        void AskAi(Texture2D picture, string text)
-        {
-            if (!aiRecognisesProduct || aiTask != null || ProductKnown && identity.shadeHex.Length > 0) return;
-            if (Time.unscaledTime - lastAiLook < secondsBetweenAiLooks) return;
-            if (!ConnectivityMonitor.Online || !ProductAiAdvisor.Available) return;
-            // the AI may only look a few times in one visit of this screen (re-scans share the same few looks)
-            if (!AiBudget.CanRecognise) { aiLimitReached = true; return; }
-            byte[] jpeg;
-            try { jpeg = picture.EncodeToJPG(aiPictureQuality); } catch (Exception e) { Debug.LogWarning("Scan: " + e.Message); return; }
-            AiBudget.TakeRecognition();
-            aiLooks++; lastAiLook = Time.unscaledTime;
-            SetWorking(true);
-            aiTask = ProductAiAdvisor.Identify(jpeg, text);
-        }
+            ScanEvidence.Result result = evidence.Add(reading, known, sentSharpness);
+            KeepBest(result);
 
-        [Header("FDA Philippines (when the AI cannot name the product)")]
-        [Tooltip("After this many looks of the AI without a product name, the FDA Philippines list is searched with the text that was read")]
-        [SerializeField] private int fdaAfterAiLooks = 3;
-        Task<PhFdaVerification.Result> fdaTask;
-        string lastLabelText = "";
-        bool fdaAsked;
+            // ---- the barcode: a product of the inventory is recognised at once
+            if (barcode.Length == 0 && evidence.Barcode.Length > 0) TakeBarcode(evidence.Barcode);
+            // ---- the look of the pack: a product this phone has scanned before is known again (also offline)
+            if (!ProductKnown && result.zones[(int)ScanZone.Front]) RecogniseFromLook(text);
+            if (identity.shadeName.Length == 0 && evidence.ShadeText.Length > 0) identity.shadeName = evidence.ShadeText;
 
-        /// <summary>The AI looked several times and still has no name: ask the FDA Philippines list. True when it named the product.</summary>
-        bool CollectFdaAnswer(string text)
-        {
-            if (fdaTask == null)
+            bool[] filled = result.filledNow;
+            if (ProductKnown && !evidence.IsFull(ScanZone.Front)) Merge(filled, evidence.ProductKnown());
+
+            // ---- make-up only: stop as soon as the product is known to be something else
+            if (StopIfNotMakeup(result.zones[(int)ScanZone.Ingredients] ? null : text)) return;
+
+            // ---- a product of the inventory brings its ingredient list with it: nothing more to scan
+            if (knownProduct != null && knownProduct.ingredients != null && knownProduct.ingredients.Count >= 3)
             {
-                // after the AI's looks (all it may have, or as many as set here) without a name
-                int looksFirst = Mathf.Max(1, Mathf.Min(fdaAfterAiLooks, AiBudget.RecognitionsPerSession));
-                if (fdaAsked || ProductKnown || aiTask != null || aiLooks < looksFirst || !ConnectivityMonitor.Online || string.IsNullOrWhiteSpace(text)) return false;
-                fdaAsked = true;
-                SetWorking(true);
-                fdaTask = PhFdaVerification.FindInText(text);
-                return false;
+                Merge(filled, evidence.ListKnown());
+                ShowProgress(filled);
+                UseLookedUpList(knownProduct.ingredients, ListPagesOf(knownProduct), "inventory", false);
+                return;
             }
-            if (!fdaTask.IsCompleted) return false;
-            Task<PhFdaVerification.Result> task = fdaTask;
-            fdaTask = null;
-            SetWorking(false);
-            if (task.Status != TaskStatus.RanToCompletion || task.Result == null || !task.Result.found) return false;
-            PhFdaVerification.Result fda = task.Result;
-            var names = System.Globalization.CultureInfo.InvariantCulture.TextInfo;
-            if (identity.productName.Length == 0) identity.productName = names.ToTitleCase(fda.productName.ToLowerInvariant());
-            if (identity.brandName.Length == 0) identity.brandName = names.ToTitleCase(fda.brandName.ToLowerInvariant());
-            if (identity.cosmeticType.Length == 0) identity.cosmeticType = PhFdaVerification.TypeFromUse(fda.intendedUse);
-            ShowIdentity();
-            return true;
+
+            if (result.useful)
+            {
+                sinceProgress = 0f;
+                if (stalledSaid) { stalledSaid = false; messageOver = null; shownStatus = null; }      // moving again: the status line comes back
+            }
+            ShowProgress(filled);
+            // FINISH BY ITSELF, also while the button is still held. (Not after nobody could name the product: then the
+            // user decides between typing the name, starting over and "Finish anyway".)
+            if (evidence.AllFull && !finishUnnamed) FinishAttempt();
         }
 
-        /// <summary>True when an answer of the AI has just been taken over.</summary>
-        bool CollectAiAnswer()
+        static void Merge(bool[] into, bool[] more) { for (int i = 0; i < into.Length && i < more.Length; i++) into[i] |= more[i]; }
+
+        /// <summary>The ring, the checklist and the buttons after a picture; a buzz for each segment that became full.</summary>
+        void ShowProgress(bool[] filledNow)
         {
-            if (aiTask == null || !aiTask.IsCompleted) return false;
-            Task<ProductAiAdvisor.Identity> task = aiTask;
-            aiTask = null;
-            SetWorking(false);
-            if (task.Status != TaskStatus.RanToCompletion || task.Result == null || !task.Result.found || task.Result.confidence < minimumAiConfidence) return false;
-            ProductAiAdvisor.Identity seen = task.Result;
-            // what the app's own lists said stays; the AI fills the gaps
-            if (identity.productName.Length == 0) identity.productName = seen.productName;
-            if (identity.brandName.Length == 0) identity.brandName = seen.brandName;
-            if (identity.cosmeticType.Length == 0) identity.cosmeticType = seen.cosmeticType;
-            if (seen.shadeHex.Length > 0) identity.shadeHex = seen.shadeHex;
-            if (seen.shadeName.Length > 0) identity.shadeName = seen.shadeName;
-            if (seen.finish.Length > 0) identity.finish = seen.finish;
+            if (ring != null) ring.Show(evidence);
             ShowIdentity();
-            return true;
+            if (ingredientsCheck != null && ingredientText == null)
+            {
+                int counted = evidence.Text.Counted;
+                if (evidence.IsFull(ScanZone.Ingredients)) ingredientsCheck.SetFound(string.Format(ingredientsFoundFormat, counted));
+                else if (counted > 0) { ingredientsCheck.SetWorking(true); ingredientsCheck.SetLabel(string.Format(ingredientsReadingFormat, counted)); }
+            }
+            bool any = false;
+            if (filledNow != null) foreach (bool one in filledNow) any |= one;
+            if (any && vibrate) Haptics.Tick();
+            ShowButtons();
+            ShowGuidance();
+        }
+
+        /// <summary>Keeps the picture when it is the best one so far of a zone it shows (the AI may need it at the end).</summary>
+        void KeepBest(ScanEvidence.Result result)
+        {
+            if (pixels == null || pixelsW <= 0) return;
+            int[] copy = null;
+            for (int i = 0; i < ScanZones.Count; i++)
+            {
+                if (!result.zones[i] || (best[i] != null && best[i].score >= result.score)) continue;
+                if (copy == null) { copy = new int[pixelsW * pixelsH]; Array.Copy(pixels, copy, copy.Length); }
+                best[i] = new Kept { pixels = copy, width = pixelsW, height = pixelsH, score = result.score };
+            }
+        }
+
+        // ---------------------------------------------------------------------------------------
+        //  What is said on screen
+        // ---------------------------------------------------------------------------------------
+        void ShowGuidance()
+        {
+            if (stage == Stage.Leaving || stage == Stage.Recognising) return;
+            bool held = stage == Stage.Scanning && holdButton != null && holdButton.IsHeld;
+            if (holdLabel != null) holdLabel.text = held ? (holdButton.IsLocked ? holdLockedLabel : holdActiveLabel) : holdIdleLabel;
+            if (stage != Stage.Scanning) return;
+
+            // the status line. A message that was said in its place stays until the status itself changes.
+            string status = StatusNow();
+            if (messageOver != null && status != messageOver) messageOver = null;
+            if (messageOver == null && status != shownStatus)
+            {
+                if (statusText != null) statusText.text = status;
+                shownStatus = status;
+            }
+            string hint = held ? ScanGuidance.Hint(words, fault, evidence) : ScanGuidance.Hint(words, FrameQuality.Fault.None, evidence);
+            if (hint.Length == 0) hint = hintAllDone;
+            if (hint != lastHint && guide != null) { lastHint = hint; guide.SetHint(hint); }
+        }
+
+        /// <summary>"Holding, 2 of 5", "Paused at 2 of 5 ...", or the first instruction.</summary>
+        string StatusNow()
+        {
+            bool held = stage == Stage.Scanning && holdButton != null && holdButton.IsHeld;
+            return ScanGuidance.Status(words, held, evidence.Pictures > 0, evidence.FullZones, false);
+        }
+
+        /// <summary>
+        /// FINISH is offered when the ingredient list is complete (read to its end, or known already), and also for a
+        /// list that is only partly read once the user has let go of the button or the scan is not getting further:
+        /// nobody is made to wait for a ring that will not fill. START OVER is offered as soon as there is anything to forget.
+        /// </summary>
+        void ShowButtons()
+        {
+            bool busy = stage == Stage.Recognising || stage == Stage.Leaving;
+            bool held = stage == Stage.Scanning && holdButton != null && holdButton.IsHeld;
+            bool listComplete = ingredientText != null || evidence.IsFull(ScanZone.Ingredients);
+            bool listStarted = evidence.Text.Counted >= 2;
+            if (finishButton != null) finishButton.gameObject.SetActive(!busy && (listComplete || (listStarted && (!held || stalledSaid || finishUnnamed))));
+            if (finishText != null) finishText.text = ProductKnown || !finishUnnamed ? finishNormalLabel : finishUnnamedLabel;
+            if (startOverButton != null) startOverButton.gameObject.SetActive(!busy && (evidence.Pictures > 0 || ProductKnown || ingredientText != null));
+        }
+
+        /// <summary>A message in the place of the status line. While scanning it stays until the status changes (a part of the ring fills, the button is pressed or let go).</summary>
+        void Say(string message)
+        {
+            if (statusText != null) statusText.text = message;
+            shownStatus = null;
+            messageOver = stage == Stage.Scanning ? StatusNow() : null;
+        }
+
+        void ResetChecklist()
+        {
+            foreach (ScanCheckItem item in new[] { productCheck, brandCheck, typeCheck, shadeCheck, ingredientsCheck }) if (item != null) item.SetPending();
+            if (shadeSwatch != null) shadeSwatch.gameObject.SetActive(false);
         }
 
         void SetWorking(bool on)
@@ -563,27 +634,58 @@ namespace GlowUp.Scan
             if (brandCheck != null && identity.brandName.Length > 0) brandCheck.SetFound(identity.brandName);
             if (typeCheck != null && identity.cosmeticType.Length > 0) typeCheck.SetFound(identity.cosmeticType);
 
-            // the shade: what the AI saw, otherwise (for a colour cosmetic) the strongest colour in the picture
+            // the shade: its printed name, what the AI saw, otherwise (for a colour cosmetic) the colour the pictures agree on
             string hex = identity.shadeHex;
-            if (hex.Length == 0 && ProductKnown && ShadeAdvisor.IsColourCosmetic(identity.cosmeticType)) hex = lastColour;
+            if (hex.Length == 0 && ShadeAdvisor.IsColourCosmetic(identity.cosmeticType)) hex = evidence.ShadeHex.Length > 0 ? evidence.ShadeHex : (ProductKnown ? lastColour : "");
             hex = ShadeAdvisor.ShadeFor(identity.cosmeticType, hex);          // a face powder is white, whatever colour its box has
             if (ShadeAdvisor.IsFacePowder(identity.cosmeticType)) identity.shadeHex = hex;
-            if (hex.Length == 0) return;
-            string words = identity.shadeName.Length > 0 ? identity.shadeName : hex;
-            if (identity.finish.Length > 0) words += ", " + identity.finish;
-            if (shadeCheck != null) shadeCheck.SetFound(words);
-            if (shadeSwatch != null) { shadeSwatch.gameObject.SetActive(true); shadeSwatch.color = ShadeAdvisor.Parse(hex, Color.gray); }
+            if (hex.Length == 0 && identity.shadeName.Length == 0) return;
+            string shown = identity.shadeName.Length > 0 ? identity.shadeName : hex;
+            if (identity.finish.Length > 0) shown += ", " + identity.finish;
+            if (shadeCheck != null) shadeCheck.SetFound(shown);
+            if (shadeSwatch != null && hex.Length > 0) { shadeSwatch.gameObject.SetActive(true); shadeSwatch.color = ShadeAdvisor.Parse(hex, Color.gray); }
         }
 
-        /// <summary>Phase 1 is done when the product is known. Returns true when the scan is finished altogether.</summary>
-        PackagingMemory.Look lastLook;          // what the front of the pack looked like in the latest picture
+        // ---------------------------------------------------------------------------------------
+        //  Recognising the product from what the app already knows
+        // ---------------------------------------------------------------------------------------
+        /// <summary>The product of the inventory whose whole name stands in this text (words in any order, small reading mistakes forgiven), or null.</summary>
+        static ProductData ProductIn(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return null;
+            List<ProductIndex.Candidate> found = ProductRepository.Index.InText(text, 1);
+            return found.Count > 0 && found[0].exactName && found[0].score >= ProductIndex.Sure ? found[0].product : null;
+        }
+
+        void Adopt(ProductData product)
+        {
+            knownProduct = product;
+            identity.productName = (product.name ?? "").Trim();
+            if (!string.IsNullOrWhiteSpace(product.brandName)) identity.brandName = product.brandName.Trim();
+            if (!string.IsNullOrWhiteSpace(product.cosmeticType)) identity.cosmeticType = product.cosmeticType.Trim();
+        }
+
+        /// <summary>True when a brand the app knows stands in the text. The first one found is taken over when no brand is known yet.</summary>
+        bool BrandIn(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return false;
+            string seen = " " + TextKey.Normalize(text) + " ";
+            foreach (BrandData brand in brands)
+            {
+                string name = TextKey.Normalize(brand != null ? brand.name : "");
+                if (name.Length < 3 || !seen.Contains(" " + name + " ")) continue;
+                if (identity.brandName.Length == 0) identity.brandName = brand.name.Trim();
+                return true;
+            }
+            return false;
+        }
 
         /// <summary>Compares the picture with the packagings this phone remembers; fills in the product when it knows it.</summary>
-        void RecogniseFromLook(Texture2D picture, string text)
+        void RecogniseFromLook(string text)
         {
-            if (!PackagingMemory.Enabled) return;
-            lastLook = PackagingMemory.SignatureOf(picture);
-            if (ProductKnown || lastLook == null) return;
+            if (!PackagingMemory.Enabled || pixels == null) return;
+            lastLook = PackagingMemory.SignatureOf(pixels, pixelsW, pixelsH);
+            if (lastLook == null) return;
             PackagingMemory.Look known = PackagingMemory.Recall(lastLook, text);
             if (known == null) return;
             if (identity.productName.Length == 0) identity.productName = known.productName;
@@ -594,59 +696,252 @@ namespace GlowUp.Scan
             if (identity.finish.Length == 0) identity.finish = known.finish;
         }
 
-        bool TryLeavePhase1()
+        /// <summary>
+        /// Takes over a barcode the camera has read. A product in the inventory with that barcode is the product being
+        /// scanned: its name, brand and kind are filled in (its saved ingredient list is used by the caller).
+        /// </summary>
+        void TakeBarcode(string seen)
         {
-            if (phase != Phase.Product || !ProductKnown) return false;
-            // the product has a name now: remember what its packaging looks like for next time
-            if (lastLook != null) { PackagingMemory.Remember(lastLook, identity.productName, identity.brandName, identity.cosmeticType, identity.shadeHex, identity.shadeName, identity.finish); lastLook = null; }
-            if (ingredientText != null) { Finish(); return true; }
-            EnterIngredients();
-            return false;
+            if (MlKitBarcodeReader.Key(seen).Length == 0) return;
+            barcode = seen.Trim();
+            ProductData p = ProductRepository.Index.ByBarcode(barcode);            // the phone's look-up table: no reading through the list
+            if (p != null) Adopt(p);
         }
 
-        [Header("Ingredient list by itself")]
-        [Tooltip("On = as soon as the product is recognised, its ingredient list is looked up without a tap: first in the app's own inventory, then (online) on the maker's official website and other credible sources. The user can still scan the list on the pack; whichever comes first is used.")]
-        [SerializeField] private bool lookUpByItself = true;
-
-        void EnterIngredients()
+        /// <summary>
+        /// MAKE-UP ONLY. As soon as the scan knows the product is something else (the inventory, the AI or the pack itself
+        /// says "shampoo"), the scan stops: the user is told why, and can scan again or type the name in when the app got
+        /// it wrong. Nothing is saved or sent to the inventory. True = the scan was stopped.
+        /// </summary>
+        bool StopIfNotMakeup(string frontText = null)
         {
-            phase = Phase.Ingredients;
-            ShowPhase();
-            Guide(ScanGuideOverlay.State.Searching);
-            Say(msgPhase2);
-            steadyFor = 0f; sinceLastRead = 0f;
-            // the product has a name: fetch its ingredient list right away, while the user turns the pack round
-            if (lookUpByItself && identity.productName.Length > 0 && ingredientText == null) LookUp();
-        }
+            if (stage == Stage.Leaving || stage == Stage.Idle) return false;
+            ProductScope.Verdict verdict = ProductScope.Judge(identity.cosmeticType, identity.productName);
+            // nothing recognised yet (offline, or the AI has not been asked): only unmistakable words on the pack count
+            if (!verdict.IsNotMakeup && !string.IsNullOrWhiteSpace(frontText) && identity.productName.Length == 0 && identity.cosmeticType.Length == 0)
+                verdict = ProductScope.JudgeLabel(frontText);
+            if (!verdict.IsNotMakeup) return false;
 
-        void ShowPhase()
-        {
-            if (phase1Group != null) phase1Group.alpha = phase == Phase.Product ? 1f : idlePhaseAlpha;
-            if (phase2Group != null) phase2Group.alpha = phase == Phase.Ingredients || ingredientText != null ? 1f : idlePhaseAlpha;
-            if (skipButton != null) skipButton.gameObject.SetActive(phase == Phase.Product);
-        }
-
-        void ResetChecklist()
-        {
-            foreach (ScanCheckItem item in new[] { productCheck, brandCheck, typeCheck, shadeCheck, ingredientsCheck }) if (item != null) item.SetPending();
-            if (shadeSwatch != null) shadeSwatch.gameObject.SetActive(false);
-            if (phase1Group != null) phase1Group.alpha = 1f;
-            if (phase2Group != null) phase2Group.alpha = 1f;
-        }
-
-        void Guide(ScanGuideOverlay.State state)
-        {
-            if (guide == null) return;
-            guide.SetState(state);
-            if (state == ScanGuideOverlay.State.Searching) guide.SetHint(phase == Phase.Product ? hintProduct : hintIngredients);
+            StartOver(false, null);
+            BackToIdle();
+            Say(ProductScope.StopMessage(verdict));
+            return true;
         }
 
         // ---------------------------------------------------------------------------------------
-        //  Phase 2 without a list on the product: look the list up
+        //  Start over
+        // ---------------------------------------------------------------------------------------
+        void OnStartOverTapped()
+        {
+            if (stage == Stage.Leaving || stage == Stage.Recognising) return;
+            // a product that has a name: the same one again, or a different one? Without a name there is nothing to keep.
+            if (ProductKnown && startOverPanel != null) { if (holdButton != null) holdButton.LetGo(); startOverPanel.Show(); }
+            else StartOver(false, msgStartedOver);
+        }
+
+        static void ClosePanel(OverlayPanel panel) { if (panel != null) panel.Hide(); }
+
+        /// <summary>
+        /// A fresh ring. `sameProduct` keeps the product's name, brand and kind (only the pictures and the text are taken
+        /// anew); otherwise everything is forgotten. How often the AI was asked in this visit is kept either way.
+        /// </summary>
+        void StartOver(bool sameProduct, string message)
+        {
+            evidence.Reset();
+            for (int i = 0; i < best.Length; i++) best[i] = null;
+            ingredientText = null; ingredientSource = "scan"; listFrom = ""; listWebBacked = false; sources.Clear();
+            barcode = ""; lastColour = ""; lastLook = null;
+            fault = FrameQuality.Fault.None; blurrySkips = 0; differentSeen = 0; sinceProgress = 0f; stalledSaid = false; pausedFor = 0f;
+            finishUnnamed = false; lookingUp = false; shownStatus = null; messageOver = null; lastHint = "";
+            lock (answerLock) { answerWaiting = false; answerReading = null; }
+            overviewBefore = null;
+            if (textOutlines != null) textOutlines.Clear();
+
+            bool keep = sameProduct && ProductKnown;
+            if (!keep)
+            {
+                identity.found = false; identity.confidence = 0f;
+                identity.productName = identity.brandName = identity.cosmeticType = identity.shadeHex = identity.shadeName = identity.finish = "";
+                knownProduct = null;
+                rescanOf = null;                 // a different product is a new scan: nothing is replaced
+            }
+            else { identity.shadeHex = identity.shadeName = identity.finish = ""; }
+            ResetChecklist();
+            SetWorking(false);
+            if (ring != null) ring.Clear();
+            if (keep) { evidence.ProductKnown(); ShowIdentity(); if (ring != null) ring.Show(evidence); }
+            ShowButtons();
+            if (!string.IsNullOrEmpty(message)) Say(message);
+            ShowGuidance();
+        }
+
+        // ---------------------------------------------------------------------------------------
+        //  Finishing
+        // ---------------------------------------------------------------------------------------
+        void OnFinishTapped()
+        {
+            if (stage == Stage.Scanning || stage == Stage.Idle) FinishAttempt();
+        }
+
+        /// <summary>
+        /// The ring is full, or the user tapped Finish. The list read from the pack is taken; when the app could not name
+        /// the product, the AI is asked once with the best pictures; then the analysis starts.
+        /// </summary>
+        void FinishAttempt()
+        {
+            if (stage == Stage.Leaving || stage == Stage.Recognising) return;
+            if (ingredientText == null)
+            {
+                string read = evidence.Text.IngredientText();
+                if (evidence.Text.Counted < 2 || read.Length == 0) { Say(msgNeedList); return; }
+                ingredientText = read; ingredientSource = "scan"; listFrom = "pack"; listWebBacked = false; sources.Clear();
+                if (ingredientsCheck != null) ingredientsCheck.SetFound(string.Format(ingredientsFoundFormat, evidence.Text.Counted));
+            }
+            if (holdButton != null) holdButton.LetGo();
+
+            if (!ProductKnown && !finishUnnamed)
+            {
+                bool canAsk = aiRecognisesProduct && ConnectivityMonitor.Online && ProductAiAdvisor.Available && HasPictures();
+                if (canAsk && AiBudget.CanRecognise) { StartCoroutine(RecogniseThenFinish()); return; }
+                // online, but the AI has been asked as often as it may be: say so, and offer the other ways on
+                if (canAsk) { NotSure(msgAiLimit); return; }
+                // offline: the product stays without a name (its ingredients are still checked)
+            }
+            Finish();
+        }
+
+        bool HasPictures() { foreach (Kept kept in best) if (kept != null) return true; return false; }
+
+        /// <summary>The app's own lists could not name the product: the AI is shown the best pictures, ONCE.</summary>
+        IEnumerator RecogniseThenFinish()
+        {
+            stage = Stage.Recognising;
+            if (holdButton != null) holdButton.Usable = false;
+            ShowButtons();
+            SetWorking(true);
+            Say(msgAiLooking);
+            if (guide != null) guide.SetState(ScanGuideOverlay.State.Reading);
+            yield return null;                               // let the message show before the pictures are packed
+
+            // the best picture of the front first, then the codes and the shade, the ingredient list last (it is text already)
+            var pictures = new List<byte[]>();
+            var used = new HashSet<int[]>();
+            foreach (ScanZone zone in new[] { ScanZone.Front, ScanZone.Shade, ScanZone.Codes, ScanZone.Around, ScanZone.Ingredients })
+            {
+                Kept kept = best[(int)zone];
+                if (kept == null || pictures.Count >= Mathf.Max(1, aiPictures) || !used.Add(kept.pixels)) continue;
+                byte[] jpg = ToJpg(kept);
+                if (jpg != null) pictures.Add(jpg);
+                yield return null;
+            }
+
+            Task<ProductAiAdvisor.Identity> task = null;
+            if (pictures.Count > 0)
+            {
+                AiBudget.TakeRecognition();
+                string text = evidence.FrontText.Length > 0 ? evidence.FrontText : evidence.Text.AllText(ScanEvidence.UsableLine);
+                task = ProductAiAdvisor.Identify(pictures, text);
+            }
+            float waited = 0f, limit = ProductAiAdvisor.TimeoutSeconds + 6f;     // EVERY LONG STEP HAS A TIME LIMIT
+            while (task != null && !task.IsCompleted && waited < limit) { waited += Time.unscaledDeltaTime; yield return null; }
+            SetWorking(false);
+            if (guide != null) guide.SetState(ScanGuideOverlay.State.Searching);
+
+            if (task != null && task.Status == TaskStatus.RanToCompletion && task.Result != null && task.Result.found && task.Result.confidence >= minimumAiConfidence)
+            {
+                ProductAiAdvisor.Identity seen = task.Result;
+                // what the app's own lists said stays; the AI fills the gaps
+                if (identity.productName.Length == 0) identity.productName = seen.productName;
+                if (identity.brandName.Length == 0) identity.brandName = seen.brandName;
+                if (identity.cosmeticType.Length == 0) identity.cosmeticType = seen.cosmeticType;
+                if (seen.shadeHex.Length > 0) identity.shadeHex = seen.shadeHex;
+                if (identity.shadeName.Length == 0 && seen.shadeName.Length > 0) identity.shadeName = seen.shadeName;
+                if (seen.finish.Length > 0) identity.finish = seen.finish;
+                ShowIdentity();
+            }
+            stage = Stage.Scanning;
+            if (holdButton != null) holdButton.Usable = true;
+            if (StopIfNotMakeup()) yield break;              // the AI says it is not make-up
+            if (!ProductKnown) { NotSure(msgNotSure); yield break; }
+            // the product has a name now: remember what its packaging looks like for next time
+            if (lastLook != null) { PackagingMemory.Remember(lastLook, identity.productName, identity.brandName, identity.cosmeticType, identity.shadeHex, identity.shadeName, identity.finish); lastLook = null; }
+            Finish();
+        }
+
+        /// <summary>Nobody could name the product: never a dead end. The user types the name, scans again, or finishes without a name.</summary>
+        void NotSure(string message)
+        {
+            finishUnnamed = true;
+            stage = cameraFeed != null && cameraFeed.IsPlaying ? Stage.Scanning : Stage.Idle;
+            if (holdButton != null) holdButton.Usable = true;
+            ShowButtons();
+            Say(message);
+        }
+
+        /// <summary>A kept picture as a JPG for the AI: made smaller first, so it travels fast.</summary>
+        byte[] ToJpg(Kept kept)
+        {
+            Texture2D picture = null;
+            try
+            {
+                float shrink = Mathf.Max(1f, Mathf.Max(kept.width, kept.height) / (float)Mathf.Max(256, aiPictureSize));
+                int w = Mathf.Max(8, Mathf.RoundToInt(kept.width / shrink)), h = Mathf.Max(8, Mathf.RoundToInt(kept.height / shrink));
+                var colours = new Color32[w * h];
+                for (int y = 0; y < h; y++)
+                {
+                    int from = Mathf.Min(kept.height - 1, (int)((h - 1 - y) * shrink)) * kept.width;      // a texture counts its rows from the bottom
+                    for (int x = 0; x < w; x++)
+                    {
+                        int p = kept.pixels[from + Mathf.Min(kept.width - 1, (int)(x * shrink))];
+                        colours[y * w + x] = new Color32((byte)(p >> 16), (byte)(p >> 8), (byte)p, 255);
+                    }
+                }
+                picture = new Texture2D(w, h, TextureFormat.RGBA32, false);
+                picture.SetPixels32(colours); picture.Apply();
+                return picture.EncodeToJPG(aiPictureQuality);
+            }
+            catch (Exception e) { Debug.LogWarning("Scan: " + e.Message); return null; }
+            finally { if (picture != null) Destroy(picture); }
+        }
+
+        /// <summary>Hands the scan over to the analysis.</summary>
+        void Finish()
+        {
+            if (stage == Stage.Leaving || ingredientText == null) return;
+            // the look of a product that was named by the app's own lists is remembered as well
+            if (lastLook != null && ProductKnown) { PackagingMemory.Remember(lastLook, identity.productName, identity.brandName, identity.cosmeticType, identity.shadeHex, identity.shadeName, identity.finish); lastLook = null; }
+            ScanSession.PendingText = ingredientText; ScanSession.PendingSource = ingredientSource;
+            ScanSession.PendingShadeHex = identity.shadeHex.Length > 0 ? identity.shadeHex : evidence.ShadeHex.Length > 0 ? evidence.ShadeHex : lastColour;
+            ScanSession.PendingProductName = identity.productName; ScanSession.PendingBrandName = identity.brandName;
+            ScanSession.PendingCosmeticType = identity.cosmeticType;
+            ScanSession.PendingShadeName = identity.shadeName; ScanSession.PendingFinish = identity.finish;
+            ScanSession.PendingSources = new List<string>(sources);
+            ScanSession.PendingBarcode = barcode;
+            ScanSession.PendingListFrom = listFrom; ScanSession.PendingListWebBacked = listWebBacked;
+            ScanSession.PendingReplaces = rescanOf;
+            StartCoroutine(Recognised());
+        }
+
+        IEnumerator Recognised()
+        {
+            stage = Stage.Leaving;
+            if (holdButton != null) holdButton.Usable = false;
+            ShowButtons();
+            if (ring != null) ring.Show(evidence);
+            if (guide != null) guide.SetState(ScanGuideOverlay.State.Detected);
+            if (vibrate) Haptics.Tick(60);
+            Say(statusDone);
+            yield return new WaitForSecondsRealtime(recognisedHoldSeconds);
+            if (cameraFeed != null) cameraFeed.StopCamera();
+            SceneNavigator.GoViaLoading(resultScene, loadingMessage, ScanAnalysisPipeline.Run);
+        }
+
+        // ---------------------------------------------------------------------------------------
+        //  A product without a list on it: look the list up
         // ---------------------------------------------------------------------------------------
         async void LookUp()
         {
-            if (leaving || lookingUp) return;
+            if (stage == Stage.Leaving || stage == Stage.Recognising || lookingUp) return;
             if (identity.productName.Length == 0) { Say(msgLookUpNeedsName); return; }
             lookingUp = true;
             if (lookUpButton != null) lookUpButton.interactable = false;
@@ -667,7 +962,7 @@ namespace GlowUp.Scan
                 if (!ConnectivityMonitor.Online || !ProductAiAdvisor.Available) { Say(msgLookUpOffline); return; }
                 if (!AiBudget.TakeLookUp()) { Say(msgLookUpLimit); return; }
                 ProductAiAdvisor.IngredientLookup found = await ProductAiAdvisor.FindIngredients(identity.productName, identity.brandName, identity.cosmeticType);
-                if (this == null || leaving) return;
+                if (this == null || stage == Stage.Leaving) return;
                 if (found == null || !found.found) { await SayWhatFdaKnows(); return; }
 
                 // additives that hide behind words like "Fragrance": kept on the phone and sent to the shared database
@@ -695,49 +990,10 @@ namespace GlowUp.Scan
             }
         }
 
-        /// <summary>Asks the phone's barcode reader to look at the picture (only until a barcode has been seen).</summary>
-        void LookForBarcode(Texture2D picture)
-        {
-            if (!readBarcode || barcode.Length > 0) return;
-            if (!barcodeReaderAsked) { barcodeReaderAsked = true; MlKitBarcodeReader.TryCreate(out barcodeReader); }
-            if (barcodeReader != null) barcodeReader.Read(picture, code => { if (!string.IsNullOrEmpty(code)) barcodeSeen = code; });
-        }
-
-        /// <summary>
-        /// Takes over a barcode the reader has seen. A product in the inventory with that barcode is the product being
-        /// scanned: its name, brand and kind are filled in. Returns true when its saved ingredient list was used as well,
-        /// which finishes the scan.
-        /// </summary>
-        bool TakeBarcode()
-        {
-            string seen = barcodeSeen;
-            if (string.IsNullOrEmpty(seen) || barcode.Length > 0) return false;
-            barcodeSeen = null;
-            string key = MlKitBarcodeReader.Key(seen);
-            if (key.Length == 0) return false;
-            barcode = seen.Trim();
-            ProductData p = ProductRepository.Index.ByBarcode(barcode);            // the phone's look-up table: no reading through the list
-            if (p != null)
-            {
-                knownProduct = p;
-                identity.productName = p.name.Trim();
-                if (!string.IsNullOrWhiteSpace(p.brandName)) identity.brandName = p.brandName.Trim();
-                if (!string.IsNullOrWhiteSpace(p.cosmeticType)) identity.cosmeticType = p.cosmeticType.Trim();
-                ShowIdentity();
-                // its list is saved already: reuse it instead of reading the pack again
-                if (ingredientText == null && !leaving && p.ingredients != null && p.ingredients.Count >= 3)
-                {
-                    UseLookedUpList(p.ingredients, ListPagesOf(p), "inventory", false);
-                    return true;
-                }
-            }
-            return false;
-        }
-
         /// <summary>
         /// The inventory's entry for a product that was recognised, also when the names are not written exactly alike: the
         /// brand must agree, and one name must hold (nearly) all the words of the other. Of several, the one that has an
-        /// ingredient list and shares the most words wins. Null when the inventory does not have it.
+        /// ingredient list wins. Null when the inventory does not have it.
         /// </summary>
         ProductData InventoryProductFor(string productName, string brandName)
         {
@@ -745,14 +1001,14 @@ namespace GlowUp.Scan
             ProductData exact = index.Exact(brandName, productName);
             if (exact != null && exact.ingredients != null && exact.ingredients.Count >= 3) return exact;
             // not written exactly alike: the closest names, as long as the index is sure and the brand agrees
-            ProductData best = exact;
+            ProductData bestMatch = exact;
             foreach (ProductIndex.Candidate candidate in index.Search(brandName, productName, 3))
             {
                 if (candidate.score < ProductIndex.Sure) break;
                 bool hasList = candidate.product.ingredients != null && candidate.product.ingredients.Count >= 3;
-                if (best == null || (hasList && (best.ingredients == null || best.ingredients.Count < 3))) best = candidate.product;
+                if (bestMatch == null || (hasList && (bestMatch.ingredients == null || bestMatch.ingredients.Count < 3))) bestMatch = candidate.product;
             }
-            return best;
+            return bestMatch;
         }
 
         /// <summary>
@@ -777,7 +1033,7 @@ namespace GlowUp.Scan
             if (!ConnectivityMonitor.Online || !PhFdaVerification.Enabled) { Say(msgNoListFound); return; }
             Say(msgNoListCheckingFda);
             PhFdaVerification.Result fda = await PhFdaVerification.Find(identity.productName, identity.brandName, identity.shadeName);
-            if (this == null || leaving || ingredientText != null) return;        // the list was read from the pack in the meantime
+            if (this == null || stage == Stage.Leaving || ingredientText != null) return;        // the list was read from the pack in the meantime
             string known = fda.Status == PhFdaVerification.Registered ? fdaSaysRegistered : fda.Status == PhFdaVerification.Expired ? fdaSaysExpired
                          : fda.Status == PhFdaVerification.Similar ? fdaSaysSimilar : fda.Status == PhFdaVerification.None ? fdaSaysNone : "";
             Say(known.Length > 0 ? string.Format(msgNoListButFda, known) : msgNoListFound);
@@ -792,45 +1048,20 @@ namespace GlowUp.Scan
             listFrom = kind; listWebBacked = webBacked;
             sources = new List<string>(from ?? new List<string>());
             if (ingredientsCheck != null) ingredientsCheck.SetFound(string.Format(ingredientsLookedUpFormat, ingredients.Count));
-            Finish();
+            evidence.ListKnown();
+            if (ring != null) ring.Show(evidence);
+            if (holdButton != null) holdButton.LetGo();
+            // the list is there: a product that has a name goes straight on; otherwise the usual end (the AI is asked once)
+            if (ProductKnown) Finish(); else FinishAttempt();
         }
 
         // ---------------------------------------------------------------------------------------
-        //  Handing over to the analysis
-        // ---------------------------------------------------------------------------------------
-        void Finish()
-        {
-            if (leaving || ingredientText == null) return;
-            ScanSession.PendingText = ingredientText; ScanSession.PendingSource = ingredientSource;
-            ScanSession.PendingShadeHex = identity.shadeHex.Length > 0 ? identity.shadeHex : lastColour;
-            ScanSession.PendingProductName = identity.productName; ScanSession.PendingBrandName = identity.brandName;
-            ScanSession.PendingCosmeticType = identity.cosmeticType;
-            ScanSession.PendingShadeName = identity.shadeName; ScanSession.PendingFinish = identity.finish;
-            ScanSession.PendingSources = new List<string>(sources);
-            ScanSession.PendingBarcode = barcode;
-            ScanSession.PendingListFrom = listFrom; ScanSession.PendingListWebBacked = listWebBacked;
-            StartCoroutine(Recognised());
-        }
-
-        IEnumerator Recognised()
-        {
-            leaving = true;
-            if (guide != null) guide.SetState(ScanGuideOverlay.State.Detected);
-            if (phase1Group != null) phase1Group.alpha = 1f;
-            if (phase2Group != null) phase2Group.alpha = 1f;
-            Say(msgDone);
-            if (startScanButton != null) startScanButton.interactable = false;
-            yield return new WaitForSecondsRealtime(recognisedHoldSeconds);
-            if (cameraFeed != null) cameraFeed.StopCamera();
-            SceneNavigator.GoViaLoading(resultScene, loadingMessage, ScanAnalysisPipeline.Run);
-        }
-
-        // ---------------------------------------------------------------------------------------
-        //  Typing the ingredients in
+        //  Typing the product in
         // ---------------------------------------------------------------------------------------
         void OpenManual()
         {
-            if (leaving || manualPanel == null) return;
+            if (stage == Stage.Leaving || stage == Stage.Recognising || manualPanel == null) return;
+            if (holdButton != null) holdButton.LetGo();
             if (manualFeedbackText != null) manualFeedbackText.text = "";
             // what the scan already found is filled in, so the user only types what is missing
             if (manualProductInput != null && string.IsNullOrWhiteSpace(manualProductInput.text)) manualProductInput.text = identity.productName;
@@ -846,7 +1077,12 @@ namespace GlowUp.Scan
                 manualTypeDropdown.SetValueWithoutNotify(keep > 0 ? keep : Mathf.Max(0, found));
                 manualTypeDropdown.RefreshShownValue();
             }
-            if (manualInput != null && string.IsNullOrWhiteSpace(manualInput.text) && ingredientText != null) manualInput.text = ingredientText;
+            if (manualInput != null && string.IsNullOrWhiteSpace(manualInput.text))
+            {
+                // what the camera has read of the list so far is offered for correcting
+                string read = ingredientText ?? string.Join(", ", evidence.Text.CountedNames());
+                if (!string.IsNullOrEmpty(read)) manualInput.text = read;
+            }
             manualPanel.Show();
         }
 
@@ -858,11 +1094,11 @@ namespace GlowUp.Scan
                 if (manualFeedbackText != null) manualFeedbackText.text = msgNeedIngredients;
                 return;
             }
-            leaving = true;
-            StopScanning();
+            stage = Stage.Leaving;
+            StopCamera();
             ScanSession.PendingText = text; ScanSession.PendingSource = "manual"; ScanSession.PendingShadeHex = identity.shadeHex;
             ScanSession.PendingListFrom = "typed"; ScanSession.PendingListWebBacked = false;
-            // what the user typed comes first; what phase 1 found fills the rest
+            // what the user typed comes first; what the scan found fills the rest
             string typedName = manualProductInput != null ? manualProductInput.text.Trim() : "";
             string typedBrand = manualBrandInput != null ? manualBrandInput.text.Trim() : "";
             string typedType = manualTypeDropdown != null && manualTypeDropdown.value > 0 ? manualTypeDropdown.options[manualTypeDropdown.value].text : "";
@@ -870,9 +1106,9 @@ namespace GlowUp.Scan
             ScanSession.PendingBrandName = typedBrand.Length > 0 ? typedBrand : identity.brandName;
             ScanSession.PendingCosmeticType = typedType.Length > 0 ? typedType : identity.cosmeticType;
             ScanSession.PendingShadeName = identity.shadeName; ScanSession.PendingFinish = identity.finish;
+            ScanSession.PendingBarcode = barcode;
+            ScanSession.PendingReplaces = rescanOf;
             SceneNavigator.GoViaLoading(resultScene, loadingMessage, ScanAnalysisPipeline.Run);
         }
-
-        void Say(string message) { if (statusText != null) statusText.text = message; }
     }
 }

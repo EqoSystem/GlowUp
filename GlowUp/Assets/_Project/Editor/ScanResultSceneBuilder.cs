@@ -161,7 +161,7 @@ namespace GlowUp.EditorTools
             A.Size(specialistButton, -1, 96);
 
             // ---- bottom buttons ----
-            Button scanAnother = A.PillButton(card, "ScanAnotherButton", "Scan Another", 38, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Scan);
+            Button scanAnother = A.PillButton(card, "ScanAnotherButton", "Scan again", 38, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Scan);
             A.BottomStrip(scanAnother.transform, 44, 132, A.Pad, 512);
             A.Outline(scanAnother.transform, ThemeRole.Accent, 132f);
             Button tryOn = A.PillButton(card, "TryOnButton", "AR Try-On", 38, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Sparkle);
@@ -186,6 +186,9 @@ namespace GlowUp.EditorTools
 
             OverlayPanel renamePanel = A.RenameDialog(s, out TMP_InputField renameInput, out Button renameSave);
             IngredientSheet sheet = A.IngredientSheetPopup(s);
+            // "Scan again": the same product, or a different one?
+            A.AppPopup scanAgain = SmartScanSceneBuilder.ScanAgainPopup(s, "ScanAgainPanel", "The new result takes the place of this one.",
+                                                                        "A new scan. This result stays in Recent Scans.", out Button sameProduct, out Button differentProduct);
 
             // ---- ingredient safety alert: opens by itself when the scan contains a trigger the user switched on in Settings ----
             A.AppPopup alertPopup = A.Overlay(s, "SafetyAlertPanel", "Safety alert");
@@ -229,9 +232,10 @@ namespace GlowUp.EditorTools
             A.Set(controller, "renameButton", rename); A.Set(controller, "renamePanel", renamePanel);
             A.Set(controller, "renameInput", renameInput); A.Set(controller, "renameSaveButton", renameSave);
             A.Set(controller, "backButton", s.back); A.Set(controller, "scanAnotherButton", scanAnother); A.Set(controller, "tryOnButton", tryOn);
+            A.Set(controller, "scanAgainPanel", scanAgain.panel); A.Set(controller, "sameProductButton", sameProduct); A.Set(controller, "differentProductButton", differentProduct);
 
             A.Finish(s);
-            Debug.Log("[GlowUp] AiSmartAnalysisResultScene built. ChipTemplate, SourceLinkTemplate and AlternativeTileTemplate are pattern objects; ExplanationText and FdaDetails open with their buttons; the pop-ups are inactive until opened.");
+            Debug.Log("[GlowUp] AiSmartAnalysisResultScene built. ChipTemplate, SourceLinkTemplate and AlternativeTileTemplate are pattern objects; ExplanationText and FdaDetails open with their buttons; the pop-ups (ScanAgainPanel among them) are inactive until opened.");
         }
 
         /// <summary>

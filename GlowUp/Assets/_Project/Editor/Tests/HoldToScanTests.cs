@@ -421,5 +421,75 @@ namespace GlowUp.Tests
             ring.ListKnown();
             Assert.AreEqual(words.codes, ScanGuidance.Hint(words, FrameQuality.Fault.None, ring));
         }
+
+        // ------------------------------------------------------------------------------------ what the phone's reader hands over
+        [Test]
+        public void TheReadersAnswerIsUnderstood()
+        {
+            // one row per line of text: confidence, left, top, right, bottom, text (separated by tabs)
+            string rows = "0.91\t0.10\t0.20\t0.60\t0.26\tMAYBELLINE\n"
+                        + "0.42\t0.10\t0.30\t0.90\t0.36\tFit Me\tMatte\n"            // a tab inside the text stays part of the text
+                        + "nonsense\n"                                             // a row that cannot be understood is left out
+                        + "0.80\t0.1\t0.4\t0.5\t0.45\t   \n"                       // so is a row without text
+                        + "1.7\t-0.2\t0.5\t1.4\t0.56\tSPF 22";                     // numbers outside 0..1 are pulled back into it
+            FrameReading reading = FrameReader.Parse(rows, " 4800123456789 ");
+            Assert.AreEqual("4800123456789", reading.barcode);
+            Assert.AreEqual(3, reading.lines.Count);
+            Assert.AreEqual("MAYBELLINE", reading.lines[0].text);
+            Assert.AreEqual(0.91f, reading.lines[0].confidence, 0.001f);
+            Assert.AreEqual("Fit Me\tMatte", reading.lines[1].text);
+            Assert.AreEqual(1f, reading.lines[2].confidence, 0.001f);
+            Assert.AreEqual(0f, reading.lines[2].left, 0.001f);
+            Assert.AreEqual(1f, reading.lines[2].right, 0.001f);
+
+            // nothing read: an empty reading, never null
+            Assert.AreEqual(0, FrameReader.Parse(null, null).lines.Count);
+            Assert.AreEqual("", FrameReader.Parse("", null).barcode);
+        }
+
+        [Test]
+        public void TheOutlinesAreMeasuredFromTheBottom()
+        {
+            FrameReading reading = FrameReader.Parse("0.9\t0.10\t0.20\t0.60\t0.30\tMAYBELLINE\n0.2\t0.1\t0.5\t0.6\t0.6\tfaint\n0.9\t0\t0\t0\t0\tno place", "");
+            UnityEngine.Rect[] boxes = FrameReader.BoxesOf(reading, 0.3f);
+            Assert.AreEqual(1, boxes.Length, "a line the reader is not sure of, and a line without a place, get no outline");
+            Assert.AreEqual(0.10f, boxes[0].x, 0.001f);
+            Assert.AreEqual(0.70f, boxes[0].y, 0.001f, "the top edge 0.20 from the top with a height of 0.10 starts 0.70 from the bottom");
+            Assert.AreEqual(0.50f, boxes[0].width, 0.001f);
+            Assert.AreEqual(0.10f, boxes[0].height, 0.001f);
+            Assert.AreEqual(0, FrameReader.BoxesOf(null).Length);
+
+            // the barcode gets an outline too, when the reader says where it is
+            FrameReading withCode = FrameReader.Parse("", "4800123456789\t0.2\t0.7\t0.8\t0.9");
+            Assert.AreEqual("4800123456789", withCode.barcode);
+            boxes = FrameReader.BoxesOf(withCode);
+            Assert.AreEqual(1, boxes.Length);
+            Assert.AreEqual(0.2f, boxes[0].x, 0.001f);
+            Assert.AreEqual(0.1f, boxes[0].y, 0.001f);
+            Assert.AreEqual(0.6f, boxes[0].width, 0.001f);
+            Assert.AreEqual(0.2f, boxes[0].height, 0.001f);
+            Assert.AreEqual(0, FrameReader.BoxesOf(FrameReader.Parse("", "4800123456789")).Length, "digits without a place: no outline");
+        }
+
+        [Test]
+        public void ARuleChangeReachesTheScanner()
+        {
+            // the Scan Rules asset hands its numbers to the quality gate and the ring
+            ScanRules rules = UnityEngine.ScriptableObject.CreateInstance<ScanRules>();
+            try
+            {
+                rules.pictureDarkBelow = 0.2f; rules.frontPictures = 3; rules.viewsAround = 4; rules.picturesForAnUnknownName = 3;
+                rules.Apply();
+                Assert.AreEqual(0.2f, FrameQuality.DarkBelow, 0.0001f);
+                Assert.AreEqual(3, ScanEvidence.FrontPictures);
+                Assert.AreEqual(4, ScanEvidence.ViewsAround);
+                Assert.AreEqual(3, ScanTextMerger.SeenToCount);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(rules);
+                ScanRules.Current.Apply();           // the numbers in force again, for the tests that follow
+            }
+        }
     }
 }

@@ -315,6 +315,13 @@ namespace GlowUp.EditorTools
             return White(r >= 0.74f && r <= 0.92f ? 1f : 0f);
         });
 
+        /// <summary>The band of the scan ring (hold-to-scan): each of its five segments is this picture, drawn as a part of a circle.</summary>
+        public static Sprite ScanRing => Shape("guide_scan_ring", 384, 384, (u, v) =>
+        {
+            float r = Mathf.Sqrt(u * u + v * v);
+            return White(r >= 0.85f && r <= 0.985f ? 1f : 0f);
+        });
+
         /// <summary>A plain white square: progress fills, dim layers and anything that must NOT be rounded.</summary>
         public static Sprite Square => Shape("ui_square", 8, 8, (u, v) => Color.white);
 

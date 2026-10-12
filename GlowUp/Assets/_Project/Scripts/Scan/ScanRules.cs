@@ -43,6 +43,40 @@ namespace GlowUp.Scan
         [Tooltip("After the AI's web search was refused once (the key does not offer it), it is not tried again for this many minutes: that saves one wasted request per question")]
         [Min(0f)] public float skipWebSearchMinutesAfterRefusal = 30f;
 
+        [Header("Hold-to-scan: is a camera picture good enough to be read?")]
+        [Tooltip("A picture darker than this is not read (0 = black, 1 = white). The hint says: too dark.")]
+        [Range(0.02f, 0.5f)] public float pictureDarkBelow = 0.14f;
+        [Tooltip("A pixel at least this bright counts as burnt out by glare (0 to 1)")]
+        [Range(0.8f, 1f)] public float glareBrightness = 0.97f;
+        [Tooltip("The hint says 'there is glare' when more than this share of the picture is burnt out")]
+        [Range(0.02f, 0.6f)] public float glareShare = 0.18f;
+        [Tooltip("The phone counts as moving when the picture changed more than this since the look before (0 to 1). Such a picture is not read.")]
+        [Range(0.01f, 0.3f)] public float movingAbove = 0.06f;
+        [Tooltip("Sharpness below this counts as out of focus (the share of fine detail among the edges of the picture)")]
+        [Range(0.1f, 0.9f)] public float blurBelow = 0.4f;
+        [Tooltip("A picture with fewer edges than this has nothing to judge sharpness by (a plain wall): it is not called blurred")]
+        [Range(0f, 0.5f)] public float minimumEdges = 0.1f;
+
+        [Header("Hold-to-scan: when is a part of the ring full?")]
+        [Tooltip("A line of text counts as clearly read when the text reader is at least this sure of it (0 to 1)")]
+        [Range(0.3f, 0.95f)] public float clearLineConfidence = 0.55f;
+        [Tooltip("A line the text reader is less sure of than this is thrown away (0 to 1)")]
+        [Range(0.05f, 0.6f)] public float usableLineConfidence = 0.3f;
+        [Tooltip("Front: this many pictures of the front fill the part (a brand the app knows counts double; a product the app knows fills it at once)")]
+        [Range(1, 6)] public int frontPictures = 2;
+        [Tooltip("Other sides: this many different views of the product fill the part")]
+        [Range(1, 8)] public int viewsAround = 3;
+        [Tooltip("A picture is a new view when less than this share of its clear lines was seen before")]
+        [Range(0.1f, 0.9f)] public float newViewBelow = 0.4f;
+        [Tooltip("Shade: this many pictures in a row with the same colour fill the part (a printed shade name fills it at once)")]
+        [Range(1, 6)] public int colourPictures = 2;
+        [Tooltip("Ingredients: the list must have at least this many names that count")]
+        [Range(1, 10)] public int minimumIngredients = 2;
+        [Tooltip("An ingredient name the app does not know counts once it was read in this many pictures (a name the app knows counts at once)")]
+        [Range(1, 5)] public int picturesForAnUnknownName = 2;
+        [Tooltip("The list is complete when this many pictures of it in a row brought no new name")]
+        [Range(1, 6)] public int quietPicturesForDone = 2;
+
         /// <summary>The rules in force (the asset, or the defaults above when the asset is missing).</summary>
         public static ScanRules Current
         {
@@ -70,6 +104,18 @@ namespace GlowUp.Scan
             AiBudget.RecognitionsPerSession = Mathf.Max(0, aiRecognitionsPerScanSession);
             AiBudget.ListLookUpsPerSession = Mathf.Max(0, aiListLookUpsPerScanSession);
             AiBudget.SkipWebSearchMinutes = Mathf.Max(0f, skipWebSearchMinutesAfterRefusal);
+
+            FrameQuality.DarkBelow = Mathf.Clamp01(pictureDarkBelow);
+            FrameQuality.GlareLevel = Mathf.Clamp01(glareBrightness); FrameQuality.GlareShare = Mathf.Clamp01(glareShare);
+            FrameQuality.MovingAbove = Mathf.Max(0.001f, movingAbove);
+            FrameQuality.BlurBelow = Mathf.Clamp01(blurBelow); FrameQuality.MinimumEdges = Mathf.Clamp01(minimumEdges);
+            ScanEvidence.ClearLine = Mathf.Clamp01(clearLineConfidence);
+            ScanEvidence.UsableLine = Mathf.Clamp(usableLineConfidence, 0f, ScanEvidence.ClearLine);
+            ScanEvidence.FrontPictures = Mathf.Max(1, frontPictures); ScanEvidence.ViewsAround = Mathf.Max(1, viewsAround);
+            ScanEvidence.NewViewBelow = Mathf.Clamp01(newViewBelow); ScanEvidence.ColourPictures = Mathf.Max(1, colourPictures);
+            ScanEvidence.MinimumIngredients = Mathf.Max(1, minimumIngredients);
+            ScanTextMerger.SeenToCount = Mathf.Max(1, picturesForAnUnknownName);
+            ScanTextMerger.QuietFramesForDone = Mathf.Max(1, quietPicturesForDone);
         }
 
         void OnValidate() { if (Application.isPlaying) Apply(); }

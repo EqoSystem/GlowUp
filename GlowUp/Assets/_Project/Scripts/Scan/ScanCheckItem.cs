@@ -72,6 +72,13 @@ namespace GlowUp.Scan
             Paint();
         }
 
+        /// <summary>Not found yet, but there is something to say ("7 ingredients so far"). The check mark does not appear.</summary>
+        public void SetLabel(string value)
+        {
+            if (Found) return;
+            if (text != null) text.text = string.IsNullOrWhiteSpace(value) ? label : value.Trim();
+        }
+
         /// <summary>The app is still looking for this (the ring breathes).</summary>
         public void SetWorking(bool on) { working = on && !Found; if (!working && ring != null) ring.rectTransform.localScale = Vector3.one; }
 

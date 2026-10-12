@@ -14,13 +14,16 @@ namespace GlowUp.EditorTools
     /// <summary>
     /// Menu: GlowUp > Build Scene > 10 AI Smart Scan.
     /// The camera view with the scan guide (corner brackets, guiding mesh, sweeping line, the outlines
-    /// round the text that was read), the sun and flashlight buttons, the two-phase checklist with its
-    /// gold check marks (1 the product, 2 the ingredients), the status line, Start Scan, and the
-    /// "type the ingredients" pop-up.
+    /// round the text that was read), the sun and flashlight buttons, the checklist of what was found with
+    /// its gold check marks, the status line, the round HOLD-TO-SCAN button inside its ring of five
+    /// segments, "Start over" and "Finish" beside it, and the pop-ups ("type it in", "the same product or a
+    /// different one?").
     /// </summary>
     public static class SmartScanSceneBuilder
     {
-        const float BottomBlock = 716;          // space under the camera view for the instructions, status and buttons
+        const float BottomBlock = 730;          // space under the camera view for the checklist, the status line and the hold button
+        const float RingSize = 264, HoldSize = 190, RingBottom = 24;
+        static readonly string[] ZoneNames = { "Front", "Ingredients", "Codes", "Shade", "OtherSides" };
 
         [MenuItem("GlowUp/Build Scene/10 AI Smart Scan", false, 120)]
         public static void Build()
@@ -44,7 +47,7 @@ namespace GlowUp.EditorTools
             A.Fill(idle.transform);
             Image cameraIcon = A.RawIcon(idle.transform, "CameraIcon", IconFactory.CameraIcon, 150, new Color(1, 1, 1, 0.55f));
             cameraIcon.rectTransform.anchoredPosition = new Vector2(0, 60);
-            TextMeshProUGUI idleText = A.RawLabel(idle.transform, "IdleText", "The camera turns on when you tap Start Scan", 34,
+            TextMeshProUGUI idleText = A.RawLabel(idle.transform, "IdleText", "The camera turns on when you hold the button below", 34,
                                                   new Color(1, 1, 1, 0.82f), FontRole.Body, TextAlignmentOptions.Center, true);
             A.At(idleText.transform, A.MC, new Vector2(0, -90), new Vector2(640, 110));
 
@@ -69,7 +72,7 @@ namespace GlowUp.EditorTools
 
             Image hintPill = A.RawPanel(guideObject.transform, "HintPill", new Color(0, 0, 0, 0.5f), 60f);
             A.BottomStrip(hintPill.transform, 46, 104, 56, 56);
-            TextMeshProUGUI hint = A.RawLabel(hintPill.transform, "HintText", "Show the front of the product and hold steady", 30,
+            TextMeshProUGUI hint = A.RawLabel(hintPill.transform, "HintText", "Show the front: the brand and the product's name", 30,
                                               Color.white, FontRole.Label, TextAlignmentOptions.Center, true);
             A.Fill(hint.transform, 34, 6, 34, 6);
 
@@ -113,20 +116,22 @@ namespace GlowUp.EditorTools
             A.Set(lightAssistant, "prompt", lightPrompt.gameObject); A.Set(lightAssistant, "promptText", lightText);
             A.Set(lightAssistant, "yesButton", lightYes); A.Set(lightAssistant, "noButton", lightNo);
             A.Set(lightAssistant, "flashButton", flash); A.Set(lightAssistant, "flashIcon", flashIcon);
+            A.Set(lightAssistant, "flashBackground", flash.targetGraphic);
+            // reworded: the light is switched through the camera now, so a refusal has other reasons (wording changed in the Inspector is kept)
+            SceneBuilderCore.ReplaceText(lightAssistant, "cannotMessage",
+                "The flashlight is not available right now: the phone may be hot, or another app is using the camera. The screen was made brighter instead.",
+                "This phone cannot use the flashlight while the camera is on. The screen was made brighter instead.");
 
-            // ---- the checklist: phase 1 the product, phase 2 the ingredients ----
+            // ---- what was found: the product on the left, its ingredient list on the right ----
             Image list = A.Panel(card, "ScanChecklist", ThemeRole.SurfaceAlt, Kit.PanelAlpha, 48f);
-            A.BottomStrip(list.transform, 362, 336);
+            A.BottomStrip(list.transform, 446, 276);
 
-            GameObject phase1 = A.Node(list.transform, "Phase1_Product", typeof(CanvasGroup));
-            A.Share(phase1.transform, 0f, 0.55f);
-            PhaseHeader(phase1.transform, "1", "The product");
-            Button skip = A.LinkButton(phase1.transform, "SkipButton", "Skip", 28, ThemeRole.AccentText);
-            A.At(skip.transform, A.TR, new Vector2(-14, -16), new Vector2(120, 56));
-            ScanCheckItem productCheck = CheckRow(phase1.transform, "ProductNameCheck", "Product name", 0);
-            ScanCheckItem brandCheck = CheckRow(phase1.transform, "BrandCheck", "Brand", 1);
-            ScanCheckItem typeCheck = CheckRow(phase1.transform, "CosmeticTypeCheck", "Cosmetic type", 2);
-            ScanCheckItem shadeCheck = CheckRow(phase1.transform, "ShadeCheck", "Shade colour and texture", 3);
+            GameObject foundProduct = A.Node(list.transform, "Found_Product");
+            A.Share(foundProduct.transform, 0f, 0.55f);
+            ScanCheckItem productCheck = CheckRow(foundProduct.transform, "ProductNameCheck", "Product name", 0);
+            ScanCheckItem brandCheck = CheckRow(foundProduct.transform, "BrandCheck", "Brand", 1);
+            ScanCheckItem typeCheck = CheckRow(foundProduct.transform, "CosmeticTypeCheck", "Cosmetic type", 2);
+            ScanCheckItem shadeCheck = CheckRow(foundProduct.transform, "ShadeCheck", "Shade colour and texture", 3);
             Image swatch = A.RawPanel(shadeCheck.transform, "ShadeSwatch", new Color32(194, 75, 98, 255), 30f);
             A.At(swatch.transform, A.MR, new Vector2(-4, 0), new Vector2(30, 30));
             A.Outline(swatch.transform, ThemeRole.Gold, 30f);
@@ -135,30 +140,65 @@ namespace GlowUp.EditorTools
             Image split = A.Panel(list.transform, "Divider", ThemeRole.Gold, 0.45f, 2f);
             split.sprite = IconFactory.Square; split.type = Image.Type.Simple;
             var splitRect = split.rectTransform; splitRect.anchorMin = new Vector2(0.55f, 0); splitRect.anchorMax = new Vector2(0.55f, 1); splitRect.pivot = A.MC;
-            splitRect.offsetMin = new Vector2(-1.5f, 28); splitRect.offsetMax = new Vector2(1.5f, -28);
+            splitRect.offsetMin = new Vector2(-1.5f, 24); splitRect.offsetMax = new Vector2(1.5f, -24);
 
-            GameObject phase2 = A.Node(list.transform, "Phase2_Ingredients", typeof(CanvasGroup));
-            A.Share(phase2.transform, 0.55f, 1f);
-            PhaseHeader(phase2.transform, "2", "Ingredients");
-            ScanCheckItem ingredientsCheck = CheckRow(phase2.transform, "IngredientListCheck", "Ingredient list", 0);
-            TextMeshProUGUI lookUpHint = A.Label(phase2.transform, "LookUpHintText", "No list on the product, or no packaging?", 24, ThemeRole.SecondaryText, FontRole.Body,
+            GameObject foundList = A.Node(list.transform, "Found_Ingredients");
+            A.Share(foundList.transform, 0.55f, 1f);
+            ScanCheckItem ingredientsCheck = CheckRow(foundList.transform, "IngredientListCheck", "Ingredient list", 0);
+            TextMeshProUGUI lookUpHint = A.Label(foundList.transform, "LookUpHintText", "No list on the product, or no packaging?", 24, ThemeRole.SecondaryText, FontRole.Body,
                                                  TextAlignmentOptions.Center, true);
-            A.BottomStrip(lookUpHint.transform, 106, 70, 22, 22);
+            A.BottomStrip(lookUpHint.transform, 104, 70, 22, 22);
             A.ShrinkWrapped(lookUpHint, 20);
-            Button lookUp = A.PillButton(phase2.transform, "LookUpButton", "Look it up", 28, ThemeRole.InputBackground, ThemeRole.MainText, IconFactory.Ai);
-            A.BottomStrip(lookUp.transform, 26, 72, 26, 26);
+            Button lookUp = A.PillButton(foundList.transform, "LookUpButton", "Look it up", 28, ThemeRole.InputBackground, ThemeRole.MainText, IconFactory.Ai);
+            A.BottomStrip(lookUp.transform, 24, 72, 26, 26);
             A.Outline(lookUp.transform, ThemeRole.Gold, 72f);
 
-            // ---- status, the type-it-in link, Start Scan ----
-            TextMeshProUGUI status = A.Label(card, "StatusText", "Tap Start Scan, then show the front of the product.", 31,
+            // ---- the status line and the type-it-in link ----
+            TextMeshProUGUI status = A.Label(card, "StatusText", "Hold the button and show the product. A quick tap keeps it scanning.", 31,
                                              ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.Center, true);
-            A.BottomStrip(status.transform, 266, 88, 52, 52);
+            A.BottomStrip(status.transform, 352, 86, 52, 52);
             A.ShrinkWrapped(status, 24);
             Button manualEntry = A.LinkButton(card, "ManualEntryButton", "Type the product in instead", 30, ThemeRole.SecondaryText);
-            A.BottomStrip(manualEntry.transform, 196, 64, 180, 180);
-            Button startScan = A.PillButton(card, "StartScanButton", "Start Scan", Kit.ButtonSize, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Scan);
-            A.BottomStrip(startScan.transform, 44, Kit.ButtonHeight, Kit.PadX, Kit.PadX);
-            A.Glow(startScan, Kit.ButtonHeight);
+            A.BottomStrip(manualEntry.transform, 292, 56, 180, 180);
+
+            // ---- HOLD TO SCAN: the round button, and round it the ring of five segments that fills as the product is read ----
+            GameObject hold = A.Node(card, "HoldToScan");
+            A.At(hold.transform, A.BC, new Vector2(0, RingBottom), new Vector2(RingSize, RingSize));
+            GameObject ringObject = A.Node(hold.transform, "ScanRing", typeof(ScanRingView));
+            A.Fill(ringObject.transform);
+            var tracks = new Image[ScanZones.Count]; var fills = new Image[ScanZones.Count];
+            for (int i = 0; i < ScanZones.Count; i++) tracks[i] = RingSegment(ringObject.transform, "Track_" + ZoneNames[i], new Color(0.55f, 0.5f, 0.5f, 0.35f));
+            for (int i = 0; i < ScanZones.Count; i++) fills[i] = RingSegment(ringObject.transform, "Fill_" + ZoneNames[i], new Color32(217, 142, 160, 255));
+            var ring = ringObject.GetComponent<ScanRingView>();
+            Kit.SetArray(ring, "tracks", tracks); Kit.SetArray(ring, "fills", fills);
+            ring.SetUp();                                    // places the ten pictures round the ring
+            foreach (Image fill in fills) { fill.fillAmount = 0f; EditorUtility.SetDirty(fill); }
+            foreach (Image track in tracks) EditorUtility.SetDirty(track);
+
+            Image disc = A.Panel(hold.transform, "HoldButton", ThemeRole.ButtonFill, 1f, HoldSize);
+            disc.raycastTarget = true;                       // the button takes the touch
+            A.At(disc.transform, A.MC, Vector2.zero, new Vector2(HoldSize, HoldSize));
+            Image holdIcon = A.Icon(disc.transform, "Icon", IconFactory.Scan, 56, ThemeRole.ButtonText);
+            holdIcon.rectTransform.anchoredPosition = new Vector2(0, 26);
+            TextMeshProUGUI holdLabel = A.Label(disc.transform, "Label", "Hold to scan", 23, ThemeRole.ButtonText, FontRole.Button, TextAlignmentOptions.Center);
+            A.At(holdLabel.transform, A.MC, new Vector2(0, -34), new Vector2(HoldSize - 36, 40));
+            A.Shrink(holdLabel, 17);
+            holdLabel.raycastTarget = false;
+            var holdButton = SceneBuilderCore.Ensure<HoldToScanButton>(disc.gameObject);
+            A.Set(holdButton, "scaleTarget", disc.rectTransform);
+
+            // beside the ring: start over (left) and finish (right). Both appear when there is something to start over or to finish.
+            float side = (Kit.CardWidth - RingSize) * 0.5f + 28f;       // from the card's edge to the far edge of a side button
+            Button startOver = A.PillButton(card, "StartOverButton", "Start over", 30, ThemeRole.SurfaceAlt, ThemeRole.MainText);
+            A.BottomStrip(startOver.transform, RingBottom + RingSize * 0.5f - 46, 92, A.Pad, Kit.CardWidth - side + 56f);
+            A.Outline(startOver.transform, ThemeRole.Accent, 92f);
+            Button finish = A.PillButton(card, "FinishButton", "Finish", 32, ThemeRole.ButtonFill, ThemeRole.ButtonText);
+            A.BottomStrip(finish.transform, RingBottom + RingSize * 0.5f - 46, 92, Kit.CardWidth - side + 56f, A.Pad);
+            A.Shrink(A.LabelOf(finish), 22);
+
+            // ---- "Start over": the same product, or a different one? ----
+            A.AppPopup startOverPopup = ScanAgainPopup(s, "StartOverPanel", "Keeps the product's name; the pictures are taken anew.",
+                                                       "Forgets everything that was read.", out Button sameProduct, out Button differentProduct);
 
             // ---- type-it-in pop-up (for labels the camera cannot read) ----
             A.AppPopup manual = A.Overlay(s, "ManualEntryPanel", "Type it in");
@@ -211,7 +251,10 @@ namespace GlowUp.EditorTools
             A.Set(camera, "focusRing", focusRing.rectTransform);
 
             A.Set(controller, "cameraFeed", camera); A.Set(controller, "guide", guide); A.Set(controller, "idlePlaceholder", idle);
-            A.Set(controller, "startScanButton", startScan); A.Set(controller, "startScanLabel", A.LabelOf(startScan));
+            A.Set(controller, "holdButton", holdButton); A.Set(controller, "holdLabel", holdLabel); A.Set(controller, "ring", ring);
+            A.Set(controller, "finishButton", finish); A.Set(controller, "finishText", A.LabelOf(finish)); A.Set(controller, "startOverButton", startOver);
+            A.Set(controller, "startOverPanel", startOverPopup.panel);
+            A.Set(controller, "sameProductButton", sameProduct); A.Set(controller, "differentProductButton", differentProduct);
             A.Set(controller, "manualEntryButton", manualEntry); A.Set(controller, "backButton", s.back);
             A.Set(controller, "statusText", status);
             A.Set(controller, "manualPanel", manual.panel); A.Set(controller, "manualInput", manualInput);
@@ -220,18 +263,23 @@ namespace GlowUp.EditorTools
             A.Set(controller, "textOutlines", outlines.GetComponent<TextOutlineOverlay>());
             A.Set(controller, "productCheck", productCheck); A.Set(controller, "brandCheck", brandCheck);
             A.Set(controller, "typeCheck", typeCheck); A.Set(controller, "shadeCheck", shadeCheck); A.Set(controller, "shadeSwatch", swatch);
-            A.Set(controller, "phase1Group", phase1.GetComponent<CanvasGroup>()); A.Set(controller, "skipButton", skip);
-            A.Set(controller, "ingredientsCheck", ingredientsCheck); A.Set(controller, "phase2Group", phase2.GetComponent<CanvasGroup>());
+            A.Set(controller, "ingredientsCheck", ingredientsCheck);
             A.Set(controller, "lookUpButton", lookUp); A.Set(controller, "lookUpLabel", A.LabelOf(lookUp));
             GlowUp.Scanning.GeminiApiConfig aiConfig = AppTiles.AiConfig();
             if (aiConfig != null) A.Set(controller, "aiConfig", aiConfig);
             A.Set(lightAssistant, "cameraFeed", camera);
+            // texts of the earlier two-step scan that would name buttons which are gone (wording changed in the Inspector is kept)
+            SceneBuilderCore.ReplaceText(controller, "hintIngredients", "Turn to the back: show the ingredient list", "Now fit the ingredient list inside the frame");
+            SceneBuilderCore.ReplaceText(controller, "msgAiLimit", "The AI has been asked as often as it may be for now. Type the product's name, or tap Finish anyway.",
+                "The AI could not name this product. Type its name instead, or tap Skip and scan the ingredient list.");
 
             AppTiles.SwipeNavigation(s, null);               // drag sideways: Dashboard on one side, AR Try-On on the other
 
             A.Finish(s);
-            Debug.Log("[GlowUp] AiSmartAnalysisScene built. ScanGuide > Frame is the area that gets read; ManualEntryPanel, LightAssistant > LightPrompt and ShadeSwatch are inactive until needed. " +
-                      "The check marks' animation is on each ...Check object (ScanCheckItem).");
+            Debug.Log("[GlowUp] AiSmartAnalysisScene built. ScanGuide > Frame is the area that gets read; HoldToScan holds the round button (HoldToScanButton) and its ring of five segments " +
+                      "(ScanRing: Fill_Front, Fill_Ingredients, Fill_Codes, Fill_Shade, Fill_OtherSides start empty and fill while scanning). ManualEntryPanel, StartOverPanel, " +
+                      "LightAssistant > LightPrompt and ShadeSwatch are inactive until needed; StartOverButton and FinishButton are shown here and hidden by the controller until they can be used. " +
+                      "The numbers of the ring and of the picture check are in GlowUp > Open Scan Rules.");
         }
 
         /// <summary>A round, see-through dark button for the camera view, with a white icon.</summary>
@@ -246,23 +294,48 @@ namespace GlowUp.EditorTools
             return button;
         }
 
-        /// <summary>The heading of one phase of the checklist: a gold number badge and a title.</summary>
-        static void PhaseHeader(Transform parent, string number, string title)
+        /// <summary>One segment of the scan ring: the ring picture, drawn as a part of a circle (ScanRingView.SetUp turns it into place).</summary>
+        static Image RingSegment(Transform parent, string name, Color color)
         {
-            Image badge = A.Panel(parent, "NumberBadge", ThemeRole.Gold, 1f, 46f);
-            A.At(badge.transform, A.TL, new Vector2(26, -22), new Vector2(46, 46));
-            TextMeshProUGUI n = A.RawLabel(badge.transform, "Number", number, 27, Color.white, FontRole.Label, TextAlignmentOptions.Center);
-            A.Fill(n.transform);
-            TextMeshProUGUI t = A.Label(parent, "TitleText", title, 34, ThemeRole.Heading, FontRole.Heading);
-            A.TopStrip(t.transform, 18, 54, 86, 130);
-            A.Shrink(t, 26);
+            Image image = A.RawIcon(parent, name, IconFactory.ScanRing, RingSize, color);
+            image.preserveAspect = false;
+            A.Fill(image.transform);
+            return image;
+        }
+
+        /// <summary>
+        /// The question "the same product, or a different one?" with its two buttons and a short line under each that says
+        /// what the choice does. Used by the scan screen ("Start over") and by the result screen ("Scan again").
+        /// </summary>
+        internal static A.AppPopup ScanAgainPopup(A.AppScreen s, string name, string sameNote, string differentNote, out Button same, out Button different)
+        {
+            A.AppPopup p = A.Overlay(s, name, "Scan again");
+            A.At(p.box, A.MC, new Vector2(0, 60), new Vector2(900, 640));
+            TextMeshProUGUI question = A.Label(p.box, "QuestionText", "Is it the same product, or a different one?", 32, ThemeRole.MainText, FontRole.Body,
+                                               TextAlignmentOptions.TopLeft, true);
+            A.TopStrip(question.transform, 130, 56, 48, 48);
+            A.Shrink(question, 24);
+
+            same = A.PillButton(p.box, "SameProductButton", "Scan the same product again", 34, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Scan);
+            A.TopStrip(same.transform, 206, 116, 48, 48);
+            TextMeshProUGUI sameText = A.Label(p.box, "SameProductNote", sameNote, 25, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center, true);
+            A.TopStrip(sameText.transform, 330, 44, 48, 48);
+            A.Shrink(sameText, 19);
+
+            different = A.PillButton(p.box, "DifferentProductButton", "Scan a different product", 34, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Swap);
+            A.TopStrip(different.transform, 408, 116, 48, 48);
+            A.Outline(different.transform, ThemeRole.Accent, 116f);
+            TextMeshProUGUI differentText = A.Label(p.box, "DifferentProductNote", differentNote, 25, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center, true);
+            A.TopStrip(differentText.transform, 532, 44, 48, 48);
+            A.Shrink(differentText, 19);
+            return p;
         }
 
         /// <summary>One line of the checklist: an empty ring that becomes a glowing gold check mark, and the text.</summary>
         static ScanCheckItem CheckRow(Transform parent, string name, string label, int index)
         {
             GameObject row = A.Node(parent, name, typeof(ScanCheckItem));
-            A.TopStrip(row.transform, 88 + index * 58, 52, 26, 18);
+            A.TopStrip(row.transform, 24 + index * 58, 52, 26, 18);
             Image glow = A.RawIcon(row.transform, "Glow", IconFactory.SoftDisc, 84, new Color32(184, 138, 59, 0));
             A.At(glow.transform, A.ML, new Vector2(-22, 0), new Vector2(84, 84));
             Image ring = A.RawIcon(row.transform, "Ring", IconFactory.RingThin, 40, new Color32(139, 123, 122, 180));
