@@ -1082,13 +1082,25 @@ async function importFdaCatalogue(byItself) {
         if (!brandIdOf.has(compactName(e.brand)) && !newBrands.has(compactName(e.brand))) newBrands.set(compactName(e.brand), { id: "fda_" + slug(e.brand), name: e.brand });
         fresh.push(e);
     });
-    if (fresh.length === 0) { if (!byItself) notify("Everything from the FDA Philippines catalogue is in the inventory already.", "ok"); return; }
+    // A product that is in the inventory already but still has NO ingredient list gets the list the catalogue file now
+    // has for it. Only products that came from this list and that nobody has given a list: nothing an admin typed, an
+    // import approved or a scan read is ever overwritten.
+    const listed = new Map();
+    everyProduct.forEach((p) => { if (!p.binned) [p.name, ...p.aliases].forEach((known) => { listed.set(keyOf(brandNameOf(p), known), p); listed.set(keyOf(p.brandName, known), p); }); });
+    const fills = [];
+    entries.forEach((e) => {
+        if (!Array.isArray(e.ingredients) || e.ingredients.length === 0) return;
+        const p = listed.get(keyOf(e.brand, e.name));
+        if (p && p.source === "fdaph" && p.ingredients.length === 0 && !fills.some((f) => f.product.id === p.id)) fills.push({ product: p, entry: e });
+    });
+    if (fresh.length === 0 && fills.length === 0) { if (!byItself) notify("Everything from the FDA Philippines catalogue is in the inventory already.", "ok"); return; }
     const withList = fresh.filter((e) => Array.isArray(e.ingredients) && e.ingredients.length > 0).length;
     if (!byItself && !(await askConfirm({
-        title: `Add ${many(fresh.length, "product", "products")} and ${many(newBrands.size, "brand", "brands")}?`,
+        title: fresh.length > 0 ? `Add ${many(fresh.length, "product", "products")} and ${many(newBrands.size, "brand", "brands")}?` : `Fill in the ingredient list of ${many(fills.length, "product", "products")}?`,
         message: `They are on the FDA Philippines list of notified cosmetics (gathered ${catalogue.gathered || "recently"}). ${withList} come with an ingredient list; the others get theirs when a user scans them. Make-up is added as Active, marked as coming from the FDA list; ${fresh.filter((e) => scopeOfEntry(e) === "unclear").length} whose kind is not clear are added as Pending for you to look at.`,
-        items: fresh.slice(0, 12).map((e) => `${e.brand}: ${e.name} (${e.type})`).concat(fresh.length > 12 ? [`and ${fresh.length - 12} more`] : []),
-        confirmLabel: "Add them"
+        items: fresh.slice(0, 12).map((e) => `${e.brand}: ${e.name} (${e.type})`).concat(fresh.length > 12 ? [`and ${fresh.length - 12} more`] : [])
+            .concat(fills.length > 0 ? [`${many(fills.length, "product", "products")} already listed without an ingredient list get the list the catalogue now has (each names its source page)`] : []),
+        confirmLabel: fresh.length > 0 ? "Add them" : "Fill them in"
     }))) return;
 
     try {
@@ -1110,12 +1122,20 @@ async function importFdaCatalogue(byItself) {
                 }
             });
         });
+        // the lists for products that had none: only the list and where it came from are written, the rest of the entry stays
+        fills.forEach((f) => sets.push({
+            ref: doc(db, "products", f.product.id), update: true,
+            data: { ingredients: f.entry.ingredients.slice(0, 80), sources: f.product.sources.concat(f.entry.ingredientSource && !f.product.sources.includes(f.entry.ingredientSource) ? [f.entry.ingredientSource] : []) }
+        }));
         for (let i = 0; i < sets.length; i += BATCH_LIMIT) {
             const batch = writeBatch(db);
-            sets.slice(i, i + BATCH_LIMIT).forEach((s) => batch.set(s.ref, s.data));
+            sets.slice(i, i + BATCH_LIMIT).forEach((s) => (s.update ? batch.update(s.ref, s.data) : batch.set(s.ref, s.data)));
             await batch.commit();
         }
-        notify(`${many(fresh.length, "product", "products")} and ${many(newBrands.size, "brand", "brands")} added from the FDA Philippines list.`, "ok");
+        const told = [];
+        if (fresh.length > 0) told.push(`${many(fresh.length, "product", "products")} and ${many(newBrands.size, "brand", "brands")} added from the FDA Philippines list`);
+        if (fills.length > 0) told.push(`${many(fills.length, "ingredient list", "ingredient lists")} filled in`);
+        notify(told.join("; ") + ".", "ok");
     } catch (error) {
         console.error("Error adding the catalogue: ", error);
         notify("Not everything was added. " + describeError(error), "error");
