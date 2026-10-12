@@ -505,6 +505,11 @@ namespace GlowUp.EditorTools
         // =====================================================================================
         //  Bottom action bar: Recent Scans | Start Scan | Try On
         // =====================================================================================
+        /// <summary>
+        /// The bar's buttons have NO tap animation (no bounce, no scaling, no colour fade): a tap changes the screen at once.
+        /// Which screen the user is on is shown without movement: the soft drop behind that screen's icon and its darker
+        /// icon and label. The drop only moves while the user drags sideways to another screen (LiquidTabBar).
+        /// </summary>
         /// <param name="current">0 = none, 1 = Recent, 2 = Scan, 3 = Try On (the screen this bar is on)</param>
         public static BottomActionBar BottomBar(AppScreen s, int current)
         {
@@ -531,6 +536,7 @@ namespace GlowUp.EditorTools
             var midLabel = Label(mid.transform, "Label", "Start Scan", 26, current == 2 ? ThemeRole.Heading : ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.Center);
             BottomStrip(midLabel.transform, 12, 40, 0, 0);
             var scan = mid.GetComponent<Button>(); scan.targetGraphic = disc;
+            scan.transition = Selectable.Transition.None;       // no tap animation on the bar: the screen simply changes
 
             var liquid = SceneBuilderCore.Ensure<LiquidTabBar>(bar.gameObject);
             Set(liquid, "drop", drop.rectTransform); Set(liquid, "dropImage", drop);
@@ -554,6 +560,7 @@ namespace GlowUp.EditorTools
             var text = Label(go.transform, "Label", label, 26, role, FontRole.Label, TextAlignmentOptions.Center);
             BottomStrip(text.transform, 18, 40, 0, 0);
             var b = go.GetComponent<Button>(); b.targetGraphic = ic;
+            b.transition = Selectable.Transition.None;          // no tap animation on the bar: the screen simply changes
             return b;
         }
 

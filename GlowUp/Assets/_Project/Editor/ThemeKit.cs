@@ -118,6 +118,11 @@ namespace GlowUp.EditorTools
                 if (b.GetComponent<ShadeButton>() != null) continue;        // shade swatches have their own grow animation
                 if (b.GetComponent<PressSweepEffect>() != null) continue;   // the tile animation has its own lift
                 if (b.name == "Backdrop") continue;                         // the dim layer behind a pop-up must not move
+                if (b.GetComponentInParent<BottomActionBar>(true) != null)  // the bottom bar: no tap animation at all (the brief of 11 October 2026)
+                {
+                    if (b.TryGetComponent(out ButtonPressFeedback old)) Object.DestroyImmediate(old);
+                    continue;
+                }
                 SceneBuilderCore.Ensure<ButtonPressFeedback>(b.gameObject);
             }
         }
