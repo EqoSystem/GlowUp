@@ -235,9 +235,9 @@ function renderList(w, d, rows) {
     w.page.size = LIST_SIZE;
     const items = paginate(rows, w.page).map((row) => toItem(d, row));
     const list = h("ul", { class: "w-list" }, items.map((item) => h("li", Object.assign({ class: "w-item" + (d.open ? " can-open" : "") }, opener(d, item)),
-        h("span", { class: "tone-dot tone-" + (item.tone || "muted") }),
+        item.meta ? null : h("span", { class: "tone-dot tone-" + (item.tone || "muted") }),
         h("div", { class: "w-main" }, h("div", { class: "w-title", text: item.title }), item.subtitle ? h("div", { class: "w-sub", text: item.subtitle }) : null),
-        item.meta ? h("span", { class: "w-meta", text: item.meta }) : null,
+        item.meta ? h("span", { class: "status-badge tone-" + (item.tone || "muted"), text: item.meta }) : null,
         valueNode(item))));
     w.body.replaceChildren(list);
     renderPager(w.pager, w.page, rows.length, () => render(w), d.noun);
@@ -246,7 +246,7 @@ function renderList(w, d, rows) {
 function renderRow(w, d, rows) {
     const items = rows.slice(0, ROW_LIMIT).map((row) => toItem(d, row));
     const strip = h("div", { class: "w-strip", tabindex: 0, "aria-label": d.label }, items.map((item) => h("div", Object.assign({ class: "w-card" + (d.open ? " can-open" : "") }, opener(d, item)),
-        h("div", { class: "w-card-top" }, h("span", { class: "tone-dot tone-" + (item.tone || "muted") }), item.meta ? h("span", { class: "w-meta", text: item.meta }) : null),
+        h("div", { class: "w-card-top" }, item.meta ? h("span", { class: "status-badge tone-" + (item.tone || "muted"), text: item.meta }) : h("span", { class: "tone-dot tone-" + (item.tone || "muted") })),
         h("div", { class: "w-title", text: item.title }),
         item.subtitle ? h("div", { class: "w-sub", text: item.subtitle }) : null,
         h("div", { class: "w-foot" }, valueNode(item)))));
@@ -300,7 +300,7 @@ function renderGrid(w, d, rows) {
         class: "w-tile" + (w.selected.has(item.id) ? " is-selected" : ""), "data-id": item.id, tabindex: 0,
         role: can ? "option" : "button", "aria-selected": can ? String(w.selected.has(item.id)) : null
     },
-        h("div", { class: "w-card-top" }, h("span", { class: "tone-dot tone-" + (item.tone || "muted") }), item.meta ? h("span", { class: "w-meta", text: item.meta }) : null),
+        h("div", { class: "w-card-top" }, item.meta ? h("span", { class: "status-badge tone-" + (item.tone || "muted"), text: item.meta }) : h("span", { class: "tone-dot tone-" + (item.tone || "muted") })),
         h("div", { class: "w-title", text: item.title }),
         item.subtitle ? h("div", { class: "w-sub", text: item.subtitle }) : null,
         h("div", { class: "w-foot" }, valueNode(item)))));

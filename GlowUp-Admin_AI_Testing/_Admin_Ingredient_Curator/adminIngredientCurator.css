@@ -18,6 +18,10 @@
 .card-head .spacer { flex: 1; }
 .ingredient-tech { font-size: var(--fs-sm); color: var(--muted); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 45px; }
 .ingredient-card.open .ingredient-tech { white-space: normal; overflow-wrap: anywhere; }
+/* the card's second line: the scientific name, and at its right end the badges (waiting for review, how the app judges it) */
+.card-sub { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.card-sub .ingredient-tech { flex: 1; min-width: 0; }
+.card-sub .status-badge { flex: none; }
 .ingredient-card .detail-box { margin-top: 10px; }
 .ingredient-card .pick { margin-right: -2px; }
 .panel-head > .pick { margin-right: 2px; }

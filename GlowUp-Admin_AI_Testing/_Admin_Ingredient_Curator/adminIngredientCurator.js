@@ -26,7 +26,7 @@ import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed } from "../_Sh
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
     notify, describeError, setBusy, setFormError, renderChecks, readChecks, writeChecks, originLabel, sourceLinks, wireSearch,
-    ALLERGEN_FAMILIES, SKIN_TYPES, SKIN_CONDITIONS, dialogIsOpen
+    ALLERGEN_FAMILIES, SKIN_TYPES, SKIN_CONDITIONS, dialogIsOpen, statusBadge, toneBadge
 } from "../_Shared/adminCommon.js";
 import { matchesSearch } from "../_Shared/glowupRules.js";
 import { cleanupPlan, ingredientDuplicates, ingredientLookalikes, ingredientIssues, mergeIngredients } from "../_Shared/glowupCatalog.js";
@@ -417,8 +417,8 @@ function renderFromProducts(term, typed) {
             </div>`;
         return `
             <article class="ingredient-card from-product${open ? " open" : ""}" data-id="new:${escapeHtml(x.key)}" tabindex="0" aria-expanded="${open}">
-                <header class="card-head"><span class="tone-dot tone-muted" data-tip="Listed by products in the inventory. No entry here yet."></span><h4 class="ingredient-name">${escapeHtml(x.name)}</h4></header>
-                <p class="ingredient-tech">in ${many(x.products.length, "product", "products")}</p>
+                <header class="card-head"><h4 class="ingredient-name">${escapeHtml(x.name)}</h4></header>
+                <div class="card-sub"><p class="ingredient-tech">in ${many(x.products.length, "product", "products")}</p>${toneBadge("No entry yet", "muted", "Listed by products in the inventory. Nothing is written about it here yet.")}</div>
                 ${detail}
             </article>`;
     }).join("");
@@ -433,7 +433,7 @@ const actionButton = (classes, act, id, iconHtml, title, tip, preview) =>
 function cardOf(item, inBin) {
     const open = item.id === openId;
     const review = needsReview(item);
-    const riskText = review ? "Found by the app's AI lookup. Waiting for your review." : item.riskLevel ? `Marked ${RISK_NAMES[item.riskLevel]}.` : "No risk level set here: the app decides.";
+    const riskText = item.riskLevel ? `How the app judges it: ${RISK_NAMES[item.riskLevel]}.` : "No risk level is set here: the app decides by its own built-in knowledge.";
     const buttons = [];
     if (inBin) {
         buttons.push(actionButton("row-btn approve", "restore", item.id, icon("undo"), "Restore", "Back to the list. The app uses it again."));
@@ -446,12 +446,11 @@ function cardOf(item, inBin) {
         <article class="ingredient-card${review ? " needs-review" : ""}${open ? " open" : ""}" data-id="${escapeHtml(item.id)}" data-key="${escapeHtml(item.id)}" data-drag tabindex="0" aria-expanded="${open}">
             <header class="card-head">
                 <button type="button" class="pick" role="checkbox" aria-checked="false" aria-label="Select ${escapeHtml(titleOf(item))}"></button>
-                <span class="tone-dot tone-${review ? "info" : toneOfRisk(item.riskLevel)}" data-tip="${escapeHtml(riskText)}"></span>
                 <h4 class="ingredient-name">${escapeHtml(titleOf(item))}</h4>
                 <span class="spacer"></span>
                 <div class="btn-group row-actions">${buttons.join("")}</div>
             </header>
-            <p class="ingredient-tech">${escapeHtml(item.techName || "No scientific name")}</p>
+            <div class="card-sub"><p class="ingredient-tech">${escapeHtml(item.techName || "No scientific name")}</p>${review ? statusBadge("Pending") : ""}${toneBadge(RISK_NAMES[item.riskLevel || "auto"], toneOfRisk(item.riskLevel), riskText)}</div>
             ${open ? detailOf(item, inBin) : ""}
         </article>`;
 }
@@ -461,9 +460,7 @@ function detailOf(item, inBin) {
     const review = needsReview(item);
     const origin = originLabel(item.source);
     const facts = [];
-    facts.push(["Risk", item.riskLevel
-        ? `<span class="risk-pill ${item.riskLevel}">${RISK_NAMES[item.riskLevel]}</span>`
-        : `<span class="risk-pill auto">App decides</span> <span class="muted small">no risk level set here</span>`]);
+    // the risk is on the card's own badge (with what it means in its tooltip): it is not said a second time here
     facts.push(["Definition", escapeHtml(item.description || "No description provided.")]);
     if (item.aliases.length > 0) facts.push(["Also known as", escapeHtml(item.aliases.join(", "))]);
     if (item.commonUses) facts.push(["Used in", escapeHtml(item.commonUses)]);

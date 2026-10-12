@@ -371,6 +371,23 @@ button:disabled, .btn[disabled] { opacity: .5; cursor: not-allowed; }
 .row-sub.warn { color: var(--warn); }
 .row-sub.review { color: var(--info); }
 
+/* ---- THE ONE BADGE FOR A STATE: a dot and the word together (see statusBadge in adminCommon.js) ----
+   Active, Pending, Inactive and Recycle bin look the same on every page. The dot is part of the badge, never a second
+   sign beside it, and the word stays: colour alone is not enough. */
+.status-badge {
+    display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px 2px 8px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 600;
+    white-space: nowrap; --c: var(--muted); color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent);
+    border: 1px solid color-mix(in srgb, var(--c) 30%, transparent);
+}
+.status-badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+.status-badge.active, .status-badge.tone-ok { --c: var(--ok); }
+.status-badge.pending, .status-badge.tone-warn { --c: var(--warn); }
+.status-badge.inactive, .status-badge.tone-muted { --c: var(--muted); }
+.status-badge.bin, .status-badge.tone-bad { --c: var(--bad); }
+.status-badge.tone-info { --c: var(--info); }
+th .guide-badge { margin-left: 6px; vertical-align: 1px; }
+.guide-pop { white-space: pre-line; }       /* a guide may list things line by line (the status guide does) */
+
 /* ---- pills and chips ---- */
 .status-pill, .risk-pill, .chip, .badge {
     display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 600;

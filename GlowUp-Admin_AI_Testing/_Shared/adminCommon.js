@@ -359,10 +359,39 @@ export function normalizeStatus(value) {
     return known || text;
 }
 
-/** <span class="status-pill active">Active</span> */
-export function statusPill(status) {
-    const text = status || "Active";
-    return `<span class="status-pill ${escapeHtml(text.toLowerCase())}">${escapeHtml(text)}</span>`;
+/** What each status means for the app: said by the "i" next to a status (statusGuide) and by each badge's own tooltip. */
+export const STATUS_MEANINGS = {
+    "Active": "The app uses it.",
+    "Pending": "It waits for an admin to check it. The app does not use it yet.",
+    "Inactive": "An admin switched it off. The app does not use it.",
+    "Recycle bin": "It was removed. It can be restored, or deleted for good, on the Recycle Bin page."
+};
+
+/**
+ * THE ONE STATUS BADGE of the whole site: a dot and the word, together, in one colour. A status is shown with this
+ * and nothing else (no separate dot, no second label), so it looks the same on every page and is never said by colour
+ * alone. status = "Active" | "Pending" | "Inactive" | "Recycle bin"; anything else is shown as it is, in grey.
+ */
+export function statusBadge(status) {
+    const text = String(status || "Active");
+    const key = text.toLowerCase() === "recycle bin" ? "bin" : text.toLowerCase().replace(/[^a-z]/g, "");
+    return `<span class="status-badge ${escapeHtml(key)}" title="${escapeHtml(STATUS_MEANINGS[text] || "")}">${escapeHtml(text)}</span>`;
+}
+/** The older name of the same badge. */
+export const statusPill = statusBadge;
+
+/**
+ * The same badge for a judgement that is not a status (how a scan was judged, how risky an ingredient is):
+ * tone = "ok" | "warn" | "bad" | "info" | "muted". `title` = what a tooltip says about it (optional).
+ */
+export function toneBadge(text, tone, title) {
+    return `<span class="status-badge tone-${escapeHtml(tone || "muted")}"${title ? ` title="${escapeHtml(title)}"` : ""}>${escapeHtml(text)}</span>`;
+}
+
+/** The "i" that tells an admin what each status means. */
+export function statusGuide() {
+    const text = Object.keys(STATUS_MEANINGS).map((name) => `${name}: ${STATUS_MEANINGS[name]}`).join("\n");
+    return `<button type="button" class="guide-badge" aria-label="What each status means" data-tip-title="What each status means" data-tip="${escapeHtml(text)}">i</button>`;
 }
 
 // ---------------------------------------------------------------------------------------------

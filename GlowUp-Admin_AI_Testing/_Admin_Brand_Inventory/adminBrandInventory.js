@@ -33,7 +33,7 @@ import { collection, doc, serverTimestamp } from "https://www.gstatic.com/fireba
 import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed } from "../_Shared/adminStore.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
-    statusPill, normalizeStatus, notify, describeError, setBusy, setFormError, originLabel, sourceLinks, COSMETIC_TYPES, STATUSES,
+    statusBadge, statusGuide, normalizeStatus, notify, describeError, setBusy, setFormError, originLabel, sourceLinks, COSMETIC_TYPES, STATUSES,
     productScope, notMakeup, scopeWords, categoryOutOfScope, BRAND_CATEGORY, wireSearch, dialogIsOpen
 } from "../_Shared/adminCommon.js";
 import { matchesSearch, compactName, barcodeKey } from "../_Shared/glowupRules.js";
@@ -415,15 +415,19 @@ function notCurated(ingredientNames) {
     return curatorKnown ? ingredientNames.filter((n) => !curatedKeys.has(sameKey(n))) : [];
 }
 
-/** What is wrong with a product, for the small dot in front of its name: { tone, text } or null. */
-function attentionOf(p, brand) {
+/**
+ * What is wrong with a product BESIDES its status, for the small dot in front of its name: { tone, text } or null.
+ * The status has its own badge in the row, so "waiting for review" is not said a second time here; and where the
+ * brand's own row stands above the product (`brandShown`), the brand's status is not repeated either.
+ */
+function attentionOf(p, brand, brandShown) {
     const notes = [];
     let tone = "";
     if (isOut(p)) { tone = "bad"; notes.push(`Not make-up: ${scopeWords(p.cosmeticType, p.name)}.`); }
     else if (isUnclear(p)) { tone = "warn"; notes.push(`The app hides it: ${scopeWords(p.cosmeticType, p.name)}. Edit it and choose its kind.`); }
-    if (p.needsReview) { tone = tone || "info"; notes.push("Waiting for review."); }
+    if (p.needsReview && p.status !== "Pending") { tone = tone || "info"; notes.push("Nobody has checked it yet."); }
     if (p.ingredients.length === 0) { tone = tone || "warn"; notes.push("No ingredient list: the app cannot check it."); }
-    if (brand && brand.status !== "Active") { tone = tone || "warn"; notes.push(`Its brand is ${brand.status}: the app hides it.`); }
+    if (brand && brand.status !== "Active" && !brandShown) { tone = tone || "warn"; notes.push(`Its brand is ${brand.status}: the app hides it.`); }
     if (!brand) { tone = tone || "warn"; notes.push("Its brand is gone."); }
     return notes.length > 0 ? { tone, text: notes.join(" ") } : null;
 }
@@ -495,7 +499,7 @@ function renderList(now) {
     const folder = now.kind === "folder" ? now.name : "";
     const flat = view.mode === "all";
     const columns = flat ? 7 : 6;
-    el("inventoryTableHead").innerHTML = `<tr><th><span class="th-line">${pickAllBox("product")}Product</span></th>${flat ? "<th>Brand</th>" : ""}<th>Type</th><th>Shades</th><th class="text-right" data-tip="Scans the app recognised as this product.">Scans</th><th data-tip="The app only uses Active products of Active brands.">Status</th><th></th></tr>`;
+    el("inventoryTableHead").innerHTML = `<tr><th><span class="th-line">${pickAllBox("product")}Product</span></th>${flat ? "<th>Brand</th>" : ""}<th>Type</th><th>Shades</th><th class="text-right" data-tip="Scans the app recognised as this product.">Scans</th><th><span class="th-line">Status${statusGuide()}</span></th><th></th></tr>`;
 
     if (everyBrand.length === 0 && everyProduct.length === 0) {
         shownGroups = [];
@@ -589,7 +593,7 @@ function sortedBrands() {
 const actionButton = (classes, act, id, iconHtml, title, tip, preview) =>
     `<button type="button" class="icon-btn small ${classes}" data-act="${act}" data-id="${escapeHtml(id)}" aria-label="${escapeHtml(title)}" data-tip-title="${escapeHtml(title)}" data-tip="${escapeHtml(tip)}"${preview ? ` data-tip-preview="${escapeHtml(preview)}"` : ""}>${iconHtml}</button>`;
 const rowActions = (buttons) => `<div class="btn-group row-actions">${buttons.join("")}</div>`;
-const toneDot = (note) => (note ? `<span class="tone-dot tone-${note.tone}" data-tip="${escapeHtml(note.text)}"></span>` : "");
+const toneDot = (note) => (note ? `<span class="tone-dot tone-${note.tone}" role="img" aria-label="${escapeHtml(note.text)}" data-tip="${escapeHtml(note.text)}"></span>` : "");
 
 function brandRow(brand, productCount, columns) {
     const about = [brand.category, brand.market].filter((t) => t).map(escapeHtml).join(" · ");
@@ -600,7 +604,7 @@ function brandRow(brand, productCount, columns) {
     buttons.push(actionButton("", "edit-brand", brand.id, icon("edit"), "Edit brand", "Change the name, category, market or status.", "Opens the brand form."));
     buttons.push(actionButton("row-btn danger", "bin-brand", brand.id, BIN_ICON, "Recycle bin", "Remove this brand together with its products.", "They go to the Recycle bin and can be restored."));
     const fdaBrand = brand.source === "fdaph" || productsOf(brand.id).some(QUICK.fda.test);
-    const flags = (fdaBrand ? `<span class="chip good" data-tip="Products of this brand were checked on the FDA Philippines list of notified cosmetics.">FDA Philippines</span>` : "") + (brand.needsReview ? `<span class="chip review" data-tip="${escapeHtml(originLabel(brand.source) || "Added automatically")}. Nobody has checked it yet.">needs review</span>` : "")
+    const flags = (fdaBrand ? `<span class="chip good" data-tip="Products of this brand were checked on the FDA Philippines list of notified cosmetics.">FDA Philippines</span>` : "") + (brand.needsReview && brand.status !== "Pending" ? `<span class="chip review" data-tip="${escapeHtml(originLabel(brand.source) || "Added automatically")}. Nobody has checked it yet.">needs review</span>` : "")
         + (out ? `<span class="chip bad">not a make-up brand</span>` : "");
     return `
         <tr class="brand-row${out ? " out-row" : ""}" data-brand="${escapeHtml(brand.id)}" data-key="b:${escapeHtml(brand.id)}" data-drag>
@@ -611,7 +615,7 @@ function brandRow(brand, productCount, columns) {
                 <span class="spacer"></span>
                 ${rowActions(buttons)}
                 <span class="brand-meta">${many(productCount, "product", "products")} · ${many(brand.scans, "scan", "scans")}</span>
-                ${statusPill(brand.status)}
+                ${statusBadge(brand.status)}
             </div></td>
         </tr>`;
 }
@@ -626,12 +630,12 @@ function productRow(p, brand, flat) {
 
     return `
         <tr class="product-row${isOut(p) ? " out-row" : ""}${open ? " open" : ""}" data-product="${escapeHtml(p.id)}" data-key="p:${escapeHtml(p.id)}" data-drag tabindex="0" aria-expanded="${open}">
-            <td class="name-cell"><div class="name-line">${pickBox(p.name || "product")}${toneDot(attentionOf(p, brand))}<span class="product-name">${escapeHtml(p.name || "Unnamed Product")}</span></div></td>
+            <td class="name-cell"><div class="name-line">${pickBox(p.name || "product")}${toneDot(attentionOf(p, brand, !flat))}<span class="product-name">${escapeHtml(p.name || "Unnamed Product")}</span></div></td>
             ${flat ? `<td class="brand-ref">${escapeHtml(brand ? brand.name : (p.brandName || "–"))}</td>` : ""}
             <td class="type-cell">${escapeHtml(p.cosmeticType || "–")}</td>
             <td class="shade-cell">${shadeCell}</td>
             <td class="scan-count text-right">${p.scans}</td>
-            <td class="status-cell">${statusPill(p.status)}</td>
+            <td class="status-cell">${statusBadge(p.status)}</td>
             <td class="text-right">${rowActions(buttons)}</td>
         </tr>` + (open ? detailRow(p, brand, flat ? 7 : 6) : "");
 }

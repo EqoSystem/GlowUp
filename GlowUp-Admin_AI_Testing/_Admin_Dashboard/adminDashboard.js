@@ -15,7 +15,7 @@ import {
 import { getDocs, updateDoc, writeBatch, onListsRefreshed } from "../_Shared/adminStore.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, escapeHtml, asArray, toWholeNumber, timeAgo, formatWhen, startOfTodayUnix,
-    notify, describeError
+    notify, describeError, toneBadge
 } from "../_Shared/adminCommon.js";
 import { mountShell, paginate, renderPager, icon } from "../_Shared/adminShell.js";
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
@@ -279,14 +279,12 @@ function activityRow(a) {
     const flagged = asArray(a.flaggedIngredients);
     const harmful = toWholeNumber(a.harmfulCount), caution = toWholeNumber(a.cautionCount);
 
-    let verdict;
-    if (status === "safe") verdict = "Safe for the user";
-    else if (status === "harmful") verdict = "Harmful for the user" + (flagged.length > 0 ? ": " + escapeHtml(flagged.slice(0, 3).join(", ")) + (flagged.length > 3 ? " and more" : "") : "");
-    else verdict = "Use with care" + (caution > 0 ? ` (${caution} to watch)` : "");
-
+    // how the scan was judged for the person who made it: ONE badge (dot and word); what goes with it follows as text
+    const verdict = toneBadge(STATUS_NAMES[status], toneOf(status), status === "safe" ? "Nothing in it was flagged for this user." : status === "harmful" ? "Something in it is flagged for this user." : "Something in it is worth watching for this user.");
     const parts = [];
     if (a.cosmeticType) parts.push(escapeHtml(a.cosmeticType));
-    parts.push(verdict);
+    if (status === "harmful" && flagged.length > 0) parts.push(escapeHtml(flagged.slice(0, 3).join(", ")) + (flagged.length > 3 ? " and more" : ""));
+    if (status === "caution" && caution > 0) parts.push(`${caution} to watch`);
     if (toWholeNumber(a.ingredientCount) > 0) parts.push(`${toWholeNumber(a.ingredientCount)} ingredients`);
     if (a.source === "manual") parts.push("typed in");
 
@@ -302,10 +300,9 @@ function activityRow(a) {
 
     return `
         <li class="activity-item${a.id === openScanId ? " open" : ""}" data-id="${escapeHtml(a.id)}" tabindex="0">
-            <span class="activity-dot ${status}" title="${status}"></span>
             <div class="activity-main">
-                <div class="activity-title">${escapeHtml(product)}${brand}${a.allergenFlagged === true ? ` <span class="chip warn">allergen match</span>` : ""}${harmful > 1 && status === "harmful" ? ` <span class="chip">${harmful} flagged</span>` : ""}</div>
-                <div class="activity-detail">${parts.join(" · ")}</div>
+                <div class="activity-title">${escapeHtml(product)}${brand}${a.allergenFlagged === true ? ` <span class="chip warn">allergen match</span>` : ""}${harmful > Math.min(3, flagged.length) && status === "harmful" ? ` <span class="chip">${harmful} flagged</span>` : ""}</div>
+                <div class="activity-detail">${verdict}${parts.length > 0 ? " " + parts.join(" · ") : ""}</div>
             </div>
             <span class="activity-time" title="${escapeHtml(formatWhen(a.scannedAtUnix))}">${escapeHtml(timeAgo(a.scannedAtUnix))}</span>
             ${more}
