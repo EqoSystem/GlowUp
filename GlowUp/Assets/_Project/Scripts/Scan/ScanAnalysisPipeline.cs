@@ -41,6 +41,8 @@ namespace GlowUp.Scan
             if (label.Count == 0)
             {
                 ScanSession.LastError = "We could not find an ingredient list in that. Try again with the list filling the frame, or type the ingredients in.";
+                ScanSession.RescanOf = ScanSession.PendingReplaces;     // still the same product: the next try takes the same place
+                ScanSession.KeepLightChoice = true;                     // and a flashlight the user switched on comes back on
                 SceneNavigator.Retarget(SceneNames.AiSmartAnalysis);
                 return;
             }
@@ -77,6 +79,12 @@ namespace GlowUp.Scan
             record.mayContain = new List<string>(label.mayContain);
             record.source = string.IsNullOrEmpty(ScanSession.PendingSource) ? "scan" : ScanSession.PendingSource;
             record.shadeHex = ScanSession.PendingShadeHex ?? "";
+
+            // "SCAN THE SAME PRODUCT AGAIN": this result takes the place of the earlier one (the same id), so the product
+            // is in Recent Scans once and its scan is counted once. (An earlier scan that is no longer kept: a new scan.)
+            ScanRecord earlier = ScanSession.PendingReplaces;
+            if (earlier != null && ScanHistoryRepository.Find(earlier.id) == null) earlier = null;
+            if (earlier != null) record.id = earlier.id;
 
             // is it a product from the website's inventory? (its ingredient list is nearly the same)
             if (RecogniseCatalogueProducts)
@@ -133,10 +141,18 @@ namespace GlowUp.Scan
                 try { ScannedProductPublisher.PublishIfNew(record, names, kindIsKnown); }
                 catch (Exception e) { Debug.LogWarning("Adding the product to the inventory was skipped: " + e.Message); }
             }
-            ScanHistoryRepository.Add(record);                       // every scan is saved to Recent Scans automatically
-            if (!string.IsNullOrEmpty(record.brandId)) BrandRepository.RecordScan(record.brandId);   // the brand's scan counter on the admin website
-            if (!string.IsNullOrEmpty(record.productId)) ProductRepository.RecordScan(record.productId); // the product's "App Scans" on the admin website
-            SyncQueue.EnqueueSet("scanActivity/" + record.id, ScanActivity.From(record));           // anonymous: feeds the admin dashboard
+            // every scan is saved to Recent Scans automatically; a scan that was done again takes the earlier one's place
+            bool replaced = earlier != null && ScanHistoryRepository.Replace(earlier.id, record);
+            if (!replaced) ScanHistoryRepository.Add(record);
+            // the scan counters on the admin website: ONCE per scan. A scan that was done again only counts for a brand
+            // or a product the earlier attempt did not count (it was recognised differently this time).
+            if (!string.IsNullOrEmpty(record.brandId) && !(replaced && earlier.brandId == record.brandId)) BrandRepository.RecordScan(record.brandId);
+            if (!string.IsNullOrEmpty(record.productId) && !(replaced && earlier.productId == record.productId)) ProductRepository.RecordScan(record.productId);
+            // the anonymous note that feeds the admin dashboard: one per scan. For a scan that was done again, a note that
+            // is still waiting to be sent gets the new result; one that was sent already stays as it is (the database's
+            // rules let the app add a note, not change one), so the dashboard never counts the scan twice.
+            if (!replaced) SyncQueue.EnqueueSet("scanActivity/" + record.id, ScanActivity.From(record));
+            else SyncQueue.ReplacePendingSet("scanActivity/" + record.id, ScanActivity.From(record));
             ScanSession.Current = record;
             ScanSession.ResultBackScene = SceneNames.Dashboard;
             ScanSession.ClearPending();
@@ -152,6 +168,7 @@ namespace GlowUp.Scan
             ProductScope.Verdict scope = ProductScope.Judge(kindIsKnown ? record.cosmeticType : "", record.productName);
             if (!scope.IsNotMakeup) return false;
             ScanSession.LastError = ProductScope.StopMessage(scope);
+            ScanSession.KeepLightChoice = true;
             ScanSession.ClearPending();
             SceneNavigator.Retarget(SceneNames.AiSmartAnalysis);
             return true;
@@ -272,7 +289,11 @@ namespace GlowUp.Scan
             try
             {
                 PhFdaVerification.Result fda = await search;
-                if (fda != null) { ApplyFda(record, fda); ScanHistoryRepository.Update(record); }
+                if (fda == null) return;
+                ApplyFda(record, fda);
+                // saved again, unless the scan was done again in the meantime (its place now holds the newer result)
+                ScanRecord kept = ScanHistoryRepository.Find(record.id);
+                if (kept == record || (kept != null && kept.scannedAtUnix == record.scannedAtUnix)) ScanHistoryRepository.Update(record);
             }
             catch (Exception e) { Debug.LogWarning("FDA Philippines check skipped: " + e.Message); }
             finally { PhFdaVerification.SetChecking(record.id, false); }

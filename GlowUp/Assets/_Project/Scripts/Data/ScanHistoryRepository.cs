@@ -65,6 +65,33 @@ namespace GlowUp.Data
             if (uid != null) SyncQueue.EnqueueSet($"users/{uid}/scans/{r.id}", r);
         }
 
+        /// <summary>
+        /// "Scan the same product again": the new result takes the PLACE of the earlier one, so the product is in Recent
+        /// Scans once and not twice. It keeps the earlier scan's id and the user's own name for it, and gets the time of
+        /// the new scan. Returns false (and saves nothing) when the earlier scan is no longer kept: it is then a new scan.
+        /// </summary>
+        public static bool Replace(string earlierId, ScanRecord r)
+        {
+            if (r == null || string.IsNullOrEmpty(earlierId)) return false;
+            ScanHistoryHolder h = H();
+            int at = h.items.FindIndex(x => x != null && x.id == earlierId);
+            if (at < 0) return false;
+            r.id = earlierId;
+            if (string.IsNullOrEmpty(r.displayName)) r.displayName = h.items[at].displayName;
+            if (r.scannedAtUnix == 0) r.scannedAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            r.deleted = false;
+            h.items[at] = r;
+            Persist();
+            string uid = UserProfileRepository.ActiveUid;
+            if (uid != null)
+            {
+                // the earlier result may still be waiting to be sent: it is replaced in the queue, not sent as well
+                string path = $"users/{uid}/scans/{r.id}";
+                if (!SyncQueue.ReplacePendingSet(path, r)) SyncQueue.EnqueueSet(path, r);
+            }
+            return true;
+        }
+
         public static void Remove(string id) { var r = Find(id); if (r != null) { r.deleted = true; Persist(); } }
         public static void ClearAll() { foreach (var r in H().items) r.deleted = true; Persist(); }
         public static void Restore(string id) { var r = Find(id); if (r != null) { r.deleted = false; Persist(); } }

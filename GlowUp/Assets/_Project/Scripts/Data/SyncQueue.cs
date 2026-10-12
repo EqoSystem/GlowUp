@@ -77,6 +77,26 @@ namespace GlowUp.Data
         {
             Ensure().Add(new PendingWrite { op = "set", path = path, json = JsonUtility.ToJson(data) });
         }
+        /// <summary>
+        /// A write to this document that is still WAITING gets the new content instead of a second write being queued
+        /// behind it (a scan that was done again before the first result was sent). Returns false when nothing is waiting
+        /// for that path, or when that write is being sent at this moment: the caller then decides what to do.
+        /// </summary>
+        public static bool ReplacePendingSet(string path, object data)
+        {
+            if (string.IsNullOrEmpty(path)) return false;
+            SyncQueue q = Ensure();
+            for (int i = q.queue.items.Count - 1; i >= 0; i--)
+            {
+                PendingWrite w = q.queue.items[i];
+                if (w == null || w.op != "set" || w.path != path) continue;
+                if (i == 0 && q.flushing) return false;              // on its way already
+                w.json = JsonUtility.ToJson(data);
+                OfflineCache.Save(CacheKey, q.queue);
+                return true;
+            }
+            return false;
+        }
         public static void EnqueueIncrement(string path, string field, long amount)
         {
             Ensure().Add(new PendingWrite { op = "increment", path = path, field = field, amount = amount });

@@ -113,7 +113,14 @@ namespace GlowUp.Result
 
         [Header("Buttons / scenes")]
         [SerializeField] private Button backButton;
+        [Tooltip("\"Scan again\": asks whether it is the same product or a different one")]
         [SerializeField] private Button scanAnotherButton;
+        [Tooltip("The question that button opens. Empty = the scanner opens at once, for a new product.")]
+        [SerializeField] private OverlayPanel scanAgainPanel;
+        [Tooltip("\"Scan the same product again\": the product keeps its name, and the new result takes the place of this one")]
+        [SerializeField] private Button sameProductButton;
+        [Tooltip("\"Scan a different product\": a new scan; this result stays in Recent Scans")]
+        [SerializeField] private Button differentProductButton;
         [SerializeField] private Button tryOnButton;
         [SerializeField] private string scanScene = SceneNames.AiSmartAnalysis;
         [SerializeField] private string tryOnScene = SceneNames.ArTryOn;
@@ -132,13 +139,27 @@ namespace GlowUp.Result
             if (alternativeTileTemplate != null) alternativeTileTemplate.gameObject.SetActive(false);
             if (sourceLinkTemplate != null) sourceLinkTemplate.gameObject.SetActive(false);
             if (backButton != null) backButton.onClick.AddListener(() => SceneNavigator.Go(string.IsNullOrEmpty(ScanSession.ResultBackScene) ? defaultBackScene : ScanSession.ResultBackScene));
-            if (scanAnotherButton != null) scanAnotherButton.onClick.AddListener(() => SceneNavigator.Go(scanScene));
+            if (scanAnotherButton != null) scanAnotherButton.onClick.AddListener(() => { if (scanAgainPanel != null && record != null) scanAgainPanel.Show(); else ScanAgain(false); });
+            if (sameProductButton != null) sameProductButton.onClick.AddListener(() => ScanAgain(true));
+            if (differentProductButton != null) differentProductButton.onClick.AddListener(() => ScanAgain(false));
             if (tryOnButton != null) tryOnButton.onClick.AddListener(() => { ScanSession.TryOn = record; SceneNavigator.Go(tryOnScene); });
             if (allIngredientsButton != null) allIngredientsButton.onClick.AddListener(() => { if (ingredientSheet != null && record != null) ingredientSheet.Show(record); });
             if (dermatologistButton != null) dermatologistButton.onClick.AddListener(() => Application.OpenURL(dermatologistUrl));
             if (alternativesButton != null) alternativesButton.onClick.AddListener(ShowAlternatives);
             if (renameButton != null) renameButton.onClick.AddListener(BeginRename);
             if (renameSaveButton != null) renameSaveButton.onClick.AddListener(SaveRename);
+        }
+
+        /// <summary>
+        /// Opens the scanner again. `sameProduct`: the product keeps its name and the new result takes the place of this
+        /// one (no second entry in Recent Scans, and the scan is not counted twice). Otherwise it is a new scan and this
+        /// result stays as it is.
+        /// </summary>
+        void ScanAgain(bool sameProduct)
+        {
+            ScanSession.RescanOf = sameProduct ? record : null;
+            ScanSession.KeepLightChoice = true;             // a flashlight the user switched on comes back on
+            SceneNavigator.Go(scanScene);
         }
 
         // the FDA Philippines search can end a few seconds after this screen opened: the badge then fills in by itself
