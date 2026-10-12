@@ -22,6 +22,13 @@ namespace GlowUp.Recent
     /// go there pops the tile and removes it (it can still be brought back from the bar at the bottom).
     /// While the tiles shake each one shows a small pencil for renaming it (on this phone only), and
     /// "Done" stops the shaking. The Sort button changes the order of the tiles.
+    ///
+    /// SEVERAL AT ONCE: the Delete button at the top right starts selection mode. The rows shake, a tap on a row
+    /// selects it or takes it out again (a check mark and "3 selected" show it), with "Select all" and "Cancel".
+    /// Dragging ANY selected row moves the whole group: that row carries a small number, the others fade, and the same
+    /// drag, shadow and finger-following are used as for one row. Let go inside the shadow: every selected scan is
+    /// removed in one save, with one sound. Let go outside: they return to their places, still selected. A row that is
+    /// not selected is dragged alone. Press-and-hold works as before; it simply has no selection.
     /// </summary>
     public class RecentScansFlowController : MonoBehaviour
     {
@@ -63,6 +70,18 @@ namespace GlowUp.Recent
         [Tooltip("The freezing sound of a removal: once per removal, at the moment the tile starts to pop (the user can switch it off in Settings)")]
         [SerializeField] private DeleteSoundPlayer deleteSound;
 
+        [Header("Selecting several to remove them together")]
+        [Tooltip("The Delete button at the top right: starts and ends selection mode")]
+        [SerializeField] private Button selectButton;
+        [Tooltip("The strip that takes the place of the count and Sort while rows are being selected")]
+        [SerializeField] private GameObject selectionBar;
+        [SerializeField] private TextMeshProUGUI selectionText;
+        [SerializeField] private Button selectAllButton;
+        [SerializeField] private Button cancelSelectionButton;
+        [Tooltip("{0} = how many are selected")]
+        [SerializeField] private string selectedFormat = "{0} selected";
+        [SerializeField] private string selectedNone = "Tap scans to select them";
+
         [Header("Clear / restore")]
         [SerializeField] private Button clearAllButton;
         [Tooltip("The bar that appears while there are removed items to bring back")]
@@ -95,7 +114,8 @@ namespace GlowUp.Recent
         readonly List<ProductTileView> tiles = new List<ProductTileView>();
         ScanRecord renaming;
         SortOrder order;
-        bool shaking, popping, fingerInZone;
+        bool shaking, popping, fingerInZone, selecting, groupShown;
+        readonly HashSet<string> selected = new HashSet<string>();      // the ids of the selected scans
         float zoneTarget;
         Image zoneImage;
 
@@ -110,6 +130,10 @@ namespace GlowUp.Recent
             if (sortButton != null) sortButton.onClick.AddListener(NextSort);
             if (doneButton != null) { doneButton.onClick.AddListener(() => SetShaking(false)); doneButton.gameObject.SetActive(false); }
             if (backButton != null) backButton.onClick.AddListener(() => { if (shaking) SetShaking(false); else SceneNavigator.Go(backScene); });
+            if (selectButton != null) selectButton.onClick.AddListener(() => SetSelecting(!selecting));
+            if (selectAllButton != null) selectAllButton.onClick.AddListener(SelectAll);
+            if (cancelSelectionButton != null) cancelSelectionButton.onClick.AddListener(() => SetSelecting(false));
+            if (selectionBar != null) selectionBar.SetActive(false);
             if (removeZone != null)
             {
                 removeZone.alpha = 0f; removeZone.blocksRaycasts = false; removeZone.interactable = false;
@@ -161,11 +185,18 @@ namespace GlowUp.Recent
                     tile.AiClicked += t => { if (!shaking && aiPanel != null) aiPanel.Show(t.Data as ScanRecord); };
                     tile.RenameClicked += t => BeginRename(t.Data as ScanRecord);
                     tile.DrawerOpening += CloseOtherRows;
+                    tile.LockedTap += OnRowTappedWhileShaking;
+                    tile.SetSelectedForRemoval(selected.Contains(record.id));
                     if (tile.TryGetComponent(out HoldToRemoveTile hold))
                     {
                         if (removeZone != null) hold.SetRemoveArea((RectTransform)removeZone.transform);
                         hold.HoldStarted += _ => SetShaking(true);
-                        hold.Dragging += (_, inZone) => { fingerInZone = inZone >= 0.5f; zoneTarget = fingerInZone ? zoneAlphaAtRemove : zoneAlphaWaiting; };
+                        hold.Dragging += (h, inZone) =>
+                        {
+                            fingerInZone = inZone >= 0.5f; zoneTarget = fingerInZone ? zoneAlphaAtRemove : zoneAlphaWaiting;
+                            // a selected row is dragged: the whole selection moves as one group under the finger
+                            if (!groupShown && h.TryGetComponent(out ProductTileView draggedTile) && DragsGroup(draggedTile)) ShowGroup(draggedTile, true);
+                        };
                         hold.DragEnded += OnDragEnded;
                     }
                     tiles.Add(tile);
@@ -174,7 +205,10 @@ namespace GlowUp.Recent
             if (countText != null) countText.text = saved.Count == 1 ? countOne : string.Format(countFormat, saved.Count);
             if (emptyState != null) emptyState.SetActive(saved.Count == 0);
             if (sortLabel != null) sortLabel.text = string.Format(sortFormat, SortName(order));
-            if (saved.Count == 0) shaking = false;
+            // a selected scan that is no longer in the list (removed, or gone) is no longer selected
+            selected.RemoveWhere(id => !saved.Exists(r => r.id == id));
+            groupShown = false;
+            if (saved.Count == 0) { shaking = false; selecting = false; selected.Clear(); }
             ApplyShaking();
 
             int removed = ScanHistoryRepository.Trash().Count;
@@ -211,10 +245,64 @@ namespace GlowUp.Recent
         // ---------------------------------------------------------------------------------------
         void SetShaking(bool on)
         {
-            if (shaking == on) return;
+            if (!on && selecting) { selecting = false; selected.Clear(); }      // leaving delete mode also leaves selection mode
+            if (shaking == on) { ApplyShaking(); return; }
             shaking = on;
             ApplyShaking();
         }
+
+        /// <summary>
+        /// Selection mode on or off (the Delete button; "Cancel" and Back end it). It is delete mode with a selection: the
+        /// rows shake and can be dragged as after a press-and-hold, and a tap on a row selects it.
+        /// </summary>
+        void SetSelecting(bool on)
+        {
+            if (on && tiles.Count == 0) return;
+            selecting = on;
+            if (!on) selected.Clear();
+            if (on && !shaking) { shaking = true; }
+            if (!on) shaking = false;
+            ApplyShaking();
+        }
+
+        void SelectAll()
+        {
+            if (!selecting) return;
+            foreach (ProductTileView tile in tiles) if (tile != null && tile.Data is ScanRecord record) selected.Add(record.id);
+            ApplyShaking();
+        }
+
+        /// <summary>A tap on a shaking row: in selection mode it selects the row or takes it out again; otherwise nothing.</summary>
+        void OnRowTappedWhileShaking(ProductTileView tile)
+        {
+            if (!selecting || popping || !(tile.Data is ScanRecord record)) return;
+            if (!selected.Remove(record.id)) selected.Add(record.id);
+            tile.SetSelectedForRemoval(selected.Contains(record.id));
+            ShowSelection();
+        }
+
+        void ShowSelection()
+        {
+            if (selectionBar != null) selectionBar.SetActive(selecting);
+            if (selectionText != null) selectionText.text = selected.Count == 0 ? selectedNone : string.Format(selectedFormat, selected.Count);
+            if (countText != null) countText.gameObject.SetActive(!selecting);
+        }
+
+        /// <summary>One selected row is under the finger for all of them: it carries the number, the others fade.</summary>
+        void ShowGroup(ProductTileView dragged, bool show)
+        {
+            groupShown = show;
+            foreach (ProductTileView tile in tiles)
+            {
+                if (tile == null) continue;
+                if (tile == dragged) tile.ShowGroupCount(show ? selected.Count : 0);
+                else if (tile.Selected) tile.SetDimmed(show);
+            }
+            if (!show && dragged != null) dragged.ShowGroupCount(0);
+        }
+
+        /// <summary>True when this row is dragged for a whole group (selection mode, the row is selected, and so is at least one more).</summary>
+        bool DragsGroup(ProductTileView tile) => selecting && tile != null && tile.Selected && selected.Count > 1;
 
         void ApplyShaking()
         {
@@ -224,8 +312,11 @@ namespace GlowUp.Recent
                 if (tile.TryGetComponent(out HoldToRemoveTile hold)) hold.SetShaking(shaking);
                 tile.ShowRename(shaking);
                 tile.SetExpandLocked(shaking);          // delete mode comes first: a shaking row does not open, and an open one closes
+                tile.SetSelectedForRemoval(selecting && tile.Data is ScanRecord record && selected.Contains(record.id));
+                if (!selecting) { tile.ShowRename(shaking); } else tile.ShowRename(false);     // while selecting, the check marks take the pencils' place
             }
-            if (doneButton != null) doneButton.gameObject.SetActive(shaking);
+            ShowSelection();
+            if (doneButton != null) doneButton.gameObject.SetActive(shaking && !selecting);     // selection mode ends with its own Cancel
             if (sortButton != null) sortButton.gameObject.SetActive(!shaking);
             if (clearAllButton != null) clearAllButton.gameObject.SetActive(!shaking && tiles.Count > 0);
             zoneTarget = shaking ? zoneAlphaWaiting : 0f;
@@ -241,15 +332,29 @@ namespace GlowUp.Recent
         {
             fingerInZone = false;
             zoneTarget = shaking ? zoneAlphaWaiting : 0f;
-            if (!remove || popping || hold == null) return;
-            if (!hold.TryGetComponent(out ProductTileView tile) || !(tile.Data is ScanRecord record)) return;
+            ProductTileView tile = hold != null && hold.TryGetComponent(out ProductTileView found) ? found : null;
+            bool group = DragsGroup(tile);
+            if (groupShown) ShowGroup(tile, false);             // let go: the others are fully there again (outside the shadow they stay selected)
+            if (!remove || popping || tile == null || !(tile.Data is ScanRecord record)) return;
             popping = true;
-            if (deleteSound != null) deleteSound.Play();        // once per removal; not when the tile is dropped outside the shadow (that never gets here)
+            if (deleteSound != null) deleteSound.Play();        // ONCE per removal, for one scan or a whole group; not when it is dropped outside the shadow
+            // a group: every selected scan; otherwise the one that was dragged (a row that is not selected is always dragged alone)
+            var ids = group ? new List<string>(selected) : new List<string> { record.id };
             tile.PlayPop(() =>
             {
-                ScanHistoryRepository.Remove(record.id);       // into the trash: the Restore bar can bring it back
+                // into the removed scans, all in one save: the Restore bar can bring them back. A group is never left half removed.
+                int gone = ids.Count == 1 ? RemoveOne(ids[0]) : ScanHistoryRepository.RemoveMany(ids);
+                if (gone < ids.Count) Debug.LogWarning("Recent scans: " + (ids.Count - gone) + " of " + ids.Count + " scans were no longer there to remove.");
+                foreach (string id in ids) selected.Remove(id);
                 if (this != null) Refresh();
             });
+        }
+
+        static int RemoveOne(string id)
+        {
+            if (ScanHistoryRepository.Find(id) == null) return 0;
+            ScanHistoryRepository.Remove(id);
+            return 1;
         }
 
         // ---------------------------------------------------------------------------------------

@@ -82,6 +82,15 @@ namespace GlowUp.Views
         [Tooltip("Recent Scans: the button in the opened part that opens the full result")]
         [SerializeField] private Button resultButton;
 
+        [Header("Selecting several rows to remove them together (Recent Scans)")]
+        [Tooltip("The check mark over the row's icon: this row is selected")]
+        [SerializeField] private GameObject selectedMark;
+        [Tooltip("The small number on the row that is dragged for a whole group: how many scans move together")]
+        [SerializeField] private GameObject groupBadge;
+        [SerializeField] private TextMeshProUGUI groupBadgeText;
+        [Tooltip("How see-through the other rows of a group are while one of them is dragged for all")]
+        [Range(0f, 1f)] [SerializeField] private float dimmedAlpha = 0.28f;
+
         [Header("Pop (when the tile is removed)")]
         [SerializeField] private RectTransform popTarget;
         [SerializeField] private CanvasGroup popGroup;
@@ -98,6 +107,10 @@ namespace GlowUp.Views
         public event Action<ProductTileView> Clicked, TryOnClicked, AiClicked, SaveClicked, RenameClicked;
         /// <summary>Raised when this tile's drawer starts to open (the controller closes the other tiles' drawers).</summary>
         public event Action<ProductTileView> DrawerOpening;
+        /// <summary>A row was tapped while it cannot open (delete mode): in selection mode that tap selects it.</summary>
+        public event Action<ProductTileView> LockedTap;
+        /// <summary>True while the row is selected for removal.</summary>
+        public bool Selected { get; private set; }
 
         float drawerK, popT = -1f;
         Action popDone;
@@ -113,6 +126,8 @@ namespace GlowUp.Views
             if (resultButton != null) resultButton.onClick.AddListener(() => Clicked?.Invoke(this));       // "open this": what a tap on a square tile does
             if (renameButton != null) { renameButton.onClick.AddListener(() => RenameClicked?.Invoke(this)); renameButton.gameObject.SetActive(false); }
             if (statusDot != null) statusDot.gameObject.SetActive(false);
+            if (selectedMark != null) selectedMark.SetActive(false);
+            if (groupBadge != null) groupBadge.SetActive(false);
             if (popTarget != null) popBase = popTarget.localScale;
             ApplyDrawer(0f);
         }
@@ -121,8 +136,10 @@ namespace GlowUp.Views
         {
             if (IsRow)
             {
-                // a row: a tap opens or closes it and does nothing else (and nothing at all while it is locked: delete mode)
-                if (!expandLocked && tileTapTogglesDrawer) ToggleDrawer();
+                // a row: a tap opens or closes it and does nothing else. While it is locked (delete mode) it does not open:
+                // the controller hears of the tap and, in selection mode, selects the row.
+                if (expandLocked) LockedTap?.Invoke(this);
+                else if (tileTapTogglesDrawer) ToggleDrawer();
                 return;
             }
             PlaySelect();
@@ -199,6 +216,26 @@ namespace GlowUp.Views
             expandLocked = locked;
             if (locked) SetDrawer(false);
             if (chevron != null) chevron.gameObject.SetActive(!locked);
+        }
+
+        /// <summary>Marks the row as selected for removal (a check mark over its icon), or clears the mark.</summary>
+        public void SetSelectedForRemoval(bool on)
+        {
+            Selected = on;
+            if (selectedMark != null && selectedMark.activeSelf != on) selectedMark.SetActive(on);
+        }
+
+        /// <summary>The row that is dragged for a whole group shows how many scans move with it (1 or less: no number).</summary>
+        public void ShowGroupCount(int count)
+        {
+            if (groupBadge != null) groupBadge.SetActive(count > 1);
+            if (groupBadgeText != null) groupBadgeText.text = count.ToString();
+        }
+
+        /// <summary>The other rows of a dragged group fade while their group is under the finger, and come back when it is let go.</summary>
+        public void SetDimmed(bool dimmed)
+        {
+            if (popGroup != null && popT < 0f) popGroup.alpha = dimmed ? dimmedAlpha : 1f;
         }
 
         /// <summary>Shows the open or closed state at once, without the short growing (used when a list is built).</summary>

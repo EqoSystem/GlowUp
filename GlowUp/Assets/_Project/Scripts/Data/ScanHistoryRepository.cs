@@ -93,6 +93,24 @@ namespace GlowUp.Data
         }
 
         public static void Remove(string id) { var r = Find(id); if (r != null) { r.deleted = true; Persist(); } }
+
+        /// <summary>
+        /// Removes several scans together, exactly as Remove does for one (they go to the removed scans and can be
+        /// restored; nothing is sent to the cloud until "Delete forever"). They are all marked first and saved ONCE, so a
+        /// group is never left half removed. Returns how many were removed.
+        /// </summary>
+        public static int RemoveMany(IEnumerable<string> ids)
+        {
+            int removed = 0;
+            if (ids != null)
+                foreach (string id in ids)
+                {
+                    ScanRecord r = Find(id);
+                    if (r != null && !r.deleted) { r.deleted = true; removed++; }
+                }
+            if (removed > 0) Persist();
+            return removed;
+        }
         public static void ClearAll() { foreach (var r in H().items) r.deleted = true; Persist(); }
         public static void Restore(string id) { var r = Find(id); if (r != null) { r.deleted = false; Persist(); } }
         public static void RestoreAll() { foreach (var r in H().items) r.deleted = false; Persist(); }

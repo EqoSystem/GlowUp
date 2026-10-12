@@ -37,7 +37,22 @@ namespace GlowUp.EditorTools
             A.At(done.transform, A.TR, new Vector2(-A.Pad, -160), new Vector2(226, 68));
             done.gameObject.SetActive(false);             // shown while the tiles shake
 
-            TextMeshProUGUI listHint = A.Label(card, "ListHintText", "Tap a tile for its result. Press and hold a tile, then drag it left to remove it.", 26,
+            // ---- several at once: the Delete button (top right, the mirror of Back) starts selection mode; while it is on, this
+            //      strip takes the place of the count and Sort: how many are selected, Select all, Cancel ----
+            Button select = A.IconButton(card, "DeleteButton", IconFactory.Trash, 92, 52, ThemeRole.MainText);
+            A.At(select.transform, A.TR, new Vector2(-28, -28), new Vector2(92, 92));
+            GameObject selectionBar = A.Node(card, "SelectionBar");
+            A.TopStrip(selectionBar.transform, 160, 68, 52, A.Pad);
+            TextMeshProUGUI selectionText = A.Label(selectionBar.transform, "SelectionText", "3 selected", 34, ThemeRole.MainText, FontRole.Label);
+            A.Fill(selectionText.transform, 0, 0, 450, 0);
+            A.Shrink(selectionText, 22);
+            Button selectAll = A.PillButton(selectionBar.transform, "SelectAllButton", "Select all", 28, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.ListIcon);
+            A.At(selectAll.transform, A.MR, new Vector2(-206, 0), new Vector2(236, 68));
+            Button cancelSelection = A.PillButton(selectionBar.transform, "CancelSelectionButton", "Cancel", 28, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Close);
+            A.At(cancelSelection.transform, A.MR, new Vector2(0, 0), new Vector2(194, 68));
+            selectionBar.SetActive(false);                // shown while scans are being selected
+
+            TextMeshProUGUI listHint = A.Label(card, "ListHintText", "Tap a scan to open it. Press and hold one, then drag it into the shadow to remove it.", 26,
                                                ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center);
             A.TopStrip(listHint.transform, 234, 40);
             A.Shrink(listHint, 18); A.HintOnly(listHint);
@@ -122,6 +137,8 @@ namespace GlowUp.EditorTools
             }
             if (deleteClip == null) Debug.LogWarning("[GlowUp] Assets/_Project/Audio/Delete_FreezingCold.mp3 was not found: removing a scan stays silent until a clip is set on DeleteSoundPlayer.");
             A.Set(controller, "deleteSound", deleteSound);
+            A.Set(controller, "selectButton", select); A.Set(controller, "selectionBar", selectionBar); A.Set(controller, "selectionText", selectionText);
+            A.Set(controller, "selectAllButton", selectAll); A.Set(controller, "cancelSelectionButton", cancelSelection);
 
             A.Finish(s);
             Debug.Log("[GlowUp] RecentScanActivitiesScene built. ScanTileTemplate is the pattern row (left open in the Hierarchy so its buttons can be styled); RemoveZone is invisible until the tiles shake (set its CanvasGroup's Alpha to 1 to see it); " +

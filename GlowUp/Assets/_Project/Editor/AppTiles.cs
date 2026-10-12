@@ -127,11 +127,25 @@ namespace GlowUp.EditorTools
                 rename.gameObject.SetActive(false);
                 A.Set(view, "renameButton", rename);
 
+                // selecting several rows (the Delete button of the screen): a check mark takes the icon's place on a selected row,
+                // and the row that is dragged for the whole group carries a small number. Both are switched off until needed.
+                Image mark = A.Panel(visual.transform, "SelectedMark", ThemeRole.ButtonFill, 1f, 26f);
+                A.At(mark.transform, A.TL, new Vector2(20, -20), new Vector2(88, 88));
+                A.Icon(mark.transform, "Icon", IconFactory.Check, 50, ThemeRole.ButtonText);
+                mark.gameObject.SetActive(false);
+                Image badge = A.Panel(visual.transform, "GroupBadge", ThemeRole.ButtonFill, 1f, 30f);
+                A.At(badge.transform, A.TR, new Vector2(10, 14), new Vector2(76, 60));
+                TextMeshProUGUI badgeText = A.Label(badge.transform, "CountText", "3", 32, ThemeRole.ButtonText, FontRole.Label, TextAlignmentOptions.Center);
+                A.Fill(badgeText.transform);
+                badge.gameObject.SetActive(false);
+                A.Set(view, "selectedMark", mark.gameObject); A.Set(view, "groupBadge", badge.gameObject); A.Set(view, "groupBadgeText", badgeText);
+
                 // press and hold, then drag to the shadow to remove; the Visual gets its own drawing layer so it can pass over everything
                 var layer = SceneBuilderCore.Ensure<Canvas>(visual);
                 SceneBuilderCore.Ensure<GraphicRaycaster>(visual);
                 var hold = SceneBuilderCore.Ensure<HoldToRemoveTile>(root);
                 A.Set(hold, "visual", (RectTransform)visual.transform); A.Set(hold, "visualCanvas", layer);
+                A.Set(hold, "shakeDegrees", 0.55f);                 // a long row tilts far less than a square tile, or its ends would swing
             }
             else
             {
