@@ -29,6 +29,7 @@ import {
     ALLERGEN_FAMILIES, SKIN_TYPES, SKIN_CONDITIONS, dialogIsOpen, statusBadge, toneBadge
 } from "../_Shared/adminCommon.js";
 import { matchesSearch } from "../_Shared/glowupRules.js";
+import { auth } from "../_Database/firebase-console.js";
 import { cleanupPlan, ingredientDuplicates, ingredientLookalikes, ingredientIssues, mergeIngredients } from "../_Shared/glowupCatalog.js";
 import { openPlanDialog, openDuplicatesDialog } from "../_Shared/adminCleanup.js";
 import { mountShell, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm } from "../_Shared/adminShell.js";
@@ -59,6 +60,7 @@ let editingIngredientId = null;
 let modal = null;
 let fromProducts = [];                // ingredient names the inventory's products list that the Curator has no entry for: [{ key, name, products[] }]
 let fdaBrands = [];                   // the brands whose products were checked on the FDA Philippines list (for the helper line)
+let assisted = null;                  // the AI draft that fills the open form: { sources, model } (null = the form was written by hand)
 let org = null;                       // folders, the Recycle bin, picking and dragging
 let openId = "";                      // the card whose details are open
 let quick = "";                       // a filter a helper switched on: "" | a key of QUICK
@@ -411,7 +413,8 @@ function renderFromProducts(term, typed) {
                     <dt>Listed by</dt><dd>${x.products.slice(0, 12).map((name) => `<span class="chip">${escapeHtml(name)}</span>`).join("")}${x.products.length > 12 ? `<span class="muted small">and ${x.products.length - 12} more</span>` : ""}</dd>
                     <dt>In the app</dt><dd>No entry here yet: the app uses its own built-in knowledge for it, or looks it up when it is scanned.</dd>
                 </dl>
-                <div class="detail-actions"><button type="button" class="row-btn main" data-act="write" data-name="${escapeHtml(x.name)}" data-tip="Opens the form with the name filled in. You write what it is and how the app should judge it.">${icon("plus")}Write its entry</button></div>
+                <div class="detail-actions"><button type="button" class="row-btn main" data-act="write" data-name="${escapeHtml(x.name)}" data-tip="Opens the form with the name filled in. You write what it is and how the app should judge it.">${icon("plus")}Write its entry</button>`
+                    + `<button type="button" class="row-btn" data-act="assist" data-name="${escapeHtml(x.name)}" data-tip-title="Assist with AI" data-tip="The AI searches credible sources and fills the form as a DRAFT, with the pages it used. Nothing is saved until you have read it and pressed Save.">${icon("sparkle")}Assist with AI</button></div>
             </div>`;
         return `
             <article class="ingredient-card from-product${open ? " open" : ""}" data-id="new:${escapeHtml(x.key)}" tabindex="0" aria-expanded="${open}">
@@ -536,6 +539,78 @@ function writeFit(container, avoid, good) {
         const want = no.has(key) ? "avoid" : yes.has(key) ? "good" : "";
         row.querySelectorAll("input").forEach((input) => { input.checked = input.value === want; });
     });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Assist with AI: a DRAFT of one entry, with the pages it came from (the server function api/assist-ingredient.js)
+// ---------------------------------------------------------------------------------------------
+const ASSIST_PER_DAY = 40;                    // drafts one browser may ask for in a day, so a slip cannot use up the AI's quota
+const ASSIST_KEY = "glowup.curator.assist";
+
+/** How many drafts were asked for today in this browser. */
+function assistsToday(add) {
+    const today = new Date().toISOString().slice(0, 10);
+    let kept = {};
+    try { kept = JSON.parse(localStorage.getItem(ASSIST_KEY) || "{}"); } catch (error) { kept = {}; }
+    const count = (kept.day === today ? Number(kept.count) || 0 : 0) + (add ? 1 : 0);
+    if (add) localStorage.setItem(ASSIST_KEY, JSON.stringify({ day: today, count }));
+    return count;
+}
+
+/** The sources as links: the credible ones first and marked, the others marked "other site". */
+function assistSources(pages) {
+    if (!pages || pages.length === 0) return "<b>The AI named no web page.</b> Treat every box as unchecked.";
+    return pages.map((p) => `<a class="source-link" href="${escapeHtml(p.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(p.title || p.site || p.url)}</a> `
+        + (p.credible ? `<span class="chip good">credible source</span>` : `<span class="chip">other site</span>`)).join("<br>");
+}
+
+/** Asks the server for a draft of `name` and fills the open form with it. The admin reads it, corrects it and saves. */
+async function assistWithAi(name) {
+    const note = el("ingredientReviewNote"), form = el("addIngredientForm"), saveButton = el("saveIngredientBtn");
+    const say = (html) => { note.innerHTML = html; note.style.display = ""; };
+    if (!name) return;
+    if (assistsToday(false) >= ASSIST_PER_DAY) { say(`Assist with AI was used ${ASSIST_PER_DAY} times today in this browser. Write this entry by hand, or go on tomorrow.`); return; }
+    say(`${icon("sparkle")} <b>Asking the AI about "${escapeHtml(name)}"...</b> It searches credible sources; this can take up to a minute.`);
+    setBusy(saveButton, true, "Waiting for the AI...");
+    try {
+        const user = auth.currentUser;
+        if (!user) throw new Error("You are signed out. Sign in again.");
+        const stop = new AbortController();
+        const timer = setTimeout(() => stop.abort(), 75000);
+        let answer;
+        try {
+            answer = await fetch("/api/assist-ingredient", {
+                method: "POST", signal: stop.signal,
+                headers: { "Content-Type": "application/json", Authorization: "Bearer " + (await user.getIdToken()) },
+                body: JSON.stringify({ name })
+            });
+        } finally { clearTimeout(timer); }
+        assistsToday(true);
+        const body = await answer.json().catch(() => ({}));
+        if (!answer.ok) throw new Error(body.error || "The AI could not be reached (error " + answer.status + ").");
+        if (!dialogIsOpen() || el("ingredientTechInput").value.trim() !== name.trim()) return;      // the form was closed or used for something else meanwhile
+        if (!body.found) { say(`<b>No draft.</b> ${escapeHtml(body.message || "The AI found nothing credible.")}<br>${assistSources(body.sources)}`); return; }
+
+        const d = body.draft;
+        el("ingredientNameInput").value = d.name; el("ingredientTechInput").value = d.techName; el("ingredientDescInput").value = d.description;
+        el("ingredientAliasesInput").value = d.aliases.join(", "); el("ingredientRiskInput").value = d.riskLevel;
+        el("ingredientMinAgeInput").value = d.minAge > 0 ? d.minAge : ""; el("ingredientCautionInput").value = d.cautionNote; el("ingredientUsesInput").value = d.commonUses;
+        el("ingredientKeyActiveInput").checked = d.keyActive; el("ingredientUmbrellaInput").checked = d.umbrella;
+        writeChecks(el("allergenTagsChecks"), d.allergenTags);
+        writeFit(el("skinTypesFit"), d.avoidForSkinTypes, d.goodForSkinTypes);
+        writeFit(el("conditionsFit"), d.avoidForConditions, d.goodForConditions);
+        assisted = { sources: body.sources || [], model: body.model || "" };
+        const sure = { high: "The AI is fairly sure of this draft.", medium: "The AI is only partly sure of this draft.", low: "The AI is NOT sure of this draft." }[d.confidence] || "";
+        say(`<b>This is a draft the AI wrote. Nothing is saved yet.</b> ${sure} Read every box against the sources, correct what is wrong, then press Save.`
+            + (body.credibleSources === 0 ? " <b>None of its pages is on the list of credible sources: check with extra care.</b>" : "")
+            + `<br><b>Sources:</b><br>${assistSources(body.sources)}`);
+    } catch (error) {
+        const why = error && error.name === "AbortError" ? "The AI took too long." : (error && error.message) || "Something went wrong.";
+        say(`<b>Assist with AI did not work.</b> ${escapeHtml(why)} You can still write the entry by hand.`);
+        setFormError(form, "");
+    } finally {
+        setBusy(saveButton, false);
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -698,6 +773,7 @@ function openIngredientForm(item) {
     form.reset();
     setFormError(form, "");
     editingIngredientId = item ? item.id : null;
+    assisted = null;
     el("modalTitle").textContent = item ? "Edit Ingredient" : "Add Ingredient";
 
     const note = el("ingredientReviewNote");
@@ -774,6 +850,10 @@ async function saveIngredient(event) {
     const before = ingredients.find((i) => i.id === editingIngredientId);
     const nowReviewed = !!before && before.source !== "" && before.source !== "admin" && !before.reviewed;
     if (nowReviewed) { data.reviewed = true; data.reviewedAt = serverTimestamp(); }
+    // a draft the AI wrote and the admin has now read and saved: the pages it came from are kept with the entry
+    if (assisted && !editingIngredientId)
+        Object.assign(data, { source: "aiassist", reviewed: true, reviewedAt: serverTimestamp(), webSearched: assisted.sources.length > 0, model: assisted.model,
+            sources: assisted.sources.map((p) => `${p.title || p.site || "web page"} | ${p.url}`) });
 
     setBusy(saveButton, true, "Saving...");
     try {
@@ -808,11 +888,12 @@ function onListClick(event) {
         return;
     }
     const act = button.dataset.act, id = button.dataset.id || "";
-    if (act === "write") {
+    if (act === "write" || act === "assist") {
         openIngredientForm(null);
         el("ingredientNameInput").value = button.dataset.name || "";
         el("ingredientTechInput").value = button.dataset.name || "";
         el("ingredientDescInput").focus();
+        if (act === "assist") assistWithAi(button.dataset.name || "");
         return;
     }
     const item = everyIngredient.find((i) => i.id === id);

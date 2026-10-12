@@ -404,6 +404,7 @@ export function originLabel(source) {
     switch (key) {
         case "": case "admin": return "";
         case "ai": return "Found by the app's AI lookup";
+        case "aiassist": return "Drafted with Assist with AI, checked by an admin";
         case "scan": return "Added by an app scan";
         case "openbeautyfacts": return "Imported from Open Beauty Facts";
         case "starter": return "Starter data";
