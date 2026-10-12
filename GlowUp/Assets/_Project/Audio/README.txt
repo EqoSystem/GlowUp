@@ -11,16 +11,24 @@ Delete_FreezingCold.mp3
     silence and is a quiet recording: the app skips the silence, plays the next 1.1 seconds, makes that piece louder
     and fades it out (all of this can be changed on DeleteSoundPlayer in the Inspector).
     Where it comes from: given by the project owner on 12 October 2026 (it was "Freezing Cold - Sound Effect.mp3"
-    on their Desktop). The owner says it was taken from YOUTUBE. Which video (its address and who uploaded it) is not
-    written down yet; the file itself carries no information about its author or licence.
-    Licence: NOT CONFIRMED. "From YouTube" is where it was found, not a permission: a sound in a YouTube video belongs
-    to whoever made it, unless the video or its description says it may be reused (for example "Creative Commons",
-    "free to use", or a sound from YouTube's own Audio Library). Before the app is published or handed in, write here:
-        the video's address: ...
-        who uploaded it: ...
-        what the video or its description says about reusing the sound: ...
-    If it does not say that reuse is allowed, replace the sound with one whose licence is known (YouTube's Audio
-    Library, freesound.org with a CC0 licence, or a sound the team records itself).
+    on their Desktop), taken from this YouTube video, as the owner showed on the same day:
+        the video's address:  https://www.youtube.com/watch?v=enz7eXF5IUo
+        its title:            "Teeth Chattering - Sound Effect for editing" (uploaded 17 August 2020)
+        who uploaded it:      the channel "Sound Library" (https://www.youtube.com/@SoundLibrary1)
+        (the file's name and the video's title are not the same: the owner showed this video as its source)
+    What the video's description says about reusing the sound (copied on 12 October 2026):
+        "Feel free to use the uploaded sounds. That's what they are here for after all!
+         Just don't forget to credit the original creator, if there is one. Of course if you want, you can also credit me :)"
+        "DISCLAIMER: This sound is most likely not produced by myself, but rather taken from somewhere else. [...] If
+         there is no recognizable creator in the video, it's either Royalty free and/or falls under the Creative Commons
+         license and/or has an unknown creator."
+    Credit: sound "Teeth Chattering" as shared by the YouTube channel Sound Library; original creator unknown.
+    Licence: PERMISSION FROM THE UPLOADER, BUT NOT A CONFIRMED LICENCE. The channel says the sound may be used, and asks
+    for a credit. It also says it did not make the sound and does not know who did. So nobody who owns the sound has
+    given permission in writing. For a school project that is shown and graded, the credit above is the fair thing to do.
+    Before the app is PUBLISHED (a store, a public download), replace it with a sound whose licence is known: YouTube's
+    own Audio Library, freesound.org with a CC0 licence, a sound the team records itself, or one made by a program
+    like the tap sounds.
     Played by: Scripts/Common/DeleteSoundPlayer.cs (the DeleteSoundPlayer object in RecentScanActivitiesScene).
     The user's switch: Settings > Sounds & Motion > Delete sound.
 
