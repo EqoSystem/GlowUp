@@ -830,7 +830,12 @@ svg.chart { display: block; max-width: 100%; overflow: visible; }
 .folder-chip.on svg.ic { color: inherit; }
 .chip-count { font-size: var(--fs-xs); font-variant-numeric: tabular-nums; opacity: .72; }
 .folder-chip.add { border-style: dashed; background: transparent; color: var(--muted); }
-.folder-chip.bin-chip svg.ic { color: var(--bad); }
+/* the Recycle bin is LOW-KEY: a small grey bin at the end of the row, without a frame or a name. It shows itself
+   fully when it is pointed at, opened, or while entries are being dragged (then it is a place to drop them). */
+.folder-chip.bin-chip { border-color: transparent; background: transparent; color: var(--muted); opacity: .6; padding-inline: 8px; transition: opacity .15s var(--ease), border-color .15s var(--ease); }
+.folder-chip.bin-chip svg.ic { color: var(--muted); }
+.folder-chip.bin-chip:hover, .folder-chip.bin-chip:focus-visible, .folder-chip.bin-chip.on, body.is-moving-items .folder-chip.bin-chip { opacity: 1; border-color: var(--border); }
+.folder-chip.bin-chip:hover svg.ic, body.is-moving-items .folder-chip.bin-chip svg.ic { color: var(--bad); }
 .folder-chip.bin-chip.on { color: var(--text); background: color-mix(in srgb, var(--bad) 16%, var(--surface)); border-color: var(--bad); }
 .folder-chip.bin-chip.on svg.ic { color: var(--bad); }
 .shelf-note { font-size: var(--fs-xs); color: var(--muted); }

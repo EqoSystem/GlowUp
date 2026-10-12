@@ -303,7 +303,9 @@ export function createOrganizer(spec) {
             kids.push(act("Restore all", "restoreAll", "", "Everything in the Recycle bin goes back to the list."), act("Empty bin", "empty", "danger", "Delete everything in the Recycle bin from the database. It asks first."));
         }
         kids.push(chip("bin-chip" + (now.kind === "bin" ? " on" : ""), { "data-view": "bin", "data-drop": "bin", "data-tip-title": "Recycle bin", "data-tip": "What was removed. The app does not use it, and it can be restored.", "data-tip-preview": "Drop entries here to remove them. Only Delete forever is final." },
-            BIN_ICON, "Recycle bin", inBin));
+            BIN_ICON, now.kind === "bin" ? "Recycle bin" : "", inBin > 0 ? inBin : null));
+        // low-key on purpose: only the small bin (and a number when something is in it) until it is opened, pointed at, or something is dragged
+        kids[kids.length - 1].setAttribute("aria-label", "Recycle bin" + (inBin > 0 ? ", " + inBin + " inside" : ", empty"));
         shelf.replaceChildren(...kids);
     }
 
