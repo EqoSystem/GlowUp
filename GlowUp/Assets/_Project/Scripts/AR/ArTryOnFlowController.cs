@@ -133,7 +133,7 @@ namespace GlowUp.AR
             ApplyIntensity();
             if (split != null && split.IsOn && liveTracking != null) liveTracking.SetCompare(true);
 
-            TextSkeleton.Waiting(this);                 // the words are bars until the profile is here (skeleton loading)
+            TextSkeleton.Waiting(this);                 // the profile is being fetched (bars meanwhile only if TextSkeleton is switched on here)
             try { profile = await UserProfileRepository.Load(); } catch (Exception e) { Debug.LogWarning("AR Try-On: " + e.Message); }
             TextSkeleton.Ready(this);
             if (this == null) return;

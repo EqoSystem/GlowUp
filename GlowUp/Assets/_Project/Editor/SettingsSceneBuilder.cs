@@ -412,7 +412,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "backButton", s.back); A.Set(controller, "list", scroll);
             Kit.SetArray(controller, "popups", new Object[] { confirmPopup.panel, deletePopup.panel, legalPopup.panel, supportPopup.panel });
 
-            // while the account and the profile are fetched: the page's titles, labels and subtitles are bars
+            // TextSkeleton: can show the page's titles, labels and subtitles as bars while the account is fetched. Built switched off.
             AppTiles.WordSkeleton(s);
 
             A.Finish(s);

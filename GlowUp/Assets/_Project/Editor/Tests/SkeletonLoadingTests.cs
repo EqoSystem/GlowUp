@@ -52,6 +52,31 @@ namespace GlowUp.Tests
             Assert.IsFalse(SkeletonLook.MayEnd(100f, 400, 1, Shortest, 0f), "0 = no time limit");
         }
 
+        // ------------------------------------------------------------------------------------ when the bars may come
+        [Test]
+        public void A_screen_keeps_its_words_when_it_opens_unless_it_is_told_otherwise()
+        {
+            // the project owner's choice of 13 October 2026: no bars and no wait on a change of screen
+            var holder = new GameObject("TextSkeletonCheck", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextSkeleton));
+            try { Assert.AreEqual(TextSkeleton.OnOpen.KeepTheWords, holder.GetComponent<TextSkeleton>().WhenScreenOpens); }
+            finally { Object.DestroyImmediate(holder); }
+        }
+
+        [Test]
+        public void Bars_only_when_slow_never_touches_a_screen_whose_data_is_there_at_once()
+        {
+            Assert.IsFalse(SkeletonLook.SlowEnough(0, 0f, 0.6f));
+            Assert.IsFalse(SkeletonLook.SlowEnough(0, 30f, 0.6f), "nothing is being fetched: no bars, however long the screen is open");
+            Assert.IsFalse(SkeletonLook.SlowEnough(1, 0.3f, 0.6f), "a fetch that is still quick");
+        }
+
+        [Test]
+        public void Bars_only_when_slow_shows_them_when_a_fetch_drags_on()
+        {
+            Assert.IsTrue(SkeletonLook.SlowEnough(1, 0.6f, 0.6f));
+            Assert.IsTrue(SkeletonLook.SlowEnough(2, 3f, 0.6f));
+        }
+
         // ------------------------------------------------------------------------------------ the shine
         [Test]
         public void The_shine_is_full_in_its_middle_and_gone_outside_its_width()

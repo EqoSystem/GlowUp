@@ -46,7 +46,7 @@ namespace GlowUp.AppSettings
         async void Start()
         {
             Show(null);
-            GlowUp.Common.TextSkeleton.Waiting(this);       // the page's words are bars until the profile is here
+            GlowUp.Common.TextSkeleton.Waiting(this);       // the profile is being fetched (bars meanwhile only if TextSkeleton is switched on)
             try { profile = await UserProfileRepository.Load(); }
             catch (Exception e) { Debug.LogWarning("Settings: profile not loaded: " + e.Message); }
             GlowUp.Common.TextSkeleton.Ready(this);

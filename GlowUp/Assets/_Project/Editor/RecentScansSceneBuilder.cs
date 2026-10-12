@@ -64,8 +64,8 @@ namespace GlowUp.EditorTools
             AppTiles.ListScroll(listArea.transform, "ScanHistoryList", out RectTransform content);
             content.GetComponent<VerticalLayoutGroup>().padding = new RectOffset(0, 18, 4, 140);   // room for the restore bar under the last row
             ProductTileView template = AppTiles.ExpandingRow(content, "ScanTileTemplate", AppTiles.TileKind.RecentScan);
-            // placeholder rows for the time the saved scans are fetched (inactive here: TextSkeleton switches them on), and
-            // the real rows kept out of sight meanwhile
+            // placeholder rows and a way to keep the real rows out of sight: only used when TextSkeleton is switched on for
+            // this screen (it is built switched off, so the real rows show at once)
             GameObject listSkeleton = AppTiles.SkeletonRows(listArea.transform, "ScanListSkeleton", 5);
             listSkeleton.SetActive(false);
             CanvasGroup listGroup = SceneBuilderCore.Ensure<CanvasGroup>(content.gameObject);
@@ -160,7 +160,8 @@ namespace GlowUp.EditorTools
             A.Set(controller, "selectButton", select); A.Set(controller, "selectionBar", selectionBar); A.Set(controller, "selectionText", selectionText);
             A.Set(controller, "selectAllButton", selectAll); A.Set(controller, "cancelSelectionButton", cancelSelection);
 
-            // while the saved scans are fetched: the title, the count and the hint are bars, the list is placeholder rows
+            // TextSkeleton: can show the title and the count as bars and the list as placeholder rows while the saved scans are
+            // fetched. Built switched off (the words and the rows are there at once); see AppTiles.WordSkeleton.
             AppTiles.WordSkeleton(s, new[] { listSkeleton }, new[] { listGroup, emptyGroup });
 
             A.Finish(s);

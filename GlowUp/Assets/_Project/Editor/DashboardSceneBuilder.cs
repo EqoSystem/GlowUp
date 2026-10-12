@@ -172,8 +172,8 @@ namespace GlowUp.EditorTools
             A.Set(controller, "signOutConfirm", signOutConfirm);
             A.Set(controller, "settingsButton", settings);
 
-            // while the profile is fetched: the greeting, the summary's labels and values and the subtitles are bars (TextSkeleton).
-            // The list under "Recommended for you" has its own placeholder rows, which the controller switches on and off.
+            // TextSkeleton: can show the greeting, the summary and the subtitles as bars while the profile is fetched. Built
+            // switched off (the words are there at once); see AppTiles.WordSkeleton.
             AppTiles.WordSkeleton(s);
 
             A.Finish(s);

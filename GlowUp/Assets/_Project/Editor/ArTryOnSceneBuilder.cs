@@ -286,7 +286,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "typeIcons", A.TypeIcons());
             A.Set(controller, "backButton", s.back);
 
-            // while the profile and the product are fetched: the screen's titles and labels are bars
+            // TextSkeleton: can show the screen's titles and labels as bars while the profile and the product are fetched. Built switched off.
             AppTiles.WordSkeleton(s);
 
             A.Finish(s);

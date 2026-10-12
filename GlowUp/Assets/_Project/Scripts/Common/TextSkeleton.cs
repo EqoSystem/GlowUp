@@ -7,15 +7,22 @@ using UnityEngine.UI;
 namespace GlowUp.Common
 {
     /// <summary>
-    /// "Skeleton" loading for WORDS, the way the admin website fetches its data: while a screen is fetching, every title,
-    /// label and subtitle in the list "Texts" is replaced by a soft bar of the same size in the same place, with a
-    /// rose-to-gold shine travelling across. When the data is there the bars give way to the words.
+    /// "Skeleton" loading for WORDS, the way the admin website fetches its data: every title, label and subtitle in the
+    /// list "Texts" can be replaced by a soft bar of the same size in the same place, with a rose-to-gold shine travelling
+    /// across, until the screen has its data.
+    ///
+    /// BY DEFAULT IT DOES NOTHING WHEN A SCREEN OPENS ("When Screen Opens" = Keep The Words). The project owner tried
+    /// bars on every change of screen on 13 October 2026 and did not want them: the labels, titles, subtitles and the
+    /// product rows must be there at once, with no wait. The other two settings are kept for a screen that needs them:
+    ///   - "Bars Only When Slow": the words stay; they become bars only when a fetch is still running after "Slow After
+    ///     Seconds" (a weak connection), so a screen whose data is on the phone already is never touched;
+    ///   - "Bars At Once": the bars show as soon as the screen opens.
     ///
     /// How a screen uses it:
     ///   - one object "TextSkeleton" lies over the screen's card (the scene builder makes it and fills "Texts");
     ///   - a script that fetches data says so: TextSkeleton.Waiting(this) before, TextSkeleton.Ready(this) after;
-    ///   - the bars show when the screen opens and stay until nobody is fetching any more, at least "Shortest Seconds"
-    ///     (so they do not flash) and at most "Longest Seconds" (the time limit: the words then show what is known).
+    ///   - once shown, the bars stay until nobody is fetching any more, at least "Shortest Seconds" (so they do not flash)
+    ///     and at most "Longest Seconds" (the time limit: the words then show what is known).
     ///
     /// A bar is drawn for each LINE of a text, as long as that line and a little lower than its letters. A text that is
     /// empty, switched off or faded out gets no bar. Lists that are filled while the app runs have their own placeholder
@@ -37,10 +44,15 @@ namespace GlowUp.Common
         [Tooltip("The real lists: kept out of sight while the screen is fetching, then faded in. Optional.")]
         [SerializeField] private CanvasGroup[] hideWhileLoading;
 
+        /// <summary>What happens to the words when the screen opens.</summary>
+        public enum OnOpen { KeepTheWords, BarsOnlyWhenSlow, BarsAtOnce }
+
         [Header("When")]
-        [Tooltip("On = the bars show as soon as the screen opens. Off = only when a script says it is fetching (TextSkeleton.Waiting).")]
-        [SerializeField] private bool showWhenScreenOpens = true;
-        [Tooltip("The bars stay at least this long, so they do not flash when the data is on the phone already. 0 = they only show while something is really being fetched.")]
+        [Tooltip("Keep The Words (the project owner's choice) = nothing happens when the screen opens: no bars, no wait. Bars Only When Slow = the words stay and become bars only when a fetch takes longer than 'Slow After Seconds'. Bars At Once = bars from the moment the screen opens.")]
+        [SerializeField] private OnOpen whenScreenOpens = OnOpen.KeepTheWords;
+        [Tooltip("For 'Bars Only When Slow': a fetch that is still running after this many seconds turns the words into bars")]
+        [SerializeField] private float slowAfterSeconds = 0.6f;
+        [Tooltip("Once bars are shown they stay at least this long, so they do not flash")]
         [SerializeField] private float shortestSeconds = 0.35f;
         [Tooltip("The time limit: after this long the words are shown whatever happens (they then say what is known so far)")]
         [SerializeField] private float longestSeconds = 8f;
@@ -67,12 +79,15 @@ namespace GlowUp.Common
         /// <summary>True while the open screen shows bars in the place of its words.</summary>
         public static bool IsShowing => current != null && current.showing;
 
-        /// <summary>A script says: "I am fetching data for this screen". The words become bars until it calls Ready.</summary>
+        /// <summary>
+        /// A script says: "I am fetching data for this screen". What that does to the words depends on the screen's
+        /// "When Screen Opens": nothing (the default), bars if it takes long, or bars at once.
+        /// </summary>
         public static void Waiting(object who)
         {
             if (who == null) return;
             fetching.Add(who);
-            if (current != null && !current.showing && Application.isPlaying && current.isActiveAndEnabled) current.Show();
+            if (current != null && current.whenScreenOpens == OnOpen.BarsAtOnce && !current.showing && Application.isPlaying && current.isActiveAndEnabled) current.Show();
         }
 
         /// <summary>The script has its data (or gave up). Always call it, also when the fetch failed.</summary>
@@ -82,8 +97,11 @@ namespace GlowUp.Common
         CanvasGroup[][] fadersOf;          // for each text: the CanvasGroups above it (a faded-out group hides its texts: no bar)
         RectTransform[] windowOf;          // for each text: the list window it scrolls in, if any (bars are cut at its edge)
         bool showing, revealing;
-        float shownFor;
+        float shownFor, fetchingFor;
         int framesShown;
+
+        /// <summary>What this screen does with its words when it opens.</summary>
+        public OnOpen WhenScreenOpens => whenScreenOpens;
         static readonly Vector3[] corners = new Vector3[4];
         const float LongestFrame = 0.05f;          // seconds one frame may add to the clock
 
@@ -105,7 +123,7 @@ namespace GlowUp.Common
         protected override void Start()
         {
             base.Start();
-            if (Application.isPlaying && showWhenScreenOpens) Show();
+            if (Application.isPlaying && whenScreenOpens == OnOpen.BarsAtOnce) Show();
         }
 
         public override Texture mainTexture => roundSprite != null ? roundSprite.texture : s_WhiteTexture;
@@ -168,6 +186,14 @@ namespace GlowUp.Common
                 revealing = false;
                 if (hideWhileLoading != null) foreach (CanvasGroup list in hideWhileLoading) if (list != null) list.blocksRaycasts = true;
                 bars.Clear(); SetVerticesDirty();        // nothing is left to draw
+            }
+            else if (whenScreenOpens == OnOpen.BarsOnlyWhenSlow)
+            {
+                // the words are on the screen; they only become bars when a fetch drags on (counted while the screen can be seen)
+                int stillFetching = StillFetching();
+                if (stillFetching == 0) fetchingFor = 0f;
+                else if (!ScreenTransition.IsBusy) fetchingFor += Mathf.Min(Time.unscaledDeltaTime, LongestFrame);
+                if (SkeletonLook.SlowEnough(stillFetching, fetchingFor, slowAfterSeconds)) { fetchingFor = 0f; Show(); }
             }
         }
 

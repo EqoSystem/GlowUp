@@ -215,7 +215,7 @@ namespace GlowUp.Result
         {
             record = ScanSession.Current ?? ScanHistoryRepository.Active().FirstOrDefault();     // nothing handed over: show the latest saved scan
             Show();
-            TextSkeleton.Waiting(this);                 // the words are bars until the profile is here (skeleton loading)
+            TextSkeleton.Waiting(this);                 // the profile is being fetched (bars meanwhile only if TextSkeleton is switched on here)
             try { profile = await UserProfileRepository.Load(); } catch (Exception e) { Debug.LogWarning("Result: " + e.Message); }
             TextSkeleton.Ready(this);
             if (this == null) return;

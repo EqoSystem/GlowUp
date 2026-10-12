@@ -193,9 +193,10 @@ namespace GlowUp.EditorTools
         }
 
         /// <summary>
-        /// Adds the object "TextSkeleton" over the screen's card: while the screen fetches its data, its titles, labels and
-        /// subtitles are bars with a travelling shine, the way the admin website loads. Call it LAST, when every text of the
-        /// card has been built.
+        /// Adds the object "TextSkeleton" over the screen's card: it CAN show the screen's titles, labels and subtitles as bars
+        /// with a travelling shine while the screen fetches its data, the way the admin website loads. It is built SWITCHED
+        /// OFF ("When Screen Opens" = Keep The Words): the project owner does not want bars, or any wait, when a screen
+        /// opens. Set that field on the object to use it on a screen. Call this LAST, when every text of the card is built.
         ///
         /// Which texts: every text of the card that can be seen in the Hierarchy at this moment, EXCEPT the one word on a
         /// button (a tile that is a button and carries a title and a subtitle does get bars), the words of switches, sliders

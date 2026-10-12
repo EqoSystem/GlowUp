@@ -78,6 +78,15 @@ namespace GlowUp.Common
             return stillFetching <= 0 && shownSeconds >= shortestSeconds;
         }
 
+        /// <summary>
+        /// For a screen set to "Bars Only When Slow": true when its words should become bars, because a fetch has been
+        /// running for `slowAfterSeconds`. A screen whose data is there at once never gets bars.
+        /// </summary>
+        public static bool SlowEnough(int stillFetching, float fetchingSeconds, float slowAfterSeconds)
+        {
+            return stillFetching > 0 && fetchingSeconds >= Mathf.Max(0f, slowAfterSeconds);
+        }
+
         /// <summary>The part of `bar` that lies inside `window` (a list's visible area). Empty when it is outside.</summary>
         public static Rect Inside(Rect bar, Rect window)
         {
