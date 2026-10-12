@@ -52,6 +52,8 @@ namespace GlowUp.Onboarding
         [SerializeField] private TextMeshProUGUI feedbackText;
 
         [Header("Confirm the email (empty in a scene built before 12 October 2026: then nothing is confirmed)")]
+        [Tooltip("On = the email must be confirmed before the sign-up goes on (the account is made on this page). Off = as it was before: no confirmation, and the account is made on the Terms page at the end.")]
+        [SerializeField] private bool confirmEmailOnSignUp = true;
         [Tooltip("The pop-up \"Confirm your email\"")]
         [SerializeField] private OverlayPanel confirmPanel;
         [SerializeField] private TextMeshProUGUI confirmMessageText;
@@ -266,8 +268,11 @@ namespace GlowUp.Onboarding
             OnboardingSession.Age = InputRules.CalculateAge(dob);
             OnboardingSession.SaveDraft();
 
-            // a Google / Facebook email is confirmed by its provider; a scene built before the confirmation existed goes on as before
-            if (OnboardingSession.Social || confirmPanel == null) { SceneNavigator.Go(nextScene); return; }
+            // a Google / Facebook email is confirmed by its provider; with the confirmation switched off (or in a scene built before
+            // it existed) the sign-up goes on as before and the account is made on the Terms page. An account that exists already
+            // (a sign-up that was begun with the confirmation on) still has to be confirmed.
+            bool confirm = confirmPanel != null && (confirmEmailOnSignUp || OnboardingSession.HasAccount);
+            if (OnboardingSession.Social || !confirm) { SceneNavigator.Go(nextScene); return; }
             _ = ConfirmThenGoOn();
         }
 
