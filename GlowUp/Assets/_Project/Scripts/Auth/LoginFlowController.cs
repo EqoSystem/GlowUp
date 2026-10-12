@@ -144,6 +144,7 @@ namespace GlowUp.Auth
                     // signed in: nothing after this point may send the user back with "wrong password"
                     UserProfileRepository.OfflineEmail = null;
                     OfflineCredentialStore.Remember(email, pw);        // Argon2id verifier for later offline use (runs in the background)
+                    SavedAccounts.Remember(email);                     // only the email: it is offered under the email field next time
                     UserProfileData profile = null;
                     try { profile = await UserProfileRepository.Load(); }
                     catch (Exception e) { Debug.LogWarning("Sign-in: the profile could not be loaded yet: " + e.Message); }
@@ -154,6 +155,7 @@ namespace GlowUp.Auth
                 {
                     if (this == null) return;
                     UserProfileRepository.OfflineEmail = email;         // the copy of this person's profile on the device is used
+                    SavedAccounts.Remember(email);
                     SceneNavigator.Go(dashboardScene);
                 }
                 else Fail(OfflineCredentialStore.HasCredential(email) ? msgBadCredentials : msgOfflineNoRecord);

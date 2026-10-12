@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Small Android resources of the app itself (no code). Now: the style GlowUpNoAutofill, see res/values-v26/styles.xml. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="com.glowup.res"
+          android:versionCode="1"
+          android:versionName="1.0">
+</manifest>

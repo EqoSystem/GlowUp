@@ -166,6 +166,7 @@ namespace GlowUp.AppSettings
             ScanHistoryRepository.DeleteLocal(uid);
             UserProfileRepository.Clear();
             if (!string.IsNullOrEmpty(email)) OfflineCredentialStore.Forget(email);
+            if (!string.IsNullOrEmpty(email)) GlowUp.Auth.SavedAccounts.Forget(email);          // a deleted account is not offered on the log-in page any more
             OnboardingSession.Clear();
             PlayerPrefs.Save();
         }

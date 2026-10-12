@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Before Android 8 there is no autofill, so there is nothing to switch off: the style is empty here. -->
+    <style name="GlowUpNoAutofill" />
+</resources>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Android 8 and newer: text boxes created in the app are "not for autofill" unless they say otherwise.
+        GlowUpAutofill.java adds this style to the app's look when the app starts, so Android's own list of saved
+        e-mails and passwords no longer opens by itself over the app (the app shows its own list under the e-mail field).
+    -->
+    <style name="GlowUpNoAutofill">
+        <item name="android:importantForAutofill">noExcludeDescendants</item>
+    </style>
+</resources>

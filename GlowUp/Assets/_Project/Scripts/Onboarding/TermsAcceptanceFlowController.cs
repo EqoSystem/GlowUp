@@ -163,6 +163,7 @@ namespace GlowUp.Onboarding
             try
             {
                 if (!social) OfflineCredentialStore.Remember(OnboardingSession.Email, OnboardingSession.Password);   // Argon2id verifier for offline sign-in (runs in the background)
+                if (!social) SavedAccounts.Remember(OnboardingSession.Email);       // only the email, for the list on the log-in page
                 QueueSuggestions(uid);
                 PlayerPrefs.SetInt("IsOnboarded", 1);
                 ContextualHintController.MarkNewUser(true);

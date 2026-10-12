@@ -25,7 +25,7 @@ namespace GlowUp.Common
             field = GetComponent<TMP_InputField>();
             field.characterLimit = characterLimit;
             field.contentType = contentType;
-            field.onSelect.AddListener(_ => SetPlaceholder(false));
+            field.onSelect.AddListener(_ => { SetPlaceholder(false); SystemAutofill.Quiet(); });       // and the phone's own saved-account list stays away
             field.onDeselect.AddListener(_ => SetPlaceholder(string.IsNullOrEmpty(field.text)));
             field.onValueChanged.AddListener(OnValueChanged);
         }

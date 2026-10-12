@@ -5,6 +5,7 @@ using TMPro;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
+using A = GlowUp.EditorTools.AppKit;
 using Kit = GlowUp.EditorTools.OnboardingKit;
 
 namespace GlowUp.EditorTools
@@ -22,6 +23,7 @@ namespace GlowUp.EditorTools
         const float FormStartY = 170;            // from the panel top to the title
         const float TitleFont = 120, SubtitleFont = 46, LabelFont = 38, LinkFont = 34, SmallFont = 30;
         const float SocialSize = 120, SocialGap = 36;
+        const int SavedRows = 3;                 // how many emails the list under the email field can show (it has to stay above the keyboard)
 
         [MenuItem("GlowUp/Build Scene/1 Login", false, 111)]
         public static void Build()
@@ -73,15 +75,15 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(dm, "sunIcon", IconFactory.Sun);
             SceneBuilderCore.Themed(darkIcon.gameObject, ThemeRole.MainText);
 
-            // ----- inputs: 64 characters max, no spaces (with an immediate message), eye toggle on the password -----
+            // ----- inputs: no spaces (with an immediate message), eye toggle on the password; the email is as long as sign-up allows -----
             if (emailInput != null)
             {
                 Kit.StyleInput(emailInput, "Enter your email", ThemeRole.InputBackground);
                 ClearTypedText(emailInput);
                 var b = SceneBuilderCore.Ensure<InputFieldBehaviour>(emailField.gameObject);
-                SceneBuilderCore.SetField(b, "characterLimit", 64);
+                SceneBuilderCore.SetField(b, "characterLimit", Kit.EmailLimit);
                 SceneBuilderCore.SetField(b, "contentType", (int)TMP_InputField.ContentType.EmailAddress);
-                Kit.AddSpaceGuard(emailInput, fb, "Spaces are not allowed in the email.");
+                Kit.AddSpaceGuard(emailInput, fb, "Spaces are not allowed in the email.", Kit.EmailLimit);
             }
             if (pwInput != null)
             {
@@ -124,7 +126,9 @@ namespace GlowUp.EditorTools
             TopRow(subtitle, card, y, 64, SubtitleFont, TextAlignmentOptions.Center); y += 64 + 56;
 
             TopRow(emailLabel, card, y, 52, LabelFont, TextAlignmentOptions.BottomLeft); y += 52 + 8;
-            TopRow(emailField, card, y, Kit.FieldHeight, null, null); y += Kit.FieldHeight + 36;
+            TopRow(emailField, card, y, Kit.FieldHeight, null, null);
+            float savedListY = y + Kit.FieldHeight + 8;                  // the list of saved emails hangs right under the email field
+            y += Kit.FieldHeight + 36;
 
             TopRow(pwLabel, card, y, 52, LabelFont, TextAlignmentOptions.BottomLeft); y += 52 + 8;
             TopRow(pwField, card, y, Kit.FieldHeight, null, null); y += Kit.FieldHeight + 24;
@@ -164,6 +168,9 @@ namespace GlowUp.EditorTools
             foreach (var s in social) Role(s.transform, ThemeRole.InputBackground);
             RoleLabel(privacy.transform, ThemeRole.SecondaryText); RoleLabel(terms.transform, ThemeRole.SecondaryText);
 
+            // ----- the app's own list of emails used on this phone -----
+            BuildSavedAccounts(card, emailInput, pwInput, fb, savedListY);
+
             // ----- controller -----
             var flow = SceneBuilderCore.Ensure<LoginFlowController>(SceneBuilderCore.EnsureRoot("LoginFlowController"));
             SceneBuilderCore.SetField(flow, "emailInput", emailInput);
@@ -180,6 +187,63 @@ namespace GlowUp.EditorTools
             ThemeKit.FinishScene();       // canvas scaler, paper background, input text, round shapes, fonts, colours
             SceneBuilderCore.Save(scene);
             Debug.Log("[GlowUp] LogInScene built and arranged. Tune LoginFlowController / ThemeManager / ThemeProfile (colours + fonts) in the Inspector.");
+        }
+
+        // =====================================================================================
+        //  Saved emails ("Used on this phone")
+        // =====================================================================================
+        /// <summary>
+        /// SavedAccountsPanel: the app's own list under the email field, with one row per email (a tap fills the field,
+        /// the small x takes the email off the list). It replaces the phone's own saved-account list, which used to open
+        /// by itself at an odd place. The panel is a generated object (rebuilt on every run) and is switched off in the
+        /// Hierarchy: tick it active to see and style it. Its script (SavedAccountsList) sits on the email field and keeps
+        /// its Inspector settings.
+        /// </summary>
+        static void BuildSavedAccounts(Transform card, TMP_InputField emailInput, TMP_InputField passwordInput, TextMeshProUGUI feedback, float y)
+        {
+            Transform old = Kit.Loose(card.root, "SavedAccountsPanel");
+            if (old != null) Object.DestroyImmediate(old.gameObject);
+            if (emailInput == null) return;
+
+            GameObject panel = A.Node(card, "SavedAccountsPanel");
+            var rt = (RectTransform)panel.transform;
+            rt.anchorMin = new Vector2(0, 1); rt.anchorMax = new Vector2(1, 1); rt.pivot = new Vector2(0.5f, 1);
+            rt.offsetMin = new Vector2(Kit.PadX, 0); rt.offsetMax = new Vector2(-Kit.PadX, 0); rt.anchoredPosition = new Vector2(0, -y);
+            A.VStack(panel, 8, 18, 18, 14, 18);
+            var fitter = SceneBuilderCore.Ensure<ContentSizeFitter>(panel);
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained; fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            Image backdrop = A.Backdrop(panel.transform, ThemeRole.Background, 1f, 44f);
+            backdrop.raycastTarget = true;                          // a tap on the box does not reach what is under it
+            A.Outline(panel.transform, ThemeRole.Accent, 44f);
+
+            TextMeshProUGUI caption = A.Label(panel.transform, "CaptionText", "Used on this phone", 28, ThemeRole.SecondaryText, FontRole.Label);
+            caption.margin = new Vector4(14, 0, 0, 0);
+            A.Size(caption, height: 40);
+
+            var rows = new Button[SavedRows]; var labels = new TextMeshProUGUI[SavedRows]; var removes = new Button[SavedRows];
+            for (int i = 0; i < SavedRows; i++)
+            {
+                GameObject row = A.Node(panel.transform, "SavedAccountRow_" + (i + 1), typeof(Image), typeof(Button));
+                var rowImage = row.GetComponent<Image>(); Kit.StyleRounded(rowImage); rowImage.color = Color.white;
+                SceneBuilderCore.Themed(row, ThemeRole.InputBackground);
+                rows[i] = row.GetComponent<Button>(); rows[i].targetGraphic = rowImage;
+                A.Size(rowImage, height: 92);
+
+                labels[i] = A.Label(row.transform, "SavedEmailText", "name@example.com", 34, ThemeRole.MainText, FontRole.Body);
+                A.Fill(labels[i].transform, 30, 0, 96, 0);
+                A.Shrink(labels[i], 24);
+
+                removes[i] = A.IconButton(row.transform, "RemoveButton", IconFactory.Close, 76, 32, ThemeRole.SecondaryText);
+                A.At(removes[i].transform, A.MR, new Vector2(-10, 0), new Vector2(76, 76));
+            }
+
+            var list = SceneBuilderCore.Ensure<SavedAccountsList>(emailInput.gameObject);
+            SceneBuilderCore.SetField(list, "emailField", emailInput);
+            SceneBuilderCore.SetField(list, "panel", rt);
+            SceneBuilderCore.SetField(list, "nextField", passwordInput);
+            SceneBuilderCore.SetField(list, "messageText", feedback);
+            Kit.SetArray(list, "rows", rows); Kit.SetArray(list, "rowLabels", labels); Kit.SetArray(list, "removeButtons", removes);
+            panel.SetActive(false);
         }
 
         // =====================================================================================
