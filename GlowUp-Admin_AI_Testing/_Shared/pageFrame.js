@@ -33,8 +33,9 @@
     var NAV = [
         { id: "dashboard", label: "Dashboard", icon: "dashboard", href: "../_Admin_Dashboard/adminDashboard.html" },
         { id: "inventory", label: "Brand & Product Inventory", icon: "box", href: "../_Admin_Brand_Inventory/adminBrandInventory.html" },
-        { id: "curator", label: "Ingredient Curator", icon: "flask", href: "../_Admin_Ingredient_Curator/adminIngredientCurator.html" },
-        { id: "bin", label: "Recycle Bin", icon: "bin", href: "../_Admin_Recycle_Bin/adminRecycleBin.html" }
+        { id: "curator", label: "Ingredient Curator", icon: "flask", href: "../_Admin_Ingredient_Curator/adminIngredientCurator.html" }
+        // (no menu entry for the Recycle Bin since 12 October 2026: the bin is opened INSIDE Brand & Product Inventory and
+        //  inside Ingredient Curator, each with its own "Recycle bin" chip; both read the same database)
     ];
     var esc = function (value) { return String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); };
     var svg = function (name) { return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + (ICON[name] || ICON.logo) + "</svg>"; };
