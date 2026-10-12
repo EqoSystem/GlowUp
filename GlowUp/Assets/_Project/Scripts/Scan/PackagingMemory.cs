@@ -12,30 +12,56 @@ namespace GlowUp.Scan
     /// When a scan has named a product, the look of the picture is kept as a small "signature":
     ///   - its colours (how much of the picture each of 64 colours takes), and
     ///   - its pattern of light and dark (a 64-point fingerprint of the picture's layout).
-    /// A new picture is the same packaging when both are close to a remembered one. To be safe, a
-    /// remembered product is only suggested when the text on the pack does not speak against it: either
-    /// little text was read, or a word of the product's or the brand's name is among it.
+    /// Several sides of one product are kept (its front, another side), each as its own signature.
     ///
-    /// Nothing is sent anywhere: the signatures are a few numbers kept in the app's own storage
-    /// (the newest 200). Clearing the app's saved data forgets them.
+    /// A new picture is compared with all of them. A STRONG match is worth asking the user about at once ("Is this
+    /// ...?"); a MEDIUM match only when a word of the product's or the brand's name was read on the pack as well;
+    /// anything weaker is no match. The app never takes a look for the product without asking: two products of one
+    /// line can look the same.
+    ///
+    /// Nothing is sent anywhere: the signatures are a few numbers, not pictures, kept in the app's own storage
+    /// (the newest 400). Clearing the app's saved data forgets them.
     /// </summary>
     public static class PackagingMemory
     {
         public static bool Enabled = true;
-        /// <summary>How alike the colours must be (0 to 1; higher = stricter).</summary>
+        /// <summary>MEDIUM match: how alike the colours must be at least (0 to 1; higher = stricter).</summary>
         public static float ColourMatch = 0.88f;
-        /// <summary>How many of the 64 light/dark points may differ (lower = stricter).</summary>
+        /// <summary>MEDIUM match: how many of the 64 light/dark points may differ at most (lower = stricter).</summary>
         public static int PatternDifference = 12;
+        /// <summary>STRONG match: the colours are at least this alike ...</summary>
+        public static float StrongColourMatch = 0.93f;
+        /// <summary>... and at most this many of the 64 light/dark points differ.</summary>
+        public static int StrongPatternDifference = 7;
         const string CacheKey = "packaging_memory";
-        const int Limit = 200;
+        const int Limit = 400;
 
         [Serializable]
         public class Look
         {
             public string productName = "", brandName = "", cosmeticType = "", shadeHex = "", shadeName = "", finish = "";
+            /// <summary>The inventory's id of the product ("" = a product only this phone knows).</summary>
+            public string productId = "";
+            /// <summary>Which side of the pack this is: "front" or "side" ("" = kept before sides were told apart).</summary>
+            public string side = "";
             public float[] colours = new float[64];
             public long pattern;
             public long seenAtUnix;
+        }
+
+        public enum Strength { None, Medium, Strong }
+
+        /// <summary>A remembered product a picture may show.</summary>
+        public class Match
+        {
+            public Look look;
+            /// <summary>0 to 1: how alike the picture and the remembered look are.</summary>
+            public float score;
+            public Strength strength;
+            /// <summary>A word of the product's or the brand's name was read on the pack.</summary>
+            public bool wordSeen;
+            /// <summary>Strong, or medium with a word of the name on the pack: worth asking the user "Is this ...?".</summary>
+            public bool WorthAsking => strength == Strength.Strong || (strength == Strength.Medium && wordSeen);
         }
         [Serializable] class Holder { public List<Look> items = new List<Look>(); }
 
@@ -50,7 +76,9 @@ namespace GlowUp.Scan
             if (picture == null || picture.width < 16 || picture.height < 16) return null;
             Color32[] pixels;
             try { pixels = picture.GetPixels32(); } catch (Exception) { return null; }
-            return SignatureOf(pixels, picture.width, picture.height);
+            var argb = new int[pixels.Length];
+            for (int i = 0; i < pixels.Length; i++) { Color32 p = pixels[i]; argb[i] = (p.r << 16) | (p.g << 8) | p.b; }
+            return SignatureOf(argb, picture.width, picture.height, false);
         }
 
         /// <summary>
@@ -60,17 +88,15 @@ namespace GlowUp.Scan
         public static Look SignatureOf(int[] argb, int width, int height)
         {
             if (argb == null || width < 16 || height < 16 || argb.Length < width * height) return null;
-            // a texture counts its rows from the bottom: the rows are turned round so both ways give the same look
-            var pixels = new Color32[width * height];
-            for (int y = 0; y < height; y++)
-            {
-                int from = (height - 1 - y) * width, to = y * width;
-                for (int x = 0; x < width; x++) { int p = argb[from + x]; pixels[to + x] = new Color32((byte)(p >> 16), (byte)(p >> 8), (byte)p, 255); }
-            }
-            return SignatureOf(pixels, width, height);
+            return SignatureOf(argb, width, height, true);
         }
 
-        static Look SignatureOf(Color32[] pixels, int w, int h)
+        /// <summary>
+        /// The look of a picture given as numbers (0xRRGGBB, the top byte is not looked at). `fromTop` = its rows start
+        /// at the top; a texture counts them from the bottom. Both ways give the same look for the same picture, and
+        /// nothing is copied: this runs several times a second while a product is scanned.
+        /// </summary>
+        static Look SignatureOf(int[] pixels, int w, int h, bool fromTop)
         {
             var look = new Look();
 
@@ -79,8 +105,8 @@ namespace GlowUp.Scan
             for (int y = y0; y < y1; y += step)
                 for (int x = x0; x < x1; x += step)
                 {
-                    Color32 p = pixels[y * w + x];
-                    look.colours[(p.r >> 6) * 16 + (p.g >> 6) * 4 + (p.b >> 6)] += 1f;
+                    int p = pixels[(fromTop ? h - 1 - y : y) * w + x];
+                    look.colours[(((p >> 16) & 0xFF) >> 6) * 16 + (((p >> 8) & 0xFF) >> 6) * 4 + ((p & 0xFF) >> 6)] += 1f;
                     counted++;
                 }
             if (counted == 0) return null;
@@ -97,8 +123,8 @@ namespace GlowUp.Scan
                         for (int dx = -2; dx <= 2; dx++)
                         {
                             int px = Mathf.Clamp(cx + dx * step, 0, w - 1), py = Mathf.Clamp(cy + dy * step, 0, h - 1);
-                            Color32 p = pixels[py * w + px];
-                            sum += p.r * 0.3f + p.g * 0.59f + p.b * 0.11f; n++;
+                            int p = pixels[(fromTop ? h - 1 - py : py) * w + px];
+                            sum += ((p >> 16) & 0xFF) * 0.3f + ((p >> 8) & 0xFF) * 0.59f + (p & 0xFF) * 0.11f; n++;
                         }
                     grey[r * 9 + c] = sum / n;
                 }
@@ -110,20 +136,73 @@ namespace GlowUp.Scan
             return look;
         }
 
-        /// <summary>Keeps the look of a product that has just been named.</summary>
-        public static void Remember(Look look, string productName, string brandName, string cosmeticType, string shadeHex, string shadeName, string finish)
+        /// <summary>
+        /// Keeps the look of a product that has just been named. `side` = "front" or "side"; `productId` = the inventory's
+        /// id of the product, when it has one. Several sides of one product are kept next to each other.
+        /// </summary>
+        public static void Remember(Look look, string productName, string brandName, string cosmeticType, string shadeHex, string shadeName, string finish,
+                                    string productId = "", string side = "front")
         {
             if (!Enabled || look == null || (string.IsNullOrWhiteSpace(productName) && string.IsNullOrWhiteSpace(brandName))) return;
             look.productName = (productName ?? "").Trim(); look.brandName = (brandName ?? "").Trim(); look.cosmeticType = (cosmeticType ?? "").Trim();
             look.shadeHex = shadeHex ?? ""; look.shadeName = shadeName ?? ""; look.finish = finish ?? "";
+            look.productId = productId ?? ""; look.side = side ?? "";
             look.seenAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             List<Look> items = H().items;
             // the same product seen again from nearly the same side replaces its older look
-            items.RemoveAll(old => string.Equals(old.productName, look.productName, StringComparison.OrdinalIgnoreCase)
-                                && string.Equals(old.brandName, look.brandName, StringComparison.OrdinalIgnoreCase) && Alike(old, look));
+            items.RemoveAll(old => SameProduct(old, look) && Alike(old, look));
             items.Add(look);
             while (items.Count > Limit) items.RemoveAt(0);
             OfflineCache.Save(CacheKey, H());
+        }
+
+        /// <summary>The remembered products this picture may show, best first, each product once. `textOnPack` is what the text reader found (may be empty).</summary>
+        public static List<Match> Matches(Look seen, string textOnPack, int maximum = 3)
+        {
+            return Enabled ? MatchesAmong(H().items, seen, textOnPack, maximum) : new List<Match>();
+        }
+
+        /// <summary>The same against a given list of remembered looks (the app's own list is in the phone's storage).</summary>
+        public static List<Match> MatchesAmong(IEnumerable<Look> remembered, Look seen, string textOnPack, int maximum = 3)
+        {
+            var found = new List<Match>();
+            if (seen == null || remembered == null) return found;
+            string text = " " + Plain(textOnPack) + " ";
+            foreach (Look known in remembered)
+            {
+                if (known == null) continue;
+                float colours = ColourOverlap(known, seen);
+                int differ = Differences(known.pattern, seen.pattern);
+                if (colours < ColourMatch || differ > PatternDifference) continue;
+                var match = new Match
+                {
+                    look = known, score = Mathf.Clamp01(colours - differ * 0.004f),
+                    strength = colours >= StrongColourMatch && differ <= StrongPatternDifference ? Strength.Strong : Strength.Medium
+                };
+                foreach (string word in (Plain(known.productName) + " " + Plain(known.brandName)).Split(' '))
+                    if (word.Length >= 4 && text.Contains(" " + word + " ")) { match.wordSeen = true; break; }
+                // each product once: its best side
+                int at = found.FindIndex(other => SameProduct(other.look, known));
+                if (at < 0) found.Add(match);
+                else if (Better(match, found[at])) found[at] = match;
+            }
+            found.Sort((x, y) => Better(x, y) ? -1 : Better(y, x) ? 1 : 0);
+            if (found.Count > maximum) found.RemoveRange(maximum, found.Count - maximum);
+            return found;
+        }
+
+        // a match that is worth asking about comes first, then the stronger one, then the closer one
+        static bool Better(Match a, Match b)
+        {
+            if (a.WorthAsking != b.WorthAsking) return a.WorthAsking;
+            if (a.strength != b.strength) return a.strength > b.strength;
+            return a.score > b.score + 0.0001f;
+        }
+
+        static bool SameProduct(Look a, Look b)
+        {
+            if (!string.IsNullOrEmpty(a.productId) && !string.IsNullOrEmpty(b.productId)) return a.productId == b.productId;
+            return string.Equals(a.productName, b.productName, StringComparison.OrdinalIgnoreCase) && string.Equals(a.brandName, b.brandName, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>The remembered product this picture shows, or null. `textOnPack` is what the text reader found (may be empty).</summary>

@@ -62,7 +62,7 @@ namespace GlowUp.Data
         }
 
         /// <summary>The look-up table of the products the app may use: by barcode, by name, by alias, by word.</summary>
-        public static ProductIndex Index => usableIndex ?? (usableIndex = ProductIndex.Build(Usable()));
+        public static ProductIndex Index => usableIndex ?? (usableIndex = ProductIndex.Build(Usable(), LocalAliases.All()));
 
         /// <summary>
         /// The look-up table of EVERY product the phone knows of, whatever its status (waiting for review, switched off, in
@@ -88,6 +88,9 @@ namespace GlowUp.Data
         }
 
         static void Changed() { usable = null; usableIndex = null; everyIndex = null; }
+
+        /// <summary>Called by LocalAliases when this phone learned another name for a product: the look-up table is made anew.</summary>
+        public static void AliasesChanged() { usableIndex = null; }
 
         /// <summary>Called by BrandRepository when a brand was switched on or off: the usable products change with it.</summary>
         public static void BrandsChanged() { usable = null; usableIndex = null; }
