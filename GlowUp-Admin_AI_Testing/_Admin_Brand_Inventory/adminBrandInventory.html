@@ -17,13 +17,30 @@
             if (document.documentElement.classList.contains("auth-pending")) document.documentElement.classList.add("auth-stuck");
         }, 10000);
     </script>
+    <!-- the files this page needs are fetched side by side, not one after the other as each one names the next -->
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js">
+    <link rel="modulepreload" href="../_Database/firebase-console.js">
+    <link rel="modulepreload" href="../_Shared/adminCommon.js">
+    <link rel="modulepreload" href="../_Shared/adminStore.js">
+    <link rel="modulepreload" href="../_Shared/adminShell.js">
+    <link rel="modulepreload" href="../_Shared/adminLayouts.js">
+    <link rel="modulepreload" href="../_Shared/adminWidgets.js">
+    <link rel="modulepreload" href="../_Shared/adminAssist.js">
+    <link rel="modulepreload" href="../_Shared/glowupRules.js">
+    <link rel="modulepreload" href="../_Shared/glowupCatalog.js">
+    <link rel="modulepreload" href="../_Shared/adminCleanup.js">
+    <link rel="modulepreload" href="../_Shared/adminOrganizer.js">
     <link rel="stylesheet" href="../_Shared/adminCommon.css">
     <link rel="stylesheet" href="../_Admin_Brand_Inventory/adminBrandInventory.css">
 </head>
 <body>
-    <script src="../_Shared/pageSkeleton.js"></script>
 
     <main class="main-content" data-title="Brand &amp; Product Inventory" data-subtitle="Make-up only: what the app knows, arranged your way">
+        <!-- draws the menu and the top bar with the first picture: see pageFrame.js -->
+        <script src="../_Shared/pageFrame.js"></script>
         <div class="board">
 
             <!-- the counts; a click on one filters the table -->

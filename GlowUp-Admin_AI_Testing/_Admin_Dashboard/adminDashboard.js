@@ -9,8 +9,10 @@
 //                                      on an ingredient with source "ai": found by the app's AI lookup, not checked yet
 import { db } from "../_Database/firebase-console.js";
 import {
-    collection, getDocs, getCountFromServer, query, where, orderBy, limit, onSnapshot, updateDoc, doc, serverTimestamp, writeBatch
+    collection, getCountFromServer, query, where, orderBy, limit, onSnapshot, doc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+// the brand list comes from the site's own copy when another page has read it already (see adminStore.js)
+import { getDocs, updateDoc, writeBatch, onListsRefreshed } from "../_Shared/adminStore.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, escapeHtml, asArray, toWholeNumber, timeAgo, formatWhen, startOfTodayUnix,
     notify, describeError
@@ -55,6 +57,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await requireAdmin();
 
     loadCatalogueCounts();
+    onListsRefreshed((name) => { if (name === "brands") loadCatalogueCounts(); });      // the kept brand list was behind the database
     watchScansToday();
     watchRecentActivity();
     loadSuggestions();

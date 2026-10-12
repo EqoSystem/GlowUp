@@ -27,13 +27,14 @@
 //     using it at once; statusBeforeBin keeps what it was, for "Restore". A brand goes to the bin together with its
 //     products (binnedWith = the brand's id). Only "Delete forever" removes a document.
 import { db } from "../_Database/firebase-console.js";
-import {
-    collection, getDocs, addDoc, updateDoc, doc, writeBatch, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { collection, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+// reading and writing go through the site's own copy of its lists: a list is downloaded once and kept between pages,
+// and after a change only the documents that were written are read again (see adminStore.js)
+import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed } from "../_Shared/adminStore.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
     statusPill, normalizeStatus, notify, describeError, setBusy, setFormError, originLabel, sourceLinks, COSMETIC_TYPES, STATUSES,
-    productScope, notMakeup, scopeWords, categoryOutOfScope, BRAND_CATEGORY, wireSearch
+    productScope, notMakeup, scopeWords, categoryOutOfScope, BRAND_CATEGORY, wireSearch, dialogIsOpen
 } from "../_Shared/adminCommon.js";
 import { matchesSearch, compactName, barcodeKey } from "../_Shared/glowupRules.js";
 import { cleanupPlan, productDuplicates, brandDuplicates, mergeProducts, mergeBrands, nameWithoutBrand } from "../_Shared/glowupCatalog.js";
@@ -192,6 +193,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("productShadeEditor").addEventListener("click", onShadeClick);
     el("productShadeEditor").addEventListener("input", onShadeInput);
 
+    // the list on screen came from the site's own copy; when the database turns out to hold something newer, show that
+    onListsRefreshed(() => { if (!dialogIsOpen()) loadInventory(); });
     loadInventory();
 });
 

@@ -94,8 +94,43 @@ button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 svg.ic { width: 1.15em; height: 1.15em; flex: none; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.18em; transition: transform .2s var(--ease); }
 
-/* The page stays hidden until the sign-in check has finished (see adminCommon.js). */
-html.auth-pending body > * { visibility: hidden; }
+/* WHILE THE SIGN-IN CHECK RUNS (see pageFrame.js and adminCommon.js).
+   An admin this browser knows (html.frame-first) sees the page's frame and every fixed text at once: only the places
+   where data comes show a loading shape. The page cannot be used, and no data is asked for, until the check has passed.
+   Anybody else sees GlowUp's own loading mark and nothing of the page. */
+html.auth-pending:not(.frame-first) body > :not(.brand-loader):not(.auth-stuck-box):not(.page-skeleton) { visibility: hidden; }
+html.auth-pending.frame-first .main-content > :not(.topbar) { pointer-events: none; }
+html.auth-pending.frame-first .main-content { cursor: progress; }
+.topbar-tools { min-height: 36px; }                       /* its buttons arrive a moment after the frame: the bar keeps its height */
+.signed-in-as { min-height: 1.3em; }
+.brand-loader { display: none; }
+html.auth-pending:not(.frame-first) .brand-loader {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; position: fixed; inset: 0; z-index: 5000;
+    background: var(--bg); color: var(--text);
+}
+.brand-loader-mark { width: 72px; height: 72px; border-radius: 22px; display: grid; place-items: center; margin-bottom: 10px;
+    background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent-text); animation: brand-breathe 1.6s ease-in-out infinite; }
+.brand-loader-mark svg.ic { width: 56%; height: 56%; }
+.brand-loader-name { font-size: var(--fs-lg); font-weight: 700; letter-spacing: .2px; }
+.brand-loader-text { font-size: var(--fs-sm); color: var(--muted); }
+@keyframes brand-breathe { 0%, 100% { transform: scale(.94); box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 0%, transparent); } 50% { transform: scale(1.04); box-shadow: 0 0 0 10px color-mix(in srgb, var(--gold) 16%, transparent); } }
+/* the check did not answer in ten seconds: a message and a way on, never an endless loading screen */
+.auth-stuck-box {
+    position: fixed; z-index: 5200; left: 50%; top: 22px; translate: -50% 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; max-width: min(640px, calc(100vw - 32px));
+    padding: 12px 14px 12px 18px; border-radius: var(--radius); background: var(--surface); color: var(--text); font-size: var(--fs-sm);
+    border: 1px solid color-mix(in srgb, var(--bad) 45%, var(--border)); box-shadow: var(--shadow); visibility: visible;
+}
+.auth-stuck-box b { color: var(--bad); }
+html.auth-stuck .brand-loader-mark { animation: none; }
+/* moving between pages: the browser blends the old page into the new one, and the menu and top bar stay put */
+@view-transition { navigation: auto; }
+.sidebar { view-transition-name: glowup-sidebar; }
+.topbar { view-transition-name: glowup-topbar; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: .14s; }
+@media (prefers-reduced-motion: reduce) {
+    @view-transition { navigation: none; }
+    .brand-loader-mark { animation: none; }
+}
 /* ---- skeleton loading, in GlowUp's look ----
    While a page is on its way (the sign-in check of a page that just opened, or the moment after a link to another page
    was pressed) the outline of THAT page shows: the GlowUp sparkle, the menu, and soft blush shapes where its numbers,
@@ -106,7 +141,6 @@ html.auth-pending .page-skeleton, body.leaving .page-skeleton {
     --sk-a: color-mix(in srgb, var(--accent) 11%, var(--surface-2)); --sk-b: color-mix(in srgb, var(--gold) 26%, var(--surface-2));
 }
 html.auth-pending .page-skeleton.login, body.leaving .page-skeleton.login { grid-template-columns: 1fr; place-items: center; }
-body.leaving > :not(.page-skeleton) { visibility: hidden; }
 /* one shape: a blush base with the shine passing over it */
 .sk, .skeleton {
     display: block; border-radius: var(--radius-sm); color: transparent !important; user-select: none;
@@ -158,7 +192,8 @@ body.leaving > :not(.page-skeleton) { visibility: hidden; }
     .sk-brand span { display: none; } .sk-tiles, .sk-tiles.five { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sk-split { grid-template-columns: 1fr; }
 }
 html.auth-stuck .page-skeleton { display: none !important; }
-html.auth-stuck body::before {
+/* the login page has no frame script: its own short message (the admin pages show a box with a "Try again" button) */
+html.auth-stuck body:not(:has(.auth-stuck-box))::before {
     content: "Could not reach the sign-in service. Check your internet connection, then reload this page.";
     visibility: visible; position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-size: var(--fs-sm);
     color: var(--bad); padding: 24px; text-align: center;
@@ -183,18 +218,25 @@ body.app { display: grid; grid-template-columns: 232px 1fr; overflow: hidden; }
 .brand-title { font-size: var(--fs-md); font-weight: 700; line-height: 1.15; letter-spacing: .1px; }
 .brand-subtitle { font-size: var(--fs-xs); color: var(--muted); }
 .nav-links { list-style: none; display: flex; flex-direction: column; gap: 4px; flex: 1; position: relative; }
-/* the highlight behind the links: it flows from link to link like the liquid drop of the app's bottom bar */
+/* HOVER: a light gold drop that flows to the link under the pointer, like the liquid drop of the app's bottom bar.
+   It is only there while the pointer (or the keyboard) is on a link, and never on the selected page. */
 .nav-links .nav-drop {
     position: absolute; left: 0; right: 0; z-index: 0; border-radius: var(--radius-sm); pointer-events: none; opacity: 0;
-    background: color-mix(in srgb, var(--accent) 14%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+    background: color-mix(in srgb, var(--gold) 12%, transparent); border: 1px solid color-mix(in srgb, var(--gold) 38%, transparent);
 }
-.nav-links .nav-drop.visiting { background: color-mix(in srgb, var(--gold) 14%, transparent); border-color: color-mix(in srgb, var(--gold) 45%, transparent); }
 .nav-links a {
     display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm);
     color: var(--text-2); text-decoration: none; font-size: var(--fs-base); border: 1px solid transparent;
 }
 .nav-links a { position: relative; z-index: 1; transition: color .2s; }
-.nav-links a:hover, .nav-links a.active { color: var(--text); }
+.nav-links a:hover { color: var(--text); }
+/* THE PAGE YOU ARE ON: its own highlight, on the link itself. It comes from the address, so it is there after a reload
+   and a direct link, and it does not move or fade when the pointer leaves. */
+.nav-links a.active {
+    color: var(--text); font-weight: 600;
+    background: color-mix(in srgb, var(--accent) 15%, transparent); border-color: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.nav-links a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .nav-links a.fx:hover { transform: none; box-shadow: none; }
 .nav-links a:hover svg.ic { transform: scale(1.12); }
 .nav-links a.active svg.ic { color: var(--accent-text); }

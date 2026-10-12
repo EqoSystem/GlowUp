@@ -19,13 +19,14 @@
 //
 // A card shows the ingredient's name and its scientific name only. A click on it shows everything else.
 import { db } from "../_Database/firebase-console.js";
-import {
-    collection, getDocs, addDoc, updateDoc, doc, writeBatch, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { collection, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+// reading and writing go through the site's own copy of its lists: a list is downloaded once and kept between pages,
+// and after a change only the documents that were written are read again (see adminStore.js)
+import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed } from "../_Shared/adminStore.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
     notify, describeError, setBusy, setFormError, renderChecks, readChecks, writeChecks, originLabel, sourceLinks, wireSearch,
-    ALLERGEN_FAMILIES, SKIN_TYPES, SKIN_CONDITIONS
+    ALLERGEN_FAMILIES, SKIN_TYPES, SKIN_CONDITIONS, dialogIsOpen
 } from "../_Shared/adminCommon.js";
 import { matchesSearch } from "../_Shared/glowupRules.js";
 import { cleanupPlan, ingredientDuplicates, ingredientLookalikes, ingredientIssues, mergeIngredients } from "../_Shared/glowupCatalog.js";
@@ -162,6 +163,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         const item = card ? ingredients.find((i) => i.id === card.dataset.id) : null;
         if (item) openIngredientForm(item);
     });
+    // the list on screen came from the site's own copy; when the database turns out to hold something newer, show that
+    onListsRefreshed(() => { if (!dialogIsOpen()) loadIngredients(); });
     el("ingredientsList").addEventListener("keydown", (event) => { if (event.key === "Enter" && event.target.matches(".ingredient-card")) { event.preventDefault(); toggleDetails(event.target.dataset.id); } });
 
     loadIngredients();

@@ -3,6 +3,13 @@ import { auth, db } from "../_Database/firebase-console.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { MAKEUP_TYPES, normalizeName, judgeProduct, notMakeupWords } from "./glowupRules.js";
+import { clearStore } from "./adminStore.js";
+import { askConfirm } from "./adminShell.js";
+
+// "An admin was signed in on this browser": lets the next page draw its frame and fixed text at once (pageFrame.js).
+// It says nothing about who, grants nothing and is no part of the check: the check below runs every time.
+const KNOWN_KEY = "glowup.admin.known";
+const remember = (known) => { try { if (known) localStorage.setItem(KNOWN_KEY, "1"); else localStorage.removeItem(KNOWN_KEY); } catch (error) { /* a private window */ } };
 
 export const LOGIN_PAGE = "../_Index/index.html";
 export const DASHBOARD_PAGE = "../_Admin_Dashboard/adminDashboard.html";
@@ -94,15 +101,18 @@ export function requireAdmin() {
         let leaving = false;                 // once we are on the way out, later sign-in news must not change where we go
         onAuthStateChanged(auth, async (user) => {
             if (leaving) return;
-            if (!user) { leaving = true; window.location.replace(LOGIN_PAGE); return; }
+            if (!user) { leaving = true; remember(false); clearStore(); window.location.replace(LOGIN_PAGE); return; }
             if (REQUIRE_ADMIN_RECORD && !(await isAdmin(user))) {
                 if (leaving) return;
                 leaving = true;
+                remember(false); clearStore();
                 try { await signOut(auth); } catch (error) { console.error("Sign out failed:", error); }
                 window.location.replace(LOGIN_PAGE + "?denied=1");      // the login page explains why
                 return;
             }
-            document.documentElement.classList.remove("auth-pending");
+            remember(true);
+            document.documentElement.classList.remove("auth-pending", "auth-stuck", "frame-first");
+            document.querySelectorAll(".brand-loader, .auth-stuck-box").forEach((box) => box.remove());
             showSignedInAs(user);
             if (!resolved) { resolved = true; resolve(user); }
         });
@@ -111,25 +121,37 @@ export function requireAdmin() {
 
 function showSignedInAs(user) {
     const footer = document.querySelector(".sidebar-footer");
-    if (!footer || footer.querySelector(".signed-in-as")) return;
-    const line = document.createElement("p");
-    line.className = "signed-in-as";
+    if (!footer) return;
+    // the line is in the frame already (empty), so the Sign Out link below it does not jump when the name arrives
+    let line = footer.querySelector(".signed-in-as");
+    if (!line) { line = document.createElement("p"); line.className = "signed-in-as"; footer.insertBefore(line, footer.firstChild); }
     line.textContent = user.email || "Signed in";
     line.title = user.email || "";
-    footer.insertBefore(line, footer.firstChild);
 }
 
-/** Makes every "Sign Out" link really sign out before it returns to the login page. */
+/**
+ * "Sign Out" asks first: "Sign out?" with Cancel and Sign out. Only "Sign out" signs out; Cancel, Escape, the X and a
+ * click outside the box all leave the admin signed in. The keyboard starts on Cancel.
+ */
 export function wireSignOut() {
     document.querySelectorAll(".sign-out").forEach((link) => {
+        if (link.dataset.wired === "1") return;
+        link.dataset.wired = "1";
         link.addEventListener("click", async (event) => {
             event.preventDefault();
+            const sure = await askConfirm({ title: "Sign out?", message: "You will need your e-mail and password to come back in.", confirmLabel: "Sign out", danger: true });
+            if (!sure) return;
+            remember(false);
+            clearStore();                    // the lists this tab kept belong to the signed-in admin
             try { await signOut(auth); }
             catch (error) { console.error("Sign out failed:", error); }
             window.location.replace(LOGIN_PAGE);
         });
     });
 }
+
+/** True while a dialog is open (a form, a question): the list behind it is not redrawn under the admin's hands. */
+export const dialogIsOpen = () => Array.from(document.querySelectorAll(".modal-overlay")).some((box) => getComputedStyle(box).display !== "none");
 
 /** Stops a double click on a sidebar link from starting the same navigation twice. */
 export function setupNavigationGuard() {

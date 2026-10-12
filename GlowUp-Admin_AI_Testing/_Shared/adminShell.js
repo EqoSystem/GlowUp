@@ -130,12 +130,6 @@ export function mountThemeToggle(host) {
 // ---------------------------------------------------------------------------------------------
 // The page frame
 // ---------------------------------------------------------------------------------------------
-const NAV = [
-    { id: "dashboard", label: "Dashboard", icon: "dashboard", href: "../_Admin_Dashboard/adminDashboard.html" },
-    { id: "inventory", label: "Brand & Product Inventory", icon: "box", href: "../_Admin_Brand_Inventory/adminBrandInventory.html" },
-    { id: "curator", label: "Ingredient Curator", icon: "flask", href: "../_Admin_Ingredient_Curator/adminIngredientCurator.html" }
-];
-
 /**
  * Builds the sidebar and the top bar round the page's <main class="main-content" data-title data-subtitle>.
  * Call it first on every admin page. page = "dashboard" | "inventory" | "curator".
@@ -144,34 +138,14 @@ export function mountShell(page) {
     const main = document.querySelector("main.main-content");
     document.body.classList.add("app");
 
-    const sidebar = document.createElement("aside");
-    sidebar.className = "sidebar";
-    sidebar.innerHTML = `
-        <div class="sidebar-brand">
-            <div class="brand-logo">${icon("logo")}</div>
-            <div class="brand-text"><h1 class="brand-title">GlowUp</h1><p class="brand-subtitle">Admin Portal</p></div>
-        </div>
-        <ul class="nav-links">
-            <li class="nav-drop" aria-hidden="true"></li>
-            ${NAV.map((n) => `<li><a href="${n.href}" class="${n.id === page ? "active" : ""}" title="${esc(n.label)}">${icon(n.icon)}<span class="label">${esc(n.label)}</span></a></li>`).join("")}
-        </ul>
-        <div class="sidebar-footer">
-            <a href="../_Index/index.html" class="sign-out" title="Sign out">${icon("logout")}<span class="label">Sign Out</span></a>
-        </div>`;
-    document.body.insertBefore(sidebar, main);
+    // the sidebar and the top bar were drawn by pageFrame.js with the page's first picture (or are drawn now, for
+    // somebody who had to wait for the sign-in check): here they get their tools and their movement
+    if (!window.GlowUpFrame) throw new Error("pageFrame.js must be the first thing inside <main> of an admin page.");
+    window.GlowUpFrame.build();
+    const sidebar = document.querySelector("aside.sidebar");
+    const topbar = main.querySelector("header.topbar");
     wireNavDrop(sidebar.querySelector(".nav-links"));
-
-    const topbar = document.createElement("header");
-    topbar.className = "topbar";
-    topbar.innerHTML = `
-        <div class="topbar-titles">
-            <h2 class="header-title">${esc(main.dataset.title || "")}</h2>
-            <p class="header-subtitle">${esc(main.dataset.subtitle || "")}</p>
-        </div>
-        <div class="topbar-tools">
-            <button type="button" class="operator-chip" id="operatorChip" data-tip-title="Display layout" data-tip="Arrange and resize the panels, turn a panel into a list, a grid or a graph, pick a font and colours, and save it under your name." data-tip-preview="The contents never change, only how they are shown.">${icon("sliders")}<span id="operatorName">Default layout</span></button>
-        </div>`;
-    main.insertBefore(topbar, main.firstChild);
+    topbar.querySelector(".topbar-tools").innerHTML = `<button type="button" class="operator-chip" id="operatorChip" data-tip-title="Display layout" data-tip="Arrange and resize the panels, turn a panel into a list, a grid or a graph, pick a font and colours, and save it under your name." data-tip-preview="The contents never change, only how they are shown.">${icon("sliders")}<span id="operatorName">Default layout</span></button>`;
     mountThemeToggle(topbar.querySelector(".topbar-tools"));
 
     const bar = document.createElement("div");
@@ -187,13 +161,15 @@ export function mountShell(page) {
 }
 
 /**
- * The highlight of the sidebar flows like the liquid drop of the app's bottom bar: it rests behind the page you are
- * on, runs to the link under the pointer (its front edge first, its back edge a moment later) and flows back.
+ * TWO STATES, KEPT APART. The page you are on carries its own highlight on its link (class "active", set from the
+ * address by pageFrame.js): it stays whatever the pointer does. The pointer gets a lighter drop that flows to the link
+ * under it (its front edge first, its back edge a moment later) and fades when the pointer leaves the menu. The drop
+ * never rests on, replaces or removes the highlight of the selected page.
  */
 function wireNavDrop(list) {
     const drop = list.querySelector(".nav-drop");
     const links = Array.from(list.querySelectorAll("a"));
-    const home = links.find((a) => a.classList.contains("active")) || null;
+    const home = null;                          // the drop has no resting place: nothing under the pointer = no drop
     let at = null;
     const place = (link, instant) => {
         if (!link) { drop.style.opacity = "0"; return; }
@@ -203,13 +179,14 @@ function wireNavDrop(list) {
         const lead = "0.2s cubic-bezier(.2, .8, .2, 1)", follow = "0.46s cubic-bezier(.3, 1.45, .5, 1)";
         drop.style.transition = instant ? "none" : `top ${goingDown ? follow : lead}, bottom ${goingDown ? lead : follow}, opacity .2s, background-color .3s, border-color .3s`;
         drop.style.top = top + "px"; drop.style.bottom = bottom + "px"; drop.style.opacity = "1";
-        drop.classList.toggle("visiting", link !== home);
         at = top;
     };
     place(home, true);
     links.forEach((link) => {
-        link.addEventListener("mouseenter", () => place(link));
-        link.addEventListener("focus", () => place(link));
+        // the selected page needs no hover drop: it is highlighted already
+        const over = () => place(link.classList.contains("active") ? null : link);
+        link.addEventListener("mouseenter", over);
+        link.addEventListener("focus", over);
     });
     list.addEventListener("mouseleave", () => place(home));
     list.addEventListener("focusout", () => { if (!list.contains(document.activeElement)) place(home); });
@@ -282,11 +259,9 @@ export function playSweep(control) {
 document.addEventListener("pointerdown", (event) => { playSweep(event.target.closest && event.target.closest(".fx")); });
 document.addEventListener("animationend", (event) => { if (event.animationName === "fx-glow") event.target.classList.remove("fx-run"); });
 
-// Skeleton loading between pages: the moment this page is left for another one, the outline of a page shows
-// (adminCommon.css, "body.leaving") instead of the old page standing still. Coming back with the browser's
-// Back button takes it away again.
-window.addEventListener("beforeunload", () => { if (document.body) document.body.classList.add("leaving"); });
-window.addEventListener("pageshow", () => { if (document.body) document.body.classList.remove("leaving"); });
+// Moving to another page: this page stays as it is until the next one is there (no loading cover in between). The
+// next page draws its frame and fixed text with its first picture, and the browser blends the two (adminCommon.css,
+// "@view-transition"), so the menu and the top bar seem to stay where they are.
 
 /** Lists are filled after the page has loaded: new buttons get their icons, badges and animation too. */
 function watchForNewControls() {
