@@ -833,8 +833,12 @@ namespace GlowUp.EditorTools
             return badge;
         }
 
-        /// <summary>A checklist of requirement rows ("1 uppercase letter" ...). Returns each row's RequirementIndicatorItem.</summary>
-        public static RequirementIndicatorItem[] Checklist(Transform content, string namePrefix, string[] items)
+        /// <summary>
+        /// A checklist of requirement rows ("Uppercase" ...). Returns each row's RequirementIndicatorItem.
+        /// `earlier` = the wording each row had before (same order): a scene that still shows that wording gets the new
+        /// one; wording the user typed in the Inspector themselves is left alone.
+        /// </summary>
+        public static RequirementIndicatorItem[] Checklist(Transform content, string namePrefix, string[] items, string[] earlier = null)
         {
             var result = new RequirementIndicatorItem[items.Length];
             for (int i = 0; i < items.Length; i++)
@@ -856,6 +860,10 @@ namespace GlowUp.EditorTools
                 SceneBuilderCore.SetField(item, "checkIcon", icon);
                 SceneBuilderCore.SetField(item, "label", lbl);
                 if (created) SceneBuilderCore.SetField(item, "requirementText", items[i]);
+                else if (earlier != null && i < earlier.Length) SceneBuilderCore.ReplaceText(item, "requirementText", items[i], earlier[i]);
+                // the row shows its wording in Edit mode too (at run time the row writes it itself)
+                lbl.text = new SerializedObject(item).FindProperty("requirementText").stringValue;
+                EditorUtility.SetDirty(lbl);
                 result[i] = item;
             }
             return result;

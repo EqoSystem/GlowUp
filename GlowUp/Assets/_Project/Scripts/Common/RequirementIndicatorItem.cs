@@ -6,8 +6,10 @@ using UnityEngine.UI;
 namespace GlowUp.Common
 {
     /// <summary>
-    /// One row of a requirement checklist ("1 uppercase letter"). Call SetMet(true/false);
-    /// the check icon lights up with a small pop. Text, colours and timing are Inspector fields.
+    /// One row of a requirement checklist ("Uppercase"). Call SetMet(true/false).
+    /// The WORDS stay readable the whole time (the user must be able to read what is asked while typing); it is the
+    /// CHECK MARK that shows the state: faint while the condition is not met, bright green with a small pop when it is.
+    /// Text, colours and timing are Inspector fields.
     /// </summary>
     public class RequirementIndicatorItem : ThemeAwareBehaviour
     {
@@ -16,11 +18,27 @@ namespace GlowUp.Common
         [SerializeField] private TextMeshProUGUI label;
 
         [Header("Content")]
-        [SerializeField] private string requirementText = "At least 8 characters";
+        [SerializeField] private string requirementText = "Minimum of 8 characters";
 
-        [Header("Colours (filled in from the theme while Use Theme Colors is on)")]
-        [SerializeField] private Color metColor = new Color32(111, 143, 91, 255);
-        [SerializeField] private Color unmetColor = new Color32(150, 140, 132, 255);
+        [Header("The check mark (filled in from the theme while Use Theme Colors is on)")]
+        [Tooltip("The check mark when the condition is met")]
+        [SerializeField] private Color metColor = new Color32(24, 169, 87, 255);
+        [Tooltip("The check mark while the condition is not met yet (faint)")]
+        [SerializeField] private Color unmetColor = new Color32(190, 180, 176, 255);
+        [Tooltip("On = a met condition gets the BRIGHT green below. Off = the theme's calmer Success colour.")]
+        [SerializeField] private bool brightCheckWhenMet = true;
+        [Tooltip("The bright green on the light theme (dark enough to be seen on the pale card)")]
+        [SerializeField] private Color brightGreenOnLight = new Color32(24, 169, 87, 255);
+        [Tooltip("The bright green on the dark theme")]
+        [SerializeField] private Color brightGreenOnDark = new Color32(61, 220, 132, 255);
+
+        [Header("The words (filled in from the theme while Use Theme Colors is on)")]
+        [Tooltip("On = the words keep a readable colour whether the condition is met or not. Off = they fade with the check mark, as before.")]
+        [SerializeField] private bool wordsAlwaysReadable = true;
+        [Tooltip("The words while the condition is not met yet")]
+        [SerializeField] private Color labelColor = new Color32(108, 96, 98, 255);
+        [Tooltip("The words when the condition is met")]
+        [SerializeField] private Color labelMetColor = new Color32(58, 47, 48, 255);
 
         [Header("Animation")]
         [SerializeField] private float fadeSeconds = 0.2f;
@@ -35,8 +53,11 @@ namespace GlowUp.Common
 
         protected override void ApplyPalette(ThemeProfile.Palette p)
         {
-            metColor = p.success;
-            unmetColor = Color.Lerp(p.secondaryText, p.background, 0.30f); unmetColor.a = 1f;
+            bool dark = p.background.grayscale < 0.5f;
+            metColor = brightCheckWhenMet ? (dark ? brightGreenOnDark : brightGreenOnLight) : p.success;
+            unmetColor = Color.Lerp(p.secondaryText, p.background, 0.55f); unmetColor.a = 1f;       // the check that is not earned yet: faint
+            if (wordsAlwaysReadable) { labelColor = p.secondaryText; labelMetColor = p.mainText; }
+            else { labelColor = Color.Lerp(p.secondaryText, p.background, 0.30f); labelColor.a = 1f; labelMetColor = metColor; }
             Paint();
         }
 
@@ -63,9 +84,8 @@ namespace GlowUp.Common
 
         void Paint()
         {
-            var c = Color.Lerp(unmetColor, metColor, k);
-            if (checkIcon != null) checkIcon.color = c;
-            if (label != null) label.color = c;
+            if (checkIcon != null) checkIcon.color = Color.Lerp(unmetColor, metColor, k);
+            if (label != null) label.color = Color.Lerp(labelColor, labelMetColor, k);
         }
     }
 
