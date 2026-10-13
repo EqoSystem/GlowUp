@@ -336,7 +336,7 @@ namespace GlowUp.EditorTools
             // ---- type-it-in pop-up (for labels the camera cannot read) ----
             A.AppPopup manual = A.Overlay(s, "ManualEntryPanel", "Type it in");
             A.TopStrip(manual.box, 110, 1240, 40, 40);
-            TextMeshProUGUI manualHint = A.Label(manual.box, "ManualHintText", "For a product the camera or the AI cannot read. Only the ingredient list is required.",
+            TextMeshProUGUI manualHint = A.Label(manual.box, "ManualHintText", "No pack at hand? Type the product's name: GlowUp looks its ingredient list up. Or type the list yourself.",
                                                  27, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             A.TopStrip(manualHint.transform, 116, 76, 48, 48);
 
@@ -356,15 +356,16 @@ namespace GlowUp.EditorTools
             manualType.AddOptions(new System.Collections.Generic.List<string> { "Cosmetic type", "Lipstick", "Foundation", "Blush", "Eyeshadow", "Mascara", "Powder" });   // the full list is on the controller
             manualType.RefreshShownValue();
 
-            TMP_InputField manualInput = SceneBuilderCore.MakeInput(manual.box, "ManualInputField", "Ingredient list, e.g. Aqua, Glycerin, Niacinamide, Parfum", A.TC, Vector2.zero, new Vector2(800, 430));
+            TMP_InputField manualInput = SceneBuilderCore.MakeInput(manual.box, "ManualInputField", "Ingredient list (leave empty to look it up), e.g. Aqua, Glycerin, Niacinamide, Parfum", A.TC, Vector2.zero, new Vector2(800, 430));
             A.TopStrip(manualInput.transform, 444, 440, 48, 48);
-            Kit.StyleInput(manualInput, "Ingredient list, e.g. Aqua, Glycerin, Niacinamide, Parfum", ThemeRole.InputBackground);
+            Kit.StyleInput(manualInput, "Ingredient list (leave empty to look it up), e.g. Aqua, Glycerin, Niacinamide, Parfum", ThemeRole.InputBackground);
             MakeMultiLine(manualInput, 32);
             var behaviour = SceneBuilderCore.Ensure<InputFieldBehaviour>(manualInput.gameObject);
             A.Set(behaviour, "characterLimit", 3000);
 
             TextMeshProUGUI manualFeedback = A.Label(manual.box, "ManualFeedbackText", "", 28, ThemeRole.Warning, FontRole.Body, TextAlignmentOptions.Center, true);
-            A.TopStrip(manualFeedback.transform, 896, 84, 48, 48);
+            A.TopStrip(manualFeedback.transform, 892, 176, 48, 48);       // room for a sentence that says what to do next
+            A.ShrinkWrapped(manualFeedback, 22);
             Button manualCancel = A.PillButton(manual.box, "CancelButton", "Cancel", 38, ThemeRole.SurfaceAlt, ThemeRole.MainText);
             A.BottomStrip(manualCancel.transform, 44, 120, 48, 512);
             UnityEventTools.AddPersistentListener(manualCancel.onClick, manual.panel.Hide);

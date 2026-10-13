@@ -73,6 +73,22 @@ namespace GlowUp.Scan
 
         static readonly string[][] Groups = { Headers, WeightAndSize, MakerAndOrigin, CodesAndDates, Contact, DirectionsAndWarnings, Marketing };
 
+        // "paraben-free", "fragrance free", "free of parabens", "without alcohol", "no parabens", "0% alcohol".
+        // ("No. 5" and "No 7" of a colour's name are numbers, not a "no".)
+        static readonly System.Text.RegularExpressions.Regex FreeOf = new System.Text.RegularExpressions.Regex(
+            @"\bfree\b|\bwithout\b|^\s*(no|non|zero)\s+(?!\d)\p{L}|(^|[^\d.,])0\s*%",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+        /// <summary>
+        /// True when the text CLAIMS THAT SOMETHING IS NOT IN the product ("fragrance free", "paraben-free", "no parabens",
+        /// "without alcohol", "0% alcohol"). Such a piece names an ingredient, but says the opposite of an ingredient list:
+        /// it must never be read as that ingredient. `text` is the piece as written (before percentages are taken out).
+        /// </summary>
+        public static bool IsFreeOfClaim(string text)
+        {
+            return !string.IsNullOrWhiteSpace(text) && FreeOf.IsMatch(text.Replace('-', ' '));
+        }
+
         /// <summary>The stoplist entry this text holds, or null. `text` may be raw label text.</summary>
         public static string Hit(string text)
         {

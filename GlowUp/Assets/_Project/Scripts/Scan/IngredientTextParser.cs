@@ -128,6 +128,11 @@ namespace GlowUp.Scan
             // a name cut in two by a line break keeps its hyphen but not the break: "DIMETHI-\nCONE", "BIS-\nDIGLYCERYL"
             part = Regex.Replace(part, @"-[ \t]*\n[ \t]*", "-");
 
+            // ONE LINE WITHOUT A COMMA is not what a pack prints: somebody typed it ("retinol and niacinamide"). The words
+            // "and", "&" and "plus" stand between its names.
+            if (part.IndexOf(',') < 0 && part.IndexOf(';') < 0 && part.Trim().IndexOf('\n') < 0)
+                part = Regex.Replace(part, @"\s+(and|&|plus)\s+", ", ", RegexOptions.IgnoreCase);
+
             // a list separated by commas wraps over several lines; a list typed one name per line has no commas
             bool commas = part.IndexOf(',') >= 0 || part.IndexOf(';') >= 0;
             char[] cuts = commas ? new[] { ',', ';', '\u2022', '\u00b7', '*' } : new[] { '\n', '\u2022', '\u00b7', '*' };
@@ -160,6 +165,9 @@ namespace GlowUp.Scan
         {
             string piece = Clean(rawPiece);
             if (piece.Length == 0) return;
+            // 0. "fragrance free", "no parabens", "0% alcohol": it names an ingredient to say it is NOT in the product. It is
+            //    never that ingredient, and nothing is rescued out of it either.
+            if (IngredientStoplist.IsFreeOfClaim(rawPiece)) { result.rejected.Add(piece + "  (a claim that something is not in it)"); return; }
             List<string> forms = FormsOf(piece);
             string main = forms.Count > 0 ? forms[0] : piece;
 
@@ -183,12 +191,14 @@ namespace GlowUp.Scan
                 return;
             }
 
-            // 3. a close misreading of a known name, or an ingredient whose family is known
-            if (CloseName(forms, out string closeName)) { Keep(result, closeName, true, mayContain); return; }
-
-            // 4. two or more known names whose commas the camera missed: "Glycerin Niacinamide"
+            // 3. two or more known names in a row, whose commas the camera missed or the user did not type:
+            //    "Glycerin Niacinamide", "talc mica dimethicone fragrance". (Before step 4: taken as ONE name, such a row
+            //    would pass as a member of the last name's family, "... fragrance".)
             List<string> parts = Segment(main);
             if (parts != null) { foreach (string name in parts) Keep(result, name, true, mayContain); return; }
+
+            // 4. a close misreading of a known name, or an ingredient whose family is known
+            if (CloseName(forms, out string closeName)) { Keep(result, closeName, true, mayContain); return; }
 
             // 5. it looks like an ingredient name, but the app does not know it
             if ((first || last) && Rescue(main, first, out string edge)) { Keep(result, edge, true, mayContain); return; }
@@ -209,7 +219,7 @@ namespace GlowUp.Scan
         {
             name = null;
             string piece = Clean(rawPiece);
-            if (piece.Length < 3) return false;
+            if (piece.Length < 3 || IngredientStoplist.IsFreeOfClaim(rawPiece)) return false;
             List<string> forms = FormsOf(piece);
             if (ExactName(forms, out name)) return true;
             if (IngredientStoplist.Hit(piece) != null || IngredientStoplist.WrongShape(forms.Count > 0 ? forms[0] : piece)) return false;
@@ -334,7 +344,12 @@ namespace GlowUp.Scan
         /// </summary>
         static List<string> Segment(string piece)
         {
-            string[] words = piece.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            // words that only join two names are left out ("Glycerin and Niacinamide")
+            var kept = new List<string>();
+            foreach (string word in piece.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
+                if (!(word == "&" || word == "+" || string.Equals(word, "and", StringComparison.OrdinalIgnoreCase) || string.Equals(word, "plus", StringComparison.OrdinalIgnoreCase)))
+                    kept.Add(word);
+            string[] words = kept.ToArray();
             if (words.Length < 2 || words.Length > 12) return null;
             var names = new List<string>();
             int at = 0;

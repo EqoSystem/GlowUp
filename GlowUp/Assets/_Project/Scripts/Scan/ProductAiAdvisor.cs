@@ -248,6 +248,10 @@ namespace GlowUp.Scan
             public bool webSearched;
             /// <summary>MORE ABOUT IT: its ingredient list as a credible page publishes it (`found` is false when none does).</summary>
             public IngredientLookup list = new IngredientLookup();
+            /// <summary>For a product the user TYPED: what is missing to tell which product is meant ("Which Maybelline lipstick? Add its name."), or "".</summary>
+            public string question = "";
+            /// <summary>For a product the user TYPED: it is not make-up at all (GlowUp checks make-up only).</summary>
+            public bool notMakeup;
         }
 
         /// <summary>
@@ -280,25 +284,68 @@ namespace GlowUp.Scan
             q.Append("brand, or another line of the same brand, is NOT the same: then reply with same false.\n");
             q.Append("STEP 3, when it is the same: write its brand and its product name the way that page sells it. ");
             q.Append(BrandAndNameRule);
-            q.Append("STEP 4, MORE ABOUT IT: its full ingredient (INCI) list as its maker publishes it. Use credible sources only, most trusted first: the brand's official ");
-            q.Append("website or official store page; the product pages of large retailers that reproduce the list printed on the pack; Open Beauty Facts. ");
-            q.Append("Ingredient DATABASES (INCIDecoder, EWG Skin Deep, CosDNA, CosIng) explain what an ingredient is: do NOT take this product's list from them. ");
-            q.Append("The list must be a copy of what is printed on the pack: never reconstruct it from memory or from a similar product. ");
-            q.Append("When no credible page shows the list, leave \"ingredients\" empty: the product can still be the same.\n");
             if (KnownBrands != null && KnownBrands.Count > 0)
                 q.Append("BRANDS THIS APP ALREADY LISTS (when it is one of these, write the brand exactly like this): ").Append(string.Join(", ", KnownBrands.GetRange(0, Mathf.Min(80, KnownBrands.Count)))).Append("\n");
-            q.Append("Reply with ONLY one JSON object, no markdown and no other text, in exactly this shape:\n");
-            q.Append("{\"same\":true,\"brandName\":\"\",\"productName\":\"as sold, without the brand and without the shade\",");
-            q.Append("\"cosmeticType\":\"").Append(ProductScope.AiTypeChoices).Append("\",");
-            q.Append("\"page\":\"page title | https://address of the page that shows this product\",\"confidence\":0.0,");
-            q.Append("\"ingredients\":[\"INCI name\"],");
-            q.Append("\"hidden\":[{\"term\":\"the word on the label, e.g. Fragrance\",\"substances\":[\"...\"],\"note\":\"one short sentence, naming the source\"}],");
-            q.Append("\"sources\":[\"page title | https://address the ingredient list came from\"],\"note\":\"\"}\n");
+            AppendListStepAndShape(q, "");
             q.Append("confidence is 0 to 1. NEVER invent a product, a page or an ingredient list. If you cannot find the product, reply {\"same\":false}.");
 
             AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), true, TimeoutSeconds + 10f, jpegPhoto);
             if (answer == null || !answer.ok) { Debug.LogWarning("AI web check: " + (answer != null ? answer.error : "no answer")); return result; }
             return WebMatchFrom(answer.text, answer.sources, answer.usedWebSearch, answer.model, guess != null ? guess.brandName : "");
+        }
+
+        /// <summary>
+        /// THE USER TYPED A PRODUCT (they do not have the pack at hand, or the camera cannot read it). People type the way
+        /// they speak: brand and name in one go, in any order, with spelling mistakes, without the shade. This asks the AI
+        /// to work out which product is meant, to find it on the web, to write its brand and name the way it is sold, and
+        /// to bring its published ingredient list in the same answer. When the words fit several products ("lipstick",
+        /// only a brand), it does not guess: it says what is missing. Only what the user typed about the PRODUCT is sent.
+        /// </summary>
+        public static async Task<WebMatch> FindTyped(string typedProduct, string typedBrand = "", string typedKind = "")
+        {
+            var result = new WebMatch();
+            typedProduct = (typedProduct ?? "").Trim(); typedBrand = (typedBrand ?? "").Trim(); typedKind = (typedKind ?? "").Trim();
+            if (!Available || !SearchTheWeb || (typedProduct.Length < 2 && typedBrand.Length < 2)) return result;
+            var q = new StringBuilder();
+            q.Append("A user of a make-up safety app typed the product they want checked. They do not have its ingredient list. People type the way they speak: ");
+            q.Append("the brand and the product name in one go, in any order, with spelling mistakes, and usually without the shade.\n");
+            q.Append("TYPED: ").Append(typedProduct.Length > 200 ? typedProduct.Substring(0, 200) : typedProduct).Append('\n');
+            if (typedBrand.Length > 0) q.Append("BRAND THEY GAVE: ").Append(typedBrand).Append('\n');
+            if (typedKind.Length > 0) q.Append("KIND THEY CHOSE: ").Append(typedKind).Append('\n');
+            if (KnownBrands != null && KnownBrands.Count > 0)
+                q.Append("BRANDS THIS APP ALREADY LISTS (when it is one of these, write the brand exactly like this): ").Append(string.Join(", ", KnownBrands.GetRange(0, Mathf.Min(80, KnownBrands.Count)))).Append("\n");
+            q.Append("STEP 1, SEARCH THE WEB for the make-up product these words mean (the brand's own website or store first, then large retailers).\n");
+            q.Append("STEP 2, IS IT CLEAR WHICH PRODUCT? \"same\" is true only when the words clearly mean ONE product you found. When they fit several different products ");
+            q.Append("(only a kind such as \"lipstick\", only a brand, or a name several brands use), do NOT pick one: reply with same false and put into \"question\" ");
+            q.Append("one short sentence that tells the user what to add, for example \"Which Maybelline lipstick? Add the name printed on it.\" ");
+            q.Append("Different shades of one product are the same product. This app checks MAKE-UP only: when the words mean something that is not make-up ");
+            q.Append("(a shampoo, a soap, a skin-care cream, a perfume, a medicine), reply with same false and notMakeup true.\n");
+            q.Append("STEP 3, when it is clear: write its brand and its product name the way that page sells it. ");
+            q.Append(BrandAndNameRule);
+            AppendListStepAndShape(q, "\"question\":\"\",\"notMakeup\":false,");
+            q.Append("confidence is 0 to 1. NEVER invent a product, a page or an ingredient list. If you cannot find the product, reply {\"same\":false,\"question\":\"...\"}.");
+
+            AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), true, TimeoutSeconds + 10f);
+            if (answer == null || !answer.ok) { Debug.LogWarning("AI look-up of a typed product: " + (answer != null ? answer.error : "no answer")); return result; }
+            return WebMatchFrom(answer.text, answer.sources, answer.usedWebSearch, answer.model, typedBrand);
+        }
+
+        // the last step of both web questions (the product's published ingredient list) and the shape of the answer
+        static void AppendListStepAndShape(StringBuilder q, string extraFields)
+        {
+            q.Append("STEP 4, MORE ABOUT IT: its full ingredient (INCI) list as its maker publishes it. Use credible sources only, most trusted first: the brand's official ");
+            q.Append("website or official store page; the product pages of large retailers that reproduce the list printed on the pack; Open Beauty Facts. ");
+            q.Append("Ingredient DATABASES (INCIDecoder, EWG Skin Deep, CosDNA, CosIng) explain what an ingredient is: do NOT take this product's list from them. ");
+            q.Append("The list must be a copy of what is printed on the pack: never reconstruct it from memory or from a similar product. ");
+            q.Append("When no credible page shows the list, leave \"ingredients\" empty: the product can still be the same.\n");
+            q.Append("Reply with ONLY one JSON object, no markdown and no other text, in exactly this shape:\n");
+            q.Append("{\"same\":true,\"brandName\":\"\",\"productName\":\"as sold, without the brand and without the shade\",");
+            q.Append("\"cosmeticType\":\"").Append(ProductScope.AiTypeChoices).Append("\",");
+            q.Append("\"page\":\"page title | https://address of the page that shows this product\",\"confidence\":0.0,");
+            q.Append(extraFields);
+            q.Append("\"ingredients\":[\"INCI name\"],");
+            q.Append("\"hidden\":[{\"term\":\"the word on the label, e.g. Fragrance\",\"substances\":[\"...\"],\"note\":\"one short sentence, naming the source\"}],");
+            q.Append("\"sources\":[\"page title | https://address the ingredient list came from\"],\"note\":\"\"}\n");
         }
 
         /// <summary>
@@ -317,6 +364,9 @@ namespace GlowUp.Scan
             result.page = page.Contains("http") ? page : "";
             result.confidence = Number01(json, "confidence");
             result.same = webSearched && Flag(json, "same") && (result.productName.Length > 0 || result.brandName.Length > 0);
+            string question = Text(json, "question");
+            result.question = question.Length <= 160 ? question : question.Substring(0, 160).TrimEnd() + "...";
+            result.notMakeup = Flag(json, "notMakeup");
             if (!result.same) return result;                 // a list for "some similar product" is never taken
             result.list = LookupFrom(json, pagesOpened, webSearched, model, result.brandName.Length > 0 ? result.brandName : brandGuess, false);
             return result;

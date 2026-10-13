@@ -232,7 +232,18 @@ namespace GlowUp.Scan
         [SerializeField] private string msgStartedOver = "Ready for a new product.";
         [SerializeField] private string msgReaderLoading = "Getting the text reader ready...";
         [SerializeField] private string msgReaderMissing = "The text reader is not available on this device. Type the ingredients instead.";
-        [SerializeField] private string msgNeedIngredients = "Type or paste at least two ingredients, separated by commas.";
+        [Header("Typing a product in: its name is enough, the list is looked up")]
+        [Tooltip("Nothing was typed that names a product or an ingredient")]
+        [SerializeField] private string msgManualNothing = "Type the product's name (its brand helps), or its ingredient list.";
+        [Tooltip("{0} = the product as typed")]
+        [SerializeField] private string msgManualLooking = "Looking for {0}...";
+        [SerializeField] private string msgManualOffline = "{0} is not in GlowUp's own list, and you are offline. Connect to the internet, or type its ingredient list.";
+        [SerializeField] private string msgManualLimit = "The web has been searched as often as it may be for now. Type the ingredient list, or open this screen again later.";
+        [SerializeField] private string msgManualNotFound = "We could not find that product. Check the spelling, add the brand, or type its ingredient list.";
+        [Tooltip("{0} = the product as it is sold")]
+        [SerializeField] private string msgManualNoList = "Found {0}, but no trustworthy page shows its ingredient list. Type the list from the pack.";
+        [SerializeField] private string msgManualNotMakeup = "GlowUp checks make-up only, and that is not make-up.";
+        [SerializeField] private string msgManualFailed = "The look-up did not work. Check your connection and try again, or type the ingredient list.";
         [SerializeField] private string msgLookUpNeedsName = "Show the front of the product first, so we know which product to look up.";
         [SerializeField] private string msgLookingUp = "Looking up this product's ingredient list...";
         [SerializeField] private string msgLookUpOffline = "This product is not in the app's list yet. Connect to the internet to look it up, or type the ingredients.";
@@ -1771,22 +1782,114 @@ namespace GlowUp.Scan
             manualPanel.Show();
         }
 
+        bool manualBusy;
+
+        void ManualSay(string message) { if (manualFeedbackText != null) manualFeedbackText.text = message ?? ""; }
+
+        /// <summary>
+        /// "Analyse" on the type-it-in pop-up. The app works out WHAT was typed (TypedEntry): an ingredient list is analysed
+        /// as it is; a product's name is enough too, its list is then looked up (the app's own product list, then the web).
+        /// </summary>
         void AnalyseManual()
         {
+            if (manualBusy || stage == Stage.Leaving) return;
             string text = manualInput != null ? manualInput.text : "";
-            if (IngredientTextParser.Parse(text).Count < 2)
+            string typedName = manualProductInput != null ? manualProductInput.text.Trim() : "";
+            string typedBrand = manualBrandInput != null ? manualBrandInput.text.Trim() : "";
+            string typedType = manualTypeDropdown != null && manualTypeDropdown.value > 0 ? manualTypeDropdown.options[manualTypeDropdown.value].text : "";
+
+            TypedEntry.Reading typed = TypedEntry.Understand(text);
+            if (typed.kind == TypedEntry.Kind.Ingredients) { AnalyseTypedList(text, typedName, typedBrand, typedType); return; }
+
+            // NO INGREDIENT LIST WAS TYPED: the product's name is enough (in its own box, or typed into the big one)
+            string product = typedName.Length > 0 ? typedName : typed.product;
+            if (product.Length < 2 && typedBrand.Length < 2) { ManualSay(msgManualNothing); return; }
+            ManualLookUp(product, typedBrand, typedType);
+        }
+
+        /// <summary>
+        /// The user typed a product without its ingredient list. 1. The app's own product list (also offline). 2. The web:
+        /// the AI works out which product is meant, writes its brand and name as it is sold (shown in the boxes, so the
+        /// user sees what was understood) and brings its published list. When the words fit several products it asks back
+        /// instead of guessing. Every way out says what to do next; the look-up has the AI's own time limit.
+        /// </summary>
+        async void ManualLookUp(string product, string brand, string kind)
+        {
+            manualBusy = true;
+            if (manualAnalyseButton != null) manualAnalyseButton.interactable = false;
+            string shown = ((brand.Length > 0 && product.IndexOf(brand, StringComparison.OrdinalIgnoreCase) < 0 ? brand + " " : "") + product).Trim();
+            ManualSay(string.Format(msgManualLooking, shown));
+            try
             {
-                if (manualFeedbackText != null) manualFeedbackText.text = msgNeedIngredients;
-                return;
+                ProductData listed = InventoryProductFor(product, brand);          // the app's own product list (also offline)
+                if (!HasStoredList(listed)) listed = ProductIn(shown) ?? listed;      // brand and name typed in one go
+                if (HasStoredList(listed)) { UseTypedProduct(listed, kind); return; }
+
+                if (!ConnectivityMonitor.Online || !ProductAiAdvisor.Available) { ManualSay(string.Format(msgManualOffline, shown)); return; }
+                if (!AiBudget.TakeLookUp()) { ManualSay(msgManualLimit); return; }
+                ProductAiAdvisor.WebMatch match = await ProductAiAdvisor.FindTyped(product, brand, kind);
+                if (this == null || stage == Stage.Leaving) return;
+                if (manualPanel != null && !manualPanel.IsOpen) return;          // the user closed the pop-up meanwhile: nothing is done behind their back
+                if (match != null && match.notMakeup) { ManualSay(msgManualNotMakeup); return; }
+                if (match == null || !match.same) { ManualSay(match != null && match.question.Length > 0 ? match.question : msgManualNotFound); return; }
+
+                if (manualProductInput != null && match.productName.Length > 0) manualProductInput.text = match.productName;
+                if (manualBrandInput != null && match.brandName.Length > 0) manualBrandInput.text = match.brandName;
+                string foundBrand = match.brandName.Length > 0 ? match.brandName : brand;
+                string foundKind = kind.Length > 0 ? kind : match.cosmeticType;
+                ProductScope.Verdict verdict = ProductScope.Judge(foundKind, match.productName);
+                if (verdict.IsNotMakeup) { ManualSay(ProductScope.StopMessage(verdict)); return; }
+
+                // under the name the web sells it by, the app's own list may have it after all
+                listed = InventoryProductFor(match.productName, foundBrand);
+                if (HasStoredList(listed)) { UseTypedProduct(listed, foundKind); return; }
+                if (!match.list.found) { ManualSay(string.Format(msgManualNoList, (foundBrand + " " + match.productName).Trim())); return; }
+
+                foreach (ProductAiAdvisor.HiddenAdditive hidden in match.list.hidden)
+                {
+                    try { HiddenAdditives.Learn(hidden.term, hidden.substances, hidden.note, match.list.sources, match.list.webSearched, match.list.model); }
+                    catch (Exception e) { Debug.LogWarning("Hidden ingredients were not saved: " + e.Message); }
+                }
+                knownProduct = null;
+                if (listed != null) Adopt(listed);
+                else { identity.productName = match.productName; identity.brandName = foundBrand; }
+                if (foundKind.Length > 0) identity.cosmeticType = foundKind;
+                ManualSay("");
+                ClosePanel(manualPanel);
+                UseLookedUpList(match.list.ingredients, match.list.sources, "web", match.list.webSearched);
             }
+            catch (Exception e)
+            {
+                Debug.LogWarning("Scan: looking a typed product up failed: " + e.Message);
+                if (this != null) ManualSay(msgManualFailed);
+            }
+            finally
+            {
+                manualBusy = false;
+                if (this != null && manualAnalyseButton != null) manualAnalyseButton.interactable = true;
+            }
+        }
+
+        /// <summary>The typed product is one the app's own list has, with its ingredient list: it is analysed with that list.</summary>
+        void UseTypedProduct(ProductData listed, string kind)
+        {
+            Adopt(listed);
+            if (identity.cosmeticType.Length == 0 && kind.Length > 0) identity.cosmeticType = kind;
+            ProductScope.Verdict verdict = ProductScope.Judge(identity.cosmeticType, identity.productName);
+            if (verdict.IsNotMakeup) { ManualSay(ProductScope.StopMessage(verdict)); return; }
+            ManualSay("");
+            ClosePanel(manualPanel);
+            UseLookedUpList(listed.ingredients, ListPagesOf(listed), "inventory", false);
+        }
+
+        /// <summary>An ingredient list was typed (one known ingredient is enough): it goes to the analysis as it is.</summary>
+        void AnalyseTypedList(string text, string typedName, string typedBrand, string typedType)
+        {
             stage = Stage.Leaving;
             StopCamera();
             ScanSession.PendingText = text; ScanSession.PendingSource = "manual"; ScanSession.PendingShadeHex = identity.shadeHex;
             ScanSession.PendingListFrom = "typed"; ScanSession.PendingListWebBacked = false;
             // what the user typed comes first; what the scan found fills the rest
-            string typedName = manualProductInput != null ? manualProductInput.text.Trim() : "";
-            string typedBrand = manualBrandInput != null ? manualBrandInput.text.Trim() : "";
-            string typedType = manualTypeDropdown != null && manualTypeDropdown.value > 0 ? manualTypeDropdown.options[manualTypeDropdown.value].text : "";
             ScanSession.PendingProductName = typedName.Length > 0 ? typedName : identity.productName;
             ScanSession.PendingBrandName = typedBrand.Length > 0 ? typedBrand : identity.brandName;
             ScanSession.PendingCosmeticType = typedType.Length > 0 ? typedType : identity.cosmeticType;
