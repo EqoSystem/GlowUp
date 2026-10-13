@@ -32,6 +32,9 @@ namespace GlowUp.Scan
         [SerializeField] private int requestedHeight = 720;
         [SerializeField] private int requestedFps = 30;
 
+        [Tooltip("The phone's question about the camera comes when the screen has been on show this long. Asked in the very first moment, it stood over a screen that was not drawn yet.")]
+        [SerializeField] private float askAfterSeconds = 0.35f;
+
         [Header("Corrections (only if a phone shows the picture wrongly)")]
         [Tooltip("Show the front camera like a mirror")]
         [SerializeField] private bool mirrorFrontCamera = true;
@@ -102,6 +105,10 @@ namespace GlowUp.Scan
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (!Permission.HasUserAuthorizedPermission(Permission.Camera))
             {
+                // first the screen is drawn, then the phone asks
+                float shown = 0f;
+                while (shown < askAfterSeconds || GlowUp.Common.ScreenTransition.IsBusy) { if (!GlowUp.Common.ScreenTransition.IsBusy) shown += Time.unscaledDeltaTime; yield return null; }
+
                 bool answered = false, granted = false;
                 var callbacks = new PermissionCallbacks();
                 callbacks.PermissionGranted += _ => { granted = true; answered = true; };

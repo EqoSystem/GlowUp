@@ -134,6 +134,31 @@ namespace GlowUp.EditorTools
             var boost = SceneBuilderCore.Ensure<ScreenBrightnessBoost>(sun.gameObject);
             A.Set(boost, "screen", (int)ScreenBrightnessBoost.CameraScreen.TryOn); A.Set(boost, "toggleButton", sun); A.Set(boost, "toggleIcon", sunIcon);
 
+            // ---- the card that fills the camera box until there is a camera picture ----
+            // Last child of the box, so it lies over the dark box, the face guide and the camera buttons. It is INACTIVE here
+            // (it would hide the camera box in the Scene view): tick it active to see and style it. The app shows it when the
+            // screen opens and takes it away when the picture is there.
+            Image waitCard = A.Panel(viewport.transform, "CameraWaitCard", ThemeRole.SurfaceAlt, 1f, 48f);
+            A.Fill(waitCard.transform);
+            waitCard.raycastTarget = true;                           // taps do not reach the camera buttons underneath
+            CanvasGroup waitGroup = SceneBuilderCore.Ensure<CanvasGroup>(waitCard.gameObject);
+            Image waitChip = A.Panel(waitCard.transform, "IconChip", ThemeRole.InputBackground, 1f, 170f);
+            A.At(waitChip.transform, A.MC, new Vector2(0, 210), new Vector2(170, 170));
+            Image waitIcon = A.Icon(waitChip.transform, "Icon", IconFactory.FaceGuide, 96, ThemeRole.Gold);
+            waitIcon.preserveAspect = true;
+            TextMeshProUGUI waitTitle = A.Label(waitCard.transform, "TitleText", "Allow the camera", 50, ThemeRole.Heading, FontRole.Title, TextAlignmentOptions.Center);
+            A.At(waitTitle.transform, A.MC, new Vector2(0, 62), new Vector2(820, 76));
+            A.Shrink(waitTitle, 34);
+            TextMeshProUGUI waitMessage = A.Label(waitCard.transform, "MessageText", "Try-On uses the front camera to show the colour on your own face. Nothing is recorded or saved.",
+                                                  31, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Top, true);
+            A.At(waitMessage.transform, A.MC, new Vector2(0, -78), new Vector2(760, 190));
+            Button waitButton = A.PillButton(waitCard.transform, "AllowCameraButton", "Allow camera", 34, ThemeRole.ButtonFill, ThemeRole.ButtonText);
+            A.At(waitButton.transform, A.MC, new Vector2(0, -236), new Vector2(460, 96));
+            var waitView = SceneBuilderCore.Ensure<CameraWaitCard>(waitCard.gameObject);
+            A.Set(waitView, "group", waitGroup); A.Set(waitView, "titleText", waitTitle); A.Set(waitView, "messageText", waitMessage);
+            A.Set(waitView, "actionButton", waitButton); A.Set(waitView, "actionLabel", A.LabelOf(waitButton));
+            waitCard.gameObject.SetActive(false);
+
             var splitView = compare.GetComponent<BeforeAfterSplit>();
             A.Set(splitView, "area", viewport.rectTransform); A.Set(splitView, "afterClip", afterClip.GetComponent<RectMask2D>());
             A.Set(splitView, "beforeClip", beforeClip.GetComponent<RectMask2D>()); A.Set(splitView, "visuals", splitVisuals);
@@ -274,6 +299,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "liveTracking", live);
 
             A.Set(controller, "cameraFeed", camera); A.Set(controller, "makeup", makeup); A.Set(controller, "statusText", status);
+            A.Set(controller, "cameraCard", waitView);
             A.Set(controller, "productText", productText); A.Set(controller, "changeProductButton", change);
             A.Set(controller, "areaTabs", tabs); A.Set(controller, "finishTabs", finishTabs); A.Set(controller, "split", splitView);
             A.Set(controller, "productShadesGroup", productGroup);

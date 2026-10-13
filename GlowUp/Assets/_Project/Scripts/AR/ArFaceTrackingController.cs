@@ -82,6 +82,8 @@ namespace GlowUp.AR
         [SerializeField] private bool rememberCrashes = true;
         [Tooltip("Live tracking counts as working once it has run this many seconds")]
         [SerializeField] private float stableAfterSeconds = 4f;
+        [Tooltip("The phone's question about the camera comes when the screen has been on show this long. Asked in the very first moment, it stood over a screen that was not drawn yet.")]
+        [SerializeField] private float askAfterSeconds = 0.4f;
 
         [Header("Wording")]
         [SerializeField] private string msgChecking = "Getting the camera ready...";
@@ -227,6 +229,10 @@ namespace GlowUp.AR
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (!Permission.HasUserAuthorizedPermission(Permission.Camera))
             {
+                // first the screen is drawn (with its card that says why the camera is needed), then the phone asks
+                float shown = 0f;
+                while (shown < askAfterSeconds || ScreenTransition.IsBusy) { if (!ScreenTransition.IsBusy) shown += Time.unscaledDeltaTime; yield return null; }
+
                 bool answered = false, granted = false;
                 var callbacks = new PermissionCallbacks();
                 callbacks.PermissionGranted += _ => { granted = true; answered = true; };

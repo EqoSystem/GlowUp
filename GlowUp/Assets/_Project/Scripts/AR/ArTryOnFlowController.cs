@@ -28,6 +28,8 @@ namespace GlowUp.AR
         [SerializeField] private TextMeshProUGUI statusText;
         [SerializeField] private string msgAlign = "Line your face up with the guide";
         [SerializeField] private string msgStarting = "Starting the camera...";
+        [Tooltip("The light card that fills the camera box until there is a camera picture: it says why the camera is asked for, that it is starting, or that it is off. Without it the box is an empty dark area meanwhile.")]
+        [SerializeField] private CameraWaitCard cameraCard;
 
         [Header("Product")]
         [SerializeField] private TextMeshProUGUI productText;
@@ -116,6 +118,8 @@ namespace GlowUp.AR
             if (lessButton != null) lessButton.onClick.AddListener(() => { if (intensitySlider != null) intensitySlider.value = Mathf.Clamp01(intensitySlider.value - intensityStep); });
             if (moreButton != null) moreButton.onClick.AddListener(() => { if (intensitySlider != null) intensitySlider.value = Mathf.Clamp01(intensitySlider.value + intensityStep); });
             if (cameraFeed != null) cameraFeed.Started += OnCameraStarted;
+            if (liveTracking != null) liveTracking.ModeDecided += OnModeDecided;
+            if (cameraCard != null) cameraCard.ActionPressed += OnCameraCardAction;
             if (pickerSearchInput != null) pickerSearchInput.onValueChanged.AddListener(_ => FillPicker());
         }
 
@@ -128,6 +132,9 @@ namespace GlowUp.AR
         async void Start()
         {
             Say(msgStarting);
+            // until there is a camera picture the camera box shows a light card, never an empty dark area: the phone's own
+            // question about the camera then stands over a screen that says what it is for
+            ShowCameraCard();
             if (liveTracking != null) liveTracking.Begin();              // it starts the guided preview itself when tracking is not possible
             else if (cameraFeed != null) cameraFeed.StartCamera();
             ApplyIntensity();
@@ -143,14 +150,67 @@ namespace GlowUp.AR
             if (record == null) OpenPicker();
         }
 
-        void OnDestroy() { if (cameraFeed != null) cameraFeed.Started -= OnCameraStarted; }
+        void OnDestroy()
+        {
+            if (cameraFeed != null) cameraFeed.Started -= OnCameraStarted;
+            if (liveTracking != null) liveTracking.ModeDecided -= OnModeDecided;
+        }
         void StopCamera()
         {
             if (liveTracking != null) liveTracking.StopTracking();
             if (cameraFeed != null) cameraFeed.StopCamera();
         }
-        void OnCameraStarted(bool ok, string message) { Say(ok ? msgAlign : message); }
         void Say(string message) { if (statusText != null) statusText.text = message; }
+
+        // ---------------------------------------------------------------------------------------
+        //  The camera box before there is a picture (CameraWaitCard)
+        // ---------------------------------------------------------------------------------------
+        bool saidNoOnce;
+
+        void ShowCameraCard()
+        {
+            if (cameraCard != null) cameraCard.Show(CameraPermission.Granted ? CameraWaitCard.State.Starting : CameraWaitCard.State.Asking);
+        }
+
+        /// <summary>Live tracking shows its picture: the card goes. (The guided preview tells through OnCameraStarted.)</summary>
+        void OnModeDecided(bool live) { if (live && cameraCard != null) cameraCard.Hide(); }
+
+        void OnCameraStarted(bool ok, string message)
+        {
+            Say(ok ? msgAlign : message);
+            if (cameraCard == null) return;
+            if (ok) { cameraCard.Hide(); return; }
+            if (!CameraPermission.Granted)
+            {
+                // the user said no. Android shows its question once more; after a second no it answers by itself, and only
+                // the phone's settings can allow the camera
+                bool settingsOnly = saidNoOnce && !CameraPermission.CanAskAgain;
+                saidNoOnce = true;
+                cameraCard.Show(CameraWaitCard.State.Refused, null, settingsOnly);
+            }
+            else cameraCard.Show(CameraWaitCard.State.Problem, message);
+        }
+
+        /// <summary>The button of the card: ask again, open the phone's settings, or try the camera again.</summary>
+        void OnCameraCardAction()
+        {
+            if (cameraCard != null && cameraCard.OffersSettings) { CameraPermission.OpenAppSettings(); return; }
+            RestartCamera();
+        }
+
+        void RestartCamera()
+        {
+            Say(msgStarting);
+            ShowCameraCard();
+            if (liveTracking != null) liveTracking.Begin();
+            else if (cameraFeed != null) { cameraFeed.StopCamera(); cameraFeed.StartCamera(); }
+        }
+
+        // back from the phone's settings with the camera allowed: it starts without another tap
+        void OnApplicationFocus(bool focused)
+        {
+            if (focused && cameraCard != null && cameraCard.Current == CameraWaitCard.State.Refused && CameraPermission.Granted) RestartCamera();
+        }
 
         // ---------------------------------------------------------------------------------------
         void ShowProduct()
