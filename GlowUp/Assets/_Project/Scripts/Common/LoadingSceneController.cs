@@ -32,7 +32,7 @@ namespace GlowUp.Common
         [SerializeField] private string fallbackScene = SceneNames.Dashboard;
         [SerializeField] private string cancelScene = SceneNames.AiSmartAnalysis;
         [Tooltip("The loading screen is shown at least this long, so it never just flashes by")]
-        [SerializeField] private float minimumShowSeconds = 2.2f;
+        [SerializeField] private float minimumShowSeconds = 1.2f;
         [SerializeField] private float spinnerDegreesPerSecond = 220f;
         [SerializeField] private float progressSmoothing = 4f;
         [SerializeField] private string[] tips =
@@ -88,7 +88,7 @@ namespace GlowUp.Common
         [Tooltip("One search of the FDA's site takes 12 to 15 seconds. A search without an answer after this many seconds is given up (the badge then says the check was unavailable).")]
         [SerializeField] private float fdaSearchTimeoutSeconds = 25f;
         [Tooltip("The search runs beside the other steps. When they are done, the result waits at most this many more seconds for it; after that the result opens and its FDA badge fills in by itself when the answer arrives.")]
-        [SerializeField] private float fdaExtraWaitSeconds = 4f;
+        [SerializeField] private float fdaExtraWaitSeconds = 1f;
 
         [Header("AI settings (for looking up unknown ingredients)")]
         [Tooltip("The list of AI models to ask. The app never sends the user's profile (name, e-mail, age, skin conditions, allergens) to the AI: the comparison with the profile is done on the phone.")]

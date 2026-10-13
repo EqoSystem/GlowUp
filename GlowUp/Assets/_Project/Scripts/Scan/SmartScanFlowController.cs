@@ -165,7 +165,7 @@ namespace GlowUp.Scan
         [Tooltip("Held this long without the ring moving on: the user is offered to start over or type the product in")]
         [SerializeField] private float stallSeconds = 12f;
         [Tooltip("How long the 'Got it' message stays before the loading scene opens")]
-        [SerializeField] private float recognisedHoldSeconds = 1.1f;
+        [SerializeField] private float recognisedHoldSeconds = 0.5f;
 
         [Header("Barcode")]
         [Tooltip("On = the camera also looks for the product's barcode (on the phone itself, no internet). A product whose barcode is in the inventory is recognised at once, with its saved ingredient list.")]
@@ -273,6 +273,7 @@ namespace GlowUp.Scan
 
         // the picture that is being looked at
         int[] pixels; int pixelsW, pixelsH;
+        int pixelsOfScan = -1;                    // the scan `pixels` was taken in: after "Start over" it still holds the product before
         // the text tracer: the block of text it follows, and the picture of a close look (its own, so `pixels` stays the whole frame)
         readonly TextTracer tracer = new TextTracer();
         int[] closePixels; int closeW, closeH;
@@ -554,6 +555,7 @@ namespace GlowUp.Scan
             {
                 sentPart = new Rect(0f, 0f, 1f, 1f);
                 if (!cameraFeed.UprightArgb(frame, readPictureSize, ref pixels, out pixelsW, out pixelsH)) return;
+                pixelsOfScan = scanNumber;
                 if (cameraFeed.FramePixels(frame, out int wide, out int high)) { framePixelsHigh = high; frameWide = wide; frameHigh = high; }
                 string colour = cameraFeed.DominantColourHex(frame);         // only what is inside the scan frame, not the hand or the table round it
                 if (!string.IsNullOrEmpty(colour)) lastColour = colour;
@@ -1169,6 +1171,7 @@ namespace GlowUp.Scan
         //  The AI helps while the scan goes on
         // ---------------------------------------------------------------------------------------
         bool AiCanLook => aiRecognisesProduct && ConnectivityMonitor.Online && ProductAiAdvisor.Available;
+        const float EarlyLookWaitSeconds = 10f;           // Finish waits this long at most for an early look that is on its way
 
         /// <summary>
         /// A product the app's own lists do not have has no name the app could read: on its pack brand, name and claims
@@ -1179,7 +1182,7 @@ namespace GlowUp.Scan
         void MaybeAskEarly()
         {
             if (!aiHelpsEarly || earlyAsked || identity.productName.Length > 0 || knownProduct != null) return;
-            if (scanningFor < aiHelpAfterSeconds || PopupOpen || pixels == null || pixelsW <= 0) return;
+            if (scanningFor < aiHelpAfterSeconds || PopupOpen || pixels == null || pixelsW <= 0 || pixelsOfScan != scanNumber) return;
             if (!AiCanLook || !AiBudget.CanRecognise) return;
             EarlyLook();
         }
@@ -1325,7 +1328,7 @@ namespace GlowUp.Scan
         async void ShadeLook()
         {
             if (shadeOut) return;
-            if (!AiCanLook || !AiBudget.CanRecognise || identity.productName.Length == 0 || pixels == null || pixelsW <= 0)
+            if (!AiCanLook || !AiBudget.CanRecognise || identity.productName.Length == 0 || pixels == null || pixelsW <= 0 || pixelsOfScan != scanNumber)
             {
                 capWatch.Solved();
                 ShowIdentity();
@@ -1360,9 +1363,9 @@ namespace GlowUp.Scan
             ShowButtons();
             SetWorking(true);
             Say(msgAiLooking);
-            float waited = 0f, limit = ProductAiAdvisor.TimeoutSeconds + 6f;     // EVERY LONG STEP HAS A TIME LIMIT
-            while (earlyOut && waited < limit) { waited += Time.unscaledDeltaTime; yield return null; }
-            earlyOut = false;
+            float waited = 0f;                                                   // EVERY LONG STEP HAS A TIME LIMIT
+            while (earlyOut && waited < EarlyLookWaitSeconds) { waited += Time.unscaledDeltaTime; yield return null; }
+            earlyOut = false;                                                    // not waited for again (a late answer still fills the gaps)
             SetWorking(false);
             stage = Stage.Scanning;
             if (holdButton != null) holdButton.Usable = true;
@@ -1397,10 +1400,12 @@ namespace GlowUp.Scan
             }
             if (holdButton != null) holdButton.LetGo();
 
+            // the AI's early look is still on its way and the product has no name yet: its answer is waited for (a few
+            // seconds at most), the AI is not asked twice
+            if (earlyOut && identity.productName.Length == 0 && !finishUnnamed) { StartCoroutine(FinishAfterEarlyLook()); return; }
+
             if (!ProductKnown && !finishUnnamed)
             {
-                // 0. the AI's early look is still on its way: its answer is waited for, the AI is not asked twice
-                if (earlyOut) { StartCoroutine(FinishAfterEarlyLook()); return; }
                 // 1. what the app's own lists suggest: the user chooses, and no AI is needed
                 if (!shortlistAnswered && shortlist != null && Suggestions().Count > 0)
                 {

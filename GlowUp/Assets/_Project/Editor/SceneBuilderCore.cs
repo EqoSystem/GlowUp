@@ -248,6 +248,19 @@ namespace GlowUp.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        /// <summary>The same for a number with a fraction (seconds, shares).</summary>
+        public static void ReplaceNumber(Object target, string field, float newValue, params float[] earlierDefaults)
+        {
+            var so = new SerializedObject(target);
+            var p = so.FindProperty(field);
+            if (p == null || p.propertyType != SerializedPropertyType.Float) { Debug.LogWarning($"[SceneBuilder] {target.GetType().Name} has no number field '{field}'"); return; }
+            bool held = false;
+            foreach (float earlier in earlierDefaults) if (Mathf.Approximately(p.floatValue, earlier)) held = true;
+            if (!held || Mathf.Approximately(p.floatValue, newValue)) return;
+            p.floatValue = newValue;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         public static Color Hex(string hex) { ColorUtility.TryParseHtmlString(hex, out var c); return c; }
 
         /// <summary>ThemeProfile asset (created once).</summary>

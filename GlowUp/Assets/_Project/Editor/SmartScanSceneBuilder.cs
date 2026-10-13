@@ -405,6 +405,8 @@ namespace GlowUp.EditorTools
             A.Set(controller, "textOutlines", outlines.GetComponent<TextOutlineOverlay>());
             A.Set(controller, "focusAssistant", focusAssistant); A.Set(controller, "textTrace", traceView);
             A.Set(controller, "scanReadout", readoutBack.gameObject); A.Set(controller, "scanReadoutText", readout);
+            // "Got it" stays half a second, not 1.1: the project owner wants a scan of about five seconds (a time set by hand is kept)
+            SceneBuilderCore.ReplaceNumber(controller, "recognisedHoldSeconds", 0.5f, 1.1f);
             A.Set(controller, "productCheck", productCheck); A.Set(controller, "brandCheck", brandCheck);
             A.Set(controller, "typeCheck", typeCheck); A.Set(controller, "shadeCheck", shadeCheck); A.Set(controller, "shadeSwatch", swatch);
             A.Set(controller, "ingredientsCheck", ingredientsCheck);

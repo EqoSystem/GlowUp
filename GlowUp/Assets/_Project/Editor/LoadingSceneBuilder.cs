@@ -86,6 +86,11 @@ namespace GlowUp.EditorTools
 
             // ---- controller ----
             var controller = A.Controller<LoadingSceneController>("LoadingSceneController");
+            // Shorter fixed waits (the project owner wants a scan of about five seconds; times set by hand are kept): the
+            // loading screen shows at least 1.2 s instead of 2.2, and the result waits 1 s instead of 4 for the FDA
+            // Philippines search, whose badge fills in by itself when the answer comes.
+            SceneBuilderCore.ReplaceNumber(controller, "minimumShowSeconds", 1.2f, 2.2f);
+            SceneBuilderCore.ReplaceNumber(controller, "fdaExtraWaitSeconds", 1f, 4f);
             A.Set(controller, "messageText", message); A.Set(controller, "tipText", tip);
             A.Set(controller, "progressFill", fill); A.Set(controller, "spinner", arc.rectTransform);
             Kit.SetArray(controller, "steps", steps);

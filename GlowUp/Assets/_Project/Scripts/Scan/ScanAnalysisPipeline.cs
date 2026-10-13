@@ -28,7 +28,7 @@ namespace GlowUp.Scan
         /// The FDA Philippines search runs beside the other steps. When they are done, the result waits at most this many
         /// more seconds for it; after that the result opens and its FDA badge fills in by itself when the answer arrives.
         /// </summary>
-        public static float FdaExtraWaitSeconds = 4f;
+        public static float FdaExtraWaitSeconds = 1f;
         /// <summary>
         /// Open Beauty Facts is asked for a second opinion on the ingredient list (by the barcode) beside the other steps.
         /// When they are done, the result waits at most this many more seconds for it; a later answer is not used.
