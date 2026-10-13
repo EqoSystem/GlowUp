@@ -20,6 +20,7 @@ import {
 import { mountShell, paginate, renderPager, icon } from "../_Shared/adminShell.js";
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
+import { setPanelQuiet, setPanelSummary } from "../_Shared/adminFold.js";
 
 const RECENT_ITEMS = 120;             // how many recent scans are fetched (the list, the grid and the graphs all use them)
 const PAGE_SIZE = 8;                  // how many rows a panel shows at a time
@@ -130,6 +131,8 @@ async function countInto(collectionName, elementId) {
 
 function renderTopBrands(brands) {
     const ranked = brands.filter((b) => b.scans > 0).sort((a, b) => b.scans - a.scans).slice(0, TOP_BRANDS);
+    // nothing to rank: the panel folds to one line until a brand is scanned (the admin can open it all the same)
+    setPanelQuiet("brands", ranked.length === 0, ranked.length === 0 ? "No brand scanned yet" : `${ranked[0].name} leads with ${many(ranked[0].scans, "scan", "scans")}`);
     if (ranked.length === 0) { showEmpty("topBrands", "No scans recorded for any brand yet.", false); return; }
     el("topBrandsEmpty").style.display = "none";
     const list = el("topBrandsList");
@@ -188,7 +191,9 @@ async function loadReviewQueue() {
     } catch (error) {
         console.warn("Could not count the ingredients waiting for review: ", error);
     }
-    refreshAssist("actions");
+    // with nothing waiting, only the two shortcuts are left (the menu on the left has them too): the panel folds to one line
+    const waitingNow = (waitingInventory || 0) + (waitingIngredients || 0);
+    setPanelQuiet("actions", waitingNow === 0, waitingNow === 0 ? "Nothing is waiting for review" : `${many(waitingNow, "entry waits", "entries wait")} for review`);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -212,7 +217,6 @@ function watchScansToday() {
         renderResults(results);
         datasetChanged("results");
         refreshAssist("numbers");
-        refreshAssist("results");
         setMetric("totalScansCount", snapshot.size, "Scans made in the app since midnight");
         setMetric("flaggedAllergensCount", flagged, "Scans today in which one of the user's own allergens was found");
     }, (error) => {
@@ -225,6 +229,8 @@ function watchScansToday() {
 /** The bar and the three counts of the "results of today" panel. */
 function renderResults(results) {
     const total = results.safe + results.caution + results.harmful;
+    // no scan yet today: three zeros say nothing, so the panel folds to one line until the first scan comes in
+    setPanelQuiet("results", total === 0, total === 0 ? "No scans yet today" : `${many(total, "scan", "scans")} today: ${results.harmful} harmful, ${results.caution} with care, ${results.safe} safe`);
     const names = { safe: "Safe", caution: "Use with care", harmful: "Harmful" };
     el("resultBar").innerHTML = total === 0 ? "" : Object.keys(names).filter((k) => results[k] > 0)
         .map((k) => `<span class="${k}" data-status="${k}" style="flex-grow:${results[k]}" data-tip-title="${results[k]} scans" data-tip="${names[k]}"></span>`).join("");
@@ -260,6 +266,8 @@ function watchRecentActivity() {
         datasetChanged("activity");
         refreshAssist("activity");
         refreshAssist("numbers");
+        const harmfulLately = recentScans.filter((a) => statusOf(a) === "harmful").length;
+        setPanelQuiet("activity", snapshot.empty, snapshot.empty ? "No scans recorded yet" : `${many(recentScans.length, "latest scan", "latest scans")}, ${harmfulLately} harmful`);
         if (snapshot.empty) { showEmpty("activity", "No app user activity recorded yet.", false); return; }
         el("activityEmpty").style.display = "none";
         const list = el("activityList");
@@ -279,19 +287,16 @@ function activityRow(a) {
     const flagged = asArray(a.flaggedIngredients);
     const harmful = toWholeNumber(a.harmfulCount), caution = toWholeNumber(a.cautionCount);
 
-    // how the scan was judged for the person who made it: ONE badge (dot and word); what goes with it follows as text
+    // how the scan was judged for the person who made it: ONE badge (dot and word). An allergen match stands beside it,
+    // because it is a different fact. Everything else (kind, counts, the flagged names) waits until the scan is clicked:
+    // a line that repeated it under every scan made the list twice as long.
     const verdict = toneBadge(STATUS_NAMES[status], toneOf(status), status === "safe" ? "Nothing in it was flagged for this user." : status === "harmful" ? "Something in it is flagged for this user." : "Something in it is worth watching for this user.");
-    const parts = [];
-    if (a.cosmeticType) parts.push(escapeHtml(a.cosmeticType));
-    if (status === "harmful" && flagged.length > 0) parts.push(escapeHtml(flagged.slice(0, 3).join(", ")) + (flagged.length > 3 ? " and more" : ""));
-    if (status === "caution" && caution > 0) parts.push(`${caution} to watch`);
-    if (toWholeNumber(a.ingredientCount) > 0) parts.push(`${toWholeNumber(a.ingredientCount)} ingredients`);
-    if (a.source === "manual") parts.push("typed in");
 
     // the details of the scan that was clicked
     let more = "";
     if (a.id === openScanId) {
         const lines = [`<b>Scanned</b> ${escapeHtml(formatWhen(a.scannedAtUnix))}${a.source === "manual" ? " · typed in by the user" : ""}`];
+        if (a.cosmeticType) lines.push(`<b>Kind</b> ${escapeHtml(a.cosmeticType)}`);
         lines.push(`<b>Ingredients</b> ${toWholeNumber(a.ingredientCount)} read · ${harmful} harmful · ${caution} to watch`);
         if (flagged.length > 0) lines.push(`<b>Flagged for this user</b> ${escapeHtml(flagged.join(", "))}`);
         if (a.brandName) lines.push(`<b>Brand</b> ${escapeHtml(a.brandName)}`);
@@ -300,10 +305,8 @@ function activityRow(a) {
 
     return `
         <li class="activity-item${a.id === openScanId ? " open" : ""}" data-id="${escapeHtml(a.id)}" tabindex="0">
-            <div class="activity-main">
-                <div class="activity-title">${escapeHtml(product)}${brand}${a.allergenFlagged === true ? ` <span class="chip warn">allergen match</span>` : ""}${harmful > Math.min(3, flagged.length) && status === "harmful" ? ` <span class="chip">${harmful} flagged</span>` : ""}</div>
-                <div class="activity-detail">${verdict}${parts.length > 0 ? " " + parts.join(" · ") : ""}</div>
-            </div>
+            <div class="activity-main"><span class="activity-title">${escapeHtml(product)}</span>${brand}</div>
+            <span class="activity-flags">${a.allergenFlagged === true ? `<span class="chip warn" data-tip="One of this user's own allergens is in the product.">allergen match</span>` : ""}${verdict}</span>
             <span class="activity-time" title="${escapeHtml(formatWhen(a.scannedAtUnix))}">${escapeHtml(timeAgo(a.scannedAtUnix))}</span>
             ${more}
         </li>`;
@@ -343,6 +346,7 @@ function renderSuggestions() {
     suggestionsLoaded = true;
     datasetChanged("suggestions");
     refreshAssist("suggestions");
+    setPanelQuiet("suggestions", suggestions.length === 0, suggestions.length === 0 ? "Nothing waiting" : `${many(suggestions.length, "suggestion waits", "suggestions wait")} for review`);
     if (suggestions.length === 0) { showEmpty("suggestion", "No suggestions waiting for review.", false); return; }
     suggestions.sort((a, b) => b.createdAtUnix - a.createdAtUnix);
     el("suggestionEmpty").style.display = "none";
@@ -391,9 +395,9 @@ function registerHelpers() {
 
     registerAssist("numbers", () => {
         if (scansToday === null) return [];
+        // (a helper only speaks when it adds something: "no scans yet" beside a tile that says 0 was the same thing twice)
         const lines = [];
-        if (scansToday === 0) lines.push({ text: "No scans yet today. These numbers count up by themselves while this page is open." });
-        else {
+        if (scansToday > 0) {
             const hours = new Map();
             recentScans.forEach((a) => { if (toWholeNumber(a.scannedAtUnix) >= todayStart) { const hour = new Date(a.scannedAtUnix * 1000).getHours(); hours.set(hour, (hours.get(hour) || 0) + 1); } });
             const busiest = Array.from(hours).sort((a, b) => b[1] - a[1])[0];
@@ -422,27 +426,11 @@ function registerHelpers() {
         if (top) lines.push({ text: `Scanned most lately: ${top[0]} (${top[1]} of ${total}).` });
         const nameless = recentScans.filter((a) => !a.productName).length;
         if (nameless > 0) lines.push({ text: `${many(nameless, "scan", "scans")} had no product name: the name on the label could not be read.` });
-        lines.push({ text: "Click a scan for its details. The panel's ... menu turns this list into a graph." });
         return lines;
     });
 
-    registerAssist("actions", () => {
-        if (waitingInventory === null && waitingIngredients === null) return [];
-        const waiting = (waitingInventory || 0) + (waitingIngredients || 0);
-        return [waiting > 0
-            ? { tone: "info", text: `${many(waiting, "entry waits", "entries wait")} for your review.` }
-            : { tone: "ok", text: "Nothing is waiting for review. All caught up." }];
-    });
-
-    registerAssist("results", () => {
-        if (scansToday === null) return [];
-        const total = todayResults.safe + todayResults.caution + todayResults.harmful;
-        if (total === 0) return [{ text: "No results yet today." }];
-        const top = ["safe", "caution", "harmful"].sort((a, b) => todayResults[b] - todayResults[a])[0];
-        const lines = [{ tone: toneOf(top), text: `Mostly "${STATUS_NAMES[top]}" today: ${todayResults[top]} of ${total} (${percent(todayResults[top], total)}%).` }];
-        if (todayResults.harmful > 0 && top !== "harmful") lines.push({ tone: "bad", text: `${many(todayResults.harmful, "scan was", "scans were")} harmful for the user today.`, label: "Show", run: () => setActivityFilter("harmful", true) });
-        return lines;
-    });
+    // "Quick actions" and "Today's results" have no helper line: it only repeated what their tiles and their legend say
+    // (the sum of what waits, the share of each result). Their folded line carries the short version instead.
 
     registerAssist("suggestions", () => {
         if (!suggestionsLoaded || suggestions.length === 0) return [];

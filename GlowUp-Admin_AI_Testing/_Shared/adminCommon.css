@@ -295,6 +295,32 @@ body.app { display: grid; grid-template-columns: 232px 1fr; overflow: hidden; }
 .panel-menu-btn { opacity: 0; background: transparent; border-color: transparent; transition: opacity .2s, background-color .2s; }
 .panel:hover > .panel-inner > .panel-head > .panel-menu-btn, .panel-menu-btn:focus-visible, .panel-menu-btn[aria-expanded] { opacity: 1; }
 @media (hover: none) { .panel-menu-btn { opacity: 1; } }
+/* ---- Auto resize: the panels are packed without gaps ----
+   The board becomes a grid of very low rows; adminLayouts.js gives every panel the number of rows its own height needs
+   (--rows), and "dense" lets the next panel move up into a free place beside a taller one. While it measures, every
+   panel has its own height for a moment (.measuring). */
+.board.fit { grid-auto-flow: row dense; grid-auto-rows: var(--row-unit, 4px); row-gap: 0; align-items: stretch; }
+.board.fit > .panel { grid-row: span var(--rows, 40); margin-bottom: var(--gap); }
+.board.fit.measuring { grid-auto-rows: auto; align-items: start; }
+.board.fit.measuring > .panel { grid-row: auto; }
+
+/* ---- a folded panel shows only its title line (adminFold.js) ---- */
+.panel-head > .panel-fold-btn { margin-left: auto; background: transparent; border-color: transparent; box-shadow: none; color: var(--muted); }
+.panel-head > .panel-fold-btn:hover, .panel-head > .panel-fold-btn:focus-visible { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); }
+.panel-head > .spacer ~ .panel-fold-btn { margin-left: 0; }
+.panel-fold-btn svg.ic { transition: transform .2s var(--ease); }
+.panel.folded > .panel-inner > .panel-head > .panel-fold-btn svg.ic { transform: rotate(-90deg); }
+.panel-summary { display: none; flex: 1; min-width: 0; font-size: var(--fs-xs); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel.folded { height: auto !important; }          /* a height set by hand does not hold a folded panel open */
+.panel.folded > .panel-inner { padding-block: calc(var(--pad) * .5); overflow: visible; }
+.panel.folded > .panel-inner > :not(.panel-head) { display: none !important; }
+.panel.folded > .panel-inner > .panel-head > :not(.panel-title):not(.guide-badge):not(.panel-summary):not(.panel-fold-btn):not(.panel-menu-btn) { display: none !important; }
+.panel.folded > .panel-inner > .panel-head > .panel-summary { display: block; }
+.panel.folded > .panel-inner > .panel-head > .panel-title { color: var(--text-2); }
+.panel.member > .panel-inner > .panel-head > .panel-fold-btn, .panel.member > .panel-inner > .panel-head > .panel-summary,
+.panel.group > .panel-inner > .panel-head > .panel-fold-btn, .panel.preview .panel-fold-btn { display: none; }
+body.layout-editing .board > .panel .panel-fold-btn { pointer-events: auto; }
+
 /* a built-in panel that is shown as a list, a row, a grid or a graph: its own content steps aside */
 .panel.alt-view > .panel-inner > :not(.panel-head):not(.widget-body):not(.assist) { display: none !important; }
 .panel.alt-view > .panel-inner > .panel-head .pager:not(.widget-pager) { display: none; }
@@ -665,6 +691,12 @@ body.drawer-open .drawer-overlay { opacity: 1; pointer-events: auto; }
 .drawer-row #profileSelect { flex: 1; width: auto; min-width: 0; }
 .drawer-row input[type=color] { width: 40px; height: 28px; border: 1px solid var(--border); border-radius: 8px; background: none; padding: 2px; cursor: pointer; }
 .drawer-actions { display: flex; gap: 8px; }
+/* an on / off switch (Layout & Style: "Keep the gaps closed") */
+.switch { position: relative; width: 38px; height: 22px; flex: none; padding: 0; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); cursor: pointer; transition: background-color .2s, border-color .2s; }
+.switch i { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--muted); transition: transform .2s var(--ease), background-color .2s; }
+.switch[aria-checked="true"] { background: color-mix(in srgb, var(--accent) 30%, var(--surface-2)); border-color: var(--accent); }
+.switch[aria-checked="true"] i { transform: translateX(16px); background: var(--accent); }
+.drawer-row > span .guide-badge { vertical-align: middle; }
 .drawer-actions .btn { flex: 1; }
 .drawer-note { font-size: var(--fs-xs); color: var(--muted); line-height: 1.5; }
 input[type=range] { accent-color: var(--accent); }

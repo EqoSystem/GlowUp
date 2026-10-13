@@ -8,13 +8,21 @@
 //   - what a panel is shown as: its standard look, a list, a row, a grid or a graph (the panel's "..." menu)
 //   - data panels that were added, panels that were hidden, and panels that were combined into one
 //     (as tabs, stacked, or side by side)
+//   - whether the gaps between panels are closed ("Auto resize": on unless the person switches it off)
 // and for the whole site: font, text size, spacing, colours (kept per theme) and how round the corners are.
+//
+// Auto resize: a short panel beside a tall one used to leave a hole under it. With it on, the board is a grid of very
+// low rows; each panel takes the rows its own height needs and the browser slots it into the first free place, so the
+// next panel moves up into the hole. It is worked out again whenever a panel's content, the window or the layout changes.
+// Folding (adminFold.js): every panel with a title can be folded to that title; an empty panel folds by itself.
 //
 // Layouts are kept in this browser (localStorage). Export / Import carries one to another computer.
 // What a panel CONTAINS is never changed here: that is the pages' own code and the database.
 import { icon, esc, hydrate, currentTheme, toast, openMenu, closeMenu, flip, askText, askConfirm, guideBadge, hideTip } from "./adminShell.js";
 import { datasetList, datasetSpec, measuresOf, mountWidget, unmountWidget, normalizeConfig, defaultTitle, VIEWS, CHARTS } from "./adminWidgets.js";
 import { hasAssist, assistHidden, setAssistHidden, anyAssistHidden, showAllAssists } from "./adminAssist.js";
+import { rowsFor, ROW_UNIT } from "./layoutRules.js";
+import { setFoldPage, foldButton, FOLD_PARTS, paintFold, toggleFold, foldedNow, anyFoldChoice, forgetFoldChoices } from "./adminFold.js";
 
 const LAYOUT_KEY = "glowup.layouts.v1";
 const MAX_PROFILES = 4;
@@ -58,6 +66,7 @@ function cleanPage(raw) {
     const views = {};
     Object.keys(page.views || {}).slice(0, 30).forEach((id) => { if (ID.test(id)) views[id] = cleanView(page.views[id]); });
     return {
+        fit: page.fit !== false,                      // Auto resize: on unless it was switched off
         order: idList(page.order, 60), size, hidden: idList(page.hidden, 60), views,
         widgets: (Array.isArray(page.widgets) ? page.widgets : []).slice(0, MAX_ADDED).filter((w) => w && ID.test(String(w.id)))
             .map((w) => Object.assign({ id: String(w.id), title: cleanName(w.title, 40) }, cleanView(w))),
@@ -129,6 +138,7 @@ async function newProfile() {
 // ---------------------------------------------------------------------------------------------
 export function initLayouts(page) {
     pageId = page;
+    setFoldPage(page);
     if (!board()) return;
     defaults = { order: [], size: {}, source: {} };
     topPanels().forEach((panel) => {
@@ -145,6 +155,7 @@ export function initLayouts(page) {
     byId("addPanelBtn").addEventListener("click", () => openPanelDialog(null));
     byId("doneArrangingBtn").addEventListener("click", () => setEditing(false));
     wireBoard();
+    watchForFit();
     window.setTimeout(() => board().classList.add("settled"), 900);          // the panels' entrance is over: moving them must not replay it
 }
 
@@ -160,7 +171,13 @@ function decorate(panel) {
     panel.insertAdjacentHTML("beforeend", `<div class="resize-x"></div><div class="resize-y" title="Drag to set the height. Double-click: automatic height."></div>`);
     const menu = `<button type="button" class="icon-btn small panel-menu-btn" aria-label="Panel options" aria-haspopup="menu">${icon("more")}</button>`;
     const head = inner.querySelector(":scope > .panel-head");
-    if (head) head.insertAdjacentHTML("beforeend", menu); else panel.querySelector(".panel-tools").insertAdjacentHTML("beforeend", menu);
+    if (head) {
+        // the short line a folded panel shows beside its title goes right after the title and its "i"; the arrow that folds
+        // the panel and the "..." menu close the bar
+        const after = head.querySelector(":scope > .guide-badge") || head.querySelector(":scope > .panel-title");
+        if (after) after.insertAdjacentHTML("afterend", FOLD_PARTS); else head.insertAdjacentHTML("afterbegin", FOLD_PARTS);
+        head.insertAdjacentHTML("beforeend", foldButton() + menu);
+    } else panel.querySelector(".panel-tools").insertAdjacentHTML("beforeend", menu);
     panel.querySelector(".tools-name").textContent = panel.dataset.label || panel.dataset.panel;
 }
 
@@ -269,7 +286,88 @@ function applyLayout() {
     const name = byId("operatorName");
     if (name) name.textContent = profile ? profile.name : "Default layout";
     applyAppearance();
+    paintFold();
     paintDrawer();
+    fitNow();
+}
+
+// ---------------------------------------------------------------------------------------------
+// Auto resize: the panels are packed without gaps
+// ---------------------------------------------------------------------------------------------
+/** True when the active layout closes the gaps on this page. The default layout always does. */
+function fitOn() {
+    const page = pageData(false);
+    return !page || page.fit !== false;
+}
+
+let fitWatcher = null, fitQueued = 0;
+
+/** Measures every panel's own height and gives it that many rows of the packing grid (see layoutRules.js). */
+function fitNow() {
+    const b = board();
+    if (!b) return;
+    const on = fitOn();
+    const panels = topPanels();
+    if (b.classList.contains("fit") !== on) b.classList.toggle("fit", on);
+    if (on) {
+        b.style.setProperty("--row-unit", ROW_UNIT + "px");
+        const gap = parseFloat(getComputedStyle(b).columnGap) || 16;
+        b.classList.add("measuring");                 // for one moment every panel has its own height again
+        const heights = panels.map((panel) => panel.offsetHeight);
+        b.classList.remove("measuring");
+        panels.forEach((panel, index) => {
+            const rows = String(rowsFor(heights[index], gap));
+            if (panel.style.getPropertyValue("--rows") !== rows) panel.style.setProperty("--rows", rows);
+        });
+    } else panels.forEach((panel) => panel.style.removeProperty("--rows"));
+    if (fitWatcher) fitWatcher.takeRecords();         // what was just written here is not a reason to measure again
+}
+
+function queueFit() {
+    if (fitQueued) return;
+    fitQueued = window.requestAnimationFrame(() => { fitQueued = 0; fitNow(); });
+}
+
+/** Whatever changes a panel's height (a list that loaded, a row that opened, a helper line, the window) packs the page again. */
+function watchForFit() {
+    const b = board();
+    fitWatcher = new MutationObserver(() => {
+        // while a panel is carried around its place is not final, and measuring on every step would make it stutter
+        if (document.body.classList.contains("is-dragging") && b.querySelector(":scope > .panel.floating")) return;
+        queueFit();
+    });
+    fitWatcher.observe(b, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "style", "hidden"] });
+    window.addEventListener("resize", queueFit);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(queueFit).catch(() => { });
+    fitNow();
+}
+
+/** The switch in Layout & Style: gaps closed, or every panel on its own line of the grid as before. */
+async function setFit(on) {
+    if (!(await ensureProfile())) { paintDrawer(); return; }
+    capture();
+    pageData(true).fit = !!on;
+    commit(on ? "Gaps closed: panels move up into free space." : "Auto resize is off for this page: panels keep their own rows.");
+}
+
+/**
+ * The "Auto resize" button: every panel gets the height of its content again (a height set by hand is dropped) and
+ * the gaps are closed. "Undo" in the message puts the sizes back.
+ */
+async function autoResize() {
+    if (!activeProfile()) {
+        toast("The default layout is resized already: its panels are packed without gaps. Make your own layout to change sizes.", "info", { label: "Make mine", run: () => newProfile() });
+        return;
+    }
+    capture();
+    const page = pageData(true);
+    const before = JSON.stringify({ size: page.size, fit: page.fit });
+    const fixed = Object.keys(page.size).filter((id) => page.size[id].h > 0).length;
+    Object.keys(page.size).forEach((id) => { page.size[id].h = 0; });
+    page.fit = true;
+    commit();
+    const what = fixed > 0 ? `${fixed} panel${fixed === 1 ? "" : "s"} got the height of ${fixed === 1 ? "its" : "their"} content back, and the gaps are closed.` : "Panels are packed without gaps.";
+    toast(what, "ok", { label: "Undo", run: () => { const old = JSON.parse(before); page.size = old.size; page.fit = old.fit; commit(); } });
 }
 
 function labelSize(panel) {
@@ -481,6 +579,10 @@ function openPanelMenu(panel, anchor) {
         const hidden = panel.classList.contains("is-hidden");
         items.push({ label: hidden ? "Show panel" : "Hide panel", icon: hidden ? "eye" : "eyeOff", run: () => hidePanel(id, !hidden) });
     }
+    if (!isMember && panel.querySelector(":scope > .panel-inner > .panel-head > .panel-fold-btn")) {
+        const folded = foldedNow(id);
+        items.push({ label: folded ? "Open panel" : "Fold panel", icon: folded ? "down" : "up", description: folded ? null : "Only its title stays. The arrow at its top right opens it again.", run: () => toggleFold(id) });
+    }
     if (hasAssist(id)) { const off = assistHidden(id); items.push({ label: off ? "Show helper" : "Hide helper", icon: "sparkle", description: off ? "The line that says what needs attention here." : null, run: () => setAssistHidden(id, !off) }); }
     items.push({ label: editing ? "Done arranging" : "Arrange panels", icon: "grip", description: editing ? null : "Move and resize every panel.", run: () => setEditing(!editing) });
     openMenu(anchor, items);
@@ -616,6 +718,8 @@ function wireBoard() {
     b.addEventListener("click", (event) => {
         const menuButton = event.target.closest(".panel-menu-btn");
         if (menuButton) { openPanelMenu(menuButton.closest(".panel"), menuButton); return; }
+        const foldBtn = event.target.closest(".panel-fold-btn");
+        if (foldBtn) { hideTip(); toggleFold(foldBtn.closest(".panel").dataset.panel); return; }
         const tab = event.target.closest(".group-tab");
         if (!tab) return;
         const panel = tab.closest(".panel.group"), page = pageData(false), group = groupOf(page, panel.dataset.panel);
@@ -706,6 +810,7 @@ function wireBoard() {
         document.body.classList.remove("is-dragging");
         if (slot) { slot.remove(); slot = null; }
         if (!done.started) return;
+        queueFit();                                   // packing waited while the panel was carried
         if (done.mode === "move") {
             // the panel settles into its place
             const panel = done.panel;
@@ -719,7 +824,7 @@ function wireBoard() {
     b.addEventListener("pointerdown", (event) => {
         if (event.button > 0 || drag) return;
         const panel = event.target.closest(".board > .panel");
-        if (!panel || event.target.closest(".panel-menu-btn")) return;
+        if (!panel || event.target.closest(".panel-menu-btn, .panel-fold-btn")) return;
         let mode;
         if (editing) mode = event.target.closest(".resize-x") ? "x" : event.target.closest(".resize-y") ? "y" : "move";
         else {
@@ -761,7 +866,15 @@ function buildDrawer() {
                 <button type="button" class="btn primary" id="arrangeBtn" data-tip-title="Arrange panels" data-tip="Grab any panel to move it, or drag its right or bottom edge to resize it." data-tip-preview="Outside arranging a panel still moves by its title bar.">${icon("grip")}<span>Arrange</span></button>
                 <button type="button" class="btn" id="drawerAddPanel" data-tip-title="Add a panel" data-tip="Show the page's data once more as a list, a row, a grid or a graph, or bring a hidden panel back.">${icon("plus")}Panel</button>
             </div>
-            <p class="drawer-note">Every panel has a <b>...</b> menu at its top right: show it as a list, grid or graph, combine it with another panel, or hide it.</p>
+            <div class="drawer-actions">
+                <button type="button" class="btn" id="autoResizeBtn" data-tip-title="Auto resize" data-tip="Every panel gets the height of its content again, and the gaps between panels are closed: a panel moves up into free space." data-tip-preview="A height you set by hand is dropped. The message that follows has an Undo.">${icon("layout")}Auto resize</button>
+                <button type="button" class="btn" id="openAllBtn" data-tip-title="Folded panels" data-tip="A panel with nothing to show folds to its title by itself. This forgets the panels you folded or opened by hand on this page.">${icon("down")}Reset folds</button>
+            </div>
+            <div class="drawer-row" id="fitRow">
+                <span>Keep the gaps closed ${guideBadge("Keep the gaps closed", "On: when a panel grows or shrinks, the others move up or make room, so no hole is left between panels.", "Off: every panel keeps its own row, as before.")}</span>
+                <button type="button" class="switch" id="fitSwitch" role="switch" aria-checked="true" aria-label="Keep the gaps closed"><i></i></button>
+            </div>
+            <p class="drawer-note">Every panel has an <b>arrow</b> at its top right that folds it to its title, and a <b>...</b> menu: show it as a list, grid or graph, combine it with another panel, or hide it. A panel with nothing to show folds by itself.</p>
         </div>
 
         <div class="drawer-section">
@@ -792,6 +905,9 @@ function buildDrawer() {
     byId("profileMenuBtn").addEventListener("click", (event) => openProfileMenu(event.currentTarget));
     byId("arrangeBtn").addEventListener("click", () => setEditing(!editing));
     byId("drawerAddPanel").addEventListener("click", () => { openDrawer(false); openPanelDialog(null); });
+    byId("autoResizeBtn").addEventListener("click", autoResize);
+    byId("fitSwitch").addEventListener("click", () => setFit(!fitOn()));
+    byId("openAllBtn").addEventListener("click", () => { forgetFoldChoices(); paintDrawer(); toast("Every panel shows when it has something to show, and folds when it has not.", "ok"); });
 
     const look = async (change) => {
         if (!(await ensureProfile())) { paintDrawer(); return; }
@@ -880,6 +996,8 @@ function paintDrawer() {
     byId("profileSelect").innerHTML = `<option value="default">Default layout (fixed)</option>` + store.profiles.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("");
     byId("profileSelect").value = store.active;
     byId("arrangeBtn").querySelector("span").textContent = editing ? "Done arranging" : "Arrange";
+    byId("fitSwitch").setAttribute("aria-checked", String(fitOn()));
+    byId("openAllBtn").disabled = !anyFoldChoice();
     const look = (profile && profile.appearance) || {};
     const css = getComputedStyle(document.documentElement);
     const toHex = (value) => { const v = value.trim(); return /^#[0-9a-f]{6}$/i.test(v) ? v : "#888888"; };

@@ -29,6 +29,8 @@
     <link rel="modulepreload" href="../_Shared/adminLayouts.js">
     <link rel="modulepreload" href="../_Shared/adminWidgets.js">
     <link rel="modulepreload" href="../_Shared/adminAssist.js">
+    <link rel="modulepreload" href="../_Shared/adminFold.js">
+    <link rel="modulepreload" href="../_Shared/layoutRules.js">
     <link rel="modulepreload" href="../_Shared/glowupRules.js">
     <link rel="stylesheet" href="../_Shared/adminCommon.css">
     <link rel="stylesheet" href="../_Admin_Dashboard/adminDashboard.css">
@@ -43,30 +45,27 @@
             <!-- the five numbers -->
             <section class="panel bare" data-panel="numbers" data-label="Numbers" data-w="12">
                 <div class="kpi-row">
-                    <div class="kpi" id="kpiScans" role="button" tabindex="0">
-                        <div class="kpi-top"><span class="kpi-icon"><i data-icon="activity"></i></span><span class="badge">Today</span></div>
-                        <div class="kpi-value skeleton" id="totalScansCount">00</div>
-                        <p class="kpi-title">Scans <button type="button" class="guide-badge" data-tip-title="Scans today" data-tip="Scans made in the app since midnight. It counts up while you watch." data-tip-preview="Click the tile: the list below shows every scan again.">i</button></p>
+                    <!-- one tile = one number: its icon, the number and ONE label side by side. What a tile does on a click, and
+                         what its number means, is in the tip of the tile itself (no extra badges). -->
+                    <div class="kpi" id="kpiScans" role="button" tabindex="0" data-tip-title="Scans today" data-tip="Scans made in the app since midnight. It counts up while you watch." data-tip-preview="Click: the list below shows every scan again.">
+                        <span class="kpi-icon"><i data-icon="activity"></i></span>
+                        <span class="kpi-text"><span class="kpi-value skeleton" id="totalScansCount">00</span><span class="kpi-title">Scans today</span></span>
                     </div>
-                    <div class="kpi" id="kpiAllergens" role="button" tabindex="0">
-                        <div class="kpi-top"><span class="kpi-icon"><i data-icon="alert"></i></span><span class="badge">Today</span></div>
-                        <div class="kpi-value skeleton" id="flaggedAllergensCount">00</div>
-                        <p class="kpi-title">Allergen matches <button type="button" class="guide-badge" data-tip-title="Allergen matches" data-tip="Scans today in which one of the user's own allergens was found in the product." data-tip-preview="Click the tile: the list below shows only scans with an allergen match.">i</button></p>
+                    <div class="kpi" id="kpiAllergens" role="button" tabindex="0" data-tip-title="Allergen matches today" data-tip="Scans today in which one of the user's own allergens was found in the product." data-tip-preview="Click: the list below shows only scans with an allergen match.">
+                        <span class="kpi-icon"><i data-icon="alert"></i></span>
+                        <span class="kpi-text"><span class="kpi-value skeleton" id="flaggedAllergensCount">00</span><span class="kpi-title">Allergen matches today</span></span>
                     </div>
-                    <a class="kpi" href="../_Admin_Brand_Inventory/adminBrandInventory.html">
-                        <div class="kpi-top"><span class="kpi-icon"><i data-icon="tag"></i></span><span class="badge">Total</span></div>
-                        <div class="kpi-value skeleton" id="totalBrandsCount">00</div>
-                        <p class="kpi-title">Brands</p>
+                    <a class="kpi" href="../_Admin_Brand_Inventory/adminBrandInventory.html" data-tip-title="Brands" data-tip="Every brand in the inventory, less what is in the Recycle bin." data-tip-preview="Click: opens the Brand &amp; Product Inventory.">
+                        <span class="kpi-icon"><i data-icon="tag"></i></span>
+                        <span class="kpi-text"><span class="kpi-value skeleton" id="totalBrandsCount">00</span><span class="kpi-title">Brands</span></span>
                     </a>
-                    <a class="kpi" href="../_Admin_Brand_Inventory/adminBrandInventory.html">
-                        <div class="kpi-top"><span class="kpi-icon"><i data-icon="lipstick"></i></span><span class="badge">Total</span></div>
-                        <div class="kpi-value skeleton" id="totalProductsCount">00</div>
-                        <p class="kpi-title">Products</p>
+                    <a class="kpi" href="../_Admin_Brand_Inventory/adminBrandInventory.html" data-tip-title="Products" data-tip="Every product in the inventory, less what is in the Recycle bin." data-tip-preview="Click: opens the Brand &amp; Product Inventory.">
+                        <span class="kpi-icon"><i data-icon="lipstick"></i></span>
+                        <span class="kpi-text"><span class="kpi-value skeleton" id="totalProductsCount">00</span><span class="kpi-title">Products</span></span>
                     </a>
-                    <a class="kpi" href="../_Admin_Ingredient_Curator/adminIngredientCurator.html">
-                        <div class="kpi-top"><span class="kpi-icon"><i data-icon="flask"></i></span><span class="badge">Total</span></div>
-                        <div class="kpi-value skeleton" id="totalIngredientsCount">000</div>
-                        <p class="kpi-title">Ingredients</p>
+                    <a class="kpi" href="../_Admin_Ingredient_Curator/adminIngredientCurator.html" data-tip-title="Ingredients" data-tip="Every ingredient the app knows, less what is in the Recycle bin." data-tip-preview="Click: opens the Ingredient Curator.">
+                        <span class="kpi-icon"><i data-icon="flask"></i></span>
+                        <span class="kpi-text"><span class="kpi-value skeleton" id="totalIngredientsCount">000</span><span class="kpi-title">Ingredients</span></span>
                     </a>
                 </div>
             </section>
@@ -75,7 +74,7 @@
             <section class="panel" data-panel="activity" data-label="Recent activity" data-w="8" data-source="activity">
                 <div class="panel-head">
                     <h3 class="panel-title">Recent activity</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Recent activity" data-tip="The latest scans made in the app, newest first. No user names are stored: only the product and how it was judged." data-tip-preview="Click a scan to see its details. Red dot: harmful for that user. Amber: use with care. Green: safe.">i</button>
+                    <button type="button" class="guide-badge" data-tip-title="Recent activity" data-tip="The latest scans made in the app, newest first, one line each: the product and how it was judged. No user names are stored." data-tip-preview="Click a scan: its kind, its ingredients and what was flagged open under it. Click again to close.">i</button>
                     <span id="activityFilter"></span>
                     <span class="spacer"></span>
                     <div class="pager" id="activityPager"></div>
@@ -93,22 +92,14 @@
                     <h3 class="panel-title">Quick actions</h3>
                     <button type="button" class="guide-badge" data-tip-title="Quick actions" data-tip="Shortcuts to the work that is waiting. A blue tile only appears when something needs review.">i</button>
                 </div>
+                <!-- only what WAITS gets a full tile. The two shortcuts stand side by side as small buttons: the menu on the
+                     left has them too. What a tile opens is in its own tip (no badge beside every tile). -->
                 <div class="tile-stack">
-                    <div class="tile-line" id="reviewInventoryTile" style="display: none;">
-                        <a href="../_Admin_Brand_Inventory/adminBrandInventory.html?show=review" class="tile review"><i data-icon="inbox"></i><span class="tile-title" id="reviewInventoryTitle">Waiting for review</span><i data-icon="right"></i></a>
-                        <button type="button" class="guide-badge" data-tip-title="Inventory waiting for review" data-tip="Products and brands the app added from scans, or that were imported. The app does not use them until you approve them." data-tip-preview="Opens the inventory showing only these entries.">i</button>
-                    </div>
-                    <div class="tile-line" id="reviewIngredientsTile" style="display: none;">
-                        <a href="../_Admin_Ingredient_Curator/adminIngredientCurator.html?show=review" class="tile review"><i data-icon="inbox"></i><span class="tile-title" id="reviewIngredientsTitle">Waiting for review</span><i data-icon="right"></i></a>
-                        <button type="button" class="guide-badge" data-tip-title="Ingredients waiting for review" data-tip="Ingredients the app's AI lookup found. Until you approve one, the app uses its warnings but never counts it as proof of safety." data-tip-preview="Opens the Ingredient Curator showing only these entries.">i</button>
-                    </div>
-                    <div class="tile-line">
-                        <a href="../_Admin_Brand_Inventory/adminBrandInventory.html" class="tile"><i data-icon="box"></i><span class="tile-title">Brands &amp; products</span><i data-icon="right"></i></a>
-                        <button type="button" class="guide-badge" data-tip-title="Brands &amp; products" data-tip="Add or edit brands and the make-up and face products listed under them." data-tip-preview="Opens the Brand &amp; Product Inventory.">i</button>
-                    </div>
-                    <div class="tile-line">
-                        <a href="../_Admin_Ingredient_Curator/adminIngredientCurator.html" class="tile"><i data-icon="flask"></i><span class="tile-title">Ingredients</span><i data-icon="right"></i></a>
-                        <button type="button" class="guide-badge" data-tip-title="Ingredients" data-tip="Write what each ingredient is in plain words and tell the app how to judge it." data-tip-preview="Opens the Ingredient Curator.">i</button>
+                    <a id="reviewInventoryTile" style="display: none;" href="../_Admin_Brand_Inventory/adminBrandInventory.html?show=review" class="tile review" data-tip-title="Inventory waiting for review" data-tip="Products and brands the app added from scans, or that were imported. The app does not use them until you approve them." data-tip-preview="Opens the inventory showing only these entries."><i data-icon="inbox"></i><span class="tile-title" id="reviewInventoryTitle">Waiting for review</span><i data-icon="right"></i></a>
+                    <a id="reviewIngredientsTile" style="display: none;" href="../_Admin_Ingredient_Curator/adminIngredientCurator.html?show=review" class="tile review" data-tip-title="Ingredients waiting for review" data-tip="Ingredients the app's AI lookup found. Until you approve one, the app uses its warnings but never counts it as proof of safety." data-tip-preview="Opens the Ingredient Curator showing only these entries."><i data-icon="inbox"></i><span class="tile-title" id="reviewIngredientsTitle">Waiting for review</span><i data-icon="right"></i></a>
+                    <div class="tile-pair">
+                        <a href="../_Admin_Brand_Inventory/adminBrandInventory.html" class="tile small" data-tip-title="Brands &amp; products" data-tip="Add or edit brands and the make-up and face products listed under them." data-tip-preview="Opens the Brand &amp; Product Inventory."><i data-icon="box"></i><span class="tile-title">Brands &amp; products</span></a>
+                        <a href="../_Admin_Ingredient_Curator/adminIngredientCurator.html" class="tile small" data-tip-title="Ingredients" data-tip="Write what each ingredient is in plain words and tell the app how to judge it." data-tip-preview="Opens the Ingredient Curator."><i data-icon="flask"></i><span class="tile-title">Ingredients</span></a>
                     </div>
                 </div>
             </section>
@@ -123,21 +114,6 @@
                 <ul class="result-legend" id="resultLegend"></ul>
             </section>
 
-            <!-- suggestions -->
-            <section class="panel" data-panel="suggestions" data-label="Suggestions" data-w="4" data-source="suggestions">
-                <div class="panel-head">
-                    <h3 class="panel-title">Suggestions</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Suggestions from app users" data-tip="Allergens and skin conditions users typed in because they were not on the app's lists." data-tip-preview="Mark one reviewed after you dealt with it, or dismiss it.">i</button>
-                    <span class="spacer"></span>
-                    <div class="pager" id="suggestionPager"></div>
-                </div>
-                <ul class="suggestion-list" id="suggestionList" style="display: none;"></ul>
-                <div class="empty-state loading" id="suggestionEmpty"><div class="sk-list"><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div></div>
-                    <p class="empty-message" id="suggestionEmptyMessage">Loading suggestions...</p>
-                    <span class="empty-hint" id="suggestionEmptyHint">Nothing to review right now.</span>
-                </div>
-            </section>
-
             <!-- most scanned brands -->
             <section class="panel" data-panel="brands" data-label="Most scanned brands" data-w="4" data-source="topBrands">
                 <div class="panel-head">
@@ -148,6 +124,22 @@
                 <div class="empty-state loading" id="topBrandsEmpty"><div class="sk-list"><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div></div>
                     <p class="empty-message" id="topBrandsEmptyMessage">Loading brands...</p>
                     <span class="empty-hint">No brand has been scanned yet.</span>
+                </div>
+            </section>
+
+            <!-- suggestions: a list that can get long, so it is wide and stands under the activity list. The three narrow
+                 panels (quick actions, results, brands) stack beside them, and no hole is left between panels. -->
+            <section class="panel" data-panel="suggestions" data-label="Suggestions" data-w="8" data-source="suggestions">
+                <div class="panel-head">
+                    <h3 class="panel-title">Suggestions</h3>
+                    <button type="button" class="guide-badge" data-tip-title="Suggestions from app users" data-tip="Allergens and skin conditions users typed in because they were not on the app's lists." data-tip-preview="Mark one reviewed after you dealt with it, or dismiss it.">i</button>
+                    <span class="spacer"></span>
+                    <div class="pager" id="suggestionPager"></div>
+                </div>
+                <ul class="suggestion-list" id="suggestionList" style="display: none;"></ul>
+                <div class="empty-state loading" id="suggestionEmpty"><div class="sk-list"><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div></div>
+                    <p class="empty-message" id="suggestionEmptyMessage">Loading suggestions...</p>
+                    <span class="empty-hint" id="suggestionEmptyHint">Nothing to review right now.</span>
                 </div>
             </section>
         </div>
