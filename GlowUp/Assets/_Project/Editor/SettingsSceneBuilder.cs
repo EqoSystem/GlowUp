@@ -412,8 +412,12 @@ namespace GlowUp.EditorTools
             A.Set(controller, "backButton", s.back); A.Set(controller, "list", scroll);
             Kit.SetArray(controller, "popups", new Object[] { confirmPopup.panel, deletePopup.panel, legalPopup.panel, supportPopup.panel });
 
-            // TextSkeleton: can show the page's titles, labels and subtitles as bars while the account is fetched. Built switched off.
-            AppTiles.WordSkeleton(s);
+            // What is FETCHED on this page: the account's name, e-mail, ID and sign-in state, and the line that sums up the
+            // skin profile (bars only while nothing is on the phone yet). Every title, label, switch and button is never a bar.
+            var fetched = new System.Collections.Generic.List<Object>();
+            fetched.AddRange(AppTiles.TextsOf(Object.FindObjectOfType<AccountInfoPanel>(true), "nameText", "emailText", "userIdText", "signInStateText"));
+            fetched.AddRange(AppTiles.TextsOf(Object.FindObjectOfType<SkinProfileResetAction>(true), "currentProfileText"));
+            AppTiles.WordSkeleton(s, fetched.ToArray());
 
             A.Finish(s);
             Debug.Log("[GlowUp] SettingsScene built. The pop-ups (ConfirmPanel, DeleteAccountPanel, LegalPanel, SupportPanel) are inactive until used. " +

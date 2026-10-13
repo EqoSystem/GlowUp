@@ -172,55 +172,76 @@ namespace GlowUp.EditorTools
             return button;
         }
 
-        /// <summary>Placeholder rows shown in the place of a row list while it loads (skeleton loading, with the website's travelling shine).</summary>
+        /// <summary>
+        /// Placeholder rows shown in the place of a row list while its products are fetched. A row keeps the look of a real
+        /// product row (its panel is part of the screen, not of what is fetched); what IS fetched stands in it as bars with
+        /// the travelling shine: the kind's icon, the name and the brand.
+        /// </summary>
         public static GameObject SkeletonRows(Transform parent, string name, int count)
         {
             var holder = A.Node(parent, name, typeof(SkeletonShimmer), typeof(CanvasGroup));
             A.Fill(holder.transform);
             A.VStack(holder, RowGap, 0, 18, 4, 0);
             Material shine = UiEffectsKit.SkeletonMaterial();
+            var bars = new List<Object>();
             for (int i = 0; i < count; i++)
             {
                 var row = A.Node(holder.transform, "Placeholder" + (i + 1), typeof(Image));
-                var img = row.GetComponent<Image>(); Kit.StyleRounded(img); Kit.SetRadius(img, TileRadius); img.raycastTarget = false; img.color = new Color(1, 1, 1, 0.7f);
-                SceneBuilderCore.Themed(row, ThemeRole.SurfaceAlt);
-                if (shine != null) img.material = shine;
-                A.Size(img, -1, RowHeight);
+                var frame = row.GetComponent<Image>(); Kit.StyleRounded(frame); Kit.SetRadius(frame, TileRadius); frame.raycastTarget = false; frame.color = Color.white;
+                SceneBuilderCore.Themed(row, ThemeRole.InputBackground);
+                A.Outline(row.transform, ThemeRole.SurfaceAlt, TileRadius);
+                A.Size(frame, -1, RowHeight);
+                // the same places as in a real row (ExpandingRow): icon chip, name, brand. The lengths differ a little from row
+                // to row, so the list does not look ruled.
+                bars.Add(Bar(row.transform, "IconBar", shine, 26f, new Vector2(0, 1), new Vector2(0, 1), new Vector2(20, -108), new Vector2(108, -20)));
+                bars.Add(Bar(row.transform, "NameBar", shine, 15f, new Vector2(0, 1), new Vector2(0.66f - (i % 3) * 0.09f, 1), new Vector2(130, -62), new Vector2(0, -32)));
+                bars.Add(Bar(row.transform, "BrandBar", shine, 12f, new Vector2(0, 1), new Vector2(0.42f - (i % 2) * 0.07f, 1), new Vector2(130, -100), new Vector2(0, -78)));
             }
+            Kit.SetArray(holder.GetComponent<SkeletonShimmer>(), "shapes", bars.ToArray());        // the bars shine; the rows' panels do not
             A.Set(holder.GetComponent<SkeletonShimmer>(), "shine", shine);
             holder.GetComponent<CanvasGroup>().blocksRaycasts = false;
             return holder;
         }
 
-        /// <summary>
-        /// Adds the object "TextSkeleton" over the screen's card: it CAN show the screen's titles, labels and subtitles as bars
-        /// with a travelling shine while the screen fetches its data, the way the admin website loads. It is built SWITCHED
-        /// OFF ("When Screen Opens" = Keep The Words): the project owner does not want bars, or any wait, when a screen
-        /// opens. Set that field on the object to use it on a screen. Call this LAST, when every text of the card is built.
-        ///
-        /// Which texts: every text of the card that can be seen in the Hierarchy at this moment, EXCEPT the one word on a
-        /// button (a tile that is a button and carries a title and a subtitle does get bars), the words of switches, sliders
-        /// and text boxes, the bottom bar, and the rows of lists (a list has its own placeholder rows: `showWhileLoading`;
-        /// the real list can be kept out of sight meanwhile: `hideWhileLoading`). The list is on the object afterwards and
-        /// can be changed in the Inspector.
-        /// </summary>
-        public static TextSkeleton WordSkeleton(A.AppScreen s, GameObject[] showWhileLoading = null, CanvasGroup[] hideWhileLoading = null)
+        /// <summary>One bar of a placeholder row or tile: a round shape drawn with the travelling shine.</summary>
+        static Image Bar(Transform parent, string name, Material shine, float radius, Vector2 anchorMin, Vector2 anchorMax, Vector2 offsetMin, Vector2 offsetMax)
         {
-            var words = new List<Object>();
-            foreach (TMP_Text text in s.card.GetComponentsInChildren<TMP_Text>(true))
-            {
-                if (!text.gameObject.activeInHierarchy) continue;                              // an empty state, a closed part: no bar
-                Selectable owner = text.GetComponentInParent<Selectable>(true);
-                if (owner != null)
-                {
-                    if (!(owner is Button)) continue;                                           // a text box, a switch, a slider, a drop-down: its own words
-                    if (owner.GetComponentsInChildren<TMP_Text>(true).Length < 2) continue;     // a button with one word on it: the word stays
-                }
-                if (text.GetComponentInParent<BottomActionBar>(true) != null) continue;
-                if (text.GetComponentInParent<ProductTileView>(true) != null) continue;         // a row of a list
-                words.Add(text);
-            }
+            Image bar = A.RawPanel(parent, name, Color.white, radius);
+            var rect = bar.rectTransform;
+            rect.anchorMin = anchorMin; rect.anchorMax = anchorMax; rect.pivot = new Vector2(0, 1);
+            rect.offsetMin = offsetMin; rect.offsetMax = offsetMax;
+            if (shine != null) bar.material = shine;
+            else SceneBuilderCore.Themed(bar.gameObject, ThemeRole.SurfaceAlt);              // no shine material: a plain soft shape
+            return bar;
+        }
 
+        /// <summary>The texts a component fills with fetched data, read from its Inspector fields (for WordSkeleton).</summary>
+        public static Object[] TextsOf(Object component, params string[] fields)
+        {
+            var found = new List<Object>();
+            if (component == null) return found.ToArray();
+            var so = new SerializedObject(component);
+            foreach (string field in fields)
+            {
+                SerializedProperty p = so.FindProperty(field);
+                if (p == null) { Debug.LogWarning($"[SceneBuilder] {component.GetType().Name} has no field '{field}' (asked for by the text skeleton)"); continue; }
+                if (p.objectReferenceValue is TMP_Text) found.Add(p.objectReferenceValue);
+            }
+            return found.ToArray();
+        }
+
+        /// <summary>
+        /// Adds the object "TextSkeleton" over the screen's card. It shows the texts that hold FETCHED data as bars with a
+        /// travelling shine while that data is being fetched, the way the admin website loads: the frame first, the data
+        /// after it. Call it LAST, when the screen's controllers are wired.
+        ///
+        /// `fetchedTexts` = ONLY texts that are filled from the database (use TextsOf). The project owner's rule of
+        /// 13 October 2026: titles, labels, buttons, the bottom bar and the panel of a product row are never bars. A list has
+        /// placeholder rows instead (`showWhileLoading`), and the real list can be kept out of sight meanwhile
+        /// (`hideWhileLoading`). When the data is on the phone already nothing of this is ever seen.
+        /// </summary>
+        public static TextSkeleton WordSkeleton(A.AppScreen s, Object[] fetchedTexts, GameObject[] showWhileLoading = null, CanvasGroup[] hideWhileLoading = null)
+        {
             var holder = A.Node(s.card, "TextSkeleton", typeof(CanvasRenderer), typeof(TextSkeleton));
             A.Fill(holder.transform);
             holder.transform.SetAsLastSibling();                                                // drawn over everything on the card
@@ -229,9 +250,12 @@ namespace GlowUp.EditorTools
             Material shine = UiEffectsKit.SkeletonMaterial();
             if (shine != null) skeleton.material = shine;
             A.Set(skeleton, "roundSprite", IconFactory.Pill);
-            Kit.SetArray(skeleton, "texts", words.ToArray());
+            Kit.SetArray(skeleton, "texts", fetchedTexts ?? new Object[0]);
             Kit.SetArray(skeleton, "showWhileLoading", showWhileLoading ?? new Object[0]);
             Kit.SetArray(skeleton, "hideWhileLoading", hideWhileLoading ?? new Object[0]);
+            A.Set(skeleton, "whenScreenOpens", (int)TextSkeleton.OnOpen.BarsWhileFetching);
+            A.Set(skeleton, "slowAfterSeconds", 0f);
+            A.Set(skeleton, "shortestSeconds", 0.2f);
             EditorUtility.SetDirty(skeleton);
             return skeleton;
         }
@@ -352,7 +376,10 @@ namespace GlowUp.EditorTools
             return button;
         }
 
-        /// <summary>Grey placeholder tiles shown in the place of a tile list while it loads (skeleton loading).</summary>
+        /// <summary>
+        /// Placeholder tiles shown in the place of a tile list while its products are fetched. As with the rows: the tile
+        /// keeps its panel, and the fetched things in it (icon, name, brand) are bars with the travelling shine.
+        /// </summary>
         public static GameObject SkeletonTiles(Transform parent, string name, int count)
         {
             var holder = A.Node(parent, name, typeof(GridLayoutGroup), typeof(SkeletonShimmer), typeof(CanvasGroup));
@@ -361,13 +388,18 @@ namespace GlowUp.EditorTools
             grid.cellSize = new Vector2(Cell, CellHeight); grid.spacing = new Vector2(Gap, Gap); grid.padding = new RectOffset(0, 18, 4, 0);
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount; grid.constraintCount = 2;
             Material shine = UiEffectsKit.SkeletonMaterial();
+            var bars = new List<Object>();
             for (int i = 0; i < count; i++)
             {
                 var tile = A.Node(holder.transform, "Placeholder" + (i + 1), typeof(Image));
-                var img = tile.GetComponent<Image>(); Kit.StyleRounded(img); Kit.SetRadius(img, TileRadius); img.raycastTarget = false; img.color = new Color(1, 1, 1, 0.7f);
-                SceneBuilderCore.Themed(tile, ThemeRole.SurfaceAlt);
-                if (shine != null) img.material = shine;
+                var frame = tile.GetComponent<Image>(); Kit.StyleRounded(frame); Kit.SetRadius(frame, TileRadius); frame.raycastTarget = false; frame.color = Color.white;
+                SceneBuilderCore.Themed(tile, ThemeRole.InputBackground);
+                A.Outline(tile.transform, ThemeRole.SurfaceAlt, TileRadius);
+                bars.Add(Bar(tile.transform, "IconBar", shine, 22f, new Vector2(0, 1), new Vector2(0, 1), new Vector2(20, -90), new Vector2(90, -20)));
+                bars.Add(Bar(tile.transform, "NameBar", shine, 14f, new Vector2(0, 1), new Vector2(0.9f - (i % 3) * 0.1f, 1), new Vector2(106, -66), new Vector2(0, -38)));
+                bars.Add(Bar(tile.transform, "BrandBar", shine, 12f, new Vector2(0, 1), new Vector2(0.62f - (i % 2) * 0.1f, 1), new Vector2(24, -134), new Vector2(0, -112)));
             }
+            Kit.SetArray(holder.GetComponent<SkeletonShimmer>(), "shapes", bars.ToArray());
             A.Set(holder.GetComponent<SkeletonShimmer>(), "shine", shine);
             holder.GetComponent<CanvasGroup>().blocksRaycasts = false;
             return holder;

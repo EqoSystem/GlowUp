@@ -5,11 +5,18 @@ using UnityEngine.SceneManagement;
 namespace GlowUp.Common
 {
     /// <summary>
-    /// The change from one screen to the next. Since 12 October 2026 it is SKELETON LOADING by default (the project
-    /// owner's choice, the same as the website): no animation, grey placeholder shapes until the next screen is ready.
-    /// The earlier look is still here behind the switch "Skeleton Loading": a sheet in the page colour glides across (or fades in) with
-    /// a soft shadow at its edges and a small turning sparkle in its middle; the next scene is loaded
-    /// behind it, and the sheet glides on and uncovers the new screen.
+    /// The change from one screen to the next.
+    ///
+    /// Since 13 October 2026 NOTHING is drawn over the screens ("Between" = Nothing, the project owner's choice): the old
+    /// screen stays until the next one is ready, then the next one is simply there, with its title, its labels, its
+    /// buttons and its bottom bar. Only what is FETCHED on that screen (a value, the rows of a list) shows as bars until
+    /// it has arrived (TextSkeleton, the placeholder rows of a list). That is how the admin website loads: the frame
+    /// first, the data after it. A sheet of grey shapes over the WHOLE screen turned every label and the bottom bar into
+    /// shapes too, which the project owner did not want.
+    ///
+    /// The two earlier looks are still here ("Between"): Skeleton Sheet (grey shapes over the whole screen until the next
+    /// screen is ready) and Sliding Sheet (a sheet in the page colour glides across with a soft shadow at its edges and a
+    /// small turning sparkle; the next scene is loaded behind it, and the sheet glides on and uncovers the new screen).
     ///
     /// What keeps it smooth:
     ///  - the next scene starts loading while the sheet is still coming in, so the wait is shorter;
@@ -63,10 +70,13 @@ namespace GlowUp.Common
         [Tooltip("On = the next screen starts loading while the sheet is still coming in (shorter wait)")]
         [SerializeField] private bool loadWhileCovering = true;
 
-        [Header("Skeleton loading (the way the website loads a page)")]
-        [Tooltip("On = NO animation between screens: grey placeholder shapes with a moving shine stand in for the next screen until it is ready, then the real screen is there. Off = the sliding sheet with the sparkle, as before.")]
-        [SerializeField] private bool skeletonLoading = true;
-        [Tooltip("The placeholder shapes give way to the real screen in this many seconds (0 = at once)")]
+        /// <summary>What stands between two screens while the next one is being made ready.</summary>
+        public enum Cover { Nothing, SkeletonSheet, SlidingSheet }
+
+        [Header("Between two screens")]
+        [Tooltip("Nothing = nothing is drawn over the screens: the old one stays until the next one is ready, then the next one is there with all its labels and buttons (only fetched data shows as bars). Skeleton Sheet = grey shapes over the whole screen meanwhile. Sliding Sheet = the sheet with the sparkle.")]
+        [SerializeField] private Cover between = Cover.Nothing;
+        [Tooltip("Skeleton Sheet only: the placeholder shapes give way to the real screen in this many seconds (0 = at once)")]
         [SerializeField] private float skeletonLeaveSeconds = 0.1f;
 
         [Header("Style")]
@@ -121,7 +131,8 @@ namespace GlowUp.Common
         IEnumerator Run(string sceneName, int enterFrom)
         {
             busy = true; busySince = Time.unscaledTime;
-            if (skeletonLoading && skeletonGroup != null) { yield return RunSkeleton(sceneName); yield break; }
+            if (between == Cover.Nothing) { yield return RunPlain(sceneName); yield break; }
+            if (between == Cover.SkeletonSheet && skeletonGroup != null) { yield return RunSkeleton(sceneName); yield break; }
             bool calm = fadeOnlyInPerformanceMode && GlowUp.Performance.PerformanceSettings.ReduceEffects;
             bool sliding = slide && enterFrom != 0 && !calm;
             overlayCanvas.gameObject.SetActive(true);
@@ -171,7 +182,27 @@ namespace GlowUp.Common
         }
 
         /// <summary>
-        /// Skeleton loading: the placeholder shapes are there AT ONCE (nothing slides, fades in or spins), the next screen
+        /// Nothing between the screens: the old screen stays as it is while the next one is loaded, then the next one is
+        /// there. The canvas of this object is switched on meanwhile, with everything on it see-through, only so that no tap
+        /// reaches the old screen (a second tap must not start a second change).
+        /// </summary>
+        IEnumerator RunPlain(string sceneName)
+        {
+            overlayCanvas.gameObject.SetActive(true);
+            sheet.anchoredPosition = Vector2.zero;
+            if (sheetGroup != null) sheetGroup.alpha = 0f;
+            if (skeletonGroup != null) skeletonGroup.alpha = 0f;
+            if (markGroup != null) markGroup.alpha = 0f;
+            ThreadPriority priorityBefore = Application.backgroundLoadingPriority;
+            Application.backgroundLoadingPriority = ThreadPriority.High;
+            AsyncOperation loading = SceneManager.LoadSceneAsync(sceneName);
+            while (loading != null && !loading.isDone) yield return null;
+            Application.backgroundLoadingPriority = priorityBefore;
+            Finish();
+        }
+
+        /// <summary>
+        /// Skeleton Sheet: the placeholder shapes are there AT ONCE (nothing slides, fades in or spins), the next screen
         /// loads behind them, and when it is ready and draws smoothly they give way to it.
         /// </summary>
         IEnumerator RunSkeleton(string sceneName)

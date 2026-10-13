@@ -133,7 +133,7 @@ namespace GlowUp.AR
             ApplyIntensity();
             if (split != null && split.IsOn && liveTracking != null) liveTracking.SetCompare(true);
 
-            TextSkeleton.Waiting(this);                 // the profile is being fetched (bars meanwhile only if TextSkeleton is switched on here)
+            if (UserProfileRepository.Cached() == null) TextSkeleton.Waiting(this);      // nothing on the phone yet: the fetched texts are bars meanwhile
             try { profile = await UserProfileRepository.Load(); } catch (Exception e) { Debug.LogWarning("AR Try-On: " + e.Message); }
             TextSkeleton.Ready(this);
             if (this == null) return;

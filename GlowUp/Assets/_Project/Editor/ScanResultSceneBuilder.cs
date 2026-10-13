@@ -237,8 +237,9 @@ namespace GlowUp.EditorTools
             A.Set(controller, "backButton", s.back); A.Set(controller, "scanAnotherButton", scanAnother); A.Set(controller, "tryOnButton", tryOn);
             A.Set(controller, "scanAgainPanel", scanAgain.panel); A.Set(controller, "sameProductButton", sameProduct); A.Set(controller, "differentProductButton", differentProduct);
 
-            // TextSkeleton: can show the result's titles, labels and subtitles as bars while the profile is fetched. Built switched off.
-            AppTiles.WordSkeleton(s);
+            // What is FETCHED on this screen: the product's own words and the result (bars only while nothing is on the phone
+            // yet). The headings, the labels, the buttons and the panels are never bars.
+            AppTiles.WordSkeleton(s, AppTiles.TextsOf(controller, "brandText", "nameText", "typeText", "dateText", "summaryText", "explanationText", "shadeCaption"));
 
             A.Finish(s);
             Debug.Log("[GlowUp] AiSmartAnalysisResultScene built. ChipTemplate, SourceLinkTemplate and AlternativeTileTemplate are pattern objects; ExplanationText and FdaDetails open with their buttons; the pop-ups (ScanAgainPanel among them) are inactive until opened.");

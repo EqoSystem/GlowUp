@@ -63,6 +63,14 @@ namespace GlowUp.Tests
         }
 
         [Test]
+        public void Bars_while_fetching_come_with_the_first_picture_when_somebody_is_fetching()
+        {
+            // the scene builders set "Slow After Seconds" to 0: a value that is not there yet is a bar at once, never a half-empty word
+            Assert.IsTrue(SkeletonLook.SlowEnough(1, 0f, 0f));
+            Assert.IsFalse(SkeletonLook.SlowEnough(0, 0f, 0f), "the data is on the phone already: nobody is fetching, no bars");
+        }
+
+        [Test]
         public void Bars_only_when_slow_never_touches_a_screen_whose_data_is_there_at_once()
         {
             Assert.IsFalse(SkeletonLook.SlowEnough(0, 0f, 0.6f));

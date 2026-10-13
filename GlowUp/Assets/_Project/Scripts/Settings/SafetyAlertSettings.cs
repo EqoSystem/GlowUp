@@ -26,7 +26,7 @@ namespace GlowUp.AppSettings
         async void Start()
         {
             UserProfileData profile = null;
-            GlowUp.Common.TextSkeleton.Waiting(this);       // the profile is being fetched (bars meanwhile only if TextSkeleton is switched on)
+            if (UserProfileRepository.Cached() == null) GlowUp.Common.TextSkeleton.Waiting(this);
             try { profile = await UserProfileRepository.Load(); }
             catch (Exception e) { Debug.LogWarning("Settings: profile not loaded: " + e.Message); }
             GlowUp.Common.TextSkeleton.Ready(this);

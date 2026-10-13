@@ -151,8 +151,9 @@ namespace GlowUp.Recent
         {
             Refresh();
             // make sure the profile is known (the history belongs to the signed-in account), then show it again.
-            // (TextSkeleton is told; it shows bars and placeholder rows meanwhile only if it is switched on for this screen.)
-            TextSkeleton.Waiting(this);
+            // Only when this phone knows no profile yet is there something to wait for: then the count is a bar and the list
+            // shows placeholder rows meanwhile (TextSkeleton). Otherwise the saved scans are simply there.
+            if (UserProfileRepository.Cached() == null) TextSkeleton.Waiting(this);
             try { await UserProfileRepository.Load(); } catch (Exception e) { Debug.LogWarning("Recent scans: " + e.Message); }
             TextSkeleton.Ready(this);
             if (this != null) Refresh();

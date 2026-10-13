@@ -82,7 +82,8 @@ namespace GlowUp.EditorTools
             // longer and shows Save / Try On / AI (the user's choice of 12 October 2026: a long list must not overwhelm)
             AppTiles.ListScroll(listArea.transform, "RecommendationsScrollView", out RectTransform content);
             ProductTileView template = AppTiles.ExpandingRow(content, "RecommendationTemplate", AppTiles.TileKind.Dashboard);
-            // grey placeholder rows for the time the list loads (inactive here: the app switches them on)
+            // placeholder rows for the time the list is fetched: a row's panel with bars for the icon, the name and the brand
+            // (inactive here: the app switches them on)
             GameObject skeleton = AppTiles.SkeletonRows(listArea.transform, "RecommendationsSkeleton", 5);
             skeleton.SetActive(false);
 
@@ -172,9 +173,10 @@ namespace GlowUp.EditorTools
             A.Set(controller, "signOutConfirm", signOutConfirm);
             A.Set(controller, "settingsButton", settings);
 
-            // TextSkeleton: can show the greeting, the summary and the subtitles as bars while the profile is fetched. Built
-            // switched off (the words are there at once); see AppTiles.WordSkeleton.
-            AppTiles.WordSkeleton(s);
+            // What is FETCHED on this screen: the five values of the summary (bars while the profile is fetched and nothing is
+            // on the phone yet) and the rows under "Recommended for you" (their own placeholder rows, RecommendationsSkeleton).
+            // The greeting, the titles, the labels "Age", "Birthday" ..., the buttons and the bottom bar are never bars.
+            AppTiles.WordSkeleton(s, AppTiles.TextsOf(controller, "ageValue", "birthdayValue", "skinTypeValue", "skinToneValue", "allergensValue"));
 
             A.Finish(s);
             Debug.Log("[GlowUp] UserDashboardScene built. RecommendationTemplate is the pattern row (left open in the Hierarchy so its buttons can be styled; the app closes every row); RecommendationsSkeleton and AiInsightPanel are inactive until needed; AccountPanel is inactive until the avatar is tapped. The gear opens the Settings page.");

@@ -286,8 +286,8 @@ namespace GlowUp.EditorTools
             A.Set(controller, "typeIcons", A.TypeIcons());
             A.Set(controller, "backButton", s.back);
 
-            // TextSkeleton: can show the screen's titles and labels as bars while the profile and the product are fetched. Built switched off.
-            AppTiles.WordSkeleton(s);
+            // What is FETCHED on this screen: the name of the product that is tried on (a bar only while nothing is on the phone yet)
+            AppTiles.WordSkeleton(s, AppTiles.TextsOf(controller, "productText"));
 
             A.Finish(s);
             Debug.Log("[GlowUp] ARTryOnScene built. GuidedPreview > AfterClip > FaceGuide holds the colour shapes of the guided preview (the tints you see in the Editor are samples); " +

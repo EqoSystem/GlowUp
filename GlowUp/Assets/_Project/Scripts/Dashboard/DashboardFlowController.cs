@@ -100,14 +100,18 @@ namespace GlowUp.Dashboard
 
         async void Start()
         {
-            ShowProfile(null);
-            // while the list loads: grey placeholder tiles when the scene has them, otherwise the "looking..." line
+            // what this phone already knows about the user is shown at once; the cloud is asked after that
+            profile = UserProfileRepository.Cached();
+            ShowProfile(profile);
+            bool nothingYet = profile == null;
+            // while the list loads: placeholder rows when the scene has them, otherwise the "looking..." line
             if (recommendationsSkeleton != null) recommendationsSkeleton.SetActive(true);
             if (recommendationsEmptyText != null) { recommendationsEmptyText.gameObject.SetActive(recommendationsSkeleton == null); recommendationsEmptyText.text = msgLoading; }
 
-            // says that the profile is being fetched (TextSkeleton shows bars meanwhile only if it is switched on for this screen)
-            TextSkeleton.Waiting(this);
-            try { profile = await UserProfileRepository.Load(); }
+            // nothing on the phone yet (a first sign-in here): the summary's VALUES are bars until the profile has been fetched.
+            // Its labels, the titles and the buttons are never bars (see TextSkeleton).
+            if (nothingYet) TextSkeleton.Waiting(this);
+            try { profile = await UserProfileRepository.Load() ?? profile; }
             catch (Exception e) { Debug.LogWarning("Dashboard: profile not loaded: " + e.Message); }
             TextSkeleton.Ready(this);
             if (this == null) return;                       // the scene was left while loading

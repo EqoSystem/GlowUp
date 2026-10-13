@@ -79,8 +79,9 @@ namespace GlowUp.Common
         }
 
         /// <summary>
-        /// For a screen set to "Bars Only When Slow": true when its words should become bars, because a fetch has been
-        /// running for `slowAfterSeconds`. A screen whose data is there at once never gets bars.
+        /// For a screen set to "Bars While Fetching": true when its fetched texts should become bars, because a fetch has
+        /// been running for `slowAfterSeconds` (0 = from the first moment). A screen whose data is on the phone already
+        /// has nobody fetching, and never gets bars.
         /// </summary>
         public static bool SlowEnough(int stillFetching, float fetchingSeconds, float slowAfterSeconds)
         {

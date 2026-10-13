@@ -45,9 +45,11 @@ namespace GlowUp.AppSettings
 
         async void Start()
         {
-            Show(null);
-            GlowUp.Common.TextSkeleton.Waiting(this);       // the profile is being fetched (bars meanwhile only if TextSkeleton is switched on)
-            try { profile = await UserProfileRepository.Load(); }
+            // what this phone already knows is shown at once; only with nothing to show is the profile line a bar meanwhile
+            profile = UserProfileRepository.Cached();
+            Show(profile);
+            if (profile == null) GlowUp.Common.TextSkeleton.Waiting(this);
+            try { profile = await UserProfileRepository.Load() ?? profile; }
             catch (Exception e) { Debug.LogWarning("Settings: profile not loaded: " + e.Message); }
             GlowUp.Common.TextSkeleton.Ready(this);
             if (this == null) return;

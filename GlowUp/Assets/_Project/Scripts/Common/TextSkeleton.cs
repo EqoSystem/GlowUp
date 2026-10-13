@@ -7,16 +7,20 @@ using UnityEngine.UI;
 namespace GlowUp.Common
 {
     /// <summary>
-    /// "Skeleton" loading for WORDS, the way the admin website fetches its data: every title, label and subtitle in the
-    /// list "Texts" can be replaced by a soft bar of the same size in the same place, with a rose-to-gold shine travelling
-    /// across, until the screen has its data.
+    /// "Skeleton" loading for FETCHED WORDS, the way the admin website fetches its data: a text that holds something
+    /// from the database (a value such as the age or the birthday, a count, an account name) is replaced by a soft bar of
+    /// the same size in the same place, with a rose-to-gold shine travelling across, until that data has arrived.
     ///
-    /// BY DEFAULT IT DOES NOTHING WHEN A SCREEN OPENS ("When Screen Opens" = Keep The Words). The project owner tried
-    /// bars on every change of screen on 13 October 2026 and did not want them: the labels, titles, subtitles and the
-    /// product rows must be there at once, with no wait. The other two settings are kept for a screen that needs them:
-    ///   - "Bars Only When Slow": the words stay; they become bars only when a fetch is still running after "Slow After
-    ///     Seconds" (a weak connection), so a screen whose data is on the phone already is never touched;
-    ///   - "Bars At Once": the bars show as soon as the screen opens.
+    /// The project owner's rule (13 October 2026): ONLY fetched data becomes bars. Titles ("Quick Summary"), labels
+    /// ("Age", "Birthday"), buttons, the bottom bar and the frame of a product row are part of the screen itself: they are
+    /// there the moment the screen opens and are never touched. So the list "Texts" holds only texts with fetched data
+    /// (the scene builders fill it), and with "Bars While Fetching" the bars show only while a script is really fetching:
+    /// when the data is on the phone already the words are simply there, with no bars and no wait.
+    ///
+    /// "When Screen Opens":
+    ///   - "Keep The Words": nothing ever happens (the component is switched off);
+    ///   - "Bars While Fetching": bars from the moment a script says it is fetching until it has its data;
+    ///   - "Bars At Once": bars as soon as the screen opens, whether something is fetched or not (for looking at them).
     ///
     /// How a screen uses it:
     ///   - one object "TextSkeleton" lies over the screen's card (the scene builder makes it and fills "Texts");
@@ -37,7 +41,7 @@ namespace GlowUp.Common
     public class TextSkeleton : MaskableGraphic
     {
         [Header("What it stands in for")]
-        [Tooltip("The titles, labels and subtitles that become bars while the screen fetches its data")]
+        [Tooltip("ONLY the texts that hold fetched data (a value, a count, a name from the account). Titles, labels and the words on buttons do not belong here: they are never bars.")]
         [SerializeField] private TMP_Text[] texts;
         [Tooltip("Placeholder shapes for lists (rows, tiles): switched on while the screen is fetching, off afterwards. Optional.")]
         [SerializeField] private GameObject[] showWhileLoading;
@@ -45,15 +49,15 @@ namespace GlowUp.Common
         [SerializeField] private CanvasGroup[] hideWhileLoading;
 
         /// <summary>What happens to the words when the screen opens.</summary>
-        public enum OnOpen { KeepTheWords, BarsOnlyWhenSlow, BarsAtOnce }
+        public enum OnOpen { KeepTheWords, BarsWhileFetching, BarsAtOnce }
 
         [Header("When")]
-        [Tooltip("Keep The Words (the project owner's choice) = nothing happens when the screen opens: no bars, no wait. Bars Only When Slow = the words stay and become bars only when a fetch takes longer than 'Slow After Seconds'. Bars At Once = bars from the moment the screen opens.")]
+        [Tooltip("Keep The Words = nothing ever happens. Bars While Fetching (what the scene builders set) = the texts of the list are bars only while a script is fetching their data; data that is on the phone already shows at once. Bars At Once = bars as soon as the screen opens.")]
         [SerializeField] private OnOpen whenScreenOpens = OnOpen.KeepTheWords;
-        [Tooltip("For 'Bars Only When Slow': a fetch that is still running after this many seconds turns the words into bars")]
-        [SerializeField] private float slowAfterSeconds = 0.6f;
-        [Tooltip("Once bars are shown they stay at least this long, so they do not flash")]
-        [SerializeField] private float shortestSeconds = 0.35f;
+        [Tooltip("For 'Bars While Fetching': the bars come when a fetch has been running this many seconds (0 = with the first picture of the screen, so a half-empty value is never seen)")]
+        [SerializeField] private float slowAfterSeconds = 0f;
+        [Tooltip("Once bars are shown they stay at least this long, so they do not flicker when the data arrives a moment later")]
+        [SerializeField] private float shortestSeconds = 0.2f;
         [Tooltip("The time limit: after this long the words are shown whatever happens (they then say what is known so far)")]
         [SerializeField] private float longestSeconds = 8f;
         [Tooltip("How long the bars take to give way to the words")]
@@ -187,9 +191,9 @@ namespace GlowUp.Common
                 if (hideWhileLoading != null) foreach (CanvasGroup list in hideWhileLoading) if (list != null) list.blocksRaycasts = true;
                 bars.Clear(); SetVerticesDirty();        // nothing is left to draw
             }
-            else if (whenScreenOpens == OnOpen.BarsOnlyWhenSlow)
+            else if (whenScreenOpens == OnOpen.BarsWhileFetching)
             {
-                // the words are on the screen; they only become bars when a fetch drags on (counted while the screen can be seen)
+                // nobody fetching: the words are simply there. Somebody fetching: bars until the data has arrived
                 int stillFetching = StillFetching();
                 if (stillFetching == 0) fetchingFor = 0f;
                 else if (!ScreenTransition.IsBusy) fetchingFor += Mathf.Min(Time.unscaledDeltaTime, LongestFrame);

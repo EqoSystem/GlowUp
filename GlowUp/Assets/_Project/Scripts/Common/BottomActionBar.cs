@@ -25,16 +25,30 @@ namespace GlowUp.Common
         [Tooltip("The screen this bar is on (its own button is switched off)")]
         [SerializeField] private Tab current = Tab.None;
 
+        LiquidTabBar pill;
+
         void Awake()
         {
-            if (recentButton != null) recentButton.onClick.AddListener(() => { if (current != Tab.Recent) SceneNavigator.Go(recentScene); });
-            if (scanButton != null) scanButton.onClick.AddListener(() => { if (current != Tab.Scan) SceneNavigator.Go(scanScene); });
+            pill = GetComponent<LiquidTabBar>();
+            if (recentButton != null) recentButton.onClick.AddListener(() => { if (current != Tab.Recent) Open(recentScene, 0); });
+            if (scanButton != null) scanButton.onClick.AddListener(() => { if (current != Tab.Scan) Open(scanScene, 1); });
             if (tryOnButton != null) tryOnButton.onClick.AddListener(() =>
             {
                 if (current == Tab.TryOn) return;
                 ScanSession.TryOn = null;            // from the bar, Try On always starts by choosing a saved product
-                SceneNavigator.Go(tryOnScene);
+                Open(tryOnScene, 2);
             });
+        }
+
+        /// <summary>
+        /// Opens the screen of a button. Nothing covers the screen while the next one is made ready, so the bar answers
+        /// the tap itself: its pink pill sets off towards the tapped icon at once.
+        /// </summary>
+        void Open(string scene, int slot)
+        {
+            if (ScreenTransition.IsBusy) return;
+            SceneNavigator.Go(scene);
+            if (pill != null) pill.Commit(slot);
         }
     }
 }

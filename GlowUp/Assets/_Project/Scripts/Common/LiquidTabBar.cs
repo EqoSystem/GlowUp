@@ -90,6 +90,9 @@ namespace GlowUp.Common
         {
             base.OnDisable();
             SceneNavigator.Leaving -= RememberPlace;
+            // the screen is going: the next screen's pill starts exactly where this one is now, so its way to the tapped or
+            // swiped icon goes on without a jump (nothing covers the change of screen)
+            if (ready && current >= 0 && carriedTo != null) carriedX = x;
         }
 
         void RememberPlace(string nextScene)

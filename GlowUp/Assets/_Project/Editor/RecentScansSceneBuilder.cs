@@ -64,8 +64,8 @@ namespace GlowUp.EditorTools
             AppTiles.ListScroll(listArea.transform, "ScanHistoryList", out RectTransform content);
             content.GetComponent<VerticalLayoutGroup>().padding = new RectOffset(0, 18, 4, 140);   // room for the restore bar under the last row
             ProductTileView template = AppTiles.ExpandingRow(content, "ScanTileTemplate", AppTiles.TileKind.RecentScan);
-            // placeholder rows and a way to keep the real rows out of sight: only used when TextSkeleton is switched on for
-            // this screen (it is built switched off, so the real rows show at once)
+            // placeholder rows (a row's panel with bars inside) and a way to keep the real rows out of sight meanwhile:
+            // TextSkeleton uses both only while the saved scans are really being fetched
             GameObject listSkeleton = AppTiles.SkeletonRows(listArea.transform, "ScanListSkeleton", 5);
             listSkeleton.SetActive(false);
             CanvasGroup listGroup = SceneBuilderCore.Ensure<CanvasGroup>(content.gameObject);
@@ -160,9 +160,10 @@ namespace GlowUp.EditorTools
             A.Set(controller, "selectButton", select); A.Set(controller, "selectionBar", selectionBar); A.Set(controller, "selectionText", selectionText);
             A.Set(controller, "selectAllButton", selectAll); A.Set(controller, "cancelSelectionButton", cancelSelection);
 
-            // TextSkeleton: can show the title and the count as bars and the list as placeholder rows while the saved scans are
-            // fetched. Built switched off (the words and the rows are there at once); see AppTiles.WordSkeleton.
-            AppTiles.WordSkeleton(s, new[] { listSkeleton }, new[] { listGroup, emptyGroup });
+            // What is FETCHED on this screen: the count ("42 saved") and the rows. While this phone has nothing to show yet the
+            // count is a bar and the list is placeholder rows; otherwise the saved scans are simply there. The title, the
+            // buttons and the bottom bar are never bars.
+            AppTiles.WordSkeleton(s, AppTiles.TextsOf(controller, "countText"), new[] { listSkeleton }, new[] { listGroup, emptyGroup });
 
             A.Finish(s);
             Debug.Log("[GlowUp] RecentScanActivitiesScene built. ScanTileTemplate is the pattern row (left open in the Hierarchy so its buttons can be styled); RemoveZone is invisible until the tiles shake (set its CanvasGroup's Alpha to 1 to see it); " +
