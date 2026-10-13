@@ -114,9 +114,18 @@ namespace GlowUp.Scan
             public string productName = "", brandName = "", cosmeticType = "", shadeHex = "", shadeName = "", finish = "";
             public float confidence;
             public string model = "";
+            /// <summary>The cap or lid is ON (or the product is closed, or still in its box): the make-up itself cannot be seen in the photo.</summary>
+            public bool capOn;
+            /// <summary>
+            /// Where shadeHex was taken from: "product" (the make-up itself: the bullet, the pan, the liquid, also through a
+            /// clear case), "packaging" (a colour dot, swatch or shade sticker on the pack), "name" (worked out from the shade
+            /// name or number printed on it). "" = no shade.
+            /// </summary>
+            public string shadeFrom = "";
         }
 
         public static readonly string[] Finishes = { "matte", "satin", "glossy", "shimmer", "metallic" };
+        public static readonly string[] ShadeSources = { "product", "packaging", "name" };
         /// <summary>The brand names the website lists (the scanner fills this in), so the AI spells a brand it recognises the same way.</summary>
         public static List<string> KnownBrands = new List<string>();
 
@@ -149,31 +158,167 @@ namespace GlowUp.Scan
                 q.Append("BRANDS THIS APP ALREADY LISTS (when the pack is one of these, write the brand exactly like this): ").Append(string.Join(", ", KnownBrands.GetRange(0, Mathf.Min(80, KnownBrands.Count)))).Append("\n");
             if (!string.IsNullOrWhiteSpace(textOnProduct))
                 q.Append("TEXT A TEXT READER FOUND ON IT (may contain mistakes):\n").Append(textOnProduct.Length > 900 ? textOnProduct.Substring(0, 900) : textOnProduct).Append('\n');
+            q.Append(BrandAndNameRule);
             q.Append("Reply with ONLY one JSON object, no markdown and no other text, in exactly this shape:\n");
             q.Append("{\"found\":true,\"productName\":\"the product's name as sold, without the brand\",\"brandName\":\"\",");
             q.Append("\"cosmeticType\":\"").Append(ProductScope.AiTypeChoices).Append("\",");
+            q.Append("\"capOn\":false,");
             q.Append("\"shadeHex\":\"#RRGGBB of the PRODUCT'S OWN colour (the lipstick bullet, the powder, the liquid), never the packaging. Look at the product itself: the tip of the lipstick, the pan, the liquid. If only the packaging is visible, use the colour a shade name or shade number printed on it stands for, or a colour dot printed on it. A face powder (loose or pressed, not a blush, bronzer or eyeshadow) is always #FFFFFF. Empty when the product's own colour cannot be known\",");
+            q.Append("\"shadeFrom\":\"where shadeHex comes from, one of: product, packaging, name; empty when shadeHex is empty\",");
             q.Append("\"shadeName\":\"the shade name or number printed on it, or empty\",");
             q.Append("\"finish\":\"the texture of the colour, one of: matte, satin, glossy, shimmer, metallic; empty when it cannot be seen\",");
             q.Append("\"confidence\":0.0}\n");
+            q.Append("capOn: true when the cap or lid is ON, or the product is closed or still in its box, so that the make-up itself cannot be seen. ");
+            q.Append("A see-through cap or case that shows the make-up counts as NOT on. With capOn true, never take the colour of the cap, the tube or the box for the shade. ");
+            q.Append("shadeFrom: \"product\" = you saw the make-up itself (also through a clear case); \"packaging\" = a colour dot, colour swatch or shade sticker printed on the pack; ");
+            q.Append("\"name\" = worked out from the shade name or number.\n");
             q.Append("confidence is 0 to 1. Do not guess a name or a brand that you can neither read nor clearly recognise: leave it empty instead. ");
             q.Append("If the photo shows no cosmetic product, reply {\"found\":false}.");
 
             AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), false, TimeoutSeconds, jpegPhotos);
             if (answer == null || !answer.ok) { Debug.LogWarning("AI product recognition: " + (answer != null ? answer.error : "no answer")); return result; }
-            Dictionary<string, object> json = AiResearchClient.JsonObjectIn(answer.text);
+            return IdentityFrom(answer.text, answer.model);
+        }
+
+        /// <summary>
+        /// What tells a BRAND from a PRODUCT NAME, said the same way to every question about a product. On a pack the app
+        /// does not know, both are just words: the AI has to be told how to sort them.
+        /// </summary>
+        const string BrandAndNameRule =
+            "BRAND OR PRODUCT NAME? The BRAND is the company or label that makes the product: usually its logo, written the same way on everything it sells. " +
+            "The PRODUCT NAME is what this ONE product or line is called, usually printed next to the kind of product (\"SuperStay Matte Ink\", \"Fit Me Matte + Poreless\"). " +
+            "Never put the brand into productName. Never use the kind of product alone (\"Lipstick\", \"Loose Powder\"), a slogan, a claim (\"Long lasting\", \"24H\") " +
+            "or the shade as the product name. When only one name is printed, decide which of the two it is, and leave the other empty.\n";
+
+        /// <summary>
+        /// Reads the AI's answer to Identify (the JSON object in its text). Kept apart from the asking so that the reading
+        /// can be tested without the AI.
+        /// </summary>
+        public static Identity IdentityFrom(string answerText, string model = "")
+        {
+            var result = new Identity();
+            Dictionary<string, object> json = AiResearchClient.JsonObjectIn(answerText);
             if (json == null) return result;
 
-            result.model = answer.model;
+            result.model = model ?? "";
             result.productName = Text(json, "productName"); result.brandName = Text(json, "brandName"); result.cosmeticType = Text(json, "cosmeticType");
+            result.productName = WithoutBrand(result.productName, result.brandName);
             result.shadeName = Text(json, "shadeName");
             string hex = Text(json, "shadeHex");
             result.shadeHex = hex.Length == 7 && hex[0] == '#' && ColorUtility.TryParseHtmlString(hex, out _) ? hex.ToUpperInvariant() : "";
+            string from = Text(json, "shadeFrom").ToLowerInvariant();
+            result.shadeFrom = result.shadeHex.Length > 0 && Array.IndexOf(ShadeSources, from) >= 0 ? from : "";
+            result.capOn = Flag(json, "capOn");
+            // with the cap on, a colour that is said to be the make-up's own can only be the cap's or the tube's: it is not taken
+            if (result.capOn && result.shadeFrom == "product") { result.shadeHex = ""; result.shadeFrom = ""; }
             string finish = Text(json, "finish").ToLowerInvariant();
             result.finish = Array.IndexOf(Finishes, finish) >= 0 ? finish : "";
-            if (json.TryGetValue("confidence", out object c)) { try { result.confidence = Mathf.Clamp01(Convert.ToSingle(c, System.Globalization.CultureInfo.InvariantCulture)); } catch { } }
-            bool said = json.TryGetValue("found", out object f) && f is bool b && b;
-            result.found = said && (result.productName.Length > 0 || result.brandName.Length > 0 || result.cosmeticType.Length > 0);
+            result.confidence = Number01(json, "confidence");
+            result.found = Flag(json, "found") && (result.productName.Length > 0 || result.brandName.Length > 0 || result.cosmeticType.Length > 0);
+            return result;
+        }
+
+        /// <summary>
+        /// A product name without its brand in front: "Maybelline SuperStay Matte Ink" by Maybelline is "SuperStay Matte Ink".
+        /// A "name" that is nothing but the brand is no product name at all.
+        /// </summary>
+        public static string WithoutBrand(string productName, string brandName)
+        {
+            string name = (productName ?? "").Trim(), brand = (brandName ?? "").Trim();
+            if (name.Length == 0 || brand.Length == 0) return name;
+            if (string.Equals(name, brand, StringComparison.OrdinalIgnoreCase)) return "";
+            if (name.Length > brand.Length + 1 && name.StartsWith(brand, StringComparison.OrdinalIgnoreCase) && !char.IsLetterOrDigit(name[brand.Length]))
+                return name.Substring(brand.Length).TrimStart(' ', '-', ':', ',', '|').Trim();
+            return name;
+        }
+
+        // =====================================================================================
+        //  ConfirmOnWeb (a product the app's own lists do not have)
+        // =====================================================================================
+        /// <summary>What a live web search says about the product in the photo.</summary>
+        public class WebMatch
+        {
+            /// <summary>The web shows this very product (its name AND its look agree with the photo), and a web search was really made.</summary>
+            public bool same;
+            public string productName = "", brandName = "", cosmeticType = "";
+            /// <summary>The page that shows the product: "page title | https://address".</summary>
+            public string page = "";
+            public float confidence;
+            public string model = "";
+            public bool webSearched;
+            /// <summary>MORE ABOUT IT: its ingredient list as a credible page publishes it (`found` is false when none does).</summary>
+            public IngredientLookup list = new IngredientLookup();
+        }
+
+        /// <summary>
+        /// The app's own lists do not have the product, and a first look only GUESSED its brand and name. This asks the AI
+        /// to search the web for the product by those words and by what the pack looks like, to say whether it found the
+        /// very same product, how its brand and name are really written, and (in the same answer, so no second wait) its
+        /// published ingredient list. Only the photo of the product, the words read on it and its barcode are sent.
+        /// </summary>
+        public static async Task<WebMatch> ConfirmOnWeb(byte[] jpegPhoto, Identity guess, string textOnProduct, string barcode = "")
+        {
+            var result = new WebMatch();
+            if (!Available || !SearchTheWeb || jpegPhoto == null || jpegPhoto.Length == 0) return result;
+            barcode = OpenBeautyFacts.Digits(barcode);
+            var q = new StringBuilder();
+            q.Append("The photo shows a make-up product held up to a phone camera. A first look named it as below. That may be wrong, and brand and product name may be mixed up.\n");
+            if (guess != null)
+            {
+                q.Append("BRAND GUESS: ").Append(guess.brandName.Length > 0 ? guess.brandName : "(none)").Append('\n');
+                q.Append("PRODUCT NAME GUESS: ").Append(guess.productName.Length > 0 ? guess.productName : "(none)").Append('\n');
+                if (guess.cosmeticType.Length > 0) q.Append("KIND: ").Append(guess.cosmeticType).Append('\n');
+                if (guess.shadeName.Length > 0) q.Append("SHADE PRINTED ON IT: ").Append(guess.shadeName).Append('\n');
+            }
+            if (!string.IsNullOrWhiteSpace(textOnProduct))
+                q.Append("TEXT A TEXT READER FOUND ON IT (may contain mistakes):\n").Append(textOnProduct.Length > 700 ? textOnProduct.Substring(0, 700) : textOnProduct).Append('\n');
+            if (barcode.Length > 0) q.Append("BARCODE (GTIN / EAN / UPC) printed on the pack: ").Append(barcode).Append(" (it names exactly one product: search for the number too)\n");
+            q.Append("STEP 1, SEARCH THE WEB for this product: by the words above and by what the pack in the photo LOOKS like (its logo and lettering, its colours, ");
+            q.Append("the shape of the tube, bottle, compact or box). Open product pages (the brand's own website or store first, then large retailers) and compare ");
+            q.Append("their product pictures and names with the photo.\n");
+            q.Append("STEP 2, IS IT THE SAME PRODUCT? \"same\" is true only when the name AND the look agree with a product you found. A similar product of another ");
+            q.Append("brand, or another line of the same brand, is NOT the same: then reply with same false.\n");
+            q.Append("STEP 3, when it is the same: write its brand and its product name the way that page sells it. ");
+            q.Append(BrandAndNameRule);
+            q.Append("STEP 4, MORE ABOUT IT: its full ingredient (INCI) list as its maker publishes it. Use credible sources only, most trusted first: the brand's official ");
+            q.Append("website or official store page; the product pages of large retailers that reproduce the list printed on the pack; Open Beauty Facts. ");
+            q.Append("Ingredient DATABASES (INCIDecoder, EWG Skin Deep, CosDNA, CosIng) explain what an ingredient is: do NOT take this product's list from them. ");
+            q.Append("The list must be a copy of what is printed on the pack: never reconstruct it from memory or from a similar product. ");
+            q.Append("When no credible page shows the list, leave \"ingredients\" empty: the product can still be the same.\n");
+            if (KnownBrands != null && KnownBrands.Count > 0)
+                q.Append("BRANDS THIS APP ALREADY LISTS (when it is one of these, write the brand exactly like this): ").Append(string.Join(", ", KnownBrands.GetRange(0, Mathf.Min(80, KnownBrands.Count)))).Append("\n");
+            q.Append("Reply with ONLY one JSON object, no markdown and no other text, in exactly this shape:\n");
+            q.Append("{\"same\":true,\"brandName\":\"\",\"productName\":\"as sold, without the brand and without the shade\",");
+            q.Append("\"cosmeticType\":\"").Append(ProductScope.AiTypeChoices).Append("\",");
+            q.Append("\"page\":\"page title | https://address of the page that shows this product\",\"confidence\":0.0,");
+            q.Append("\"ingredients\":[\"INCI name\"],");
+            q.Append("\"hidden\":[{\"term\":\"the word on the label, e.g. Fragrance\",\"substances\":[\"...\"],\"note\":\"one short sentence, naming the source\"}],");
+            q.Append("\"sources\":[\"page title | https://address the ingredient list came from\"],\"note\":\"\"}\n");
+            q.Append("confidence is 0 to 1. NEVER invent a product, a page or an ingredient list. If you cannot find the product, reply {\"same\":false}.");
+
+            AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), true, TimeoutSeconds + 10f, jpegPhoto);
+            if (answer == null || !answer.ok) { Debug.LogWarning("AI web check: " + (answer != null ? answer.error : "no answer")); return result; }
+            return WebMatchFrom(answer.text, answer.sources, answer.usedWebSearch, answer.model, guess != null ? guess.brandName : "");
+        }
+
+        /// <summary>
+        /// Reads the AI's answer to ConfirmOnWeb. `pagesOpened` = the pages the web search really opened; `webSearched` =
+        /// a live web search was made. WITHOUT a live search nothing is "confirmed on the web": the answer would only be
+        /// the AI's memory. Kept apart from the asking so that the reading can be tested without the AI.
+        /// </summary>
+        public static WebMatch WebMatchFrom(string answerText, List<string> pagesOpened, bool webSearched, string model = "", string brandGuess = "")
+        {
+            var result = new WebMatch { model = model ?? "", webSearched = webSearched };
+            Dictionary<string, object> json = AiResearchClient.JsonObjectIn(answerText);
+            if (json == null) return result;
+            result.brandName = Text(json, "brandName"); result.cosmeticType = Text(json, "cosmeticType");
+            result.productName = WithoutBrand(Text(json, "productName"), result.brandName);
+            string page = Text(json, "page");
+            result.page = page.Contains("http") ? page : "";
+            result.confidence = Number01(json, "confidence");
+            result.same = webSearched && Flag(json, "same") && (result.productName.Length > 0 || result.brandName.Length > 0);
+            if (!result.same) return result;                 // a list for "some similar product" is never taken
+            result.list = LookupFrom(json, pagesOpened, webSearched, model, result.brandName.Length > 0 ? result.brandName : brandGuess, false);
             return result;
         }
 
@@ -237,8 +382,17 @@ namespace GlowUp.Scan
             if (answer == null || !answer.ok) { Debug.LogWarning("AI ingredient lookup: " + (answer != null ? answer.error : "no answer")); return result; }
             Dictionary<string, object> json = AiResearchClient.JsonObjectIn(answer.text);
             if (json == null) return result;
+            return LookupFrom(json, answer.sources, answer.usedWebSearch, answer.model, brand, true);
+        }
 
-            result.model = answer.model; result.webSearched = answer.usedWebSearch; result.note = Text(json, "note");
+        /// <summary>
+        /// The ingredient list in an answer of the AI, with the rules every looked-up list has to pass: real names only, and
+        /// at least one source the app can show that is not an ingredient database. Used by FindIngredients (whose answer must
+        /// say "found" itself) and by ConfirmOnWeb.
+        /// </summary>
+        static IngredientLookup LookupFrom(Dictionary<string, object> json, List<string> pagesOpened, bool webSearched, string model, string brand, bool mustSayFound)
+        {
+            var result = new IngredientLookup { model = model ?? "", webSearched = webSearched, note = Text(json, "note") };
             foreach (string item in Texts(json, "ingredients")) if (item.Length >= 2 && item.Length <= 90 && result.ingredients.Count < 80) result.ingredients.Add(item);
             if (json.TryGetValue("hidden", out object hiddenObject) && hiddenObject is List<object> hiddenList)
                 foreach (object entry in hiddenList)
@@ -249,14 +403,15 @@ namespace GlowUp.Scan
                     if (additive.term.Length >= 2 && additive.substances.Count > 0 && result.hidden.Count < 8) result.hidden.Add(additive);
                 }
             // pages the web search really opened come first; the pages the AI only named follow
-            var named = new List<string>(answer.sources);
+            var named = new List<string>(pagesOpened ?? new List<string>());
             foreach (string s in Texts(json, "sources"))
                 if (s.Contains("http") && !named.Contains(s) && named.Count < 8) named.Add(s);
             // A LIST IS ONLY ACCEPTED WITH A SOURCE THE APP CAN SHOW. Pages that can be opened and are not ingredient
             // databases stay, the most trusted first (the brand's site, a retailer, Open Beauty Facts ...). When none is
             // left, the answer is "not found": an AI-written list is never shown as if it were the pack's list.
             result.sources = ListSources.Usable(named, brand);
-            bool said = json.TryGetValue("found", out object f) && f is bool b && b;
+            // FindIngredients' answer says "found" itself; the answer to ConfirmOnWeb has none: there a list counts when it is there
+            bool said = mustSayFound ? Flag(json, "found") : true;
             result.found = said && result.ingredients.Count >= 3 && result.sources.Count > 0;
             if (said && result.ingredients.Count >= 3 && result.sources.Count == 0)
                 Debug.LogWarning("AI ingredient lookup: a list came without a source that can be shown, so it was not accepted.");
@@ -267,6 +422,20 @@ namespace GlowUp.Scan
         static string Text(Dictionary<string, object> json, string key)
         {
             return json != null && json.TryGetValue(key, out object v) && v is string s ? s.Trim() : "";
+        }
+
+        // true / "true" (an AI now and then writes a yes as a word)
+        static bool Flag(Dictionary<string, object> json, string key)
+        {
+            if (json == null || !json.TryGetValue(key, out object v) || v == null) return false;
+            if (v is bool b) return b;
+            return v is string s && s.Trim().Equals("true", StringComparison.OrdinalIgnoreCase);
+        }
+
+        static float Number01(Dictionary<string, object> json, string key)
+        {
+            if (json == null || !json.TryGetValue(key, out object v) || v == null) return 0f;
+            try { return Mathf.Clamp01(Convert.ToSingle(v, System.Globalization.CultureInfo.InvariantCulture)); } catch { return 0f; }
         }
 
         static List<string> Texts(Dictionary<string, object> json, string key)

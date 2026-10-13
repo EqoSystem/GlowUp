@@ -119,6 +119,19 @@ namespace GlowUp.Scan
         [Tooltip("The AI's answer counts when it is at least this sure (0 to 1)")]
         [Range(0f, 1f)] [SerializeField] private float minimumAiConfidence = 0.45f;
 
+        [Header("AI helps WHILE the scan goes on (so a scan takes seconds)")]
+        [Tooltip("On = when the app's own lists have not named the product after the seconds below, the AI is shown ONE picture in the background while the scan goes on. Its answer fills in the brand, the product name, the kind and the shade, and says whether the cap is on. Off = the AI is asked only at the end, when the scan finishes without a name.")]
+        [SerializeField] private bool aiHelpsEarly = true;
+        [Tooltip("Seconds the button is held before the AI is asked. The app's own lists and the barcode get this long first: they are instant and need no internet.")]
+        [Range(0.5f, 10f)] [SerializeField] private float aiHelpAfterSeconds = 1.5f;
+        [Tooltip("On = a product the AI named that is NOT in the app's lists is then checked on the web: a web search looks for it by its words and by what the pack looks like, says how its brand and its name are really written, and brings its published ingredient list in the same answer.")]
+        [SerializeField] private bool aiChecksTheWeb = true;
+        [SerializeField] private string msgWebChecking = "Found it. Checking it on the web...";
+        [Tooltip("Said once when the AI sees that the cap is on and no shade can be seen")]
+        [SerializeField] private string msgCapOn = "The cap is on, so the shade cannot be seen. Take it off if you can, or show the shade label.";
+        [Tooltip("What the shade row of the checklist says meanwhile")]
+        [SerializeField] private string shadeCapOnLabel = "Cap on: open it to show the shade";
+
         [Header("Reading")]
         [Tooltip("How many pictures a second are looked at while the button is held (the text reader takes the newest one whenever it is free)")]
         [Range(2f, 10f)] [SerializeField] private float looksPerSecond = 6f;
@@ -310,6 +323,13 @@ namespace GlowUp.Scan
         List<string> sources = new List<string>();
         List<BrandData> brands = new List<BrandData>();
 
+        // the AI's early look, the web check and the look for the shade: all three run in the background while the scan goes on
+        float scanningFor, earlyAskedAt, earlyTook = -1f, webTook = -1f;
+        bool earlyAsked, earlyOut, webAsked, webOut, shadeOut, aiNamed, capSaid;
+        byte[] earlyJpg;                                  // the picture the AI was shown (the web check is shown the same one)
+        ProductAiAdvisor.IngredientLookup webList;        // a list the web check brought while the pack's own list was being read: kept in case that one fails
+        readonly CapShadeWatch capWatch = new CapShadeWatch();
+
         bool ProductKnown => identity.productName.Length > 0 || (identity.brandName.Length > 0 && identity.cosmeticType.Length > 0);
 
         void Awake()
@@ -481,6 +501,8 @@ namespace GlowUp.Scan
             pausedFor = 0f;
             sinceProgress += Time.unscaledDeltaTime;
             if (!stalledSaid && sinceProgress > stallSeconds) { stalledSaid = true; Say(msgStalled); ShowButtons(); }
+            scanningFor += Time.unscaledDeltaTime;
+            MaybeAskEarly();                                 // the app's own lists had their chance: the AI is asked in the background
 
             if (cameraFeed == null || !cameraFeed.IsPlaying) return;
             if (reader == null || !reader.Available) { if (shownStatus != msgReaderMissing) { Say(msgReaderMissing); shownStatus = msgReaderMissing; } return; }
@@ -535,6 +557,7 @@ namespace GlowUp.Scan
                 if (cameraFeed.FramePixels(frame, out int wide, out int high)) { framePixelsHigh = high; frameWide = wide; frameHigh = high; }
                 string colour = cameraFeed.DominantColourHex(frame);         // only what is inside the scan frame, not the hand or the table round it
                 if (!string.IsNullOrEmpty(colour)) lastColour = colour;
+                if (capWatch.Hidden && capWatch.Look(colour)) ShadeLook();    // a new colour stays in view: the cap is probably off now
             }
             if (sentCloseLook) { closeLooksSent++; lastEnlarge = enlarge; }
             sentSharpness = measure.sharpness; sentAt = Time.unscaledTime;
@@ -564,7 +587,9 @@ namespace GlowUp.Scan
             string focus = !cameraFeed.CanLockFocus ? "fixed" : cameraFeed.FocusLocked ? "locked" : "automatic";
             scanReadoutText.text = "Camera " + camera.x + " x " + camera.y + "   frame " + frameWide + " x " + frameHigh + " px   picture " + picture
                                    + "   sharp " + lastSharpness.ToString("0.00") + "\nLetters " + letters + "   lines " + readLines + "   sure " + readSure.ToString("0.00")
-                                   + "   close looks " + closeLooksSent + "   focus " + focus;
+                                   + "   close looks " + closeLooksSent + "   focus " + focus
+                                   + "\nScan " + scanningFor.ToString("0.0") + " s   AI " + (earlyOut ? "looking" : earlyTook >= 0f ? earlyTook.ToString("0.0") + " s" : earlyAsked ? "no answer" : "-")
+                                   + "   web " + (webOut ? "searching" : webTook >= 0f ? webTook.ToString("0.0") + " s" : "-") + (capWatch.Hidden ? "   cap on" : "");
         }
 
         // called on the text reader's own thread: only the answer is stored
@@ -802,11 +827,17 @@ namespace GlowUp.Scan
             if (typeCheck != null && identity.cosmeticType.Length > 0) typeCheck.SetFound(identity.cosmeticType);
 
             // the shade: its printed name, what the AI saw, otherwise (for a colour cosmetic) the colour the pictures agree on
+            // WITH THE CAP ON (the AI saw it) the colour the camera sees is the cap's or the tube's: it is never the shade.
             string hex = identity.shadeHex;
-            if (hex.Length == 0 && ShadeAdvisor.IsColourCosmetic(identity.cosmeticType)) hex = evidence.ShadeHex.Length > 0 ? evidence.ShadeHex : (ProductKnown ? lastColour : "");
+            if (hex.Length == 0 && ShadeAdvisor.IsColourCosmetic(identity.cosmeticType) && !capWatch.Hidden)
+                hex = evidence.ShadeHex.Length > 0 ? evidence.ShadeHex : (ProductKnown ? lastColour : "");
             hex = ShadeAdvisor.ShadeFor(identity.cosmeticType, hex);          // a face powder is white, whatever colour its box has
             if (ShadeAdvisor.IsFacePowder(identity.cosmeticType)) identity.shadeHex = hex;
-            if (hex.Length == 0 && identity.shadeName.Length == 0) return;
+            if (hex.Length == 0 && identity.shadeName.Length == 0)
+            {
+                if (capWatch.Hidden && shadeCheck != null && !shadeCheck.Found) shadeCheck.SetLabel(shadeCapOnLabel);
+                return;
+            }
             string shown = identity.shadeName.Length > 0 ? identity.shadeName : hex;
             if (identity.finish.Length > 0) shown += ", " + identity.finish;
             if (shadeCheck != null) shadeCheck.SetFound(shown);
@@ -1109,6 +1140,11 @@ namespace GlowUp.Scan
             tracer.Reset(); sentCloseLook = false;
             if (textTrace != null) textTrace.Clear();
             if (textOutlines != null) textOutlines.Clear();
+            // the AI's early look, the web check and the look for the shade belong to the scan before (scanNumber tells their answers so)
+            scanningFor = 0f; earlyTook = webTook = -1f;
+            earlyAsked = earlyOut = webAsked = webOut = shadeOut = aiNamed = capSaid = false;
+            earlyJpg = null; webList = null;
+            capWatch.Reset();
 
             bool keep = sameProduct && ProductKnown;
             if (!keep)
@@ -1119,6 +1155,7 @@ namespace GlowUp.Scan
                 rescanSame = false;              // a different product: it still takes the place of the scan this one was started from
             }
             else { identity.shadeHex = identity.shadeName = identity.finish = ""; }
+            identity.capOn = false; identity.shadeFrom = "";
             ResetChecklist();
             SetWorking(false);
             if (ring != null) ring.Clear();
@@ -1126,6 +1163,215 @@ namespace GlowUp.Scan
             ShowButtons();
             if (!string.IsNullOrEmpty(message)) Say(message);
             ShowGuidance();
+        }
+
+        // ---------------------------------------------------------------------------------------
+        //  The AI helps while the scan goes on
+        // ---------------------------------------------------------------------------------------
+        bool AiCanLook => aiRecognisesProduct && ConnectivityMonitor.Online && ProductAiAdvisor.Available;
+
+        /// <summary>
+        /// A product the app's own lists do not have has no name the app could read: on its pack brand, name and claims
+        /// are all just words. Waiting for the end to ask the AI made such a scan long. So the AI is asked EARLY, once, in
+        /// the background: after the app's lists and the barcode had their moment, with one picture, while the user goes
+        /// on showing the product. (It counts as one of the AI's few questions per visit, like the question at the end.)
+        /// </summary>
+        void MaybeAskEarly()
+        {
+            if (!aiHelpsEarly || earlyAsked || identity.productName.Length > 0 || knownProduct != null) return;
+            if (scanningFor < aiHelpAfterSeconds || PopupOpen || pixels == null || pixelsW <= 0) return;
+            if (!AiCanLook || !AiBudget.CanRecognise) return;
+            EarlyLook();
+        }
+
+        async void EarlyLook()
+        {
+            earlyAsked = true;
+            int scan = scanNumber;
+            // the best picture of the front so far; otherwise the newest picture that was good enough to be read
+            Kept shot = best[(int)ScanZone.Front] ?? new Kept { pixels = pixels, width = pixelsW, height = pixelsH };
+            byte[] jpg = ToJpg(shot);
+            if (jpg == null || !AiBudget.TakeRecognition()) return;
+            earlyJpg = jpg; earlyOut = true; earlyAskedAt = Time.unscaledTime;
+            SetWorking(true);
+            string text = evidence.FrontText.Length > 0 ? evidence.FrontText : evidence.Text.AllText(ScanEvidence.UsableLine);
+            ProductAiAdvisor.Identity seen = null;
+            try { seen = await ProductAiAdvisor.Identify(jpg, text); }
+            catch (Exception e) { Debug.LogWarning("Scan: the AI's early look failed: " + e.Message); }
+            if (this == null || scan != scanNumber) return;          // the screen was left, or a new scan was started meanwhile
+            earlyOut = false; earlyTook = Time.unscaledTime - earlyAskedAt;
+            SetWorking(false);
+            if (stage == Stage.Leaving || stage == Stage.Idle) return;
+            if (!TakeAiAnswer(seen)) return;
+            if (stage != Stage.Scanning) return;                     // the scan is being finished: that step goes on with what is known now
+            if (StopIfNotMakeup()) return;                           // the AI says it is not make-up
+            AdoptIfListed();
+            ShowProgress(ProductKnown ? evidence.ProductKnown() : null);
+            if (PopupOpen) return;
+            if (HasStoredList(knownProduct)) { ContinueScanning(); return; }       // a product of the inventory brings its list with it
+            MaybeCheckTheWeb();
+            // the ingredient list may have been read while the AI was looking: then everything is there
+            if ((evidence.AllFull || RingComplete) && !finishUnnamed) FinishAttempt();
+        }
+
+        /// <summary>
+        /// Takes over what the AI saw. What the app's own lists or the user said stays; the AI fills the gaps. It also says
+        /// whether the cap is on. False = it saw nothing, or was not sure enough.
+        /// </summary>
+        bool TakeAiAnswer(ProductAiAdvisor.Identity seen)
+        {
+            if (seen == null || !seen.found || seen.confidence < minimumAiConfidence) return false;
+            if (identity.productName.Length == 0 && seen.productName.Length > 0) { identity.productName = seen.productName; aiNamed = true; }
+            if (identity.brandName.Length == 0) identity.brandName = seen.brandName;
+            if (identity.cosmeticType.Length == 0) identity.cosmeticType = seen.cosmeticType;
+            if (seen.shadeHex.Length > 0) { identity.shadeHex = seen.shadeHex; identity.shadeFrom = seen.shadeFrom; }
+            if (identity.shadeName.Length == 0 && seen.shadeName.Length > 0) identity.shadeName = seen.shadeName;
+            if (seen.finish.Length > 0) identity.finish = seen.finish;
+            identity.capOn = seen.capOn;
+
+            // THE CAP IS ON and no shade could be seen (no shade sticker or colour dot on the pack either): the colour in
+            // view is the pack's. It is not shown as the shade, the user is told once, and the colour is watched: when a
+            // different one stays in view, the cap is probably off (CapShadeWatch, ShadeLook).
+            if (seen.capOn && identity.shadeHex.Length == 0 && ShadeAdvisor.IsColourCosmetic(identity.cosmeticType))
+            {
+                capWatch.CapSeen(lastColour);
+                if (!capSaid) { capSaid = true; Say(msgCapOn); }
+            }
+            else capWatch.Solved();
+            ShowIdentity();
+            return true;
+        }
+
+        static bool HasStoredList(ProductData product) => product != null && product.ingredients != null && product.ingredients.Count >= 3;
+
+        /// <summary>The AI named a product the inventory has: it is taken with everything the inventory knows about it.</summary>
+        void AdoptIfListed()
+        {
+            if (knownProduct != null || identity.productName.Length == 0) return;
+            ProductData listed = InventoryProductFor(identity.productName, identity.brandName);
+            if (listed != null) Adopt(listed);
+        }
+
+        /// <summary>
+        /// A product the AI named that the app's lists do not have. The first look only GUESSED: it cannot always tell the
+        /// brand from the product's name. A web search settles it (the same product, by its words and by what its pack
+        /// looks like) and brings more about it: its published ingredient list. One of the few look-ups per visit.
+        /// </summary>
+        void MaybeCheckTheWeb()
+        {
+            if (!aiChecksTheWeb || webAsked || !aiNamed || knownProduct != null || earlyJpg == null || ingredientText != null) return;
+            if (!AiCanLook || !ProductAiAdvisor.SearchTheWeb || !AiBudget.WebSearchWorthTrying || !AiBudget.CanLookUp) return;
+            WebCheck();
+        }
+
+        async void WebCheck()
+        {
+            webAsked = true;
+            if (!AiBudget.TakeLookUp()) return;
+            int scan = scanNumber;
+            webOut = true; float askedAt = Time.unscaledTime;
+            Say(msgWebChecking);
+            string text = evidence.FrontText.Length > 0 ? evidence.FrontText : evidence.Text.AllText(ScanEvidence.UsableLine);
+            ProductAiAdvisor.WebMatch match = null;
+            try { match = await ProductAiAdvisor.ConfirmOnWeb(earlyJpg, identity, text, barcode); }
+            catch (Exception e) { Debug.LogWarning("Scan: the web check failed: " + e.Message); }
+            if (this == null || scan != scanNumber) return;
+            webOut = false; webTook = Time.unscaledTime - askedAt;
+            if (stage == Stage.Leaving || stage == Stage.Idle) return;
+            if (match == null || !match.same || match.confidence < minimumAiConfidence) return;       // not confirmed: the first look stays as it is
+
+            // THE WEB HAS THE SAME PRODUCT: its brand and its name as sold take the place of what the first look made of
+            // them. (Only a name the AI gave is corrected, never one from the app's lists or from the user.)
+            if (aiNamed && knownProduct == null)
+            {
+                if (match.productName.Length > 0) identity.productName = match.productName;
+                if (match.brandName.Length > 0) identity.brandName = match.brandName;
+                if (identity.cosmeticType.Length == 0 && match.cosmeticType.Length > 0) identity.cosmeticType = match.cosmeticType;
+                AdoptIfListed();
+            }
+            if (StopIfNotMakeup()) return;
+            ShowProgress(ProductKnown ? evidence.ProductKnown() : null);
+            bool free = stage == Stage.Scanning && !PopupOpen;
+            if (HasStoredList(knownProduct)) { if (free) ContinueScanning(); return; }
+
+            // MORE ABOUT IT: its published ingredient list came in the same answer
+            if (!match.list.found || ingredientText != null) return;
+            foreach (ProductAiAdvisor.HiddenAdditive hidden in match.list.hidden)
+            {
+                try { HiddenAdditives.Learn(hidden.term, hidden.substances, hidden.note, match.list.sources, match.list.webSearched, match.list.model); }
+                catch (Exception e) { Debug.LogWarning("Hidden ingredients were not saved: " + e.Message); }
+            }
+            // THE PACK COMES FIRST: while its own list is being read, the list from the web only waits (it is used when the
+            // pack's list does not come). When nothing of a list has been read from the pack, the web's list is taken now.
+            if (free && evidence.Text.Counted == 0) UseLookedUpList(match.list.ingredients, match.list.sources, "web", match.list.webSearched);
+            else webList = match.list;
+        }
+
+        /// <summary>The list the web check brought earlier, when there is still no other. True = it was used (the scan goes on to its end).</summary>
+        bool UseKeptWebList()
+        {
+            if (webList == null || !webList.found || ingredientText != null) return false;
+            ProductAiAdvisor.IngredientLookup list = webList;
+            webList = null;
+            UseLookedUpList(list.ingredients, list.sources, "web", list.webSearched);
+            return true;
+        }
+
+        /// <summary>
+        /// A new colour has stayed in view after the AI saw the cap on: the user has probably taken it off. The AI is shown
+        /// that picture and asked for the shade (when the product has a name and a question is left); otherwise the colour
+        /// the camera sees is taken, as it was before the AI knew about caps.
+        /// </summary>
+        async void ShadeLook()
+        {
+            if (shadeOut) return;
+            if (!AiCanLook || !AiBudget.CanRecognise || identity.productName.Length == 0 || pixels == null || pixelsW <= 0)
+            {
+                capWatch.Solved();
+                ShowIdentity();
+                return;
+            }
+            byte[] jpg = ToJpg(new Kept { pixels = pixels, width = pixelsW, height = pixelsH });
+            if (jpg == null || !AiBudget.TakeRecognition()) { capWatch.Solved(); ShowIdentity(); return; }
+            int scan = scanNumber;
+            shadeOut = true;
+            ProductAiAdvisor.Identity seen = null;
+            try { seen = await ProductAiAdvisor.Identify(jpg, ""); }
+            catch (Exception e) { Debug.LogWarning("Scan: the AI's look for the shade failed: " + e.Message); }
+            if (this == null || scan != scanNumber) return;
+            shadeOut = false;
+            if (stage == Stage.Leaving) return;
+            if (seen != null && seen.found && seen.shadeHex.Length > 0)
+            {
+                identity.shadeHex = seen.shadeHex; identity.shadeFrom = seen.shadeFrom; identity.capOn = false;
+                if (seen.finish.Length > 0) identity.finish = seen.finish;
+                capWatch.Solved();
+            }
+            else if (seen != null && seen.found && seen.capOn) capWatch.CapSeen(lastColour);      // still closed: what is in view is the pack
+            else capWatch.Solved();                                                              // open, but no colour named: the camera's own colour is taken
+            ShowIdentity();
+        }
+
+        /// <summary>Finish was tapped while the AI's early look is still on its way: wait for it (with a time limit), then finish.</summary>
+        IEnumerator FinishAfterEarlyLook()
+        {
+            stage = Stage.Recognising;
+            if (holdButton != null) holdButton.Usable = false;
+            ShowButtons();
+            SetWorking(true);
+            Say(msgAiLooking);
+            float waited = 0f, limit = ProductAiAdvisor.TimeoutSeconds + 6f;     // EVERY LONG STEP HAS A TIME LIMIT
+            while (earlyOut && waited < limit) { waited += Time.unscaledDeltaTime; yield return null; }
+            earlyOut = false;
+            SetWorking(false);
+            stage = Stage.Scanning;
+            if (holdButton != null) holdButton.Usable = true;
+            if (StopIfNotMakeup()) yield break;
+            AdoptIfListed();
+            if (ProductKnown) ShowProgress(evidence.ProductKnown());
+            // a product of the inventory brings its list with it (the list of this very pack wins when it was read in full)
+            if (HasStoredList(knownProduct) && (listFrom == "" || listFrom == "pack")) { ContinueScanning(); yield break; }
+            FinishAttempt();
         }
 
         // ---------------------------------------------------------------------------------------
@@ -1143,11 +1389,18 @@ namespace GlowUp.Scan
         void FinishAttempt()
         {
             if (stage == Stage.Leaving || stage == Stage.Recognising) return;
-            if (!TakePackList()) { Say(msgNeedList); return; }
+            if (!TakePackList())
+            {
+                if (UseKeptWebList()) return;                // the web check brought the product's list meanwhile
+                Say(msgNeedList);
+                return;
+            }
             if (holdButton != null) holdButton.LetGo();
 
             if (!ProductKnown && !finishUnnamed)
             {
+                // 0. the AI's early look is still on its way: its answer is waited for, the AI is not asked twice
+                if (earlyOut) { StartCoroutine(FinishAfterEarlyLook()); return; }
                 // 1. what the app's own lists suggest: the user chooses, and no AI is needed
                 if (!shortlistAnswered && shortlist != null && Suggestions().Count > 0)
                 {
@@ -1215,18 +1468,7 @@ namespace GlowUp.Scan
             SetWorking(false);
             if (guide != null) guide.SetState(ScanGuideOverlay.State.Searching);
 
-            if (task != null && task.Status == TaskStatus.RanToCompletion && task.Result != null && task.Result.found && task.Result.confidence >= minimumAiConfidence)
-            {
-                ProductAiAdvisor.Identity seen = task.Result;
-                // what the app's own lists said stays; the AI fills the gaps
-                if (identity.productName.Length == 0) identity.productName = seen.productName;
-                if (identity.brandName.Length == 0) identity.brandName = seen.brandName;
-                if (identity.cosmeticType.Length == 0) identity.cosmeticType = seen.cosmeticType;
-                if (seen.shadeHex.Length > 0) identity.shadeHex = seen.shadeHex;
-                if (identity.shadeName.Length == 0 && seen.shadeName.Length > 0) identity.shadeName = seen.shadeName;
-                if (seen.finish.Length > 0) identity.finish = seen.finish;
-                ShowIdentity();
-            }
+            if (task != null && task.Status == TaskStatus.RanToCompletion) TakeAiAnswer(task.Result);
             stage = Stage.Scanning;
             if (holdButton != null) holdButton.Usable = true;
             if (StopIfNotMakeup()) yield break;              // the AI says it is not make-up
@@ -1316,7 +1558,8 @@ namespace GlowUp.Scan
             TakePackList();
             if (ingredientText == null) return;
             ScanSession.PendingText = ingredientText; ScanSession.PendingSource = ingredientSource;
-            ScanSession.PendingShadeHex = identity.shadeHex.Length > 0 ? identity.shadeHex : evidence.ShadeHex.Length > 0 ? evidence.ShadeHex : lastColour;
+            // with the cap on, the colour the camera saw is the pack's: no shade is handed on rather than a wrong one
+            ScanSession.PendingShadeHex = identity.shadeHex.Length > 0 ? identity.shadeHex : capWatch.Hidden ? "" : evidence.ShadeHex.Length > 0 ? evidence.ShadeHex : lastColour;
             ScanSession.PendingProductName = identity.productName; ScanSession.PendingBrandName = identity.brandName;
             ScanSession.PendingCosmeticType = identity.cosmeticType;
             ScanSession.PendingShadeName = identity.shadeName; ScanSession.PendingFinish = identity.finish;
@@ -1357,6 +1600,7 @@ namespace GlowUp.Scan
                 else Say(msgLookUpNeedsName);
                 return;
             }
+            if (UseKeptWebList()) return;                    // the web check has brought it already
             lookingUp = true;
             if (lookUpButton != null) lookUpButton.interactable = false;
             if (lookUpLabel != null) lookUpLabel.text = lookUpWorkingLabel;
