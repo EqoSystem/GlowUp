@@ -135,8 +135,12 @@ namespace GlowUp.Scan
             return filled;
         }
 
-        /// <summary>Takes in one picture that passed the quality gate. `sharpness` = how crisp it is (FrameQuality), for choosing the best picture of a zone.</summary>
-        public Result Add(FrameReading frame, Known known, float sharpness = 1f)
+        /// <summary>
+        /// Takes in one picture that passed the quality gate. `sharpness` = how crisp it is (FrameQuality), for choosing the best picture of a zone.
+        /// `closeLook` = the picture shows only one block of the frame, enlarged (the text tracer): what it reads counts like
+        /// any other reading, but it is never taken for another side of the product.
+        /// </summary>
+        public Result Add(FrameReading frame, Known known, float sharpness = 1f, bool closeLook = false)
         {
             var result = new Result();
             if (frame == null) return result;
@@ -156,7 +160,7 @@ namespace GlowUp.Scan
 
             // ---- Around: is this a view that was not seen before? (asked before the lines are added; only clear lines
             //      count, so a picture of misread scraps is never taken for a new side of the product)
-            if (clear >= 2)
+            if (clear >= 2 && !closeLook)
             {
                 int already = merger.KnownAmong(clearLines);
                 if (already < clear * NewViewBelow)

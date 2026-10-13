@@ -89,6 +89,29 @@ namespace GlowUp.EditorTools
             A.At(outlineTemplate.transform, A.MC, new Vector2(0, 120), new Vector2(520, 52));
             A.Set(outlines.GetComponent<TextOutlineOverlay>(), "outlineTemplate", outlineTemplate);
 
+            // ---- the text tracer: corner marks round the block of text it follows. Small print gets close looks (the marks
+            //      turn gold and the label says so). The box lies here at a sample place; the app hides it and moves it. ----
+            GameObject trace = A.Node(frame.transform, "TextTrace", typeof(TextTraceView));
+            A.Fill(trace.transform);
+            Image traceBox = A.RawIcon(trace.transform, "TraceBox", IconFactory.ScanFrame, 64, new Color32(226, 184, 96, 255));
+            traceBox.type = Image.Type.Sliced; traceBox.preserveAspect = false; traceBox.raycastTarget = false;
+            traceBox.pixelsPerUnitMultiplier = 2f;           // smaller corners than the scan frame's own
+            var traceRect = traceBox.rectTransform;
+            traceRect.anchorMin = new Vector2(0.07f, 0.3f); traceRect.anchorMax = new Vector2(0.93f, 0.6f); traceRect.pivot = A.MC;
+            traceRect.offsetMin = traceRect.offsetMax = Vector2.zero;
+            Image traceLabelBack = A.RawPanel(traceBox.transform, "TraceLabel", new Color(0, 0, 0, 0.6f), 30f);
+            traceLabelBack.raycastTarget = false;
+            var traceLabelRect = traceLabelBack.rectTransform;       // sits on the top edge of the box, at its left
+            traceLabelRect.anchorMin = traceLabelRect.anchorMax = new Vector2(0f, 1f); traceLabelRect.pivot = new Vector2(0f, 0f);
+            traceLabelRect.anchoredPosition = new Vector2(6, 8); traceLabelRect.sizeDelta = new Vector2(440, 46);
+            TextMeshProUGUI traceLabel = A.RawLabel(traceLabelBack.transform, "LabelText", "Small print: reading it enlarged", 24, Color.white, FontRole.Label,
+                                                    TextAlignmentOptions.Center, false);
+            A.Fill(traceLabel.transform, 14, 2, 14, 2);
+            A.Shrink(traceLabel, 18);
+            var traceView = trace.GetComponent<TextTraceView>();
+            A.Set(traceView, "box", traceRect); A.Set(traceView, "boxGraphic", traceBox);
+            A.Set(traceView, "label", traceLabel); A.Set(traceView, "labelBackground", traceLabelBack);
+
             // ---- the sun button: full screen brightness while scanning ----
             Button sun = CameraButton(viewport.transform, "BrightnessButton", IconFactory.Sun, out Image sunIcon);
             A.At(sun.transform, A.TR, new Vector2(-24, -24), new Vector2(92, 92));
@@ -121,6 +144,38 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.ReplaceText(lightAssistant, "cannotMessage",
                 "The flashlight is not available right now: the phone may be hot, or another app is using the camera. The screen was made brighter instead.",
                 "This phone cannot use the flashlight while the camera is on. The screen was made brighter instead.");
+
+            // ---- the focus lock: its padlock button beside the flashlight, and the line that says what happened ----
+            GameObject focusHelper = A.Node(viewport.transform, "FocusAssistant", typeof(ScanFocusAssistant));
+            A.Fill(focusHelper.transform);
+            Button focusLock = CameraButton(focusHelper.transform, "FocusLockButton", IconFactory.LockOpen, out Image focusLockIcon);
+            A.At(focusLock.transform, A.TL, new Vector2(132, -24), new Vector2(92, 92));
+            Image focusNote = A.RawPanel(focusHelper.transform, "FocusNote", new Color(0, 0, 0, 0.72f), 40f);
+            focusNote.raycastTarget = false;
+            A.At(focusNote.transform, A.TL, new Vector2(240, -34), new Vector2(520, 72));
+            TextMeshProUGUI focusNoteText = A.RawLabel(focusNote.transform, "NoteText", "Focus locked. Tap the padlock to release it.", 26, Color.white, FontRole.Label,
+                                                       TextAlignmentOptions.Center, true);
+            A.Fill(focusNoteText.transform, 22, 6, 22, 6);
+            A.ShrinkWrapped(focusNoteText, 20);
+            CanvasGroup focusNoteGroup = SceneBuilderCore.Ensure<CanvasGroup>(focusNote.gameObject);
+            focusNoteGroup.blocksRaycasts = false; focusNoteGroup.interactable = false;
+            focusNote.gameObject.SetActive(false);           // appears for a moment when the lock goes on or off
+            var focusAssistant = focusHelper.GetComponent<ScanFocusAssistant>();
+            A.Set(focusAssistant, "lockButton", focusLock); A.Set(focusAssistant, "lockIcon", focusLockIcon);
+            A.Set(focusAssistant, "lockedSprite", IconFactory.LockClosed); A.Set(focusAssistant, "freeSprite", IconFactory.LockOpen);
+            A.Set(focusAssistant, "lockBackground", focusLock.targetGraphic);
+            A.Set(focusAssistant, "note", focusNoteGroup); A.Set(focusAssistant, "noteText", focusNoteText);
+
+            // ---- the scan readout: a line of numbers for testing on a phone (inactive; "Show Scan Readout" on the controller switches it on) ----
+            Image readoutBack = A.RawPanel(viewport.transform, "ScanReadout", new Color(0, 0, 0, 0.6f), 24f);
+            readoutBack.raycastTarget = false;
+            A.TopStrip(readoutBack.transform, 128, 84, 24, 24);
+            TextMeshProUGUI readout = A.RawLabel(readoutBack.transform, "ReadoutText",
+                                                 "Camera 1920 x 1080   frame 957 x 733 px   picture ok   sharp 0.62\nLetters 14 px (close look x2.3)   lines 12   sure 0.71   close looks 4   focus locked",
+                                                 21, Color.white, FontRole.Body, TextAlignmentOptions.Left, true);
+            A.Fill(readout.transform, 18, 6, 18, 6);
+            A.ShrinkWrapped(readout, 15);
+            readoutBack.gameObject.SetActive(false);
 
             // ---- "Is this ...?": asked on the camera picture when the pack looks like one this phone has scanned before ----
             GameObject questionHolder = A.Node(viewport.transform, "ProductQuestion", typeof(ScanProductQuestion));
@@ -327,6 +382,14 @@ namespace GlowUp.EditorTools
             A.At(focusRing.transform, A.MC, Vector2.zero, new Vector2(170, 170));
             focusRing.gameObject.SetActive(false);
             A.Set(camera, "focusRing", focusRing.rectTransform);
+            // focus lock: a tap on the picture focuses on that spot and holds the focus there (the padlock releases it)
+            A.Set(camera, "tapLocksFocus", true);
+            A.Set(focusAssistant, "cameraFeed", camera);
+            // The text reader needs the small print of an ingredient list sharp. With the first size (1280 x 720) the scan
+            // frame held only about 630 x 515 of the camera's pixels (the picture is 720 wide when the phone is upright);
+            // Full HD gives it about 950 x 770. A size that was changed in the Inspector is kept.
+            SceneBuilderCore.ReplaceNumber(camera, "requestedWidth", 1920, 1280);
+            SceneBuilderCore.ReplaceNumber(camera, "requestedHeight", 1080, 720);
 
             A.Set(controller, "cameraFeed", camera); A.Set(controller, "guide", guide); A.Set(controller, "idlePlaceholder", idle);
             A.Set(controller, "holdButton", holdButton); A.Set(controller, "holdLabel", holdLabel); A.Set(controller, "ring", ring);
@@ -340,6 +403,8 @@ namespace GlowUp.EditorTools
             A.Set(controller, "manualProductInput", manualProduct); A.Set(controller, "manualBrandInput", manualBrand); A.Set(controller, "manualTypeDropdown", manualType);
             A.Set(controller, "manualAnalyseButton", manualAnalyse); A.Set(controller, "manualFeedbackText", manualFeedback);
             A.Set(controller, "textOutlines", outlines.GetComponent<TextOutlineOverlay>());
+            A.Set(controller, "focusAssistant", focusAssistant); A.Set(controller, "textTrace", traceView);
+            A.Set(controller, "scanReadout", readoutBack.gameObject); A.Set(controller, "scanReadoutText", readout);
             A.Set(controller, "productCheck", productCheck); A.Set(controller, "brandCheck", brandCheck);
             A.Set(controller, "typeCheck", typeCheck); A.Set(controller, "shadeCheck", shadeCheck); A.Set(controller, "shadeSwatch", swatch);
             A.Set(controller, "ingredientsCheck", ingredientsCheck);

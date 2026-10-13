@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 #if UNITY_ANDROID && !UNITY_EDITOR
 using UnityEngine.Android;
@@ -68,10 +70,14 @@ namespace GlowUp.Scan
         [SerializeField] private float focusRingSeconds = 1.1f;
         [Tooltip("The circle starts this much bigger and closes in on the spot")]
         [SerializeField] private float focusRingStartScale = 1.6f;
-        [Tooltip("After a tap (or Refocus) the camera goes back to focusing by itself after this many seconds")]
+        [Tooltip("After a tap (or Refocus) the camera goes back to focusing by itself after this many seconds. Not while the focus is locked.")]
         [SerializeField] private float refocusHoldSeconds = 2.5f;
+        [Tooltip("FOCUS LOCK. On = a tap on the picture focuses on that spot and KEEPS the focus there until it is released (ReleaseFocus, the padlock button of the scan screen). Off = after a tap the camera goes back to focusing by itself.")]
+        [SerializeField] private bool tapLocksFocus = false;
 
         public bool IsPlaying => cam != null && cam.isPlaying && cam.width > 32;
+        /// <summary>The size of the picture the camera really gives, in its own pixels (it may differ from the size that was asked for). 0 x 0 while it is off.</summary>
+        public Vector2Int PictureSize => IsPlaying ? new Vector2Int(cam.width, cam.height) : Vector2Int.zero;
         public bool IsFrontCamera { get; private set; }
         /// <summary>Raised once: true + "" when the camera is running, false + reason when it cannot start.</summary>
         public event Action<bool, string> Started;
@@ -172,6 +178,8 @@ namespace GlowUp.Scan
             if (cam != null) { if (cam.isPlaying) cam.Stop(); Destroy(cam); cam = null; }
             if (display != null) display.texture = null;
             lastAngle = -1; steadyPrevious = null; refocusUntil = 0f;
+            // a camera that is opened again focuses by itself again: the lock ends with the camera
+            if (FocusLocked) { FocusLocked = false; FocusLockChanged?.Invoke(false, false); }
             if (wasOpen)
             {
                 GlowUp.Common.Flashlight.CameraStopped();
@@ -195,12 +203,39 @@ namespace GlowUp.Scan
             }
             if (tapToFocus && autoFocus && viewport != null && Input.GetMouseButtonDown(0)
                 && RectTransformUtility.RectangleContainsScreenPoint(viewport, Input.mousePosition, null)
+                && OnThePictureItself(Input.mousePosition)
                 && RectTransformUtility.ScreenPointToLocalPointInRectangle(viewport, Input.mousePosition, null, out Vector2 tapped))
                 FocusAt(tapped);
             ShowFocusRing();
         }
 
         float ringT = -1f;
+        static readonly List<RaycastResult> tapHits = new List<RaycastResult>();
+
+        /// <summary>
+        /// True when a tap at this place of the screen lands on the camera picture itself, not on a button or a message
+        /// that lies on it (the flashlight, the padlock, a question) and not on a pop-up over the screen. Such a tap must
+        /// not move the focus to the corner where the button happens to be.
+        /// </summary>
+        bool OnThePictureItself(Vector2 screenPoint)
+        {
+            EventSystem events = EventSystem.current;
+            if (events == null) return true;
+            tapHits.Clear();
+            events.RaycastAll(new PointerEventData(events) { position = screenPoint }, tapHits);
+            if (tapHits.Count == 0) return true;
+            // what the finger touches first
+            Transform top = tapHits[0].gameObject.transform;
+            if (top == viewport || (display != null && top == display.transform)) return true;
+            if (top.IsChildOf(viewport)) return false;                       // a button or a message on the picture
+            // Something outside the camera box. It is the picture when that thing lies BEHIND the box (the page shows
+            // through, the box itself does not catch taps), and not when it lies OVER it (a pop-up, a change of screen).
+            Graphic box = viewport.GetComponent<Graphic>(), hit = top.GetComponent<Graphic>();
+            if (box == null || hit == null || box.canvas == null || hit.canvas == null) return viewport.IsChildOf(top);
+            Canvas boxRoot = box.canvas.rootCanvas, hitRoot = hit.canvas.rootCanvas;
+            if (boxRoot != hitRoot) return hitRoot.sortingOrder < boxRoot.sortingOrder;
+            return hit.depth < box.depth;
+        }
 
         /// <summary>Focuses on a spot of the viewport (its own coordinates) and shows the circle there.</summary>
         void FocusAt(Vector2 local)
@@ -215,7 +250,8 @@ namespace GlowUp.Scan
                 focusRing.anchoredPosition = local - area.center;
                 ringT = 0f;
             }
-            Refocus(ToCameraPoint(seen));
+            if (tapLocksFocus) LockFocus(ToCameraPoint(seen), true);
+            else Refocus(ToCameraPoint(seen));
         }
 
         /// <summary>A spot of the picture as the user sees it -> the same spot in the camera's own picture (which may lie on its side or be mirrored).</summary>
@@ -273,25 +309,84 @@ namespace GlowUp.Scan
         // ---------------------------------------------------------------------------------------
         //  Focus
         // ---------------------------------------------------------------------------------------
-        bool canRefocus;
+        bool canRefocus, nudgeRight;
         float refocusUntil;
 
         /// <summary>
         /// Makes the camera focus again on the middle of the picture (where the scan frame and the face are),
         /// then lets it carry on focusing by itself. Does nothing on a camera with a fixed focus.
+        /// While the focus is locked it stays locked: the camera focuses once more and holds the new focus.
         /// </summary>
         public void Refocus() { Refocus(new Vector2(0.5f, 0.5f)); }
 
-        /// <summary>Makes the camera focus on a spot of its picture (0 to 1 across and up), then lets it focus by itself again.</summary>
+        /// <summary>Makes the camera focus on a spot of its picture (0 to 1 across and up), then lets it focus by itself again (or, while locked, holds it).</summary>
         public void Refocus(Vector2 cameraPoint)
         {
             if (!autoFocus || !canRefocus || cam == null || !cam.isPlaying) return;
+            if (!FocusOnce(cameraPoint)) return;
+            refocusUntil = FocusLocked ? 0f : Time.unscaledTime + Mathf.Max(0.5f, refocusHoldSeconds);
+        }
+
+        // The phone's camera, told a spot, focuses ONCE on it and then keeps the lens where it is; told "no spot" it goes
+        // back to looking for focus all the time. (Read in Unity 2022.3's own Android camera code: a spot = focus mode
+        // "auto" with one trigger, no spot = "continuous picture".) So: hold = leave the spot set, release = clear it.
+        bool FocusOnce(Vector2 cameraPoint)
+        {
             try
             {
-                cam.autoFocusPoint = cameraPoint;
-                refocusUntil = Time.unscaledTime + Mathf.Max(0.5f, refocusHoldSeconds);
+                // never exactly the spot of the time before, so "the same spot again" is never taken for nothing to do
+                nudgeRight = !nudgeRight;
+                float x = Mathf.Clamp(cameraPoint.x + (nudgeRight ? 0.004f : -0.004f), 0.01f, 0.99f);
+                cam.autoFocusPoint = new Vector2(x, Mathf.Clamp(cameraPoint.y, 0.01f, 0.99f));
+                return true;
             }
-            catch (Exception e) { Debug.LogWarning("Camera: refocus is not available: " + e.Message); canRefocus = false; }
+            catch (Exception e) { Debug.LogWarning("Camera: refocus is not available: " + e.Message); canRefocus = false; return false; }
+        }
+
+        // ---------------------------------------------------------------------------------------
+        //  Focus lock
+        // ---------------------------------------------------------------------------------------
+        /// <summary>True when this camera can be told where to focus, and so can hold its focus. False for a camera with a fixed focus and for a computer's webcam.</summary>
+        public bool CanLockFocus => autoFocus && canRefocus && cam != null && cam.isPlaying;
+        /// <summary>True while the focus is held: the camera has focused once and does not look for focus by itself.</summary>
+        public bool FocusLocked { get; private set; }
+        /// <summary>The focus lock went on or off. First value: locked now. Second: the user did it by tapping the picture.</summary>
+        public event Action<bool, bool> FocusLockChanged;
+
+        /// <summary>
+        /// FOCUS LOCK: the camera focuses once on the middle of the picture and HOLDS that focus, instead of looking for
+        /// focus all the time (which makes small print go sharp and soft again and again). It stays held until
+        /// ReleaseFocus, or until the camera is closed. Returns false when this camera cannot do it.
+        /// </summary>
+        public bool LockFocus() { return LockFocus(new Vector2(0.5f, 0.5f), false); }
+
+        /// <summary>The same, on a spot of the scan frame or any other part of the viewport (the middle of `area`).</summary>
+        public bool LockFocus(RectTransform area)
+        {
+            if (area == null || viewport == null) return LockFocus();
+            Rect inside = RectInViewport(area); Vector2 view = viewport.rect.size;
+            if (view.x < 1f || view.y < 1f) return LockFocus();
+            return LockFocus(ToCameraPoint(new Vector2(Mathf.Clamp01(inside.center.x / view.x), Mathf.Clamp01(inside.center.y / view.y))), false);
+        }
+
+        bool LockFocus(Vector2 cameraPoint, bool byTap)
+        {
+            if (!CanLockFocus || !FocusOnce(cameraPoint)) return false;
+            refocusUntil = 0f;                               // the camera does not get its own focusing back
+            bool wasLocked = FocusLocked;
+            FocusLocked = true;
+            if (!wasLocked || byTap) FocusLockChanged?.Invoke(true, byTap);
+            return true;
+        }
+
+        /// <summary>Ends the focus lock: the camera looks for focus by itself again.</summary>
+        public void ReleaseFocus()
+        {
+            refocusUntil = 0f;
+            if (cam != null) { try { cam.autoFocusPoint = null; } catch (Exception) { } }
+            if (!FocusLocked) return;
+            FocusLocked = false;
+            FocusLockChanged?.Invoke(false, false);
         }
 
         // ---------------------------------------------------------------------------------------
@@ -435,6 +530,14 @@ namespace GlowUp.Scan
             return c.cropW > 0 && c.cropH > 0;
         }
 
+        /// <summary>How many of the camera's own pixels lie inside `frame`, across and down (what the text reader has to work with). Call Grab() first.</summary>
+        public bool FramePixels(RectTransform frame, out int width, out int height)
+        {
+            bool ok = CropOf(frame, out Crop c);
+            width = ok ? c.cropW : 0; height = ok ? c.cropH : 0;
+            return ok;
+        }
+
         /// <summary>The place in the camera's own picture of the upright pixel (ux, uy), uy counted from the BOTTOM (the same sums as CaptureUpright).</summary>
         static int SourceIndex(in Crop c, int ux, int uy)
         {
@@ -479,6 +582,76 @@ namespace GlowUp.Scan
             width = outW; height = outH;
             return true;
         }
+
+        /// <summary>
+        /// The same for ONE PART of the frame, and it may be ENLARGED: this is what the text tracer of hold-to-scan uses
+        /// to give the text reader a close look at the block of small print it is following.
+        /// `part` = the part of the frame, 0 to 1 from the frame's TOP-LEFT corner (0,0,1,1 = the whole frame).
+        /// `enlarge` = how many times bigger than the camera's own picture it should be (1 = as the camera took it). An
+        /// enlarged picture is smoothed between the camera's pixels, never blocky. The longer side stays at most `maxSide`,
+        /// so `scale` says what was really done (above 1 = enlarged, below 1 = made smaller). Call Grab() first.
+        /// </summary>
+        public bool UprightArgb(RectTransform frame, Rect part, float enlarge, int maxSide, ref int[] pixels, out int width, out int height, out float scale)
+        {
+            width = height = 0; scale = 1f;
+            if (!CropOf(frame, out Crop c)) return false;
+            // the part, in the upright picture's own pixels (counted from the BOTTOM, like the crop)
+            float left = Mathf.Clamp01(part.xMin), right = Mathf.Clamp01(part.xMax), top = Mathf.Clamp01(part.yMin), bottom = Mathf.Clamp01(part.yMax);
+            if (right - left < 0.02f || bottom - top < 0.02f) { left = 0f; right = 1f; top = 0f; bottom = 1f; }
+            float partX = c.x0 + left * c.cropW, partY = c.y0 + (1f - bottom) * c.cropH;
+            float partW = Mathf.Max(8f, (right - left) * c.cropW), partH = Mathf.Max(8f, (bottom - top) * c.cropH);
+
+            scale = Mathf.Min(Mathf.Max(0.05f, enlarge), Mathf.Max(64, maxSide) / Mathf.Max(partW, partH));
+            int outW = Mathf.Max(8, Mathf.RoundToInt(partW * scale)), outH = Mathf.Max(8, Mathf.RoundToInt(partH * scale));
+            if (pixels == null || pixels.Length < outW * outH) pixels = new int[outW * outH];
+            int lastX = c.x0 + c.cropW - 1, lastY = c.y0 + c.cropH - 1;
+
+            if (scale <= 1.001f)
+            {
+                // as the camera took it, or smaller: the nearest pixel is enough
+                for (int row = 0; row < outH; row++)
+                {
+                    int uy = Mathf.Clamp((int)(partY + (outH - 1 - row + 0.5f) / scale), c.y0, lastY);      // row 0 is the top
+                    int at = row * outW;
+                    for (int ox = 0; ox < outW; ox++)
+                    {
+                        Color32 p = buffer[SourceIndex(c, Mathf.Clamp((int)(partX + (ox + 0.5f) / scale), c.x0, lastX), uy)];
+                        pixels[at + ox] = unchecked((int)0xFF000000) | (p.r << 16) | (p.g << 8) | p.b;
+                    }
+                }
+            }
+            else
+            {
+                // enlarged: every new pixel is mixed from the four camera pixels round it
+                if (enlargeColumn == null || enlargeColumn.Length < outW) { enlargeColumn = new int[outW]; enlargeShare = new int[outW]; }
+                for (int ox = 0; ox < outW; ox++)
+                {
+                    float sx = partX + (ox + 0.5f) / scale - 0.5f;
+                    int whole = Mathf.FloorToInt(sx);
+                    enlargeColumn[ox] = whole; enlargeShare[ox] = (int)((sx - whole) * 256f);
+                }
+                for (int row = 0; row < outH; row++)
+                {
+                    float sy = partY + (outH - 1 - row + 0.5f) / scale - 0.5f;
+                    int y0 = Mathf.FloorToInt(sy), fy = (int)((sy - y0) * 256f);
+                    int yA = Mathf.Clamp(y0, c.y0, lastY), yB = Mathf.Clamp(y0 + 1, c.y0, lastY);
+                    int at = row * outW;
+                    for (int ox = 0; ox < outW; ox++)
+                    {
+                        int xA = Mathf.Clamp(enlargeColumn[ox], c.x0, lastX), xB = Mathf.Clamp(enlargeColumn[ox] + 1, c.x0, lastX), fx = enlargeShare[ox];
+                        Color32 a = buffer[SourceIndex(c, xA, yA)], b = buffer[SourceIndex(c, xB, yA)];
+                        Color32 d = buffer[SourceIndex(c, xA, yB)], e = buffer[SourceIndex(c, xB, yB)];
+                        int r = ((a.r * (256 - fx) + b.r * fx) * (256 - fy) + (d.r * (256 - fx) + e.r * fx) * fy) >> 16;
+                        int g = ((a.g * (256 - fx) + b.g * fx) * (256 - fy) + (d.g * (256 - fx) + e.g * fx) * fy) >> 16;
+                        int bl = ((a.b * (256 - fx) + b.b * fx) * (256 - fy) + (d.b * (256 - fx) + e.b * fx) * fy) >> 16;
+                        pixels[at + ox] = unchecked((int)0xFF000000) | (r << 16) | (g << 8) | bl;
+                    }
+                }
+            }
+            width = outW; height = outH;
+            return true;
+        }
+        int[] enlargeColumn, enlargeShare;
 
         /// <summary>
         /// Two small grey pictures of what is inside `frame`, for the quality gate (FrameQuality): `overview` = the whole

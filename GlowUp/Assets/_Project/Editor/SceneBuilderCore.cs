@@ -237,6 +237,17 @@ namespace GlowUp.EditorTools
             so.ApplyModifiedPropertiesWithoutUndo();
         }
 
+        /// <summary>The same for a whole number: the new value is written only while the scene still holds one of the earlier defaults.</summary>
+        public static void ReplaceNumber(Object target, string field, int newValue, params int[] earlierDefaults)
+        {
+            var so = new SerializedObject(target);
+            var p = so.FindProperty(field);
+            if (p == null || p.propertyType != SerializedPropertyType.Integer) { Debug.LogWarning($"[SceneBuilder] {target.GetType().Name} has no number field '{field}'"); return; }
+            if (p.intValue == newValue || System.Array.IndexOf(earlierDefaults, p.intValue) < 0) return;
+            p.intValue = newValue;
+            so.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         public static Color Hex(string hex) { ColorUtility.TryParseHtmlString(hex, out var c); return c; }
 
         /// <summary>ThemeProfile asset (created once).</summary>

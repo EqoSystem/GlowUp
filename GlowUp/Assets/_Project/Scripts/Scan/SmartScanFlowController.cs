@@ -128,6 +128,27 @@ namespace GlowUp.Scan
         [SerializeField] private int blurrySkipsBeforeReadingAnyway = 6;
         [Tooltip("A paused scan is forgotten after this many seconds, and the camera is switched off")]
         [SerializeField] private float pauseResetSeconds = 30f;
+
+        [Header("Focus lock and text tracer")]
+        [Tooltip("The focus helper of this screen: the padlock button and the focus lock that comes by itself (ScanFocusAssistant). Optional.")]
+        [SerializeField] private ScanFocusAssistant focusAssistant;
+        [Tooltip("The corner marks that show the block of text the tracer follows (TextTraceView). Optional.")]
+        [SerializeField] private TextTraceView textTrace;
+        [Tooltip("On = when the letters of the text in view are small, every other picture the text reader gets is a CLOSE LOOK: only that block of text, enlarged. Off = every picture is the whole frame.")]
+        [SerializeField] private bool closeLooksAtSmallPrint = true;
+        [Tooltip("Letters lower than this many camera pixels count as small print")]
+        [Range(8f, 60f)] [SerializeField] private float smallPrintBelowPixels = 24f;
+        [Tooltip("A close look is enlarged until the letters are about this many pixels high")]
+        [Range(16f, 80f)] [SerializeField] private float closeLookLetterPixels = 32f;
+        [Tooltip("A close look is enlarged this many times at most (more only smears the letters)")]
+        [Range(1f, 4f)] [SerializeField] private float closeLookMostEnlarged = 2.5f;
+
+        [Header("Scan readout (for testing on a phone)")]
+        [Tooltip("On = a small line on the camera picture says what the scanner has to work with: the camera's picture size, how many of its pixels lie in the frame, how sharp the picture is, how high the letters are, how sure the text reader is, and whether the focus is locked. Switch it on, build, and read (or screenshot) the line when a scan is slow.")]
+        [SerializeField] private bool showScanReadout = false;
+        [Tooltip("The dark strip that holds the line (inactive in the Hierarchy; it appears while the switch above is on and the button is held)")]
+        [SerializeField] private GameObject scanReadout;
+        [SerializeField] private TextMeshProUGUI scanReadoutText;
         [Tooltip("Held this long without the ring moving on: the user is offered to start over or type the product in")]
         [SerializeField] private float stallSeconds = 12f;
         [Tooltip("How long the 'Got it' message stays before the loading scene opens")]
@@ -239,6 +260,15 @@ namespace GlowUp.Scan
 
         // the picture that is being looked at
         int[] pixels; int pixelsW, pixelsH;
+        // the text tracer: the block of text it follows, and the picture of a close look (its own, so `pixels` stays the whole frame)
+        readonly TextTracer tracer = new TextTracer();
+        int[] closePixels; int closeW, closeH;
+        Rect sentPart = new Rect(0f, 0f, 1f, 1f);
+        bool sentCloseLook;
+        float framePixelsHigh;
+        // for the scan readout
+        int frameWide, frameHigh, readLines, closeLooksSent;
+        float readSure, lastSharpness, lastEnlarge = 1f;
         byte[] overview, overviewBefore, detail;
         const int OverviewW = 64, OverviewH = 48, DetailSize = 160;
         float nextLook, pausedFor, sinceProgress, sentSharpness, sentAt;
@@ -403,6 +433,8 @@ namespace GlowUp.Scan
         {
             StopAllCoroutines();
             if (textOutlines != null) textOutlines.Clear();
+            tracer.Reset(); sentCloseLook = false;
+            if (textTrace != null) textTrace.Clear();
             if (cameraFeed != null) cameraFeed.StopCamera();
             lock (answerLock) { answerWaiting = false; answerReading = null; }
             readingOut = false;
@@ -470,24 +502,69 @@ namespace GlowUp.Scan
             Buffer.BlockCopy(overview, 0, overviewBefore, 0, overview.Length);
             fault = FrameQuality.Judge(measure);
 
+            // the focus helper sees every look: it locks the focus when the camera keeps losing it, and renews a lock that went soft
+            bool moving = fault == FrameQuality.Fault.Moving;
+            bool judged = fault != FrameQuality.Fault.Dark && !moving && measure.edges >= FrameQuality.MinimumEdges;
+            if (focusAssistant != null) focusAssistant.Looked(moving, judged, judged && measure.sharpness < FrameQuality.BlurBelow);
+            if (moving && tracer.Following) { tracer.Moved(); ShowTrace(); }       // the text is no longer where it was
+            lastSharpness = measure.sharpness;
+            ShowReadout();
+
             // too dark or moving: nothing in it can be trusted. (The flashlight helper of this screen deals with the dark.)
-            if (fault == FrameQuality.Fault.Dark || fault == FrameQuality.Fault.Moving) { blurrySkips = 0; return; }
+            if (fault == FrameQuality.Fault.Dark || moving) { blurrySkips = 0; return; }
             if (fault == FrameQuality.Fault.Blurry)
             {
                 // out of focus: skipped. After several in a row one is read anyway and the camera is asked to focus again,
                 // so a phone whose camera never looks "sharp" to this check can still scan (the text reader then decides).
                 if (++blurrySkips < Mathf.Max(1, blurrySkipsBeforeReadingAnyway)) return;
                 blurrySkips = 0;
-                cameraFeed.Refocus();
+                if (focusAssistant == null || !focusAssistant.LooksAfterFocus) cameraFeed.Refocus();      // a locked focus is renewed by the focus helper
             }
             else blurrySkips = 0;
             // glare: the picture is read; lines the reader is not sure of count for nothing (ScanEvidence), and the hint stays
 
-            if (!cameraFeed.UprightArgb(frame, readPictureSize, ref pixels, out pixelsW, out pixelsH)) return;
-            string colour = cameraFeed.DominantColourHex();
-            if (!string.IsNullOrEmpty(colour)) lastColour = colour;
+            // THE TEXT TRACER: while it follows small print, every other picture is a close look at that block, enlarged
+            tracer.CloseLooks = closeLooksAtSmallPrint; tracer.UsableLine = ScanEvidence.UsableLine;
+            tracer.SmallBelowPixels = smallPrintBelowPixels; tracer.GoodPixels = closeLookLetterPixels; tracer.MostEnlarged = closeLookMostEnlarged;
+            sentCloseLook = tracer.Next(out sentPart, out float enlarge);
+            if (sentCloseLook && !cameraFeed.UprightArgb(frame, sentPart, enlarge, readPictureSize, ref closePixels, out closeW, out closeH, out _)) sentCloseLook = false;
+            if (!sentCloseLook)
+            {
+                sentPart = new Rect(0f, 0f, 1f, 1f);
+                if (!cameraFeed.UprightArgb(frame, readPictureSize, ref pixels, out pixelsW, out pixelsH)) return;
+                if (cameraFeed.FramePixels(frame, out int wide, out int high)) { framePixelsHigh = high; frameWide = wide; frameHigh = high; }
+                string colour = cameraFeed.DominantColourHex();
+                if (!string.IsNullOrEmpty(colour)) lastColour = colour;
+            }
+            if (sentCloseLook) { closeLooksSent++; lastEnlarge = enlarge; }
             sentSharpness = measure.sharpness; sentAt = Time.unscaledTime;
-            readingOut = reader.Read(pixels, pixelsW, pixelsH, readBarcode && barcode.Length == 0, OnReaderAnswer);
+            readingOut = sentCloseLook ? reader.Read(closePixels, closeW, closeH, false, OnReaderAnswer)             // a block of text: no barcode is looked for
+                                       : reader.Read(pixels, pixelsW, pixelsH, readBarcode && barcode.Length == 0, OnReaderAnswer);
+        }
+
+        /// <summary>Shows where the text tracer is, and tells the focus helper to focus there (on the text, not just the middle of the frame).</summary>
+        void ShowTrace()
+        {
+            if (textTrace != null) textTrace.Show(tracer.Following, tracer.Block, tracer.SmallPrint && closeLooksAtSmallPrint);
+            if (focusAssistant != null)
+                focusAssistant.FocusOn = tracer.Following && textTrace != null && textTrace.Box != null ? textTrace.Box : (guide != null ? guide.Frame : null);
+        }
+
+        /// <summary>
+        /// The scan readout: one small line of numbers on the camera picture, for finding out on a phone WHY a scan is slow
+        /// (letters too small, picture soft, reader unsure). Only while "Show Scan Readout" is on.
+        /// </summary>
+        void ShowReadout()
+        {
+            if (scanReadout != null && scanReadout.activeSelf != showScanReadout) scanReadout.SetActive(showScanReadout);
+            if (!showScanReadout || scanReadoutText == null || cameraFeed == null) return;
+            Vector2Int camera = cameraFeed.PictureSize;
+            string picture = fault == FrameQuality.Fault.None ? "ok" : fault.ToString().ToLowerInvariant();
+            string letters = tracer.Following ? Mathf.RoundToInt(tracer.LetterPixels) + " px" + (tracer.SmallPrint && closeLooksAtSmallPrint ? " (close look x" + lastEnlarge.ToString("0.0") + ")" : "") : "-";
+            string focus = !cameraFeed.CanLockFocus ? "fixed" : cameraFeed.FocusLocked ? "locked" : "automatic";
+            scanReadoutText.text = "Camera " + camera.x + " x " + camera.y + "   frame " + frameWide + " x " + frameHigh + " px   picture " + picture
+                                   + "   sharp " + lastSharpness.ToString("0.00") + "\nLetters " + letters + "   lines " + readLines + "   sure " + readSure.ToString("0.00")
+                                   + "   close looks " + closeLooksSent + "   focus " + focus;
         }
 
         // called on the text reader's own thread: only the answer is stored
@@ -512,6 +589,16 @@ namespace GlowUp.Scan
         /// <summary>A picture was read: what does it show, and what does it do for the ring?</summary>
         void OnReading(FrameReading reading)
         {
+            // a close look showed one part of the frame: its places become places of the frame, like every other reading's
+            bool closeLook = sentCloseLook;
+            if (closeLook) TextTracer.ToFrame(reading, sentPart);
+            tracer.Take(reading, framePixelsHigh, closeLook);
+            ShowTrace();
+            readLines = 0; readSure = 0f;
+            foreach (FrameReading.Line line in reading.lines)
+                if (line != null && line.confidence >= ScanEvidence.UsableLine && !string.IsNullOrWhiteSpace(line.text)) { readLines++; readSure += line.confidence; }
+            if (readLines > 0) readSure /= readLines;
+            ShowReadout();
             if (textOutlines != null) textOutlines.Show(FrameReader.BoxesOf(reading, ScanEvidence.UsableLine));
             string text = reading.Text(ScanEvidence.UsableLine);
 
@@ -536,8 +623,8 @@ namespace GlowUp.Scan
             known.brandSeen = BrandIn(text);
             known.noShadeNeeded = identity.cosmeticType.Length > 0 && !ShadeAdvisor.IsColourCosmetic(identity.cosmeticType);
 
-            ScanEvidence.Result result = evidence.Add(reading, known, sentSharpness);
-            KeepBest(result);
+            ScanEvidence.Result result = evidence.Add(reading, known, sentSharpness, closeLook);
+            if (!closeLook) KeepBest(result);                // the kept pictures show the whole frame (`pixels`), never a close look
 
             // ---- the barcode: a product of the inventory is recognised at once
             if (barcode.Length == 0 && evidence.Barcode.Length > 0) TakeBarcode(evidence.Barcode);
@@ -549,7 +636,7 @@ namespace GlowUp.Scan
                 if (whole != null) Adopt(whole);
             }
             // ---- the look of the pack: a product this phone has scanned before. The app ASKS ("Is this ...?"), it does not decide.
-            if (!ProductKnown && showsPack) RecogniseFromLook();
+            if (!ProductKnown && showsPack && !closeLook) RecogniseFromLook();
             if (ProductKnown && productQuestion != null && productQuestion.IsOpen) productQuestion.Hide();
             if (identity.shadeName.Length == 0 && evidence.ShadeText.Length > 0) identity.shadeName = evidence.ShadeText;
 
@@ -1019,6 +1106,8 @@ namespace GlowUp.Scan
             finishUnnamed = false; lookingUp = false; shownStatus = null; messageOver = null; lastHint = "";
             lock (answerLock) { answerWaiting = false; answerReading = null; }
             overviewBefore = null;
+            tracer.Reset(); sentCloseLook = false;
+            if (textTrace != null) textTrace.Clear();
             if (textOutlines != null) textOutlines.Clear();
 
             bool keep = sameProduct && ProductKnown;

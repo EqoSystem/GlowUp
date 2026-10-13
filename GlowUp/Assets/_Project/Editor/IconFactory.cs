@@ -177,6 +177,23 @@ namespace GlowUp.EditorTools
         /// <summary>A lightning bolt (the flashlight button).</summary>
         public static Sprite Bolt => Get("icon_bolt", (x, y) =>
             Stroke(x, y, 0.09f, new[] { 0.22f, 0.86f, -0.42f, -0.06f, 0.06f, -0.06f, -0.22f, -0.86f, 0.42f, 0.1f, -0.04f, 0.1f, 0.22f, 0.86f }));
+        /// <summary>A closed padlock (the focus of the scan camera is locked).</summary>
+        public static Sprite LockClosed => Get("icon_lock_closed", (x, y) => Padlock(x, y, false));
+        /// <summary>An open padlock (the scan camera focuses by itself).</summary>
+        public static Sprite LockOpen => Get("icon_lock_open", (x, y) => Padlock(x, y, true));
+
+        // the body: a filled box with a keyhole. The shackle: half a ring with two legs; open = lifted, and its right leg is out of the body
+        static bool Padlock(float x, float y, bool open)
+        {
+            bool keyhole = Disc(x, y + 0.22f, 0.13f) || Box(x, y, 0f, -0.42f, 0.055f, 0.15f);
+            bool body = Box(x, y, 0f, -0.34f, 0.6f, 0.42f) && !keyhole;
+            float lift = open ? 0.2f : 0f, bend = 0.26f + lift;
+            bool arch = y >= bend && Ring(x, y - bend, 0.36f, 0.085f);
+            bool leftLeg = Mathf.Abs(x + 0.36f) < 0.085f && y > 0.06f && y < bend;
+            bool rightLeg = Mathf.Abs(x - 0.36f) < 0.085f && y > (open ? bend - 0.1f : 0.06f) && y < bend;
+            return body || arch || leftLeg || rightLeg;
+        }
+
         /// <summary>A screen split by a line (the before/after button of AR Try-On).</summary>
         public static Sprite Compare => Get("icon_compare_line", (x, y) =>
             Stroke(x, y, 0.078f, new[] { -0.8f, 0.56f, 0.8f, 0.56f, 0.8f, -0.56f, -0.8f, -0.56f, -0.8f, 0.56f }) || Stroke(x, y, 0.078f, new[] { 0f, 0.86f, 0f, -0.86f }) ||
