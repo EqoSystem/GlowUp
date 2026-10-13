@@ -533,7 +533,7 @@ namespace GlowUp.Scan
                 sentPart = new Rect(0f, 0f, 1f, 1f);
                 if (!cameraFeed.UprightArgb(frame, readPictureSize, ref pixels, out pixelsW, out pixelsH)) return;
                 if (cameraFeed.FramePixels(frame, out int wide, out int high)) { framePixelsHigh = high; frameWide = wide; frameHigh = high; }
-                string colour = cameraFeed.DominantColourHex();
+                string colour = cameraFeed.DominantColourHex(frame);         // only what is inside the scan frame, not the hand or the table round it
                 if (!string.IsNullOrEmpty(colour)) lastColour = colour;
             }
             if (sentCloseLook) { closeLooksSent++; lastEnlarge = enlarge; }

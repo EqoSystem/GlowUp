@@ -722,29 +722,48 @@ namespace GlowUp.Scan
         }
 
         /// <summary>
-        /// The strongest real colour in the last captured frame (ignores white, grey and black), as hex, or "".
+        /// The strongest real colour in the last captured picture (ignores white, grey and black), as hex, or "".
         /// A rough guess at the colour of the product the user is holding.
+        /// With a `frame` only what lies INSIDE it counts. The camera's picture is larger than the box it is shown in (part
+        /// of it is not on the screen at all), and a hand, a sleeve or the table round the product must not decide the
+        /// colour. Without a frame the whole picture is taken.
         /// </summary>
-        public string DominantColourHex()
+        public string DominantColourHex(RectTransform frame = null)
         {
             if (buffer == null || buffer.Length == 0) return "";
             const int bins = 24;
-            var weight = new float[bins]; var r = new float[bins]; var g = new float[bins]; var b = new float[bins];
-            int step = Mathf.Max(1, buffer.Length / 6000);
-            for (int i = 0; i < buffer.Length; i += step)
+            if (colourWeight == null) { colourWeight = new float[bins]; colourR = new float[bins]; colourG = new float[bins]; colourB = new float[bins]; }
+            Array.Clear(colourWeight, 0, bins); Array.Clear(colourR, 0, bins); Array.Clear(colourG, 0, bins); Array.Clear(colourB, 0, bins);
+            if (frame != null && CropOf(frame, out Crop c))
             {
-                Color c = buffer[i];
-                Color.RGBToHSV(c, out float hue, out float sat, out float val);
-                if (sat < 0.30f || val < 0.20f) continue;
-                int bin = Mathf.Min(bins - 1, (int)(hue * bins));
-                float wgt = sat * val;
-                weight[bin] += wgt; r[bin] += c.r * wgt; g[bin] += c.g * wgt; b[bin] += c.b * wgt;
+                // about 6000 places spread evenly over the frame
+                int stepX = Mathf.Max(1, c.cropW / 80), stepY = Mathf.Max(1, c.cropH / 75);
+                for (int uy = c.y0; uy < c.y0 + c.cropH; uy += stepY)
+                    for (int ux = c.x0; ux < c.x0 + c.cropW; ux += stepX)
+                        CountColour(buffer[SourceIndex(c, ux, uy)], bins);
+            }
+            else
+            {
+                int step = Mathf.Max(1, buffer.Length / 6000);
+                for (int i = 0; i < buffer.Length; i += step) CountColour(buffer[i], bins);
             }
             int best = 0; float total = 0f;
-            for (int i = 0; i < bins; i++) { total += weight[i]; if (weight[i] > weight[best]) best = i; }
-            if (weight[best] <= 0f || weight[best] < total * 0.18f) return "";      // no clear colour
-            var colour = new Color(r[best] / weight[best], g[best] / weight[best], b[best] / weight[best]);
+            for (int i = 0; i < bins; i++) { total += colourWeight[i]; if (colourWeight[i] > colourWeight[best]) best = i; }
+            if (colourWeight[best] <= 0f || colourWeight[best] < total * 0.18f) return "";      // no clear colour
+            var colour = new Color(colourR[best] / colourWeight[best], colourG[best] / colourWeight[best], colourB[best] / colourWeight[best]);
             return "#" + ColorUtility.ToHtmlStringRGB(colour);
+        }
+        float[] colourWeight, colourR, colourG, colourB;
+
+        // one pixel for DominantColourHex: sorted by its hue, counted more the stronger and brighter its colour is
+        void CountColour(Color32 pixel, int bins)
+        {
+            Color c = pixel;
+            Color.RGBToHSV(c, out float hue, out float sat, out float val);
+            if (sat < 0.30f || val < 0.20f) return;          // white, grey, black
+            int bin = Mathf.Min(bins - 1, (int)(hue * bins));
+            float wgt = sat * val;
+            colourWeight[bin] += wgt; colourR[bin] += c.r * wgt; colourG[bin] += c.g * wgt; colourB[bin] += c.b * wgt;
         }
     }
 }
