@@ -32,6 +32,7 @@ namespace GlowUp.Auth
         [SerializeField] private Button facebookButton;
         [SerializeField] private Button privacyPolicyButton;
         [SerializeField] private Button termsButton;
+        [SerializeField] private TextMeshProUGUI legalEntryText;
 
         [Header("Scenes")]
         [SerializeField] private string dashboardScene = SceneNames.Dashboard;
@@ -40,9 +41,8 @@ namespace GlowUp.Auth
         [SerializeField] private string socialOnboardingScene = SceneNames.Onboarding2;
         [SerializeField] private bool autoSkipIfSignedIn = true;
 
-        [Header("Links")]
-        [SerializeField] private string privacyPolicyUrl = "https://example.com/privacy";
-        [SerializeField] private string termsUrl = "https://example.com/terms";
+        [Header("Legal documents")]
+        [SerializeField] private string legalDocumentsScene = "TermsAndConditionScene";
 
         [Header("Messages")]
         [SerializeField] private string msgEnterEmail = "Please enter your email address.";
@@ -69,10 +69,35 @@ namespace GlowUp.Auth
 
             Hook(signInButton, SignIn); Hook(forgotPasswordButton, ForgotPassword); Hook(signUpButton, SignUp);
             Hook(googleButton, () => Social("Google", SocialSignIn.Google)); Hook(facebookButton, () => Social("Facebook", SocialSignIn.Facebook));
-            Hook(privacyPolicyButton, () => Application.OpenURL(privacyPolicyUrl)); Hook(termsButton, () => Application.OpenURL(termsUrl));
+            if (privacyPolicyButton != null) Hook(privacyPolicyButton, OpenLegalDocuments);
+            if (termsButton != null && termsButton != privacyPolicyButton) Hook(termsButton, OpenLegalDocuments);
+            if (privacyPolicyButton == null && termsButton == null)
+            {
+                if (legalEntryText == null)
+                {
+                    GameObject legalObject = GameObject.Find("TermsText");
+                    if (legalObject != null) legalEntryText = legalObject.GetComponent<TextMeshProUGUI>();
+                }
+                if (legalEntryText != null)
+                {
+                    legalEntryText.text = "Read the Privacy Policy and Terms before signing up";
+                    legalEntryText.raycastTarget = true;
+                    Button legalButton = legalEntryText.GetComponent<Button>();
+                    if (legalButton == null) legalButton = legalEntryText.gameObject.AddComponent<Button>();
+                    legalButton.targetGraphic = legalEntryText;
+                    legalButton.transition = Selectable.Transition.None;
+                    Hook(legalButton, OpenLegalDocuments);
+                }
+            }
         }
 
         static void Hook(Button b, Action a) { if (b != null) b.onClick.AddListener(() => a()); }
+
+        void OpenLegalDocuments()
+        {
+            GlowUp.Onboarding.TermsAcceptanceFlowController.OpenReadOnlyFromLogin();
+            SceneNavigator.Go(legalDocumentsScene);
+        }
 
         static void ClearField(TMP_InputField field)
         {

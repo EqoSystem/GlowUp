@@ -17,6 +17,8 @@ namespace GlowUp.Scan
 
         // ---- what phase 1 of the scan recognised about the product (all "" when it did not) ----
         public static string PendingProductName = "", PendingBrandName = "", PendingCosmeticType = "";
+        public static string PendingProductId = "";
+        public static string PendingOfficialIngredientSource = "";
         /// <summary>The shade's name or number printed on the product, and its texture (matte, satin, glossy, shimmer, metallic).</summary>
         public static string PendingShadeName = "", PendingFinish = "";
         /// <summary>The number under the product's barcode, when the camera saw it ("" = not seen).</summary>
@@ -44,7 +46,7 @@ namespace GlowUp.Scan
         public static void ClearPending()
         {
             PendingText = null; PendingShadeHex = null; PendingSource = "scan";
-            PendingProductName = PendingBrandName = PendingCosmeticType = PendingShadeName = PendingFinish = PendingBarcode = "";
+            PendingProductName = PendingBrandName = PendingCosmeticType = PendingProductId = PendingOfficialIngredientSource = PendingShadeName = PendingFinish = PendingBarcode = "";
             PendingSources = new System.Collections.Generic.List<string>();
             PendingListFrom = ""; PendingListWebBacked = false;
             PendingReplaces = null; PendingReplacesSame = true;

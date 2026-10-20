@@ -17,7 +17,7 @@ namespace GlowUp.Scanning
     /// - Transient errors (timeout, 429, 5xx, connection error) retry on the SAME
     ///   model with exponential backoff + jitter, up to MaxRetriesPerModel times,
     ///   before advancing to the next model.
-    /// - Terminal errors (400 bad request, 401/403 auth) stop immediately —
+    /// - Terminal errors (400 bad request, 401/403 auth) stop immediately â€”
     ///   retrying a malformed request or bad key just burns quota.
     /// - Every attempt respects the CancellationToken so leaving the scan screen
     ///   actually aborts the in-flight request instead of updating UI after the
@@ -195,7 +195,7 @@ namespace GlowUp.Scanning
                             "We couldn't authenticate the scanning service. Please try again later.", 0);
                     case 404:
                         return GeminiScanResult.Failed(GeminiErrorCode.ModelNotFound,
-                            $"404 on model '{model}' — likely retired/renamed.",
+                            $"404 on model '{model}' â€” likely retired/renamed.",
                             null, 0);
                     case 429:
                         return GeminiScanResult.Failed(GeminiErrorCode.RateLimited,
@@ -214,7 +214,7 @@ namespace GlowUp.Scanning
                 }
             }
 
-            // Success at the transport level — now validate the payload itself.
+            // Success at the transport level â€” now validate the payload itself.
             return ParseSuccessBody(req.downloadHandler?.text);
         }
 
@@ -291,7 +291,7 @@ namespace GlowUp.Scanning
         }
 
         private string Truncate(string s, int max = 300) =>
-            string.IsNullOrEmpty(s) || s.Length <= max ? s : s.Substring(0, max) + "…";
+            string.IsNullOrEmpty(s) || s.Length <= max ? s : s.Substring(0, max) + "â€¦";
 
         [Serializable] private class GeminiEnvelope { public Candidate[] candidates; }
         [Serializable] private class Candidate { public Content content; }

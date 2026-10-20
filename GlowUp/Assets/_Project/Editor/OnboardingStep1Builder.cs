@@ -75,8 +75,8 @@ namespace GlowUp.EditorTools
             AddSpaceGuard(pw, c.feedback, "Spaces are not allowed in the password.");
             InfoBadge(content, passwordLabel, "PasswordHelperText", "Needed. Tap the eye to check what you typed. Pasting is switched off here.");
             // one character of each kind is enough, so the rows name the kind and do not count
-            var pReq = Checklist(content, "Password", new[] { "Uppercase", "Lowercase", "Number", "Special character", "Minimum of 8 characters" },
-                                 new[] { "1 uppercase letter", "1 lowercase letter", "1 number", "1 special character", "At least 8 characters" });
+            var pReq = Checklist(content, "Password", new[] { "Uppercase", "Lowercase", "Number", "Special character", "8–64 characters" },
+                                 new[] { "1 uppercase letter", "1 lowercase letter", "1 number", "1 special character", "8–64 characters" });
 
             // ---- re-type password ----
             var retypeLabel = LabelRow(content, Loose(ct, "RetypePasswordText"), "RetypePasswordText", "Re-type Password");

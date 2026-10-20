@@ -24,6 +24,8 @@ namespace GlowUp.Onboarding
     /// </summary>
     public class TermsAcceptanceFlowController : MonoBehaviour
     {
+        static bool openReadOnlyFromLogin;
+
         [SerializeField] private ScrollRect policyScroll;
         [SerializeField] private Toggle readToggle;
         [SerializeField] private TextMeshProUGUI toggleLabel;
@@ -47,11 +49,22 @@ namespace GlowUp.Onboarding
         [SerializeField] private string msgSessionLost = "Your sign-up details were lost. Please start again.";
         [SerializeField] private string msgConfirmFirst = "Your email is not confirmed yet. Go back to Step 1 and tap Continue there.";
 
-        bool reachedBottom, busy;
+        bool reachedBottom, busy, readOnly;
         bool watching;          // false until the document has been laid out, so nothing unlocks by accident while the scene opens
+
+        public static void OpenReadOnlyFromLogin() { openReadOnlyFromLogin = true; }
 
         void Awake()
         {
+            readOnly = openReadOnlyFromLogin;
+            openReadOnlyFromLogin = false;
+            if (readOnly)
+            {
+                previousScene = "LogInScene";
+                if (readToggle != null) readToggle.gameObject.SetActive(false);
+                if (toggleLabel != null) toggleLabel.gameObject.SetActive(false);
+                if (continueButton != null) continueButton.gameObject.SetActive(false);
+            }
             if (policyScroll != null) policyScroll.onValueChanged.AddListener(_ => CheckBottom());
             if (readToggle != null) { readToggle.isOn = false; readToggle.interactable = false; readToggle.onValueChanged.AddListener(_ => OnToggled()); }
             if (toggleLabel != null) toggleLabel.text = readLabel;
@@ -61,8 +74,8 @@ namespace GlowUp.Onboarding
 
         IEnumerator Start()
         {
-            OnboardingSession.LoadDraft();
-            Say(msgScrollFirst);
+            if (!readOnly) OnboardingSession.LoadDraft();
+            Say(readOnly ? "Viewing only. No sign-in or agreement is needed." : msgScrollFirst);
             Refresh();
 
             // 1. let the document take its full height, 2. start at the very top, 3. only then watch for the bottom

@@ -73,7 +73,8 @@ namespace GlowUp.Common
             "fda.gov.ph (FDA Philippines) and the ASEAN Cosmetic Directive ingredient annexes",
             "ec.europa.eu CosIng (EU cosmetic ingredient database)",
             "cir-safety.org (Cosmetic Ingredient Review)",
-            "pubchem.ncbi.nlm.nih.gov (PubChem)"
+            "pubchem.ncbi.nlm.nih.gov (PubChem)",
+            "watsons.com.ph (Watsons Philippines product listings)"
         };
 
         [Header("Adding scanned products to the website's inventory (online only)")]

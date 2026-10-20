@@ -1,8 +1,7 @@
 namespace GlowUp.Scan
 {
     /// <summary>
-    /// The words of hold-to-scan: the short status line ("Holding, 2 of 5") and the hint that reacts to what is
-    /// missing or wrong ("Turn to the back", "Tilt slightly, there is glare", "Hold steadier").
+    /// The words of one-view scanning: the status line and optional hint for focus, glare, or the ingredient list.
     /// Pure logic, so the wording can be tested; the scan screen can replace every text in its Inspector.
     /// </summary>
     public static class ScanGuidance
@@ -10,9 +9,9 @@ namespace GlowUp.Scan
         /// <summary>The texts. The scan screen fills this from its Inspector fields.</summary>
         public class Words
         {
-            public string holding = "Holding, {0} of 5";
-            public string paused = "Paused at {0} of 5. Hold the button to go on.";
-            public string notStarted = "Hold the button and show the product.";
+            public string scanning = "Recognizing the product...";
+            public string paused = "Paused. Tap once to continue.";
+            public string notStarted = "Tap once to start scanning.";
             public string done = "Got it!";
             // what is wrong with the picture
             public string dark = "It is too dark. Turn on the flashlight or move to the light.";
@@ -21,19 +20,19 @@ namespace GlowUp.Scan
             public string blurry = "Move a little back so the text is sharp";
             // what is still missing, in the order it is asked for
             public string front = "Show the front: the brand and the product's name";
-            public string ingredients = "Turn to the back: show the ingredient list";
+            public string ingredients = "Show the ingredient list, or tap Look it up.";
             public string ingredientsMore = "Keep the list in view, moving slowly along it";
             public string codes = "Show the barcode (on the bottom or the back)";
             public string shade = "Show the shade's name or number";
-            public string around = "Turn the product slowly to show its other sides";
+            public string around = "Show one clear view of the product. No extra angles are needed.";
             // what the RING still misses (brand, product name, kind, ingredient list, barcode): HintForRing
             public string brandMissing = "The brand is not read yet: show the brand name on the front";
-            public string nameMissing = "Now the product's name: hold the front steady, with the name inside the frame";
+            public string nameMissing = "Keep the product name inside the frame";
             public string kindMissing = "Show where the pack says what it is (lipstick, foundation, powder...)";
             public string barcodeOptional = "Almost done. Show the barcode too if the pack has one";
         }
 
-        /// <summary>What the ring holds, for the hint: which of its five things were detected.</summary>
+        /// <summary>What the ring holds, for the hint: which product details and ingredient list were detected.</summary>
         public struct Ring
         {
             public bool brand, name, kind, barcode;
@@ -63,12 +62,11 @@ namespace GlowUp.Scan
             return ring.barcode ? "" : words.barcodeOptional;
         }
 
-        /// <summary>The status line. `held` = the button is down now; `started` = the ring holds anything at all.</summary>
-        public static string Status(Words words, bool held, bool started, int fullZones, bool finished)
+        /// <summary>The status line. `started` means at least one picture was analyzed.</summary>
+        public static string Status(Words words, bool scanning, bool started, bool finished)
         {
             if (finished) return words.done;
-            if (held) return string.Format(words.holding, fullZones);
-            return started ? string.Format(words.paused, fullZones) : words.notStarted;
+            return scanning ? words.scanning : started ? words.paused : words.notStarted;
         }
 
         /// <summary>

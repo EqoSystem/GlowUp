@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Threading.Tasks;
 using GlowUp.Auth;
 using GlowUp.Common;
@@ -116,6 +117,7 @@ namespace GlowUp.Onboarding
 
             foreach (var f in new[] { firstName, middleName, lastName, email, password, retypePassword })
                 if (f != null) f.onValueChanged.AddListener(_ => { flowMessage = ""; Validate(); });
+            if (password != null) password.onSelect.AddListener(_ => RevealPasswordRequirements());
             if (birthday != null) birthday.DateChanged += OnBirthday;
             if (continueButton != null) continueButton.onClick.AddListener(OnContinue);
             if (backButton != null) backButton.onClick.AddListener(OnBack);
@@ -228,12 +230,42 @@ namespace GlowUp.Onboarding
             if (age != null) age.SetTextWithoutNotify(InputRules.CalculateAge(d).ToString());
         }
 
+        void RevealPasswordRequirements()
+        {
+            if (password == null || !isActiveAndEnabled) return;
+            ScrollRect scroll = password.GetComponentInParent<ScrollRect>();
+            if (scroll != null) StartCoroutine(ScrollRequirementsIntoView(scroll));
+        }
+
+        IEnumerator ScrollRequirementsIntoView(ScrollRect scroll)
+        {
+            yield return null;
+            yield return null;
+            yield return new WaitForSecondsRealtime(0.25f);
+            Canvas.ForceUpdateCanvases();
+            if (scroll == null || scroll.viewport == null || scroll.content == null || pwUpper == null || pwLength == null) yield break;
+
+            Bounds requirements = RectTransformUtility.CalculateRelativeRectTransformBounds(scroll.viewport, (RectTransform)pwUpper.transform);
+            requirements.Encapsulate(RectTransformUtility.CalculateRelativeRectTransformBounds(scroll.viewport, (RectTransform)pwLength.transform));
+            Bounds viewport = new Bounds(scroll.viewport.rect.center, scroll.viewport.rect.size);
+            float overflow = scroll.content.rect.height - scroll.viewport.rect.height;
+            if (overflow <= 0f) yield break;
+
+            float position = scroll.verticalNormalizedPosition;
+            if (requirements.min.y < viewport.min.y)
+                position -= (viewport.min.y - requirements.min.y) / overflow;
+            else if (requirements.max.y > viewport.max.y)
+                position += (requirements.max.y - viewport.max.y) / overflow;
+            scroll.verticalNormalizedPosition = Mathf.Clamp01(position);
+        }
+
         void Validate()
         {
             string pw = password != null ? password.text : "", re = retypePassword != null ? retypePassword.text : "";
 
             pwUpper?.SetMet(InputRules.HasUpper(pw)); pwLower?.SetMet(InputRules.HasLower(pw));
-            pwNumber?.SetMet(InputRules.HasDigit(pw)); pwSpecial?.SetMet(InputRules.HasSpecial(pw)); pwLength?.SetMet(pw.Length >= passwordMin);
+            pwNumber?.SetMet(InputRules.HasDigit(pw)); pwSpecial?.SetMet(InputRules.HasSpecial(pw));
+            pwLength?.SetMet(pw.Length >= passwordMin && pw.Length <= passwordMax);
             bool pwOk = pw.Length >= passwordMin && pw.Length <= passwordMax && InputRules.HasUpper(pw) && InputRules.HasLower(pw) && InputRules.HasDigit(pw) && InputRules.HasSpecial(pw);
             bool match = pwOk && re.Length > 0 && re == pw;
             pwMatch?.SetMet(match);

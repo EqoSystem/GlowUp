@@ -27,6 +27,7 @@
 //     using it at once; statusBeforeBin keeps what it was, for "Restore". A brand goes to the bin together with its
 //     products (binnedWith = the brand's id). Only "Delete forever" removes a document.
 import { db } from "../_Database/firebase-console.js";
+import { auth } from "../_Database/firebase-console.js";
 import { collection, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 // reading and writing go through the site's own copy of its lists: a list is downloaded once and kept between pages,
 // and after a change only the documents that were written are read again (see adminStore.js)
@@ -43,6 +44,7 @@ import { mountShell, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
+import { readAdminDocument } from "../_Shared/adminDocumentReader.js";
 
 const OTHER_TYPE = "__other__";
 const NO_BRAND = "__none__";                // the group for products whose brand no longer exists
@@ -71,6 +73,9 @@ let shownGroups = [];                       // the brands the table currently li
 
 let everyBrand = [];                        // every brand document, also the ones in the Recycle bin
 let everyProduct = [];
+let ingredientSuggestions = [];
+let ingredientSuggestionsError = "";
+let inventoryAiDrafts = [];
 let brands = [];                            // listed (not in the bin): [{ id, name, category, market, status, scans }]
 let products = [];                          // listed: [{ id, name, brandId, brandName, cosmeticType, description, ingredients, shades, minAge, status, scans, folder }]
 let binBrands = [];                         // in the Recycle bin
@@ -80,6 +85,7 @@ let curatorKnown = false;
 let editingBrandId = null;
 let editingProductId = null;
 let formShades = [];                        // the shades being edited in the open product form
+let assistedProductSources = [];
 let brandModal = null;
 let productModal = null;
 let org = null;                             // folders, the Recycle bin, picking and dragging
@@ -143,15 +149,24 @@ document.addEventListener("DOMContentLoaded", async () => {
         binKeys: () => binEntries().map((entry) => entry.key),
         move: moveToFolder, bin: moveToBin, restore: restoreFromBin, purge: purgeFromBin,
         renameFolder: (from, to) => refolder(from, to), deleteFolder: (name) => refolder(name, ""),
+        selectionActions: () => [
+            { label: "Assist with AI", className: "bar-main", tip: "Draft sourced ingredient lists and brand aliases for selected entries.", icon: icon("sparkle"), run: assistSelectedInventory },
+            { label: "Approve All", className: "bar-quiet", tip: "Approve only eligible selected entries after you confirm you have reviewed them.", run: approveSelectedInventory }
+        ],
         onView: () => { fromFirstPage(); }
     });
     setAssistPage("inventory");
     registerHelpers();
+    el("inventoryAiDraftList").addEventListener("change", updateInventoryDraftApproval);
+    el("inventoryApproveAllBtn").addEventListener("click", approveInventoryDrafts);
 
     wireSearch(el("inventorySearchInput"), el("inventorySearchClear"), fromFirstPage);
     el("brandFilterSelect").addEventListener("change", fromFirstPage);
     el("reviewFilterSelect").addEventListener("change", fromFirstPage);
-    document.querySelectorAll(".stat[data-show]").forEach((tile) => tile.addEventListener("click", () => showOnly(tile.dataset.show)));
+    document.querySelectorAll(".stat[data-show]").forEach((tile) => tile.addEventListener("click", () => {
+        if (!tile.dataset.show) resetAllFilters();
+        else showOnly(tile.dataset.show);
+    }));
     el("addMenuBtn").addEventListener("click", (event) => openMenu(event.currentTarget, [
         { label: "Brand", icon: "tag", description: "A new brand: name, category, market, status.", run: () => openBrandForm(null) },
         { label: "Product", icon: "lipstick", description: "A make-up product of a listed brand.", disabled: brands.length === 0, run: () => openProductForm(null, el("brandFilterSelect").value) }
@@ -184,7 +199,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("productTypeOtherInput").addEventListener("input", showScopeHint);
     el("addBrandForm").addEventListener("submit", saveBrand);
     el("productForm").addEventListener("submit", saveProduct);
+    el("chooseInventoryFileBtn").addEventListener("click", () => el("inventoryFileInput").click());
+    el("inventoryDropBox").addEventListener("click", () => el("inventoryFileInput").click());
+    el("inventoryFileInput").addEventListener("change", (event) => {
+        const file = event.target.files && event.target.files[0];
+        event.target.value = "";
+        if (file) importInventoryFile(file);
+    });
+    el("inventoryDropBox").addEventListener("dragover", (event) => {
+        event.preventDefault();
+        event.currentTarget.classList.add("drag-over");
+    });
+    el("inventoryDropBox").addEventListener("dragleave", (event) => event.currentTarget.classList.remove("drag-over"));
+    el("inventoryDropBox").addEventListener("drop", (event) => {
+        event.preventDefault();
+        event.currentTarget.classList.remove("drag-over");
+        const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+        if (file) importInventoryFile(file);
+    });
+    el("assistProductIngredientsBtn").addEventListener("click", assistProductIngredients);
     el("inventoryTableBody").addEventListener("click", onTableClick);
+    el("ingredientSuggestionsList").addEventListener("click", onIngredientSuggestionClick);
     el("inventoryTableBody").addEventListener("dblclick", onTableDoubleClick);
     el("inventoryTableBody").addEventListener("keydown", (event) => { if (event.key === "Enter" && event.target.matches("tr.product-row")) { event.preventDefault(); toggleDetails(event.target.dataset.product); } });
     el("productTypeInput").addEventListener("change", showOtherTypeBox);
@@ -207,6 +242,14 @@ function showOnly(value, keep) {
     quick = "";
     if (org.view.kind === "bin") org.show({ kind: "all" }); else fromFirstPage();
 }
+/** A visible "Show all" action returns to the whole inventory, not just the current search or folder. */
+function resetAllFilters() {
+    el("inventorySearchInput").value = "";
+    el("brandFilterSelect").value = "";
+    el("reviewFilterSelect").value = "";
+    quick = "";
+    org.show({ kind: "all" });
+}
 
 // ---------------------------------------------------------------------------------------------
 // Loading
@@ -215,6 +258,67 @@ function showOnly(value, keep) {
 const madeAt = (data) => { const made = toDate(data.createdAt); return made ? Math.floor(made.getTime() / 1000) : toWholeNumber(data.addedAtUnix); };
 /** What the Recycle bin wrote on an entry. */
 const binFields = (data) => { const since = toDate(data.binnedAt); return { binned: data.binned === true, binnedAt: since ? since.getTime() : 0, statusBeforeBin: String(data.statusBeforeBin || ""), binnedWith: String(data.binnedWith || ""), binnedReason: String(data.binnedReason || "") }; };
+
+function renderIngredientSuggestions() {
+    const panel = el("ingredientSuggestionsPanel");
+    const list = el("ingredientSuggestionsList");
+    const items = ingredientSuggestions.slice().sort((a, b) => a.productName.localeCompare(b.productName, undefined, { sensitivity: "base" }));
+    panel.hidden = items.length === 0 && !ingredientSuggestionsError;
+    el("ingredientSuggestionsCount").textContent = many(items.length, "suggestion", "suggestions");
+    if (ingredientSuggestionsError) {
+        list.innerHTML = `<p class="table-message error">Suggestions are unavailable: ${escapeHtml(ingredientSuggestionsError)} If this account should be an admin, add its UID as a document in Firestore <code>admins</code>, then publish the Firestore rules. The inventory list can still be viewed.</p>`;
+        return;
+    }
+    list.innerHTML = items.map((suggestion) => {
+        const foundProduct = everyProduct.find((product) => product.id === suggestion.productId);
+        const alreadyHasList = foundProduct && foundProduct.ingredients.length > 0;
+        return `<article class="suggestion-card" data-suggestion="${escapeHtml(suggestion.id)}">
+            <div class="suggestion-title">${escapeHtml(suggestion.productName || "Unnamed product")}</div>
+            <div class="suggestion-meta">${escapeHtml(suggestion.brandName || "Unknown brand")} · ${many(suggestion.ingredients.length, "ingredient", "ingredients")}${alreadyHasList ? " · product already has a list; this suggestion cannot replace it" : ""}</div>
+            <p class="suggestion-ingredients">${escapeHtml(suggestion.ingredients.join(", "))}</p>
+            <div class="suggestion-sources"><strong>Sources:</strong> ${escapeHtml(suggestion.sources.join(" · ") || "No source details")}</div>
+            <div class="suggestion-actions">
+                <button type="button" class="btn" data-suggestion-action="dismiss">Dismiss</button>
+                <button type="button" class="primary-btn" data-suggestion-action="apply"${!foundProduct || alreadyHasList ? " disabled" : ""}>Add to catalogue</button>
+            </div>
+        </article>`;
+    }).join("");
+}
+
+async function onIngredientSuggestionClick(event) {
+    const button = event.target.closest("[data-suggestion-action]");
+    if (!button) return;
+    const card = button.closest("[data-suggestion]");
+    const suggestion = ingredientSuggestions.find((item) => item.id === card.dataset.suggestion);
+    if (!suggestion) return;
+    const product = everyProduct.find((item) => item.id === suggestion.productId);
+    if (button.dataset.suggestionAction === "apply") {
+        if (!product || product.ingredients.length > 0) {
+            notify("The product is missing or already has an ingredient list. The suggestion was not applied.", "error");
+            await loadInventory();
+            return;
+        }
+        const question = `Add the web-found ingredient list to "${product.name}"?\n\nReview the source pages above first. This replaces no existing list; it only fills an empty product list.`;
+        if (!(await sure(question, "Add ingredient list", false))) return;
+    } else if (!(await sure(`Dismiss the ingredient suggestion for "${suggestion.productName}"?\n\nThe proposal will be removed from this review list.`, "Dismiss", false))) return;
+
+    button.disabled = true;
+    try {
+        const batch = writeBatch(db);
+        if (button.dataset.suggestionAction === "apply") {
+            const sources = Array.from(new Set([...(product.sources || []), ...suggestion.sources])).slice(0, 10);
+            batch.update(doc(db, "products", product.id), { ingredients: suggestion.ingredients, sources, updatedAt: serverTimestamp() });
+        }
+        batch.delete(doc(db, "productIngredientSuggestions", suggestion.id));
+        await batch.commit();
+        notify(button.dataset.suggestionAction === "apply" ? "Ingredient list added to the catalogue." : "Suggestion dismissed.", "ok");
+        await loadInventory();
+    } catch (error) {
+        console.error("Error processing ingredient suggestion: ", error);
+        notify("The ingredient suggestion was not processed. " + describeError(error), "error");
+        button.disabled = false;
+    }
+}
 
 async function loadInventory() {
     const body = el("inventoryTableBody");
@@ -274,6 +378,29 @@ async function loadInventory() {
         return;
     }
 
+    // Suggestions are admin-only, but the catalogue itself is readable without that collection.
+    // A missing admins/{uid} record must not blank the otherwise-readable inventory table.
+    ingredientSuggestionsError = "";
+    try {
+        const suggestionSnapshot = await getDocs(collection(db, "productIngredientSuggestions"));
+        ingredientSuggestions = suggestionSnapshot.docs.map((d) => {
+            const data = d.data();
+            return {
+                id: d.id,
+                productId: String(data.productId || ""),
+                productName: String(data.productName || ""),
+                brandName: String(data.brandName || ""),
+                ingredients: asArray(data.ingredients),
+                sources: asArray(data.sources)
+            };
+        });
+    } catch (error) {
+        console.warn("Could not load the admin-only ingredient suggestions: ", error);
+        ingredientSuggestions = [];
+        ingredientSuggestionsError = describeError(error);
+    }
+    renderIngredientSuggestions();
+
     // the Ingredient Curator's names, to point out ingredients it does not explain yet (optional)
     curatedKeys = new Set();
     try {
@@ -305,6 +432,7 @@ async function loadInventory() {
                 console.warn("Automatic approval did not work: ", error);       // they simply stay "waiting for review"
             }
         }
+
     }
 
     sortOut();
@@ -383,6 +511,323 @@ function fillBrandSelects() {
     filter.innerHTML = `<option value="">All brands</option>` + offered.map(option).join("");
     filter.value = offered.some((b) => b.id === wanted) ? wanted : "";
     el("productBrandInput").innerHTML = `<option value="">Choose a brand</option>` + brands.map(option).join("");
+}
+
+const INVENTORY_AI_DAILY_LIMIT = 40;
+const INVENTORY_AI_LIMIT_KEY = "glowup.inventory.ai.daily";
+function inventoryAiCalls(add) {
+    const today = new Date().toISOString().slice(0, 10);
+    let state = {};
+    try { state = JSON.parse(localStorage.getItem(INVENTORY_AI_LIMIT_KEY) || "{}"); } catch (error) { state = {}; }
+    const count = (state.day === today ? Number(state.count) || 0 : 0) + (add ? 1 : 0);
+    if (add) localStorage.setItem(INVENTORY_AI_LIMIT_KEY, JSON.stringify({ day: today, count }));
+    return count;
+}
+
+async function askInventoryAi(payload) {
+    if (inventoryAiCalls(false) >= INVENTORY_AI_DAILY_LIMIT) throw new Error(`Assist with AI was used ${INVENTORY_AI_DAILY_LIMIT} times today in this browser. Try again tomorrow.`);
+    const user = auth.currentUser;
+    if (!user) throw new Error("You are signed out. Sign in again.");
+    const stop = new AbortController();
+    const timer = setTimeout(() => stop.abort(), 75000);
+    let answer;
+    try {
+        answer = await fetch("/api/assist-ingredient", {
+            method: "POST", signal: stop.signal,
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + (await user.getIdToken()) },
+            body: JSON.stringify(payload)
+        });
+    } finally { clearTimeout(timer); }
+    const body = await answer.json().catch(() => ({}));
+    if (!answer.ok) throw new Error(body.error || `The AI could not be reached (error ${answer.status}).`);
+    inventoryAiCalls(true);
+    return body;
+}
+
+function assistProductSourceLinks(sources) {
+    const pages = (Array.isArray(sources) ? sources : []).filter((page) => page && /^https:\/\//i.test(page.url || ""));
+    return pages.length ? pages.map((page) => `<a class="source-link" href="${escapeHtml(page.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(page.title || page.site || page.url)}</a>`).join(" · ")
+        : "<b>The AI named no web page. Check every ingredient against the package.</b>";
+}
+
+function paintInventoryDrafts() {
+    const panel = el("inventoryAiDraftPanel");
+    const list = el("inventoryAiDraftList");
+    panel.hidden = inventoryAiDrafts.length === 0;
+    el("inventoryAiDraftCount").textContent = many(inventoryAiDrafts.length, "draft", "drafts");
+    list.innerHTML = inventoryAiDrafts.map((draft, index) => {
+        const fields = draft.kind === "brand"
+            ? `<label class="field">Market <input data-draft-field="market" value="${escapeHtml(draft.draft.market || draft.item.market || "")}" maxlength="40"></label>
+               <label class="field">Aliases (comma separated) <input data-draft-field="aliases" value="${escapeHtml((draft.draft.aliases || []).join(", "))}" maxlength="400"></label>`
+            : `<label class="field">Ingredient list <textarea data-draft-field="ingredients" rows="4">${escapeHtml((draft.draft.ingredients || []).join(", "))}</textarea></label>`;
+        const sources = draft.kind === "brand" ? assistProductSourceLinks(draft.sources) : assistProductSourceLinks(draft.sources);
+        return `<article class="suggestion-card" data-draft-index="${index}">
+            <div class="suggestion-title"><strong>${escapeHtml(draft.item.name || "Unnamed")} — ${draft.kind === "brand" ? "brand details" : "product ingredients"}</strong></div>
+            ${fields}<p class="field-hint">AI: ${escapeHtml(draft.model || "unknown model")}${draft.searched === false ? " (no web search; verify carefully)" : ""}</p>
+            <p class="field-hint">Sources: ${sources}</p>
+            <label class="field-hint"><input type="checkbox" data-draft-reviewed> I checked this draft against its sources or the product packaging.</label>
+        </article>`;
+    }).join("");
+    updateInventoryDraftApproval();
+}
+
+function updateInventoryDraftApproval() {
+    if (!el("inventoryApproveAllBtn")) return;
+    el("inventoryApproveAllBtn").disabled = !el("inventoryAiDraftList").querySelector("[data-draft-reviewed]:checked");
+}
+
+async function assistSelectedInventory(keys) {
+    const selectedItems = keys.map((key) => ({ key, item: itemOf(key), kind: key.startsWith("b:") ? "brand" : "product" }))
+        .filter(({ item }) => item && !item.binned);
+    const eligible = selectedItems.filter(({ item, kind }) => {
+        if (kind === "brand") return !brandOut(item) && !!item.name;
+        const brand = brands.find((candidate) => candidate.id === item.brandId);
+        return !isOut(item) && !isUnclear(item) && item.ingredients.length === 0 && !!brand && !!item.name;
+    });
+    if (!eligible.length) {
+        notify("Select at least one listed brand or a make-up product that has no ingredient list.", "info");
+        return;
+    }
+
+    let completed = 0;
+    for (const entry of eligible) {
+        const draftKey = `${entry.kind}:${entry.item.id}`;
+        if (inventoryAiDrafts.some((draft) => draft.key === draftKey)) continue;
+        try {
+            const payload = entry.kind === "brand"
+                ? { mode: "brand", name: entry.item.name }
+                : { mode: "product", brandName: entry.item.brandName, productName: entry.item.name };
+            const body = await askInventoryAi(payload);
+            if (!body.found) throw new Error(body.message || "No sourced draft was found.");
+            inventoryAiDrafts.push({ key: draftKey, kind: entry.kind, item: entry.item, draft: body.draft, sources: body.sources || body.draft.sources || [], model: body.model, searched: body.searched });
+            completed++;
+        } catch (error) {
+            console.error(`Could not draft AI assistance for ${entry.item.name}:`, error);
+            notify(`AI could not assist "${entry.item.name}". ${describeError(error)}`, "error");
+        }
+    }
+    paintInventoryDrafts();
+    if (completed) notify(`${many(completed, "draft is", "drafts are")} ready. Check the sources and mark the drafts you reviewed before approving.`, "ok");
+}
+
+async function approveInventoryDrafts() {
+    const checked = Array.from(el("inventoryAiDraftList").querySelectorAll("[data-draft-reviewed]:checked"))
+        .map((checkbox) => Number(checkbox.closest("[data-draft-index]").dataset.draftIndex))
+        .filter((index) => Number.isInteger(index) && inventoryAiDrafts[index]);
+    const drafts = checked.map((index) => ({ index, entry: inventoryAiDrafts[index], card: el("inventoryAiDraftList").querySelector(`[data-draft-index="${index}"]`) }));
+    if (!drafts.length) return;
+    if (!(await sure(`Approve ${many(drafts.length, "reviewed draft", "reviewed drafts")}?`, "Approve All", false))) return;
+    const ops = [];
+    const approvedDrafts = [];
+    const approvedBrandIds = new Set();
+    drafts.forEach(({ entry, card }) => {
+        const item = entry.item;
+        if (entry.kind === "brand") {
+            const brand = everyBrand.find((candidate) => candidate.id === item.id && !candidate.binned);
+            if (!brand || brandOut(brand)) return;
+            const aliases = (card.querySelector('[data-draft-field="aliases"]').value || "").split(",").map((value) => value.trim()).filter(Boolean);
+            const mergedAliases = Array.from(new Map(brand.aliases.concat(aliases).filter((alias) => sameKey(alias) !== sameKey(brand.name)).map((alias) => [sameKey(alias), alias])).values());
+            const market = card.querySelector('[data-draft-field="market"]').value.trim();
+            const data = { aliases: mergedAliases, aiAssistModel: entry.model || "", aiAssistSources: entry.sources.map((source) => source.url).filter(Boolean), updatedAt: serverTimestamp() };
+            if (!brand.market && market) data.market = market;
+            if (brand.needsReview) Object.assign(data, approval());
+            ops.push({ ref: doc(db, "brands", brand.id), data });
+            approvedBrandIds.add(brand.id);
+        } else {
+            const product = everyProduct.find((candidate) => candidate.id === item.id && !candidate.binned);
+            const brand = product && brands.find((candidate) => candidate.id === product.brandId);
+            const ingredients = card.querySelector('[data-draft-field="ingredients"]').value.split(/[,;\n]/).map((value) => value.trim()).filter(Boolean);
+            if (!product || product.ingredients.length || isOut(product) || isUnclear(product) || !brand || !ingredients.length) return;
+            const data = { ingredients: Array.from(new Set(ingredients)), aiAssistModel: entry.model || "", sources: Array.from(new Set(product.sources.concat(entry.sources.map((source) => `${source.title || source.site || "AI source"} | ${source.url}`).filter((value) => !value.endsWith(" | "))))), updatedAt: serverTimestamp() };
+            if (product.needsReview) Object.assign(data, approval());
+            ops.push({ ref: doc(db, "products", product.id), data });
+            if (brand.needsReview && !approvedBrandIds.has(brand.id)) {
+                ops.push({ ref: doc(db, "brands", brand.id), data: approval() });
+                approvedBrandIds.add(brand.id);
+            }
+        }
+        approvedDrafts.push(entry);
+    });
+    if (!ops.length) {
+        notify("No drafts were saved. Confirm the selected records still meet the review requirements.", "error");
+        return;
+    }
+    try {
+        const uniqueOps = Array.from(ops.reduce((byPath, op) => {
+            byPath.set(op.ref.path, Object.assign(byPath.get(op.ref.path) || { ref: op.ref, data: {} }, { data: Object.assign({}, byPath.get(op.ref.path)?.data || {}, op.data) }));
+            return byPath;
+        }, new Map()).values());
+        await saveOrReload(uniqueOps);
+        inventoryAiDrafts = inventoryAiDrafts.filter((entry) => !approvedDrafts.includes(entry));
+        paintInventoryDrafts();
+        notify(`${many(approvedDrafts.length, "reviewed draft was", "reviewed drafts were")} saved.`, "ok");
+    } catch (error) {
+        notify("The reviewed drafts were not saved. " + describeError(error), "error");
+    }
+}
+
+async function approveSelectedInventory(keys) {
+    const selectedItems = keys.map((key) => ({ key, item: itemOf(key) })).filter(({ item }) => item && !item.binned && item.needsReview);
+    const eligibleBrands = selectedItems.filter(({ key, item }) => key.startsWith("b:") && !brandOut(item));
+    const eligibleProducts = selectedItems.filter(({ key, item }) => {
+        if (!key.startsWith("p:") || isOut(item) || isUnclear(item) || !item.ingredients.length) return false;
+        return brands.some((brand) => brand.id === item.brandId && !brand.binned);
+    });
+    const ops = eligibleBrands.map(({ item }) => ({ ref: doc(db, "brands", item.id), data: approval() }));
+    const brandIds = new Set(eligibleBrands.map(({ item }) => item.id));
+    eligibleProducts.forEach(({ item }) => {
+        ops.push({ ref: doc(db, "products", item.id), data: approval() });
+        const brand = brands.find((candidate) => candidate.id === item.brandId);
+        if (brand && brand.needsReview && !brandIds.has(brand.id)) {
+            ops.push({ ref: doc(db, "brands", brand.id), data: approval() });
+            brandIds.add(brand.id);
+        }
+    });
+    if (!ops.length) {
+        notify("No selected entries are eligible: products need a make-up type, a brand, and an ingredient list.", "info");
+        return;
+    }
+    const names = eligibleBrands.map(({ item }) => item.name).concat(eligibleProducts.map(({ item }) => item.name));
+    if (!(await sure(`Approve ${many(names.length, "reviewed entry", "reviewed entries")}?\n\nOnly waiting-for-review entries are included. Products without a complete ingredient list or valid make-up type are excluded.`, "Approve All", false))) return;
+    try {
+        await saveOrReload(ops);
+        notify(`${many(names.length, "entry was", "entries were")} approved.`, "ok");
+    } catch (error) {
+        notify("The selected entries were not approved. " + describeError(error), "error");
+    }
+}
+
+async function assistProductIngredients() {
+    const button = el("assistProductIngredientsBtn"), note = el("productAiNote");
+    const brand = brands.find((item) => item.id === el("productBrandInput").value);
+    const productName = el("productNameInput").value.trim();
+    note.hidden = false;
+    if (!brand || !productName) {
+        note.textContent = "Choose a brand and enter the exact product name first.";
+        return;
+    }
+    setBusy(button, true, "Searching...");
+    note.textContent = "Searching for the exact product and ingredient list. This may take up to a minute.";
+    try {
+        const body = await askInventoryAi({ mode: "product", brandName: brand.name, productName });
+        if (!dialogIsOpen() || el("productNameInput").value.trim() !== productName || el("productBrandInput").value !== brand.id) return;
+        if (!body.found || !body.draft || !Array.isArray(body.draft.ingredients) || body.draft.ingredients.length === 0) {
+            note.innerHTML = `<b>No ingredient-list draft was found.</b> ${escapeHtml(body.message || "Check the package or try another spelling.")}<br>${assistProductSourceLinks(body.sources)}`;
+            return;
+        }
+        el("productIngredientsInput").value = body.draft.ingredients.join(", ");
+        const sources = (body.sources || []).filter((page) => page && /^https:\/\//i.test(page.url || ""))
+            .map((page) => `${page.title || page.site || page.url} | ${page.url}`);
+        if (body.draft.fdaVerifiedLink && /^https:\/\/([a-z0-9-]+\.)*fda\.gov\.ph\//i.test(body.draft.fdaVerifiedLink))
+            sources.unshift(`FDA Philippines verification | ${body.draft.fdaVerifiedLink}`);
+        assistedProductSources = Array.from(new Set(assistedProductSources.concat(sources))).slice(0, 10);
+        showIngredientSummary();
+        note.innerHTML = `<b>AI draft only; nothing is saved yet.</b> Compare the list against the package before saving.`
+            + (body.searched === false ? ` <b>${escapeHtml(body.model || "A backup AI")} answered without web search; it gave no verified sources.</b>` : "")
+            + `<br><b>Sources:</b><br>${assistProductSourceLinks(body.sources)}`
+            + (body.notes && body.notes.length ? `<br><span class="field-hint">Provider notes: ${escapeHtml(body.notes.join("; "))}.</span>` : "");
+    } catch (error) {
+        const reason = error && error.name === "AbortError" ? "The AI took too long." : (error && error.message) || "Something went wrong.";
+        note.textContent = `Assist with AI did not work. ${reason}`;
+    } finally {
+        setBusy(button, false);
+    }
+}
+
+async function importInventoryFile(file) {
+    const status = el("inventoryImportStatus"), choose = el("chooseInventoryFileBtn"), dropbox = el("inventoryDropBox");
+    const report = (message, failed) => { status.textContent = message; status.classList.toggle("error", !!failed); };
+    setBusy(choose, true, "Analyzing...");
+    dropbox.disabled = true;
+    report(`Reading "${file.name}" in this browser...`, false);
+    try {
+        const documentText = await readAdminDocument(file);
+        report("Asking the configured AI to extract brand and product fields. The file itself is not uploaded.", false);
+        const body = await askInventoryAi({ mode: "import", documentText });
+        if (!body.found || !body.draft || !Array.isArray(body.draft.products) || body.draft.products.length === 0) {
+            report(body.message || "No product records were found. Nothing was saved.", true);
+            return;
+        }
+        const result = await saveImportedProducts(body.draft.products);
+        if (result.savedProducts === 0) {
+            report(`Nothing new was saved. ${result.skippedDuplicates} duplicate(s), ${result.skippedScope} out-of-scope product(s), and ${result.skippedInvalid} incomplete record(s) were skipped.`, true);
+            return;
+        }
+        const provider = body.model ? ` Analyzed by ${body.model}.` : "";
+        const skipped = result.skippedDuplicates + result.skippedScope + result.skippedInvalid;
+        const summary = `Saved ${many(result.savedProducts, "product", "products")} as Pending for review`
+            + (result.savedBrands ? ` and ${many(result.savedBrands, "new brand", "new brands")}` : "")
+            + (skipped ? `; skipped ${skipped} duplicate, incomplete, or out-of-scope record(s)` : "")
+            + `. ${result.withFdaLink} product(s) included an FDA Philippines source link.${provider}`;
+        report(summary, false);
+        notify(summary, "ok");
+        await loadInventory();
+    } catch (error) {
+        console.error("Importing the inventory file failed: ", error);
+        const reason = error && error.name === "AbortError" ? "The AI took too long." : (error && error.message) || "Something went wrong.";
+        report(`Import failed. ${reason} Nothing was saved unless a Firestore save completed.`, true);
+        notify(`The file was not imported. ${reason}`, "error");
+    } finally {
+        setBusy(choose, false);
+        dropbox.disabled = false;
+    }
+}
+
+async function saveImportedProducts(records) {
+    const batch = writeBatch(db);
+    const newBrands = new Map();
+    const plannedProducts = new Set();
+    let savedProducts = 0, skippedDuplicates = 0, skippedScope = 0, skippedInvalid = 0, withFdaLink = 0;
+
+    records.slice(0, 40).forEach((record) => {
+        const brandName = String(record.brandName || "").replace(/\s+/g, " ").trim().slice(0, 60);
+        const name = String(record.productName || "").replace(/\s+/g, " ").trim().slice(0, 100);
+        const cosmeticType = String(record.cosmeticType || "").replace(/\s+/g, " ").trim().slice(0, 60);
+        if (brandName.length < 2 || !name) { skippedInvalid++; return; }
+        const scope = productScope(cosmeticType, name);
+        if (scope === "out" || scope === "skincare") { skippedScope++; return; }
+
+        let brand = everyBrand.find((item) => [item.name, ...item.aliases].some((known) => sameKey(known) === sameKey(brandName)));
+        if (brand && brand.binned) { skippedDuplicates++; return; }
+        if (!brand) {
+            brand = newBrands.get(sameKey(brandName));
+            if (!brand) {
+                const ref = doc(collection(db, "brands"));
+                brand = { id: ref.id, name: brandName, ref };
+                newBrands.set(sameKey(brandName), brand);
+                batch.set(ref, {
+                    name: brandName, category: "Makeup", market: "Global", status: "Pending", scans: 0,
+                    source: "document-import", reviewed: false, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+                });
+            }
+        }
+
+        const key = brand.id + "|" + compactName(name);
+        if (plannedProducts.has(key) || everyProduct.some((item) => item.brandId === brand.id && [item.name, ...item.aliases].some((known) => compactName(known) === compactName(name)))) {
+            skippedDuplicates++;
+            return;
+        }
+        plannedProducts.add(key);
+        const ingredients = (Array.isArray(record.ingredients) ? record.ingredients : []).map((item) => String(item).trim().slice(0, 100)).filter(Boolean).slice(0, 80);
+        const shades = Array.from(new Set((Array.isArray(record.shades) ? record.shades : []).map(cleanShade).filter((shade) => shade !== null))).slice(0, MAX_SHADES);
+        const sources = Array.from(new Set((Array.isArray(record.sources) ? record.sources : []).filter((source) => /^https:\/\//i.test(String(source))))).slice(0, 10);
+        if (record.fdaVerifiedLink && /^https:\/\/([a-z0-9-]+\.)*fda\.gov\.ph\//i.test(record.fdaVerifiedLink)) {
+            const link = `FDA Philippines verification | ${record.fdaVerifiedLink}`;
+            if (!sources.includes(link) && sources.length < 10) sources.unshift(link);
+            withFdaLink++;
+        }
+        const ref = doc(collection(db, "products"));
+        batch.set(ref, {
+            name, brandId: brand.id, brandName: brand.name, cosmeticType, description: String(record.description || "").slice(0, 400),
+            ingredients, shades, sources, minAge: 0, status: "Pending", scans: 0, folder: "",
+            source: "document-import", reviewed: false, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+        });
+        savedProducts++;
+    });
+
+    if (savedProducts === 0) return { savedProducts, savedBrands: 0, skippedDuplicates, skippedScope, skippedInvalid, withFdaLink };
+    await batch.commit();
+    return { savedProducts, savedBrands: newBrands.size, skippedDuplicates, skippedScope, skippedInvalid, withFdaLink };
 }
 
 const productsOf = (brandId) => products.filter((p) => p.brandId === brandId);
@@ -610,7 +1055,7 @@ function brandRow(brand, productCount, columns) {
         <tr class="brand-row${out ? " out-row" : ""}" data-brand="${escapeHtml(brand.id)}" data-key="b:${escapeHtml(brand.id)}" data-drag>
             <td colspan="${columns}"><div class="brand-line">
                 <button type="button" class="brand-toggle" data-act="toggle" data-brand="${escapeHtml(brand.id)}" aria-label="Open or close this brand">${icon("down")}</button>
-                <span class="brand-title">${escapeHtml(brand.name || "Unnamed Brand")}</span>
+                ${pickBox(brand.name || "brand")}<span class="brand-title">${escapeHtml(brand.name || "Unnamed Brand")}</span>
                 ${about ? `<span class="brand-about">${about}</span>` : ""}${flags}
                 <span class="spacer"></span>
                 ${rowActions(buttons)}
@@ -630,7 +1075,9 @@ function productRow(p, brand, flat) {
 
     return `
         <tr class="product-row${isOut(p) ? " out-row" : ""}${open ? " open" : ""}" data-product="${escapeHtml(p.id)}" data-key="p:${escapeHtml(p.id)}" data-drag tabindex="0" aria-expanded="${open}">
-            <td class="name-cell"><div class="name-line">${pickBox(p.name || "product")}${toneDot(attentionOf(p, brand, !flat))}<span class="product-name">${escapeHtml(p.name || "Unnamed Product")}</span></div></td>
+            <td class="name-cell"><div class="name-line">${pickBox(p.name || "product")}${toneDot(attentionOf(p, brand, !flat))}<span class="product-name">${escapeHtml(p.name || "Unnamed Product")}</span>${p.ingredients.length === 0 ? (isOut(p)
+                ? `<span class="chip warn ingredient-missing">${icon("alert")}<span>No ingredient list</span></span>`
+                : `<button type="button" class="chip warn ingredient-missing" data-act="assist-product" data-id="${escapeHtml(p.id)}" aria-label="No ingredient list. Find ingredients for ${escapeHtml(p.name || "product")} with AI." data-tip="Search the web for a draft ingredient list, then check it against the product package.">${icon("alert")}<span>No ingredient list</span><span class="ingredient-missing-cta">Find with AI</span></button>`) : ""}</div></td>
             ${flat ? `<td class="brand-ref">${escapeHtml(brand ? brand.name : (p.brandName || "–"))}</td>` : ""}
             <td class="type-cell">${escapeHtml(p.cosmeticType || "–")}</td>
             <td class="shade-cell">${shadeCell}</td>
@@ -669,6 +1116,7 @@ function detailRow(p, brand, columns) {
 
     const button = (cls, act, iconHtml, label, tip) => `<button type="button" class="row-btn ${cls}" data-act="${act}" data-id="${escapeHtml(p.id)}" data-tip="${escapeHtml(tip)}">${iconHtml}${label}</button>`;
     const buttons = [button("main", "edit-product", icon("edit"), "Edit", "Change the name, brand, type, ingredients, shades or status.")];
+    if (p.ingredients.length === 0 && !isOut(p)) buttons.push(button("", "assist-product", icon("sparkle"), "Assist with AI", "Search for a draft ingredient list, then check it against the product package."));
     if (p.needsReview && scope === "makeup") buttons.push(button("approve", "approve-product", icon("check"), "Approve", "You have checked it: set it to Active."));
     buttons.push(button("", "folder-product", icon("folder"), "Folder", "Put it in a folder, or take it out."));
     buttons.push(`<span class="spacer"></span>`, button("danger", "bin-product", BIN_ICON, "Recycle bin", "Remove it. It can be restored from the Recycle bin."));
@@ -1213,7 +1661,10 @@ function openProductForm(product, brandId) {
     const form = el("productForm");
     form.reset();
     setFormError(form, "");
+    el("productAiNote").hidden = true;
+    el("productAiNote").textContent = "";
     editingProductId = product ? product.id : null;
+    assistedProductSources = product ? product.sources.slice() : [];
     el("productModalTitle").textContent = product ? "Edit Product" : "Add Product";
 
     el("productNameInput").value = product ? product.name : "";
@@ -1358,6 +1809,7 @@ async function saveProduct(event) {
         name, brandId: brand.id, brandName: brand.name, cosmeticType, description,
         ingredients, shades, minAge, status, updatedAt: serverTimestamp()
     };
+    if (assistedProductSources.length > 0) data.sources = Array.from(new Set(assistedProductSources)).slice(0, 10);
     const before = products.find((p) => p.id === editingProductId);
     if (before && before.needsReview) { data.reviewed = true; data.reviewedAt = serverTimestamp(); }     // an admin who opens it and saves has checked it
 
@@ -1462,6 +1914,7 @@ function onTableClick(event) {
     else if (act === "bin-brand" && brand) org.toBin(["b:" + brand.id]);
     else if (act === "approve-product" && product) approveProduct(product, button);
     else if (act === "edit-product" && product) openProductForm(product, null);
+    else if (act === "assist-product" && product) { openProductForm(product, null); assistProductIngredients(); }
     else if (act === "folder-product" && product) org.chooseFolder(button, ["p:" + product.id]);
     else if (act === "bin-product" && product) org.toBin(["p:" + product.id]);
 }
@@ -1489,7 +1942,7 @@ function registerHelpers() {
         const out = outsideCount(), review = reviewCount();
         const lines = [];
         if (out > 0) lines.push({ tone: "bad", text: `${many(out, "entry is", "entries are")} not make-up. GlowUp lists make-up only.`, label: "Clean up", run: openCleanUp, tip: "You see every entry with the reason, and apply one step at a time. Nothing is deleted." });
-        if (review > 0) lines.push({ tone: "info", text: `Next: ${many(review, "entry waits", "entries wait")} for your review. The app does not use ${review === 1 ? "it" : "them"} until you approve ${review === 1 ? "it" : "them"}.`, label: reviewing() ? "Show all" : "Show them", run: () => showOnly("review") });
+        if (review > 0) lines.push({ tone: "info", text: `Next: ${many(review, "entry waits", "entries wait")} for your review. The app does not use ${review === 1 ? "it" : "them"} until you approve ${review === 1 ? "it" : "them"}.`, label: reviewing() ? "Show all" : "Show them", run: () => reviewing() ? resetAllFilters() : showOnly("review") });
         if (lines.length === 0) lines.push({ tone: "ok", text: "Everything listed is make-up and has been checked." });
         // the brands that were checked on the FDA Philippines list
         const checked = brands.filter((b) => b.source === "fdaph" || productsOf(b.id).some(QUICK.fda.test));
@@ -1509,7 +1962,7 @@ function registerHelpers() {
         if (show === "review") parts.push("waiting for review");
         if (show === "out") parts.push("not make-up");
         if (quick) parts.push(QUICK[quick].label.toLowerCase());
-        if (parts.length > 0) return [{ tone: "info", text: `Showing only: ${parts.join(" · ")}.`, label: "Show everything", run: () => { el("inventorySearchInput").value = ""; el("brandFilterSelect").value = ""; el("reviewFilterSelect").value = ""; quick = ""; if (org.view.kind !== "all") org.show({ kind: "all" }); else fromFirstPage(); } }];
+        if (parts.length > 0) return [{ tone: "info", text: `Showing only: ${parts.join(" · ")}.`, label: "Show everything", run: resetAllFilters }];
         return [
             { text: `Sorted by ${sortNow().short}, ${view.mode === "all" ? "every product in one list" : "grouped by brand"}. Search also finds a type, for example "lipstick".` },
             { text: "Drag a row onto a folder or the bin. Ctrl+click picks several rows; Shift+click picks a range." }
@@ -1528,7 +1981,7 @@ function registerHelpers() {
             return lines;
         }
         if (none > 0) lines.push({ tone: "warn", text: `${many(none, "product has", "products have")} no ingredient list, so the app cannot check or recommend ${none === 1 ? "it" : "them"}.`, label: showLabel(quick === "noIngredients"), run: () => setQuick("noIngredients") });
-        if (review > 0) lines.push({ tone: "info", text: `${many(review, "entry waits", "entries wait")} for review.`, label: showLabel(reviewing()), run: () => showOnly("review") });
+        if (review > 0) lines.push({ tone: "info", text: `${many(review, "entry waits", "entries wait")} for review.`, label: showLabel(reviewing()), run: () => reviewing() ? resetAllFilters() : showOnly("review") });
         if (noShades > 0) lines.push({ tone: "warn", text: `${many(noShades, "make-up product has", "make-up products have")} no shades: AR Try-On has nothing to show for ${noShades === 1 ? "it" : "them"}.`, label: showLabel(quick === "noShades"), run: () => setQuick("noShades") });
         if (missing > 0) lines.push({ tone: "info", text: `${many(missing, "product lists", "products list")} ingredients the Curator does not explain yet.`, label: showLabel(quick === "notCurated"), run: () => setQuick("notCurated") });
         if (inBin > 0) lines.push({ text: `${many(inBin, "entry is", "entries are")} in the Recycle bin.`, label: "Open the bin", run: () => org.show({ kind: "bin" }) });

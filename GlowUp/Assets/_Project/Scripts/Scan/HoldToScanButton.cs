@@ -6,36 +6,26 @@ using UnityEngine.EventSystems;
 namespace GlowUp.Scan
 {
     /// <summary>
-    /// The big round button of the scan screen: the scan runs WHILE IT IS HELD, and pauses when it is let go.
-    ///
-    /// For someone who cannot keep a finger down, a short tap LOCKS it (the scan keeps running) and the next tap lets go
-    /// again. "Tap To Lock" switches that off. It must sit on an object with a Graphic that takes touches.
-    ///
-    /// While a finger is on the button, dragging the page sideways to another screen is switched off: a thumb that
-    /// drifts during a long hold must not leave the scanner.
+    /// The big round button of the scan screen: tap once to start scanning, tap again to pause.
+    /// It must sit on an object with a Graphic that takes touches.
     /// </summary>
     public class HoldToScanButton : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     {
-        [Tooltip("What shrinks a little while the button is held (usually this object). Optional.")]
+        [Tooltip("What shrinks a little while scanning (usually this object). Optional.")]
         [SerializeField] private RectTransform scaleTarget;
-        [Tooltip("The size of the button while it is held (1 = no change)")]
+        [Tooltip("The size of the button while scanning (1 = no change)")]
         [Range(0.8f, 1f)] [SerializeField] private float heldScale = 0.94f;
-        [Tooltip("On = a short tap keeps the scan running without holding; the next tap stops it")]
-        [SerializeField] private bool tapToLock = true;
-        [Tooltip("A press shorter than this many seconds is a tap")]
-        [SerializeField] private float tapSeconds = 0.3f;
 
         bool pressed, locked, usable = true;
-        float pressedAt;
 
-        /// <summary>True while the scan should run: the finger is down, or the button was locked with a tap.</summary>
-        public bool IsHeld => usable && (pressed || locked);
-        /// <summary>True when the button was locked with a tap (nobody is holding it).</summary>
-        public bool IsLocked => locked;
-        /// <summary>Raised when the button goes down (also when a tap locks it).</summary>
-        public event Action Pressed;
-        /// <summary>Raised when the scan should pause: the finger went up (and the button is not locked), or a tap unlocked it.</summary>
-        public event Action Released;
+        /// <summary>True while the scan should run after the user toggles it on.</summary>
+        public bool IsScanning => usable && locked;
+        /// <summary>True when scanning is toggled on.</summary>
+        public bool IsActive => locked;
+        /// <summary>Raised when a tap starts or resumes scanning.</summary>
+        public event Action ScanStarted;
+        /// <summary>Raised when a tap pauses scanning.</summary>
+        public event Action ScanPaused;
 
         /// <summary>Off = the button takes no touches and counts as let go (while the scan is being handed over).</summary>
         public bool Usable
@@ -47,16 +37,8 @@ namespace GlowUp.Scan
         public void OnPointerDown(PointerEventData eventData)
         {
             if (!usable) return;
-            if (locked)
-            {
-                // a touch on a locked button unlocks it; nothing more happens with this press
-                locked = false; pressed = false;
-                Released?.Invoke();
-                return;
-            }
-            pressed = true; pressedAt = Time.unscaledTime;
+            pressed = true;
             SwipeSceneNavigator.Suppressed = true;
-            Pressed?.Invoke();
         }
 
         public void OnPointerUp(PointerEventData eventData)
@@ -64,17 +46,18 @@ namespace GlowUp.Scan
             if (!pressed) return;
             pressed = false;
             SwipeSceneNavigator.Suppressed = false;
-            if (tapToLock && usable && Time.unscaledTime - pressedAt < tapSeconds) { locked = true; return; }     // a tap: keep going
-            Released?.Invoke();
+            if (!usable) return;
+            locked = !locked;
+            if (locked) ScanStarted?.Invoke(); else ScanPaused?.Invoke();
         }
 
-        /// <summary>Lets go of the button from code (the scan finished, the screen is left).</summary>
+        /// <summary>Stops scanning and clears any touch state from code (the scan finished, the screen is left).</summary>
         public void LetGo()
         {
             bool was = pressed || locked;
             if (pressed) SwipeSceneNavigator.Suppressed = false;
             pressed = false; locked = false;
-            if (was) Released?.Invoke();
+            if (was) ScanPaused?.Invoke();
         }
 
         void OnDisable() { LetGo(); }
@@ -84,7 +67,7 @@ namespace GlowUp.Scan
         void Update()
         {
             if (scaleTarget == null) return;
-            float wanted = IsHeld ? heldScale : 1f;
+            float wanted = IsScanning ? heldScale : 1f;
             float now = scaleTarget.localScale.x;
             if (!Mathf.Approximately(now, wanted)) scaleTarget.localScale = Vector3.one * Mathf.MoveTowards(now, wanted, Time.unscaledDeltaTime * 1.2f);
         }

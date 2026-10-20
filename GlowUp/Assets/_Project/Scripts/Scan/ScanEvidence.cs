@@ -5,7 +5,7 @@ using GlowUp.Data;
 namespace GlowUp.Scan
 {
     /// <summary>
-    /// THE RING of hold-to-scan, as numbers. It collects what the camera pictures of ONE product show and says how
+    /// The scan ring, as numbers. It collects what the camera pictures of ONE product show and says how
     /// full each of the five zones is (0 to 1):
     ///
     ///   Front        the brand and the product's name. Full at once when the app knows the product from its name;
@@ -109,6 +109,29 @@ namespace GlowUp.Scan
             }
         }
 
+        /// <summary>
+        /// Returns only readable primary-label lines while retaining barcode data. Ingredient lists and other small-print
+        /// lines must not influence product matching, scan guidance, or text tracking.
+        /// </summary>
+        public static FrameReading PrimaryLabelOnly(FrameReading frame)
+        {
+            var primary = new FrameReading();
+            if (frame == null) return primary;
+
+            primary.barcode = frame.barcode;
+            primary.barcodeLeft = frame.barcodeLeft;
+            primary.barcodeTop = frame.barcodeTop;
+            primary.barcodeRight = frame.barcodeRight;
+            primary.barcodeBottom = frame.barcodeBottom;
+
+            var usable = new List<FrameReading.Line>();
+            foreach (FrameReading.Line line in frame.lines)
+                if (line != null && line.confidence >= UsableLine && !string.IsNullOrWhiteSpace(line.text))
+                    usable.Add(line);
+            primary.lines.AddRange(FrontLines(usable));
+            return primary;
+        }
+
         /// <summary>Forgets everything: a new product, or the same one from the start.</summary>
         public void Reset()
         {
@@ -140,40 +163,43 @@ namespace GlowUp.Scan
         /// `closeLook` = the picture shows only one block of the frame, enlarged (the text tracer): what it reads counts like
         /// any other reading, but it is never taken for another side of the product.
         /// </summary>
-        public Result Add(FrameReading frame, Known known, float sharpness = 1f, bool closeLook = false)
+        public Result Add(FrameReading frame, Known known, float sharpness = 1f, bool closeLook = false, bool captureIngredients = true)
         {
             var result = new Result();
             if (frame == null) return result;
             Pictures++;
 
             // the lines the reader is sure enough of
-            var usable = new List<FrameReading.Line>(); var clearLines = new List<FrameReading.Line>(); float sure = 0f;
+            var usable = new List<FrameReading.Line>(); float sure = 0f;
             foreach (FrameReading.Line line in frame.lines)
             {
                 if (line == null || line.confidence < UsableLine || string.IsNullOrWhiteSpace(line.text)) continue;
                 usable.Add(line); sure += line.confidence;
-                if (line.confidence >= ClearLine && Letters(line.text) >= 3) clearLines.Add(line);
             }
-            int clear = clearLines.Count;
             string text = frame.Text(UsableLine);
             result.score = Math.Max(0.05f, sharpness) * (usable.Count > 0 ? sure / usable.Count : 0.2f);
 
             // ---- Around: is this a view that was not seen before? (asked before the lines are added; only clear lines
             //      count, so a picture of misread scraps is never taken for a new side of the product)
-            if (clear >= 2 && !closeLook)
+            List<FrameReading.Line> frontLines = FrontLines(usable);
+            List<FrameReading.Line> evidenceLines = captureIngredients ? usable : frontLines;
+            var clearPrimaryLines = new List<FrameReading.Line>();
+            foreach (FrameReading.Line line in evidenceLines)
+                if (line.confidence >= ClearLine && Letters(line.text) >= 3) clearPrimaryLines.Add(line);
+            if (clearPrimaryLines.Count >= 2 && !closeLook)
             {
-                int already = merger.KnownAmong(clearLines);
-                if (already < clear * NewViewBelow)
+                int already = merger.KnownAmong(clearPrimaryLines);
+                if (already < clearPrimaryLines.Count * NewViewBelow)
                 {
                     views++;
                     result.zones[(int)ScanZone.Around] = true;
                     Raise(ScanZone.Around, views / (float)Math.Max(1, ViewsAround), result.filledNow);
                 }
             }
-            if (merger.AddLines(usable) > 0) result.useful = true;
+            if (merger.AddLines(evidenceLines) > 0) result.useful = true;
 
-            // ---- Ingredients: the word "Ingredients", or a row of names with commas
-            IngredientTextParser.ParsedList list = text.Length > 0 ? IngredientTextParser.Read(text) : null;
+            // ---- Ingredients are not read during product identification when the caller only wants primary labels.
+            IngredientTextParser.ParsedList list = captureIngredients && text.Length > 0 ? IngredientTextParser.Read(text) : null;
             bool isList = list != null && (list.ingredients.Count >= 2 || (list.ingredients.Count >= 1 && list.Count >= 5 && IngredientTextParser.HasListShape(text))
                                            || (list.anchorFound && list.Count >= 1));
             if (isList)
@@ -184,35 +210,42 @@ namespace GlowUp.Scan
                 Raise(ScanZone.Ingredients, merger.IngredientProgress(MinimumIngredients), result.filledNow);
             }
 
-            // ---- Codes: a barcode, a registration number, a batch code
+            // ---- Codes: the primary-label-only flow can use decoded barcodes, but never searches OCR small print.
             string barcode = ProductIndex.BarcodeKey(frame.barcode).Length > 0 ? frame.barcode.Trim() : "";
             if (barcode.Length > 0 && Barcode.Length == 0) { Barcode = barcode; result.useful = true; }
-            if (ScanZones.HasCode(text, out string code) && Code.Length == 0) { Code = code; result.useful = true; }
-            string registration = ScanZones.RegistrationNumber(text);
-            if (registration.Length > 0 && RegistrationNumber.Length == 0) RegistrationNumber = registration;
+            string code = "";
+            if (captureIngredients)
+            {
+                if (ScanZones.HasCode(text, out code) && Code.Length == 0) { Code = code; result.useful = true; }
+                string registration = ScanZones.RegistrationNumber(text);
+                if (registration.Length > 0 && RegistrationNumber.Length == 0) RegistrationNumber = registration;
+            }
             if (barcode.Length > 0 || code.Length > 0)
             {
                 result.zones[(int)ScanZone.Codes] = true;
                 Raise(ScanZone.Codes, 1f, result.filledNow);
             }
 
-            // ---- Front: the brand or the product's name; or clear text that is neither a list nor small print
-            bool smallPrint = isList || MostlySmallPrint(usable);
+            // ---- Front: keep useful name/type lines even when the same picture also contains the ingredient list.
+            int clearFront = 0;
+            foreach (FrameReading.Line line in frontLines)
+                if (line.confidence >= ClearLine && Letters(line.text) >= 3) clearFront++;
             if (known.productSeen)
             {
                 result.zones[(int)ScanZone.Front] = true;
                 Raise(ScanZone.Front, 1f, result.filledNow);
             }
-            else if (!smallPrint && (known.brandSeen || clear >= 1))
+            else if (frontLines.Count > 0 && (known.brandSeen || clearFront >= 1))
             {
                 frontPictures += known.brandSeen ? 2 : 1;              // a brand the app knows is as good as two pictures
                 result.zones[(int)ScanZone.Front] = true;
                 Raise(ScanZone.Front, frontPictures / (float)Math.Max(1, FrontPictures), result.filledNow);
             }
-            if (!isList && text.Length > 0) { frontText.Append(text); if (frontText.Length > 6000) frontText.Remove(0, frontText.Length - 6000); }
+            foreach (FrameReading.Line line in frontLines) frontText.Append(line.text.Trim()).Append('\n');
+            if (frontText.Length > 6000) frontText.Remove(0, frontText.Length - 6000);
 
             // ---- Shade: its name or number, or the same clear colour twice
-            string shade = isList ? "" : ScanZones.ShadeIn(text);
+            string shade = isList || !captureIngredients ? ScanZones.ShadeIn(string.Join("\n", FrontLineTexts(frontLines))) : ScanZones.ShadeIn(text);
             if (shade.Length > 0 && ShadeText.Length == 0) { ShadeText = shade; result.useful = true; }
             if (known.noShadeNeeded || shade.Length > 0 || ShadeText.Length > 0)
             {
@@ -242,13 +275,44 @@ namespace GlowUp.Scan
 
         static int Letters(string text) { int n = 0; foreach (char c in text) if (char.IsLetter(c)) n++; return n; }
 
-        /// <summary>Directions, warnings, addresses, codes: the back or the bottom of a pack, not its front.</summary>
-        static bool MostlySmallPrint(List<FrameReading.Line> lines)
+        /// <summary>
+        /// Keeps readable front-of-pack text while omitting ingredient-list lines and the small print after them.
+        /// A single camera frame often contains both the product name and the start of the ingredient list.
+        /// </summary>
+        static List<FrameReading.Line> FrontLines(List<FrameReading.Line> lines)
         {
-            if (lines.Count == 0) return false;
-            int small = 0;
-            foreach (FrameReading.Line line in lines) if (IngredientStoplist.SmallPrintHit(line.text) != null || IngredientStoplist.WrongShape(line.text)) small++;
-            return small * 2 > lines.Count;
+            var front = new List<FrameReading.Line>();
+            bool inIngredientList = false;
+            foreach (FrameReading.Line line in lines)
+            {
+                string value = line.text.Trim();
+                System.Text.RegularExpressions.Match ingredientStart = IngredientStoplist.ListStart.Match(value);
+                if (ingredientStart.Success || IngredientStoplist.MayContain.IsMatch(value))
+                {
+                    string beforeList = ingredientStart.Success ? value.Substring(0, ingredientStart.Index).Trim() : "";
+                    if (beforeList.Length >= 3 && IngredientStoplist.SmallPrintHit(beforeList) == null && !IngredientStoplist.WrongShape(beforeList))
+                        front.Add(new FrameReading.Line { text = beforeList, confidence = line.confidence, left = line.left, top = line.top, right = line.right, bottom = line.bottom });
+                    inIngredientList = true;
+                    continue;
+                }
+                if (inIngredientList)
+                {
+                    if (IngredientStoplist.ListEnd.IsMatch(value)) inIngredientList = false;
+                    continue;
+                }
+                if (IngredientTextParser.HasListShape(value)
+                    || IngredientStoplist.SmallPrintHit(value) != null
+                    || IngredientStoplist.WrongShape(value)) continue;
+                front.Add(line);
+            }
+            return front;
+        }
+
+        static List<string> FrontLineTexts(List<FrameReading.Line> lines)
+        {
+            var text = new List<string>();
+            foreach (FrameReading.Line line in lines) text.Add(line.text);
+            return text;
         }
 
         /// <summary>Two colours that a person would call the same (the camera never gives exactly the same value twice).</summary>

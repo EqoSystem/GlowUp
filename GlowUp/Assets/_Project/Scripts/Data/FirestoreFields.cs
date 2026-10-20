@@ -24,6 +24,12 @@ namespace GlowUp.Data
             return d.TryGetValue(key, out object v) && v != null && v.ToString().Length > 0 ? v.ToString() : fallback;
         }
 
+        public string NestedStr(string mapKey, string key, string fallback = "")
+        {
+            Dictionary<string, object> map = Map(mapKey);
+            return map.TryGetValue(key, out object v) && v != null && v.ToString().Length > 0 ? v.ToString() : fallback;
+        }
+
         public int Int(string key)
         {
             if (!d.TryGetValue(key, out object v) || v == null) return 0;
@@ -52,15 +58,36 @@ namespace GlowUp.Data
         {
             var list = new List<string>();
             if (!d.TryGetValue(key, out object v) || v == null) return list;
-            if (v is string text)
+            AddListValues(list, v);
+            return list;
+        }
+
+        public List<string> NestedList(string mapKey, string key)
+        {
+            var list = new List<string>();
+            Dictionary<string, object> map = Map(mapKey);
+            if (map.TryGetValue(key, out object value) && value != null) AddListValues(list, value);
+            return list;
+        }
+
+        Dictionary<string, object> Map(string key)
+        {
+            return d.TryGetValue(key, out object value) && value is Dictionary<string, object> map
+                ? map
+                : new Dictionary<string, object>();
+        }
+
+        static void AddListValues(List<string> list, object value)
+        {
+            if (value is string text)
             {
-                foreach (string part in text.Split(',')) if (part.Trim().Length > 0) list.Add(part.Trim());
+                foreach (string part in text.Split(new[] { ',', ';', '\r', '\n' }, System.StringSplitOptions.RemoveEmptyEntries))
+                    if (part.Trim().Length > 0) list.Add(part.Trim());
             }
-            else if (v is IEnumerable items)
+            else if (value is IEnumerable items)
             {
                 foreach (object o in items) if (o != null && o.ToString().Trim().Length > 0) list.Add(o.ToString().Trim());
             }
-            return list;
         }
     }
 }

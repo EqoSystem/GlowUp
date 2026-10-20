@@ -15,7 +15,7 @@ namespace GlowUp.EditorTools
     /// Menu: GlowUp > Build Scene > 10 AI Smart Scan.
     /// The camera view with the scan guide (corner brackets, guiding mesh, sweeping line, the outlines
     /// round the text that was read), the sun and flashlight buttons, the checklist of what was found with
-    /// its gold check marks, the status line, the round HOLD-TO-SCAN button inside its ring of five
+    /// its gold check marks, the status line, the round tap-to-scan button inside its ring of five
     /// segments, "Start over" and "Finish" beside it, the question "Is this ...?" on the camera picture, and
     /// the pop-ups ("type it in", "the same product or a different one?", "Is it one of these?").
     /// </summary>
@@ -47,7 +47,7 @@ namespace GlowUp.EditorTools
             A.Fill(idle.transform);
             Image cameraIcon = A.RawIcon(idle.transform, "CameraIcon", IconFactory.CameraIcon, 150, new Color(1, 1, 1, 0.55f));
             cameraIcon.rectTransform.anchoredPosition = new Vector2(0, 60);
-            TextMeshProUGUI idleText = A.RawLabel(idle.transform, "IdleText", "The camera turns on when you hold the button below", 34,
+            TextMeshProUGUI idleText = A.RawLabel(idle.transform, "IdleText", "Tap the button below to start scanning", 34,
                                                   new Color(1, 1, 1, 0.82f), FontRole.Body, TextAlignmentOptions.Center, true);
             A.At(idleText.transform, A.MC, new Vector2(0, -90), new Vector2(640, 110));
 
@@ -228,14 +228,14 @@ namespace GlowUp.EditorTools
             A.Outline(lookUp.transform, ThemeRole.Gold, 72f);
 
             // ---- the status line and the type-it-in link ----
-            TextMeshProUGUI status = A.Label(card, "StatusText", "Hold the button and show the product. A quick tap keeps it scanning.", 31,
+            TextMeshProUGUI status = A.Label(card, "StatusText", "Tap once to scan. Show one clear product view.", 31,
                                              ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.Center, true);
             A.BottomStrip(status.transform, 352, 86, 52, 52);
             A.ShrinkWrapped(status, 24);
             Button manualEntry = A.LinkButton(card, "ManualEntryButton", "Type the product in instead", 30, ThemeRole.SecondaryText);
             A.BottomStrip(manualEntry.transform, 292, 56, 180, 180);
 
-            // ---- HOLD TO SCAN: the round button, and round it the ring of five segments that fills as the product is read ----
+            // ---- TAP TO SCAN: the round button, and round it the ring of five segments that fills as the product is read ----
             GameObject hold = A.Node(card, "HoldToScan");
             A.At(hold.transform, A.BC, new Vector2(0, RingBottom), new Vector2(RingSize, RingSize));
             GameObject ringObject = A.Node(hold.transform, "ScanRing", typeof(ScanRingView));
@@ -254,7 +254,7 @@ namespace GlowUp.EditorTools
             A.At(disc.transform, A.MC, Vector2.zero, new Vector2(HoldSize, HoldSize));
             Image holdIcon = A.Icon(disc.transform, "Icon", IconFactory.Scan, 56, ThemeRole.ButtonText);
             holdIcon.rectTransform.anchoredPosition = new Vector2(0, 26);
-            TextMeshProUGUI holdLabel = A.Label(disc.transform, "Label", "Hold to scan", 23, ThemeRole.ButtonText, FontRole.Button, TextAlignmentOptions.Center);
+            TextMeshProUGUI holdLabel = A.Label(disc.transform, "Label", "Tap to scan", 23, ThemeRole.ButtonText, FontRole.Button, TextAlignmentOptions.Center);
             A.At(holdLabel.transform, A.MC, new Vector2(0, -34), new Vector2(HoldSize - 36, 40));
             A.Shrink(holdLabel, 17);
             holdLabel.raycastTarget = false;
@@ -393,7 +393,7 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.ReplaceNumber(camera, "requestedHeight", 1080, 720);
 
             A.Set(controller, "cameraFeed", camera); A.Set(controller, "guide", guide); A.Set(controller, "idlePlaceholder", idle);
-            A.Set(controller, "holdButton", holdButton); A.Set(controller, "holdLabel", holdLabel); A.Set(controller, "ring", ring);
+            A.Set(controller, "holdButton", holdButton); A.Set(controller, "scanButtonLabel", holdLabel); A.Set(controller, "ring", ring);
             A.Set(controller, "finishButton", finish); A.Set(controller, "finishText", A.LabelOf(finish)); A.Set(controller, "startOverButton", startOver);
             A.Set(controller, "startOverPanel", startOverPopup.panel);
             A.Set(controller, "productQuestion", productQuestion); A.Set(controller, "shortlist", shortlistView);
@@ -408,16 +408,25 @@ namespace GlowUp.EditorTools
             A.Set(controller, "scanReadout", readoutBack.gameObject); A.Set(controller, "scanReadoutText", readout);
             // "Got it" stays half a second, not 1.1: the project owner wants a scan of about five seconds (a time set by hand is kept)
             SceneBuilderCore.ReplaceNumber(controller, "recognisedHoldSeconds", 0.5f, 1.1f);
+            SceneBuilderCore.ReplaceNumber(controller, "readPictureSize", 900, 1200);
+            SceneBuilderCore.ReplaceNumber(controller, "blurrySkipsBeforeReadingAnyway", 2, 6);
             A.Set(controller, "productCheck", productCheck); A.Set(controller, "brandCheck", brandCheck);
             A.Set(controller, "typeCheck", typeCheck); A.Set(controller, "shadeCheck", shadeCheck); A.Set(controller, "shadeSwatch", swatch);
             A.Set(controller, "ingredientsCheck", ingredientsCheck);
             A.Set(controller, "lookUpButton", lookUp); A.Set(controller, "lookUpLabel", A.LabelOf(lookUp));
             GlowUp.Scanning.GeminiApiConfig aiConfig = AppTiles.AiConfig();
             if (aiConfig != null) A.Set(controller, "aiConfig", aiConfig);
+            A.Set(controller, "aiRecognisesProduct", true);
+            A.Set(controller, "aiHelpsEarly", true); A.Set(controller, "aiHelpAfterSeconds", 0.7f);
+            A.Set(controller, "aiChecksTheWeb", true);
+            A.Set(controller, "closeLooksAtSmallPrint", true);
+            A.Set(controller, "smallPrintBelowPixels", 32f); A.Set(controller, "closeLookLetterPixels", 38f);
+            A.Set(controller, "aiPictureSize", 1200); A.Set(controller, "looksPerSecond", 10f);
             A.Set(lightAssistant, "cameraFeed", camera);
             // texts of the earlier two-step scan that would name buttons which are gone (wording changed in the Inspector is kept)
             SceneBuilderCore.ReplaceText(controller, "msgAiLooking", "This product is new to GlowUp. Recognising it takes a little longer the first time...", "Recognising the product...");
             SceneBuilderCore.ReplaceText(controller, "hintIngredients", "Turn to the back: show the ingredient list", "Now fit the ingredient list inside the frame");
+            SceneBuilderCore.ReplaceText(controller, "hintName", "Now the product's name: hold the front steady, with the name inside the frame", "Keep the product name inside the frame");
             SceneBuilderCore.ReplaceText(controller, "msgAiLimit", "The AI has been asked as often as it may be for now. Type the product's name, or tap Finish anyway.",
                 "The AI could not name this product. Type its name instead, or tap Skip and scan the ingredient list.");
 

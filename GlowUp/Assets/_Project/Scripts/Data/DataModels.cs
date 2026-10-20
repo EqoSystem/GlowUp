@@ -94,12 +94,16 @@ namespace GlowUp.Data
     public class ProductData
     {
         public string id, name, brandId, brandName, cosmeticType, description, status;
+        public string officialIngredientSource, shadeColor;
         public int minAge;
         public long scans;                       // how many times app users scanned this product (shown on the website)
         public string source;                    // "" = typed on the website, "scan" = added automatically from an app scan, or the name of the data source
         public string barcode;                   // the number under the product's barcode ("" = not known): the scan screen finds the product by it
         public bool reviewed;                    // an admin has checked it (only matters for entries the app or a data import added)
         public List<string> ingredients = new List<string>();
+        public List<string> skinCareActiveIngredients = new List<string>();
+        public List<string> baseTextureFormulators = new List<string>();
+        public List<string> pigmentsPreservatives = new List<string>();
         public List<string> shades = new List<string>();              // hex colours, e.g. #C24B62
         public List<string> sources = new List<string>();             // pages the entry's details came from, each as "page title | address" (written on the website)
         public string fdaNumber;                 // the FDA Philippines notification number the website keeps with the product ("" = none on file)
@@ -136,6 +140,7 @@ namespace GlowUp.Data
     {
         public string id, brandId, brandName, productName, cosmeticType;
         public string productId;                 // set when the scan was recognised as a product from the website's inventory
+        public string officialIngredientSource;  // attribution stored with the catalogue ingredient list
         public string displayName;               // the user's own name for it - LOCAL ONLY, never synced back
         public string status;                    // "safe" | "caution" | "harmful"
         public string summary;                   // one-line verdict
@@ -143,6 +148,9 @@ namespace GlowUp.Data
         public string source;                    // "scan" | "manual" | "recommendation"
         public long scannedAtUnix;
         public List<string> ingredients = new List<string>();
+        public List<string> skinCareActiveIngredients = new List<string>();
+        public List<string> baseTextureFormulators = new List<string>();
+        public List<string> pigmentsPreservatives = new List<string>();
         public List<string> unrecognized = new List<string>();        // names on the label that look like ingredients but match nothing the app knows: NOT part of the verdict
         public List<string> mayContain = new List<string>();          // names that stood behind "may contain" or "+/-" on the label: they depend on the shade
         public List<string> harmfulIngredients = new List<string>();
@@ -239,7 +247,7 @@ namespace GlowUp.Data
         public int minAge;
         public bool keyActive, umbrella;
         public List<string> aliases, allergenTags, avoidForSkinTypes, avoidForConditions, goodForSkinTypes, goodForConditions, sources;
-        public string source = "ai";
+        public string source = "web";
         public bool reviewed = false;
         public bool webSearched;                 // the AI's answer was backed by a live web search
         public string addedBy;                   // the signed-in user whose scan triggered the lookup
@@ -266,7 +274,7 @@ namespace GlowUp.Data
         {
             name = p.name, brandId = p.brandId, brandName = p.brandName, cosmeticType = p.cosmeticType, description = p.description,
             ingredients = p.ingredients, shades = p.shades, minAge = p.minAge, status = p.status, scans = p.scans, source = p.source,
-            reviewed = p.reviewed, addedBy = p.addedBy, addedAtUnix = p.addedAtUnix, barcode = barcode
+            reviewed = p.reviewed, addedBy = p.addedBy, addedAtUnix = p.addedAtUnix, sources = p.sources, barcode = barcode
         };
     }
 
@@ -277,10 +285,25 @@ namespace GlowUp.Data
         public string name, brandId, brandName, cosmeticType, description;
         public List<string> ingredients = new List<string>();
         public List<string> shades = new List<string>();
+        public List<string> sources = new List<string>();
         public int minAge;
         public string status = "Pending";
         public long scans;
         public string source = "scan";
+        public bool reviewed = false;
+        public string addedBy;
+        public long addedAtUnix;
+    }
+
+    /// <summary>A web-found ingredient list proposed for an existing product; the website applies it after admin review.</summary>
+    [Serializable]
+    public class ProductIngredientSuggestionRecord
+    {
+        public string productId, productName, brandName;
+        public List<string> ingredients = new List<string>();
+        public List<string> sources = new List<string>();
+        public string source = "ai";
+        public string status = "Pending";
         public bool reviewed = false;
         public string addedBy;
         public long addedAtUnix;

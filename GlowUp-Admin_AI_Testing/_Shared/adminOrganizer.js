@@ -348,6 +348,12 @@ export function createOrganizer(spec) {
         else kids.push(
             button("Folder", "bar-main", (el) => chooseFolder(el, keys()), "Put them in a folder (or take them out).", icon("folder")),
             button("Recycle bin", "bar-quiet danger", () => toBin(keys()), "Remove them. They can be restored from the Recycle bin.", BIN_ICON));
+        if (view.kind !== "bin" && typeof spec.selectionActions === "function") {
+            spec.selectionActions(keys()).forEach((action) => {
+                if (!action || typeof action.run !== "function") return;
+                kids.push(button(action.label, action.className || "bar-main", (el) => action.run(keys(), el), action.tip, action.icon || ""));
+            });
+        }
         kids.push(spacer, button("Clear", "bar-quiet", clear, "Pick nothing."));
         bar.replaceChildren(...kids);
     }

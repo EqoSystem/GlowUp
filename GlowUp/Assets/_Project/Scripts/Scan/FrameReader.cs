@@ -65,12 +65,13 @@ namespace GlowUp.Scan
         /// Reads an UPRIGHT picture: `pixels` row by row from the TOP, each pixel as one ARGB number (only the first
         /// width x height numbers are used). Returns false when the picture was not taken (busy, or no reader).
         /// </summary>
-        public bool Read(int[] pixels, int width, int height, bool wantBarcode, Answer done)
+        public bool Read(int[] pixels, int width, int height, bool wantBarcode, Answer done, Action<string> onBarcode = null)
         {
             if (!Available || java == null || done == null) return false;
             try
             {
                 callback.done = done;                 // one picture at a time, so one callback is enough
+                callback.barcodeEarly = onBarcode;
                 return java.CallStatic<bool>("read", pixels, width, height, wantBarcode && ReadsBarcodes, callback);
             }
             catch (Exception e) { Debug.LogWarning("[Scan] " + e.Message); return false; }
@@ -79,9 +80,11 @@ namespace GlowUp.Scan
         class Callback : AndroidJavaProxy
         {
             public volatile Answer done;
+            public volatile Action<string> barcodeEarly;
             public Callback() : base(JavaClass + "$Callback") { }
             [Preserve] public void onResult(string lines, string barcode) { done?.Invoke(Parse(lines, barcode), null); }
             [Preserve] public void onError(string message) { done?.Invoke(null, string.IsNullOrEmpty(message) ? "unknown problem" : message); }
+            [Preserve] public void onBarcode(string barcode) { barcodeEarly?.Invoke(barcode); }
         }
 #else
         volatile bool busy;
@@ -96,7 +99,7 @@ namespace GlowUp.Scan
         public bool Busy => busy;
 
         /// <summary>The Editor's way: the picture is read by the Tesseract engine, at once and without positions.</summary>
-        public bool Read(int[] pixels, int width, int height, bool wantBarcode, Answer done)
+        public bool Read(int[] pixels, int width, int height, bool wantBarcode, Answer done, Action<string> onBarcode = null)
         {
             if (busy || done == null || pixels == null || width <= 0 || height <= 0) return false;
             if (!OcrService.Shared.Ready) { done(new FrameReading(), null); return true; }

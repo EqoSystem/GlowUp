@@ -34,6 +34,9 @@ GlowUp-Data_Backup_*/
 facebook-unity-sdk-*/
 facebook-unity-sdk-*.unitypackage
 facebook-unity-sdk-*.zip
+GlowUp/ScenePreviews/
+_quarantine/root_vercel_link/
+GlowUp-Admin_AI_Testing/google-services*.json
 GlowUp-Admin_AI_Testing/firebase_unity_sdk_*/
 
 # 4. Website tool files
@@ -50,3 +53,11 @@ desktop.ini
 
 # 6. Local tool settings of this computer
 .claude/
+
+# 7. Documents and archives are kept outside Git (new ones only; already tracked PDFs stay tracked)
+/*.pdf
+/*.zip
+/*.unitypackage
+
+# 8. Graphify output (made again by the tool)
+graphify-out/

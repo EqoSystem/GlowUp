@@ -8,6 +8,7 @@ The admin website and the mobile app use the same Firebase project (`glowup-admi
 |---|---|---|---|
 | `brands` | Website (Brand & Product Inventory). The app adds 1 to `scans`, and adds a brand it meets in a scan as Pending. | App, website | Cosmetic brands |
 | `products` | Website (Brand & Product Inventory). The app adds 1 to `scans`, and adds a scanned product that is not listed yet as Pending. | App, website | Products the app can recommend and recognise |
+| `productIngredientSuggestions` | App | Website (Brand & Product Inventory) | Web-found lists for existing products, pending admin review |
 | `ingredients` | Website (Ingredient Curator). The app adds ingredients its AI lookup finds, marked as not reviewed. | App, website | Ingredient explanations and safety details |
 | `scanActivity` | App | Website (Dashboard) | One anonymous note per scan |
 | `allergenSuggestions`, `conditionSuggestions` | App | Website (Dashboard) | Items users typed in that were not on the app's lists |
@@ -26,6 +27,8 @@ The admin website and the mobile app use the same Firebase project (`glowup-admi
 | `market` | text | Defaults to Global. |
 | `status` | text | `Active`, `Pending` or `Inactive`. The app uses only Active brands. |
 | `scans` | number | The app adds 1 each time a scan is found to be this brand: its name is on the scanned label, or the scan is one of its products. |
+| `source`, `reviewed` | text, yes/no | Entries imported from a file use `document-import` and `false` until an admin checks them. |
+| `aiAssistSources`, `aiAssistModel` | lists/text | Source URLs and model for an admin-reviewed AI suggestion to market or aliases. Existing aliases are merged, not discarded. |
 | `createdAt`, `updatedAt` | time | Set by the website. |
 
 ### `products/{id}`
@@ -40,10 +43,31 @@ The admin website and the mobile app use the same Firebase project (`glowup-admi
 | `description` | text | Optional. |
 | `ingredients` | list of text | The names from the packaging. |
 | `shades` | list of text | Colours as `#RRGGBB`. Used by AR Try-On. |
+| `sources` | list of text | Supporting web pages. An FDA Philippines verification link is saved here only when it is present in the document or a Gemini web-search result. |
 | `minAge` | number | 0 means no limit. A younger user who scans the product is warned. |
 | `status` | text | `Active`, `Pending` or `Inactive`. |
 | `scans` | number | The app adds 1 each time a scan is recognised as this product. |
+| `source`, `reviewed` | text, yes/no | File imports use `document-import` and `false`; they are saved as Pending until checked. |
+| `aiAssistModel` | text | Model used for an admin-reviewed ingredient-list suggestion. Existing ingredient lists are not overwritten. |
 | `createdAt`, `updatedAt` | time | Set by the website. |
+
+Brand & Product Inventory can extract text from PDF, Excel (`.xlsx`/`.xls`), and Word (`.docx`) files and create new matching entries. Only extracted text is sent to the admin-only AI endpoint; imported records are never activated or used to overwrite a matching existing product. Image-only/scanned PDFs and legacy `.doc` files are not supported.
+
+The admin AI assistant drafts ingredient descriptions, product ingredient lists, and brand market/name aliases with source pages. Selected entries can be assisted in bulk, but each draft must be individually checked before the review queue's **Approve reviewed drafts** action saves it. Ingredient assistance changes only the description and its evidence; it does not generate or update risk ratings. Product ingredient assistance only fills an empty list. Gemini is tried first, then Groq, then Mistral when the preceding provider is exhausted. Groq retries with supported current models if a configured model has been retired or returns not found. Backup providers do not return web citations, so their drafts need extra checking.
+
+The selection bar's **Approve All** action applies only to selected entries that are still waiting for review and meet the inventory's existing eligibility checks. In Brand & Product Inventory, a product needs a make-up type, a listed brand and a non-empty ingredient list. The optional `productIngredientSuggestions` collection is admin-only; if its read is denied, the brand and product catalogue remains visible and the page displays a separate Firestore-admin warning.
+
+### `productIngredientSuggestions/{id}`
+
+The app creates a proposal when a product already in the catalogue has no ingredient list and a web lookup finds one. It never edits the catalogue entry itself. An admin sees the proposal and its cited sources in Brand & Product Inventory; applying it only fills a still-empty list, while dismissal deletes the proposal.
+
+| Field | Type | Notes |
+|---|---|---|
+| `productId`, `productName`, `brandName` | text | The existing catalogue product the proposal is for. |
+| `ingredients` | list of text | The AI-found list; 3 to 80 names. |
+| `sources` | list of text | Web pages supporting the lookup. |
+| `source`, `status`, `reviewed` | text, text, yes/no | Always `web`, `Pending`, `false` when created by the app. |
+| `addedBy`, `addedAtUnix` | text, number (seconds) | The signed-in app user and proposal time. |
 
 The app recognises a scan as a product by comparing ingredient lists: at least 4 ingredients must be the same, at least 70% of the product's ingredients must be in the scan, and at least 60% of the scanned ingredients must belong to the product. These limits are Inspector fields on the app's `LoadingSceneController`. A recognised scan takes the product's name, brand, type and shades.
 
@@ -84,7 +108,7 @@ A brand, product or ingredient that the app added by itself, or that came from a
 | `addedAtUnix` | number (seconds) | When it was added. |
 | `sources` | list of text | Web pages the information came from, each as `page title | address`. On ingredients and imported products. |
 | `fdaUnii` | text | Ingredients only. The US FDA substance registry's code for the name, when the registry lists it. It shows the name is a registered substance. It says nothing about safety. |
-| `webSearched`, `model` | yes/no, text | AI-found ingredients only. Whether the AI's answer came with a live web search, and which AI model answered. |
+| `webSearched`, `model`, `aiAssistModel` | yes/no, text | AI-found ingredients record the web search and model. A bulk AI description assist records its model separately, keeps the sources, and changes only the description and review state. |
 | `barcode` | text | Products only: the digits under the barcode. On imported products, and on products the app added from a scan in which the camera saw the barcode. The app's scan screen finds a product by it and reuses its saved ingredient list. |
 
 | `source` | On | Document id starts with | Meaning |
@@ -187,10 +211,10 @@ In [_Shared/adminCommon.js](_Shared/adminCommon.js), `REQUIRE_ADMIN_RECORD` is `
 | Who | Can do |
 |---|---|
 | Anyone, signed in or not | Read `brands`, `products`, `ingredients` |
-| A signed-in app user | Read and write their own `users/{uid}` and its `scans`. Add 1 to a brand's or a product's `scans`. Add a `scanActivity` note. Add a suggestion under their own id. Add (never change or delete) an ingredient `ai_...`, a product `scan_...` or a brand `scan_...`, and only marked with their own id, `reviewed` false and, for products and brands, status `Pending`. |
-| An admin | Add, edit and delete `brands`, `products`, `ingredients`. Read and delete `scanActivity`. Read and update suggestions. |
+| A signed-in app user | Read and write their own `users/{uid}` and its `scans`. Add 1 to a brand's or a product's `scans`. Add a `scanActivity` note. Add a suggestion under their own id. Add (never change or delete) an ingredient `ai_...`, a product `scan_...` or a brand `scan_...`, and only marked with their own id, `reviewed` false and, for products and brands, status `Pending`. Create a `productIngredientSuggestions` proposal, but not read or change it. |
+| An admin | Add, edit and delete `brands`, `products`, `ingredients`. Read and delete `scanActivity`. Read and process product ingredient suggestions. |
 | Nobody (console only) | Change `admins` |
 
 An admin account cannot read users' profiles or scan histories. Everything not listed is refused.
 
-The rules in [firestore.rules](firestore.rules) were checked on the local Firestore emulator (126 checks) and published to the project on 9 October 2026. After changing the file, publish it again.
+The rules in [firestore.rules](firestore.rules) were previously checked on the local Firestore emulator (126 checks) and published to the project on 9 October 2026. Publish this updated file before using AI ingredient suggestions; until then, Firestore will reject the app's new suggestions.

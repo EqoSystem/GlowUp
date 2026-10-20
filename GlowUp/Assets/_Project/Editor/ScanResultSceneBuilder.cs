@@ -15,8 +15,7 @@ namespace GlowUp.EditorTools
     /// <summary>
     /// Menu: GlowUp > Build Scene > 12 AI Scan Result.
     /// One analysed product, each fact in ONE place:
-    ///   1. the product card: who it is, the verdict (status pill and one line of reason) and the FDA Philippines badge
-    ///      (tap it for the record's details and a button to the FDA's site);
+    ///   1. the product card: who it is, the verdict, the FDA Philippines badge, and a direct verification-portal button;
     ///   2. how it matches the user (four lines);
     ///   3. key ingredients, "See all ingredients", and where the list came from (one line, the pages as buttons);
     ///   4. "Why this result?": the long text, behind a button;
@@ -73,6 +72,10 @@ namespace GlowUp.EditorTools
             TextMeshProUGUI summary = A.Label(product.transform, "SummaryText", "The one-line reason for this result shows here.", 32, ThemeRole.MainText, FontRole.Label,
                                               TextAlignmentOptions.TopLeft, true);
             FdaBadgeView fdaBadge = FdaBadge(product.transform);
+            Button fdaVerification = A.PillButton(product.transform, "FdaVerificationButton", "Verify on FDA Philippines", 30,
+                                                  ThemeRole.InputBackground, ThemeRole.MainText, IconFactory.Arrow);
+            A.Size(fdaVerification, -1, 82);
+            A.Outline(fdaVerification.transform, ThemeRole.Accent, 82f);
 
             // 3. compatibility matrix
             GameObject matrix = Section(content, "CompatibilityCard", "How it matches you");
@@ -217,10 +220,12 @@ namespace GlowUp.EditorTools
             A.Set(controller, "typeIcons", A.TypeIcons());
             A.Set(controller, "skinType", skinType); A.Set(controller, "allergens", allergens); A.Set(controller, "concerns", concerns); A.Set(controller, "age", age);
             A.Set(controller, "chipContent", chipGrid.transform); A.Set(controller, "chipTemplate", chipView);
+            A.Set(controller, "ingredientBreakdownText", chipHint);
             A.Set(controller, "allIngredientsButton", allIngredients); A.Set(controller, "allIngredientsLabel", A.LabelOf(allIngredients));
             A.Set(controller, "ingredientSheet", sheet);
             A.Set(controller, "explanationText", explanation);
-            A.Set(controller, "fdaBadge", fdaBadge); A.Set(controller, "listSourceText", listSource); A.Set(controller, "listCheckText", listCheck);
+            A.Set(controller, "fdaBadge", fdaBadge); A.Set(controller, "fdaVerificationButton", fdaVerification);
+            A.Set(controller, "listSourceText", listSource); A.Set(controller, "listCheckText", listCheck);
             A.Set(controller, "sourceLinksContent", links.transform); A.Set(controller, "sourceLinkTemplate", linkTemplate);
             A.Set(controller, "shadeCard", shade); Kit.SetArray(controller, "shadeSwatches", swatches); A.Set(controller, "shadeCaption", shadeCaption);
             A.Set(controller, "dermatologistCard", specialist); A.Set(controller, "dermatologistText", specialistText); A.Set(controller, "dermatologistButton", specialistButton);

@@ -31,28 +31,39 @@ namespace GlowUp.Scan
 
         /// <summary>
         /// Makes sure the scanned product is in the inventory. Sets record.productId to the inventory entry
-        /// (existing or newly added) so the caller can count the scan. Does nothing when the product cannot
-        /// be added (not signed in to the cloud, too few ingredients, no name).
+        /// (existing or newly added) so the caller can count the scan. A looked-up web list for an existing
+        /// product without ingredients is saved as a pending website suggestion rather than overwriting its entry.
         /// </summary>
         /// <param name="kindIsKnown">false when the product's kind was only guessed from the label text: such a product is not added</param>
         public static void PublishIfNew(ScanRecord record, List<string> labelIngredients, bool kindIsKnown = true)
         {
-            if (!Enabled || record == null || !string.IsNullOrEmpty(record.productId)) return;
+            if (!Enabled || record == null) return;
             bool named = !string.IsNullOrWhiteSpace(record.productName);
 
             // ---- already listed (also when it is not Active: waiting for review, switched off, in the Recycle bin)? ----
             // Then the scan is counted there and nothing is added. Looked for by barcode, by brand and name, by ingredients.
             ProductIndex every = ProductRepository.Every;
-            ProductData listed = every.ByBarcode(record.barcode);
+            ProductData listed = !string.IsNullOrEmpty(record.productId) ? every.ById(record.productId) : null;
+            if (listed == null) listed = every.ByBarcode(record.barcode);
             if (listed == null && named) listed = every.Exact(record.brandName, record.productName);
             if (listed == null && named) listed = every.ById(ProductIndex.ScanId(record.brandName, record.productName));
             if (listed == null && labelIngredients != null && labelIngredients.Count >= Mathf.Max(1, ProductMatcher.MinimumShared))
                 listed = ProductMatcher.Find(labelIngredients, ProductRepository.All(), null);
-            if (listed != null) { record.productId = listed.id; return; }
+            if (listed != null)
+            {
+                record.productId = listed.id;
+                if ((listed.ingredients == null || listed.ingredients.Count == 0)
+                    && labelIngredients != null && labelIngredients.Count >= Mathf.Max(3, ProductMatcher.MinimumShared)
+                    && record.listFrom == "web" && record.listWebBacked)
+                {
+                    QueueIngredientSuggestion(record, listed, labelIngredients);
+                }
+                return;
+            }
+            if (!string.IsNullOrEmpty(record.productId)) return;
 
             if (labelIngredients == null || labelIngredients.Count < Mathf.Max(1, ProductMatcher.MinimumShared)) return;   // too short a list to add
             string uid = UserProfileRepository.CurrentUid;
-            if (string.IsNullOrEmpty(uid)) return;                               // the cloud only accepts additions from a signed-in user
             if (!named && RequireProductName) return;
             // MAKE-UP ONLY: the inventory takes a product only when it is clearly make-up and of a kind the app knows.
             // A kind that was merely guessed from the label text counts only when the product's own name says it too.
@@ -76,7 +87,7 @@ namespace GlowUp.Scan
                         name = Limit(brandName, 60), category = "Makeup", market = "",
                         status = "Pending", scans = 0, source = "scan", reviewed = false, addedBy = uid, addedAtUnix = now
                     };
-                    SyncQueue.EnqueueSet("brands/" + brandId, brand);
+                    if (!string.IsNullOrEmpty(uid)) SyncQueue.EnqueueSet("brands/" + brandId, brand);
                     BrandRepository.AddLocal(new BrandData { id = brandId, name = brand.name, category = brand.category, market = "", status = "Pending" });
                 }
                 record.brandId = brandId;
@@ -101,19 +112,59 @@ namespace GlowUp.Scan
                 description = Limit((record.aiEnhanced ? "Added automatically from an app scan. Name and type suggested by the AI." : "Added automatically from an app scan.")
                     + FdaNote(record), 400),
                 ingredients = ingredients, shades = shades, minAge = 0,
+                sources = SourcesFor(record),
                 status = "Pending", scans = 0, source = "scan", reviewed = false, addedBy = uid, addedAtUnix = now
             };
             // the barcode the camera saw goes with it, so the next scan of this product is found by its barcode
             string barcode = MlKitBarcodeReader.Key(record.barcode).Length > 0 ? Limit(record.barcode.Trim(), 20) : "";
-            if (barcode.Length > 0) SyncQueue.EnqueueSet("products/" + productId, ScannedProductWithBarcodeRecord.From(product, barcode));
-            else SyncQueue.EnqueueSet("products/" + productId, product);
+            if (!string.IsNullOrEmpty(uid))
+            {
+                if (barcode.Length > 0) SyncQueue.EnqueueSet("products/" + productId, ScannedProductWithBarcodeRecord.From(product, barcode));
+                else SyncQueue.EnqueueSet("products/" + productId, product);
+            }
             ProductRepository.AddLocal(new ProductData
             {
                 id = productId, name = product.name, brandId = brandId, brandName = product.brandName, cosmeticType = product.cosmeticType,
                 description = product.description, status = "Pending", ingredients = new List<string>(ingredients), shades = new List<string>(shades),
-                source = "scan", reviewed = false, barcode = barcode
+                sources = new List<string>(product.sources), source = "scan", reviewed = false, barcode = barcode
             });
             record.productId = productId;
+        }
+
+        static void QueueIngredientSuggestion(ScanRecord record, ProductData listed, List<string> labelIngredients)
+        {
+            string uid = UserProfileRepository.CurrentUid;
+            if (string.IsNullOrEmpty(uid)) return;
+
+            var ingredients = new List<string>();
+            foreach (string ingredient in labelIngredients)
+                if (!string.IsNullOrWhiteSpace(ingredient) && ingredients.Count < 80) ingredients.Add(Limit(ingredient.Trim(), 120));
+            if (ingredients.Count < 3) return;
+
+            var sources = new List<string>();
+            foreach (string source in record.ingredientSources ?? new List<string>())
+                if (!string.IsNullOrWhiteSpace(source) && sources.Count < 10) sources.Add(Limit(source.Trim(), 500));
+            if (sources.Count == 0) return;
+
+            var suggestion = new ProductIngredientSuggestionRecord
+            {
+                productId = listed.id,
+                productName = Limit(listed.name, 100),
+                brandName = Limit(listed.brandName, 60),
+                ingredients = ingredients,
+                sources = sources,
+                addedBy = uid,
+                addedAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+            };
+            SyncQueue.EnqueueSet("productIngredientSuggestions/" + Guid.NewGuid().ToString("N"), suggestion);
+        }
+
+        static List<string> SourcesFor(ScanRecord record)
+        {
+            var sources = new List<string>();
+            foreach (string source in record.ingredientSources ?? new List<string>())
+                if (!string.IsNullOrWhiteSpace(source) && sources.Count < 10) sources.Add(Limit(source.Trim(), 500));
+            return sources;
         }
 
         /// <summary>

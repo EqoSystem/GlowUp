@@ -46,45 +46,103 @@ namespace GlowUp.Scan
         public static async Task<Answer> Ask(GeminiApiConfig config, string apiKey, string question, bool searchTheWeb, float timeoutSeconds, IList<byte[]> jpegPictures)
         {
             var last = new Answer { error = "No AI model is configured." };
-            if (config == null || string.IsNullOrEmpty(apiKey) || config.ModelChain == null) return last;
+            if (config == null) return last;
+            if (string.IsNullOrWhiteSpace(apiKey)) return new Answer { error = "The AI service key is not configured." };
+            if (config.ModelChain == null || config.ModelChain.Count == 0) return last;
+            if (string.IsNullOrWhiteSpace(question)) return new Answer { error = "The AI question is empty." };
 
             // switched off for the rest of this question once the service refuses it, and not even tried for a while after a
             // refusal (the key does not offer web search: asking with it first would waste a request on every question)
             bool searchOffered = searchTheWeb && AiBudget.WebSearchWorthTrying;
+            int retries = Mathf.Clamp(config.MaxRetriesPerModel, 0, 3);
+            bool triedModel = false;
             foreach (string model in config.ModelChain)
             {
+                if (string.IsNullOrWhiteSpace(model)) continue;
+                triedModel = true;
+                bool modelUnavailable = false;
                 bool[] modes = searchOffered ? new[] { true, false } : new[] { false };
                 foreach (bool withSearch in modes)
                 {
-                    using (var request = new UnityWebRequest(config.BuildUrl(model), "POST"))
+                    for (int attempt = 0; attempt <= retries; attempt++)
                     {
-                        request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(Body(question, withSearch, jpegPictures)));
-                        request.downloadHandler = new DownloadHandlerBuffer();
-                        request.SetRequestHeader("Content-Type", "application/json");
-                        request.SetRequestHeader("x-goog-api-key", apiKey);
-                        request.timeout = Mathf.Max(5, Mathf.RoundToInt(timeoutSeconds));
-                        await request.SendWebRequest();
-
-                        long status = request.responseCode;
-                        if (request.result == UnityWebRequest.Result.Success && status == 200)
+                        bool retryAttempt = false;
+                        using (var request = new UnityWebRequest(config.BuildUrl(model), "POST"))
                         {
-                            Answer answer = Read(request.downloadHandler.text);
-                            answer.model = model;
-                            if (answer.ok) return answer;
-                            last = answer;
-                            continue;                                   // empty answer: try the plain mode / next model
+                            request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(Body(question, withSearch, jpegPictures)));
+                            request.downloadHandler = new DownloadHandlerBuffer();
+                            request.SetRequestHeader("Content-Type", "application/json");
+                            request.SetRequestHeader("x-goog-api-key", apiKey);
+                            request.timeout = Mathf.Max(5, Mathf.RoundToInt(timeoutSeconds));
+                            bool sent = true;
+                            try
+                            {
+                                await request.SendWebRequest();
+                            }
+                            catch (Exception e)
+                            {
+                                sent = false;
+                                last = new Answer { error = $"{model}: request failed: {e.Message}" };
+                                retryAttempt = attempt < retries;
+                            }
+
+                            if (sent)
+                            {
+                                long status = request.responseCode;
+                                if (request.result == UnityWebRequest.Result.Success && status == 200)
+                                {
+                                    Answer answer = Read(request.downloadHandler.text);
+                                    answer.model = model;
+                                    if (answer.ok) return answer;
+                                    last = answer;
+                                    break;
+                                }
+
+                                last = new Answer { error = $"{model}: HTTP {status} {request.error}" };
+                                if (status == 401 || status == 403) return last; // the key is refused: no point trying on
+                                if (status == 404) { modelUnavailable = true; break; } // this model is gone: next model
+                                // 400 or 429 with web search usually means "search is not offered on this key or plan": ask again without it
+                                if (withSearch && (status == 400 || status == 429))
+                                {
+                                    searchOffered = false;
+                                    AiBudget.WebSearchRefused();
+                                    break;
+                                }
+                                bool transient = IsRetryable(request);
+                                retryAttempt = transient && attempt < retries;
+                                if (transient && !retryAttempt && status == 0) return last;
+                            }
                         }
 
-                        last = new Answer { error = $"{model}: HTTP {status} {request.error}" };
-                        if (status == 401 || status == 403) return last; // the key is refused: no point trying on
-                        if (status == 404) break;                        // this model is gone: next model
-                        if (status == 0) return last;                    // no connection / timed out
-                        // 400 or 429 with web search usually means "search is not offered on this key or plan": ask again without it
-                        if (withSearch && (status == 400 || status == 429)) { searchOffered = false; AiBudget.WebSearchRefused(); }
+                        if (!retryAttempt) break;
+                        await Task.Delay(TimeSpan.FromSeconds(RetryDelay(config, attempt)));
                     }
+                    if (modelUnavailable) break;
                 }
+                if (modelUnavailable) continue;
             }
+            if (!triedModel) last.error = "No usable AI model is configured.";
             return last;
+        }
+
+        static bool IsRetryable(UnityWebRequest request)
+        {
+            long status = request.responseCode;
+            return request.result == UnityWebRequest.Result.ConnectionError
+                || request.result == UnityWebRequest.Result.DataProcessingError
+                || status == 0
+                || status == 408
+                || status == 429
+                || status >= 500;
+        }
+
+        static float RetryDelay(GeminiApiConfig config, int retryIndex)
+        {
+            float baseDelay = Mathf.Max(0f, config.BaseBackoffSeconds);
+            float ceiling = Mathf.Max(baseDelay, config.MaxBackoffSeconds);
+            float exponential = baseDelay * Mathf.Pow(2f, retryIndex);
+            float jitter = UnityEngine.Random.Range(0f, baseDelay * 0.5f);
+            return Mathf.Min(exponential + jitter, ceiling);
         }
 
         static string Body(string question, bool withSearch, IList<byte[]> jpegPictures)

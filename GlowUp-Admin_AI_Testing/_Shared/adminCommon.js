@@ -407,6 +407,7 @@ export function originLabel(source) {
         case "aiassist": return "Drafted with Assist with AI, checked by an admin";
         case "scan": return "Added by an app scan";
         case "openbeautyfacts": return "Imported from Open Beauty Facts";
+        case "document-import": return "Imported from a document";
         case "starter": return "Starter data";
         case "fdaph": return "From the FDA Philippines list of notified cosmetics";
         case "fda": return "From the US FDA list";

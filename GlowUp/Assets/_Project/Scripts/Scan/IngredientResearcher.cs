@@ -40,7 +40,8 @@ namespace GlowUp.Scan
             "fda.gov.ph (FDA Philippines) and the ASEAN Cosmetic Directive ingredient annexes",
             "ec.europa.eu CosIng (EU cosmetic ingredient database)",
             "cir-safety.org (Cosmetic Ingredient Review)",
-            "pubchem.ncbi.nlm.nih.gov (PubChem)"
+            "pubchem.ncbi.nlm.nih.gov (PubChem)",
+            "watsons.com.ph (Watsons Philippines product listings)"
         };
 
         static readonly string[] AllergenTags = { "fragrance", "paraben", "sulfate", "formaldehyde", "lanolin", "essentialoil", "nut" };

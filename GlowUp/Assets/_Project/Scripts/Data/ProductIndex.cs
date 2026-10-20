@@ -326,8 +326,19 @@ namespace GlowUp.Data
         public static string BarcodeKey(string barcode)
         {
             if (string.IsNullOrWhiteSpace(barcode)) return "";
+            string trimmed = barcode.Trim();
+            // When scanning a QR code containing a URL or query string, look for a standard 6-14 digit barcode/product sequence
+            if (trimmed.Contains("/") || trimmed.Contains("?") || trimmed.Contains("=") || trimmed.Contains(":"))
+            {
+                var match = System.Text.RegularExpressions.Regex.Match(trimmed, @"\b\d{6,14}\b");
+                if (match.Success)
+                {
+                    string k = match.Value.TrimStart('0');
+                    if (k.Length >= 6 && k.Length <= 14) return k;
+                }
+            }
             var digits = new System.Text.StringBuilder();
-            foreach (char c in barcode) if (c >= '0' && c <= '9') digits.Append(c);
+            foreach (char c in trimmed) if (c >= '0' && c <= '9') digits.Append(c);
             string key = digits.ToString().TrimStart('0');
             return key.Length >= 6 && key.Length <= 14 ? key : "";
         }

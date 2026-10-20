@@ -283,7 +283,7 @@ public class ProductScanner : MonoBehaviour
 
     string BuildRequestBody(string extractedOcrText, string skinProfileJson)
     {
-        string systemInstructions = @"You are analyzing the ingredient list text of a cosmetic/skincare product. Perform ALL of the following and return ONLY the JSON object described at the end — no prose, no markdown fences.
+        string systemInstructions = @"You are analyzing the ingredient list text of a cosmetic/skincare product. Perform ALL of the following and return ONLY the JSON object described at the end â€” no prose, no markdown fences.
     1. Parse the provided ingredient list text, preserving each ingredient as a separate string, in RawIngredients.
     2. Compare each ingredient against the user's skin profile provided below. Populate SafetyFlags for any ingredient matching a listed sensitivity or allergy.
     3. Identify 'umbrella' or blend terms on the list (e.g. Fragrance/Parfum, Flavor/Aroma) in HiddenIngredientAlerts.

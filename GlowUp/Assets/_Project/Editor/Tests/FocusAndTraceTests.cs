@@ -279,5 +279,35 @@ namespace GlowUp.Tests
             Assert.AreEqual(0.1f, reading.lines[0].left, 0.0001f);
             Assert.AreEqual(0.25f, reading.lines[0].bottom, 0.0001f);
         }
+
+        [Test]
+        public void Primary_label_mode_does_not_collect_ingredient_list_text()
+        {
+            var reading = new FrameReading();
+            reading.lines.Add(new FrameReading.Line { text = "GLOWUP", confidence = 0.95f });
+            reading.lines.Add(new FrameReading.Line { text = "VELVET MATTE LIPSTICK", confidence = 0.95f });
+            reading.lines.Add(new FrameReading.Line { text = "INGREDIENTS: AQUA, GLYCERIN, MICA", confidence = 0.95f });
+            reading.lines.Add(new FrameReading.Line { text = "TALC, IRON OXIDES", confidence = 0.95f });
+            reading.barcode = "4801234567890";
+
+            FrameReading primary = ScanEvidence.PrimaryLabelOnly(reading);
+            var evidence = new ScanEvidence();
+            evidence.Add(primary, new ScanEvidence.Known { brandSeen = true }, 1f, false, false);
+
+            Assert.AreEqual(2, primary.lines.Count);
+            Assert.AreEqual(reading.barcode, primary.barcode);
+            Assert.AreEqual(0, evidence.Text.Counted);
+            StringAssert.Contains("VELVET MATTE LIPSTICK", evidence.FrontText);
+            StringAssert.DoesNotContain("GLYCERIN", evidence.FrontText);
+            Assert.AreEqual(0f, evidence.Progress(ScanZone.Ingredients));
+        }
+
+        [Test]
+        public void Cosmetic_type_can_be_detected_from_primary_label_text()
+        {
+            Assert.AreEqual("Lipstick", ProductScope.TypeFromLabel("GLOWUP VELVET MATTE LIPSTICK"));
+            Assert.AreEqual("Powder", ProductScope.TypeFromLabel("Pressed Face Powder"));
+            Assert.AreEqual("", ProductScope.TypeFromLabel("GLOWUP ROSE SHADE 03"));
+        }
     }
 }

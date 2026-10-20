@@ -21,3 +21,21 @@ MonoBehaviour:
   aiRecognitionsPerScanSession: 2
   aiListLookUpsPerScanSession: 2
   skipWebSearchMinutesAfterRefusal: 30
+  pictureDarkBelow: 0.14
+  glareBrightness: 0.9392
+  glareShare: 0.18
+  movingAbove: 0.12
+  blurBelow: 0.343
+  minimumEdges: 0.1
+  clearLineConfidence: 0.55
+  usableLineConfidence: 0.3
+  frontPictures: 2
+  viewsAround: 3
+  newViewBelow: 0.4
+  colourPictures: 2
+  minimumIngredients: 2
+  picturesForAnUnknownName: 2
+  quietPicturesForDone: 2
+  packStrongLikeness: 0.7
+  packMediumLikeness: 0.55
+  packPictureMiddle: 0.8

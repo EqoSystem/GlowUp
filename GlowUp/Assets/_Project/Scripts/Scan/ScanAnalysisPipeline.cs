@@ -60,24 +60,14 @@ namespace GlowUp.Scan
             Task<PhFdaVerification.Result> fdaSearch = ScanSession.PendingListFrom == "inventory" ? null
                 : StartFdaSearch(ScanSession.PendingProductName, ScanSession.PendingBrandName);
             // ONLINE: a second opinion on the list itself (Open Beauty Facts, by the barcode). It starts now as well.
-            Task<OpenBeautyFacts.Result> secondOpinion = StartSecondOpinion(ScanSession.PendingBarcode);
+            Task<OpenBeautyFacts.Result> secondOpinion = null;
 
             report(1, "Checking our ingredient database");
             await IngredientRepository.LoadAll();
             List<BrandData> brands = await BrandRepository.LoadActive();
 
-            // ONLINE: ingredients nobody has described yet are looked up (AI + web search + the FDA's substance
-            // registry) and added to the shared database, marked "AI, not reviewed". Offline they stay "not checked".
-            // Only names that passed the reader's checks are ever shown to the AI: never raw label text.
-            if (IngredientResearcher.Enabled && AiConfig != null && ConnectivityMonitor.Online && label.unrecognized.Count > 0)
-            {
-                try
-                {
-                    int learned = await IngredientResearcher.ResearchUnknown(label.unrecognized, AiConfig, message => report(1, message));
-                    if (learned > 0) label = IngredientTextParser.Read(ScanSession.PendingText);      // what was just learned is known now
-                }
-                catch (Exception e) { Debug.LogWarning("Ingredient lookup skipped: " + e.Message); }
-            }
+            // Unknown ingredients stay explicitly unknown here. Product and ingredient facts are not researched or
+            // imported from a third-party service during analysis.
             List<string> names = label.inOrder;         // every name on the label, known or not, in its order (for the inventory)
 
             report(2, "Comparing with your skin profile");
@@ -86,6 +76,7 @@ namespace GlowUp.Scan
             ScanRecord record = ProductAnalysisEngine.Analyse(label.ingredients, ScanSession.PendingText, profile, brands, null, null, null, label.unrecognized);
             record.mayContain = new List<string>(label.mayContain);
             record.source = string.IsNullOrEmpty(ScanSession.PendingSource) ? "scan" : ScanSession.PendingSource;
+            record.officialIngredientSource = ScanSession.PendingOfficialIngredientSource ?? "";
             record.shadeHex = ScanSession.PendingShadeHex ?? "";
 
             // "SCAN THE SAME PRODUCT AGAIN": this result takes the place of the earlier one (the same id), so the product
@@ -103,7 +94,10 @@ namespace GlowUp.Scan
             {
                 try
                 {
-                    ProductData known = ProductMatcher.Find(names, await ProductRepository.LoadActive(), record.brandId);
+                    ProductData known = !string.IsNullOrWhiteSpace(ScanSession.PendingProductId)
+                        ? ProductRepository.All().Find(p => p != null && p.id == ScanSession.PendingProductId)
+                        : null;
+                    if (known == null) known = ProductMatcher.Find(names, await ProductRepository.LoadActive(), record.brandId);
                     if (known != null) ApplyCatalogueProduct(record, known, profile);
                 }
                 catch (Exception e) { Debug.LogWarning("Product recognition skipped: " + e.Message); }
@@ -156,12 +150,9 @@ namespace GlowUp.Scan
             catch (Exception e) { ScanSession.AlertPending = false; Debug.LogWarning("Safety alerts skipped: " + e.Message); }
 
             report(3, "Preparing your result");
-            // ONLINE: a product the inventory does not have yet is added to it as "Pending" (see ScannedProductPublisher)
-            if (ConnectivityMonitor.Online)
-            {
-                try { ScannedProductPublisher.PublishIfNew(record, names, kindIsKnown); }
-                catch (Exception e) { Debug.LogWarning("Adding the product to the inventory was skipped: " + e.Message); }
-            }
+            // Save the product to the device catalogue now; signed-in users also queue a pending website entry or review suggestion.
+            try { ScannedProductPublisher.PublishIfNew(record, names, kindIsKnown); }
+            catch (Exception e) { Debug.LogWarning("Adding the product to the inventory was skipped: " + e.Message); }
             // every scan is saved to Recent Scans automatically; a scan that was done again takes the earlier one's place
             bool replaced = earlier != null && ScanHistoryRepository.Replace(earlier.id, record);
             if (!replaced) ScanHistoryRepository.Add(record);
@@ -216,7 +207,7 @@ namespace GlowUp.Scan
                     kindGiven = true;
                 }
             }
-            record.shadeName = ScanSession.PendingShadeName ?? "";
+            if (!string.IsNullOrWhiteSpace(ScanSession.PendingShadeName)) record.shadeName = ScanSession.PendingShadeName.Trim();
             record.finish = ScanSession.PendingFinish ?? "";
             record.barcode = ScanSession.PendingBarcode ?? "";
             record.ingredientSources = new List<string>(ScanSession.PendingSources ?? new List<string>());
@@ -241,6 +232,16 @@ namespace GlowUp.Scan
                 record.recommendedShades = ShadeAdvisor.Recommend(profile.skinTone, ShadeAdvisor.AreaFor(record.cosmeticType));
             }
             record.productShades = new List<string>(known.shades ?? new List<string>());
+            if (string.IsNullOrWhiteSpace(record.shadeName) && !string.IsNullOrWhiteSpace(known.shadeColor))
+            {
+                if (ColorUtility.TryParseHtmlString(known.shadeColor, out _)) record.shadeHex = known.shadeColor.Trim();
+                else record.shadeName = known.shadeColor.Trim();
+            }
+            record.skinCareActiveIngredients = new List<string>(known.skinCareActiveIngredients ?? new List<string>());
+            record.baseTextureFormulators = new List<string>(known.baseTextureFormulators ?? new List<string>());
+            record.pigmentsPreservatives = new List<string>(known.pigmentsPreservatives ?? new List<string>());
+            if (string.IsNullOrWhiteSpace(record.officialIngredientSource))
+                record.officialIngredientSource = known.officialIngredientSource ?? "";
 
             // the FDA Philippines record the website keeps with the product: no search is needed, and it is there offline too
             PhFdaVerification.Result onFile = PhFdaVerification.FromInventory(known.fdaNumber, known.description);

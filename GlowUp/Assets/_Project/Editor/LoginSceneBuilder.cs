@@ -55,6 +55,7 @@ namespace GlowUp.EditorTools
             // ----- wording -----
             SetText(title, "Glow Up"); SetText(subtitle, "Welcome!"); SetText(emailLabel, "Email:"); SetText(pwLabel, "Password:");
             SetText(forgot, "Forgot Password?"); SetText(signUp, "Sign Up"); SetText(signIn, "Log-In");
+            SetText(termsText, "Read the Privacy Policy and Terms before signing up");
             if (fb != null)
             {
                 fb.text = "";
@@ -99,8 +100,7 @@ namespace GlowUp.EditorTools
             if (oldInstagram != null) Object.DestroyImmediate(oldInstagram.gameObject);
             var google = Social(ct, "GoogleSignInButton", IconFactory.Google);
             var facebook = Social(ct, "FacebookSignInButton", IconFactory.Facebook);
-            // the two links at the very bottom ("Privacy Policy", "Terms & Conditions") were removed on request (12 October 2026);
-            // the sentence above them still names the Terms and Conditions
+            // Replace any old external-link buttons with one in-app, read-only entry to both legal documents.
             foreach (string gone in new[] { "PrivacyPolicyLink", "TermsAndConditionsLink" })
             { var old = Kit.Loose(ct, gone); if (old != null) Object.DestroyImmediate(old.gameObject); }
 
@@ -180,6 +180,7 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(flow, "signUpButton", signUpBtn);
             SceneBuilderCore.SetField(flow, "googleButton", google);
             SceneBuilderCore.SetField(flow, "facebookButton", facebook);
+            SceneBuilderCore.SetField(flow, "legalEntryText", termsText != null ? termsText.GetComponent<TextMeshProUGUI>() : null);
 
             ThemeKit.FinishScene();       // canvas scaler, paper background, input text, round shapes, fonts, colours
             SceneBuilderCore.Save(scene);

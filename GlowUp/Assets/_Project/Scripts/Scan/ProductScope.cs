@@ -47,6 +47,22 @@ namespace GlowUp.Scan
             "Highlighter", "Contour", "Eyeshadow", "Eyeliner", "Mascara", "Brow", "Setting Spray"
         };
 
+        /// <summary>Finds a supported make-up type when its label appears in OCR text; returns empty when it is unclear.</summary>
+        public static string TypeFromLabel(string text)
+        {
+            string key = " " + TextKey.Normalize(text) + " ";
+            foreach (string type in MakeupTypes)
+            {
+                string normalized = TextKey.Normalize(type);
+                if (normalized.Length > 0 && key.Contains(" " + normalized + " ")) return type;
+            }
+            if (key.Contains(" lip stain ")) return "Lip Tint";
+            if (key.Contains(" liquid lipstick ")) return "Lipstick";
+            if (key.Contains(" cheek tint ") || key.Contains(" cheek stain ")) return "Blush";
+            if (key.Contains(" loose powder ") || key.Contains(" pressed powder ") || key.Contains(" face powder ")) return "Powder";
+            return "";
+        }
+
         // ---------------------------------------------------------------------------------------
         //  The word lists. Each word is looked for as a whole word (a plural with -s or -es counts too).
         // ---------------------------------------------------------------------------------------

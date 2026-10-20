@@ -1,0 +1,67 @@
+# Graphify: what is NOT read. Same syntax as .gitignore.
+graphify-out/
+_quarantine/
+docs/
+node_modules/
+Library/
+Temp/
+obj/
+Logs/
+Builds/
+UserSettings/
+GlowUp-*Backup*/
+GlowUp-*Removed*/
+facebook-unity-sdk-*/
+firebase_unity_sdk_*/
+
+# Unity vendor / generated folders
+GlowUp/Assets/StreamingAssets/
+GlowUp/Assets/Firebase/
+GlowUp/Assets/GeneratedLocalRepo/
+GlowUp/Assets/TextMesh Pro/
+GlowUp/Assets/ExternalDependencyManager/
+GlowUp/Assets/FacebookSDK/
+GlowUp/Assets/Editor/
+GlowUp/Assets/IAPiOS/
+GlowUp/Img/
+GlowUp/ProjectSettings/
+GlowUp/Packages/
+GlowUp/Assets/_Project/Editor/Tests/
+GlowUp-Admin_AI_Testing/_Shared/data/
+
+# Plugins: skip everything except our own Android .java files
+GlowUp/Assets/Plugins/*
+!GlowUp/Assets/Plugins/Android/
+GlowUp/Assets/Plugins/Android/*
+!GlowUp/Assets/Plugins/Android/GlowUp*.java
+
+# Binary, image, document, Unity data files
+*.meta
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.zip
+*.unitypackage
+*.wav
+*.ttf
+*.asset
+*.unity
+*.mat
+*.prefab
+*.shader
+*.dll
+*.so
+*.bundle
+*.mp3
+*.webp
+*.storekit
+*.txt
+.gitattributes
+.vsconfig
+*.code-workspace
+
+# JSON: keep only the two deploy configs
+*.json
+!firebase.json
+!vercel.json

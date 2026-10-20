@@ -567,21 +567,22 @@ namespace GlowUp.Scan
             float shrink = Mathf.Max(1f, Mathf.Max(c.cropW, c.cropH) / (float)Mathf.Max(64, maxSide));
             int outW = Mathf.Max(8, Mathf.RoundToInt(c.cropW / shrink)), outH = Mathf.Max(8, Mathf.RoundToInt(c.cropH / shrink));
             if (pixels == null || pixels.Length < outW * outH) pixels = new int[outW * outH];
-            var columns = new int[outW];
-            for (int ox = 0; ox < outW; ox++) columns[ox] = c.x0 + Mathf.Min(c.cropW - 1, (int)(ox * shrink));
+            if (columnsBuffer == null || columnsBuffer.Length < outW) columnsBuffer = new int[outW];
+            for (int ox = 0; ox < outW; ox++) columnsBuffer[ox] = c.x0 + Mathf.Min(c.cropW - 1, (int)(ox * shrink));
             for (int row = 0; row < outH; row++)
             {
                 int uy = c.y0 + Mathf.Min(c.cropH - 1, (int)((outH - 1 - row) * shrink));        // row 0 is the top
                 int at = row * outW;
                 for (int ox = 0; ox < outW; ox++)
                 {
-                    Color32 p = buffer[SourceIndex(c, columns[ox], uy)];
+                    Color32 p = buffer[SourceIndex(c, columnsBuffer[ox], uy)];
                     pixels[at + ox] = unchecked((int)0xFF000000) | (p.r << 16) | (p.g << 8) | p.b;
                 }
             }
             width = outW; height = outH;
             return true;
         }
+        int[] columnsBuffer;
 
         /// <summary>
         /// The same for ONE PART of the frame, and it may be ENLARGED: this is what the text tracer of hold-to-scan uses
@@ -694,24 +695,26 @@ namespace GlowUp.Scan
             if (buffer == null || buffer.Length != w * h) buffer = new Color32[w * h];
             cam.GetPixels32(buffer);
             const int gx = 16, gy = 12;
-            var current = new float[gx * gy];
+            if (motionBuffer == null || motionBuffer.Length != gx * gy) motionBuffer = new float[gx * gy];
             for (int y = 0; y < gy; y++)
                 for (int x = 0; x < gx; x++)
                 {
                     Color32 c = buffer[(int)((y + 0.5f) / gy * h) * w + (int)((x + 0.5f) / gx * w)];
-                    current[y * gx + x] = (c.r + c.g + c.b) / 765f;
+                    motionBuffer[y * gx + x] = (c.r + c.g + c.b) / 765f;
                 }
             float motion = 1f;
-            if (steadyPrevious != null && steadyPrevious.Length == current.Length)
+            if (steadyPrevious != null && steadyPrevious.Length == motionBuffer.Length)
             {
                 float sum = 0f;
-                for (int i = 0; i < current.Length; i++) sum += Mathf.Abs(current[i] - steadyPrevious[i]);
-                motion = sum / current.Length;
+                for (int i = 0; i < motionBuffer.Length; i++) sum += Mathf.Abs(motionBuffer[i] - steadyPrevious[i]);
+                motion = sum / motionBuffer.Length;
             }
-            steadyPrevious = current;
+            if (steadyPrevious == null || steadyPrevious.Length != motionBuffer.Length) steadyPrevious = new float[motionBuffer.Length];
+            Array.Copy(motionBuffer, steadyPrevious, motionBuffer.Length);
             LastMotion = motion;
             return motion;
         }
+        float[] motionBuffer;
 
         /// <summary>The average brightness of the picture, 0 (black) to 1 (white). Very low = the lens is covered.</summary>
         public float MeasureBrightness()

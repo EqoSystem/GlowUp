@@ -30,3 +30,8 @@
 @media (max-width: 620px) { .ingredients-list { grid-template-columns: 1fr; } }
 .ingredient-card.from-product { border-style: dashed; }
 .ingredient-card.from-product .ingredient-tech { font-style: normal; padding-left: 18px; }
+.suggestion-list { display: grid; gap: 12px; }
+.suggestion-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: var(--surface-2); }
+.suggestion-card .field { display: grid; gap: 6px; margin: 12px 0; }
+.suggestion-card .field textarea { width: 100%; }
+.suggestion-card [data-draft-reviewed] { margin-right: 6px; }

@@ -130,28 +130,15 @@ namespace GlowUp.Scan
         public static List<string> KnownBrands = new List<string>();
 
         /// <summary>
-        /// Shows the AI a photo of the product (JPG) and the text the text reader found on it.
+        /// Shows the AI one clear photo of the product (JPG) and any text already read from it.
         /// Returns what it recognised; `found` is false when it could not tell.
         /// </summary>
-        public static Task<Identity> Identify(byte[] jpegPhoto, string textOnProduct)
-        {
-            return Identify(jpegPhoto != null && jpegPhoto.Length > 0 ? new List<byte[]> { jpegPhoto } : null, textOnProduct);
-        }
-
-        /// <summary>
-        /// The same with SEVERAL photos of ONE product (its front, its back, its bottom ...), sent together in one request:
-        /// hold-to-scan asks the AI once, at the end, with the best picture of each side and all the text that was read.
-        /// </summary>
-        public static async Task<Identity> Identify(IList<byte[]> jpegPhotos, string textOnProduct)
+        public static async Task<Identity> Identify(byte[] jpegPhoto, string textOnProduct)
         {
             var result = new Identity();
-            int photos = 0;
-            if (jpegPhotos != null) foreach (byte[] one in jpegPhotos) if (one != null && one.Length > 0) photos++;
-            if (!Available || photos == 0) return result;
+            if (!Available || jpegPhoto == null || jpegPhoto.Length == 0) return result;
             var q = new StringBuilder();
-            q.Append(photos > 1
-                ? "The " + photos + " photos show ONE product held up to a phone camera, from different sides (its front, its back, its bottom). It may be shown with or without its packaging. Identify it. This app checks MAKE-UP only, so say honestly when the product is something else.\n"
-                : "The photo shows a product held up to a phone camera. It may be shown with or without its packaging. Identify it. This app checks MAKE-UP only, so say honestly when the product is something else.\n");
+            q.Append("The photo shows one make-up product held up to a phone camera. It may be shown with or without its packaging. Identify it from this single view. This app checks MAKE-UP only, so say honestly when the product is something else.\n");
             q.Append("LOOK FIRST, READ SECOND: decide from what the pack looks like before you use any text. ");
             q.Append("Use everything the packaging shows, not only the words: the logo and its lettering, the colours and pattern of the pack, the shape of the tube, bottle, compact or box, and the cap. A well-known pack can be recognised by its look even when its text cannot be read.\n");
             if (KnownBrands != null && KnownBrands.Count > 0)
@@ -175,7 +162,7 @@ namespace GlowUp.Scan
             q.Append("confidence is 0 to 1. Do not guess a name or a brand that you can neither read nor clearly recognise: leave it empty instead. ");
             q.Append("If the photo shows no cosmetic product, reply {\"found\":false}.");
 
-            AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), false, TimeoutSeconds, jpegPhotos);
+            AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), false, TimeoutSeconds, jpegPhoto);
             if (answer == null || !answer.ok) { Debug.LogWarning("AI product recognition: " + (answer != null ? answer.error : "no answer")); return result; }
             return IdentityFrom(answer.text, answer.model);
         }
@@ -335,6 +322,7 @@ namespace GlowUp.Scan
         {
             q.Append("STEP 4, MORE ABOUT IT: its full ingredient (INCI) list as its maker publishes it. Use credible sources only, most trusted first: the brand's official ");
             q.Append("website or official store page; the product pages of large retailers that reproduce the list printed on the pack; Open Beauty Facts. ");
+            q.Append("For products sold in the Philippines, search Watsons Philippines (watsons.com.ph) among the retailer pages. ");
             q.Append("Ingredient DATABASES (INCIDecoder, EWG Skin Deep, CosDNA, CosIng) explain what an ingredient is: do NOT take this product's list from them. ");
             q.Append("The list must be a copy of what is printed on the pack: never reconstruct it from memory or from a similar product. ");
             q.Append("When no credible page shows the list, leave \"ingredients\" empty: the product can still be the same.\n");
@@ -416,7 +404,7 @@ namespace GlowUp.Scan
             q.Append("\nSTART WITH THE BRAND'S OFFICIAL WEBSITE: search for this product's own page there and take the list from it. ");
             q.Append("Only when the official website does not publish the list, go on to the next sources. In \"sources\" put the page the list really came from first.");
             q.Append("\nUse credible sources only, most trusted first: the brand's official website or official store page; the product pages of large retailers ");
-            q.Append("that reproduce the list printed on the pack; Open Beauty Facts. ");
+            q.Append("that reproduce the list printed on the pack; Open Beauty Facts. For products sold in the Philippines, include Watsons Philippines (watsons.com.ph) among the retailer pages to search. ");
             q.Append("Ingredient DATABASES (INCIDecoder, EWG Skin Deep, CosDNA, CosIng) explain what an ingredient is: do NOT take this product's list from them. ");
             q.Append("The list must be a copy of what is printed on the pack: never reconstruct it from memory or from a similar product.\n");
             q.Append("Also list EXTRA ADDITIVES AND HIDDEN INGREDIENTS: substances such a product contains that the label does not list one by one, ");

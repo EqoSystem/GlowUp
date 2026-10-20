@@ -49,7 +49,15 @@ public final class GlowUpBarcodeReader {
             }
             if (scanner == null) {
                 scanner = BarcodeScanning.getClient(new BarcodeScannerOptions.Builder()
-                        .setBarcodeFormats(Barcode.FORMAT_EAN_13, Barcode.FORMAT_EAN_8, Barcode.FORMAT_UPC_A, Barcode.FORMAT_UPC_E)
+                        .setBarcodeFormats(
+                                Barcode.FORMAT_QR_CODE,
+                                Barcode.FORMAT_EAN_13,
+                                Barcode.FORMAT_EAN_8,
+                                Barcode.FORMAT_UPC_A,
+                                Barcode.FORMAT_UPC_E,
+                                Barcode.FORMAT_CODE_128,
+                                Barcode.FORMAT_CODE_39,
+                                Barcode.FORMAT_DATA_MATRIX)
                         .build());
             }
             scanner.process(InputImage.fromBitmap(bitmap, 0))
@@ -58,7 +66,7 @@ public final class GlowUpBarcodeReader {
                         String found = "";
                         for (Barcode code : codes) {
                             String value = code.getRawValue();
-                            if (value != null && value.length() >= 8) { found = value; break; }
+                            if (value != null && value.trim().length() >= 3) { found = value.trim(); break; }
                         }
                         callback.onResult(found);
                     })

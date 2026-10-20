@@ -51,7 +51,7 @@ namespace GlowUp.Scan
         [Tooltip("The hint says 'there is glare' when more than this share of the picture is burnt out")]
         [Range(0.02f, 0.6f)] public float glareShare = 0.18f;
         [Tooltip("The phone counts as moving when the picture changed more than this since the look before (0 to 1). Such a picture is not read.")]
-        [Range(0.01f, 0.3f)] public float movingAbove = 0.06f;
+        [Range(0.01f, 0.3f)] public float movingAbove = 0.12f;
         [Tooltip("Sharpness below this counts as out of focus (the share of fine detail among the edges of the picture)")]
         [Range(0.1f, 0.9f)] public float blurBelow = 0.4f;
         [Tooltip("A picture with fewer edges than this has nothing to judge sharpness by (a plain wall): it is not called blurred")]

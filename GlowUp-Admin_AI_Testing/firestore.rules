@@ -90,7 +90,7 @@ service cloud.firestore {
       allow create: if isAdmin()
         || (addedByTheApp()
             && productId.matches('scan_.*')
-            && request.resource.data.keys().hasOnly(['name', 'brandId', 'brandName', 'cosmeticType', 'description', 'ingredients', 'shades',
+            && request.resource.data.keys().hasOnly(['name', 'brandId', 'brandName', 'cosmeticType', 'description', 'ingredients', 'shades', 'sources',
                  'minAge', 'status', 'scans', 'source', 'reviewed', 'addedBy', 'addedAtUnix', 'barcode'])
             // "barcode": the digits under the product's barcode, when the camera saw them
             && request.resource.data.get('barcode', '') is string
@@ -107,12 +107,39 @@ service cloud.firestore {
             && request.resource.data.ingredients.size() >= 1
             && request.resource.data.ingredients.size() <= 80
             && request.resource.data.shades is list
-            && request.resource.data.shades.size() <= 12);
+            && request.resource.data.shades.size() <= 12
+            && request.resource.data.get('sources', []) is list
+            && request.resource.data.get('sources', []).size() <= 10);
       // the app may add exactly 1 to "scans" (a scan was recognised as this product) and change nothing else
       allow update: if isAdmin()
         || (signedIn()
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['scans'])
             && request.resource.data.scans == resource.data.get('scans', 0) + 1);
+    }
+
+    // A web-found list for a product already in the catalogue is submitted for an admin to review.
+    // The app cannot alter the catalogue entry itself or read other users' proposals.
+    match /productIngredientSuggestions/{suggestionId} {
+      allow read, update, delete: if isAdmin();
+      allow create: if addedByTheApp()
+        && request.resource.data.keys().hasOnly([
+             'productId', 'productName', 'brandName', 'ingredients', 'sources', 'source', 'status', 'reviewed', 'addedBy', 'addedAtUnix'])
+        && request.resource.data.productId is string
+        && request.resource.data.productId.size() >= 1
+        && request.resource.data.productId.size() <= 128
+        && request.resource.data.productName is string
+        && request.resource.data.productName.size() >= 1
+        && request.resource.data.productName.size() <= 100
+        && request.resource.data.brandName is string
+        && request.resource.data.brandName.size() <= 60
+        && request.resource.data.ingredients is list
+        && request.resource.data.ingredients.size() >= 3
+        && request.resource.data.ingredients.size() <= 80
+        && request.resource.data.sources is list
+        && request.resource.data.sources.size() >= 1
+        && request.resource.data.sources.size() <= 10
+        && request.resource.data.source == 'web'
+        && request.resource.data.status == 'Pending';
     }
 
     match /ingredients/{ingredientId} {

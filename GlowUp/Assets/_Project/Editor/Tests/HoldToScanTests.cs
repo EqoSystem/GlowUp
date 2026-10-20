@@ -1,11 +1,13 @@
 using System.Collections.Generic;
+using GlowUp.Common;
 using GlowUp.Scan;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace GlowUp.Tests
 {
     /// <summary>
-    /// Checks the logic of hold-to-scan without a camera: the quality gate (FrameQuality), what tells the zones apart
+    /// Checks the logic of tap-to-scan without a camera: the button toggle, quality gate (FrameQuality), what tells the zones apart
     /// (ScanZones), putting the readings of many pictures together (ScanTextMerger), the ring (ScanEvidence) and its
     /// words (ScanGuidance). The ingredients used are in the app's built-in list.
     /// </summary>
@@ -22,6 +24,41 @@ namespace GlowUp.Tests
             ScanTextMerger.SeenToCount = 2; ScanTextMerger.QuietFramesForDone = 2;
             ScanEvidence.ClearLine = 0.55f; ScanEvidence.UsableLine = 0.3f; ScanEvidence.FrontPictures = 2;
             ScanEvidence.ViewsAround = 3; ScanEvidence.NewViewBelow = 0.4f; ScanEvidence.ColourPictures = 2; ScanEvidence.MinimumIngredients = 2;
+        }
+
+        [Test]
+        public void EachTapTogglesScanningOnAndOff()
+        {
+            var gameObject = new GameObject("TapToScanButtonTest");
+            try
+            {
+                HoldToScanButton button = gameObject.AddComponent<HoldToScanButton>();
+                int started = 0, paused = 0;
+                button.ScanStarted += () => started++;
+                button.ScanPaused += () => paused++;
+
+                button.OnPointerDown(null);
+                Assert.IsFalse(button.IsScanning, "scanning starts on tap release, not while the finger is down");
+                Assert.AreEqual(0, started);
+                button.OnPointerUp(null);
+                Assert.IsTrue(button.IsScanning);
+                Assert.AreEqual(1, started);
+
+                button.OnPointerDown(null);
+                button.OnPointerUp(null);
+                Assert.IsFalse(button.IsScanning);
+                Assert.AreEqual(1, paused);
+
+                button.OnPointerDown(null);
+                button.OnPointerUp(null);
+                Assert.IsTrue(button.IsScanning, "the next tap resumes scanning");
+                Assert.AreEqual(2, started);
+            }
+            finally
+            {
+                Object.DestroyImmediate(gameObject);
+                SwipeSceneNavigator.Suppressed = false;
+            }
         }
 
         // ------------------------------------------------------------------------------------ pictures made of numbers
@@ -292,6 +329,24 @@ namespace GlowUp.Tests
         }
 
         [Test]
+        public void ProductNameAndTypeSurviveInTheSameFrameAsTheIngredientList()
+        {
+            var ring = new ScanEvidence();
+            ScanEvidence.Result result = ring.Add(
+                Frame("EVER BILENA SPLASH RED", "LIP TINT", "INGREDIENTS: Aqua, Glycerin, Mica, Dimethicone"),
+                new ScanEvidence.Known { brandSeen = true });
+
+            Assert.IsTrue(result.zones[(int)ScanZone.Front]);
+            StringAssert.Contains("EVER BILENA SPLASH RED", ring.FrontText);
+            StringAssert.Contains("LIP TINT", ring.FrontText);
+            StringAssert.DoesNotContain("INGREDIENTS", ring.FrontText);
+            for (int i = 0; i < 20; i++)
+                ring.Add(Frame("EVER BILENA SPLASH RED", "LIP TINT", "INGREDIENTS: Aqua, Glycerin, Mica, Dimethicone"),
+                    new ScanEvidence.Known { brandSeen = true });
+            CollectionAssert.AreEqual(new[] { "Aqua", "Glycerin", "Mica", "Dimethicone" }, ring.Text.CountedNames());
+        }
+
+        [Test]
         public void TheIngredientZoneGrowsAndThenFills()
         {
             var ring = new ScanEvidence();
@@ -405,10 +460,10 @@ namespace GlowUp.Tests
         {
             var words = new ScanGuidance.Words();
             var ring = new ScanEvidence();
-            Assert.AreEqual("Hold the button and show the product.", ScanGuidance.Status(words, false, false, 0, false));
-            Assert.AreEqual("Holding, 2 of 5", ScanGuidance.Status(words, true, true, 2, false));
-            Assert.AreEqual("Paused at 2 of 5. Hold the button to go on.", ScanGuidance.Status(words, false, true, 2, false));
-            Assert.AreEqual("Got it!", ScanGuidance.Status(words, true, true, 5, true));
+            Assert.AreEqual("Tap once to start scanning.", ScanGuidance.Status(words, false, false, false));
+            Assert.AreEqual("Recognizing the product...", ScanGuidance.Status(words, true, true, false));
+            Assert.AreEqual("Paused. Tap once to continue.", ScanGuidance.Status(words, false, true, false));
+            Assert.AreEqual("Got it!", ScanGuidance.Status(words, true, true, true));
 
             // a fault of the picture comes before what is missing
             Assert.AreEqual(words.glare, ScanGuidance.Hint(words, FrameQuality.Fault.Glare, ring));

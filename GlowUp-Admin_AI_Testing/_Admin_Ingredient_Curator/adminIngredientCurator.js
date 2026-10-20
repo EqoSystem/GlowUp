@@ -60,7 +60,8 @@ let editingIngredientId = null;
 let modal = null;
 let fromProducts = [];                // ingredient names the inventory's products list that the Curator has no entry for: [{ key, name, products[] }]
 let fdaBrands = [];                   // the brands whose products were checked on the FDA Philippines list (for the helper line)
-let assisted = null;                  // the AI draft that fills the open form: { sources, model } (null = the form was written by hand)
+let assisted = null;                  // description draft evidence: { sources, model } (null = the description was written by hand)
+let ingredientAiDrafts = [];
 let org = null;                       // folders, the Recycle bin, picking and dragging
 let openId = "";                      // the card whose details are open
 let quick = "";                       // a filter a helper switched on: "" | a key of QUICK
@@ -134,10 +135,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         binKeys: () => binIngredients.map((item) => item.id),
         move: moveToFolder, bin: moveToBin, restore: restoreFromBin, purge: purgeFromBin,
         renameFolder: (from, to) => refolder(from, to), deleteFolder: (name) => refolder(name, ""),
+        selectionActions: () => [
+            { label: "Assist with AI", className: "bar-main", tip: "Draft sourced descriptions for selected ingredients.", icon: icon("sparkle"), run: assistSelectedIngredients },
+            { label: "Approve All", className: "bar-quiet", tip: "Approve only selected AI entries that are still waiting for review.", run: approveSelectedIngredients }
+        ],
         onView: () => { fromFirstPage(); }
     });
     setAssistPage("curator");
     registerHelpers();
+    el("ingredientAiDraftList").addEventListener("change", updateIngredientDraftApproval);
+    el("ingredientApproveAllBtn").addEventListener("click", approveIngredientDrafts);
 
     wireSearch(el("ingredientSearchInput"), el("ingredientSearchClear"), fromFirstPage);
     el("moreMenuBtn").addEventListener("click", (event) => openMenu(event.currentTarget, [
@@ -414,7 +421,7 @@ function renderFromProducts(term, typed) {
                     <dt>In the app</dt><dd>No entry here yet: the app uses its own built-in knowledge for it, or looks it up when it is scanned.</dd>
                 </dl>
                 <div class="detail-actions"><button type="button" class="row-btn main" data-act="write" data-name="${escapeHtml(x.name)}" data-tip="Opens the form with the name filled in. You write what it is and how the app should judge it.">${icon("plus")}Write its entry</button>`
-                    + `<button type="button" class="row-btn" data-act="assist" data-name="${escapeHtml(x.name)}" data-tip-title="Assist with AI" data-tip="The AI searches credible sources and fills the form as a DRAFT, with the pages it used. Nothing is saved until you have read it and pressed Save.">${icon("sparkle")}Assist with AI</button></div>
+                    + `<button type="button" class="row-btn" data-act="assist" data-name="${escapeHtml(x.name)}" data-tip-title="Assist with AI" data-tip="The AI searches credible sources and drafts only the ingredient description. Nothing is saved until you have read it and pressed Save.">${icon("sparkle")}Assist with AI</button></div>
             </div>`;
         return `
             <article class="ingredient-card from-product${open ? " open" : ""}" data-id="new:${escapeHtml(x.key)}" tabindex="0" aria-expanded="${open}">
@@ -542,7 +549,7 @@ function writeFit(container, avoid, good) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Assist with AI: a DRAFT of one entry, with the pages it came from (the server function api/assist-ingredient.js)
+// Assist with AI: a DRAFT of the description only, with source pages (the server function api/assist-ingredient.js)
 // ---------------------------------------------------------------------------------------------
 const ASSIST_PER_DAY = 40;                    // drafts one browser may ask for in a day, so a slip cannot use up the AI's quota
 const ASSIST_KEY = "glowup.curator.assist";
@@ -564,7 +571,7 @@ function assistSources(pages) {
         + (p.credible ? `<span class="chip good">credible source</span>` : `<span class="chip">other site</span>`)).join("<br>");
 }
 
-/** Asks the server for a draft of `name` and fills the open form with it. The admin reads it, corrects it and saves. */
+/** Asks the server for a description draft of `name`; other ingredient fields stay under the admin's control. */
 async function assistWithAi(name) {
     const note = el("ingredientReviewNote"), form = el("addIngredientForm"), saveButton = el("saveIngredientBtn");
     const say = (html) => { note.innerHTML = html; note.style.display = ""; };
@@ -582,28 +589,20 @@ async function assistWithAi(name) {
             answer = await fetch("/api/assist-ingredient", {
                 method: "POST", signal: stop.signal,
                 headers: { "Content-Type": "application/json", Authorization: "Bearer " + (await user.getIdToken()) },
-                body: JSON.stringify({ name })
+                body: JSON.stringify({ mode: "description", name })
             });
         } finally { clearTimeout(timer); }
         assistsToday(true);
         const body = await answer.json().catch(() => ({}));
         if (!answer.ok) throw new Error(body.error || "The AI could not be reached (error " + answer.status + ").");
         if (!dialogIsOpen() || el("ingredientTechInput").value.trim() !== name.trim()) return;      // the form was closed or used for something else meanwhile
-        if (!body.found) { say(`<b>No draft.</b> ${escapeHtml(body.message || "The AI found nothing credible.")}<br>${assistSources(body.sources)}`); return; }
+        if (!body.found) { say(`<b>No description draft.</b> ${escapeHtml(body.message || "The AI found nothing credible.")}<br>${assistSources(body.sources)}`); return; }
 
         const d = body.draft;
-        el("ingredientNameInput").value = d.name; el("ingredientTechInput").value = d.techName; el("ingredientDescInput").value = d.description;
-        el("ingredientAliasesInput").value = d.aliases.join(", "); el("ingredientRiskInput").value = d.riskLevel;
-        el("ingredientMinAgeInput").value = d.minAge > 0 ? d.minAge : ""; el("ingredientCautionInput").value = d.cautionNote; el("ingredientUsesInput").value = d.commonUses;
-        el("ingredientKeyActiveInput").checked = d.keyActive; el("ingredientUmbrellaInput").checked = d.umbrella;
-        writeChecks(el("allergenTagsChecks"), d.allergenTags);
-        writeFit(el("skinTypesFit"), d.avoidForSkinTypes, d.goodForSkinTypes);
-        writeFit(el("conditionsFit"), d.avoidForConditions, d.goodForConditions);
+        el("ingredientDescInput").value = d.description;
         assisted = { sources: body.sources || [], model: body.model || "" };
         const backupNote = body.notes && body.notes.length > 0 ? `<br><span class="field-hint">Before it answered: ${escapeHtml(body.notes.join("; "))}.</span>` : "";
-        const sure = { high: "The AI is fairly sure of this draft.", medium: "The AI is only partly sure of this draft.", low: "The AI is NOT sure of this draft." }[d.confidence] || "";
-        say(`<b>This is a draft the AI wrote. Nothing is saved yet.</b> ${sure} Read every box against the sources, correct what is wrong, then press Save.`
-            + (body.credibleSources === 0 ? " <b>None of its pages is on the list of credible sources: check with extra care.</b>" : "")
+        say(`<b>This is a description-only draft. Nothing is saved yet.</b> Read it against the sources, correct what is wrong, then press Save.`
             + (body.searched === false ? `<br><b>This draft was written WITHOUT a web search (by ${escapeHtml(body.model || "a backup AI")}), from the AI's memory. It names no sources, so every box is unchecked: check it with the links below.</b>` : "")
             + `<br><b>Sources:</b><br>${assistSources(body.sources)}`
             + `<br><b>Check it yourself:</b> ` + (body.lookups || []).map((l) => `<a class="source-link" href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.title)}</a>`).join(" · ")
@@ -614,6 +613,142 @@ async function assistWithAi(name) {
         setFormError(form, "");
     } finally {
         setBusy(saveButton, false);
+    }
+}
+
+async function askCuratorAi(name) {
+    const user = auth.currentUser;
+    if (!user) throw new Error("You are signed out. Sign in again.");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 75000);
+    let response;
+    try {
+        response = await fetch("/api/assist-ingredient", {
+            method: "POST",
+            signal: controller.signal,
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + (await user.getIdToken()) },
+            body: JSON.stringify({ mode: "description", name })
+        });
+    } finally {
+        clearTimeout(timeout);
+    }
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || `The AI could not be reached (error ${response.status}).`);
+    return result;
+}
+
+function paintIngredientDrafts() {
+    const panel = el("ingredientAiDraftPanel"), list = el("ingredientAiDraftList");
+    panel.hidden = ingredientAiDrafts.length === 0;
+    el("ingredientAiDraftCount").textContent = many(ingredientAiDrafts.length, "draft", "drafts");
+    list.innerHTML = ingredientAiDrafts.map((draft, index) => {
+        const sources = (draft.sources || []).filter((source) => source && /^https:\/\//i.test(source.url || ""))
+            .map((source) => `<a class="source-link" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.title || source.site || source.url)}</a>`).join(" · ");
+        return `<article class="suggestion-card" data-draft-index="${index}">
+            <strong>${escapeHtml(titleOf(draft.item))}</strong>
+            <label class="field">Description draft <textarea data-draft-description rows="3" maxlength="600">${escapeHtml(draft.description)}</textarea></label>
+            <p class="field-hint">AI: ${escapeHtml(draft.model || "unknown model")}${draft.searched === false ? " (no web search; verify carefully)" : ""}</p>
+            <p class="field-hint">Sources: ${sources || "No source links were returned; verify this description yourself."}</p>
+            <label class="field-hint"><input type="checkbox" data-draft-reviewed> I checked this description against its sources.</label>
+        </article>`;
+    }).join("");
+    updateIngredientDraftApproval();
+}
+
+function updateIngredientDraftApproval() {
+    const button = el("ingredientApproveAllBtn");
+    if (button) button.disabled = !el("ingredientAiDraftList").querySelector("[data-draft-reviewed]:checked");
+}
+
+async function assistSelectedIngredients(keys) {
+    const selected = keys.map((id) => everyIngredient.find((item) => item.id === id && !item.binned)).filter((item) => item && (item.name || item.techName));
+    if (!selected.length) {
+        notify("Select at least one listed ingredient first.", "info");
+        return;
+    }
+    let completed = 0;
+    for (const item of selected) {
+        if (ingredientAiDrafts.some((draft) => draft.item.id === item.id)) continue;
+        try {
+            const answer = await askCuratorAi(item.techName || item.name);
+            if (!answer.found || !answer.draft || !answer.draft.description) throw new Error(answer.message || "No sourced description was found.");
+            ingredientAiDrafts.push({ item, description: answer.draft.description, sources: answer.sources || [], model: answer.model, searched: answer.searched });
+            completed++;
+        } catch (error) {
+            const reason = error && error.name === "AbortError" ? "The AI took too long." : describeError(error);
+            notify(`AI could not assist "${titleOf(item)}". ${reason}`, "error");
+        }
+    }
+    paintIngredientDrafts();
+    if (completed) notify(`${many(completed, "draft is", "drafts are")} ready. Check the sources and select the drafts you reviewed.`, "ok");
+}
+
+async function approveIngredientDrafts() {
+    const checked = Array.from(el("ingredientAiDraftList").querySelectorAll("[data-draft-reviewed]:checked"))
+        .map((checkbox) => Number(checkbox.closest("[data-draft-index]").dataset.draftIndex))
+        .filter((index) => Number.isInteger(index) && ingredientAiDrafts[index]);
+    if (!checked.length) return;
+    const drafts = checked.map((index) => ({
+        index,
+        entry: ingredientAiDrafts[index],
+        description: el("ingredientAiDraftList").querySelector(`[data-draft-index="${index}"] [data-draft-description]`).value.trim()
+    })).filter((draft) => draft.description);
+    if (!drafts.length) {
+        notify("Enter a description in at least one checked draft before approving.", "error");
+        return;
+    }
+    if (!(await askConfirm({
+        title: `Approve ${many(drafts.length, "reviewed description", "reviewed descriptions")}?`,
+        message: "Only checked descriptions are saved. Ingredient names and all risk or safety fields remain unchanged.",
+        items: drafts.map((draft) => titleOf(draft.entry.item)),
+        confirmLabel: "Approve All"
+    }))) return;
+    const ops = drafts.map(({ entry, description }) => {
+        const sources = entry.sources.map((source) => `${source.title || source.site || "web page"} | ${source.url}`).filter((source) => !source.endsWith(" | "));
+        return {
+            ref: doc(db, "ingredients", entry.item.id),
+            data: {
+                description,
+                source: entry.item.source || "aiassist",
+                sources: Array.from(new Set(entry.item.sources.concat(sources))),
+                webSearched: sources.length > 0,
+                aiAssistModel: entry.model || "",
+                reviewed: true,
+                reviewedAt: serverTimestamp(),
+                updatedAt: serverTimestamp()
+            }
+        };
+    });
+    try {
+        await saveOrReload(ops);
+        ingredientAiDrafts = ingredientAiDrafts.filter((entry) => !drafts.some((draft) => draft.entry === entry));
+        paintIngredientDrafts();
+        notify(`${many(drafts.length, "reviewed description was", "reviewed descriptions were")} saved.`, "ok");
+    } catch (error) {
+        notify("The reviewed descriptions were not saved. " + describeError(error), "error");
+    }
+}
+
+async function approveSelectedIngredients(keys) {
+    const selected = keys.map((id) => everyIngredient.find((item) => item.id === id && !item.binned && needsReview(item))).filter((item) => item);
+    if (!selected.length) {
+        notify("No selected ingredients are AI entries waiting for review.", "info");
+        return;
+    }
+    if (!(await askConfirm({
+        title: `Approve ${many(selected.length, "selected ingredient", "selected ingredients")}?`,
+        message: "This marks only existing AI-found entries as reviewed. It does not change descriptions or risk ratings.",
+        items: selected.map(titleOf),
+        confirmLabel: "Approve All"
+    }))) return;
+    try {
+        await saveOrReload(selected.map((item) => ({
+            ref: refOf(item),
+            data: { reviewed: true, reviewedAt: serverTimestamp(), updatedAt: serverTimestamp() }
+        })));
+        notify(`${many(selected.length, "ingredient was", "ingredients were")} approved.`, "ok");
+    } catch (error) {
+        notify("The selected ingredients were not approved. " + describeError(error), "error");
     }
 }
 

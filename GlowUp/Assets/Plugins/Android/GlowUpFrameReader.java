@@ -43,6 +43,7 @@ public final class GlowUpFrameReader {
          */
         void onResult(String lines, String barcode);
         void onError(String message);
+        default void onBarcode(String barcode) {}
     }
 
     private static final int MOST_LINES = 80;
@@ -84,7 +85,7 @@ public final class GlowUpFrameReader {
      */
     public static synchronized boolean read(final int[] pixels, final int width, final int height, final boolean wantBarcode, final Callback callback) {
         if (busy || callback == null || pixels == null || width <= 0 || height <= 0 || pixels.length < width * height) return false;
-        if (worker == null) worker = Executors.newSingleThreadExecutor();
+        if (worker == null) worker = Executors.newFixedThreadPool(2);
         busy = true;
         worker.execute(new Runnable() {
             @Override
@@ -93,13 +94,39 @@ public final class GlowUpFrameReader {
                 try {
                     bitmap = Bitmap.createBitmap(pixels, width, height, Bitmap.Config.ARGB_8888);
                     InputImage image = InputImage.fromBitmap(bitmap, 0);
-                    if (recognizer == null) recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
-                    Text text = Tasks.await(recognizer.process(image), 8, TimeUnit.SECONDS);
-                    String barcode = "";
+
+                    // 1. Kick off barcode / QR scanning in parallel - ultra fast (10-25ms)
+                    com.google.android.gms.tasks.Task<List<com.google.mlkit.vision.barcode.common.Barcode>> barcodeTask = null;
                     if (wantBarcode) {
-                        try { barcode = Barcodes.read(image, width, height); } catch (Throwable ignored) { }      // a build without the barcode library still reads text
+                        try {
+                            barcodeTask = Barcodes.getScanner().process(image);
+                            final float w = width, h = height;
+                            barcodeTask.addOnSuccessListener(new com.google.android.gms.tasks.OnSuccessListener<List<com.google.mlkit.vision.barcode.common.Barcode>>() {
+                                @Override
+                                public void onSuccess(List<com.google.mlkit.vision.barcode.common.Barcode> barcodes) {
+                                    String bc = Barcodes.formatCodes(barcodes, w, h);
+                                    if (bc != null && bc.length() > 0) {
+                                        try { callback.onBarcode(bc); } catch (Throwable ignored) { }
+                                    }
+                                }
+                            });
+                        } catch (Throwable ignored) { }
                     }
-                    callback.onResult(linesOf(text, width, height), barcode);
+
+                    // 2. Concurrently run text recognition
+                    if (recognizer == null) recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS);
+                    Text text = Tasks.await(recognizer.process(image), 6, TimeUnit.SECONDS);
+
+                    // 3. Collect barcode result if not yet collected
+                    String barcode = "";
+                    if (barcodeTask != null) {
+                        try {
+                            List<com.google.mlkit.vision.barcode.common.Barcode> codes = Tasks.await(barcodeTask, 2, TimeUnit.SECONDS);
+                            barcode = Barcodes.formatCodes(codes, width, height);
+                        } catch (Throwable ignored) { }
+                    }
+
+                    callback.onResult(linesOf(text, width, height), barcode != null ? barcode : "");
                 } catch (Throwable t) {
                     try { callback.onError(String.valueOf(t.getMessage() != null ? t.getMessage() : t)); } catch (Throwable ignored) { }
                 } finally {
@@ -144,21 +171,35 @@ public final class GlowUpFrameReader {
     private static final class Barcodes {
         private static com.google.mlkit.vision.barcode.BarcodeScanner scanner;
 
-        static String read(InputImage image, float width, float height) throws Exception {
+        static com.google.mlkit.vision.barcode.BarcodeScanner getScanner() {
             if (scanner == null) {
                 scanner = com.google.mlkit.vision.barcode.BarcodeScanning.getClient(
                         new com.google.mlkit.vision.barcode.BarcodeScannerOptions.Builder()
                                 .setBarcodeFormats(
+                                        com.google.mlkit.vision.barcode.common.Barcode.FORMAT_QR_CODE,
                                         com.google.mlkit.vision.barcode.common.Barcode.FORMAT_EAN_13,
                                         com.google.mlkit.vision.barcode.common.Barcode.FORMAT_EAN_8,
                                         com.google.mlkit.vision.barcode.common.Barcode.FORMAT_UPC_A,
-                                        com.google.mlkit.vision.barcode.common.Barcode.FORMAT_UPC_E)
+                                        com.google.mlkit.vision.barcode.common.Barcode.FORMAT_UPC_E,
+                                        com.google.mlkit.vision.barcode.common.Barcode.FORMAT_CODE_128,
+                                        com.google.mlkit.vision.barcode.common.Barcode.FORMAT_CODE_39,
+                                        com.google.mlkit.vision.barcode.common.Barcode.FORMAT_DATA_MATRIX)
                                 .build());
             }
-            List<com.google.mlkit.vision.barcode.common.Barcode> codes = Tasks.await(scanner.process(image), 4, TimeUnit.SECONDS);
+            return scanner;
+        }
+
+        static String read(InputImage image, float width, float height) throws Exception {
+            List<com.google.mlkit.vision.barcode.common.Barcode> codes = Tasks.await(getScanner().process(image), 3, TimeUnit.SECONDS);
+            return formatCodes(codes, width, height);
+        }
+
+        static String formatCodes(List<com.google.mlkit.vision.barcode.common.Barcode> codes, float width, float height) {
+            if (codes == null) return "";
             for (com.google.mlkit.vision.barcode.common.Barcode code : codes) {
                 String value = code.getRawValue();
-                if (value == null || value.length() < 8) continue;
+                if (value == null || value.trim().length() < 3) continue;
+                value = value.trim();
                 Rect box = code.getBoundingBox();
                 if (box == null || width <= 0 || height <= 0) return value;
                 return value + '\t' + (box.left / width) + '\t' + (box.top / height) + '\t' + (box.right / width) + '\t' + (box.bottom / height);

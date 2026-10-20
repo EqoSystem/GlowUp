@@ -13,7 +13,7 @@ namespace GlowUp.Result
 {
     /// <summary>
     /// AI Smart Analysis Result: shows one analysed product - its verdict (status pill and one line), what the
-    /// FDA Philippines list says about it, the compatibility matrix, key-ingredient chips with where the ingredient
+    /// FDA Philippines list says about it, a direct verification-portal link, the compatibility matrix, key-ingredient chips with where the ingredient
     /// list came from (the pages as buttons), "Why this result?" (the long text, behind a button), shades that suit the
     /// user, the advice to see a dermatologist, and a list of alternative products.
     /// Each fact has ONE place on the screen: nothing is said twice.
@@ -50,10 +50,14 @@ namespace GlowUp.Result
         [Tooltip("{0} = number of ingredients")]
         [SerializeField] private string allIngredientsFormat = "See all {0} ingredients";
         [SerializeField] private IngredientSheet ingredientSheet;
+        [SerializeField] private TextMeshProUGUI ingredientBreakdownText;
 
         [Header("FDA Philippines, and where the ingredient list came from")]
         [Tooltip("The badge that says what the FDA Philippines list answered (in the product card)")]
         [SerializeField] private FdaBadgeView fdaBadge;
+        [Tooltip("Opens the FDA Philippines verification portal directly from the result card")]
+        [SerializeField] private Button fdaVerificationButton;
+        [SerializeField] private string fdaVerificationUrl = "https://verification.fda.gov.ph/";
         [Tooltip("One short line under the ingredient chips: where the list came from")]
         [SerializeField] private TextMeshProUGUI listSourceText;
         [Tooltip("The row the page buttons are put in")]
@@ -170,6 +174,7 @@ namespace GlowUp.Result
             if (tryOnButton != null) tryOnButton.onClick.AddListener(() => { ScanSession.TryOn = record; SceneNavigator.Go(tryOnScene); });
             if (allIngredientsButton != null) allIngredientsButton.onClick.AddListener(() => { if (ingredientSheet != null && record != null) ingredientSheet.Show(record); });
             if (dermatologistButton != null) dermatologistButton.onClick.AddListener(() => Application.OpenURL(dermatologistUrl));
+            if (fdaVerificationButton != null) fdaVerificationButton.onClick.AddListener(OpenFdaVerification);
             if (alternativesButton != null) alternativesButton.onClick.AddListener(ShowAlternatives);
             if (renameButton != null) renameButton.onClick.AddListener(BeginRename);
             if (renameSaveButton != null) renameSaveButton.onClick.AddListener(SaveRename);
@@ -229,6 +234,7 @@ namespace GlowUp.Result
             bool has = record != null;
             if (tryOnButton != null) tryOnButton.interactable = has && ProductScope.CanTryOn(record);      // AR Try-On is for make-up only
             if (allIngredientsButton != null) allIngredientsButton.interactable = has;
+            if (fdaVerificationButton != null) fdaVerificationButton.interactable = has;
             if (renameButton != null) renameButton.gameObject.SetActive(has);
             if (!has)
             {
@@ -255,6 +261,7 @@ namespace GlowUp.Result
             if (age != null) age.Bind(record.ageMatch);
 
             ShowChips();
+            ShowIngredientBreakdown();
             ShowProof();
             ShowShades();
 
@@ -263,6 +270,15 @@ namespace GlowUp.Result
         }
 
         static void Set(TextMeshProUGUI label, string value) { if (label != null) label.text = value ?? ""; }
+
+        void OpenFdaVerification()
+        {
+            if (Uri.TryCreate(fdaVerificationUrl, UriKind.Absolute, out Uri uri) &&
+                (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+                Application.OpenURL(uri.AbsoluteUri);
+            else
+                Debug.LogWarning("Result: FDA Philippines verification URL is invalid.");
+        }
 
         void ShowChips()
         {
@@ -286,6 +302,22 @@ namespace GlowUp.Result
                 chip.Clicked += name => { if (ingredientSheet != null) ingredientSheet.Show(record, name); };
                 chips.Add(chip.gameObject);
             }
+        }
+
+        void ShowIngredientBreakdown()
+        {
+            if (ingredientBreakdownText == null || record == null) return;
+            var lines = new List<string> { "Tap an ingredient to see what it does and why it matters for you." };
+            AddBreakdown(lines, "Skin-care active ingredients", record.skinCareActiveIngredients);
+            AddBreakdown(lines, "Base and texture formulators", record.baseTextureFormulators);
+            AddBreakdown(lines, "Pigments and preservatives", record.pigmentsPreservatives);
+            ingredientBreakdownText.text = string.Join("\n", lines);
+        }
+
+        static void AddBreakdown(List<string> lines, string heading, List<string> ingredients)
+        {
+            if (ingredients == null || ingredients.Count == 0) return;
+            lines.Add("<b>" + heading + ":</b> " + string.Join(", ", ingredients));
         }
 
         // ---------------------------------------------------------------------------------------
@@ -323,6 +355,8 @@ namespace GlowUp.Result
                 }
                 else if (has && from == "web" && record.listDateUnix > 0) line += " " + string.Format(listLookedUpOn, DayOf(record.listDateUnix));
                 if (has && (from == "web" || from == "inventory") && !string.IsNullOrWhiteSpace(listMayDiffer)) line += " " + listMayDiffer;
+                if (has && !string.IsNullOrWhiteSpace(record.officialIngredientSource))
+                    line += " Source: " + record.officialIngredientSource.Trim();
                 listSourceText.text = line;
             }
             ShowListCheck(from);

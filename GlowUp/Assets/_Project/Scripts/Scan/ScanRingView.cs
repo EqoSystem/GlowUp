@@ -8,7 +8,7 @@ namespace GlowUp.Scan
     /// <summary>
     /// The ring round the scan button: five segments, one for each thing the camera detects: brand name, product name,
     /// cosmetic type, barcode (when visible) and ingredient list. A segment lights up (gold, with a small pulse) when
-    /// its thing is detected, and it is bright only while the button is held. The checklist above the button
+    /// its thing is detected, and it is bright only while scanning is active. The checklist above the button
     /// names the same things. This object only draws; the scan screen says what was detected (ShowParts).
     ///
     /// Each segment is two Images that use a ring picture and Unity's "Filled, Radial 360" drawing: a faint Track (the
@@ -26,7 +26,7 @@ namespace GlowUp.Scan
         [SerializeField] private TextMeshProUGUI[] labels = new TextMeshProUGUI[ScanZones.Count];
         [Tooltip("The words, in the order of the segments (clockwise from the top)")]
         [SerializeField] private string[] partNames = { "Brand", "Name", "Type", "Barcode", "Ingredients" };
-        [Tooltip("How visible a lit segment is while the button is NOT held (1 = as bright as while holding)")]
+        [Tooltip("How visible a lit segment is while scanning is paused (1 = as bright as while scanning)")]
         [Range(0f, 1f)] [SerializeField] private float restingAlpha = 0.3f;
         [SerializeField] private Color labelIdleColor = new Color(0.45f, 0.4f, 0.4f, 0.75f);
 
@@ -99,19 +99,19 @@ namespace GlowUp.Scan
         /// <summary>
         /// What the ring shows since 12 October 2026: one segment for each thing the camera has DETECTED, in this order:
         /// brand name, product name, cosmetic type, barcode (when one is visible), ingredient list. `parts` = five
-        /// numbers 0 to 1. A segment is bright only while the button is held (`held`); let go, it rests faint.
+        /// numbers 0 to 1. A segment is bright only while scanning (`scanning`); when paused, it rests faint.
         /// </summary>
-        public void ShowParts(float[] parts, bool held)
+        public void ShowParts(float[] parts, bool scanning)
         {
             for (int i = 0; i < ScanZones.Count; i++) Set((ScanZone)i, parts != null && i < parts.Length ? parts[i] : 0f);
-            SetHeld(held);
+            SetScanning(scanning);
         }
 
-        /// <summary>The button is held (segments bright) or not (segments faint).</summary>
-        public void SetHeld(bool held)
+        /// <summary>Scanning is active (segments bright) or paused (segments faint).</summary>
+        public void SetScanning(bool scanning)
         {
-            if (live == held) return;
-            live = held;
+            if (live == scanning) return;
+            live = scanning;
             Paint(true);
         }
 

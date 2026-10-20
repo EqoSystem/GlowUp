@@ -40,7 +40,7 @@ namespace GlowUp.Scan
         /// <summary>More than this share of burnt-out pixels = glare.</summary>
         public static float GlareShare = 0.18f;
         /// <summary>The picture changed more than this since the one before = the phone is moving fast.</summary>
-        public static float MovingAbove = 0.06f;
+        public static float MovingAbove = 0.12f;
         /// <summary>Edges less crisp than this = out of focus.</summary>
         public static float BlurBelow = 0.4f;
         /// <summary>Focus is only judged when the strongest edges are at least this strong (a plain surface has no edges to judge).</summary>
