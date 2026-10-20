@@ -1,4 +1,4 @@
-// The parts every admin page is built from (no database code in here):
+// The parts every admin page is built from (no database code in here; the Refresh data button only calls adminStore.js):
 //   icons            - one set of thin-line icons, drawn as SVG (no emoji, no picture files)
 //   theme            - dark / light, remembered on this computer; follows the computer's setting until chosen
 //   mountShell       - the sidebar (with its flowing highlight) and the top bar (title, layout name, theme button)
@@ -10,6 +10,7 @@
 // The display layouts (arranging panels, panel kinds, fonts and colours) live in adminLayouts.js;
 // the data panels (lists, grids, graphs) in adminWidgets.js.
 import { initLayouts, applyAppearance } from "./adminLayouts.js";
+import { refreshData, REFRESH_COOLDOWN_MS } from "./adminStore.js";   // only for the "Refresh data" button
 
 // ---------------------------------------------------------------------------------------------
 // Icons
@@ -131,6 +132,43 @@ export function mountThemeToggle(host) {
 // The page frame
 // ---------------------------------------------------------------------------------------------
 /**
+ * The "Refresh data" button of the top bar: downloads brands, products and ingredients again in full (adminStore.js allows
+ * it once a minute). Skipped without an error when the top bar has no tools area; it can never stop mountShell.
+ */
+function addRefreshDataButton(topbar) {
+    try {
+        const tools = topbar ? topbar.querySelector(".topbar-tools") : null;
+        if (!tools) return;
+        const idleText = "Refresh data";
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "operator-chip";
+        button.id = "refreshDataButton";
+        button.setAttribute("data-tip", "Download brands, products and ingredients again in full (about 700 reads). Possible once a minute.");
+        button.textContent = idleText;
+        const cool = (seconds) => {
+            button.disabled = true;
+            button.textContent = idleText + " (" + seconds + " s)";
+            const tick = setInterval(() => {
+                seconds -= 1;
+                if (seconds <= 0) { clearInterval(tick); button.disabled = false; button.textContent = idleText; }
+                else button.textContent = idleText + " (" + seconds + " s)";
+            }, 1000);
+        };
+        button.addEventListener("click", async () => {
+            button.disabled = true;
+            button.textContent = "Refreshing…";
+            let wait = 0;
+            try { wait = await refreshData(); } catch (error) { console.error("Refresh data failed:", error); }
+            cool(wait > 0 ? wait : Math.round(REFRESH_COOLDOWN_MS / 1000));
+        });
+        tools.prepend(button);
+    } catch (error) {
+        console.warn("The Refresh data button could not be added:", error);
+    }
+}
+
+/**
  * Builds the sidebar and the top bar round the page's <main class="main-content" data-title data-subtitle>.
  * Call it first on every admin page. page = "dashboard" | "inventory" | "curator".
  */
@@ -147,8 +185,9 @@ export function mountShell(page) {
     wireNavDrop(sidebar.querySelector(".nav-links"));
     topbar.querySelector(".topbar-tools").innerHTML = `<button type="button" class="operator-chip" id="operatorChip" data-tip-title="Display layout" data-tip="Arrange and resize the panels, turn a panel into a list, a grid or a graph, pick a font and colours, and save it under your name." data-tip-preview="The contents never change, only how they are shown.">${icon("sliders")}<span id="operatorName">Default layout</span></button>`;
     mountThemeToggle(topbar.querySelector(".topbar-tools"));
+    addRefreshDataButton(topbar);
 
-    const bar = document.createElement("div");
+    const bar =document.createElement("div");
     bar.className = "editing-bar";
     bar.innerHTML = `${icon("layout")}<span><b>Arranging.</b> Drag a panel to move it; drag its right or bottom edge to resize it.</span><span class="spacer"></span>
         <button type="button" class="btn" id="addPanelBtn">${icon("plus")}Panel</button>

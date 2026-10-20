@@ -9,10 +9,11 @@
 //                                      on an ingredient with source "ai": found by the app's AI lookup, not checked yet
 import { db } from "../_Database/firebase-console.js";
 import {
-    collection, getCountFromServer, query, where, orderBy, limit, onSnapshot, doc, serverTimestamp
+    collection, query, where, orderBy, limit, doc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-// the brand list comes from the site's own copy when another page has read it already (see adminStore.js)
-import { getDocs, updateDoc, writeBatch, onListsRefreshed } from "../_Shared/adminStore.js";
+// the brand list comes from the site's own copy when another page has read it already (see adminStore.js);
+// getCountFromServer and onSnapshot come from there too, so that every read is counted in the console
+import { getDocs, updateDoc, writeBatch, onListsRefreshed, getCountFromServer, onSnapshot } from "../_Shared/adminStore.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, escapeHtml, asArray, toWholeNumber, timeAgo, formatWhen, startOfTodayUnix,
     notify, describeError, toneBadge
@@ -28,6 +29,10 @@ const activityPage = { page: 1, size: PAGE_SIZE };
 const suggestionPage = { page: 1, size: PAGE_SIZE };
 let recentScans = [];
 const TOP_BRANDS = 5;
+const TODAY_LIMIT = 200;              // the live "today" listener reads at most this many scans; the exact total comes from one count
+const COUNT_EVERY_MS = 60 * 1000;     // that count is asked for at most once a minute
+let lastCountAt = 0;                  // when it was last asked for
+let exactToday = null;                // its answer (null = not asked yet, or the day has fewer scans than the limit)
 
 const el = (id) => document.getElementById(id);
 let stopToday = null;                 // switches the "today" listener off (it is restarted when the date changes)
@@ -202,8 +207,20 @@ async function loadReviewQueue() {
 function watchScansToday() {
     if (stopToday) stopToday();
     todayStart = startOfTodayUnix();
-    const today = query(collection(db, "scanActivity"), where("scannedAtUnix", ">=", todayStart));
+    exactToday = null; lastCountAt = 0;
+    const sinceMidnight = where("scannedAtUnix", ">=", todayStart);
+    const today = query(collection(db, "scanActivity"), sinceMidnight, orderBy("scannedAtUnix", "desc"), limit(TODAY_LIMIT));
     stopToday = onSnapshot(today, (snapshot) => {
+        const capped = snapshot.size >= TODAY_LIMIT;
+        if (capped && Date.now() - lastCountAt >= COUNT_EVERY_MS) {
+            lastCountAt = Date.now();
+            getCountFromServer(query(collection(db, "scanActivity"), sinceMidnight)).then((counted) => {
+                exactToday = counted.data().count;
+                scansToday = exactToday;
+                setMetric("totalScansCount", exactToday, "Scans made in the app since midnight (exact count)");
+            }).catch((error) => console.warn("Could not count today's scans:", error));
+        }
+        if (!capped) exactToday = null;
         let flagged = 0;
         const results = { safe: 0, caution: 0, harmful: 0 };
         snapshot.forEach((d) => {
@@ -212,13 +229,13 @@ function watchScansToday() {
             results[status === "safe" || status === "harmful" ? status : "caution"]++;
         });
         todayResults = results;
-        scansToday = snapshot.size;
+        scansToday = capped && exactToday !== null ? exactToday : snapshot.size;
         flaggedToday = flagged;
         renderResults(results);
         datasetChanged("results");
         refreshAssist("numbers");
-        setMetric("totalScansCount", snapshot.size, "Scans made in the app since midnight");
-        setMetric("flaggedAllergensCount", flagged, "Scans today in which one of the user's own allergens was found");
+        setMetric("totalScansCount", capped ? (exactToday !== null ? exactToday : TODAY_LIMIT + "+") : snapshot.size, "Scans made in the app since midnight");
+        setMetric("flaggedAllergensCount", flagged, "Scans today in which one of the user's own allergens was found" + (capped ? " (among the latest " + TODAY_LIMIT + ")" : ""));
     }, (error) => {
         console.error("Error watching today's scans: ", error);
         setMetric("totalScansCount", "–", describeError(error));
