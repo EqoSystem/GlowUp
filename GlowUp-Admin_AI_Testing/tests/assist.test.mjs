@@ -3,7 +3,7 @@
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const handler = require("../api/assist-ingredient.js");
-const { firstObject, tidy, tidyProduct, tidyBrand, tidyImport, importQuestion, descriptionQuestion, brandQuestion, isCredible, searchResultUrl, chatContent } = handler.helpers;
+const { ingredientImportQuestion, tidyIngredientImport, firstObject, tidy, tidyProduct, tidyBrand, tidyImport, importQuestion, descriptionQuestion, brandQuestion, isCredible, searchResultUrl, chatContent } = handler.helpers;
 
 let checks = 0, failed = 0;
 const check = (ok, what) => { checks++; if (!ok) { failed++; console.log("FAILED: " + what); } };
@@ -252,6 +252,20 @@ equal(share(50, 2), 30, "with Groq and Mistral behind it, Gemini may take 30 of 
 check(share(20, 2) < 3, "when Gemini has used up its part, no further Gemini call is started");
 equal(share(20, 1), 10, "Groq then has 10 seconds, with 10 kept for Mistral");
 equal(share(10, 0), 10, "and Mistral has the last 10");
+
+// ingredient-only import: brand and product fields never come through
+const ingImport = tidyIngredientImport({ ingredients: [
+    { name: "Niacinamide", techName: "Niacinamide", aliases: ["Vitamin B3"], description: "A form of vitamin B3.", riskLevel: "SAFE", brandName: "Glow", productName: "Tint", price: "9" },
+    { name: "niacinamide" },
+    { name: "" },
+    { name: "Parfum", riskLevel: "made up", cautionNote: "It can irritate." }
+], products: [{ brandName: "Glow", productName: "Tint" }] });
+equal(ingImport.ingredients.length, 2, "ingredient import drops duplicate and nameless rows");
+check(ingImport.ingredients.every((row) => !("brandName" in row) && !("productName" in row) && !("price" in row)), "ingredient import never copies brand or product fields");
+equal(ingImport.ingredients[0].riskLevel, "safe", "ingredient import keeps a valid risk level");
+equal(ingImport.ingredients[1].riskLevel, "", "ingredient import drops an unknown risk level");
+equal(ingImport.ingredients[1].cautionNote, "can irritate", "ingredient import trims the caution note");
+check(/untrusted data/.test(ingredientImportQuestion("x")) && /IGNORE them/.test(ingredientImportQuestion("x")), "ingredient import asks the AI to ignore brands and products");
 
 console.log("checks made: " + checks);
 console.log(failed === 0 ? "ALL PASSED" : failed + " FAILED");

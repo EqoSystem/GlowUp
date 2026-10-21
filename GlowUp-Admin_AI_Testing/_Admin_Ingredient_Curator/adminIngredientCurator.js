@@ -26,13 +26,16 @@ import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed } from "../_Sh
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
     notify, describeError, setBusy, setFormError, renderChecks, readChecks, writeChecks, originLabel, sourceLinks, wireSearch,
-    ALLERGEN_FAMILIES, SKIN_TYPES, SKIN_CONDITIONS, dialogIsOpen, statusBadge, toneBadge
+    SKIN_TYPES, dialogIsOpen, statusBadge, toneBadge
 } from "../_Shared/adminCommon.js";
 import { matchesSearch } from "../_Shared/glowupRules.js";
 import { auth } from "../_Database/firebase-console.js";
 import { cleanupPlan, ingredientDuplicates, ingredientLookalikes, ingredientIssues, mergeIngredients } from "../_Shared/glowupCatalog.js";
 import { openPlanDialog, openDuplicatesDialog } from "../_Shared/adminCleanup.js";
-import { mountShell, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm } from "../_Shared/adminShell.js";
+import { mountShell, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
+import { readAdminDocument } from "../_Shared/adminDocumentReader.js";
+import { loadLists, optionsOf, allOptions, openListManager } from "../_Shared/adminLists.js";
+import { BUILT_IN_HIGHLIGHTS } from "../_Shared/listRules.js";
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
@@ -65,7 +68,7 @@ let ingredientAiDrafts = [];
 let org = null;                       // folders, the Recycle bin, picking and dragging
 let openId = "";                      // the card whose details are open
 let quick = "";                       // a filter a helper switched on: "" | a key of QUICK
-const view = { sort: "name" };        // the order; remembered in this browser
+const view = { sort: "name", layout: "rows" };        // the order and the look of the list (rows or cards); remembered in this browser
 
 const el = (id) => document.getElementById(id);
 const RISK_LEVELS = ["safe", "caution", "harmful"];
@@ -112,16 +115,24 @@ const QUICK = {
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
-    try { const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || "{}"); if (SORTS.some((s) => s.id === saved.sort)) view.sort = saved.sort; } catch (error) { /* first visit */ }
+    try { const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || "{}"); if (SORTS.some((s) => s.id === saved.sort)) view.sort = saved.sort; if (saved.layout === "cards") view.layout = "cards"; } catch (error) { /* first visit */ }
     registerData();                   // before the page frame: a saved layout may hold panels that show this data
     mountShell("curator");
     wireSignOut();
     setupNavigationGuard();
     await requireAdmin();
 
-    renderChecks(el("allergenTagsChecks"), "allergenTags", ALLERGEN_FAMILIES);
+    await loadLists();                // allergen families, highlights and skin conditions: one document, built-in lists when it is missing
     renderFit(el("skinTypesFit"), "skinType", SKIN_TYPES);
-    renderFit(el("conditionsFit"), "condition", SKIN_CONDITIONS);
+    renderPickers(null);
+    el("addIngredientForm").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-list-edit]");
+        if (!button) return;
+        openListManager(button.dataset.listEdit, {
+            ingredients: () => everyIngredient,                 // also the ones in the Recycle bin: restoring one must not point at a deleted item
+            onSaved: async () => { renderPickers(editingIngredientId ? everyIngredient.find((i) => i.id === editingIngredientId) || null : null); renderIngredients(); }
+        });
+    });
 
     modal = setupModal(el("addIngredientModal"), () => { editingIngredientId = null; });
 
@@ -162,6 +173,33 @@ document.addEventListener("DOMContentLoaded", async () => {
         SORTS.map((s) => ({ label: s.label, checked: s.id === view.sort, run: () => { view.sort = s.id; try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) { /* private window */ } fromFirstPage(); } })))));
     el("ingredientQuick").addEventListener("click", () => { quick = ""; fromFirstPage(); });
     el("addIngredientBtn").addEventListener("click", () => openIngredientForm(null));
+    el("quickAddIngredient").addEventListener("click", () => openIngredientForm(null));
+    el("curatorQuickTiles").addEventListener("click", (event) => {
+        const tile = event.target.closest(".tile[data-source]");
+        if (tile) narrow(tile.dataset.source || "", tile.dataset.risk || "");
+    });
+    Array.from(el("listLayoutSwitch").querySelectorAll(".seg")).forEach((button) => button.addEventListener("click", () => {
+        view.layout = button.dataset.layout === "cards" ? "cards" : "rows";
+        try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) { /* private window */ }
+        paintListLayout();
+    }));
+    paintListLayout();
+    // import of ingredient data from a file
+    el("chooseIngredientFileBtn").addEventListener("click", () => el("ingredientFileInput").click());
+    el("ingredientDropBox").addEventListener("click", () => el("ingredientFileInput").click());
+    el("ingredientFileInput").addEventListener("change", (event) => {
+        const file = event.target.files && event.target.files[0];
+        event.target.value = "";
+        if (file) importIngredientFile(file);
+    });
+    el("ingredientDropBox").addEventListener("dragover", (event) => { event.preventDefault(); event.currentTarget.classList.add("drag-over"); });
+    el("ingredientDropBox").addEventListener("dragleave", (event) => event.currentTarget.classList.remove("drag-over"));
+    el("ingredientDropBox").addEventListener("drop", (event) => {
+        event.preventDefault();
+        event.currentTarget.classList.remove("drag-over");
+        const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+        if (file) importIngredientFile(file);
+    });
     el("addIngredientForm").addEventListener("submit", saveIngredient);
     el("ingredientsList").addEventListener("click", onListClick);
     el("ingredientsList").addEventListener("dblclick", (event) => {
@@ -178,6 +216,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 function fromFirstPage() { pageState.page = 1; renderIngredients(); }
+
+/** Rows (one ingredient per line) or cards: the list's look. */
+function paintListLayout() {
+    el("ingredientsList").classList.toggle("as-rows", view.layout !== "cards");
+    Array.from(el("listLayoutSwitch").querySelectorAll(".seg")).forEach((button) => {
+        const on = button.dataset.layout === view.layout;
+        button.classList.toggle("on", on);
+        button.setAttribute("aria-pressed", String(on));
+    });
+}
 /** Narrows the list to one origin and one risk level (a count tile, a graph or a helper does this). */
 function narrow(source, risk) {
     el("ingredientSearchInput").value = "";
@@ -212,6 +260,8 @@ async function loadIngredients() {
                 minAge: toWholeNumber(data.minAge),
                 keyActive: data.keyActive === true,
                 umbrella: data.umbrella === true,
+                highlights: asArray(data.highlights),
+                chemicalDescription: String(data.chemicalDescription || ""),
                 allergenTags: asArray(data.allergenTags),
                 avoidForSkinTypes: asArray(data.avoidForSkinTypes),
                 goodForSkinTypes: asArray(data.goodForSkinTypes),
@@ -292,6 +342,7 @@ function afterChange() {
     everyIngredient.sort(byName);
     ingredients = everyIngredient.filter((item) => !item.binned);
     binIngredients = everyIngredient.filter((item) => item.binned);
+    setBinCount(binIngredients.length, "ingredients");
     if (org) org.sync(everyIngredient.map((item) => item.id));
     fillSourceFilter();
     renderIngredients();
@@ -319,6 +370,18 @@ function usedInProducts(item) {
     return total;
 }
 
+/** Draws the allergen, highlight and condition pickers from the lists; what is ticked stays ticked, and a retired item an ingredient already has is still offered. */
+function renderPickers(item) {
+    const allergens = readChecks(el("allergenTagsChecks")), highlights = readChecks(el("highlightTagsChecks"));
+    const conditions = readFit(el("conditionsFit"));
+    renderChecks(el("allergenTagsChecks"), "allergenTags", optionsOf("allergens", (item ? item.allergenTags : []).concat(allergens)));
+    renderChecks(el("highlightTagsChecks"), "highlights", optionsOf("highlights", (item ? item.highlights : []).concat(highlights)).filter((o) => !BUILT_IN_HIGHLIGHTS.includes(o.value)));
+    renderFit(el("conditionsFit"), "condition", optionsOf("conditions", (item ? item.avoidForConditions.concat(item.goodForConditions) : []).concat(conditions.avoid, conditions.good)));
+    writeChecks(el("allergenTagsChecks"), allergens);
+    writeChecks(el("highlightTagsChecks"), highlights);
+    writeFit(el("conditionsFit"), conditions.avoid, conditions.good);
+}
+
 const labelOf = (options, value) => {
     const match = options.find((o) => o.value.toLowerCase() === String(value).toLowerCase());
     return match ? match.label : value;
@@ -341,8 +404,21 @@ function proofLines(item) {
     return lines;
 }
 
+/** The Quick actions tiles: only what waits gets a tile. Numbers already loaded; nothing is asked of the database. */
+function paintQuick() {
+    const review = ingredients.filter(needsReview).length;
+    const harmful = ingredients.filter((i) => i.riskLevel === "harmful").length;
+    const unexplained = productUseKnown ? fromProducts.length : 0;
+    const tiles = [];
+    if (review > 0) tiles.push(`<button type="button" class="tile review" data-source="review" data-risk="" data-tip-title="Ingredients waiting for review" data-tip="Ingredients the app's AI lookup or an import found. Until you approve one, the app uses its warnings but never counts it as proof of safety." data-tip-preview="Shows only these entries.">${icon("inbox")}<span class="tile-title">${many(review, "ingredient", "ingredients")} waiting for review</span>${icon("right")}</button>`);
+    if (unexplained > 0) tiles.push(`<button type="button" class="tile" data-source="${FROM_PRODUCTS}" data-risk="" data-tip-title="Not explained yet" data-tip="Ingredients that listed products contain and that have no entry here yet." data-tip-preview="Shows only these names.">${icon("lipstick")}<span class="tile-title">${unexplained} from products, not explained</span>${icon("right")}</button>`);
+    if (harmful > 0) tiles.push(`<button type="button" class="tile" data-source="" data-risk="harmful" data-tip-title="Marked harmful" data-tip="Ingredients marked Harmful here." data-tip-preview="Shows only these entries.">${icon("alert")}<span class="tile-title">${harmful} marked harmful</span>${icon("right")}</button>`);
+    el("curatorQuickTiles").innerHTML = tiles.length ? tiles.join("") : `<p class="field-hint">Nothing is waiting for you.</p>`;
+}
+
 /** The four counts above the list; a click on one filters the list. */
 function paintStats() {
+    paintQuick();
     const inBin = org.view.kind === "bin";
     const source = el("ingredientSourceFilter").value, risk = el("ingredientRiskFilter").value;
     const tiles = [
@@ -352,10 +428,15 @@ function paintStats() {
         { label: "Caution", value: ingredients.filter((i) => i.riskLevel === "caution").length, iconName: "shield", source: "", risk: "caution", tip: "Ingredients marked Caution here." },
         { label: "From products, not explained", value: fromProducts.length, iconName: "lipstick", source: FROM_PRODUCTS, risk: "", tip: "Ingredients the inventory's products list that have no entry here yet. The app uses its built-in knowledge for them." }
     ];
-    el("curatorStats").innerHTML = tiles.map((t) => `
-        <button type="button" class="stat${!inBin && t.source === source && t.risk === risk && (source || risk) ? " on" : ""}" data-source="${t.source}" data-risk="${t.risk}" data-tip-title="${escapeHtml(t.label)}" data-tip="${escapeHtml(t.tip)}" data-tip-preview="Click: the list shows only these.">
-            <span class="stat-icon">${icon(t.iconName)}</span><span><span class="stat-value">${t.value}</span><span class="stat-title">${escapeHtml(t.label)}</span></span>
-        </button>`).join("");
+    // the tiles and their labels are fixed HTML (they show before any data): only the numbers and the chosen one change here
+    const buttons = Array.from(el("curatorStats").querySelectorAll(".stat"));
+    tiles.forEach((t, index) => {
+        const button = buttons[index];
+        if (!button) return;
+        const value = button.querySelector(".stat-value");
+        if (value) { value.textContent = String(t.value); value.classList.remove("skeleton"); }
+        button.classList.toggle("on", !inBin && t.source === source && t.risk === risk && !!(source || risk));
+    });
 }
 
 function renderIngredients() {
@@ -470,6 +551,7 @@ function detailOf(item, inBin) {
     const facts = [];
     // the risk is on the card's own badge (with what it means in its tooltip): it is not said a second time here
     facts.push(["Definition", escapeHtml(item.description || "No description provided.")]);
+    if (item.chemicalDescription) facts.push(["What the chemical is", escapeHtml(item.chemicalDescription)]);
     if (item.aliases.length > 0) facts.push(["Also known as", escapeHtml(item.aliases.join(", "))]);
     if (item.commonUses) facts.push(["Used in", escapeHtml(item.commonUses)]);
     else if (item.usesBroken) facts.push(["Used in", `<span class="chip warn" data-tip="An older build of the app wrote text here that is not a description. It is not shown to anyone. Edit and save to replace it.">text from the app could not be read</span>`]);
@@ -479,11 +561,12 @@ function detailOf(item, inBin) {
     if (item.keyActive) chips.push(`<span class="chip pink">Key active</span>`);
     if (item.umbrella) chips.push(`<span class="chip warn">Umbrella term</span>`);
     if (item.minAge > 0) chips.push(`<span class="chip warn">Age ${item.minAge}+</span>`);
-    item.allergenTags.forEach((t) => chips.push(`<span class="chip warn">Allergen: ${escapeHtml(labelOf(ALLERGEN_FAMILIES, t))}</span>`));
+    item.highlights.forEach((t) => chips.push(`<span class="chip pink">Highlight: ${escapeHtml(labelOf(allOptions("highlights"), t))}</span>`));
+    item.allergenTags.forEach((t) => chips.push(`<span class="chip warn">Allergen: ${escapeHtml(labelOf(allOptions("allergens"), t))}</span>`));
     item.avoidForSkinTypes.forEach((t) => chips.push(`<span class="chip warn">Avoid: ${escapeHtml(labelOf(SKIN_TYPES, t))} skin</span>`));
-    item.avoidForConditions.forEach((t) => chips.push(`<span class="chip warn">Avoid: ${escapeHtml(labelOf(SKIN_CONDITIONS, t))}</span>`));
+    item.avoidForConditions.forEach((t) => chips.push(`<span class="chip warn">Avoid: ${escapeHtml(labelOf(allOptions("conditions"), t))}</span>`));
     item.goodForSkinTypes.forEach((t) => chips.push(`<span class="chip good">Good: ${escapeHtml(labelOf(SKIN_TYPES, t))} skin</span>`));
-    item.goodForConditions.forEach((t) => chips.push(`<span class="chip good">Good: ${escapeHtml(labelOf(SKIN_CONDITIONS, t))}</span>`));
+    item.goodForConditions.forEach((t) => chips.push(`<span class="chip good">Good: ${escapeHtml(labelOf(allOptions("conditions"), t))}</span>`));
     if (chips.length > 0) facts.push(["For the app", chips.join("")]);
 
     if (productUseKnown) { const used = usedInProducts(item); facts.push(["In products", used === 0 ? "Not in any listed product yet" : many(used, "listed product", "listed products")]); }
@@ -589,7 +672,7 @@ async function assistWithAi(name) {
             answer = await fetch("/api/assist-ingredient", {
                 method: "POST", signal: stop.signal,
                 headers: { "Content-Type": "application/json", Authorization: "Bearer " + (await user.getIdToken()) },
-                body: JSON.stringify({ mode: "description", name })
+                body: JSON.stringify(payload)
             });
         } finally { clearTimeout(timer); }
         assistsToday(true);
@@ -616,7 +699,91 @@ async function assistWithAi(name) {
     }
 }
 
+// ---------------------------------------------------------------------------------------------
+// Import ingredients from a file: ingredient data ONLY, saved as Pending (source "ai", not reviewed) for an admin to check
+// ---------------------------------------------------------------------------------------------
+const IMPORT_TYPES = ["docx", "xlsx", "pdf"];
+const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
+const IMPORT_MAX_ROWS = 60;
+
+async function importIngredientFile(file) {
+    const status = el("ingredientImportStatus"), choose = el("chooseIngredientFileBtn"), dropbox = el("ingredientDropBox");
+    const report = (message, failed) => { status.textContent = message; status.classList.toggle("error", !!failed); };
+    const extension = String(file.name || "").split(".").pop().toLowerCase();
+    if (!IMPORT_TYPES.includes(extension)) { report("Only .docx, .xlsx and .pdf files are accepted. The file was not read.", true); return; }
+    if (file.size > IMPORT_MAX_BYTES) { report("The file is larger than 5 MB. Split it into smaller files and try again.", true); return; }
+    if (assistsToday(false) >= ASSIST_PER_DAY) { report(`The AI was used ${ASSIST_PER_DAY} times today in this browser. Try again tomorrow.`, true); return; }
+    setBusy(choose, true, "Analyzing...");
+    dropbox.disabled = true;
+    try {
+        report(`Reading "${file.name}" in this browser...`, false);
+        const documentText = await readAdminDocument(file);
+        report("Asking the AI to pick out the ingredients. Only the extracted text is sent, not the file.", false);
+        const body = await askCuratorApi({ mode: "ingredientImport", documentText });
+        assistsToday(true);
+        if (!body.found || !body.draft || !Array.isArray(body.draft.ingredients) || body.draft.ingredients.length === 0) {
+            report(body.message || "No ingredient records were found. Nothing was saved.", true);
+            return;
+        }
+        const result = await saveImportedIngredients(body.draft.ingredients);
+        if (result.saved === 0) {
+            report(`Nothing new was saved. ${result.skippedDuplicates} already in the list or the Recycle bin, ${result.skippedInvalid} incomplete.`, true);
+            return;
+        }
+        const skipped = result.skippedDuplicates + result.skippedInvalid;
+        const summary = `Saved ${many(result.saved, "ingredient", "ingredients")} as Pending for review` + (skipped ? `; skipped ${skipped} duplicate or incomplete.` : ".") + (body.model ? ` Read by ${body.model}.` : "");
+        report(summary, false);
+        notify(summary, "ok");
+        await loadIngredients();
+    } catch (error) {
+        console.error("Importing the ingredient file failed: ", error);
+        const reason = error && error.name === "AbortError" ? "The AI took too long." : (error && error.message) || "Something went wrong.";
+        report(`Import failed. ${reason}`, true);
+        notify(`The file was not imported. ${reason}`, "error");
+    } finally {
+        setBusy(choose, false);
+        dropbox.disabled = false;
+    }
+}
+
+/** Writes new ingredient entries only (never changes one that exists). Only ingredient fields are copied from a record. */
+async function saveImportedIngredients(records) {
+    const batch = writeBatch(db);
+    const planned = new Set();
+    let saved = 0, skippedDuplicates = 0, skippedInvalid = 0;
+    records.slice(0, IMPORT_MAX_ROWS).forEach((record) => {
+        const name = String(record.name || "").replace(/\s+/g, " ").trim().slice(0, 80);
+        if (name.length < 2) { skippedInvalid++; return; }
+        const techName = String(record.techName || "").replace(/\s+/g, " ").trim().slice(0, 120) || name;
+        const aliases = (Array.isArray(record.aliases) ? record.aliases : []).map((a) => String(a).replace(/\s+/g, " ").trim().slice(0, 80)).filter(Boolean).slice(0, 6);
+        const mine = [name, techName, ...aliases].map(sameKey).filter((k) => k.length > 0);
+        if (mine.some((k) => planned.has(k)) || everyIngredient.some((other) => keysOf(other).some((k) => mine.includes(k)))) { skippedDuplicates++; return; }
+        mine.forEach((k) => planned.add(k));
+        const risk = ["safe", "caution", "harmful"].includes(record.riskLevel) ? record.riskLevel : "";
+        batch.set(doc(collection(db, "ingredients")), {
+            name, techName, aliases,
+            description: String(record.description || "").replace(/\s+/g, " ").trim().slice(0, 300),
+            riskLevel: risk,
+            cautionNote: String(record.cautionNote || "").replace(/\s+/g, " ").trim().slice(0, 120).replace(/^it\s+/i, "").replace(/\.$/, ""),
+            commonUses: "", minAge: 0, keyActive: false, umbrella: false,
+            allergenTags: [], avoidForSkinTypes: [], goodForSkinTypes: [], avoidForConditions: [], goodForConditions: [],
+            folder: "",
+            // "ai" + not reviewed is the existing Pending state: the app uses such an entry as a warning at most, never as proof of safety
+            source: "ai", reviewed: false, via: "document-import",
+            createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+        });
+        saved++;
+    });
+    if (saved === 0) return { saved, skippedDuplicates, skippedInvalid };
+    await batch.commit();
+    return { saved, skippedDuplicates, skippedInvalid };
+}
+
 async function askCuratorAi(name) {
+    return askCuratorApi({ mode: "description", name });
+}
+
+async function askCuratorApi(payload) {
     const user = auth.currentUser;
     if (!user) throw new Error("You are signed out. Sign in again.");
     const controller = new AbortController();
@@ -930,13 +1097,17 @@ function openIngredientForm(item) {
     el("ingredientTechInput").value = item ? item.techName : "";
     el("ingredientDescInput").value = item ? item.description : "";
     el("ingredientAliasesInput").value = item ? item.aliases.join(", ") : "";
+    el("ingredientChemInput").value = item ? item.chemicalDescription : "";
+    el("ingredientSourcesInput").value = item ? item.sources.join("\n") : "";
     el("ingredientRiskInput").value = item ? item.riskLevel : "";
     el("ingredientMinAgeInput").value = item && item.minAge > 0 ? item.minAge : "";
     el("ingredientCautionInput").value = item ? item.cautionNote : "";
     el("ingredientUsesInput").value = item ? item.commonUses : "";
+    renderPickers(item);
     el("ingredientKeyActiveInput").checked = item ? item.keyActive : false;
     el("ingredientUmbrellaInput").checked = item ? item.umbrella : false;
     writeChecks(el("allergenTagsChecks"), item ? item.allergenTags : []);
+    writeChecks(el("highlightTagsChecks"), item ? item.highlights : []);
     writeFit(el("skinTypesFit"), item ? item.avoidForSkinTypes : [], item ? item.goodForSkinTypes : []);
     writeFit(el("conditionsFit"), item ? item.avoidForConditions : [], item ? item.goodForConditions : []);
     modal.open();
@@ -962,6 +1133,10 @@ async function saveIngredient(event) {
     if (!name) { setFormError(form, "Type the ingredient name."); el("ingredientNameInput").focus(); return; }
     if (!techName) { setFormError(form, "Type the technical / scientific name (the name printed on labels)."); el("ingredientTechInput").focus(); return; }
     if (!description) { setFormError(form, "Write a short user-friendly definition."); el("ingredientDescInput").focus(); return; }
+    // reference links: one per line, "Title | https://..." or just the address; only https is kept
+    const sourceLines = el("ingredientSourcesInput").value.split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
+    const badLine = sourceLines.find((line) => { try { return new URL((line.split("|").pop() || "").trim()).protocol !== "https:"; } catch (error) { return true; } });
+    if (badLine) { setFormError(form, "Each reference link must contain a web address that starts with https://  (" + badLine.slice(0, 50) + ")"); el("ingredientSourcesInput").focus(); return; }
     if (minAgeText !== "" && (!/^\d+$/.test(minAgeText) || minAge > 99)) { setFormError(form, "Minimum age must be a whole number from 0 to 99."); el("ingredientMinAgeInput").focus(); return; }
 
     // the same ingredient must not be in the list twice (any of its names matching any name of another entry)
@@ -977,6 +1152,9 @@ async function saveIngredient(event) {
         commonUses: clean("ingredientUsesInput"),
         minAge,
         keyActive: el("ingredientKeyActiveInput").checked,
+        highlights: readChecks(el("highlightTagsChecks")),
+        chemicalDescription: el("ingredientChemInput").value.replace(/\s+/g, " ").trim().slice(0, 600),
+        sources: sourceLines.slice(0, 10),
         umbrella: el("ingredientUmbrellaInput").checked,
         allergenTags: readChecks(el("allergenTagsChecks")),
         avoidForSkinTypes: avoidTypes,
@@ -1147,8 +1325,8 @@ function registerData() {
             { id: "risk", label: "Risk level", of: (i) => i.riskLevel || "auto", keys: ["harmful", "caution", "safe", "auto"], labelOf: (k) => RISK_NAMES[k] || k, tone: toneOfRisk, pick: (k) => narrow("", k) },
             { id: "origin", label: "Where it came from", of: (i) => originLabel(i.source) || "Typed on this website" },
             { id: "review", label: "Checked or not", of: (i) => (needsReview(i) ? "Waiting for review" : "Checked"), keys: ["Waiting for review", "Checked"], tone: (k) => (k === "Checked" ? "ok" : "info"), pick: (k) => narrow(k === "Checked" ? "" : "review", "") },
-            { id: "allergen", label: "Allergen family", of: (i) => i.allergenTags.map((t) => labelOf(ALLERGEN_FAMILIES, t)), none: "No allergen family" },
-            { id: "avoid", label: "Skin condition to avoid it", of: (i) => i.avoidForConditions.map((t) => labelOf(SKIN_CONDITIONS, t)), none: "None" },
+            { id: "allergen", label: "Allergen family", of: (i) => i.allergenTags.map((t) => labelOf(allOptions("allergens"), t)), none: "No allergen family" },
+            { id: "avoid", label: "Skin condition to avoid it", of: (i) => i.avoidForConditions.map((t) => labelOf(allOptions("conditions"), t)), none: "None" },
             { id: "skin", label: "Skin type to avoid it", of: (i) => i.avoidForSkinTypes.map((t) => labelOf(SKIN_TYPES, t)), none: "None" },
             { id: "used", label: "Used in a listed product", of: (i) => (usedInProducts(i) > 0 ? "In a listed product" : "Not in any product"), keys: ["In a listed product", "Not in any product"] },
             { id: "folder", label: "Folder", of: (i) => i.folder || null, none: "No folder", pick: (k) => org.show(k === "No folder" ? { kind: "all" } : { kind: "folder", name: k }) }

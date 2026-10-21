@@ -5,10 +5,11 @@
 // page are on screen with the first picture. Nothing fixed waits for the sign-in check or for data any more: only the
 // places where real data will appear show a loading shape (they are part of each page's own HTML).
 //
-//   - An admin who was signed in on this browser before gets the frame at once (html.frame-first). The page cannot be
-//     used until the sign-in check has passed, and no data is asked for before that: the check itself is unchanged.
-//   - Somebody this browser does not know sees GlowUp's own loading mark until the check has answered, and is then
-//     sent to the login page as before.
+//   - EVERY visit gets the frame at once (html.frame-first): the static shell (menu, title, panel headings, fixed
+//     labels) never waits for the sign-in check or for data. Only the data containers (counts, lists, tables) show a
+//     loading shape. The page cannot be used until the sign-in check has passed, and no data is asked for before that:
+//     the check itself is unchanged, and somebody who is not an admin is sent to the login page as before (the frame
+//     holds no data, only fixed text).
 //   - When the check does not answer within 10 seconds, a message with a "Try again" button shows instead of an
 //     endless loading screen.
 //   - Resting the pointer on a menu link fetches that page ahead, so it opens without a wait.
@@ -28,15 +29,21 @@
         box: '<path d="M21 8l-9-5-9 5 9 5 9-5z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/>',
         flask: '<path d="M9 3h6"/><path d="M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/><path d="M7.5 15h9"/>',
         bin: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/>',
+        camera: '<path d="M4 8h3.2l1.8-2.5h6l1.8 2.5H20v11H4z"/><circle cx="12" cy="13.2" r="3.6"/>',
+        chevron: '<path d="M15 6l-6 6 6 6"/>',
         logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>'
     };
     var NAV = [
         { id: "dashboard", label: "Dashboard", icon: "dashboard", href: "../_Admin_Dashboard/adminDashboard.html" },
         { id: "inventory", label: "Brand & Product Inventory", icon: "box", href: "../_Admin_Brand_Inventory/adminBrandInventory.html" },
         { id: "curator", label: "Ingredient Curator", icon: "flask", href: "../_Admin_Ingredient_Curator/adminIngredientCurator.html" }
+        // (Pending Snapshot Reviews is a window inside Brand & Product Inventory since 22 October 2026, not a page of its own)
         // (no menu entry for the Recycle Bin since 12 October 2026: the bin is opened INSIDE Brand & Product Inventory and
         //  inside Ingredient Curator, each with its own "Recycle bin" chip; both read the same database)
     ];
+    // the menu can be folded to its icons; the choice is kept in this browser (and applied before the menu is drawn)
+    var FOLD_KEY = "glowup.sidebar.folded";
+    try { if (localStorage.getItem(FOLD_KEY) === "1") root.classList.add("sb-collapsed"); } catch (error) { /* a private window */ }
     var esc = function (value) { return String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); };
     var svg = function (name) { return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + (ICON[name] || ICON.logo) + "</svg>"; };
 
@@ -47,9 +54,10 @@
         var sidebar = document.createElement("aside");
         sidebar.className = "sidebar";
         sidebar.innerHTML =
-            '<div class="sidebar-brand"><div class="brand-logo">' + svg("logo") + '</div>' +
-            '<div class="brand-text"><h1 class="brand-title">GlowUp</h1><p class="brand-subtitle">Admin Portal</p></div></div>' +
-            '<ul class="nav-links" aria-label="Pages"><li class="nav-drop" aria-hidden="true"></li>' +
+            '<div class="sidebar-brand"><div class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"></div>' +
+            '<div class="brand-text"><h1 class="brand-title">GlowUp</h1><p class="brand-subtitle">Admin Portal</p></div>' +
+            '<button type="button" class="sidebar-toggle" id="sidebarToggle" aria-controls="sidebarNav">' + svg("chevron") + '</button></div>' +
+            '<ul class="nav-links" id="sidebarNav" aria-label="Pages"><li class="nav-drop" aria-hidden="true"></li>' +
             NAV.map(function (n) {
                 var here = n.id === page;
                 // the page you are on is marked on the link itself (and for screen readers), not by where the pointer is
@@ -59,12 +67,25 @@
             '<div class="sidebar-footer"><p class="signed-in-as" aria-live="polite">&nbsp;</p>' +
             '<a href="../_Index/index.html" class="sign-out" title="Sign out">' + svg("logout") + '<span class="label">Sign Out</span></a></div>';
         document.body.insertBefore(sidebar, main);
+        var toggle = sidebar.querySelector("#sidebarToggle");
+        var paintToggle = function () {
+            var folded = root.classList.contains("sb-collapsed");
+            var text = folded ? "Expand the menu" : "Collapse the menu";
+            toggle.setAttribute("aria-expanded", folded ? "false" : "true");
+            toggle.setAttribute("aria-label", text);
+            toggle.title = text;
+        };
+        paintToggle();
+        toggle.addEventListener("click", function () {
+            var folded = root.classList.toggle("sb-collapsed");
+            try { localStorage.setItem(FOLD_KEY, folded ? "1" : "0"); } catch (error) { /* not kept */ }
+            paintToggle();
+        });
 
         var topbar = document.createElement("header");
         topbar.className = "topbar";
         topbar.innerHTML =
-            '<div class="topbar-titles"><h2 class="header-title">' + esc(main.getAttribute("data-title") || "") + "</h2>" +
-            '<p class="header-subtitle">' + esc(main.getAttribute("data-subtitle") || "") + "</p></div>" +
+            '<div class="topbar-titles"><h2 class="header-title">' + esc(main.getAttribute("data-title") || "") + "</h2></div>" +
             '<div class="topbar-tools"></div>';
         main.insertBefore(topbar, main.firstChild);
 
@@ -111,9 +132,8 @@
         document.body.appendChild(box);
     }
 
-    var known = false;
-    try { known = localStorage.getItem("glowup.admin.known") === "1"; } catch (error) { /* a private window */ }
-    if (known && main) { root.classList.add("frame-first"); build(); }
+    // the static shell is drawn at once on every visit; only a page without a <main> (none today) falls back to the loading mark
+    if (main) { root.classList.add("frame-first"); build(); }
     else brandLoader();
     setTimeout(stuck, 10000);
 

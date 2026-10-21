@@ -196,8 +196,20 @@ async function loadReviewQueue() {
     } catch (error) {
         console.warn("Could not count the ingredients waiting for review: ", error);
     }
+    // products app users sent as a photo (pending_products): one count query, 1 read
+    let waitingSnapshots = 0;
+    try {
+        const snapshots = await getCountFromServer(query(collection(db, "pending_products"), where("isApproved", "==", false)));
+        waitingSnapshots = snapshots.data().count;
+        if (waitingSnapshots > 0) {
+            el("reviewSnapshotsTitle").textContent = many(waitingSnapshots, "product photo", "product photos") + " waiting for review";
+            el("reviewSnapshotsTile").style.display = "";
+        }
+    } catch (error) {
+        console.warn("Could not count the photos waiting for review: ", error);           // the tile simply stays hidden
+    }
     // with nothing waiting, only the two shortcuts are left (the menu on the left has them too): the panel folds to one line
-    const waitingNow = (waitingInventory || 0) + (waitingIngredients || 0);
+    const waitingNow = (waitingInventory || 0) + (waitingIngredients || 0) + waitingSnapshots;
     setPanelQuiet("actions", waitingNow === 0, waitingNow === 0 ? "Nothing is waiting for review" : `${many(waitingNow, "entry waits", "entries wait")} for review`);
 }
 

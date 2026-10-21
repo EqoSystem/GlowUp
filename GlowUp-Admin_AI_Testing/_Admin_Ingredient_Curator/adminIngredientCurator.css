@@ -35,3 +35,20 @@
 .suggestion-card .field { display: grid; gap: 6px; margin: 12px 0; }
 .suggestion-card .field textarea { width: 100%; }
 .suggestion-card [data-draft-reviewed] { margin-right: 6px; }
+
+/* ---- the list as rows (the default): name | scientific name and badges | actions, one ingredient per line ---- */
+.ingredients-list.as-rows { grid-template-columns: 1fr; gap: 6px; }
+.as-rows .ingredient-card:not(.open) { flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 14px; padding: 7px 14px; }
+.as-rows .ingredient-card:not(.open) > .card-head { display: contents; }
+.as-rows .ingredient-card:not(.open) .pick { order: 0; flex: none; }
+.as-rows .ingredient-card:not(.open) .ingredient-name { order: 1; flex: 1 1 34%; min-width: 0; }
+.as-rows .ingredient-card:not(.open) .card-head .spacer { display: none; }
+.as-rows .ingredient-card:not(.open) .card-sub { order: 2; flex: 1 1 46%; min-width: 0; }
+.as-rows .ingredient-card:not(.open) .row-actions { order: 3; flex: none; }
+.as-rows .ingredient-card:not(.open) .ingredient-tech { padding-left: 0; }
+@media (max-width: 620px) {
+    .as-rows .ingredient-card:not(.open) { flex-wrap: wrap; row-gap: 2px; }
+    .as-rows .ingredient-card:not(.open) .ingredient-name { flex: 1 1 60%; }
+    .as-rows .ingredient-card:not(.open) .card-sub { flex: 1 1 100%; order: 3; }
+    .as-rows .ingredient-card:not(.open) .row-actions { order: 2; }
+}

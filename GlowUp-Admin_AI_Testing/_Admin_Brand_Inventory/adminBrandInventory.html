@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GlowUp Admin - Brand &amp; Product Inventory</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="../_Shared/assets/glowup-icon-32.png">
     <script>
         // dark or light before anything is drawn: the person's choice, else the computer's own setting
         (function () {
@@ -43,19 +44,9 @@
         <script src="../_Shared/pageFrame.js"></script>
         <div class="board">
 
-            <!-- the counts; a click on one filters the table -->
-            <section class="panel bare" data-panel="counts" data-label="Counts" data-w="12">
-                <div class="stat-row">
-                    <button type="button" class="stat" data-show="" data-tip-title="Everything" data-tip="Show every brand and product."><span class="stat-icon"><i data-icon="tag"></i></span><span><span class="stat-value skeleton" id="statBrands">00</span><span class="stat-title">Brands</span></span></button>
-                    <button type="button" class="stat" data-show="" data-tip-title="Everything" data-tip="Show every brand and product."><span class="stat-icon"><i data-icon="lipstick"></i></span><span><span class="stat-value skeleton" id="statProducts">00</span><span class="stat-title">Products</span></span></button>
-                    <button type="button" class="stat" data-show="review" data-tip-title="Waiting for review" data-tip="Entries the app added from a scan or that were imported, and products whose kind is not clear. The app does not use them until you have dealt with them." data-tip-preview="Click: the table shows only these."><span class="stat-icon"><i data-icon="inbox"></i></span><span><span class="stat-value skeleton" id="statReview">00</span><span class="stat-title">Waiting for review</span></span></button>
-                    <button type="button" class="stat" data-show="out" data-tip-title="Not make-up" data-tip="Skin care, hair, body, nail and fragrance products. GlowUp is for make-up only." data-tip-preview="Click: the table shows only these, ready to go to the Recycle bin."><span class="stat-icon"><i data-icon="ban"></i></span><span><span class="stat-value skeleton" id="statOut">00</span><span class="stat-title">Not make-up</span></span></button>
-                </div>
-            </section>
-
             <!-- find and add -->
-            <section class="panel" data-panel="tools" data-label="Search and actions" data-w="12">
-                <div class="toolbar">
+            <section class="panel" data-panel="tools" data-label="Search and actions" data-w="8">
+                <div class="toolbar inv-tools">
                     <div class="search-container">
                         <i data-icon="search"></i>
                         <input type="text" placeholder="Search brands and products" class="search-input" id="inventorySearchInput" autocomplete="off" aria-label="Search brands and products">
@@ -64,22 +55,27 @@
                     <select id="brandFilterSelect" class="toolbar-select" aria-label="Show one brand only">
                         <option value="">All brands</option>
                     </select>
-                    <!-- what to show is chosen with the count tiles above; this box only keeps the choice -->
+                    <!-- what to show is chosen with the count tiles below; this box only keeps the choice -->
                     <select id="reviewFilterSelect" aria-label="What to show" hidden>
                         <option value="">Everything</option>
                     </select>
-                    <button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most scanned, newest, type, or what needs attention first." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button>
-                    <div class="segmented" id="viewSwitch" role="group" aria-label="How the products are listed">
-                        <button type="button" class="seg" data-mode="brands" data-tip-title="Brands" data-tip="Each brand with its products under it."><i data-icon="layers"></i>Brands</button>
-                        <button type="button" class="seg" data-mode="all" data-tip-title="All products" data-tip="Every product in one list, without the brand rows." data-tip-preview="Ten at a time, in the order chosen with Sort."><i data-icon="list"></i>All products</button>
+                    <div class="tool-group end">
+                        <span id="inventoryNotes"></span>
+                        <button type="button" class="icon-btn" id="moreMenuBtn" aria-label="More" aria-haspopup="menu" data-tip-title="More" data-tip="Clean up, find duplicates, open or close every brand, add the FDA Philippines catalogue."><i data-icon="more"></i></button>
+                        <button type="button" class="primary-btn" id="addMenuBtn" aria-haspopup="menu" data-tip-title="Add" data-tip="Add a brand, or a product to a brand that is listed already." data-tip-preview="Choose Brand or Product; a form opens."><i data-icon="plus"></i>Add</button>
                     </div>
-                    <span class="spacer"></span>
-                    <button type="button" class="icon-btn" id="moreMenuBtn" aria-label="More" aria-haspopup="menu" data-tip-title="More" data-tip="Clean up, find duplicates, open or close every brand, add the FDA Philippines catalogue."><i data-icon="more"></i></button>
-                    <button type="button" class="primary-btn" id="addMenuBtn" aria-haspopup="menu" data-guide="Add a brand, or a product to a brand that is listed already." data-guide-title="Add" data-guide-preview="Choose Brand or Product; a form opens."><i data-icon="plus"></i>Add</button>
+                    <div class="tool-group view">
+                        <button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most scanned, newest, type, or what needs attention first." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button>
+                        <button type="button" class="btn" id="filterMenuBtn" aria-haspopup="dialog" aria-expanded="false" data-tip-title="Filters" data-tip="Narrow the list by kind, status and a few facts at once, then press Apply filters." data-tip-preview="Nothing is read from the database: it only looks through what is already loaded."><i data-icon="sliders"></i>Filters<span class="sort-now" id="filterNow"></span></button>
+                        <div class="segmented" id="viewSwitch" role="group" aria-label="How the products are listed">
+                            <button type="button" class="seg" data-mode="brands" data-tip-title="Brands" data-tip="Each brand with its products under it."><i data-icon="layers"></i>Brands</button>
+                            <button type="button" class="seg" data-mode="all" data-tip-title="All products" data-tip="Every product in one list, without the brand rows." data-tip-preview="Ten at a time, in the order chosen with Sort."><i data-icon="list"></i>All products</button>
+                        </div>
+                    </div>
                 </div>
             </section>
 
-            <section class="panel import-panel" data-panel="import" data-label="Import brand and product file" data-w="12">
+            <section class="panel import-panel" data-panel="import" data-label="Import brand and product file" data-w="4" data-right>
                 <div class="panel-head">
                     <h3 class="panel-title">Import from a file</h3>
                     <span class="spacer"></span>
@@ -90,10 +86,35 @@
                     <span class="import-drop-icon"><i data-icon="upload"></i></span>
                     <span><strong>Drop a PDF, Excel, or Word file here</strong><small id="inventoryImportHint">Reads brand, product, cosmetic type, ingredients, source links, and shade colors. Imported entries are saved as Pending for admin review.</small></span>
                 </button>
+                <p class="import-types">Accepted: PDF (.pdf), Excel (.xlsx, .xls), Word (.docx)</p>
                 <p class="field-hint import-status" id="inventoryImportStatus" role="status" aria-live="polite">Ready for readable PDFs, Excel workbooks, and Word documents. Text is extracted in your browser; only the extracted text is analyzed.</p>
             </section>
 
-            <section class="panel ingredient-suggestions" id="ingredientSuggestionsPanel" hidden data-panel="suggestions" data-label="AI ingredient suggestions" data-w="12">
+            <!-- products app users sent as ONE photo: reviewed in a floating window over this page. Nothing is read until it opens,
+                 except one count for the badge. The labels are fixed text; only the number waits for data. -->
+            <section class="panel snapshots-panel" data-panel="snapshots" data-label="Pending snapshot reviews" data-w="4" data-right>
+                <div class="panel-head">
+                    <h3 class="panel-title">Pending snapshots</h3>
+                    <button type="button" class="guide-badge" data-tip-title="Pending snapshot reviews" data-tip="When a scanned product is not in the catalogue, the app offers to take one photo. The AI reads the brand, name, kind, shade and ingredient list. Users see that reading marked PENDING APPROVAL until you approve it here." data-tip-preview="Opens a review window over this page: one snapshot at a time, photo next to the reading.">i</button>
+                </div>
+                <button type="button" class="snapshots-open" id="snapshotReviewBtn" aria-haspopup="dialog">
+                    <span class="snapshots-icon"><i data-icon="camera"></i></span>
+                    <span class="snapshots-text"><strong>Pending Snapshot Reviews</strong><small id="snapshotReviewHint">One at a time: the photo next to what the AI read.</small></span>
+                    <span class="snapshots-count skeleton" id="snapshotCount" aria-label="Snapshots waiting">00</span>
+                </button>
+            </section>
+
+            <!-- the counts; a click on one filters the table -->
+            <section class="panel bare" data-panel="counts" data-label="Counts" data-w="8">
+                <div class="stat-row">
+                    <button type="button" class="stat" data-show="" data-tip-title="Everything" data-tip="Show every brand and product."><span class="stat-icon"><i data-icon="tag"></i></span><span><span class="stat-value skeleton" id="statBrands">00</span><span class="stat-title">Brands</span></span></button>
+                    <button type="button" class="stat" data-show="" data-tip-title="Everything" data-tip="Show every brand and product."><span class="stat-icon"><i data-icon="lipstick"></i></span><span><span class="stat-value skeleton" id="statProducts">00</span><span class="stat-title">Products</span></span></button>
+                    <button type="button" class="stat" data-show="review" data-tip-title="Waiting for review" data-tip="Entries the app added from a scan or that were imported, and products whose kind is not clear. The app does not use them until you have dealt with them." data-tip-preview="Click: the table shows only these."><span class="stat-icon"><i data-icon="inbox"></i></span><span><span class="stat-value skeleton" id="statReview">00</span><span class="stat-title">Waiting for review</span></span></button>
+                    <button type="button" class="stat" data-show="out" data-tip-title="Not make-up" data-tip="Skin care, hair, body, nail and fragrance products. GlowUp is for make-up only." data-tip-preview="Click: the table shows only these, ready to go to the Recycle bin."><span class="stat-icon"><i data-icon="ban"></i></span><span><span class="stat-value skeleton" id="statOut">00</span><span class="stat-title">Not make-up</span></span></button>
+                </div>
+            </section>
+
+            <section class="panel ingredient-suggestions" id="ingredientSuggestionsPanel" hidden data-panel="suggestions" data-label="AI ingredient suggestions" data-w="8">
                 <div class="panel-head">
                     <h3 class="panel-title">Web ingredient lists to review</h3>
                     <span class="panel-count" id="ingredientSuggestionsCount"></span>
@@ -102,7 +123,7 @@
                 <div class="suggestion-list" id="ingredientSuggestionsList"></div>
             </section>
 
-            <section class="panel ingredient-suggestions" id="inventoryAiDraftPanel" hidden data-panel="ai-drafts" data-label="AI drafts to review" data-w="12">
+            <section class="panel ingredient-suggestions" id="inventoryAiDraftPanel" hidden data-panel="ai-drafts" data-label="AI drafts to review" data-w="8">
                 <div class="panel-head">
                     <h3 class="panel-title">AI drafts to review</h3>
                     <span class="panel-count" id="inventoryAiDraftCount"></span>
@@ -114,16 +135,21 @@
             </section>
 
             <!-- the inventory -->
-            <section class="panel" data-panel="table" data-label="Inventory table" data-w="12" data-source="products">
+            <section class="panel" data-panel="table" data-label="Inventory table" data-w="8" data-source="products">
                 <div class="panel-head">
                     <h3 class="panel-title">Inventory</h3>
                     <button type="button" class="guide-badge" data-tip-title="How to use this list" data-tip="Click a product to see everything about it; double-click to edit it. Click a brand to open or close it. The app only uses Active products of Active brands." data-tip-preview="Drag rows onto a folder or the Recycle bin. The small box in front of a name picks it; Ctrl+click picks several.">i</button>
                     <span class="panel-count" id="inventoryCountLine"></span>
                     <span id="inventoryQuick"></span>
                     <span class="spacer"></span>
+                    <!-- the same line as the Ingredient Curator's list: how it is shown, how many, which page -->
+                    <div class="segmented" id="inventoryLayoutSwitch" role="group" aria-label="How the inventory is shown">
+                        <button type="button" class="seg" data-layout="rows" aria-pressed="true" data-tip-title="Rows" data-tip="One product per line, in a table."><i data-icon="list"></i>Rows</button>
+                        <button type="button" class="seg" data-layout="cards" aria-pressed="false" data-tip-title="Cards" data-tip="Products as cards, several side by side. Brands stay as headings."><i data-icon="layers"></i>Cards</button>
+                    </div>
                     <div class="pager" id="inventoryPagerTop"></div>
                 </div>
-                <!-- everything, the folders and the Recycle bin -->
+                <!-- the second line, as in the Ingredient Curator: everything, the folders, and the Recycle bin at the right end -->
                 <div class="shelf" id="inventoryShelf"></div>
                 <div class="table-container" id="inventoryHost">
                     <table class="admin-table inventory-table">
@@ -183,6 +209,18 @@
                     </div>
                 </div>
 
+                <div class="form-row">
+                    <div class="field">
+                        <label for="brandLogoInput">Logo link</label>
+                        <input type="url" id="brandLogoInput" maxlength="300" placeholder="https://... (the brand's official logo)" autocomplete="off" inputmode="url">
+                    </div>
+                    <div class="field">
+                        <label for="brandImageInput">Picture link</label>
+                        <input type="url" id="brandImageInput" maxlength="300" placeholder="https://... (the brand's display or pack picture)" autocomplete="off" inputmode="url">
+                    </div>
+                </div>
+                <span class="field-hint">Only the web address is saved (https). Nothing is uploaded.</span>
+
                 <p class="form-error" role="alert"></p>
 
                 <div class="modal-actions">
@@ -223,13 +261,30 @@
                     <textarea id="productDescInput" rows="2" maxlength="400" placeholder="One or two sentences about the product (optional)."></textarea>
                 </div>
 
+                <div class="form-row">
+                    <div class="field">
+                        <label for="productImageInput">Product photo link</label>
+                        <input type="url" id="productImageInput" maxlength="300" placeholder="https://... (the bottle, tube or compact)" autocomplete="off" inputmode="url">
+                    </div>
+                    <div class="field">
+                        <label for="productFdaInput">FDA approval link</label>
+                        <input type="url" id="productFdaInput" maxlength="300" placeholder="https://verification.fda.gov.ph/..." autocomplete="off" inputmode="url">
+                        <span class="field-hint">The government page that verifies this product's registration.</span>
+                    </div>
+                </div>
+
                 <div class="field">
                     <div class="field-heading">
                         <label for="productIngredientsInput">Ingredients <span class="required">*</span></label>
                         <button type="button" class="row-btn" id="assistProductIngredientsBtn"><i data-icon="sparkle"></i>Assist with AI</button>
                     </div>
-                    <textarea id="productIngredientsInput" rows="5" placeholder="Paste the ingredient list from the packaging, e.g. Dimethicone, Isododecane, Mica, Parfum"></textarea>
-                    <span class="field-hint" id="productIngredientsHint">Separate the ingredients with commas (or put one on each line).</span>
+                    <div class="ing-search">
+                        <input type="text" id="productIngredientSearch" role="combobox" aria-expanded="false" aria-controls="productIngredientResults" aria-autocomplete="list" autocomplete="off" aria-label="Search the ingredient library">
+                        <ul id="productIngredientResults" class="ing-results" role="listbox" hidden></ul>
+                    </div>
+                    <div id="productIngredientPills" class="ing-pills" aria-live="polite"></div>
+                    <textarea id="productIngredientsInput" rows="3" placeholder="Or paste the whole list from the packaging, e.g. Dimethicone, Isododecane, Mica, Parfum"></textarea>
+                    <span class="field-hint" id="productIngredientsHint">Search above to pick from the library, or paste the list here, separated by commas (or one on each line).</span>
                     <p class="review-note ai-product-note" id="productAiNote" role="status" aria-live="polite" hidden></p>
                 </div>
 

@@ -10,6 +10,8 @@ The admin website and the mobile app use the same Firebase project (`glowup-admi
 | `products` | Website (Brand & Product Inventory). The app adds 1 to `scans`, and adds a scanned product that is not listed yet as Pending. | App, website | Products the app can recommend and recognise |
 | `productIngredientSuggestions` | App | Website (Brand & Product Inventory) | Web-found lists for existing products, pending admin review |
 | `ingredients` | Website (Ingredient Curator). The app adds ingredients its AI lookup finds, marked as not reviewed. | App, website | Ingredient explanations and safety details |
+| `config` (one document, `lists`) | Website (Ingredient Curator, "Edit list") | App, website | The editable Allergen Family, Highlights and Skin Conditions lists |
+| `pending_products`, `pending_product_images` | App (AI photo snapshot) | App users (entries only), website (Pending Snapshot Reviews) | Products the catalogue does not have, read by the AI from one photo, waiting for an admin |
 | `scanActivity` | App | Website (Dashboard) | One anonymous note per scan |
 | `allergenSuggestions`, `conditionSuggestions` | App | Website (Dashboard) | Items users typed in that were not on the app's lists |
 | `users/{uid}` and `users/{uid}/scans` | App | App (that user only) | A user's profile and scan history |
@@ -28,6 +30,7 @@ The admin website and the mobile app use the same Firebase project (`glowup-admi
 | `status` | text | `Active`, `Pending` or `Inactive`. The app uses only Active brands. |
 | `scans` | number | The app adds 1 each time a scan is found to be this brand: its name is on the scanned label, or the scan is one of its products. |
 | `source`, `reviewed` | text, yes/no | Entries imported from a file use `document-import` and `false` until an admin checks them. |
+| `logoUrl`, `imageUrl` | text | Optional web addresses (https) of the brand's official logo and of a display or pack picture. Only the address is stored, nothing is uploaded. |
 | `aiAssistSources`, `aiAssistModel` | lists/text | Source URLs and model for an admin-reviewed AI suggestion to market or aliases. Existing aliases are merged, not discarded. |
 | `createdAt`, `updatedAt` | time | Set by the website. |
 
@@ -43,7 +46,12 @@ The admin website and the mobile app use the same Firebase project (`glowup-admi
 | `description` | text | Optional. |
 | `ingredients` | list of text | The names from the packaging. |
 | `shades` | list of text | Colours as `#RRGGBB`. Used by AR Try-On. |
-| `sources` | list of text | Supporting web pages. An FDA Philippines verification link is saved here only when it is present in the document or a Gemini web-search result. |
+| `sources` | list of text | Supporting web pages. The FDA Philippines verification link is the entry that reads `FDA Philippines verification | https://...fda.gov.ph/...` (the product form has its own box for it). |
+| `imageUrl` | text | Optional web address (https) of a photo of the bottle, tube or compact. |
+| `ingredientIds` | list of text | Light summary kept by the website's product form: the ids of the library ingredients this product's names match. It links a product to its ingredients without a join. |
+| `ingredientCount` | number | How many ingredients the list has (a light summary). |
+| `ingredientNotes` | list of maps | Optional per-product overrides, one per ingredient that needs one: `{ name, id, caution, percent }`. `caution` replaces the ingredient's own caution note for THIS product only; `percent` is how much of it is in this formula (0 to 100). Empty = the ingredient's own note applies. |
+| `tags` | list of text | Words a product can be found by (kind, brand, `has-shades`, `no-ingredient-list`, `fda-listed`), at most 20. Lets a filter use one query on the product alone. |
 | `minAge` | number | 0 means no limit. A younger user who scans the product is warned. |
 | `status` | text | `Active`, `Pending` or `Inactive`. |
 | `scans` | number | The app adds 1 each time a scan is recognised as this product. |
@@ -87,13 +95,59 @@ The app offers a product to a user only when all of these are true: the product 
 | `minAge` | number | 0 means no limit. |
 | `keyActive` | yes/no | Shown as a highlighted chip in results. |
 | `umbrella` | yes/no | A term that can hide other ingredients, such as Fragrance. |
-| `allergenTags` | list of text | Any of `fragrance`, `paraben`, `sulfate`, `formaldehyde`, `lanolin`, `essentialoil`, `nut`. |
+| `chemicalDescription` | text | Optional. What the substance is, technically (the plain-words definition stays in `description`). |
+| `highlights` | list of text | Ids of the custom highlights of `config/lists` (the built-in ones are `keyActive` and `umbrella` above). A custom highlight makes the ingredient show up among the chips of a scan result, like a key active. |
+| `allergenTags` | list of text | Ids of the allergen families in `config/lists` (built in: `fragrance`, `paraben`, `sulfate`, `formaldehyde`, `lanolin`, `essentialoil`, `nut`). |
 | `avoidForSkinTypes`, `goodForSkinTypes` | list of text | Any of `Oily`, `Normal`, `Dry`, `Mix`. |
-| `avoidForConditions`, `goodForConditions` | list of text | Any of `acne`, `eczema`, `psoriasis`, `rosacea`, `seborrheic`, `melasma`, `contact`. |
+| `avoidForConditions`, `goodForConditions` | list of text | Ids of the skin conditions in `config/lists` (built in: `acne`, `eczema`, `psoriasis`, `rosacea`, `seborrheic`, `melasma`, `contact`). |
 
 Only `name`, `techName` and `description` are required. The app has its own built-in list of common ingredients. When an ingredient is also in this collection, the website's values win, and any field left empty here is filled from the app's built-in list.
 
-The allergen, skin type and condition words must be spelled exactly as above. The website's tick-boxes write them for you.
+The allergen, skin type and condition ids must be spelled exactly. The website's tick-boxes write them for you.
+
+### How the data is split, and what keeps the free tier safe
+
+- **One master record per ingredient** (`ingredients`), written once however many products use it. **One record per product** (`products`) with only what belongs to that physical item. A product points at its ingredients by name and, as a light summary, by id (`ingredientIds`); a note that differs for one product lives on that product (`ingredientNotes`), and an empty note falls back to the ingredient's own.
+- **No mass updates.** When an ingredient's warning changes, products are NOT rewritten: the app reads the product and the ingredient list and works the verdict out then, so it is always current. Only links and counts are kept on a product, never a safety verdict (a copy would go stale).
+- **Reads.** The website keeps each list in the browser and downloads only what changed (adminStore.js); search, filters and CSV export work on what is loaded and cost no reads. An export holds at most the newest 100 products (`EXPORT_MAX_ROWS` in `_Shared/adminExport.js`).
+- **Writes.** Public users and the app can read the catalogue; only admin accounts write it, and the app may only create Pending entries and add 1 to `scans`. The rules also refuse an admin write whose name is not text, whose lists are absurdly long, or whose `imageUrl` / `logoUrl` is not an https address.
+- **Not built:** image upload to Firebase Storage (Cloud Storage needs the Blaze plan on new projects, and no Storage rules exist), so pictures are stored as web addresses; a visual-similarity search (there is no vector search in Firestore: the metadata filters do that job).
+
+### `pending_products/{id}` (AI photo snapshots, waiting for an admin)
+
+When a scanned product is not in `products` (and nobody staged it yet), the app offers to take ONE photo. The AI reads the brand, name, kind, shade and the printed ingredient list; the result is analysed at once and shown with a **PENDING APPROVAL** badge. The id is `snap_<brand>__<name>` (letters, digits and underscores), so every user who snaps the same product lands on the same entry. Kept apart from `products` so unverified user content never mixes with the curated catalogue.
+
+| Field (PDF name) | Type | Notes |
+|---|---|---|
+| document id (`product_id`) | text | `snap_<brand>__<name>`, made by the app. |
+| `brandName`, `name` (`brand_name`, `product_name`) | text | What the AI read. Field names follow the rest of this database (camelCase). |
+| `cosmeticType`, `shadeHex` | text | Make-up only (the rules check the kind). |
+| `ingredients` (`extracted_ingredients`) | list of text | Read from the photo only, at most 80. |
+| `hasImage` (instead of `image_url`) | yes/no | The photo is in `pending_product_images` under the same id. Firebase Storage is not used: it needs the Blaze plan. |
+| `isApproved` (`is_approved`) | yes/no | `false` from the app. The website sets `true` (with `status: "approved"`, `approvedProductId`, `reviewedAt`) when an admin approves. |
+| `createdByUid` (`created_by_uid`) | text | The signed-in user who sent it (the rules require it to be their own id). |
+| `status`, `source`, `key`, `confidence`, `model`, `createdAtUnix` | | `pending`, `snapshot`, the comparable name, how sure the AI was (0 to 1), which AI, when. |
+
+`pending_product_images/{same id}`: `jpegBase64` (a JPG of at most about 80 KB, max 1080 px; WebP cannot be made in Unity), `bytes`, `createdByUid`, `createdAtUnix`. Only admins can read it; phones never download it. It is deleted when the entry is approved or rejected.
+
+**Approve** (website: the Pending Snapshot Reviews window in Brand & Product Inventory) is one batch: the brand (found by name, or added as Active), the product (added as Active with `source: "snapshot"`; an existing entry without a list gets this list), every ingredient the library does not have (added with `source: "ai"`, `reviewed: false`, `via: "snapshot"`, so the Curator lists it as waiting and the app uses it as a warning at most), and the pending entry marked approved. **Reject** deletes the entry and its photo.
+
+**Reads and quotas.** The app looks for a staged entry only after the catalogue has no match: its own copy first (0 reads), then one read of the entry by id; a miss is remembered for 30 minutes. A photo costs one AI request at most (the scan screen's AI budget), the button locks for 5 seconds, and the same product later comes from the phone's copy (0 reads, 0 AI). The website reads one count for the badge when the Inventory opens; the waiting entries (at most 50) only when the review window is opened, and a photo only when its card is on screen (1 read). The Dashboard tile is one count query.
+
+### `config/lists` (one document, written by the website only)
+
+| Field | Type | Notes |
+|---|---|---|
+| `version` | number | Goes up by 1 on every save. The website refuses to save over a newer version. |
+| `updatedAt` | time | Set by the server on every save. |
+| `allergens`, `conditions`, `highlights` | list of items | At most 40 each. An item is `{ id, label, keywords, retired }`. |
+
+- The **id never changes** (letters and digits). Ingredients store ids, so renaming an item changes only its `label`.
+- `keywords` are the words the app looks for in what a user saved (a user saves the label text they ticked). A rename keeps the old label as a keyword, so saved profiles keep matching. Highlights have no keywords.
+- `retired: true` hides an item from the pickers (website and app) but it still matches what is already saved. An item can be deleted only when no ingredient uses it.
+- `highlights` always starts with the built-in `keyActive` and `umbrella` (the ingredient fields of the same name). Other highlight ids are stored in the ingredient's `highlights` list.
+- While the document does not exist the website and the app use their built-in lists (the ones above), so nothing breaks before the first save.
+- Cost: 1 read per website page load that shows the lists, and about 1 read per app list check (the app keeps a copy).
 
 ### Entries that were not typed on the website
 

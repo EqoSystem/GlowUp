@@ -8,11 +8,12 @@
 // A helper can be hidden per panel (its small x); the panel's "..." menu and Customise bring it back.
 //
 // The text is always written with textContent, never as HTML.
-import { icon, toast } from "./adminShell.js";
+import { icon, toast, infoBadge, refreshInfoWindow } from "./adminShell.js";
 
 const OFF_KEY = "glowup.assist.off.v1";
 const providers = new Map();          // panel id -> what the page registered
 const shown = new Map();              // panel id -> which of its lines shows
+const badgeOf = new Map();            // panel id -> id of the slot whose info badge carries its lines (instead of a strip in the panel)
 let pageName = "";
 
 const readOff = () => {
@@ -25,9 +26,29 @@ const nameOf = (panelId) => pageName + "/" + panelId;
 /** Call once per page, before the helpers are registered: a hidden helper is remembered per page. */
 export function setAssistPage(page) { pageName = String(page || ""); }
 
-export function registerAssist(panelId, provider) {
+export function registerAssist(panelId, provider, options) {
     providers.set(panelId, provider);
+    if (options && options.badge) badgeOf.set(panelId, String(options.badge)); else badgeOf.delete(panelId);
     paint(panelId);
+}
+
+/** The lines of every helper that shares a slot, as ONE small info badge (its pop-over lists them, with their buttons). */
+function paintBadge(slotId) {
+    const slot = document.getElementById(slotId);
+    if (!slot) return;
+    const lines = [];
+    badgeOf.forEach((id, panelId) => {
+        if (id !== slotId || assistHidden(panelId)) return;
+        try { const provider = providers.get(panelId); (provider ? provider() || [] : []).forEach((line) => { if (line && line.text) lines.push(line); }); }
+        catch (error) { console.warn("A helper could not work out what to say: ", error); }
+    });
+    slot.replaceChildren();
+    refreshInfoWindow(slotId, lines);
+    if (lines.length === 0) return;
+    const badge = infoBadge({ label: lines.length === 1 ? "A note about this page" : lines.length + " notes about this page", lines, window: true, title: "Notes about this page", key: slotId });
+    badge.dataset.tone = ["bad", "warn", "info"].find((tone) => lines.some((line) => line.tone === tone)) || "";
+    if (lines.length > 1) badge.dataset.count = String(lines.length);
+    slot.appendChild(badge);
 }
 
 /** Draws the helper of one panel again (or of every panel when no id is given). */
@@ -73,6 +94,12 @@ function build(panelId) {
 }
 
 function paint(panelId, stepped) {
+    if (badgeOf.has(panelId)) {
+        paintBadge(badgeOf.get(panelId));
+        const own = document.querySelector(`.board .panel[data-panel="${CSS.escape(panelId)}"] > .panel-inner > .assist`);
+        if (own) own.remove();
+        return;
+    }
     const panel = document.querySelector(`.board .panel[data-panel="${CSS.escape(panelId)}"]`);
     if (!panel) return;
     const inner = panel.querySelector(":scope > .panel-inner") || panel;

@@ -10,7 +10,7 @@
 // The display layouts (arranging panels, panel kinds, fonts and colours) live in adminLayouts.js;
 // the data panels (lists, grids, graphs) in adminWidgets.js.
 import { initLayouts, applyAppearance } from "./adminLayouts.js";
-import { refreshData, REFRESH_COOLDOWN_MS } from "./adminStore.js";   // only for the "Refresh data" button
+import { refreshData, refreshWait } from "./adminStore.js";   // only for the "Refresh data" button
 
 // ---------------------------------------------------------------------------------------------
 // Icons
@@ -29,7 +29,10 @@ const ICONS = {
     edit: '<path d="M4 20h4L19 9l-4-4L4 16v4z"/><path d="M13.5 6.5l4 4"/>',
     trash: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    flag: '<path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/>',
     x: '<path d="M6 6l12 12M18 6L6 18"/>',
+    camera: '<path d="M4 8h3.2l1.8-2.5h6l1.8 2.5H20v11H4z"/><circle cx="12" cy="13.2" r="3.6"/>',
+    refresh: '<path d="M20 11a8 8 0 0 0-14.5-3.5L4 9"/><path d="M4 4v5h5"/><path d="M4 13a8 8 0 0 0 14.5 3.5L20 15"/><path d="M20 20v-5h-5"/>',
     left: '<path d="M15 6l-6 6 6 6"/>',
     right: '<path d="M9 6l6 6-6 6"/>',
     down: '<path d="M6 9l6 6 6-6"/>',
@@ -73,6 +76,21 @@ const ICONS = {
 };
 /** The Recycle bin: its lid is drawn apart from its body so it can open when something is held over it. */
 export const BIN_ICON = '<svg class="ic bin-ic" viewBox="0 0 24 24" aria-hidden="true"><g class="bin-lid"><path d="M4 7h16"/><path d="M9 7V4h6v3"/></g><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg>';
+
+/**
+ * Shows how many entries are in the Recycle bin on the header button. Only for a number the page already holds (no new read).
+ * `what` names what the number counts ("products and brands"): a page holds only its own part of the bin.
+ */
+export function setBinCount(count, what) {
+    const badge = document.getElementById("binBadge"), link = document.getElementById("binLink");
+    if (!badge || !link) return;
+    const n = Math.max(0, Number(count) || 0);
+    badge.textContent = n > 99 ? "99+" : String(n);
+    badge.hidden = n === 0;
+    const text = n > 0 && what ? `Recycle Bin: ${n} ${what}` : "Recycle Bin";
+    link.setAttribute("data-tip", text);
+    link.setAttribute("aria-label", text);
+}
 
 /** The SVG of one icon, as text to put into HTML. */
 export function icon(name, extraClass) {
@@ -132,36 +150,46 @@ export function mountThemeToggle(host) {
 // The page frame
 // ---------------------------------------------------------------------------------------------
 /**
- * The "Refresh data" button of the top bar: downloads brands, products and ingredients again in full (adminStore.js allows
- * it once a minute). Skipped without an error when the top bar has no tools area; it can never stop mountShell.
+ * The "Refresh data" button of the top bar: an icon only. It downloads brands, products and ingredients again in full
+ * (about 700 reads), so adminStore.js limits it (a pause after each use, and a number of uses per hour). While it is
+ * blocked its tooltip says how long to wait. Skipped without an error when the top bar has no tools area.
  */
 function addRefreshDataButton(topbar) {
     try {
         const tools = topbar ? topbar.querySelector(".topbar-tools") : null;
         if (!tools) return;
-        const idleText = "Refresh data";
+        const baseTip = "Refresh data, about 700 reads";
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "operator-chip";
+        button.className = "icon-btn refresh-btn";
         button.id = "refreshDataButton";
-        button.setAttribute("data-tip", "Download brands, products and ingredients again in full (about 700 reads). Possible once a minute.");
-        button.textContent = idleText;
-        const cool = (seconds) => {
-            button.disabled = true;
-            button.textContent = idleText + " (" + seconds + " s)";
-            const tick = setInterval(() => {
-                seconds -= 1;
-                if (seconds <= 0) { clearInterval(tick); button.disabled = false; button.textContent = idleText; }
-                else button.textContent = idleText + " (" + seconds + " s)";
-            }, 1000);
+        button.setAttribute("aria-label", "Refresh data");
+        button.innerHTML = icon("refresh");
+        const words = (seconds) => seconds >= 3600 ? "1 h" : seconds >= 60 ? Math.floor(seconds / 60) + " min " + (seconds % 60 ? (seconds % 60) + " s" : "").trim() : seconds + " s";
+        let working = false, ticker = 0;
+        const paint = () => {
+            const wait = refreshWait();
+            const blocked = working || wait.seconds > 0;
+            button.classList.toggle("is-blocked", blocked);
+            button.classList.toggle("is-working", working);
+            button.setAttribute("aria-disabled", String(blocked));
+            const tip = working ? baseTip + ". Refreshing now..." : wait.seconds > 0
+                ? baseTip + ". " + (wait.hourly ? "The hourly limit is used up. Try again in " : "Wait ") + words(wait.seconds).trim() + "."
+                : baseTip;
+            button.setAttribute("data-tip", tip);
+            button.setAttribute("aria-label", tip);
+            if (wait.seconds > 0 && !ticker) ticker = setInterval(paint, 1000);
+            if (wait.seconds <= 0 && ticker) { clearInterval(ticker); ticker = 0; }
         };
         button.addEventListener("click", async () => {
-            button.disabled = true;
-            button.textContent = "Refreshing…";
-            let wait = 0;
-            try { wait = await refreshData(); } catch (error) { console.error("Refresh data failed:", error); }
-            cool(wait > 0 ? wait : Math.round(REFRESH_COOLDOWN_MS / 1000));
+            if (working || refreshWait().seconds > 0) { paint(); return; }
+            working = true;
+            paint();
+            try { await refreshData(); } catch (error) { console.error("Refresh data failed:", error); }
+            working = false;
+            paint();
         });
+        paint();
         tools.prepend(button);
     } catch (error) {
         console.warn("The Refresh data button could not be added:", error);
@@ -184,6 +212,10 @@ export function mountShell(page) {
     const topbar = main.querySelector("header.topbar");
     wireNavDrop(sidebar.querySelector(".nav-links"));
     topbar.querySelector(".topbar-tools").innerHTML = `<button type="button" class="operator-chip" id="operatorChip" data-tip-title="Display layout" data-tip="Arrange and resize the panels, turn a panel into a list, a grid or a graph, pick a font and colours, and save it under your name." data-tip-preview="The contents never change, only how they are shown.">${icon("sliders")}<span id="operatorName">Default layout</span></button>`;
+    if (page !== "bin") {
+        // icon-only link to the Recycle Bin page; a page that already holds the bin's size can show it with setBinCount()
+        topbar.querySelector("#operatorChip").insertAdjacentHTML("afterend", `<a class="icon-btn bin-link" id="binLink" href="../_Admin_Recycle_Bin/adminRecycleBin.html" aria-label="Recycle Bin" data-tip="Recycle Bin">${BIN_ICON}<span class="bin-badge" id="binBadge" hidden></span></a>`);
+    }
     mountThemeToggle(topbar.querySelector(".topbar-tools"));
     addRefreshDataButton(topbar);
 
@@ -236,6 +268,7 @@ function wireNavDrop(list) {
 export function hydrate(root = document) {
     hydrateIcons(root);
     hydrateGuides(root);
+    hydrateInfos(root);
     tagFx(root);
 }
 
@@ -255,6 +288,233 @@ function hydrateGuides(root) {
         control.insertAdjacentHTML("afterend", guideBadge(title, control.getAttribute("data-guide"), control.getAttribute("data-guide-preview")));
     });
 }
+
+// ---------------------------------------------------------------------------------------------
+// Info badges: a small "i" whose text opens in a pop-over on hover, focus or click. Esc closes it. Text is set with textContent.
+// An element with data-info="text" (and data-info-label) gets one appended.
+// ---------------------------------------------------------------------------------------------
+let infoPop = null, infoOwner = null, infoPinned = false, infoTimer = 0;
+
+function infoElement() {
+    if (infoPop) return infoPop;
+    infoPop = document.createElement("div");
+    infoPop.className = "info-pop";
+    infoPop.id = "infoPop";
+    infoPop.setAttribute("role", "note");
+    infoPop.addEventListener("mouseenter", () => clearTimeout(infoTimer));
+    infoPop.addEventListener("mouseleave", () => closeInfoSoon());
+    document.body.appendChild(infoPop);
+    return infoPop;
+}
+
+function openInfo(badge, pinned) {
+    clearTimeout(infoTimer);
+    const box = infoElement();
+    if (infoOwner && infoOwner !== badge) infoOwner.setAttribute("aria-expanded", "false");
+    infoOwner = badge;
+    infoPinned = !!pinned;
+    box.replaceChildren();
+    (badge._info || []).forEach((line) => {
+        const row = document.createElement("p");
+        row.className = "info-line";
+        row.dataset.tone = line.tone || "";
+        row.textContent = line.text;
+        box.appendChild(row);
+        if (line.label && line.run) {
+            const act = document.createElement("button");
+            act.type = "button";
+            act.className = "row-btn";
+            act.textContent = line.label;
+            act.addEventListener("click", () => { closeInfo(false); line.run(); });
+            row.appendChild(act);
+        }
+    });
+    badge.setAttribute("aria-expanded", "true");
+    badge.setAttribute("aria-describedby", "infoPop");
+    box.classList.add("show");
+    const at = badge.getBoundingClientRect(), size = box.getBoundingClientRect();
+    let left = at.left + at.width / 2 - size.width / 2;
+    left = Math.max(8, Math.min(left, window.innerWidth - size.width - 8));
+    let top = at.bottom + 6;
+    if (top + size.height > window.innerHeight - 8) top = at.top - size.height - 6;
+    box.style.left = left + "px";
+    box.style.top = Math.max(8, top) + "px";
+}
+
+function closeInfo(giveFocusBack) {
+    clearTimeout(infoTimer);
+    if (infoPop) infoPop.classList.remove("show");
+    if (infoOwner) { infoOwner.setAttribute("aria-expanded", "false"); if (giveFocusBack) infoOwner.focus(); }
+    infoOwner = null;
+    infoPinned = false;
+}
+function closeInfoSoon() {
+    if (infoPinned) return;
+    clearTimeout(infoTimer);
+    infoTimer = setTimeout(() => closeInfo(false), 160);
+}
+
+/**
+ * One info badge. `text` = the sentence; or `lines` = [{ text, tone, label, run }] (a line can offer one button).
+ * `label` is what a screen reader says for the badge.
+ */
+export function infoBadge({ label, text, lines, window: asWindow, title, key }) {
+    const badge = document.createElement("button");
+    badge.type = "button";
+    badge.className = "guide-badge info-badge";
+    badge.textContent = "i";
+    badge.setAttribute("aria-label", label || "More information");
+    badge.setAttribute("aria-haspopup", "true");
+    badge.setAttribute("aria-expanded", "false");
+    badge._info = Array.isArray(lines) && lines.length ? lines : [{ text: String(text || "") }];
+    if (asWindow) {
+        // a click opens a floating, draggable window (rows, serious matters first); there is no hover pop-over
+        badge.setAttribute("aria-haspopup", "dialog");
+        badge.setAttribute("aria-expanded", String(!!(infoWin && infoWinKey === key)));
+        badge.addEventListener("click", () => { if (infoWin && infoWinKey === key) closeInfoWindow(true); else openInfoWindow(badge, { key, title, lines: badge._info }); });
+        return badge;
+    }
+    badge.addEventListener("mouseenter", () => { if (!infoPinned) openInfo(badge, false); });
+    badge.addEventListener("mouseleave", closeInfoSoon);
+    badge.addEventListener("focus", () => { if (!infoPinned) openInfo(badge, false); });
+    badge.addEventListener("blur", (event) => { if (!infoPop || !infoPop.contains(event.relatedTarget)) { infoPinned = false; closeInfoSoon(); } });
+    badge.addEventListener("click", () => { if (infoOwner === badge && infoPinned) closeInfo(false); else openInfo(badge, true); });
+    return badge;
+}
+
+// ---- the floating notes window: opened by a click on a notes badge, draggable, one row per note ----
+let infoWin = null, infoWinKey = "", infoWinOpener = null;
+const TONE_ORDER = { bad: 0, warn: 1, info: 2 };
+const TONE_TAG = { bad: "Important", warn: "Check", info: "Info", ok: "OK" };
+
+function fillInfoWindow(lines) {
+    const list = infoWin.querySelector(".iw-list");
+    list.replaceChildren();
+    // serious matters first, then the rest in the order the page gave them
+    const rows = (lines || []).map((line, index) => ({ line, index })).sort((a, b) => ((TONE_ORDER[a.line.tone] ?? 3) - (TONE_ORDER[b.line.tone] ?? 3)) || a.index - b.index);
+    rows.forEach(({ line }) => {
+        const item = document.createElement("li");
+        item.className = "iw-row";
+        item.dataset.tone = line.tone || "";
+        const tag = document.createElement("span");
+        tag.className = "iw-tag";
+        tag.textContent = TONE_TAG[line.tone] || "Note";
+        const text = document.createElement("p");
+        text.className = "iw-text";
+        text.textContent = line.text;
+        const body = document.createElement("div");
+        body.className = "iw-body";
+        body.append(tag, text);
+        item.appendChild(body);
+        if (line.label && line.run) {
+            const act = document.createElement("button");
+            act.type = "button";
+            act.className = "row-btn";
+            act.textContent = line.label;
+            act.addEventListener("click", () => line.run());
+            item.appendChild(act);
+        }
+        list.appendChild(item);
+    });
+    const count = infoWin.querySelector(".iw-count");
+    count.textContent = String((lines || []).length);
+    const serious = (lines || []).filter((line) => line.tone === "bad").length;
+    infoWin.dataset.serious = serious > 0 ? "1" : "";
+}
+
+function placeInfoWindow(left, top) {
+    const box = infoWin.getBoundingClientRect();
+    infoWin.style.left = Math.max(4, Math.min(left, window.innerWidth - Math.min(box.width, window.innerWidth) - 4)) + "px";
+    infoWin.style.top = Math.max(4, Math.min(top, window.innerHeight - 60)) + "px";
+}
+
+function buildInfoWindow() {
+    const win = document.createElement("div");
+    win.className = "info-window";
+    win.setAttribute("role", "dialog");
+    win.setAttribute("tabindex", "-1");
+    win.innerHTML = '<div class="iw-head" tabindex="0" aria-label="Notes window. Drag it, or move it with the arrow keys."><span class="iw-title"></span><span class="iw-count"></span><button type="button" class="icon-btn small iw-close" aria-label="Close the notes window"></button></div><ul class="iw-list"></ul>';
+    win.querySelector(".iw-close").innerHTML = icon("x");
+    win.querySelector(".iw-close").addEventListener("click", () => closeInfoWindow(true));
+    const head = win.querySelector(".iw-head");
+    head.addEventListener("pointerdown", (event) => {
+        if (event.target.closest(".iw-close")) return;
+        event.preventDefault();
+        const box = win.getBoundingClientRect(), dx = event.clientX - box.left, dy = event.clientY - box.top;
+        win.classList.add("moving");
+        const move = (e) => placeInfoWindow(e.clientX - dx, e.clientY - dy);
+        const stop = () => { win.classList.remove("moving"); window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", stop); window.removeEventListener("pointercancel", stop); };
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", stop);
+        window.addEventListener("pointercancel", stop);
+    });
+    head.addEventListener("keydown", (event) => {
+        const step = event.shiftKey ? 60 : 20, box = win.getBoundingClientRect();
+        const to = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[event.key];
+        if (!to) return;
+        event.preventDefault();
+        placeInfoWindow(box.left + to[0], box.top + to[1]);
+    });
+    document.body.appendChild(win);
+    return win;
+}
+
+/** Opens (or re-uses) the notes window. `opts` = { key, title, lines }. */
+export function openInfoWindow(opener, opts) {
+    closeInfo(false);
+    if (!infoWin) infoWin = buildInfoWindow();
+    const fresh = !infoWin.classList.contains("open") || infoWinKey !== opts.key;
+    infoWinKey = opts.key;
+    infoWinOpener = opener;
+    infoWin.setAttribute("aria-label", opts.title || "Notes");
+    infoWin.querySelector(".iw-title").textContent = opts.title || "Notes";
+    fillInfoWindow(opts.lines);
+    infoWin.classList.add("open");
+    if (opener) opener.setAttribute("aria-expanded", "true");
+    if (fresh) {
+        // first near the badge (its right edge lines up with the badge), later wherever it was dragged to
+        const at = opener ? opener.getBoundingClientRect() : { right: window.innerWidth - 24, bottom: 80 };
+        const width = infoWin.getBoundingClientRect().width;
+        placeInfoWindow(at.right - width, at.bottom + 8);
+        infoWin.focus({ preventScroll: true });
+    }
+}
+
+/** The page's lines changed: an open notes window shows the new ones (and closes when there are none). */
+export function refreshInfoWindow(key, lines) {
+    if (!infoWin || !infoWin.classList.contains("open") || infoWinKey !== key) return;
+    if (!lines || lines.length === 0) { closeInfoWindow(false); return; }
+    fillInfoWindow(lines);
+    const opener = document.querySelector(`#${CSS.escape(key)} .info-badge`);
+    if (opener) { infoWinOpener = opener; opener.setAttribute("aria-expanded", "true"); }
+}
+
+export function closeInfoWindow(giveFocusBack) {
+    if (!infoWin) return;
+    infoWin.classList.remove("open");
+    const opener = infoWinOpener;
+    infoWinKey = "";
+    infoWinOpener = null;
+    if (opener && opener.isConnected) { opener.setAttribute("aria-expanded", "false"); if (giveFocusBack) opener.focus(); }
+}
+
+function hydrateInfos(root) {
+    if (!root.querySelectorAll) return;
+    root.querySelectorAll("[data-info]:not([data-info-done])").forEach((slot) => {
+        slot.setAttribute("data-info-done", "1");
+        slot.appendChild(infoBadge({ label: slot.getAttribute("data-info-label") || "More information", text: slot.getAttribute("data-info") }));
+    });
+}
+
+// Esc closes an open pop-over before anything else (a dialog behind it stays open); a press outside closes it too
+document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    if (infoOwner) { event.preventDefault(); event.stopImmediatePropagation(); closeInfo(true); }
+    else if (infoWin && infoWin.classList.contains("open") && infoWin.contains(document.activeElement)) { event.preventDefault(); event.stopImmediatePropagation(); closeInfoWindow(true); }
+}, true);
+document.addEventListener("pointerdown", (event) => {
+    if (infoOwner && !infoOwner.contains(event.target) && !(infoPop && infoPop.contains(event.target))) closeInfo(false);
+}, true);
 
 let pop = null;
 function showTip(target) {
@@ -423,7 +683,7 @@ export function openMenu(anchor, items) {
 }
 
 /** The frame of a small dialog. Returns { overlay, box, close }. Esc and a click on the dark area call onDismiss. */
-function dialogFrame(title, onDismiss) {
+export function dialogFrame(title, onDismiss) {
     const overlay = document.createElement("div");
     overlay.className = "modal-overlay";
     overlay.style.display = "flex";

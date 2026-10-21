@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GlowUp Admin - Ingredient Curator</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="../_Shared/assets/glowup-icon-32.png">
     <script>
         // dark or light before anything is drawn: the person's choice, else the computer's own setting
         (function () {
@@ -43,13 +44,14 @@
         <script src="../_Shared/pageFrame.js"></script>
         <div class="board">
 
-            <!-- the counts; a click on one filters the list -->
-            <section class="panel bare" data-panel="counts" data-label="Counts" data-w="12">
-                <div class="stat-row" id="curatorStats"></div>
-            </section>
-
             <!-- find and add -->
-            <section class="panel" data-panel="tools" data-label="Search and actions" data-w="12">
+            <section class="panel" data-panel="tools" data-label="Search and actions" data-w="8">
+                <div class="panel-head">
+                    <h3 class="panel-title">Search and filters</h3>
+                    <span class="spacer"></span>
+                    <button type="button" class="icon-btn" id="moreMenuBtn" aria-label="More" aria-haspopup="menu" data-tip-title="More" data-tip="Clean up entries that are not ingredients, and find duplicates."><i data-icon="more"></i></button>
+                    <button type="button" class="primary-btn" id="addIngredientBtn" data-guide="Add an ingredient with its plain-words definition." data-guide-preview="Opens a form. Only the first three boxes are required."><i data-icon="plus"></i>Ingredient</button>
+                </div>
                 <div class="toolbar">
                     <div class="search-container">
                         <i data-icon="search"></i>
@@ -67,16 +69,54 @@
                         <option value="auto">App decides</option>
                     </select>
                     <button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most harmful, waiting for review, most used, or newest." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button>
+                </div>
+            </section>
+
+            <!-- import: ingredient data only -->
+            <section class="panel import-panel" data-panel="import" data-label="Import ingredient file" data-w="4" data-right>
+                <div class="panel-head">
+                    <h3 class="panel-title">Import ingredients</h3>
                     <span class="spacer"></span>
-                    <button type="button" class="icon-btn" id="moreMenuBtn" aria-label="More" aria-haspopup="menu" data-tip-title="More" data-tip="Clean up entries that are not ingredients, and find duplicates."><i data-icon="more"></i></button>
-                    <div class="btn-group">
-                        <button type="button" class="primary-btn" id="addIngredientBtn" data-guide="Add an ingredient with its plain-words definition." data-guide-preview="Opens a form. Only the first three boxes are required."><i data-icon="plus"></i>Ingredient</button>
+                    <button type="button" class="btn" id="chooseIngredientFileBtn"><i data-icon="upload"></i>Choose file</button>
+                    <input id="ingredientFileInput" type="file" accept=".pdf,.xlsx,.docx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+                </div>
+                <button type="button" id="ingredientDropBox" class="import-dropbox" aria-describedby="ingredientImportHint">
+                    <span class="import-drop-icon"><i data-icon="upload"></i></span>
+                    <span><strong>Drop a PDF, Excel, or Word file here</strong><small id="ingredientImportHint">Only ingredient data is accepted: name, scientific name, other names and description. Brand and product data in the file is ignored.</small></span>
+                </button>
+                <p class="import-types">Accepted: PDF (.pdf), Excel (.xlsx), Word (.docx). Up to 5 MB.</p>
+                <p class="field-hint import-status" id="ingredientImportStatus" role="status" aria-live="polite">The text is read in your browser; only the extracted text is sent to the AI. Entries are saved as Pending for your review.</p>
+            </section>
+
+            <!-- the counts; a click on one filters the list -->
+            <section class="panel bare" data-panel="counts" data-label="Counts" data-w="8">
+                <!-- the labels are fixed text and show at once; only the numbers wait for the data (skeleton) -->
+                <div class="stat-row" id="curatorStats">
+                    <button type="button" class="stat" data-source="" data-risk="" data-tip-title="Ingredients" data-tip="Show every ingredient." data-tip-preview="Click: the list shows only these."><span class="stat-icon"><i data-icon="flask"></i></span><span><span class="stat-value skeleton" id="curatorStatAll">00</span><span class="stat-title">Ingredients</span></span></button>
+                    <button type="button" class="stat" data-source="review" data-risk="" data-tip-title="Waiting for review" data-tip="Found by the app's AI lookup and not checked yet. The app uses their warnings but never counts them as proof of safety." data-tip-preview="Click: the list shows only these."><span class="stat-icon"><i data-icon="inbox"></i></span><span><span class="stat-value skeleton" id="curatorStatReview">00</span><span class="stat-title">Waiting for review</span></span></button>
+                    <button type="button" class="stat" data-source="" data-risk="harmful" data-tip-title="Harmful" data-tip="Ingredients marked Harmful here." data-tip-preview="Click: the list shows only these."><span class="stat-icon"><i data-icon="alert"></i></span><span><span class="stat-value skeleton" id="curatorStatHarmful">00</span><span class="stat-title">Harmful</span></span></button>
+                    <button type="button" class="stat" data-source="" data-risk="caution" data-tip-title="Caution" data-tip="Ingredients marked Caution here." data-tip-preview="Click: the list shows only these."><span class="stat-icon"><i data-icon="shield"></i></span><span><span class="stat-value skeleton" id="curatorStatCaution">00</span><span class="stat-title">Caution</span></span></button>
+                    <button type="button" class="stat" data-source="products" data-risk="" data-tip-title="From products, not explained" data-tip="Ingredients the inventory's products list that have no entry here yet. The app uses its built-in knowledge for them." data-tip-preview="Click: the list shows only these."><span class="stat-icon"><i data-icon="lipstick"></i></span><span><span class="stat-value skeleton" id="curatorStatFromProducts">00</span><span class="stat-title">From products, not explained</span></span></button>
+                </div>
+            </section>
+
+            <!-- what to do next: the same tiles as the Dashboard's Quick actions, built from counts the page already holds -->
+            <section class="panel" data-panel="actions" data-label="Quick actions" data-w="4" data-right>
+                <div class="panel-head">
+                    <h3 class="panel-title">Quick actions</h3>
+                    <button type="button" class="guide-badge" data-tip-title="Quick actions" data-tip="Shortcuts to the work that is waiting. A blue tile only appears when something needs review.">i</button>
+                </div>
+                <div class="tile-stack">
+                    <div class="tile-stack" id="curatorQuickTiles"></div>
+                    <div class="tile-pair">
+                        <button type="button" class="tile small" id="quickAddIngredient" data-tip-title="Add an ingredient" data-tip="Opens the form for a new ingredient, with its plain-words definition."><i data-icon="plus"></i><span class="tile-title">Add ingredient</span></button>
+                        <a href="../_Admin_Brand_Inventory/adminBrandInventory.html" class="tile small" data-tip-title="Brands &amp; products" data-tip="Add or edit brands and the make-up and face products listed under them." data-tip-preview="Opens the Brand &amp; Product Inventory."><i data-icon="box"></i><span class="tile-title">Brands &amp; products</span></a>
                     </div>
                 </div>
             </section>
 
             <!-- the ingredients -->
-            <section class="panel" data-panel="list" data-label="Ingredient list" data-w="12" data-source="ingredients">
+            <section class="panel" data-panel="list" data-label="Ingredient list" data-w="8" data-source="ingredients">
                 <div class="panel-head">
                     <button type="button" class="pick" data-pick-all role="checkbox" aria-checked="false" aria-label="Select all shown" data-tip="Select every ingredient shown here."></button>
                     <h3 class="panel-title">Ingredients</h3>
@@ -84,11 +124,15 @@
                     <span class="panel-count" id="ingredientCountLine"></span>
                     <span id="ingredientQuick"></span>
                     <span class="spacer"></span>
+                    <div class="segmented" id="listLayoutSwitch" role="group" aria-label="How the ingredients are listed">
+                        <button type="button" class="seg" data-layout="rows" aria-pressed="true" data-tip-title="Rows" data-tip="One ingredient per line: name, scientific name and how the app judges it."><i data-icon="list"></i>Rows</button>
+                        <button type="button" class="seg" data-layout="cards" aria-pressed="false" data-tip-title="Cards" data-tip="Ingredients as cards, several side by side."><i data-icon="layers"></i>Cards</button>
+                    </div>
                     <div class="pager" id="ingredientPagerTop"></div>
                 </div>
                 <!-- everything, the folders and the Recycle bin -->
                 <div class="shelf" id="ingredientShelf"></div>
-                <div class="ingredients-list" id="ingredientsList">
+                <div class="ingredients-list as-rows" id="ingredientsList">
                     <div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div>
                 </div>
                 <!-- shows while cards are picked -->
@@ -96,7 +140,7 @@
                 <div class="table-foot"><span class="spacer"></span><div class="pager" id="ingredientPager"></div></div>
             </section>
 
-            <section class="panel ingredient-suggestions" id="ingredientAiDraftPanel" hidden data-panel="ai-drafts" data-label="AI drafts to review" data-w="12">
+            <section class="panel ingredient-suggestions" id="ingredientAiDraftPanel" hidden data-panel="ai-drafts" data-label="AI drafts to review" data-w="8">
                 <div class="panel-head">
                     <h3 class="panel-title">AI drafts to review</h3>
                     <span class="panel-count" id="ingredientAiDraftCount"></span>
@@ -133,9 +177,20 @@
                 </div>
 
                 <div class="field">
+                    <label for="ingredientChemInput">What the chemical is <span class="optional">(optional)</span></label>
+                    <textarea id="ingredientChemInput" rows="2" maxlength="600" placeholder="The technical description: what the substance is, for example a salt of hyaluronic acid."></textarea>
+                </div>
+
+                <div class="field">
                     <label for="ingredientAliasesInput">Also Known As</label>
                     <input type="text" id="ingredientAliasesInput" maxlength="300" placeholder="e.g., Nicotinamide, Vitamin B3" autocomplete="off">
                     <span class="field-hint">Other spellings found on labels, separated by commas. A scan of any of them finds this ingredient.</span>
+                </div>
+
+                <div class="field">
+                    <label for="ingredientSourcesInput">Reference links <span class="optional">(optional)</span></label>
+                    <textarea id="ingredientSourcesInput" rows="2" maxlength="900" placeholder="One per line, for example: CIR safety report | https://www.cir-safety.org/..."></textarea>
+                    <span class="field-hint">Where this ingredient's safety information came from. Only https addresses are kept.</span>
                 </div>
 
                 <div class="form-section">
@@ -169,17 +224,17 @@
                     </div>
 
                     <div class="field">
-                        <span class="field-label">Highlights</span>
+                        <span class="field-label">Highlights<button type="button" class="icon-btn small list-edit" data-list-edit="highlights" aria-label="Edit the highlights list" data-tip-title="Highlights" data-tip="Add, rename, retire or delete highlights. They reach the app too."><i data-icon="edit"></i></button></span>
                         <div class="checks pills">
                             <label class="check" title="The app shows it as a highlighted chip in results."><input type="checkbox" id="ingredientKeyActiveInput"> <span>Key active</span></label>
                             <label class="check" title="A word that can hide other ingredients, like Fragrance."><input type="checkbox" id="ingredientUmbrellaInput"> <span>Umbrella term</span></label>
                         </div>
+                        <div class="checks pills" id="highlightTagsChecks"></div>
                     </div>
 
                     <div class="field">
-                        <span class="field-label">Allergen Family</span>
+                        <span class="field-label">Allergen Family<button type="button" class="icon-btn small list-edit" data-list-edit="allergens" aria-label="Edit the allergen families list" data-tip-title="Allergen families" data-tip="Add, rename, retire or delete allergen families. They reach the app too."><i data-icon="edit"></i></button><span class="info-slot" data-info="A user who picked that allergen in the app is warned about this ingredient." data-info-label="About Allergen Family"></span></span>
                         <div class="checks pills" id="allergenTagsChecks"></div>
-                        <span class="field-hint">A user who picked that allergen in the app is warned about this ingredient.</span>
                     </div>
 
                     <!-- ONE row per skin type and per condition, with three choices: Avoid, no effect, Good. (Before, each name
@@ -190,11 +245,10 @@
                             <div class="fit-list" id="skinTypesFit"></div>
                         </div>
                         <div class="field">
-                            <span class="field-label">Skin Conditions</span>
+                            <span class="field-label">Skin Conditions<button type="button" class="icon-btn small list-edit" data-list-edit="conditions" aria-label="Edit the skin conditions list" data-tip-title="Skin conditions" data-tip="Add, rename, retire or delete skin conditions. They reach the app too."><i data-icon="edit"></i></button><span class="info-slot" data-info="Choose Avoid or Good only where this ingredient matters; leave the rest on the dash." data-info-label="About Skin Conditions"></span></span>
                             <div class="fit-list" id="conditionsFit"></div>
                         </div>
                     </div>
-                    <span class="field-hint">Choose <b>Avoid</b> or <b>Good</b> only where this ingredient matters; leave the rest on the dash.</span>
                 </div>
 
                 <p class="form-error" role="alert"></p>

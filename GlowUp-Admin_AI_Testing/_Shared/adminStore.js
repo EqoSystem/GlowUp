@@ -36,7 +36,10 @@ const OVERLAP_MS = 5 * 60 * 1000;                // clocks differ a little: chan
 const ADDED_OVERLAP_S = 2 * 3600;                // "addedAtUnix" comes from phone clocks: asked for 2 hours further back
 const SYNC_MIN_MS = 30 * 1000;                   // not checked again within 30 s of the last check
 const AUTO_FULL_EVERY_MS = 60 * 60 * 1000;       // at most one automatic full download per list per hour (counts differ)
-export const REFRESH_COOLDOWN_MS = 60 * 1000;    // "Refresh data" can be used once a minute
+// "Refresh data" downloads about 700 documents, so it is limited (kept in this browser): a pause after each use, and a cap per hour
+export const REFRESH_COOLDOWN_MS = 2 * 60 * 1000;
+export const REFRESH_MAX_PER_HOUR = 6;
+const REFRESH_LOG_KEY = "glowup.refresh.log.v1";
 
 // name -> { uid, at, docs: Map(id -> data) }
 const memory = {};
@@ -263,17 +266,31 @@ async function refreshQuietly(name, ref, kept) {
     } catch (error) { console.warn("Could not check the " + name + " list for changes:", error); }
 }
 
+/** The times "Refresh data" was used in the last hour (newest last, at most the hourly cap). */
+function refreshLog() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(REFRESH_LOG_KEY) || "[]");
+        const now = Date.now();
+        return Array.isArray(saved) ? saved.map(Number).filter((time) => time > now - 3600000 && time <= now + 60000).slice(-REFRESH_MAX_PER_HOUR) : [];
+    } catch (error) { return []; }
+}
+
+/** How long "Refresh data" is blocked: { seconds, hourly } (hourly = the cap per hour is used up, not just the pause). */
+export function refreshWait() {
+    const log = refreshLog(), now = Date.now();
+    const pause = log.length ? Math.ceil((log[log.length - 1] + REFRESH_COOLDOWN_MS - now) / 1000) : 0;
+    const hourly = log.length >= REFRESH_MAX_PER_HOUR ? Math.ceil((log[0] + 3600000 - now) / 1000) : 0;
+    return hourly > 0 && hourly > pause ? { seconds: hourly, hourly: true } : { seconds: Math.max(0, pause), hourly: false };
+}
+
 /**
  * The "Refresh data" button: forget nothing, download the three lists in full, tell the pages what changed.
- * Returns the seconds still to wait when it was used less than a minute ago (nothing is downloaded then), else 0.
+ * Returns the seconds still to wait when it is blocked (nothing is downloaded then), else 0.
  */
 export async function refreshData() {
-    const mark = KEY + "refreshed";
-    let last = 0;
-    try { last = Number(disk.getItem(mark)) || 0; } catch (error) { /* none */ }
-    const wait = Math.ceil((last + REFRESH_COOLDOWN_MS - Date.now()) / 1000);
+    const wait = refreshWait().seconds;
     if (wait > 0) return wait;
-    try { disk.setItem(mark, String(Date.now())); } catch (error) { /* none */ }
+    try { localStorage.setItem(REFRESH_LOG_KEY, JSON.stringify(refreshLog().concat(Date.now()))); } catch (error) { /* not kept: the limit then holds only per page */ }
     const before = {};
     LISTS.forEach((name) => { const kept = load(name); before[name] = kept ? fingerprint(kept) : ""; });
     for (const name of LISTS) {

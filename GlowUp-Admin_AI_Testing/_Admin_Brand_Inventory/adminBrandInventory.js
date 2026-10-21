@@ -40,15 +40,21 @@ import {
 import { matchesSearch, compactName, barcodeKey } from "../_Shared/glowupRules.js";
 import { cleanupPlan, productDuplicates, brandDuplicates, mergeProducts, mergeBrands, nameWithoutBrand } from "../_Shared/glowupCatalog.js";
 import { openPlanDialog, openDuplicatesDialog } from "../_Shared/adminCleanup.js";
-import { mountShell, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm } from "../_Shared/adminShell.js";
+import { mountShell, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
 import { readAdminDocument } from "../_Shared/adminDocumentReader.js";
+import { nearShade } from "../_Shared/listRules.js";
+import { mountIngredientPicker } from "../_Shared/adminIngredientPicker.js";
+import { openFacets } from "../_Shared/adminFacets.js";
+import { EXPORT_MAX_ROWS, EXPORT_FILE_PREFIX, toCsv, downloadCsv, today } from "../_Shared/adminExport.js";
+import { countPending, openSnapshotReview } from "../_Shared/adminSnapshots.js";
 
 const OTHER_TYPE = "__other__";
 const NO_BRAND = "__none__";                // the group for products whose brand no longer exists
 const MAX_SHADES = 12;
+const MAX_TAGS = 10;                        // filter words kept on a product (tags), so a filter needs one cheap query and no join
 const BATCH_LIMIT = 400;                    // Firestore allows 500 writes in one batch
 const BRANDS_PER_PAGE = 10;                 // "Brands": this many brands at a time
 const PRODUCTS_PER_PAGE = 10;               // "All products" and the Recycle bin: this many rows at a time
@@ -81,6 +87,9 @@ let products = [];                          // listed: [{ id, name, brandId, bra
 let binBrands = [];                         // in the Recycle bin
 let binProducts = [];
 let curatedKeys = new Set();                // every name / technical name / alias in the Ingredient Curator
+let curatedList = [];                       // the same ingredients with their ids, for the picker of the product form: [{ id, name, techName, aliases }]
+let ingredientPicker = null;                // the picker of the product form (adminIngredientPicker.js)
+let snapshotsWaiting = null;                // products app users sent as a photo, waiting for review (null = not counted yet)
 let curatorKnown = false;
 let editingBrandId = null;
 let editingProductId = null;
@@ -91,7 +100,17 @@ let productModal = null;
 let org = null;                             // folders, the Recycle bin, picking and dragging
 let openId = "";                            // the product whose details are open
 let quick = "";                             // a filter a helper switched on: "" | a key of QUICK
-const view = { mode: "brands", sort: "name" };      // "Brands" or "All products", and the order; remembered in this browser
+// The Filters button: several choices at once. Looked up in the products already loaded (no database read).
+const FACTS = [
+    { value: "has-shades", label: "Has shades" },
+    { value: "no-ingredient-list", label: "No ingredient list" },
+    { value: "fda-listed", label: "On the FDA Philippines list" }
+];
+let facets = { type: "", status: "", facts: [] };
+const facetCount = () => (facets.type ? 1 : 0) + (facets.status ? 1 : 0) + facets.facts.length;
+const facetOk = (p) => (!facets.type || sameKey(p.cosmeticType) === sameKey(facets.type)) && (!facets.status || p.status === facets.status)
+    && facets.facts.every((fact) => productTags(p).includes(fact));
+const view = { mode: "brands", sort: "name", layout: "rows" };      // "Brands" or "All products", the order, rows or cards; remembered in this browser
 
 const el = (id) => document.getElementById(id);
 const DASH = `<span class="muted">–</span>`;
@@ -124,7 +143,7 @@ const QUICK = {
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
-    try { const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || "{}"); if (saved.mode === "all") view.mode = "all"; if (SORTS.some((s) => s.id === saved.sort)) view.sort = saved.sort; } catch (error) { /* first visit */ }
+    try { const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || "{}"); if (saved.mode === "all") view.mode = "all"; if (saved.layout === "cards") view.layout = "cards"; if (SORTS.some((s) => s.id === saved.sort)) view.sort = saved.sort; } catch (error) { /* first visit */ }
     registerData();                   // before the page frame: a saved layout may hold panels that show this data
     mountShell("inventory");
     wireSignOut();
@@ -180,6 +199,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             { label: "Clean up", icon: "sparkle", description: "What is not make-up, what is there twice, kinds and names to put right. You see every change and apply one step at a time.", run: openCleanUp },
             { label: "Find duplicates", icon: "layers", description: "Products and brands that are (or may be) the same thing. You choose which one to keep.", run: () => openDuplicates("products") },
             { separator: true },
+            { label: `Export to CSV (newest ${EXPORT_MAX_ROWS})`, icon: "download", description: `Saves the newest ${EXPORT_MAX_ROWS} listed products as a spreadsheet file. Nothing is read from the database: it uses what is loaded.`, run: exportProductsCsv },
+            { separator: true },
             { label: "Add the FDA Philippines catalogue", icon: "download", description: "Make-up that is on the FDA Philippines list of notified cosmetics. You see how many and confirm first.", run: importFdaCatalogue },
             { label: "Trim the FDA Philippines catalogue", icon: "undo", description: "Moves FDA-list products that are no longer in the catalogue, have no ingredient list and were never scanned to the Recycle bin.", run: trimFdaCatalogue },
             { label: `Remove what is not make-up (${outside})`, icon: "ban", danger: true, disabled: outside === 0, description: "Skin care, hair, body, nail and fragrance entries go to the Recycle bin. You see the list and confirm first.", run: removeOutOfScope }
@@ -194,7 +215,32 @@ document.addEventListener("DOMContentLoaded", async () => {
         saveView();
         if (org.view.kind === "bin") org.show({ kind: "all" }); else fromFirstPage();
     });
-    el("inventoryQuick").addEventListener("click", () => { quick = ""; fromFirstPage(); });
+    // Rows or Cards: only how the same rows are drawn (CSS), so every click, drag, selection and the pager work the same
+    el("inventoryLayoutSwitch").addEventListener("click", (event) => {
+        const button = event.target.closest("[data-layout]");
+        if (!button) return;
+        view.layout = button.dataset.layout === "cards" ? "cards" : "rows";
+        saveView();
+        paintLayout();
+    });
+    paintLayout();
+    el("inventoryQuick").addEventListener("click", (event) => {
+        const chip = event.target.closest("[data-clear]");
+        if (chip && chip.dataset.clear === "facets") facets = { type: "", status: "", facts: [] }; else quick = "";
+        fromFirstPage();
+    });
+    el("filterMenuBtn").addEventListener("click", (event) => {
+        const types = Array.from(new Set(products.map((p) => p.cosmeticType).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+        openFacets(event.currentTarget, {
+            title: "Filters",
+            fields: [
+                { id: "type", label: "Kind", kind: "select", options: types.map((t) => ({ value: t, label: t })), value: facets.type },
+                { id: "status", label: "Status", kind: "select", options: STATUSES.map((s) => ({ value: s, label: s })), value: facets.status },
+                { id: "facts", label: "Only products that", kind: "checks", options: FACTS, value: facets.facts }
+            ],
+            onApply: (values) => { facets = { type: values.type || "", status: values.status || "", facts: values.facts || [] }; fromFirstPage(); }
+        });
+    });
     el("productNameInput").addEventListener("input", showScopeHint);
     el("productTypeOtherInput").addEventListener("input", showScopeHint);
     el("addBrandForm").addEventListener("submit", saveBrand);
@@ -225,12 +271,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("productTypeInput").addEventListener("change", showOtherTypeBox);
     el("productBrandInput").addEventListener("change", showBrandHint);
     el("productIngredientsInput").addEventListener("input", showIngredientSummary);
+    ingredientPicker = mountIngredientPicker({
+        textarea: el("productIngredientsInput"), search: el("productIngredientSearch"), results: el("productIngredientResults"), pills: el("productIngredientPills"),
+        library: () => curatedList,
+        create: createIngredientFromPicker
+    });
     el("productShadeEditor").addEventListener("click", onShadeClick);
     el("productShadeEditor").addEventListener("input", onShadeInput);
+    el("productShadeEditor").addEventListener("change", onShadeChange);
+    el("productShadeEditor").addEventListener("keydown", onShadeKey);
 
     // the list on screen came from the site's own copy; when the database turns out to hold something newer, show that
     onListsRefreshed(() => { if (!dialogIsOpen()) loadInventory(); });
-    loadInventory();
+    const firstLoad = loadInventory();
+
+    // Pending snapshot reviews: one count for the badge now; the snapshots themselves only when the window is opened
+    el("snapshotReviewBtn").addEventListener("click", openSnapshots);
+    countPending().then((n) => { snapshotsWaiting = n; paintSnapshotCount(); })
+        .catch((error) => { console.warn("Could not count the pending snapshots:", error); snapshotsWaiting = null; paintSnapshotCount(true); });
+    // the Dashboard's tile opens this page with ?snapshots=open: the window opens once the lists are here
+    if (new URLSearchParams(location.search).get("snapshots") === "open") firstLoad.then(openSnapshots);
 });
 
 const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) { /* private window */ } };
@@ -244,6 +304,7 @@ function showOnly(value, keep) {
 }
 /** A visible "Show all" action returns to the whole inventory, not just the current search or folder. */
 function resetAllFilters() {
+    facets = { type: "", status: "", facts: [] };
     el("inventorySearchInput").value = "";
     el("brandFilterSelect").value = "";
     el("reviewFilterSelect").value = "";
@@ -341,6 +402,8 @@ async function loadInventory() {
                 needsReview: data.reviewed === false,         // only entries the app or an import added carry this mark
                 autoApproved: data.autoApproved === true,     // approved by this page itself (the FDA Philippines list confirmed it)
                 aliases: asArray(data.aliases),               // other ways the name is written (kept when two entries are merged)
+                logoUrl: String(data.logoUrl || ""),          // the brand's logo and picture: web addresses only
+                imageUrl: String(data.imageUrl || ""),
                 addedAt: madeAt(data)
             }, binFields(data));
         });
@@ -364,6 +427,8 @@ async function loadInventory() {
                 needsReview: data.reviewed === false,
                 autoApproved: data.autoApproved === true,
                 barcode: String(data.barcode || ""),
+                imageUrl: String(data.imageUrl || ""),
+                ingredientNotes: Array.isArray(data.ingredientNotes) ? data.ingredientNotes : [],     // per-product caution and share of an ingredient
                 aliases: asArray(data.aliases),
                 folder: cleanFolder(data.folder),
                 addedAt: madeAt(data)
@@ -403,13 +468,16 @@ async function loadInventory() {
 
     // the Ingredient Curator's names, to point out ingredients it does not explain yet (optional)
     curatedKeys = new Set();
+    curatedList = [];
     try {
         const ingredientSnapshot = await getDocs(collection(db, "ingredients"));
         ingredientSnapshot.forEach((d) => {
             const data = d.data();
             if (data.binned === true) return;
             [data.name, data.techName, ...asArray(data.aliases)].forEach((n) => { const k = sameKey(n); if (k) curatedKeys.add(k); });
+            if (data.name) curatedList.push({ id: d.id, name: String(data.name), techName: String(data.techName || ""), aliases: asArray(data.aliases), riskLevel: String(data.riskLevel || "") });
         });
+        curatedList.sort((a, b) => a.name.localeCompare(b.name));
         curatorKnown = true;
     } catch (error) {
         console.warn("Could not read the Ingredient Curator: ", error);
@@ -469,6 +537,7 @@ function sortOut() {
     binBrands = everyBrand.filter((b) => b.binned);
     products = everyProduct.filter((p) => !p.binned);
     binProducts = everyProduct.filter((p) => p.binned);
+    setBinCount(binBrands.length + binProducts.length, "products and brands");
     if (org) org.sync(everyProduct.map((p) => "p:" + p.id).concat(everyBrand.map((b) => "b:" + b.id)));
 }
 
@@ -716,6 +785,7 @@ async function assistProductIngredients() {
             return;
         }
         el("productIngredientsInput").value = body.draft.ingredients.join(", ");
+        if (ingredientPicker) ingredientPicker.refresh();
         const sources = (body.sources || []).filter((page) => page && /^https:\/\//i.test(page.url || ""))
             .map((page) => `${page.title || page.site || page.url} | ${page.url}`);
         if (body.draft.fdaVerifiedLink && /^https:\/\/([a-z0-9-]+\.)*fda\.gov\.ph\//i.test(body.draft.fdaVerifiedLink))
@@ -849,9 +919,13 @@ const reviewCount = () => brands.filter((b) => b.needsReview && !brandOut(b)).le
 const itemOf = (key) => (key.startsWith("b:") ? everyBrand.find((b) => b.id === key.slice(2)) : everyProduct.find((p) => p.id === key.slice(2))) || null;
 
 /** "#c24b62", "C24B62" -> "#C24B62"; anything that is not a colour -> null. */
+/** "#C24B62", "c24b62", "#C46" or "rgb(194, 75, 98)" become "#C24B62"; anything else is null. */
 function cleanShade(value) {
     let text = String(value || "").trim().toUpperCase();
+    const rgb = text.match(/^RGB\(\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*\)$/);
+    if (rgb) return [1, 2, 3].every((i) => Number(rgb[i]) <= 255) ? "#" + [1, 2, 3].map((i) => Number(rgb[i]).toString(16).padStart(2, "0")).join("").toUpperCase() : null;
     if (text && text[0] !== "#") text = "#" + text;
+    if (/^#[0-9A-F]{3}$/.test(text)) text = "#" + text[1] + text[1] + text[2] + text[2] + text[3] + text[3];
     return /^#[0-9A-F]{6}$/.test(text) ? text : null;
 }
 
@@ -912,11 +986,15 @@ function paintToolbar() {
     const inBin = org.view.kind === "bin";
     el("sortNow").textContent = sortNow().short;
     el("viewSwitch").querySelectorAll("[data-mode]").forEach((button) => { const on = !inBin && button.dataset.mode === view.mode; button.classList.toggle("on", on); button.setAttribute("aria-pressed", String(on)); });
-    el("inventoryQuick").innerHTML = quick && !inBin ? `<button type="button" class="filter-chip" data-tip="Showing only these products. Click to show all again.">${escapeHtml(QUICK[quick].label)}${icon("x")}</button>` : "";
+    el("inventoryQuick").innerHTML = (quick && !inBin ? `<button type="button" class="filter-chip" data-clear="quick" data-tip="Showing only these products. Click to show all again.">${escapeHtml(QUICK[quick].label)}${icon("x")}</button>` : "")
+        + (facetCount() > 0 && !inBin ? `<button type="button" class="filter-chip" data-clear="facets" data-tip="Filters are on. Click to switch them off.">Filters (${facetCount()})${icon("x")}</button>` : "");
+    el("filterNow").textContent = facetCount() > 0 ? " " + facetCount() : "";
+    el("filterMenuBtn").classList.toggle("on", facetCount() > 0);
 }
 
 function renderInventory() {
     paintStats();
+    paintLayout();
     paintToolbar();
     if (org.view.kind === "bin") renderBin(); else renderList(org.view);
     org.refresh();
@@ -929,6 +1007,43 @@ let lastFocus = "|";
 
 const pickBox = (label) => `<button type="button" class="pick" role="checkbox" aria-checked="false" aria-label="Select ${escapeHtml(label)}"></button>`;
 const pickAllBox = (what) => `<button type="button" class="pick" data-pick-all role="checkbox" aria-checked="false" aria-label="Select all shown" data-tip="Select every ${what} shown here."></button>`;
+
+// ----- pending snapshot reviews -----
+/** The badge on the Pending Snapshot Reviews button. */
+function paintSnapshotCount(failed) {
+    const count = el("snapshotCount"), hint = el("snapshotReviewHint");
+    count.classList.remove("skeleton");
+    count.textContent = failed ? "–" : String(snapshotsWaiting || 0);
+    el("snapshotReviewBtn").classList.toggle("has-waiting", (snapshotsWaiting || 0) > 0);
+    hint.textContent = failed ? "The count could not be read. Open it to look anyway."
+        : snapshotsWaiting > 0 ? `${many(snapshotsWaiting, "snapshot waits", "snapshots wait")}. One at a time: the photo next to what the AI read.`
+        : "Nothing is waiting. New photos from the app arrive here.";
+}
+
+/** Opens the review window over this page, with the lists the page already holds (no extra read for them). */
+function openSnapshots() {
+    openSnapshotReview({
+        context: () => ({
+            brands: everyBrand.map((b) => ({ id: b.id, name: b.name, aliases: b.aliases, binned: b.binned === true })),
+            products: everyProduct.map((p) => ({ id: p.id, brandId: p.brandId, name: p.name, aliases: p.aliases, ingredients: p.ingredients, binned: p.binned === true })),
+            library: curatedList
+        }),
+        onLoaded: (n) => { if (snapshotsWaiting === null || n > snapshotsWaiting) { snapshotsWaiting = n; paintSnapshotCount(); } },
+        onProcessed: () => { snapshotsWaiting = Math.max(0, (snapshotsWaiting || 1) - 1); paintSnapshotCount(); },
+        onClose: async (approved) => { if (approved > 0) await loadInventory(); }
+    });
+}
+
+/** Rows or Cards on the inventory list (the switch in its title line). */
+function paintLayout() {
+    // the Recycle bin keeps its table: cards are for products
+    el("inventoryHost").classList.toggle("as-cards", view.layout === "cards" && !(org && org.view.kind === "bin"));
+    el("inventoryLayoutSwitch").querySelectorAll("[data-layout]").forEach((button) => {
+        const on = button.dataset.layout === view.layout;
+        button.classList.toggle("on", on);
+        button.setAttribute("aria-pressed", String(on));
+    });
+}
 
 function setPagers(state, total, noun) {
     renderPager(el("inventoryPager"), state, total, renderInventory, noun);
@@ -955,7 +1070,7 @@ function renderList(now) {
     }
 
     const base = (p) => (show === "out" ? isOut(p) : !isOut(p)) && (!folder || sameKey(p.folder) === sameKey(folder))
-        && (show !== "review" || waits(p)) && (!quick || QUICK[quick].test(p));
+        && (show !== "review" || waits(p)) && (!quick || QUICK[quick].test(p)) && facetOk(p);
     // Search: any letter case, with or without accents and punctuation, parts of words, several words in any order.
     // A product is also found by its other names, its kind, its barcode and its brand ("maybelline lipstick").
     const productMatches = (p) => matchesSearch(typed, [p.name, ...p.aliases, p.cosmeticType, p.description, p.barcode, (brandOf(p) || {}).name || p.brandName]);
@@ -1604,6 +1719,8 @@ function openBrandForm(brand) {
     el("brandCategoryInput").value = BRAND_CATEGORY;           // every brand is a make-up brand; saving one that had another category corrects it
     el("brandMarketInput").value = brand ? brand.market : "Global";
     el("brandStatusInput").value = brand && STATUSES.includes(brand.status) ? brand.status : "Active";
+    el("brandLogoInput").value = brand ? brand.logoUrl : "";
+    el("brandImageInput").value = brand ? brand.imageUrl : "";
     showReviewNote(el("brandReviewNote"), brand, "brand");
     brandModal.open();
 }
@@ -1617,7 +1734,10 @@ async function saveBrand(event) {
     const name = el("brandNameInput").value.replace(/\s+/g, " ").trim();
     const market = el("brandMarketInput").value.replace(/\s+/g, " ").trim() || "Global";
     const status = el("brandStatusInput").value;
+    const logoUrl = cleanLink(el("brandLogoInput").value), imageUrl = cleanLink(el("brandImageInput").value);
 
+    if (logoUrl === null) { setFormError(form, "The logo link must be a web address that starts with https://"); el("brandLogoInput").focus(); return; }
+    if (imageUrl === null) { setFormError(form, "The picture link must be a web address that starts with https://"); el("brandImageInput").focus(); return; }
     if (!name) { setFormError(form, "Type the brand name."); el("brandNameInput").focus(); return; }
     if (name.length < 2) { setFormError(form, "The brand name is too short."); el("brandNameInput").focus(); return; }
     // the same brand written another way ("L'Oreal" / "LOREAL", an accent, a space) is the same brand
@@ -1633,14 +1753,14 @@ async function saveBrand(event) {
             const mine = renamed ? everyProduct.filter((p) => p.brandId === editingBrandId) : [];
 
             // the brand and (when it was renamed) the brand name stored on each of its products, together
-            const brandData = { name, category: BRAND_CATEGORY, market, status, updatedAt: serverTimestamp() };
+            const brandData = { name, category: BRAND_CATEGORY, market, status, logoUrl, imageUrl, updatedAt: serverTimestamp() };
             if (before && before.needsReview) { brandData.reviewed = true; brandData.reviewedAt = serverTimestamp(); }     // an admin who opens it and saves has checked it
             const writes = [{ ref: doc(db, "brands", editingBrandId), data: brandData }];
             mine.forEach((p) => writes.push({ ref: doc(db, "products", p.id), data: { brandName: name, updatedAt: serverTimestamp() } }));
             await runBatches(writes);
             notify(renamed && mine.length > 0 ? `Brand saved. Its ${many(mine.length, "product now shows", "products now show")} the new name.` : "Brand saved.", "ok");
         } else {
-            await addDoc(collection(db, "brands"), { name, category: BRAND_CATEGORY, market, status, scans: 0, createdAt: serverTimestamp() });
+            await addDoc(collection(db, "brands"), { name, category: BRAND_CATEGORY, market, status, logoUrl, imageUrl, scans: 0, createdAt: serverTimestamp() });
             notify("Brand added. Point at its row and press + to list its products.", "ok");
         }
         brandModal.close();
@@ -1678,9 +1798,14 @@ function openProductForm(product, brandId) {
 
     el("productDescInput").value = product ? product.description : "";
     el("productIngredientsInput").value = product ? product.ingredients.join(", ") : "";
+    el("productImageInput").value = product ? product.imageUrl : "";
+    el("productFdaInput").value = product ? fdaLinkOf(product.sources) : "";
+    el("productIngredientSearch").value = "";
+    if (ingredientPicker) ingredientPicker.setNotes(product ? product.ingredientNotes : []);
     el("productMinAgeInput").value = product && product.minAge > 0 ? product.minAge : "";
     el("productStatusInput").value = product && STATUSES.includes(product.status) ? product.status : "Active";
     formShades = product ? product.shades.slice() : [];
+    shadeAdding = false; shadeMessage = "";
 
     showOtherTypeBox();
     showBrandHint();
@@ -1741,38 +1866,171 @@ function showIngredientSummary() {
     hint.className = missing.length > 0 ? "field-hint warn" : "field-hint";
 }
 
+/** The newest products as a CSV file (capped at EXPORT_MAX_ROWS; built from the loaded list, so it costs no reads). */
+function exportProductsCsv() {
+    const newest = listed().slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+    const columns = [
+        { title: "Brand", value: (p) => p.brandName }, { title: "Product", value: (p) => p.name }, { title: "Kind", value: (p) => p.cosmeticType },
+        { title: "Shades", value: (p) => p.shades }, { title: "Minimum age", value: (p) => p.minAge }, { title: "Status", value: (p) => p.status },
+        { title: "Scans", value: (p) => p.scans }, { title: "Ingredients", value: (p) => p.ingredients },
+        { title: "FDA link", value: (p) => fdaLinkOf(p.sources) }, { title: "Photo link", value: (p) => p.imageUrl }
+    ];
+    downloadCsv(`${EXPORT_FILE_PREFIX}-products-${today()}.csv`, toCsv(columns, newest));
+    notify(`${Math.min(EXPORT_MAX_ROWS, newest.length)} products saved to a file.${newest.length > EXPORT_MAX_ROWS ? " The export holds the newest " + EXPORT_MAX_ROWS + " only." : ""}`, "ok");
+}
+
+// ----- ingredients picked in the product form -----
+/** A new ingredient made from the product form: saved in the library at once, so the next product finds it too. */
+async function createIngredientFromPicker(fields) {
+    const data = {
+        name: fields.name, techName: fields.techName, description: fields.description, aliases: [],
+        riskLevel: ["safe", "caution", "harmful"].includes(fields.riskLevel) ? fields.riskLevel : "",
+        cautionNote: "", commonUses: "", minAge: 0, keyActive: false, umbrella: false, highlights: [],
+        allergenTags: [], avoidForSkinTypes: [], goodForSkinTypes: [], avoidForConditions: [], goodForConditions: [],
+        folder: "", createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+    };
+    const made = await addDoc(collection(db, "ingredients"), data);
+    const entry = { id: made.id, name: data.name, techName: data.techName, aliases: [] };
+    curatedList.push(entry);
+    curatedList.sort((a, b) => a.name.localeCompare(b.name));
+    [data.name, data.techName].forEach((n) => { const k = sameKey(n); if (k) curatedKeys.add(k); });
+    curatorKnown = true;
+    notify(`"${data.name}" is in the ingredient library now.`, "ok");
+    return entry;
+}
+
+/** The library entry of a name as written on a product ("" when the library does not have it). */
+function libraryIdOf(name) {
+    const key = sameKey(name);
+    const found = curatedList.find((entry) => [entry.name, entry.techName, ...entry.aliases].some((n) => sameKey(n) === key));
+    return found ? found.id : "";
+}
+
+/** Words a product can be found by (kept on the product itself): its kind, its brand and a few facts. */
+function productTags(product) {
+    const slug = (text) => String(text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30);
+    const tags = [slug(product.cosmeticType), slug(product.brandName)];
+    if (product.shades.length > 0) tags.push("has-shades");
+    if (product.ingredients.length === 0) tags.push("no-ingredient-list");
+    if ((product.sources || []).some((s) => /fda\.gov\.ph/i.test(s))) tags.push("fda-listed");
+    return Array.from(new Set(tags.filter(Boolean))).slice(0, MAX_TAGS);
+}
+
+/** A web address typed into a form: "" when empty, null when it is not an https address, else the clean address. */
+function cleanLink(value) {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    try { const url = new URL(text); return url.protocol === "https:" && text.length <= 300 ? url.href : null; } catch (error) { return null; }
+}
+
+/** The FDA Philippines page of a product, from its sources ("FDA Philippines verification | https://...") */
+const fdaLinkOf = (sources) => {
+    const entry = (sources || []).find((s) => /fda\.gov\.ph/i.test(s));
+    return entry ? (entry.split("|").pop() || "").trim() : "";
+};
+
 // ----- shades -----
+// Each shade is "#RRGGBB" (the app and AR Try-On read them in this order). The admin adds one by typing a hex code or
+// picking a colour (nothing is added by itself), edits one by its picker or its code, moves it earlier or later, or removes it.
+let shadeAdding = false, shadeMessage = "", shadeDraft = "#C24B62", shadeNearOk = "";
+
 function renderShadeEditor() {
+    const swatch = (shade) => `background:${escapeHtml(shade)}`;
     const items = formShades.map((shade, index) => `
-        <span class="shade-item">
-            <input type="color" value="${escapeHtml(shade.toLowerCase())}" data-index="${index}" title="Change this shade">
-            <code>${escapeHtml(shade)}</code>
-            <button type="button" data-remove="${index}" title="Remove this shade">×</button>
+        <span class="shade-item" data-index="${index}">
+            <label class="shade-swatch" style="${swatch(shade)}" title="Pick a colour"><input type="color" class="shade-picker" value="${escapeHtml(shade.toLowerCase())}" data-index="${index}" aria-label="Pick the colour of shade ${index + 1}"></label>
+            <input type="text" class="shade-hex" value="${escapeHtml(shade)}" maxlength="22" spellcheck="false" autocomplete="off" data-index="${index}" aria-label="Hex code of shade ${index + 1}">
+            <button type="button" data-move="-1" data-index="${index}" title="Move earlier" aria-label="Move shade ${index + 1} earlier"${index === 0 ? " disabled" : ""}>‹</button>
+            <button type="button" data-move="1" data-index="${index}" title="Move later" aria-label="Move shade ${index + 1} later"${index === formShades.length - 1 ? " disabled" : ""}>›</button>
+            <button type="button" data-remove="${index}" title="Remove this shade" aria-label="Remove shade ${index + 1}">×</button>
         </span>`).join("");
-    const add = formShades.length < MAX_SHADES ? `<button type="button" class="row-btn" id="addShadeBtn">${icon("plus")}Shade</button>` : "";
-    el("productShadeEditor").innerHTML = items + add;
+    let tail;
+    if (shadeAdding && formShades.length < MAX_SHADES) {
+        tail = `<span class="shade-item shade-new">
+            <label class="shade-swatch" style="${swatch(shadeDraft)}" title="Pick a colour"><input type="color" class="shade-picker" id="newShadePicker" value="${escapeHtml(shadeDraft.toLowerCase())}" aria-label="Pick a colour for the new shade"></label>
+            <input type="text" class="shade-hex" id="newShadeHex" value="${escapeHtml(shadeDraft)}" maxlength="22" spellcheck="false" autocomplete="off" placeholder="#C24B62" aria-label="Hex code of the new shade">
+            <button type="button" class="row-btn" id="confirmShadeBtn">Add</button>
+            <button type="button" id="cancelShadeBtn" title="Cancel" aria-label="Cancel adding a shade">×</button>
+        </span>`;
+    } else if (formShades.length < MAX_SHADES) tail = `<button type="button" class="row-btn" id="addShadeBtn">${icon("plus")}Shade</button>`;
+    else tail = `<span class="field-hint">A product can have up to ${MAX_SHADES} shades.</span>`;
+    const note = shadeMessage ? `<span class="field-hint shade-msg" role="alert">${escapeHtml(shadeMessage)}</span>` : "";
+    el("productShadeEditor").innerHTML = items + tail + note;
+}
+
+function addShadeFromDraft() {
+    const field = el("newShadeHex");
+    const shade = cleanShade(field ? field.value : "");
+    if (shade === null) { shadeMessage = "Type a colour such as #C24B62, or pick one with the colour box."; renderShadeEditor(); return; }
+    if (formShades.includes(shade)) { shadeMessage = shade + " is in the list already."; renderShadeEditor(); return; }
+    if (formShades.length >= MAX_SHADES) return;
+    // a colour that is almost one already in the list: said once, and the same colour again means "add anyway"
+    const near = nearShade(formShades, shade);
+    if (near && shadeNearOk !== shade) { shadeNearOk = shade; shadeMessage = shade + " looks almost like " + near + ", which is in the list. Press Add again to add it anyway."; renderShadeEditor(); return; }
+    shadeNearOk = "";
+    formShades.push(shade);
+    shadeDraft = shade;
+    shadeMessage = "";
+    shadeAdding = formShades.length < MAX_SHADES;
+    renderShadeEditor();
+    const next = el("newShadeHex");
+    if (next) next.focus();
 }
 
 function onShadeClick(event) {
     const button = event.target.closest("button");
     if (!button) return;
-    if (button.id === "addShadeBtn") {
-        if (formShades.length < MAX_SHADES) formShades.push("#C24B62");
-    } else if (button.hasAttribute("data-remove")) {
-        formShades.splice(Number(button.getAttribute("data-remove")), 1);
+    if (button.id === "addShadeBtn") { shadeAdding = true; shadeMessage = ""; renderShadeEditor(); const field = el("newShadeHex"); if (field) field.select(); return; }
+    if (button.id === "confirmShadeBtn") { addShadeFromDraft(); return; }
+    if (button.id === "cancelShadeBtn") { shadeAdding = false; shadeMessage = ""; renderShadeEditor(); return; }
+    if (button.hasAttribute("data-remove")) formShades.splice(Number(button.getAttribute("data-remove")), 1);
+    else if (button.hasAttribute("data-move")) {
+        const from = Number(button.getAttribute("data-index")), to = from + Number(button.getAttribute("data-move"));
+        if (to < 0 || to >= formShades.length) return;
+        formShades.splice(to, 0, formShades.splice(from, 1)[0]);
     } else return;
+    shadeMessage = "";
     renderShadeEditor();
 }
 
+/** A colour picked with the colour box: the code and the swatch follow, without a full re-draw (the picker stays open). */
 function onShadeInput(event) {
     const input = event.target;
-    if (input.type !== "color") return;
-    const shade = cleanShade(input.value);
+    if (input.classList.contains("shade-picker")) {
+        const shade = cleanShade(input.value);
+        if (shade === null) return;
+        const item = input.closest(".shade-item");
+        const hex = item.querySelector(".shade-hex");
+        if (hex) hex.value = shade;
+        input.parentElement.style.background = shade;
+        if (input.id === "newShadePicker") shadeDraft = shade;
+        else {
+            const index = Number(input.getAttribute("data-index"));
+            if (index >= 0 && index < formShades.length) formShades[index] = shade;
+        }
+    } else if (input.id === "newShadeHex") {
+        const shade = cleanShade(input.value);
+        if (shade !== null) { shadeDraft = shade; const swatchBox = input.closest(".shade-item"); swatchBox.querySelector(".shade-swatch").style.background = shade; swatchBox.querySelector(".shade-picker").value = shade.toLowerCase(); }
+    }
+}
+
+/** A code typed into an existing shade: kept when it is a colour, put back (with a note) when it is not. */
+function onShadeChange(event) {
+    const input = event.target;
+    if (!input.classList.contains("shade-hex") || input.id === "newShadeHex") return;
     const index = Number(input.getAttribute("data-index"));
-    if (shade === null || !(index >= 0 && index < formShades.length)) return;
-    formShades[index] = shade;
-    const code = input.parentElement.querySelector("code");
-    if (code) code.textContent = shade;                 // no full re-draw: the colour picker stays open
+    if (!(index >= 0 && index < formShades.length)) return;
+    const shade = cleanShade(input.value);
+    if (shade === null) shadeMessage = "That is not a colour. Use a code such as #C24B62.";
+    else if (formShades.some((other, at) => at !== index && other === shade)) shadeMessage = shade + " is in the list already.";
+    else { formShades[index] = shade; shadeMessage = ""; }
+    renderShadeEditor();
+}
+
+function onShadeKey(event) {
+    if (event.key !== "Enter" || !event.target.classList.contains("shade-hex")) return;
+    event.preventDefault();
+    if (event.target.id === "newShadeHex") addShadeFromDraft(); else event.target.blur();
 }
 
 // ----- saving -----
@@ -1792,7 +2050,10 @@ async function saveProduct(event) {
     const minAge = toWholeNumber(minAgeText);
     const status = el("productStatusInput").value;
     const shades = Array.from(new Set(formShades.map(cleanShade).filter((s) => s !== null)));
+    const imageUrl = cleanLink(el("productImageInput").value), fdaUrl = cleanLink(el("productFdaInput").value);
 
+    if (imageUrl === null) { setFormError(form, "The photo link must be a web address that starts with https://"); el("productImageInput").focus(); return; }
+    if (fdaUrl === null || (fdaUrl && !/^https:\/\/([a-z0-9-]+\.)*fda\.gov\.ph\//i.test(fdaUrl))) { setFormError(form, "The FDA link must be a page of fda.gov.ph (it starts with https://)."); el("productFdaInput").focus(); return; }
     if (!name) { setFormError(form, "Type the product name."); el("productNameInput").focus(); return; }
     if (!brand) { setFormError(form, "Choose the brand."); el("productBrandInput").focus(); return; }
     if (!cosmeticType) { setFormError(form, "Choose the cosmetic type."); el("productTypeInput").focus(); return; }
@@ -1805,11 +2066,21 @@ async function saveProduct(event) {
     if (duplicate) { setFormError(form, duplicate.binned ? `"${duplicate.name}" of ${brand.name} is in the Recycle bin. Restore it from there instead.` : `${brand.name} already has a product named "${duplicate.name}".`); el("productNameInput").focus(); return; }
     setFormError(form, "");
 
+    // the FDA page lives in the sources, as "FDA Philippines verification | https://..." (the convention of the import and of the scan)
+    const sources = assistedProductSources.filter((s) => !/fda\.gov\.ph/i.test(s));
+    if (fdaUrl) sources.unshift("FDA Philippines verification | " + fdaUrl);
+    const notes = ingredientPicker ? ingredientPicker.getNotes() : [];
     const data = {
         name, brandId: brand.id, brandName: brand.name, cosmeticType, description,
-        ingredients, shades, minAge, status, updatedAt: serverTimestamp()
+        ingredients, shades, minAge, status, imageUrl,
+        // light summaries kept on the product so that nothing needs a join: the links to the library, how many, and the words a filter uses
+        ingredientIds: Array.from(new Set(ingredients.map(libraryIdOf).filter(Boolean))),
+        ingredientCount: ingredients.length,
+        ingredientNotes: notes.map((n) => ({ name: n.name, id: libraryIdOf(n.name), caution: n.caution, percent: n.percent })),
+        tags: productTags({ cosmeticType, brandName: brand.name, shades, ingredients, sources }),
+        updatedAt: serverTimestamp()
     };
-    if (assistedProductSources.length > 0) data.sources = Array.from(new Set(assistedProductSources)).slice(0, 10);
+    if (sources.length > 0 || editingProductId) data.sources = Array.from(new Set(sources)).slice(0, 10);
     const before = products.find((p) => p.id === editingProductId);
     if (before && before.needsReview) { data.reviewed = true; data.reviewedAt = serverTimestamp(); }     // an admin who opens it and saves has checked it
 
@@ -1949,7 +2220,7 @@ function registerHelpers() {
         const onList = listed().filter(QUICK.fda.test).length;
         if (onList > 0) lines.push({ tone: "ok", text: `${many(onList, "product", "products")} of ${many(checked.length, "brand", "brands")} are on the FDA Philippines list: ${checked.slice(0, 8).map((b) => b.name).join(", ")}${checked.length > 8 ? ` and ${checked.length - 8} more` : ""}.`, label: quick === "fda" ? "Show all" : "Show them", run: () => setQuick("fda") });
         return lines;
-    });
+    }, { badge: "inventoryNotes" });
 
     registerAssist("tools", () => {
         if (!ready()) return [];
@@ -1967,7 +2238,7 @@ function registerHelpers() {
             { text: `Sorted by ${sortNow().short}, ${view.mode === "all" ? "every product in one list" : "grouped by brand"}. Search also finds a type, for example "lipstick".` },
             { text: "Drag a row onto a folder or the bin. Ctrl+click picks several rows; Shift+click picks a range." }
         ];
-    });
+    }, { badge: "inventoryNotes" });
 
     registerAssist("table", () => {
         if (!ready()) return [];

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GlowUp Admin - Operations Dashboard</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="../_Shared/assets/glowup-icon-32.png">
     <script>
         // dark or light before anything is drawn: the person's choice, else the computer's own setting
         (function () {
@@ -43,7 +44,7 @@
         <div class="board">
 
             <!-- the five numbers -->
-            <section class="panel bare" data-panel="numbers" data-label="Numbers" data-w="12">
+            <section class="panel bare" data-panel="numbers" data-label="Numbers" data-w="8">
                 <div class="kpi-row">
                     <!-- one tile = one number: its icon, the number and ONE label side by side. What a tile does on a click, and
                          what its number means, is in the tip of the tile itself (no extra badges). -->
@@ -70,6 +71,25 @@
                 </div>
             </section>
 
+            <!-- what to do next -->
+            <section class="panel" data-panel="actions" data-label="Quick actions" data-w="4">
+                <div class="panel-head">
+                    <h3 class="panel-title">Quick actions</h3>
+                    <button type="button" class="guide-badge" data-tip-title="Quick actions" data-tip="Shortcuts to the work that is waiting. A blue tile only appears when something needs review.">i</button>
+                </div>
+                <!-- only what WAITS gets a full tile. The two shortcuts stand side by side as small buttons: the menu on the
+                     left has them too. What a tile opens is in its own tip (no badge beside every tile). -->
+                <div class="tile-stack">
+                    <a id="reviewInventoryTile" style="display: none;" href="../_Admin_Brand_Inventory/adminBrandInventory.html?show=review" class="tile review" data-tip-title="Inventory waiting for review" data-tip="Products and brands the app added from scans, or that were imported. The app does not use them until you approve them." data-tip-preview="Opens the inventory showing only these entries."><i data-icon="inbox"></i><span class="tile-title" id="reviewInventoryTitle">Waiting for review</span><i data-icon="right"></i></a>
+                    <a id="reviewIngredientsTile" style="display: none;" href="../_Admin_Ingredient_Curator/adminIngredientCurator.html?show=review" class="tile review" data-tip-title="Ingredients waiting for review" data-tip="Ingredients the app's AI lookup found. Until you approve one, the app uses its warnings but never counts it as proof of safety." data-tip-preview="Opens the Ingredient Curator showing only these entries."><i data-icon="inbox"></i><span class="tile-title" id="reviewIngredientsTitle">Waiting for review</span><i data-icon="right"></i></a>
+                    <a id="reviewSnapshotsTile" style="display: none;" href="../_Admin_Brand_Inventory/adminBrandInventory.html?snapshots=open" class="tile review" data-tip-title="Photos waiting for review" data-tip="Products app users sent as a photo because the catalogue did not have them. Users see the AI's reading marked PENDING APPROVAL until you approve it." data-tip-preview="Opens the review window in Brand &amp; Product Inventory."><i data-icon="camera"></i><span class="tile-title" id="reviewSnapshotsTitle">Photos waiting for review</span><i data-icon="right"></i></a>
+                    <div class="tile-pair">
+                        <a href="../_Admin_Brand_Inventory/adminBrandInventory.html" class="tile small" data-tip-title="Brands &amp; products" data-tip="Add or edit brands and the make-up and face products listed under them." data-tip-preview="Opens the Brand &amp; Product Inventory."><i data-icon="box"></i><span class="tile-title">Brands &amp; products</span></a>
+                        <a href="../_Admin_Ingredient_Curator/adminIngredientCurator.html" class="tile small" data-tip-title="Ingredients" data-tip="Write what each ingredient is in plain words and tell the app how to judge it." data-tip-preview="Opens the Ingredient Curator."><i data-icon="flask"></i><span class="tile-title">Ingredients</span></a>
+                    </div>
+                </div>
+            </section>
+
             <!-- recent scans -->
             <section class="panel" data-panel="activity" data-label="Recent activity" data-w="8" data-source="activity">
                 <div class="panel-head">
@@ -83,24 +103,6 @@
                 <div class="empty-state loading" id="activityEmpty"><div class="sk-list"><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div></div>
                     <p class="empty-message" id="activityEmptyMessage">Loading activity...</p>
                     <span class="empty-hint" id="activityEmptyHint">Scans appear here once app users start scanning.</span>
-                </div>
-            </section>
-
-            <!-- what to do next -->
-            <section class="panel" data-panel="actions" data-label="Quick actions" data-w="4">
-                <div class="panel-head">
-                    <h3 class="panel-title">Quick actions</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Quick actions" data-tip="Shortcuts to the work that is waiting. A blue tile only appears when something needs review.">i</button>
-                </div>
-                <!-- only what WAITS gets a full tile. The two shortcuts stand side by side as small buttons: the menu on the
-                     left has them too. What a tile opens is in its own tip (no badge beside every tile). -->
-                <div class="tile-stack">
-                    <a id="reviewInventoryTile" style="display: none;" href="../_Admin_Brand_Inventory/adminBrandInventory.html?show=review" class="tile review" data-tip-title="Inventory waiting for review" data-tip="Products and brands the app added from scans, or that were imported. The app does not use them until you approve them." data-tip-preview="Opens the inventory showing only these entries."><i data-icon="inbox"></i><span class="tile-title" id="reviewInventoryTitle">Waiting for review</span><i data-icon="right"></i></a>
-                    <a id="reviewIngredientsTile" style="display: none;" href="../_Admin_Ingredient_Curator/adminIngredientCurator.html?show=review" class="tile review" data-tip-title="Ingredients waiting for review" data-tip="Ingredients the app's AI lookup found. Until you approve one, the app uses its warnings but never counts it as proof of safety." data-tip-preview="Opens the Ingredient Curator showing only these entries."><i data-icon="inbox"></i><span class="tile-title" id="reviewIngredientsTitle">Waiting for review</span><i data-icon="right"></i></a>
-                    <div class="tile-pair">
-                        <a href="../_Admin_Brand_Inventory/adminBrandInventory.html" class="tile small" data-tip-title="Brands &amp; products" data-tip="Add or edit brands and the make-up and face products listed under them." data-tip-preview="Opens the Brand &amp; Product Inventory."><i data-icon="box"></i><span class="tile-title">Brands &amp; products</span></a>
-                        <a href="../_Admin_Ingredient_Curator/adminIngredientCurator.html" class="tile small" data-tip-title="Ingredients" data-tip="Write what each ingredient is in plain words and tell the app how to judge it." data-tip-preview="Opens the Ingredient Curator."><i data-icon="flask"></i><span class="tile-title">Ingredients</span></a>
-                    </div>
                 </div>
             </section>
 

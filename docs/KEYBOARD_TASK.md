@@ -12,5 +12,12 @@ Rules: no scene edits by hand, no builder run by Claude, no commit. Each step wa
   - [ ] Device check (Android, iOS if available)
   - [x] Android only: IME window insets (API 30+), window frame fallback, TouchScreenKeyboard.area last fallback; every Java call wrapped, objects cached; dev-only on-screen label (Log Numbers)
   - iOS untested and out of scope (the TouchScreenKeyboard.area code stays as the Android fallback)
+- Step 1 phone test: NOT TESTED YET (reported 2026-10-22)
 - [ ] Step 2: KeyboardKit.cs, idempotent Ensure() in ThemeKit.FinishScene, ScrollRect wrap for Login and Onboarding Step 1 (one builder at a time), badge grouping
+  - [x] (a) KeyboardKit.Ensure() idempotent (keeps first KeyboardAvoider, removes extra components, empty roots left alone); KeepVisible and KeyboardKeepVisible.Set reject the container and any parent of the field. Saved, not yet compiled in Unity.
+    - Editor check: no CS errors. Nothing calls Ensure() yet, so no scene change.
+    - Device check: none.
+  - [ ] (b) hook KeyboardKit.Ensure() in ThemeKit.FinishScene (waits for the Step 1 phone result)
+  - [ ] (c) Login ScrollRect wrap in LoginSceneBuilder
+  - Onboarding Step 1 wrap only after Login is tested on the phone
 - [ ] Step 3: list of forms whose badges need moving (list only, no edits)

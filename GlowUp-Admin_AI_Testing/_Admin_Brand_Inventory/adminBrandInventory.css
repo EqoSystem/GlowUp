@@ -47,18 +47,31 @@
 .suggestion-card .field input, .suggestion-card .field textarea { width: 100%; }
 .suggestion-card [data-draft-reviewed] { margin-right: 6px; }
 .suggestion-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
-.import-dropbox {
-    width: 100%; min-height: 88px; display: flex; align-items: center; gap: 14px; padding: 16px;
-    border: 1px dashed var(--line-strong, var(--line)); border-radius: 12px; background: var(--surface-2);
-    color: var(--text); text-align: left; cursor: pointer; transition: border-color .15s, background .15s;
-}
-.import-dropbox:hover, .import-dropbox.drag-over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-2)); }
-.import-dropbox strong, .import-dropbox small { display: block; }
-.import-dropbox small { color: var(--muted); font-size: var(--fs-xs); line-height: 1.5; margin-top: 4px; }
-.import-drop-icon { color: var(--accent); display: inline-grid; flex: 0 0 auto; }
-.import-status { margin: 8px 0 0; overflow-wrap: anywhere; color: var(--text-2); font-size: var(--fs-sm); line-height: 1.5; text-decoration: none; }
-.import-status.error { color: var(--bad); }
 .field-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
 .field-heading label { margin: 0; }
 .ai-product-note { margin: 8px 0 0; }
 .ai-product-note[hidden] { display: none; }
+
+/* ---- Cards: the same rows of the table, drawn as cards (brands stay as full-width headings). Pure CSS, so every
+   handler of the rows (open, edit, drag, select) works the same in both looks. ---- */
+#inventoryHost.as-cards { overflow: visible; }
+.as-cards .inventory-table { min-width: 0; display: block; }
+.as-cards .inventory-table thead { display: block; }
+.as-cards .inventory-table thead tr { display: block; }
+.as-cards .inventory-table thead th { display: none; border: 0; background: none; padding: 0 0 8px; }
+.as-cards .inventory-table thead th:first-child { display: block; }          /* the "select all" box stays */
+.as-cards .inventory-table tbody { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; align-items: stretch; }
+.as-cards .inventory-table tbody > tr { display: block; }
+.as-cards .inventory-table tbody > tr.brand-row, .as-cards .inventory-table tbody > tr.detail-row, .as-cards .inventory-table tbody > tr.note-row,
+.as-cards .inventory-table tbody > tr.more-row, .as-cards .inventory-table tbody > tr:not(.product-row):not(.brand-row) { grid-column: 1 / -1; }
+.as-cards .inventory-table tbody > tr > td { display: block; border: 0; }
+.as-cards .inventory-table tr.brand-row > td { border-radius: var(--radius-sm); margin-top: 6px; }
+.as-cards .inventory-table tr.product-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
+.as-cards .inventory-table tr.product-row:hover { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.as-cards .inventory-table tr.product-row.open { border-color: var(--accent); }
+.as-cards .inventory-table tr.product-row > td { padding: 0; background: none; }
+.as-cards .inventory-table tr.product-row > td.name-cell { flex: 1 1 100%; min-width: 0; }
+.as-cards .inventory-table tr.product-row > td.brand-ref, .as-cards .inventory-table tr.product-row > td.type-cell { font-size: var(--fs-xs); color: var(--muted); }
+.as-cards .inventory-table tr.product-row > td.scan-count::after { content: " scans"; color: var(--muted); font-size: var(--fs-xs); }
+.as-cards .inventory-table tr.product-row > td:last-child { margin-left: auto; }
+.as-cards .inventory-table tr.product-row .row-actions { opacity: 1; }

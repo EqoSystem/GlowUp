@@ -25,6 +25,9 @@ import { rowsFor, ROW_UNIT } from "./layoutRules.js";
 import { setFoldPage, foldButton, FOLD_PARTS, paintFold, toggleFold, foldedNow, anyFoldChoice, forgetFoldChoices } from "./adminFold.js";
 
 const LAYOUT_KEY = "glowup.layouts.v1";
+// Version of the DEFAULT panel positions. A saved page older than this loses its saved order and sizes (names, fonts,
+// colours, views, added panels and groups stay) so the new default positions show. Raise it whenever a page's default order or widths change.
+const POSITIONS_VERSION = 5;
 const MAX_PROFILES = 4;
 const MAX_ADDED = 12;                             // data panels one page of a layout can hold
 const FONTS = [
@@ -66,6 +69,7 @@ function cleanPage(raw) {
     const views = {};
     Object.keys(page.views || {}).slice(0, 30).forEach((id) => { if (ID.test(id)) views[id] = cleanView(page.views[id]); });
     return {
+        ver: Math.max(0, Math.min(1000, Number(page.ver) || 0)),
         fit: page.fit !== false,                      // Auto resize: on unless it was switched off
         order: idList(page.order, 60), size, hidden: idList(page.hidden, 60), views,
         widgets: (Array.isArray(page.widgets) ? page.widgets : []).slice(0, MAX_ADDED).filter((w) => w && ID.test(String(w.id)))
@@ -95,6 +99,12 @@ function loadStore() {
             store = { active: String(saved.active || "default"), profiles: saved.profiles.slice(0, MAX_PROFILES).filter((p) => p && ID.test(String(p.id))).map((p) => cleanProfile(p, String(p.id))) };
     } catch (error) { console.warn("Saved layouts could not be read: ", error); }
     if (!store.profiles.some((p) => p.id === store.active)) store.active = "default";
+    let moved = false;
+    store.profiles.forEach((profile) => Object.keys(profile.pages).forEach((key) => {
+        const saved = profile.pages[key];
+        if (saved.ver < POSITIONS_VERSION) { saved.order = []; saved.size = {}; saved.ver = POSITIONS_VERSION; moved = true; }
+    }));
+    if (moved) saveStore();
 }
 function saveStore() { try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(store)); } catch (error) { console.warn("The layout could not be saved: ", error); } }
 
@@ -110,7 +120,7 @@ function pageData(create) {
     const profile = activeProfile();
     if (!profile) return null;
     profile.pages = profile.pages || {};
-    if (!profile.pages[pageId]) { if (!create) return null; profile.pages[pageId] = cleanPage({}); }
+    if (!profile.pages[pageId]) { if (!create) return null; profile.pages[pageId] = cleanPage({ ver: POSITIONS_VERSION }); }
     return profile.pages[pageId];
 }
 
@@ -280,6 +290,9 @@ function applyLayout() {
         panel.classList.toggle("is-hidden", !!(page && page.hidden.includes(id)));
         labelSize(panel);
     });
+
+    // the default places: a panel marked data-right sits in the right-hand column whatever the packing would do
+    b.classList.toggle("pinned", !page || page.order.length === 0);
 
     const profile = activeProfile();
     document.body.classList.toggle("own-layout", !!profile);          // with a layout of your own, panels move by their title bar
