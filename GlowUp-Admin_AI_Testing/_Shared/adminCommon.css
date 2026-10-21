@@ -454,6 +454,9 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .count-link { color: var(--accent-text); text-decoration: none; font-weight: 600; }
 .count-link:hover { text-decoration: underline; }
 .source-link { color: var(--info); text-decoration: underline; text-underline-offset: 2px; }
+/* the kind of page after a source link (the same words as in the app); hover for the advice */
+.chip.source-kind { margin: 0 2px; font-size: var(--fs-xs); cursor: help; vertical-align: baseline; }
+.source-guide { display: block; margin-top: 6px; }
 .source-line { font-size: var(--fs-xs); color: var(--muted); line-height: 1.6; overflow-wrap: anywhere; }
 .review-note {
     font-size: var(--fs-sm); line-height: 1.55; color: var(--text-2); overflow-wrap: anywhere; margin-top: 10px; padding: 10px 12px;

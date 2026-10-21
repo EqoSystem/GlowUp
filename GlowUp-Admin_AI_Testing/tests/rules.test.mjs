@@ -61,7 +61,7 @@ const sharedLines = readCases("SharedRuleCases.txt");
 for (const line of sharedLines) {
     const parts = line.split("|").map((part) => decode(part.trim()));
     const rule = parts[0];
-    const needed = ["same", "squashsame", "brands", "scanid"].includes(rule) ? 4 : 3;
+    const needed = ["same", "squashsame", "brands", "scanid", "sourcekind"].includes(rule) ? 4 : 3;
     check(parts.length === needed, "This line does not have the columns its rule needs: " + line);
     if (parts.length !== needed) continue;
     const expected = parts[needed - 1];
@@ -82,6 +82,8 @@ for (const line of sharedLines) {
         case "brandid": got = rules.scanBrandId(parts[1]); break;
         case "stoplist": got = rules.stoplistHit(parts[1]) || ""; break;
         case "shape": got = rules.wrongIngredientShape(parts[1]) ? "wrong" : "ok"; break;
+        case "sourcekind": got = rules.sourceKind(parts[1], parts[2]); break;
+        case "sourcelabel": got = (rules.SOURCE_KINDS[parts[1]] || {}).label || ""; break;
         default: failures.push("The list names a rule this test does not know: " + rule); continue;
     }
     equal(got, expected, line);

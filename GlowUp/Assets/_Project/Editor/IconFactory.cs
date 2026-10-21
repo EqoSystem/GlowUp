@@ -47,6 +47,11 @@ namespace GlowUp.EditorTools
 
         public static Sprite Back => Get("icon_back", (x, y) => Stroke(x, y, 0.14f, new[] { 0.3f, 0.7f, -0.3f, 0f, 0.3f, -0.7f }));
         public static Sprite Arrow => Get("icon_arrow", (x, y) => Stroke(x, y, 0.13f, new[] { -0.7f, 0f, 0.65f, 0f }) || Stroke(x, y, 0.13f, new[] { 0.15f, 0.55f, 0.65f, 0f, 0.15f, -0.55f }));
+        /// <summary>"Opens a website": an open box with an arrow leaving it at the top right. Only on buttons that leave the app.</summary>
+        public static Sprite ExternalLink => Get("icon_external_link", (x, y) =>
+            Stroke(x, y, 0.11f, new[] { -0.05f, 0.45f, -0.75f, 0.45f, -0.75f, -0.75f, 0.45f, -0.75f, 0.45f, 0.05f })
+            || Stroke(x, y, 0.11f, new[] { -0.15f, -0.15f, 0.76f, 0.76f })
+            || Stroke(x, y, 0.11f, new[] { 0.3f, 0.8f, 0.8f, 0.8f, 0.8f, 0.3f }));
         public static Sprite Check => Get("icon_check", (x, y) => Stroke(x, y, 0.15f, new[] { -0.65f, 0f, -0.2f, -0.5f, 0.65f, 0.5f }));
         public static Sprite Close => Get("icon_close", (x, y) => Stroke(x, y, 0.13f, new[] { -0.55f, 0.55f, 0.55f, -0.55f }) || Stroke(x, y, 0.13f, new[] { -0.55f, -0.55f, 0.55f, 0.55f }));
         public static Sprite Info => Get("icon_info", (x, y) => { float r = Mathf.Sqrt(x * x + y * y); bool ring = r < 0.9f && r > 0.75f; bool dot = (x * x + (y - 0.4f) * (y - 0.4f)) < 0.01f; bool bar = Mathf.Abs(x) < 0.07f && y > -0.45f && y < 0.2f; return ring || dot || bar; });

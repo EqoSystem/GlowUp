@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using GlowUp.Data;
 
 namespace GlowUp.Scan
@@ -163,6 +164,152 @@ namespace GlowUp.Scan
                 default: return "another page";
             }
         }
+
+        // ---------------------------------------------------------------------------------------
+        //  WHAT KIND OF PAGE a source is, in words a dermatologist or pharmacist can check
+        // ---------------------------------------------------------------------------------------
+        // A label shown next to every source button. SHARED WORD FOR WORD with the admin website (_Shared/glowupRules.js,
+        // sourceKind) and the Assist with AI server (api/assist-ingredient.js): all three are tested against the
+        // "sourcekind" and "sourcelabel" lines of Editor/Tests/SharedRuleCases.txt. It only LABELS a page; which pages may
+        // carry a product's list is still decided by KindOf / Usable above.
+
+        public const string KindRegulator = "regulator", KindMedical = "medical", KindMaker = "maker", KindReference = "reference",
+                            KindPublic = "public", KindRetailer = "retailer", KindUnverified = "other";
+
+        /// <summary>Regulators and governments (any .gov or .gov.xx site counts too).</summary>
+        public static readonly string[] Regulators =
+        {
+            "europa.eu", "fda.gov", "fda.gov.ph", "nih.gov", "who.int", "aseancosmetics.org", "asean.org", "health.gov.au", "tga.gov.au", "canada.ca", "gov.uk", "echa.europa.eu"
+        };
+
+        /// <summary>Medical and scientific bodies and publishers (any .edu or .edu.xx site counts too).</summary>
+        public static readonly string[] MedicalBodies =
+        {
+            "cir-safety.org", "cir-reports.cir-safety.org", "aad.org", "dermnetnz.org", "contactderm.org", "sciencedirect.com", "wiley.com", "springer.com",
+            "nature.com", "jamanetwork.com", "bmj.com", "mayoclinic.org", "clevelandclinic.org"
+        };
+
+        /// <summary>Ingredient databases and consumer references: they explain an ingredient, they are not peer-reviewed.</summary>
+        public static readonly string[] References =
+        {
+            "personalcarecouncil.org", "incibeauty.com", "incidecoder.com", "paulaschoice.com", "ewg.org", "cosmeticsinfo.org"
+        };
+
+        /// <summary>Public lists that anybody can edit.</summary>
+        public static readonly string[] PublicLists = { "openbeautyfacts.org" };
+
+        /// <summary>A brand's own site may add one of these to the brand's name ("nyxcosmetics.com", "absidybeauty.com").</summary>
+        public static readonly string[] MakerSuffixes = { "", "cosmetics", "beauty", "makeup", "official", "ph", "store", "shop" };
+
+        static readonly Regex GovSite = new Regex(@"\.gov(\.[a-z]{2})?$"), EduSite = new Regex(@"\.edu(\.[a-z]{2})?$"), NotLetterOrDigit = new Regex("[^a-z0-9]");
+
+        /// <summary>
+        /// The kind of page of a source line ("page title | https://address", or an address): regulator, medical, maker,
+        /// reference, public, retailer or other. `brandName` = the brand of the product (may be empty: then no page is the maker's).
+        /// </summary>
+        public static string SourceKind(string source, string brandName)
+        {
+            string host = LabelHost(source);
+            if (host.Length == 0) return KindUnverified;
+            if (OnSite(host, Regulators) || GovSite.IsMatch(host)) return KindRegulator;
+            if (OnSite(host, MedicalBodies) || EduSite.IsMatch(host)) return KindMedical;
+            if (IsMakersSite(host, brandName)) return KindMaker;
+            if (OnSite(host, References)) return KindReference;
+            if (OnSite(host, PublicLists)) return KindPublic;
+            foreach (string shop in Retailers) if (host.Contains(shop)) return KindRetailer;
+            return KindUnverified;
+        }
+
+        /// <summary>
+        /// The site a source line points to, lower case, without "www.", a user name or a port ("" when there is none).
+        /// A search engine's pass-through address hides the real site: then the page title stands in for it.
+        /// </summary>
+        public static string LabelHost(string source)
+        {
+            string address = AddressOf(source);
+            if (address.Length == 0) return "";
+            string host = HostOf(address);
+            string lower = address.ToLowerInvariant();
+            foreach (string redirect in Redirects) if (lower.Contains(redirect)) { host = TitleOf(source).ToLowerInvariant(); break; }
+            int at = host.LastIndexOf('@');
+            if (at >= 0) host = host.Substring(at + 1);
+            int colon = host.IndexOf(':');
+            if (colon >= 0) host = host.Substring(0, colon);
+            host = host.Trim().TrimEnd('.');
+            return host.StartsWith("www.", StringComparison.Ordinal) ? host.Substring(4) : host;
+        }
+
+        /// <summary>"maybelline" for maybelline.com.ph or shop.maybelline.com: the site's own name, without the country ending.</summary>
+        public static string OwnName(string host)
+        {
+            string[] parts = (host ?? "").Split('.');
+            if (parts.Length < 2) return "";
+            string second = parts[parts.Length - 2];
+            bool countryEnding = parts.Length >= 3 && parts[parts.Length - 1].Length == 2 && Array.IndexOf(new[] { "co", "com", "org", "net", "gov", "edu" }, second) >= 0;
+            return NotLetterOrDigit.Replace(countryEnding ? parts[parts.Length - 3] : second, "");
+        }
+
+        /// <summary>
+        /// True when the site's own name IS the brand's name (with at most one of MakerSuffixes after it). Containing the name
+        /// is not enough: "maybelline-offers.xyz" and "maybelline.evil.com" are not Maybelline's site.
+        /// </summary>
+        public static bool IsMakersSite(string host, string brandName)
+        {
+            string own = OwnName(host);
+            string[] words = TextKey.Words(brandName);
+            if (own.Length == 0 || words.Length == 0) return false;
+            var names = new List<string>();
+            string whole = string.Join("", words);
+            if (whole.Length >= 3) names.Add(whole);
+            if (words.Length > 1 && words[0].Length >= 4) names.Add(words[0]);
+            foreach (string name in names)
+                foreach (string suffix in MakerSuffixes)
+                    if (own == name + suffix) return true;
+            // a first word of three letters ("NYX Professional Makeup") only with a word after it: nyxcosmetics.com
+            if (words.Length > 1 && words[0].Length == 3)
+                foreach (string suffix in MakerSuffixes)
+                    if (suffix.Length > 0 && own == words[0] + suffix) return true;
+            return false;
+        }
+
+        static bool OnSite(string host, string[] sites)
+        {
+            foreach (string site in sites) if (host == site || host.EndsWith("." + site, StringComparison.Ordinal)) return true;
+            return false;
+        }
+
+        /// <summary>The words shown for a kind of page (the same words as on the admin website).</summary>
+        public static string LabelOf(string kind)
+        {
+            switch (kind)
+            {
+                case KindRegulator: return "Regulator / government";
+                case KindMedical: return "Medical / scientific body";
+                case KindMaker: return "Manufacturer's own site";
+                case KindReference: return "Ingredient database";
+                case KindPublic: return "Public list (anyone can edit)";
+                case KindRetailer: return "Retailer listing";
+                default: return "Unverified site";
+            }
+        }
+
+        /// <summary>One sentence of advice for a careful reader, per kind of page (the same words as on the admin website).</summary>
+        public static string AdviceOf(string kind)
+        {
+            switch (kind)
+            {
+                case KindRegulator: return "An official body. The strongest kind of source here.";
+                case KindMedical: return "A medical or scientific publisher. A dermatologist or pharmacist can check the cited study or review.";
+                case KindMaker: return "The maker's own ingredient list. Confirm it against the pack; marketing claims are not evidence.";
+                case KindReference: return "Explains what an ingredient is. Not peer-reviewed, and never proof of what one product contains.";
+                case KindPublic: return "A public list anybody can edit. Use it as a second opinion only.";
+                case KindRetailer: return "A shop's copy of the pack's list. It can be out of date: compare it with your pack.";
+                default: return "Not recognised. Do not rely on it without checking elsewhere.";
+            }
+        }
+
+        /// <summary>The line under every list of source links, for people who are careful about links (the same words as on the admin website).</summary>
+        public const string LinkGuide = "Links open another website and GlowUp does not control it. Check the address in the browser bar, never enter personal details, and let a dermatologist or pharmacist confirm any claim you rely on.";
 
         // ---------------------------------------------------------------------------------------
         //  Two lists of the same product

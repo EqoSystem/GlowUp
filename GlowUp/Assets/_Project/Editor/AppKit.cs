@@ -634,11 +634,12 @@ namespace GlowUp.EditorTools
         /// One line of the compatibility matrix. `withDetail` adds the one-line reason under the title (result scene);
         /// without it the line is compact (scan cards).
         /// </summary>
-        public static CompatibilityIndicator Indicator(Transform parent, string name, string title, bool withDetail)
+        /// <param name="titleSize">text sizes of the title and the reason (with detail only; 0 = the usual 32 / 27)</param>
+        public static CompatibilityIndicator Indicator(Transform parent, string name, string title, bool withDetail, float titleSize = 0, float detailSize = 0, float discSize = 0)
         {
             var go = Node(parent, name);
             HStack(go, withDetail ? 20 : 10, 0, 0, 0, 0, withDetail ? TextAnchor.UpperLeft : TextAnchor.MiddleCenter);
-            float disc = withDetail ? 56 : 40;
+            float disc = discSize > 0 ? discSize : withDetail ? 56 : 40;
             var discImage = RawPanel(go.transform, "IconDisc", new Color32(94, 127, 75, 255), disc);
             Size(discImage, disc, disc);
             var icon = RawIcon(discImage.transform, "Icon", IconFactory.Check, disc * 0.56f, Color.white);
@@ -649,8 +650,8 @@ namespace GlowUp.EditorTools
                 var column = Node(go.transform, "Texts");
                 VStack(column, 2);
                 Size(column.transform, -1, -1, 1);
-                titleLabel = Label(column.transform, "Title", title, 32, ThemeRole.MainText, FontRole.Label);
-                detail = Label(column.transform, "Detail", "The reason shows here once a product is analysed.", 27, ThemeRole.SecondaryText, FontRole.Body,
+                titleLabel = Label(column.transform, "Title", title, titleSize > 0 ? titleSize : 32, ThemeRole.MainText, FontRole.Label);
+                detail = Label(column.transform, "Detail", "The reason shows here once a product is analysed.", detailSize > 0 ? detailSize : 27, ThemeRole.SecondaryText, FontRole.Body,
                                TextAlignmentOptions.TopLeft, true);
             }
             else

@@ -12,10 +12,12 @@ using UnityEngine.UI;
 namespace GlowUp.Result
 {
     /// <summary>
-    /// AI Smart Analysis Result: shows one analysed product - its verdict (status pill and one line), what the
-    /// FDA Philippines list says about it, a direct verification-portal link, the compatibility matrix, key-ingredient chips with where the ingredient
-    /// list came from (the pages as buttons), "Why this result?" (the long text, behind a button), shades that suit the
-    /// user, the advice to see a dermatologist, and a list of alternative products.
+    /// AI Smart Analysis Result: shows one analysed product - its verdict (status pill and one line), "See safer
+    /// alternatives" when something is flagged, what the FDA Philippines list says about it, a direct verification-portal
+    /// link, the compatibility matrix, key-ingredient chips (an icon AND a colour per level), where the ingredient list
+    /// came from (behind a button: the pages as buttons, each labelled with its kind of page, and what each kind means),
+    /// "Why this result?" (the long text, behind a button), shades that suit the user, the advice to see a dermatologist
+    /// (a pink button only when something is flagged), and a list of alternative products.
     /// Each fact has ONE place on the screen: nothing is said twice.
     /// The same scene shows a new scan and a product opened from Recent Scans.
     /// </summary>
@@ -66,7 +68,22 @@ namespace GlowUp.Result
         [SerializeField] private SourceLinkButton sourceLinkTemplate;
         [Tooltip("At most this many page buttons")]
         [SerializeField] private int maximumSourceLinks = 2;
+        [Tooltip("Under the page buttons: one line of advice per kind of page shown, then the caution line for careful readers (hidden when there is no page button)")]
+        [SerializeField] private TextMeshProUGUI sourceGuideText;
+        [Tooltip("One line per kind of page shown. {0} = the kind's label (Retailer listing ...), {1} = its advice. The labels and advice are shared with the admin website (ListSources.LabelOf / AdviceOf).")]
+        [SerializeField] private string sourceAdviceFormat = "<b>{0}:</b> {1}";
         [SerializeField] private string listFromPack = "Ingredient list read from your pack.";
+        [Tooltip("The list was read by the AI from a photo and waits for an admin's approval")]
+        [SerializeField] private string listFromPending = "Ingredient list read by the AI from a photo of the pack. It is waiting for an admin's approval: check it against your pack.";
+
+        [Header("Pending approval (a product the AI read from a photo)")]
+        [Tooltip("The PENDING APPROVAL badge in the product card (inactive until a result needs it)")]
+        [SerializeField] private GameObject pendingBadge;
+        [SerializeField] private TextMeshProUGUI pendingBadgeText;
+        [SerializeField] private string pendingBadgeWords = "PENDING APPROVAL";
+        [Tooltip("Under the badge: what it means")]
+        [SerializeField] private TextMeshProUGUI pendingDetailText;
+        [SerializeField] private string pendingDetailWords = "Read by the AI from a photo. Not checked by an admin yet, so treat it as unverified.";
         [SerializeField] private string listFromInventory = "Ingredient list from the GlowUp product list.";
         [SerializeField] private string listFromWeb = "Ingredient list looked up online. Check it against your pack when you can.";
         [Tooltip("Looked up by the AI without a live web search: the page is one the AI named, not one that was opened")]
@@ -113,14 +130,19 @@ namespace GlowUp.Result
         [Header("See a specialist")]
         [SerializeField] private GameObject dermatologistCard;
         [SerializeField] private TextMeshProUGUI dermatologistText;
+        [Tooltip("The FILLED (pink) button: shown when the result is \"use with care\" or \"flagged\", or a dermatologist is advised")]
         [SerializeField] private Button dermatologistButton;
+        [Tooltip("The same button in the calm outline style: shown for a result with nothing flagged, so AR Try-On stays the one pink next step")]
+        [SerializeField] private Button dermatologistQuietButton;
         [SerializeField] private string dermatologistUrl = "https://www.google.com/maps/search/dermatologist+near+me";
         [Tooltip("The advice in this last card. Every result ends with the dermatologist line here (it is no longer repeated inside \"Why this result?\")")]
         [TextArea] [SerializeField] private string flaggedAdvice = "This product has ingredients that may not suit you. " + ProductScope.DermatologistLine;
         [TextArea] [SerializeField] private string standardAdvice = ProductScope.DermatologistLine;
 
-        [Header("Alternatives (button at the top)")]
+        [Header("Alternatives (button at the top, and one in the product card for a flagged result)")]
         [SerializeField] private Button alternativesButton;
+        [Tooltip("\"See safer alternatives\" in the product card, right under the verdict. Shown only when the result is \"use with care\" or \"flagged\".")]
+        [SerializeField] private Button saferAlternativesButton;
         [SerializeField] private OverlayPanel alternativesPanel;
         [SerializeField] private RectTransform alternativesContent;
         [Tooltip("The pattern tile. Hidden when the app runs and copied once per alternative.")]
@@ -174,6 +196,8 @@ namespace GlowUp.Result
             if (tryOnButton != null) tryOnButton.onClick.AddListener(() => { ScanSession.TryOn = record; SceneNavigator.Go(tryOnScene); });
             if (allIngredientsButton != null) allIngredientsButton.onClick.AddListener(() => { if (ingredientSheet != null && record != null) ingredientSheet.Show(record); });
             if (dermatologistButton != null) dermatologistButton.onClick.AddListener(() => Application.OpenURL(dermatologistUrl));
+            if (dermatologistQuietButton != null) dermatologistQuietButton.onClick.AddListener(() => Application.OpenURL(dermatologistUrl));
+            if (saferAlternativesButton != null) saferAlternativesButton.onClick.AddListener(ShowAlternatives);
             if (fdaVerificationButton != null) fdaVerificationButton.onClick.AddListener(OpenFdaVerification);
             if (alternativesButton != null) alternativesButton.onClick.AddListener(ShowAlternatives);
             if (renameButton != null) renameButton.onClick.AddListener(BeginRename);
@@ -236,6 +260,7 @@ namespace GlowUp.Result
             if (allIngredientsButton != null) allIngredientsButton.interactable = has;
             if (fdaVerificationButton != null) fdaVerificationButton.interactable = has;
             if (renameButton != null) renameButton.gameObject.SetActive(has);
+            if (saferAlternativesButton != null) saferAlternativesButton.gameObject.SetActive(has && IsFlagged(record));
             if (!has)
             {
                 Set(nameText, "No result yet"); Set(brandText, ""); Set(typeText, ""); Set(dateText, "");
@@ -267,7 +292,14 @@ namespace GlowUp.Result
 
             if (dermatologistCard != null) dermatologistCard.SetActive(true);
             Set(dermatologistText, record.dermatologistAdvised ? flaggedAdvice : standardAdvice);
+            // ONE pink next step per screen: the filled dermatologist button only when something is flagged
+            bool urgent = IsFlagged(record) || record.dermatologistAdvised;
+            if (dermatologistButton != null) dermatologistButton.gameObject.SetActive(urgent || dermatologistQuietButton == null);
+            if (dermatologistQuietButton != null) dermatologistQuietButton.gameObject.SetActive(!urgent);
         }
+
+        /// <summary>True for a result that is "use with care" or "flagged as harmful".</summary>
+        static bool IsFlagged(ScanRecord r) => r != null && (r.status == "caution" || r.status == "harmful");
 
         static void Set(TextMeshProUGUI label, string value) { if (label != null) label.text = value ?? ""; }
 
@@ -337,13 +369,21 @@ namespace GlowUp.Result
                 if (show) fdaBadge.Bind(record, PhFdaVerification.IsChecking(record.id));
             }
 
+            if (pendingBadge != null)
+            {
+                bool pending = has && record.pendingApproval;
+                pendingBadge.SetActive(pending);
+                if (pending && pendingBadgeText != null) pendingBadgeText.text = pendingBadgeWords;
+                if (pending && pendingDetailText != null) pendingDetailText.text = pendingDetailWords;
+            }
+
             string from = has ? ListFrom(record) : "";
             if (listSourceText != null)
             {
                 listSourceText.gameObject.SetActive(has);
                 // a scan saved before "web-backed" was kept is not called "not web-backed": that is simply not known
                 bool backedOrUnknown = has && (record.listWebBacked || string.IsNullOrEmpty(record.listFrom));
-                string line = from == "typed" ? listTyped : from == "inventory" ? listFromInventory
+                string line = from == "pending" ? listFromPending : from == "typed" ? listTyped : from == "inventory" ? listFromInventory
                             : from == "web" ? (backedOrUnknown ? listFromWeb : listFromWebUnchecked) : listFromPack;
                 // a list that was not read from the user's own pack: when it was looked up, and that it may differ
                 bool fromOpenBeautyFacts = has && from == "web" && record.ingredientSources != null && record.ingredientSources.Count > 0
@@ -363,6 +403,7 @@ namespace GlowUp.Result
 
             // the pages the list came from, as buttons (never the FDA's page: that one holds no ingredient lists)
             int shown = 0;
+            var kindsShown = new List<string>();
             if (has && sourceLinkTemplate != null && sourceLinksContent != null)
             {
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -380,12 +421,23 @@ namespace GlowUp.Result
                     SourceLinkButton link = Instantiate(sourceLinkTemplate, sourceLinksContent);
                     link.gameObject.name = "SourceLink_" + SourceLinkButton.SiteName(address);
                     link.gameObject.SetActive(true);
-                    link.Bind(source);
+                    link.Bind(source, record.brandName);
+                    if (!kindsShown.Contains(link.Kind)) kindsShown.Add(link.Kind);
                     sourceLinks.Add(link.gameObject);
                     shown++;
                 }
             }
             if (sourceLinksContent != null) sourceLinksContent.gameObject.SetActive(shown > 0);
+
+            // what each kind of page shown means, then the caution line (the same words as on the admin website)
+            if (sourceGuideText != null)
+            {
+                sourceGuideText.gameObject.SetActive(shown > 0);
+                var lines = new List<string>();
+                foreach (string kind in kindsShown) lines.Add(string.Format(sourceAdviceFormat, ListSources.LabelOf(kind), ListSources.AdviceOf(kind)));
+                lines.Add(ListSources.LinkGuide);
+                sourceGuideText.text = string.Join("\n", lines);
+            }
         }
 
         /// <summary>"12 Oct 2026" for a time kept in Unix seconds.</summary>
@@ -427,7 +479,7 @@ namespace GlowUp.Result
         {
             if (r == null) return "pack";
             string kept = (r.listFrom ?? "").Trim().ToLowerInvariant();
-            if (kept == "pack" || kept == "inventory" || kept == "web" || kept == "typed") return kept;
+            if (kept == "pack" || kept == "inventory" || kept == "web" || kept == "typed" || kept == "pending") return kept;
             if (r.source == "manual") return "typed";
             if (r.source == "recommendation") return "inventory";
             if (r.source != "lookup") return "pack";

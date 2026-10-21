@@ -1,4 +1,5 @@
 using System;
+using GlowUp.Scan;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -16,25 +17,32 @@ namespace GlowUp.Views
     {
         [SerializeField] private Button button;
         [SerializeField] private TextMeshProUGUI label;
+        [Tooltip("The small second line: what KIND of page it is (Regulator / government, Retailer listing ...). The words are shared with the admin website (ListSources.LabelOf), so they are not edited here. Optional.")]
+        [SerializeField] private TextMeshProUGUI kindLabel;
         [Tooltip("Longest label, in letters (a longer site name is cut)")]
         [SerializeField] private int maximumLabelLength = 24;
 
         /// <summary>The web address this button opens ("" until Bind succeeded).</summary>
         public string Url { get; private set; } = "";
+        /// <summary>The kind of page (ListSources.KindRegulator ... KindUnverified), set by Bind.</summary>
+        public string Kind { get; private set; } = ListSources.KindUnverified;
 
         void Awake() { if (button != null) button.onClick.AddListener(Open); }
 
         /// <summary>
         /// `source` is a source line as the app keeps it: "page title | https://address" (the title is optional).
-        /// Returns false when the line holds no web address; the button is then of no use.
+        /// `brandName` = the product's brand, so the maker's own site is recognised. Returns false when the line holds no
+        /// web address; the button is then of no use.
         /// </summary>
-        public bool Bind(string source)
+        public bool Bind(string source, string brandName = "")
         {
             Url = AddressIn(source);
             if (Url.Length == 0) return false;
             string name = LabelFor(source, Url);
             int most = Mathf.Max(8, maximumLabelLength);
             if (label != null) label.text = name.Length > most ? name.Substring(0, most - 3).TrimEnd() + "..." : name;
+            Kind = ListSources.SourceKind(source, brandName);
+            if (kindLabel != null) kindLabel.text = ListSources.LabelOf(Kind);
             return true;
         }
 

@@ -37,7 +37,7 @@ namespace GlowUp.Tests
                 string[] parts = line.Split('|');
                 for (int i = 0; i < parts.Length; i++) parts[i] = Decode(parts[i].Trim());
                 string rule = parts[0];
-                int needed = rule == "same" || rule == "squashsame" || rule == "brands" || rule == "scanid" ? 4 : 3;
+                int needed = rule == "same" || rule == "squashsame" || rule == "brands" || rule == "scanid" || rule == "sourcekind" ? 4 : 3;
                 Assert.AreEqual(needed, parts.Length, "This line does not have the columns its rule needs: " + line);
                 checkedLines++;
 
@@ -58,6 +58,8 @@ namespace GlowUp.Tests
                     case "brandid": got = ProductIndex.ScanBrandId(parts[1]); break;
                     case "stoplist": got = IngredientStoplist.Hit(parts[1]) ?? ""; break;
                     case "shape": got = IngredientStoplist.WrongShape(parts[1]) ? "wrong" : "ok"; break;
+                    case "sourcekind": got = ListSources.SourceKind(parts[1], parts[2]); break;
+                    case "sourcelabel": got = ListSources.LabelOf(parts[1]); break;
                     default: Assert.Fail("The list names a rule this test does not know: " + rule); return;
                 }
                 if (got != expected) wrong.Add($"{line}\n      expected \"{expected}\", the app said \"{got}\"");

@@ -34,7 +34,7 @@ import { collection, doc, serverTimestamp } from "https://www.gstatic.com/fireba
 import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed } from "../_Shared/adminStore.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
-    statusBadge, statusGuide, normalizeStatus, notify, describeError, setBusy, setFormError, originLabel, sourceLinks, COSMETIC_TYPES, STATUSES,
+    statusBadge, statusGuide, normalizeStatus, notify, describeError, setBusy, setFormError, originLabel, sourceLinks, assistSourceLinks, sourceGuideHtml, COSMETIC_TYPES, STATUSES,
     productScope, notMakeup, scopeWords, categoryOutOfScope, BRAND_CATEGORY, wireSearch, dialogIsOpen
 } from "../_Shared/adminCommon.js";
 import { matchesSearch, compactName, barcodeKey } from "../_Shared/glowupRules.js";
@@ -561,11 +561,14 @@ function fillReviewFilter() {
     select.value = wanted;
 }
 
+/** The brand a source must belong to, to count as the maker's own site: a product's brand, or a brand's own name. */
+const brandOfEntry = (entry) => ("brandName" in entry ? entry.brandName : entry.name) || "";
+
 /** Where an entry came from and whether an admin has checked it, as HTML ("" for an entry typed here). */
 function originText(entry) {
     const origin = originLabel(entry.source) || (entry.needsReview ? "Added automatically" : "");
     if (!origin) return "";
-    const links = sourceLinks(entry.sources || []);
+    const links = sourceLinks(entry.sources || [], brandOfEntry(entry));
     const state = entry.needsReview ? " · needs review" : entry.reviewed ? " · reviewed" : "";
     return escapeHtml(origin + state) + (links ? " · " + links : "");
 }
@@ -614,9 +617,7 @@ async function askInventoryAi(payload) {
 }
 
 function assistProductSourceLinks(sources) {
-    const pages = (Array.isArray(sources) ? sources : []).filter((page) => page && /^https:\/\//i.test(page.url || ""));
-    return pages.length ? pages.map((page) => `<a class="source-link" href="${escapeHtml(page.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(page.title || page.site || page.url)}</a>`).join(" · ")
-        : "<b>The AI named no web page. Check every ingredient against the package.</b>";
+    return assistSourceLinks(sources, "<b>The AI named no web page. Check every ingredient against the package.</b>");
 }
 
 function paintInventoryDrafts() {
@@ -787,7 +788,7 @@ async function assistProductIngredients() {
         el("productIngredientsInput").value = body.draft.ingredients.join(", ");
         if (ingredientPicker) ingredientPicker.refresh();
         const sources = (body.sources || []).filter((page) => page && /^https:\/\//i.test(page.url || ""))
-            .map((page) => `${page.title || page.site || page.url} | ${page.url}`);
+            .map((page) => `${page.title || page.site || page.url} | ${page.url}`);      // the kind label is worked out when shown, never stored
         if (body.draft.fdaVerifiedLink && /^https:\/\/([a-z0-9-]+\.)*fda\.gov\.ph\//i.test(body.draft.fdaVerifiedLink))
             sources.unshift(`FDA Philippines verification | ${body.draft.fdaVerifiedLink}`);
         assistedProductSources = Array.from(new Set(assistedProductSources.concat(sources))).slice(0, 10);
@@ -1821,11 +1822,11 @@ function openProductForm(product, brandId) {
 function showReviewNote(note, entry, kind) {
     if (!entry || !entry.needsReview) { note.textContent = ""; note.style.display = "none"; return; }
     const origin = originLabel(entry.source) || "Added automatically";
-    const links = sourceLinks(entry.sources || []);
+    const links = sourceLinks(entry.sources || [], brandOfEntry(entry));
     note.innerHTML = `<b>${escapeHtml(origin)}.</b> Nobody has checked this ${kind} yet. `
         + (kind === "product" ? "Compare the name, brand, type and ingredient list with the packaging, " : "Check the name and category, ")
         + "set Status to <b>Active</b> if the app should use it, then save: <b>saving marks it as reviewed</b>."
-        + (links ? "<br>Source: " + links : "");
+        + (links ? "<br>Source: " + links + sourceGuideHtml() : "");
     note.style.display = "";
 }
 

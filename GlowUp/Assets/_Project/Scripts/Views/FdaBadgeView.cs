@@ -130,7 +130,9 @@ namespace GlowUp.Views
                 default: title = unavailableTitle; detail = unavailableDetail; break;
             }
             if (titleLabel != null) titleLabel.text = title;
-            if (detailLabel != null) { detailLabel.text = detail; detailLabel.gameObject.SetActive(detail.Length > 0); }
+            // the second line always keeps its place (an empty one holds a no-break space), so the screen does not jump
+            // when the FDA's answer arrives a few seconds after the screen opened
+            if (detailLabel != null) { detailLabel.text = detail.Length > 0 ? detail : "\u00A0"; detailLabel.gameObject.SetActive(true); }
             if (confirmRow != null) confirmRow.SetActive(state == PhFdaVerification.Similar && record != null);
 
             if (moreText != null)

@@ -2,7 +2,7 @@
 import { auth, db } from "../_Database/firebase-console.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { MAKEUP_TYPES, normalizeName, judgeProduct, notMakeupWords } from "./glowupRules.js";
+import { MAKEUP_TYPES, normalizeName, judgeProduct, notMakeupWords, describeSourceLine, SOURCE_LINK_GUIDE } from "./glowupRules.js";
 import { clearStore } from "./adminStore.js";
 import { askConfirm } from "./adminShell.js";
 
@@ -426,9 +426,39 @@ export function parseSource(text) {
     return { title, url };
 }
 
-/** Links to the pages an entry's information came from. Anything that is not a web address shows as plain text. */
-export function sourceLinks(sources) {
-    return (Array.isArray(sources) ? sources : []).map(parseSource).filter((s) => s.title || s.url).map((s) => s.url
-        ? `<a class="source-link" href="${escapeHtml(s.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(s.title)}</a>`
+/**
+ * The small label after a source link: what KIND of page it is (Regulator / government, Retailer listing ...), the
+ * same words the app shows. Hovering it gives one line of advice. `brandName` = the product's brand ("" for an ingredient).
+ */
+export function sourceKindChip(source, brandName) {
+    const kind = describeSourceLine(source, brandName);
+    return `<span class="chip source-kind${kind.tone ? " " + kind.tone : ""}" title="${escapeHtml(kind.advice)}">${escapeHtml(kind.label)}</span>`;
+}
+
+/** The line for people who are careful about links, under a list of source links. */
+export const sourceGuideHtml = () => `<span class="field-hint source-guide">${escapeHtml(SOURCE_LINK_GUIDE)}</span>`;
+
+/**
+ * The pages Assist with AI returned ({ title, site, url, label, advice, tone }), one per line with their kind label,
+ * then the guide line. `emptyHtml` is shown when there is no page. The server's label is used; an older answer without
+ * one is labelled here by the same rule.
+ */
+export function assistSourceLinks(pages, emptyHtml, brandName = "") {
+    const shown = (Array.isArray(pages) ? pages : []).filter((page) => page && /^https:\/\//i.test(page.url || ""));
+    if (shown.length === 0) return emptyHtml;
+    return shown.map((page) => {
+        const kind = page.label ? page : describeSourceLine(`${page.site || page.title || ""} | ${page.url}`, brandName);
+        return `<a class="source-link" href="${escapeHtml(page.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(page.title || page.site || page.url)}</a> `
+            + `<span class="chip source-kind${kind.tone ? " " + kind.tone : ""}" title="${escapeHtml(kind.advice || "")}">${escapeHtml(kind.label)}</span>`;
+    }).join("<br>") + sourceGuideHtml();
+}
+
+/**
+ * Links to the pages an entry's information came from, each with its kind label. Anything that is not a web address
+ * shows as plain text. `brandName` = the product's brand, so its maker's own site is recognised ("" for an ingredient).
+ */
+export function sourceLinks(sources, brandName = "") {
+    return (Array.isArray(sources) ? sources : []).map((line) => ({ line, ...parseSource(line) })).filter((s) => s.title || s.url).map((s) => s.url
+        ? `<a class="source-link" href="${escapeHtml(s.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(s.title)}</a> ${sourceKindChip(s.line, brandName)}`
         : `<span>${escapeHtml(s.title)}</span>`).join(" · ");
 }

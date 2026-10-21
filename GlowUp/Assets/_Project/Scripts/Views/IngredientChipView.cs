@@ -7,14 +7,24 @@ using UnityEngine.UI;
 namespace GlowUp.Views
 {
     /// <summary>
-    /// A tappable ingredient chip (the highlighted key ingredients of a result): a coloured dot for
-    /// its level and its name. Tapping it opens that ingredient's details.
+    /// A tappable ingredient chip (the highlighted key ingredients of a result): a coloured disc with an icon for its
+    /// level (check = not flagged, warning sign = use with care, cross = flagged as harmful, i = not known), and its name.
+    /// The level is never told by colour alone. Tapping the chip opens that ingredient's details.
     /// </summary>
     [RequireComponent(typeof(Button))]
     public class IngredientChipView : ThemeAwareBehaviour
     {
         [SerializeField] private TextMeshProUGUI label;
+        [Tooltip("The coloured disc behind the icon")]
         [SerializeField] private Image dot;
+        [Tooltip("The white icon inside the disc (optional: a chip of an older scene has only the disc)")]
+        [SerializeField] private Image icon;
+
+        [Header("Icons, one per level")]
+        [SerializeField] private Sprite safeIcon;
+        [SerializeField] private Sprite cautionIcon;
+        [SerializeField] private Sprite harmfulIcon;
+        [SerializeField] private Sprite unknownIcon;
 
         [Header("Colours (filled in from the theme while Use Theme Colors is on)")]
         [SerializeField] private Color safeColor = new Color32(94, 127, 75, 255);
@@ -46,6 +56,10 @@ namespace GlowUp.Views
         void Paint()
         {
             if (dot != null) dot.color = level == "safe" ? safeColor : level == "caution" ? cautionColor : level == "harmful" ? harmfulColor : unknownColor;
+            if (icon == null) return;
+            Sprite s = level == "safe" ? safeIcon : level == "caution" ? cautionIcon : level == "harmful" ? harmfulIcon : unknownIcon;
+            if (s != null) icon.sprite = s;
+            icon.color = Color.white;
         }
     }
 }

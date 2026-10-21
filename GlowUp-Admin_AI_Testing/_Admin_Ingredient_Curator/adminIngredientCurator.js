@@ -25,7 +25,7 @@ import { collection, doc, serverTimestamp } from "https://www.gstatic.com/fireba
 import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed } from "../_Shared/adminStore.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
-    notify, describeError, setBusy, setFormError, renderChecks, readChecks, writeChecks, originLabel, sourceLinks, wireSearch,
+    notify, describeError, setBusy, setFormError, renderChecks, readChecks, writeChecks, originLabel, sourceLinks, assistSourceLinks, sourceGuideHtml, wireSearch,
     SKIN_TYPES, dialogIsOpen, statusBadge, toneBadge
 } from "../_Shared/adminCommon.js";
 import { matchesSearch } from "../_Shared/glowupRules.js";
@@ -647,11 +647,9 @@ function assistsToday(add) {
     return count;
 }
 
-/** The sources as links: the credible ones first and marked, the others marked "other site". */
+/** The sources as links, each with its kind label (Regulator / government, Ingredient database ...), then the guide line. */
 function assistSources(pages) {
-    if (!pages || pages.length === 0) return "<b>The AI named no web page.</b> Treat every box as unchecked.";
-    return pages.map((p) => `<a class="source-link" href="${escapeHtml(p.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(p.title || p.site || p.url)}</a> `
-        + (p.credible ? `<span class="chip good">credible source</span>` : `<span class="chip">other site</span>`)).join("<br>");
+    return assistSourceLinks(pages, "<b>The AI named no web page.</b> Treat every box as unchecked.");
 }
 
 /** Asks the server for a description draft of `name`; other ingredient fields stay under the admin's control. */
@@ -809,8 +807,7 @@ function paintIngredientDrafts() {
     panel.hidden = ingredientAiDrafts.length === 0;
     el("ingredientAiDraftCount").textContent = many(ingredientAiDrafts.length, "draft", "drafts");
     list.innerHTML = ingredientAiDrafts.map((draft, index) => {
-        const sources = (draft.sources || []).filter((source) => source && /^https:\/\//i.test(source.url || ""))
-            .map((source) => `<a class="source-link" href="${escapeHtml(source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(source.title || source.site || source.url)}</a>`).join(" · ");
+        const sources = assistSourceLinks(draft.sources, "");
         return `<article class="suggestion-card" data-draft-index="${index}">
             <strong>${escapeHtml(titleOf(draft.item))}</strong>
             <label class="field">Description draft <textarea data-draft-description rows="3" maxlength="600">${escapeHtml(draft.description)}</textarea></label>

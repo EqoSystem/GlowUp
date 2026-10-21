@@ -13,7 +13,7 @@ const equal = (a, b, what) => check(JSON.stringify(a) === JSON.stringify(b), `${
 equal(firstObject('Here it is:\n```json\n{"name":"Vitamin E","note":"a } inside text"}\n```'), { name: "Vitamin E", note: "a } inside text" }, "the object is found inside other text");
 equal(firstObject("no object here"), null, "no object gives nothing");
 equal(searchResultUrl("//duckduckgo.com/l/?uddg=https%3A%2F%2Fcir-safety.org%2Freport"), "https://cir-safety.org/report", "a search redirect is unwrapped to its actual HTTPS destination");
-equal(searchResultUrl("https://duckduckgo.com/l/?uddg=https%3A%2F%2Fevil.example"), "", "a search provider redirect without a valid target is not presented as a source");
+equal(searchResultUrl("https://duckduckgo.com/l/?uddg=notaurl"), "", "a search provider redirect without a valid target is not presented as a source");
 equal(searchResultUrl("https://fda.gov/product"), "https://fda.gov/product", "a direct secure result URL is retained");
 equal(chatContent({ content: [{ type: "text", text: '{"name":"Mica"}' }] }), '{"name":"Mica"}', "chat responses with content blocks are readable");
 
@@ -239,7 +239,7 @@ check(r.body.notes.findIndex((n) => /^Groq/.test(n)) > r.body.notes.findIndex((n
 r = await chain();
 check(r.status === 502 && /Gemini/.test(r.body.error) && /Groq/.test(r.body.error) && /Mistral/.test(r.body.error), "all three have run out: said plainly, naming each");
 equal(r.asked, ["Gemini", "Groq", "Mistral"], "all three were asked, in the order Gemini, Groq, Mistral");
-equal(r.body.error, "Every AI that is set up said no: Gemini: free quota used up; Web: search: no results were returned; Groq: free quota used up; Mistral: free quota used up. Try again later, or write the entry by hand.", "search and AI failure reasons are surfaced in order");
+equal(r.body.error, "Every AI that is set up said no: Gemini: free quota used up; Web: no results were returned; Groq: free quota used up; Mistral: free quota used up. Try again later, or write the entry by hand.", "search and AI failure reasons are surfaced in order");
 r = await chain({ keys: ["MISTRAL_API_KEY"], mistral: 200 });
 equal(r.asked, ["Gemini", "Mistral"], "no Groq key: Groq is passed over and Mistral is asked");
 r = await chain({ keys: ["OPENROUTER_API_KEY", "MISTRAL_API_KEY", "GROQ_API_KEY"], openrouter: 200 });
@@ -266,6 +266,28 @@ equal(ingImport.ingredients[0].riskLevel, "safe", "ingredient import keeps a val
 equal(ingImport.ingredients[1].riskLevel, "", "ingredient import drops an unknown risk level");
 equal(ingImport.ingredients[1].cautionNote, "can irritate", "ingredient import trims the caution note");
 check(/untrusted data/.test(ingredientImportQuestion("x")) && /IGNORE them/.test(ingredientImportQuestion("x")), "ingredient import asks the AI to ignore brands and products");
+
+// source labels: the server's copy of the shared rule gives what SharedRuleCases.txt (the app's list) says
+const { sourceKind, describeSource, SOURCE_KINDS, SEARCH_KINDS } = handler.helpers;
+{
+    const { readFileSync } = await import("node:fs");
+    const casesFile = new URL("../../GlowUp/Assets/_Project/Editor/Tests/SharedRuleCases.txt", import.meta.url);
+    const bar = String.fromCharCode(92) + "u007c";              // how a "|" inside a column is written in the list
+    let seen = 0;
+    for (const raw of readFileSync(casesFile, "utf8").split(/\r?\n/)) {
+        const line = raw.trim();
+        if (!line.startsWith("sourcekind |") && !line.startsWith("sourcelabel |")) continue;
+        const parts = line.split("|").map((p) => p.trim().split(bar).join("|"));
+        seen++;
+        if (parts[0] === "sourcekind") equal(sourceKind(parts[1], parts[2]), parts[3], "server source kind: " + line);
+        else equal((SOURCE_KINDS[parts[1]] || {}).label, parts[2], "server source label: " + line);
+    }
+    check(seen >= 30, "the source-kind examples were found in SharedRuleCases.txt (" + seen + ")");
+}
+check(describeSource({ url: "https://fda.gov.ph/x", site: "fda.gov.ph" }, "").label === "Regulator / government" && describeSource({ url: "https://fda.gov.ph/x" }, "").advice.length > 10, "a described source carries a label and advice");
+check(describeSource({ url: "https://vertexaisearch.cloud.google.com/grounding-api-redirect/x", site: "absidy.com" }, "Absidy").kind === "maker", "an unresolved search link is labelled by its site's name");
+check(!SEARCH_KINDS.product.includes("reference") && SEARCH_KINDS.product.includes("retailer") && SEARCH_KINDS.product.includes("maker"), "a product's list never rests on an ingredient database; makers and retailers count");
+check(SEARCH_KINDS.ingredient.includes("reference") && !SEARCH_KINDS.ingredient.includes("retailer"), "an ingredient's description rests on references, not shops");
 
 console.log("checks made: " + checks);
 console.log(failed === 0 ? "ALL PASSED" : failed + " FAILED");

@@ -27,14 +27,9 @@ const ALLERGENS = ["fragrance", "paraben", "sulfate", "formaldehyde", "lanolin",
 const SKIN_TYPES = ["Oily", "Normal", "Dry", "Mix"];
 const CONDITIONS = ["acne", "eczema", "psoriasis", "rosacea", "seborrheic", "melasma", "contact"];
 
-// Pages that count as credible for WHAT AN INGREDIENT IS AND DOES: regulators, scientific bodies, medical references.
-// (A page of another site is still shown, marked "other", so the admin can judge it.)
-const CREDIBLE = [
-    "europa.eu", "fda.gov", "fda.gov.ph", "nih.gov", "who.int", "cir-safety.org", "cir-reports.cir-safety.org", "aseancosmetics.org", "asean.org",
-    "health.gov.au", "tga.gov.au", "canada.ca", "gov.uk", "echa.europa.eu", "cosmeticsinfo.org", "aad.org", "dermnetnz.org", "contactderm.org",
-    "sciencedirect.com", "wiley.com", "springer.com", "nature.com", "jamanetwork.com", "bmj.com", "mayoclinic.org", "clevelandclinic.org",
-    "personalcarecouncil.org", "incibeauty.com", "incidecoder.com", "paulaschoice.com", "ewg.org"
-];
+// Pages that count as credible for WHAT AN INGREDIENT IS AND DOES (regulators, scientific bodies, medical references)
+// are the "regulator", "medical" and "reference" kinds of sourceKind below (isCredible). A page of another site is
+// still shown with its label, so the admin can judge it.
 
 function send(res, status, body) {
     res.statusCode = status;
@@ -192,7 +187,7 @@ function searchResultUrl(href) {
     }
 }
 
-async function webSearch(query, notes) {
+async function webSearch(query, notes, brand, purpose) {
     if (!query) return [];
     try {
         const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
@@ -217,9 +212,13 @@ async function webSearch(query, notes) {
                 credible: isCredible(site)
             };
         }).filter((result, index, all) => result && all.findIndex((item) => item.url === result.url) === index);
-        if (results.length) notes.push(`Web search: found ${results.length} result(s)`);
+        // Only the kinds of page that fit this task (SEARCH_KINDS) go on to the backup AI and the sources list.
+        const allowed = SEARCH_KINDS[purpose] || SEARCH_KINDS.ingredient;
+        const credible = results.map((result) => describeSource(result, brand)).filter((result) => allowed.includes(result.kind));
+        if (credible.length) notes.push(`Web search: found ${credible.length} credible result(s)`);
+        else if (results.length) notes.push("Web search: only sites that do not fit this task were returned");
         else notes.push("Web search: no results were returned");
-        return results;
+        return credible;
     } catch (error) {
         notes.push("Web search: could not reach the search service");
         return [];
@@ -362,7 +361,113 @@ function tidyIngredientImport(raw) {
 }
 
 const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, "").toLowerCase(); } catch (error) { return ""; } };
-const isCredible = (host) => CREDIBLE.some((d) => host === d || host.endsWith("." + d)) || /\.gov(\.[a-z]{2})?$/.test(host) || /\.edu(\.[a-z]{2})?$/.test(host);
+
+// ---------------------------------------------------------------------------------------------
+// What KIND of page a source is, in words a dermatologist or pharmacist can check.
+// A COPY of sourceKind in _Shared/glowupRules.js and of ListSources.SourceKind in the app: all three are checked against
+// the "sourcekind" / "sourcelabel" lines of the app's Editor/Tests/SharedRuleCases.txt (tests/assist.test.mjs,
+// tests/rules.test.mjs, SharedRuleCasesTests.cs). Change all three together.
+// ---------------------------------------------------------------------------------------------
+const SOURCE_REGULATORS = ["europa.eu", "fda.gov", "fda.gov.ph", "nih.gov", "who.int", "aseancosmetics.org", "asean.org", "health.gov.au", "tga.gov.au", "canada.ca", "gov.uk", "echa.europa.eu"];
+const SOURCE_MEDICAL = ["cir-safety.org", "cir-reports.cir-safety.org", "aad.org", "dermnetnz.org", "contactderm.org", "sciencedirect.com", "wiley.com", "springer.com",
+    "nature.com", "jamanetwork.com", "bmj.com", "mayoclinic.org", "clevelandclinic.org"];
+const SOURCE_REFERENCES = ["personalcarecouncil.org", "incibeauty.com", "incidecoder.com", "paulaschoice.com", "ewg.org", "cosmeticsinfo.org"];
+const SOURCE_PUBLIC_LISTS = ["openbeautyfacts.org"];
+const SOURCE_RETAILERS = ["watsons", "lazada", "shopee", "sephora", "ulta.com", "boots.com", "lookfantastic", "beautymnl", "zalora", "amazon.", "walmart.com", "target.com",
+    "superdrug.com", "cultbeauty", "nykaa", "yesstyle", "stylevana", "sasa.com", "guardian.com", "oliveyoung", "feelunique", "beautybay", "notino", "douglas.",
+    "priceline.com.au", "chemistwarehouse", "mercurydrug", "southstardrug", "landers.ph", "sm-markets", "smmarkets", "calyxta", "glamourbox"];
+const SOURCE_MAKER_SUFFIXES = ["", "cosmetics", "beauty", "makeup", "official", "ph", "store", "shop"];
+const SOURCE_REDIRECTS = ["vertexaisearch.cloud.google.com", "google.com/url", "bing.com/ck"];
+const SOURCE_KINDS = {
+    regulator: { label: "Regulator / government", advice: "An official body. The strongest kind of source here.", tone: "good" },
+    medical: { label: "Medical / scientific body", advice: "A medical or scientific publisher. A dermatologist or pharmacist can check the cited study or review.", tone: "good" },
+    maker: { label: "Manufacturer's own site", advice: "The maker's own ingredient list. Confirm it against the pack; marketing claims are not evidence.", tone: "" },
+    reference: { label: "Ingredient database", advice: "Explains what an ingredient is. Not peer-reviewed, and never proof of what one product contains.", tone: "" },
+    public: { label: "Public list (anyone can edit)", advice: "A public list anybody can edit. Use it as a second opinion only.", tone: "" },
+    retailer: { label: "Retailer listing", advice: "A shop's copy of the pack's list. It can be out of date: compare it with your pack.", tone: "" },
+    other: { label: "Unverified site", advice: "Not recognised. Do not rely on it without checking elsewhere.", tone: "warn" }
+};
+// Which kinds of page the backup AI may be shown, per task. An ingredient's description rests on regulators, medical
+// bodies and ingredient references; ONE product's list rests on the maker, a retailer or a public list (an ingredient
+// database never proves what one product contains: the app's ListSources says the same).
+const SEARCH_KINDS = {
+    ingredient: ["regulator", "medical", "reference"],
+    product: ["regulator", "maker", "retailer", "public"],
+    brand: ["regulator", "maker", "retailer", "public"]
+};
+
+function sourceAddress(source) {
+    const s = String(source == null ? "" : source);
+    if (s.trim().length === 0) return "";
+    const lower = s.toLowerCase();
+    let at = lower.indexOf("http://");
+    const secure = lower.indexOf("https://");
+    if (secure >= 0 && (at < 0 || secure < at)) at = secure;
+    if (at < 0) return "";
+    let end = at;
+    while (end < s.length && !/\s/.test(s[end])) end++;
+    return s.slice(at, end).replace(/[.,;)"]+$/, "");
+}
+function sourceTitle(source) {
+    const s = String(source == null ? "" : source);
+    const cut = s.lastIndexOf(" | ");
+    return (cut > 0 ? s.slice(0, cut) : sourceAddress(s).length === 0 ? s : "").trim();
+}
+function sourceHost(source) {
+    const address = sourceAddress(source);
+    if (address.length === 0) return "";
+    const start = address.indexOf("://") < 0 ? 0 : address.indexOf("://") + 3;
+    const ends = ["/", "?", "#"].map((c) => address.indexOf(c, start)).filter((i) => i >= 0);
+    let host = address.slice(start, ends.length ? Math.min(...ends) : address.length).toLowerCase();
+    const lower = address.toLowerCase();
+    if (SOURCE_REDIRECTS.some((r) => lower.includes(r))) host = sourceTitle(source).toLowerCase();
+    const at = host.lastIndexOf("@");
+    if (at >= 0) host = host.slice(at + 1);
+    const colon = host.indexOf(":");
+    if (colon >= 0) host = host.slice(0, colon);
+    host = host.trim().replace(/\.+$/, "");
+    return host.startsWith("www.") ? host.slice(4) : host;
+}
+function sourceOwnName(host) {
+    const parts = String(host || "").split(".");
+    if (parts.length < 2) return "";
+    const second = parts[parts.length - 2];
+    const countryEnding = parts.length >= 3 && parts[parts.length - 1].length === 2 && ["co", "com", "org", "net", "gov", "edu"].includes(second);
+    return (countryEnding ? parts[parts.length - 3] : second).replace(/[^a-z0-9]/g, "");
+}
+/** The brand's words as the shared name key gives them (lower case, no accents, letters and digits only). */
+const brandWords = (brand) => String(brand || "").toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean);
+function isMakersSite(host, brandName) {
+    const own = sourceOwnName(host), words = brandWords(brandName);
+    if (own.length === 0 || words.length === 0) return false;
+    const names = [];
+    const whole = words.join("");
+    if (whole.length >= 3) names.push(whole);
+    if (words.length > 1 && words[0].length >= 4) names.push(words[0]);
+    if (names.some((name) => SOURCE_MAKER_SUFFIXES.some((suffix) => own === name + suffix))) return true;
+    return words.length > 1 && words[0].length === 3 && SOURCE_MAKER_SUFFIXES.some((suffix) => suffix.length > 0 && own === words[0] + suffix);
+}
+const onSite = (host, sites) => sites.some((site) => host === site || host.endsWith("." + site));
+/** regulator, medical, maker, reference, public, retailer or other, for a source line ("page title | https://address"). */
+function sourceKind(source, brandName) {
+    const host = sourceHost(source);
+    if (host.length === 0) return "other";
+    if (onSite(host, SOURCE_REGULATORS) || /\.gov(\.[a-z]{2})?$/.test(host)) return "regulator";
+    if (onSite(host, SOURCE_MEDICAL) || /\.edu(\.[a-z]{2})?$/.test(host)) return "medical";
+    if (isMakersSite(host, brandName)) return "maker";
+    if (onSite(host, SOURCE_REFERENCES)) return "reference";
+    if (onSite(host, SOURCE_PUBLIC_LISTS)) return "public";
+    if (SOURCE_RETAILERS.some((shop) => host.includes(shop))) return "retailer";
+    return "other";
+}
+/** A source page plus its kind, label, advice and tone (the page's own fields are kept). An unresolved search link is named by its site. */
+const describeSource = (page, brand) => {
+    const kind = sourceKind(`${page.site || page.title || ""} | ${page.url || ""}`, brand);
+    return { ...page, kind, label: SOURCE_KINDS[kind].label, advice: SOURCE_KINDS[kind].advice, tone: SOURCE_KINDS[kind].tone };
+};
+
+/** Credible for WHAT AN INGREDIENT IS AND DOES: a regulator, a medical or scientific body, or an ingredient reference. */
+const isCredible = (host) => SEARCH_KINDS.ingredient.includes(sourceKind("https://" + String(host || ""), ""));
 
 /** The search links come as Google redirect addresses: this follows one to the real page (its own address when that fails). */
 async function realAddress(url) {
@@ -483,7 +588,13 @@ function lookupLinks(name) {
     ];
 }
 
-async function ask(key, prompt, searchQuery) {
+/** `purpose` = "ingredient", "product" or "brand": which kinds of page a backup AI may be shown (SEARCH_KINDS). */
+async function ask(key, prompt, searchQuery, brand, purpose) {
+    const answer = await askAny(key, prompt, searchQuery, brand, purpose);
+    return { ...answer, sources: (answer.sources || []).map((page) => describeSource(page, brand)) };
+}
+
+async function askAny(key, prompt, searchQuery, brand, purpose) {
     const notes = [];
     const until = Date.now() + TOTAL_SECONDS * 1000;
     const left = () => (until - Date.now()) / 1000;
@@ -498,7 +609,7 @@ async function ask(key, prompt, searchQuery) {
             if (plain) return { ...plain, notes };
         }
     }
-    const searchResults = backups.length > 0 ? await webSearch(searchQuery, notes) : [];
+    const searchResults = backups.length > 0 ? await webSearch(searchQuery, notes, brand, purpose) : [];
     for (let i = 0; i < backups.length; i++) {
         const got = await askBackup(backups[i], prompt, notes, share(left(), backups.length - 1 - i), searchResults);
         if (got) return { ...got, notes };
@@ -533,7 +644,7 @@ module.exports = async (req, res) => {
         if (mode === "description") {
             const name = text(body.name, 120);
             if (name.length < 2 || !/[a-z0-9]/i.test(name)) return send(res, 400, { error: "No ingredient name was sent." });
-            const result = await ask(key, descriptionQuestion(name), `${name} cosmetic ingredient description official sources PubChem CIR`);
+            const result = await ask(key, descriptionQuestion(name), `${name} cosmetic ingredient description official sources PubChem CIR`, "", "ingredient");
             const description = text(result.object.description, 300);
             return send(res, 200, {
                 found: description.length > 0 && result.object.notFound !== true,
@@ -544,14 +655,14 @@ module.exports = async (req, res) => {
         if (mode === "product") {
             const brandName = text(body.brandName, 60), productName = text(body.productName, 100);
             if (brandName.length < 2 || productName.length < 1) return send(res, 400, { error: "Choose a brand and product name first." });
-            const result = await ask(key, productQuestion(brandName, productName), `${brandName} ${productName} ingredients INCI official`);
+            const result = await ask(key, productQuestion(brandName, productName), `${brandName} ${productName} ingredients INCI official`, brandName, "product");
             const draft = tidyProduct(result.object, { brandName, productName }, result.sources);
             return send(res, 200, { found: draft.ingredients.length > 0, draft, sources: result.sources, model: result.model, searched: result.searched, notes: result.notes });
         }
         if (mode === "brand") {
             const name = text(body.name, 60);
             if (name.length < 2) return send(res, 400, { error: "Choose a brand name first." });
-            const result = await ask(key, brandQuestion(name), `${name} cosmetics official website brand aliases market`);
+            const result = await ask(key, brandQuestion(name), `${name} cosmetics official website brand aliases market`, name, "brand");
             const draft = tidyBrand(result.object, name, result.sources);
             return send(res, 200, { found: draft.aliases.length > 0 || !!draft.market, draft, sources: result.sources, model: result.model, searched: result.searched, notes: result.notes });
         }
@@ -579,7 +690,7 @@ module.exports = async (req, res) => {
         const name = text(body.name, 120);
         if (name.length < 2 || !/[a-z0-9]/i.test(name)) return send(res, 400, { error: "No ingredient name was sent." });
 
-        const { object, sources, model, searched, notes } = await ask(key, question(name), `${name} cosmetic ingredient official safety PubChem NIH CIR`);
+        const { object, sources, model, searched, notes } = await ask(key, question(name), `${name} cosmetic ingredient official safety PubChem NIH CIR`, "", "ingredient");
         const lookups = lookupLinks(name);
         if (object.notFound === true) return send(res, 200, { found: false, sources, lookups, model, searched, notes, message: "The AI found nothing credible about this name. It may be a misread label or a trade name." });
         const credible = sources.filter((s) => s.credible).length;
@@ -590,4 +701,4 @@ module.exports = async (req, res) => {
 };
 
 // for the checks in tests/ (pure helpers; no network)
-module.exports.helpers = { normalShade, ingredientImportQuestion, tidyIngredientImport, firstObject, tidy, tidyProduct, tidyBrand, tidyImport, isCredible, hostOf, question, descriptionQuestion, productQuestion, brandQuestion, importQuestion, lookupLinks, searchResultUrl, chatContent, share, order: () => ["Gemini"].concat(BACKUPS.map((b) => b.label)) };
+module.exports.helpers = { sourceKind, describeSource, SOURCE_KINDS, SEARCH_KINDS, normalShade, ingredientImportQuestion, tidyIngredientImport, firstObject, tidy, tidyProduct, tidyBrand, tidyImport, isCredible, hostOf, question, descriptionQuestion, productQuestion, brandQuestion, importQuestion, lookupLinks, searchResultUrl, chatContent, share, order: () => ["Gemini"].concat(BACKUPS.map((b) => b.label)) };

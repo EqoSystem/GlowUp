@@ -181,6 +181,24 @@ How the app treats them:
 
 Open Beauty Facts is an open database of product labels typed in by volunteers, so its ingredient lists can contain mistakes. Compare each list with the packaging before approving a product. Its data is published under the Open Database License, which asks that the source is named. The website shows the source link on every imported product.
 
+### What kind of page a source is (shown, never stored)
+
+Every `sources` entry stays `page title | https://address`. The kind of page is **worked out when it is shown**, the same way in the app, on the website and in the Assist with AI server, so older entries are labelled too and nothing new is written to the database. Do not put the label into the stored text.
+
+| Kind | Label shown | Which pages |
+|---|---|---|
+| `regulator` | Regulator / government | EU, US FDA, FDA Philippines, NIH, WHO, ASEAN, TGA, Health Canada, gov.uk, ECHA; any `.gov` / `.gov.xx` site |
+| `medical` | Medical / scientific body | CIR, AAD, DermNet, Contact Dermatitis Society, ScienceDirect, Wiley, Springer, Nature, JAMA, BMJ, Mayo Clinic, Cleveland Clinic; any `.edu` / `.edu.xx` site |
+| `maker` | Manufacturer's own site | The site whose own name IS the product's brand, alone or with one of: cosmetics, beauty, makeup, official, ph, store, shop (`maybelline.com.ph`, `nyxcosmetics.com`). Containing the name is not enough (`maybelline-offers.xyz` is not the maker). |
+| `reference` | Ingredient database | Personal Care Products Council, INCI Beauty, INCIDecoder, Paula's Choice dictionary, EWG, CosmeticsInfo |
+| `public` | Public list (anyone can edit) | Open Beauty Facts |
+| `retailer` | Retailer listing | Large shops (Watsons, Lazada, Shopee, Sephora, Mercury Drug ...): the app's `ListSources.Retailers` |
+| `other` | Unverified site | Everything else |
+
+Each label has one line of advice (hover it on the website), and every list of links ends with a caution line for careful readers. The rule lives in `_Shared/glowupRules.js` (`sourceKind`), the app's `ListSources.SourceKind` and `api/assist-ingredient.js`; all three are tested against the `sourcekind` / `sourcelabel` lines of the app's `Editor/Tests/SharedRuleCases.txt`.
+
+Assist with AI's backup search keeps only the kinds that fit the task: an ingredient's description rests on `regulator`, `medical` and `reference` pages; one product's ingredient list (and a brand's details) on `regulator`, `maker`, `retailer` and `public` pages. An ingredient database never counts as proof of what one product contains (the app's `ListSources` rule).
+
 Neither the US FDA nor FDA Philippines publishes a list of cosmetic products with their ingredients that a program can read. For a product sold in the Philippines, an admin can look up its notification by hand on the [FDA Philippines Verification Portal](https://verification.fda.gov.ph/).
 
 ### Folders and the Recycle bin (website only)

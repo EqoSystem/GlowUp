@@ -497,3 +497,117 @@ export function wrongIngredientShape(piece) {
     if (!holdsColourIndex && codeLike(p)) return true;                               // batch and lot codes such as L2304A
     return false;
 }
+
+// =============================================================================================
+//  5. What KIND of page a source is, in words a dermatologist or pharmacist can check
+// =============================================================================================
+// The label shown next to every source link, in the app (ListSources.SourceKind, Assets/_Project/Scripts/Scan/
+// ListSources.cs), on these pages and in the Assist with AI server (api/assist-ingredient.js keeps its own copy).
+// All three are checked against the "sourcekind" and "sourcelabel" lines of SharedRuleCases.txt.
+// Nothing about a source is stored: a source stays "page title | https://address" and its kind is worked out when shown.
+
+export const SOURCE_REGULATORS = ["europa.eu", "fda.gov", "fda.gov.ph", "nih.gov", "who.int", "aseancosmetics.org", "asean.org", "health.gov.au", "tga.gov.au", "canada.ca", "gov.uk", "echa.europa.eu"];
+export const SOURCE_MEDICAL = ["cir-safety.org", "cir-reports.cir-safety.org", "aad.org", "dermnetnz.org", "contactderm.org", "sciencedirect.com", "wiley.com", "springer.com",
+    "nature.com", "jamanetwork.com", "bmj.com", "mayoclinic.org", "clevelandclinic.org"];
+export const SOURCE_REFERENCES = ["personalcarecouncil.org", "incibeauty.com", "incidecoder.com", "paulaschoice.com", "ewg.org", "cosmeticsinfo.org"];
+export const SOURCE_PUBLIC_LISTS = ["openbeautyfacts.org"];
+// the app's ListSources.Retailers: large shops whose product pages copy the list printed on the pack (a piece of the site's name)
+export const SOURCE_RETAILERS = ["watsons", "lazada", "shopee", "sephora", "ulta.com", "boots.com", "lookfantastic", "beautymnl", "zalora", "amazon.", "walmart.com", "target.com",
+    "superdrug.com", "cultbeauty", "nykaa", "yesstyle", "stylevana", "sasa.com", "guardian.com", "oliveyoung", "feelunique", "beautybay", "notino", "douglas.",
+    "priceline.com.au", "chemistwarehouse", "mercurydrug", "southstardrug", "landers.ph", "sm-markets", "smmarkets", "calyxta", "glamourbox"];
+export const SOURCE_MAKER_SUFFIXES = ["", "cosmetics", "beauty", "makeup", "official", "ph", "store", "shop"];
+const SOURCE_REDIRECTS = ["vertexaisearch.cloud.google.com", "google.com/url", "bing.com/ck"];
+
+export const SOURCE_KINDS = {
+    regulator: { label: "Regulator / government", advice: "An official body. The strongest kind of source here.", tone: "good" },
+    medical: { label: "Medical / scientific body", advice: "A medical or scientific publisher. A dermatologist or pharmacist can check the cited study or review.", tone: "good" },
+    maker: { label: "Manufacturer's own site", advice: "The maker's own ingredient list. Confirm it against the pack; marketing claims are not evidence.", tone: "" },
+    reference: { label: "Ingredient database", advice: "Explains what an ingredient is. Not peer-reviewed, and never proof of what one product contains.", tone: "" },
+    public: { label: "Public list (anyone can edit)", advice: "A public list anybody can edit. Use it as a second opinion only.", tone: "" },
+    retailer: { label: "Retailer listing", advice: "A shop's copy of the pack's list. It can be out of date: compare it with your pack.", tone: "" },
+    other: { label: "Unverified site", advice: "Not recognised. Do not rely on it without checking elsewhere.", tone: "warn" }
+};
+
+/** The line under every list of source links, for people who are careful about links. */
+export const SOURCE_LINK_GUIDE = "Links open another website and GlowUp does not control it. Check the address in the browser bar, never enter personal details, and let a dermatologist or pharmacist confirm any claim you rely on.";
+
+/** The web address in a source line ("" when it has none): the first http(s) address, up to a space. */
+function sourceAddress(source) {
+    const s = text0(source);
+    if (s.trim().length === 0) return "";
+    const lower = s.toLowerCase();
+    let at = lower.indexOf("http://");
+    const secure = lower.indexOf("https://");
+    if (secure >= 0 && (at < 0 || secure < at)) at = secure;
+    if (at < 0) return "";
+    let end = at;
+    while (end < s.length && !/\s/.test(s[end])) end++;
+    return s.slice(at, end).replace(/[.,;)"]+$/, "");
+}
+
+/** The page title in front of the last " | " of a source line. */
+function sourceTitle(source) {
+    const s = text0(source);
+    const cut = s.lastIndexOf(" | ");
+    return (cut > 0 ? s.slice(0, cut) : sourceAddress(s).length === 0 ? s : "").trim();
+}
+
+/** The site a source line points to: lower case, no "www.", user name or port. A search engine's pass-through address: its page title. */
+export function sourceHost(source) {
+    const address = sourceAddress(source);
+    if (address.length === 0) return "";
+    const start = address.indexOf("://") < 0 ? 0 : address.indexOf("://") + 3;
+    const ends = ["/", "?", "#"].map((c) => address.indexOf(c, start)).filter((i) => i >= 0);
+    let host = address.slice(start, ends.length ? Math.min(...ends) : address.length).toLowerCase();
+    const lower = address.toLowerCase();
+    if (SOURCE_REDIRECTS.some((r) => lower.includes(r))) host = sourceTitle(source).toLowerCase();
+    const at = host.lastIndexOf("@");
+    if (at >= 0) host = host.slice(at + 1);
+    const colon = host.indexOf(":");
+    if (colon >= 0) host = host.slice(0, colon);
+    host = host.trim().replace(/\.+$/, "");
+    return host.startsWith("www.") ? host.slice(4) : host;
+}
+
+/** "maybelline" for maybelline.com.ph or shop.maybelline.com: the site's own name, without the country ending. */
+export function sourceOwnName(host) {
+    const parts = text0(host).split(".");
+    if (parts.length < 2) return "";
+    const second = parts[parts.length - 2];
+    const countryEnding = parts.length >= 3 && parts[parts.length - 1].length === 2 && ["co", "com", "org", "net", "gov", "edu"].includes(second);
+    return (countryEnding ? parts[parts.length - 3] : second).replace(/[^a-z0-9]/g, "");
+}
+
+/** True when the site's own name IS the brand's name (at most one SOURCE_MAKER_SUFFIXES word after it); containing it is not enough. */
+export function isMakersSite(host, brandName) {
+    const own = sourceOwnName(host), words = nameWords(brandName);
+    if (own.length === 0 || words.length === 0) return false;
+    const names = [];
+    const whole = words.join("");
+    if (whole.length >= 3) names.push(whole);
+    if (words.length > 1 && words[0].length >= 4) names.push(words[0]);
+    if (names.some((name) => SOURCE_MAKER_SUFFIXES.some((suffix) => own === name + suffix))) return true;
+    // a first word of three letters ("NYX Professional Makeup") only with a word after it: nyxcosmetics.com
+    return words.length > 1 && words[0].length === 3 && SOURCE_MAKER_SUFFIXES.some((suffix) => suffix.length > 0 && own === words[0] + suffix);
+}
+
+const onSite = (host, sites) => sites.some((site) => host === site || host.endsWith("." + site));
+
+/** regulator, medical, maker, reference, public, retailer or other. `brandName` may be empty (then no page is the maker's). */
+export function sourceKind(source, brandName) {
+    const host = sourceHost(source);
+    if (host.length === 0) return "other";
+    if (onSite(host, SOURCE_REGULATORS) || /\.gov(\.[a-z]{2})?$/.test(host)) return "regulator";
+    if (onSite(host, SOURCE_MEDICAL) || /\.edu(\.[a-z]{2})?$/.test(host)) return "medical";
+    if (isMakersSite(host, brandName)) return "maker";
+    if (onSite(host, SOURCE_REFERENCES)) return "reference";
+    if (onSite(host, SOURCE_PUBLIC_LISTS)) return "public";
+    if (SOURCE_RETAILERS.some((shop) => host.includes(shop))) return "retailer";
+    return "other";
+}
+
+/** { kind, label, advice, tone } of a source line. */
+export function describeSourceLine(source, brandName) {
+    const kind = sourceKind(source, brandName);
+    return { kind, ...SOURCE_KINDS[kind] };
+}

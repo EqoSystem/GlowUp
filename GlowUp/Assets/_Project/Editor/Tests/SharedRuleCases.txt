@@ -16,6 +16,10 @@
 #   brandid    | brand                   | the id a brand gets when the app adds it from a scan
 #   stoplist   | a piece of label text   | the stoplist entry it holds (nothing = it holds none)
 #   shape      | a piece of label text   | ok or wrong: can it be an ingredient name at all?
+#   sourcekind | a source line | brand   | regulator, medical, maker, reference, public, retailer or other: the KIND of page
+#              (app: ListSources.SourceKind; website: sourceKind in glowupRules.js; server: api/assist-ingredient.js)
+#   sourcelabel| a kind                  | the words shown next to a source link for that kind
+#   (a source line holds " | " itself, so inside a column its bar is written \u007c)
 #
 # \uXXXX stands for one character given by its code: \u00e9 is an e with an acute accent, \u0020 is a space
 # (spaces at the ends of a column are cut off, so a space that matters is written as its code).
@@ -140,3 +144,43 @@ shape | Polysorbate 20 | ok
 shape | PENTAERYTHRITYL TETRA-DI-T-BUTYL HYDROXYHYDROCINNAMATE | ok
 shape | Acrylates/C10-30 Alkyl Acrylate Crosspolymer | ok
 shape | Iron Oxides (CI 77491) | ok
+
+# ---- the kind of page a source line is (the label a dermatologist or pharmacist sees next to the link)
+sourcekind | FDA Philippines verification \u007c https://verification.fda.gov.ph/search?q=x | | regulator
+sourcekind | https://pubchem.ncbi.nlm.nih.gov/compound/Niacinamide | | regulator
+sourcekind | https://www.health.gov.au/topics/cosmetics | | regulator
+sourcekind | https://www.state.gov/x | | regulator
+sourcekind | https://user@www.fda.gov:443/cosmetics | | regulator
+sourcekind | https://fda.gov.ph.evil.com/x | | other
+sourcekind | https://dermnetnz.org/topics/contact-dermatitis | | medical
+sourcekind | https://skin.harvard.edu/x | | medical
+sourcekind | https://www.nature.com/articles/x | Nature Republic | medical
+sourcekind | https://www.naturerepublic.com/products/x | Nature Republic | maker
+sourcekind | INCIDecoder \u007c https://incidecoder.com/ingredients/niacinamide | | reference
+sourcekind | http://www.ewg.org/skindeep/x | | reference
+sourcekind | https://www.paulaschoice.com/ingredient-dictionary/x | | reference
+sourcekind | https://www.paulaschoice.com/products/x | Paula's Choice | maker
+sourcekind | Open Beauty Facts \u007c https://world.openbeautyfacts.org/product/4800000000000 | | public
+sourcekind | https://www.maybelline.com.ph/face/fit-me | Maybelline New York | maker
+sourcekind | https://shop.absidy.com/p/1 | Absidy | maker
+sourcekind | https://www.nyxcosmetics.com/lip/x | NYX Professional Makeup | maker
+sourcekind | https://www.nyx.com/x | NYX Professional Makeup | other
+sourcekind | https://maybelline-offers.xyz/deal | Maybelline | other
+sourcekind | https://maybelline.evil.com/x | Maybelline | other
+sourcekind | https://maybelline.com.evil.ru/x | Maybelline | other
+sourcekind | https://www.maybelline.com.ph/face/fit-me | | other
+sourcekind | Watsons \u007c https://www.watsons.com.ph/p/1 | Maybelline | retailer
+sourcekind | https://shopee.ph/maybelline-store | Maybelline | retailer
+sourcekind | https://www.sephora.com/product/x | | retailer
+sourcekind | absidy.com \u007c https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc | Absidy | maker
+sourcekind | https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc | | other
+sourcekind | https://random-blog.com/review | Maybelline | other
+sourcekind | GlowUp product inventory | | other
+sourcekind | | | other
+sourcelabel | regulator | Regulator / government
+sourcelabel | medical | Medical / scientific body
+sourcelabel | maker | Manufacturer's own site
+sourcelabel | reference | Ingredient database
+sourcelabel | public | Public list (anyone can edit)
+sourcelabel | retailer | Retailer listing
+sourcelabel | other | Unverified site
