@@ -168,43 +168,13 @@ namespace GlowUp.Scan
         }
 
         // =====================================================================================
-        //  ReadPack: the AI snapshot (a product the catalogue does not have, one photo of its pack)
+        //  The AI snapshot (a product the catalogue does not have, one photo of its pack): read by api/scan-snapshot.js, see ScanPhotoService
         // =====================================================================================
         /// <summary>What the AI read from one photo of a pack: who and what it is, and the ingredient list when it is printed and readable.</summary>
         public class PackReading
         {
             public Identity identity = new Identity();
             public List<string> ingredients = new List<string>();
-        }
-
-        /// <summary>
-        /// Shows the AI ONE photo of the product's pack (JPG) and asks for its brand, name, kind, shade AND the ingredient list as
-        /// printed. The list is only ever read from the photo, never filled in from what the AI knows. Never throws.
-        /// </summary>
-        public static async Task<PackReading> ReadPack(byte[] jpegPhoto)
-        {
-            var result = new PackReading();
-            if (!Available || jpegPhoto == null || jpegPhoto.Length == 0) return result;
-            var q = new StringBuilder();
-            q.Append("The photo shows one make-up product, usually its pack, held up to a phone camera. This app checks MAKE-UP only, so say honestly when the product is something else.\n");
-            q.Append("Read what the pack shows: the brand (its logo), the product's name, the kind of make-up, the shade, and the INGREDIENT LIST when one is printed and readable.\n");
-            if (KnownBrands != null && KnownBrands.Count > 0)
-                q.Append("BRANDS THIS APP ALREADY LISTS (when the pack is one of these, write the brand exactly like this): ").Append(string.Join(", ", KnownBrands.GetRange(0, Mathf.Min(80, KnownBrands.Count)))).Append("\n");
-            q.Append(BrandAndNameRule);
-            q.Append("Reply with ONLY one JSON object, no markdown and no other text, in exactly this shape:\n");
-            q.Append("{\"found\":true,\"productName\":\"\",\"brandName\":\"\",\"cosmeticType\":\"").Append(ProductScope.AiTypeChoices).Append("\",");
-            q.Append("\"capOn\":false,\"shadeHex\":\"#RRGGBB of the product's own colour, or empty\",\"shadeFrom\":\"product, packaging or name; empty when shadeHex is empty\",");
-            q.Append("\"shadeName\":\"\",\"finish\":\"matte, satin, glossy, shimmer, metallic or empty\",");
-            q.Append("\"ingredients\":[\"each ingredient name exactly as printed, in the printed order\"],\"confidence\":0.0}\n");
-            q.Append("INGREDIENTS: copy them ONLY from the photo. Never add an ingredient you cannot read, never complete a list from memory or from other products. ");
-            q.Append("Leave the list empty when no ingredient list is visible or it cannot be read. Leave out headings such as \"Ingredients:\" and claims such as \"paraben free\".\n");
-            q.Append("confidence is 0 to 1. Do not guess a name or a brand you can neither read nor clearly recognise: leave it empty. If the photo shows no cosmetic product, reply {\"found\":false}.");
-
-            AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), false, TimeoutSeconds, jpegPhoto);
-            if (answer == null || !answer.ok) { Debug.LogWarning("AI snapshot: " + (answer != null ? answer.error : "no answer")); return result; }
-            result.identity = IdentityFrom(answer.text, answer.model);
-            result.ingredients = IngredientsIn(answer.text);
-            return result;
         }
 
         /// <summary>The "ingredients" list of the AI's answer: trimmed, no repeats, no headings or claims, at most 80 names.</summary>

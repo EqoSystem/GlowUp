@@ -26,8 +26,6 @@ import * as fb from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firesto
 
 /** The collections that are kept. */
 export const LISTS = ["brands", "products", "ingredients"];
-/** No longer used by this file (a full download is not made because a copy is old); kept so nothing that imports it breaks. */
-export const FULL_AFTER_MS = 5 * 60 * 1000;
 /** After more than this many changed documents one full download is simpler than reading them one by one. */
 const MANY_CHANGES = 40;
 const KEY = "glowup.store.v2.";                  // v2: localStorage, with a sync point (v1 copies in sessionStorage are ignored)
@@ -48,8 +46,6 @@ const countChecked = {};
 const listeners = new Set();
 let reads = 0;
 
-/** How many documents this page has read through the store (for the console, and for measuring). */
-export const readsThisPage = () => reads;
 
 // ---------------------------------------------------------------------------------------------
 // The read counter: every document read through here, per page load, in the browser console

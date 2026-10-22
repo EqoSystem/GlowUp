@@ -489,11 +489,9 @@ namespace GlowUp.EditorTools
 
         // Brand-style colour icons (simple vector approximations - swap for official logo PNGs if you have them)
         public static Sprite Google => GetColor("icon_google", GoogleG);
-        public static Sprite Facebook => GetColor("icon_facebook", FacebookF);
 
         static readonly Color GBlue = new Color32(66, 133, 244, 255), GRed = new Color32(234, 67, 53, 255),
-                              GYellow = new Color32(251, 188, 5, 255), GGreen = new Color32(52, 168, 83, 255),
-                              FbBlue = new Color32(24, 119, 242, 255);
+                              GYellow = new Color32(251, 188, 5, 255), GGreen = new Color32(52, 168, 83, 255);
 
         static Color GoogleG(float x, float y)
         {
@@ -508,17 +506,6 @@ namespace GlowUp.EditorTools
             if (a >= 150f && a < 215f) return GYellow;
             if (a >= 215f && a < 300f) return GGreen;
             return GBlue;
-        }
-
-        static Color FacebookF(float x, float y)
-        {
-            if (x * x + y * y > 0.92f * 0.92f) return Color.clear;
-            bool stem = x > -0.04f && x < 0.18f && y > -1f && y < 0.46f;
-            bool bar = x > -0.30f && x < 0.44f && y > 0.12f && y < 0.30f;
-            float dx = x - 0.36f, dy = y - 0.46f, d = Mathf.Sqrt(dx * dx + dy * dy);
-            bool hook = d > 0.18f && d < 0.40f && dx < 0.02f && dy > -0.02f;
-            bool tip = x >= 0.34f && x < 0.58f && y > 0.62f && y < 0.84f;
-            return (stem || bar || hook || tip) ? Color.white : FbBlue;
         }
 
         static Sprite Get(string name, Func<float, float, bool> inside)

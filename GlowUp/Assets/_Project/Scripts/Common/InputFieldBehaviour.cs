@@ -40,7 +40,6 @@ namespace GlowUp.Common
         }
 
         string lastValid = "";
-        float lastLen;
 
         void OnValueChanged(string value)
         {

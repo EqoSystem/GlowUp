@@ -19,30 +19,12 @@ export const DASHBOARD_PAGE = "../_Admin_Dashboard/adminDashboard.html";
 // It is on: the admin account was added to "admins" on 2026-10-09. To add another admin see FIRESTORE_SCHEMA.md, "Admin accounts".
 export const REQUIRE_ADMIN_RECORD = true;
 
-// The words the mobile app understands. Keep these lists the same as the app's.
-export const ALLERGEN_FAMILIES = [
-    { value: "fragrance", label: "Fragrance / Parfum" },
-    { value: "paraben", label: "Parabens" },
-    { value: "sulfate", label: "Sulfates (SLS / SLES)" },
-    { value: "formaldehyde", label: "Formaldehyde releasers" },
-    { value: "lanolin", label: "Lanolin" },
-    { value: "essentialoil", label: "Essential oils" },
-    { value: "nut", label: "Nut-derived oils" }
-];
+// The words the mobile app understands. Keep this list the same as the app's.
 export const SKIN_TYPES = [
     { value: "Oily", label: "Oily" },
     { value: "Normal", label: "Normal" },
     { value: "Dry", label: "Dry" },
     { value: "Mix", label: "Mix (combination)" }
-];
-export const SKIN_CONDITIONS = [
-    { value: "acne", label: "Acne" },
-    { value: "eczema", label: "Eczema" },
-    { value: "psoriasis", label: "Psoriasis" },
-    { value: "rosacea", label: "Rosacea" },
-    { value: "seborrheic", label: "Seborrheic dermatitis" },
-    { value: "melasma", label: "Melasma / hyperpigmentation" },
-    { value: "contact", label: "Contact dermatitis" }
 ];
 // GlowUp is about MAKE-UP ONLY. Skin care, hair, body, nail and fragrance products are not listed.
 // The rule itself lives in glowupRules.js (the same rule as the app's ProductScope.cs, tested against the same examples).
@@ -377,8 +359,6 @@ export function statusBadge(status) {
     const key = text.toLowerCase() === "recycle bin" ? "bin" : text.toLowerCase().replace(/[^a-z]/g, "");
     return `<span class="status-badge ${escapeHtml(key)}" title="${escapeHtml(STATUS_MEANINGS[text] || "")}">${escapeHtml(text)}</span>`;
 }
-/** The older name of the same badge. */
-export const statusPill = statusBadge;
 
 /**
  * The same badge for a judgement that is not a status (how a scan was judged, how risky an ingredient is):

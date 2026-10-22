@@ -49,3 +49,13 @@ To remove files from history only if a real secret ever shows up:
 - `GlowUp-Admin_AI_Testing/firebase_unity_sdk_13.17.0/` (743 MB).
 - Backup/removed folders (about 90 MB total) and `facebook-unity-sdk-18.1.1*`.
 - Git history now covers the backups.
+
+## 2026-10-22 clean-up (nothing deleted: everything moved to `_quarantine/archive-2026-10-22/`, move it back to restore)
+- Facebook SDK downloads: `facebook-unity-sdk-18.1.1`, `.unitypackage`, `.zip` (Facebook sign-in was removed).
+- Old backups: `GlowUp-Admin_Backup_*`, `GlowUp-Data_Backup_*`, `GlowUp-Unity_Backup_*`, `GlowUp-Unity_Removed_*` (Git history covers them).
+- `GlowUp-Admin_AI_Testing/firebase_unity_sdk_13.17.0` (743 MB Firebase download; the SDK is already in Assets).
+- `GlowUp/tesseract-unity-master` (177 MB download), `GlowUp/ScenePreviews` (made again by the scene preview tool), `GlowUp/GlowUp_BurstDebugInformation_DoNotShip` (made again by a build).
+- `GlowUp/Img` (design pictures nothing refers to) moved with Git to `_quarantine/GlowUp_Img`.
+- Empty folder `GlowUp-Admin_AI_Testing/_Admin_Product_Catalog` removed.
+- Code: 8 unused message fields of SmartScanFlowController, two unused private fields, ReadPack (the phone no longer calls the AI itself), the Facebook icon, and five unused website exports.
+- Left for the Unity Editor (files under Assets are not moved from outside it): see the list in the chat of that day.

@@ -249,31 +249,22 @@ namespace GlowUp.Scan
         [SerializeField] private string msgNotSure = "We could not name this product. Type its name, start over, or tap Finish anyway.";
         [Tooltip("The AI has been asked as often as it may be in one visit of this screen")]
         [SerializeField] private string msgAiLimit = "The AI has been asked as often as it may be for now. Type the product's name, or tap Finish anyway.";
-        [Tooltip("Shown when the ingredient list was looked up online as often as it may be in one visit of this screen")]
-        [SerializeField] private string msgLookUpLimit = "This product's list was already looked up. Scan the list on the pack, or type it in.";
         [SerializeField] private string msgNeedList = "The ingredient list is not read yet. Show it to the camera, or tap Look it up.";
         [SerializeField] private string msgStalled = "Not getting further? Tap Start over, or type the product in instead.";
         [SerializeField] private string msgPauseReset = "The scan was paused for a while, so it was put back to the start.";
         [SerializeField] private string msgDifferentProduct = "That is a different product: a new scan was started for it.";
         [SerializeField] private string msgSameAgain = "Scanning the same product again. Its name is kept.";
         [SerializeField] private string msgStartedOver = "Ready for a new product.";
-        [SerializeField] private string msgReaderLoading = "Getting the text reader ready...";
         [SerializeField] private string msgReaderMissing = "The text reader is not available on this device. Type the ingredients instead.";
         [Header("Typing a product in: its name is enough, the list is looked up")]
         [Tooltip("Nothing was typed that names a product or an ingredient")]
         [SerializeField] private string msgManualNothing = "Type the product's name (its brand helps), or its ingredient list.";
         [Tooltip("{0} = the product as typed")]
         [SerializeField] private string msgManualLooking = "Looking for {0}...";
-        [SerializeField] private string msgManualOffline = "{0} is not in GlowUp's own list, and you are offline. Connect to the internet, or type its ingredient list.";
-        [SerializeField] private string msgManualLimit = "The web has been searched as often as it may be for now. Type the ingredient list, or open this screen again later.";
-        [SerializeField] private string msgManualNotFound = "We could not find that product. Check the spelling, add the brand, or type its ingredient list.";
         [Tooltip("{0} = the product as it is sold")]
         [SerializeField] private string msgManualNoList = "Found {0}, but no trustworthy page shows its ingredient list. Type the list from the pack.";
-        [SerializeField] private string msgManualNotMakeup = "GlowUp checks make-up only, and that is not make-up.";
-        [SerializeField] private string msgManualFailed = "The look-up did not work. Check your connection and try again, or type the ingredient list.";
         [SerializeField] private string msgLookUpNeedsName = "Show the front of the product first, so we know which product to look up.";
         [SerializeField] private string msgLookingUp = "Looking up this product's ingredient list...";
-        [SerializeField] private string msgLookUpOffline = "This product is not in the app's list yet. Connect to the internet to look it up, or type the ingredients.";
         [SerializeField] private string msgFirebaseMiss = "No matching product was found in GlowUp's Firebase catalogue. Re-align the brand and product name, or type the product in.";
         [SerializeField] private string msgFirebaseNoIngredients = "GlowUp found this product, but its ingredient list is not saved in the catalogue yet.";
         [SerializeField] private string msgFirebaseUnavailable = "GlowUp's product catalogue could not be reached. Check your connection and try again.";

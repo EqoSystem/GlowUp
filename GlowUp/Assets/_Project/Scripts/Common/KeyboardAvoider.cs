@@ -70,7 +70,6 @@ namespace GlowUp.Common
         readonly List<Part> parts = new List<Part>();
         readonly Vector3[] corners = new Vector3[4];
         TMP_InputField current;
-        bool keyboardSeen;
         float share, lastShare = -1f, nextMeasure, scrollUntil, lastTop, lastBottom;
 
         void Start()
@@ -148,7 +147,7 @@ namespace GlowUp.Common
             if (!avoidKeyboard) return;
             current = Selected();                       // TMP raises onSelect before isFocused turns true; Update checks it from the next frame
             if (current == null) return;
-            keyboardSeen = false; lastShare = -1f; nextMeasure = 0f;
+            lastShare = -1f; nextMeasure = 0f;
             scrollUntil = Time.unscaledTime + scrollSeconds;
             enabled = true;
         }
@@ -169,7 +168,6 @@ namespace GlowUp.Common
 #if DEVELOPMENT_BUILD || UNITY_EDITOR
                 ShowNumbers();
 #endif
-                if (share > 0f) keyboardSeen = true;
                 if (Mathf.Abs(share - lastShare) > 0.01f) { lastShare = share; scrollUntil = Time.unscaledTime + scrollSeconds; }
             }
 
