@@ -58,6 +58,16 @@ namespace GlowUp.Performance
         [Header("High Quality")]
         public ModeSettings highQuality = new ModeSettings { qualityLevel = "High Fidelity", defaultFrameRate = 60, resolutionScale = 1f, reduceEffects = false };
 
+        [Header("AR Try-On: which pipeline a phone gets (Settings > AR Try-On quality > Automatic)")]
+        [Tooltip("Memory (RAM) at or above this many megabytes: the full pipeline (dense face mesh, blend shaders, light adaptation, mouth mask). A phone sold as 6 GB reports about 5500, so 5500 is the line for \"more than 6 GB\" phones.")]
+        public int arHighMinMemoryMb = 5500;
+        [Tooltip("Memory below this many megabytes: the lighter pipeline (small overlay picture, one colour layer at a time, no light adaptation, frame-rate cap). A phone sold as 4 GB reports about 3700.")]
+        public int arLowBelowMemoryMb = 3800;
+        [Tooltip("A phone between the two limits gets: on = the full pipeline, off = the lighter one")]
+        public bool arMidRangeGetsFullPipeline = true;
+        [Tooltip("Graphics memory at or below this many megabytes counts as a weak graphics chip (0 = this check is not used). A weak chip gets the lighter pipeline whatever its RAM.")]
+        public int arWeakGraphicsMemoryMb = 0;
+
         [Header("Frame rate choices on the Settings page")]
         [Tooltip("Saves battery and keeps budget phones cooler")]
         public int batterySaverFrameRate = 30;

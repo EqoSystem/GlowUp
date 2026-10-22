@@ -16,6 +16,8 @@ Shader "GlowUp/FaceMakeupBlend"
         _BaseColor ("Shade (alpha = strength)", Color) = (1, 1, 1, 0)
         _SkinBase ("Skin Under It", Color) = (0.74, 0.52, 0.47, 1)
         _Feather ("Soft Edge", Range(0, 1)) = 0.6
+        _MouthMask ("Inside of the mouth (set by ArMouthMask)", 2D) = "black" {}
+        _MouthOpen ("How open the mouth is (set by ArMouthMask)", Range(0, 1)) = 0
     }
     SubShader
     {
@@ -35,15 +37,19 @@ Shader "GlowUp/FaceMakeupBlend"
             float4 _BaseMap_ST;
             fixed4 _BaseColor;
             fixed4 _SkinBase;
+            sampler2D _MouthMask;
+            float4 _MouthMask_ST;
+            float _MouthOpen;
             float _Feather;
 
-            struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; };
+            struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; float2 mouthUv : TEXCOORD1; };
 
             v2f vert(appdata_base v)
             {
                 v2f o;
                 o.pos = UnityObjectToClipPos(v.vertex);
                 o.uv = TRANSFORM_TEX(v.texcoord, _BaseMap);
+                o.mouthUv = TRANSFORM_TEX(v.texcoord, _MouthMask);
                 return o;
             }
 
@@ -53,6 +59,8 @@ Shader "GlowUp/FaceMakeupBlend"
                 // a softer edge: the colour thins out towards the rim of the mask, as real make-up does
                 mask = lerp(mask, mask * mask * (3.0 - 2.0 * mask), _Feather);
                 float amount = saturate(mask * _BaseColor.a);
+                // the inside of an open mouth (teeth, tongue) is not painted: the picture shows through
+                amount *= 1.0 - saturate(tex2D(_MouthMask, i.mouthUv).r * _MouthOpen);
                 float3 tint = saturate(0.5 * _BaseColor.rgb / max(_SkinBase.rgb, 0.08));
                 return fixed4(lerp(float3(0.5, 0.5, 0.5), tint, amount), 1);
             }

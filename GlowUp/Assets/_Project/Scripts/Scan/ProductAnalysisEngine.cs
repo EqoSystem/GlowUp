@@ -65,7 +65,7 @@ namespace GlowUp.Scan
                 }
 
                 f.techName = data.techName ?? ""; f.description = data.description ?? ""; f.commonUses = data.commonUses ?? "";
-                f.keyActive = data.keyActive; f.hidden = data.umbrella;
+                f.keyActive = data.keyActive || ListsRepository.HasActiveHighlight(data.highlights); f.hidden = data.umbrella;
                 bool aiOnly = data.IsUnreviewedAi();               // found by the AI lookup, not yet checked by an admin
                 f.aiSourced = aiOnly;
                 if (aiOnly) f.description = (f.description.TrimEnd('.') + ". (Found by the AI lookup; not yet reviewed.)").TrimStart('.', ' ');
@@ -260,25 +260,18 @@ namespace GlowUp.Scan
         // ---------------------------------------------------------------------------------------
         //  Matching helpers
         // ---------------------------------------------------------------------------------------
-        static readonly string[][] AllergenFamilies =
-        {
-            new[] { "fragrance", "fragrance", "parfum", "perfume" },
-            new[] { "paraben", "paraben" },
-            new[] { "sulfate", "sulfate", "sulphate", "sls", "sles" },
-            new[] { "formaldehyde", "formaldehyde" },
-            new[] { "lanolin", "lanolin" },
-            new[] { "essentialoil", "essential oil", "essential oils" },
-            new[] { "nut", "nut" }
-        };
+        // The allergen families come from the admin website's list (ListsRepository; the same seven built in): each is { id, word, word, ... }
+        // and a user's saved allergen that contains one of the words belongs to it.
 
         /// <summary>The user's allergen label that this ingredient matches, or null.</summary>
         static string MatchAllergen(IngredientData data, string shownName, List<string> userAllergens)
         {
             string name = (shownName + " " + (data.techName ?? "")).ToLowerInvariant();
+            string[][] families = ListsRepository.AllergenFamilies();
             foreach (string label in userAllergens)
             {
                 string l = label.ToLowerInvariant();
-                foreach (var family in AllergenFamilies)
+                foreach (var family in families)
                 {
                     bool userHasFamily = false;
                     for (int i = 1; i < family.Length; i++) if (l.Contains(family[i])) { userHasFamily = true; break; }
@@ -305,7 +298,9 @@ namespace GlowUp.Scan
             foreach (string c in ingredientConditions)
             {
                 string k = c.ToLowerInvariant().Trim();
-                if (k.Length > 0 && u.Contains(k)) return true;
+                if (k.Length == 0) continue;
+                // the condition's id and the words the admin website lists for it (a condition added there works the same way)
+                foreach (string word in ListsRepository.ConditionWords(k)) if (u.Contains(word)) return true;
             }
             return false;
         }

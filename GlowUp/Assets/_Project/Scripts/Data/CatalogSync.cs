@@ -95,6 +95,10 @@ namespace GlowUp.Data
                 Task<QuerySnapshot> added = list.WhereGreaterThan("addedAtUnix", addedSince).GetSnapshotAsync(Source.Server);
                 Task<AggregateQuerySnapshot> counted = list.Count.GetSnapshotAsync(AggregateSource.Server);
                 await Task.WhenAll(updated, created, added, counted).OrTimeout(10f, what);
+                ReadCounter.AddQuery(collection + " changed since the last sync (updatedAt)", updated.Result.Count);
+                ReadCounter.AddQuery(collection + " changed since the last sync (createdAt)", created.Result.Count);
+                ReadCounter.AddQuery(collection + " changed since the last sync (addedAtUnix)", added.Result.Count);
+                ReadCounter.Add(collection + " count check", 1);
 
                 var known = new HashSet<string>(state.ids);
                 var seen = new HashSet<string>();
@@ -118,6 +122,7 @@ namespace GlowUp.Data
 
             // ---- everything
             QuerySnapshot all = await list.GetSnapshotAsync(Source.Server).OrTimeout(haveCopy ? 12f : 25f, what);
+            ReadCounter.AddQuery(collection + " full download", all.Count);
             foreach (DocumentSnapshot document in all.Documents) pull.documents.Add(document);
             state.ids = new List<string>();
             foreach (DocumentSnapshot document in pull.documents) state.ids.Add(document.Id);

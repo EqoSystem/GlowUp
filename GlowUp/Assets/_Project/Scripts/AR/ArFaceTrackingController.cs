@@ -39,6 +39,16 @@ namespace GlowUp.AR
         [Tooltip("The colour layers that go on the tracked face")]
         [SerializeField] private ArFaceMakeup makeup;
 
+        [Header("Adaptive quality and the helpers (each is its own object in the Hierarchy; all optional)")]
+        [Tooltip("AR Quality Controller: decides the full or the light pipeline and holds the numbers of both")]
+        [SerializeField] private ArAdaptiveQuality quality;
+        [Tooltip("AR Light Adapter: makes the make-up follow the room (skin colour, highlight) and notices a dark room")]
+        [SerializeField] private ArLightAdapter lightAdapter;
+        [Tooltip("AR Face Hold: keeps a lost face on screen for a moment, predicts its movement and fades it out")]
+        [SerializeField] private ArFaceHold faceHold;
+        [Tooltip("AR Mouth Mask: keeps the make-up off the teeth and tongue when the mouth opens")]
+        [SerializeField] private ArMouthMask mouthMask;
+
         [Header("Where the picture shows")]
         [SerializeField] private RawImage display;
         [SerializeField] private RectTransform viewport;
@@ -92,6 +102,8 @@ namespace GlowUp.AR
         [SerializeField] private string msgLookingForFace = "Looking for your face. Hold the phone in front of you.";
         [SerializeField] private string msgTracking = "Live try-on. Turn your head to see the colour from the side.";
         [SerializeField] private string msgSwitchedOff = "Live try-on closed the app last time, so the guided preview is used on this phone.";
+        [Tooltip("Said while the face is lost for a moment and the make-up is held on screen")]
+        [SerializeField] private string msgFaceHeld = "Face lost for a moment. Turn back towards the camera.";
 
         /// <summary>True while the tracked face is being shown (false = guided preview, or not started).</summary>
         public bool IsLive { get; private set; }
@@ -108,6 +120,9 @@ namespace GlowUp.AR
         Coroutine routine;
         int frames;
         bool subscribed, hadFace, saidAnything;
+        bool usingLight, usingHold, usingMouth;     // which helpers were started for this live session
+        int dressedLayer = int.MinValue;            // the colour layer the faces are dressed in now (light pipeline: only the shown one)
+        string lastSaid = "";
         float lastSeen = -100f;
         Vector2 lastView;
         readonly List<Camera> otherCameras = new List<Camera>();    // the scene's own cameras: they must not draw the tracked face a second time
@@ -205,12 +220,14 @@ namespace GlowUp.AR
         {
             if (!useLiveTracking) return false;
             if (!useInPerformanceMode && PerformanceSettings.Mode == GraphicsMode.Performance) return false;
+            if (quality != null && quality.PreferGuidedPreview) return false;
             return sessionObject != null && originObject != null && arCamera != null && cameraManager != null && faceManager != null
                 && display != null && viewport != null && makeup != null && makeup.Ready;
         }
 
         IEnumerator Run()
         {
+            if (quality != null) quality.BeginSession();         // which pipeline this phone gets (and the frame-rate cap of the light one)
             if (!CanTryLive()) { UseGuidedPreview("live tracking is switched off, or its objects are not set on this script"); yield break; }
             if (Is32BitAppOn64BitPhone())
             {
@@ -248,6 +265,7 @@ namespace GlowUp.AR
             {
                 // the user has just answered "no": say so on the screen, do not ask a second time
                 routine = null;
+                if (quality != null) quality.EndSession();
                 Debug.Log("[GlowUp] AR Try-On: the camera permission was not given.");
                 if (faceGuide != null) faceGuide.SetActive(true);
                 if (guidedCamera != null) guidedCamera.ReportPermissionRefused();
@@ -295,6 +313,7 @@ namespace GlowUp.AR
 
             // 4. live
             IsLive = true; hadFace = false; lastSeen = -100f; liveSince = Time.unscaledTime;
+            StartHelpers();
             HideFaceFromOtherCameras();
             if (faceGuide != null) faceGuide.SetActive(false);
             display.color = Color.white;
@@ -309,6 +328,7 @@ namespace GlowUp.AR
             routine = null;
             IsLive = false;
             EndGuard();
+            if (quality != null) quality.EndSession();
             Debug.Log("[GlowUp] AR Try-On uses the guided preview: " + reason + ".");
             if (faceGuide != null) faceGuide.SetActive(true);
             if (guidedCamera != null) guidedCamera.StartCamera();
@@ -335,6 +355,7 @@ namespace GlowUp.AR
 
         void StopLive()
         {
+            StopHelpers();
             if (subscribed)
             {
                 subscribed = false;
@@ -414,7 +435,8 @@ namespace GlowUp.AR
         // ---------------------------------------------------------------------------------------
         void PreparePicture()
         {
-            int height = Mathf.Clamp(Screen.height, 320, Mathf.Max(320, maximumPictureHeight));
+            int pictureCap = quality != null ? quality.PictureHeight : maximumPictureHeight;
+            int height = Mathf.Clamp(Screen.height, 320, Mathf.Max(320, pictureCap));
             int width = Mathf.Max(180, Mathf.RoundToInt(height * (Screen.width / (float)Mathf.Max(1, Screen.height))));
             picture = new RenderTexture(width, height, 24) { name = "AR Try-On picture", antiAliasing = 1 };
             picture.Create();
@@ -448,8 +470,59 @@ namespace GlowUp.AR
         // ---------------------------------------------------------------------------------------
         void OnFacesChanged(ARFacesChangedEventArgs args)
         {
+            if (usingHold && faceHold != null) faceHold.Observe(args);
             if (args.added == null) return;
             foreach (ARFace face in args.added) Dress(face);
+        }
+
+        // ---------------------------------------------------------------------------------------
+        //  The helpers of the full pipeline (light adaptation, face hold, mouth mask) and the light pipeline's savings
+        // ---------------------------------------------------------------------------------------
+        void StartHelpers()
+        {
+            usingLight = lightAdapter != null && (quality == null || quality.LightAdaptation);
+            usingHold = faceHold != null && (quality == null || quality.HoldLostFace);
+            usingMouth = mouthMask != null && (quality == null || quality.MouthMask);
+            if (usingLight) lightAdapter.BeginSession(arCamera, makeup);
+            if (usingHold) faceHold.BeginSession(faceManager, makeup);
+            if (usingMouth) mouthMask.BeginSession(makeup);
+            if (quality != null) quality.TierChanged += OnTierChanged;
+            dressedLayer = int.MinValue;
+        }
+
+        void StopHelpers()
+        {
+            if (quality != null) { quality.TierChanged -= OnTierChanged; quality.EndSession(); }
+            if (usingLight && lightAdapter != null) lightAdapter.EndSession();
+            if (usingHold && faceHold != null) faceHold.EndSession();
+            if (usingMouth && mouthMask != null) mouthMask.EndSession();
+            usingLight = usingHold = usingMouth = false;
+            if (makeup != null) makeup.Presence = 1f;
+        }
+
+        /// <summary>The frame-rate check moved this phone to the light pipeline while AR Try-On was open.</summary>
+        void OnTierChanged()
+        {
+            if (!IsLive || quality == null) return;
+            if (usingLight && !quality.LightAdaptation) { lightAdapter.EndSession(); usingLight = false; }
+            if (usingMouth && !quality.MouthMask) { mouthMask.EndSession(); usingMouth = false; }
+            if (picture != null)
+            {
+                RenderTexture old = picture;
+                PreparePicture();                    // a smaller picture
+                old.Release(); Destroy(old);
+                if (compare) ReleaseBefore();        // the before picture is drawn again at the new size
+            }
+            dressedLayer = int.MinValue;             // every face is dressed again
+        }
+
+        /// <summary>In the light pipeline only the colour layer being tried is drawn: when another part is chosen, the faces get that layer.</summary>
+        void RedressWhenLayerChanged()
+        {
+            if (quality == null || !quality.DrawOnlyShownLayer) return;
+            if (makeup.ShownLayer == dressedLayer) return;
+            dressedLayer = makeup.ShownLayer;
+            foreach (ARFace f in faceManager.trackables) Dress(f);
         }
 
         /// <summary>Gives a newly found face its mesh and the four colour layers.</summary>
@@ -461,7 +534,7 @@ namespace GlowUp.AR
             if (!go.TryGetComponent(out MeshRenderer faceRenderer)) faceRenderer = go.AddComponent<MeshRenderer>();
 
             var layers = new List<Material>();
-            foreach (Material layer in makeup.Layers) if (layer != null) layers.Add(layer);
+            foreach (Material layer in makeup.LayersFor(quality != null && quality.DrawOnlyShownLayer)) if (layer != null) layers.Add(layer);
             faceRenderer.sharedMaterials = layers.ToArray();    // one mesh, drawn once per layer
             faceRenderer.shadowCastingMode = ShadowCastingMode.Off;
             faceRenderer.receiveShadows = false;
@@ -487,15 +560,24 @@ namespace GlowUp.AR
             }
 
             bool seen = false;
+            ARFace tracked = null;
             foreach (ARFace face in faceManager.trackables)
-                if (face != null && face.trackingState == TrackingState.Tracking) { seen = true; break; }
+                if (face != null && face.trackingState == TrackingState.Tracking) { seen = true; tracked = face; break; }
             if (seen) lastSeen = Time.unscaledTime;
             bool hasFace = Time.unscaledTime - lastSeen <= Mathf.Max(0f, faceLostAfterSeconds);
-            if (hasFace != hadFace || !saidAnything)
-            {
-                hadFace = hasFace;
-                Say(hasFace ? msgTracking : msgLookingForFace);
-            }
+
+            // the helpers: light and mouth follow a tracked face; a lost face is held for a moment and fades
+            if (usingLight) lightAdapter.FaceVisible = seen;
+            if (usingMouth) { if (tracked != null) mouthMask.Step(tracked); else mouthMask.Lost(); }
+            bool holding = false;
+            if (usingHold) { faceHold.Step(); holding = faceHold.IsHolding; }
+            RedressWhenLayerChanged();
+
+            string say = hasFace ? msgTracking
+                : holding ? msgFaceHeld
+                : usingLight && lightAdapter.LowLight ? lightAdapter.LowLightMessage
+                : msgLookingForFace;
+            if (say != lastSaid || !saidAnything) { lastSaid = say; hadFace = hasFace; Say(say); }
         }
 
         void Say(string message)

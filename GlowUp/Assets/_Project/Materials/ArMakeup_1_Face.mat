@@ -35,6 +35,10 @@ Material:
         m_Texture: {fileID: 2800000, guid: 75a82252263b33d48a9dcfaa3c20dd75, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _MouthMask:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
     - _AlphaClip: 0
@@ -46,6 +50,7 @@ Material:
     - _DstBlend: 10
     - _DstBlendAlpha: 10
     - _Feather: 0.6
+    - _MouthOpen: 0
     - _QueueOffset: 0
     - _SampleGI: 0
     - _SrcBlend: 5

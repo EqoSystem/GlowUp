@@ -48,6 +48,7 @@ namespace GlowUp.Onboarding
 
         readonly List<Toggle> rows = new List<Toggle>();
         readonly Dictionary<Toggle, string> labels = new Dictionary<Toggle, string>();
+        readonly HashSet<Toggle> kept = new HashSet<Toggle>();     // rows the user added or that came from a saved answer: never taken away by ApplyOptions
         Toggle applyAll;
         bool suppress;
         bool built;
@@ -126,10 +127,30 @@ namespace GlowUp.Onboarding
             Build();
             var set = new HashSet<string>(values ?? new string[0], StringComparer.OrdinalIgnoreCase);
             suppress = true;
-            foreach (var v in set) if (!labels.Values.Contains(v, StringComparer.OrdinalIgnoreCase)) AddRow(v, true, rows.Count, animate: false);
+            foreach (var v in set) if (!labels.Values.Contains(v, StringComparer.OrdinalIgnoreCase)) kept.Add(AddRow(v, true, rows.Count, animate: false));
             foreach (var kv in labels) if (IsOption(kv.Key)) kv.Key.SetIsOnWithoutNotify(set.Contains(kv.Value));
             if (noneRow != null) noneRow.SetIsOnWithoutNotify(false);
             suppress = false;
+            SyncApplyAll();
+        }
+
+        /// <summary>
+        /// Makes the option rows match the admin website's list: an option that is not on it any more disappears (unless the user
+        /// ticked it, or added it themselves), and a new one gets a row before "Apply All". Does nothing for an empty list.
+        /// </summary>
+        public void ApplyOptions(IList<string> wanted)
+        {
+            if (wanted == null || wanted.Count == 0) return;
+            Build();
+            var want = new HashSet<string>(wanted, StringComparer.OrdinalIgnoreCase);
+            foreach (var row in rows.Where(r => IsOption(r) && !kept.Contains(r) && !r.isOn && !want.Contains(labels[r])).ToList())
+            {
+                rows.Remove(row); labels.Remove(row);
+                Destroy(row.gameObject);
+            }
+            int index = rows.Count;
+            foreach (string text in wanted)
+                if (!string.IsNullOrWhiteSpace(text) && !labels.Values.Contains(text, StringComparer.OrdinalIgnoreCase)) AddRow(text, false, index++);
             SyncApplyAll();
         }
 
@@ -212,6 +233,7 @@ namespace GlowUp.Onboarding
             if (labels.Values.Contains(text, StringComparer.OrdinalIgnoreCase)) { Say(msgDuplicate); return; }
             suppress = true;
             var t = AddRow(text, true, rows.Count);
+            kept.Add(t);
             if (noneRow != null) noneRow.SetIsOnWithoutNotify(false);          // an added item replaces "none"
             suppress = false;
             customInput.text = "";

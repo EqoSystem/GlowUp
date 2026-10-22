@@ -28,7 +28,8 @@ namespace GlowUp.Common
             Transform container = transform.parent;
             if (items != null && container != null)
                 foreach (RectTransform item in items)
-                    if (item != null && item != transform && item.IsChildOf(container) && !kept.Contains(item)) kept.Add(item);
+                    if (item != null && item != transform && item != container && item.IsChildOf(container)
+                        && !transform.IsChildOf(item) && !kept.Contains(item)) kept.Add(item);      // not the container, not a parent of the field
             alsoShow = kept.ToArray();
         }
     }

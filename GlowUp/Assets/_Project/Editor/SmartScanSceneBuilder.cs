@@ -260,6 +260,8 @@ namespace GlowUp.EditorTools
             holdLabel.raycastTarget = false;
             var holdButton = SceneBuilderCore.Ensure<HoldToScanButton>(disc.gameObject);
             A.Set(holdButton, "scaleTarget", disc.rectTransform);
+            // a Canvas Group on the button, so the dimming while it is locked is an object you can see in the Hierarchy and Inspector
+            A.Set(holdButton, "dimGroup", SceneBuilderCore.Ensure<CanvasGroup>(disc.gameObject));
 
             // beside the ring: start over (left) and finish (right). Both appear when there is something to start over or to finish.
             float side = (Kit.CardWidth - RingSize) * 0.5f + 28f;       // from the card's edge to the far edge of a side button
@@ -403,6 +405,36 @@ namespace GlowUp.EditorTools
             A.Set(controller, "manualPanel", manual.panel); A.Set(controller, "manualInput", manualInput);
             A.Set(controller, "manualProductInput", manualProduct); A.Set(controller, "manualBrandInput", manualBrand); A.Set(controller, "manualTypeDropdown", manualType);
             A.Set(controller, "manualAnalyseButton", manualAnalyse); A.Set(controller, "manualFeedbackText", manualFeedback);
+
+            // ---- AI photo fallback: "Product not in catalog yet!" ----
+            // The pop-up sits low on the screen so the camera picture above it stays visible while the user aims.
+            // Its logic is the "Scan Snapshot" object (ScanSnapshotController): every word and number is in its Inspector.
+            A.AppPopup snap = A.Overlay(s, "SnapshotPanel", "Not in our catalog yet");
+            A.At(snap.box, A.BC, new Vector2(0, 90), new Vector2(940, 660));
+            TextMeshProUGUI snapPrompt = A.Label(snap.box, "PromptText", "Product not in catalog yet! Tap to take a quick photo for live AI analysis.", 30,
+                                                 ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.TopLeft, true);
+            A.TopStrip(snapPrompt.transform, 124, 96, 48, 48);
+            A.ShrinkWrapped(snapPrompt, 22);
+            TextMeshProUGUI snapStatus = A.Label(snap.box, "StatusText", "Show the front of the pack, or the side with the ingredient list, inside the frame. Good light helps.", 26,
+                                                 ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            A.TopStrip(snapStatus.transform, 232, 150, 48, 48);
+            A.ShrinkWrapped(snapStatus, 20);
+            Button snapCancel = A.PillButton(snap.box, "CancelButton", "Not now", 34, ThemeRole.SurfaceAlt, ThemeRole.MainText);
+            A.BottomStrip(snapCancel.transform, 44, 112, 48, 512);
+            A.Outline(snapCancel.transform, ThemeRole.Accent, 112f);
+            Button snapTake = A.PillButton(snap.box, "TakePhotoButton", "Take photo", 34, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.CameraIcon);
+            A.BottomStrip(snapTake.transform, 44, 112, 512, 48);
+            // the spinner turns at the right end of the button while the AI reads the photo (inactive until then)
+            Image snapSpinner = A.Icon(snapTake.transform, "Spinner", IconFactory.Sync, 40, ThemeRole.ButtonText);
+            A.At(snapSpinner.transform, A.MR, new Vector2(-34, 0), new Vector2(40, 40));
+            snapSpinner.raycastTarget = false;
+            snapSpinner.gameObject.SetActive(false);
+            var snapController = SceneBuilderCore.Ensure<ScanSnapshotController>(SceneBuilderCore.EnsureRoot("Scan Snapshot"));
+            A.Set(snapController, "panel", snap.panel); A.Set(snapController, "promptText", snapPrompt); A.Set(snapController, "statusText", snapStatus);
+            A.Set(snapController, "takePhotoButton", snapTake); A.Set(snapController, "takePhotoLabel", A.LabelOf(snapTake));
+            A.Set(snapController, "spinner", snapSpinner.rectTransform); A.Set(snapController, "cancelButton", snapCancel);
+            A.Set(snapController, "cameraFeed", camera); A.Set(snapController, "frame", (RectTransform)frame.transform);
+            A.Set(controller, "snapshot", snapController);
             A.Set(controller, "textOutlines", outlines.GetComponent<TextOutlineOverlay>());
             A.Set(controller, "focusAssistant", focusAssistant); A.Set(controller, "textTrace", traceView);
             A.Set(controller, "scanReadout", readoutBack.gameObject); A.Set(controller, "scanReadoutText", readout);

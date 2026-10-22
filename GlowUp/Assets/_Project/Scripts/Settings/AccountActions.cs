@@ -130,6 +130,7 @@ namespace GlowUp.AppSettings
                 QuerySnapshot scans = await profile.Collection("scans").GetSnapshotAsync(Source.Server).OrTimeout(StepWaitSeconds, "Finding your scans");
                 var pending = new List<DocumentReference>();
                 foreach (DocumentSnapshot scan in scans.Documents) pending.Add(scan.Reference);
+                ReadCounter.AddQuery("your scans (account deletion)", pending.Count);
                 for (int i = 0; i < pending.Count; i += 400)
                 {
                     WriteBatch batch = db.StartBatch();

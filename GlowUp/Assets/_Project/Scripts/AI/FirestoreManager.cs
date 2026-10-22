@@ -55,6 +55,7 @@ public class FirestoreManager : MonoBehaviour
             if (task.IsCompleted)
             {
                 QuerySnapshot snapshot = task.Result;
+                GlowUp.Data.ReadCounter.AddQuery("ingredient look-up (WhereIn on products)", snapshot.Documents.Count());
                 DocumentSnapshot doc = snapshot.Documents.FirstOrDefault();
 
                 if (doc != null)

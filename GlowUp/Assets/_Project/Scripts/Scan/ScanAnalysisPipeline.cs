@@ -64,6 +64,7 @@ namespace GlowUp.Scan
 
             report(1, "Checking our ingredient database");
             await IngredientRepository.LoadAll();
+            await ListsRepository.Refresh();          // the allergen families and skin conditions the website lists (about one read, only when the copy is old)
             List<BrandData> brands = await BrandRepository.LoadActive();
 
             // Unknown ingredients stay explicitly unknown here. Product and ingredient facts are not researched or
@@ -151,7 +152,9 @@ namespace GlowUp.Scan
 
             report(3, "Preparing your result");
             // Save the product to the device catalogue now; signed-in users also queue a pending website entry or review suggestion.
-            try { ScannedProductPublisher.PublishIfNew(record, names, kindIsKnown); }
+            // a product staged from a photo is already in pending_products: it is not added to the inventory a second time
+            if (!record.pendingApproval)
+                try { ScannedProductPublisher.PublishIfNew(record, names, kindIsKnown); }
             catch (Exception e) { Debug.LogWarning("Adding the product to the inventory was skipped: " + e.Message); }
             // every scan is saved to Recent Scans automatically; a scan that was done again takes the earlier one's place
             bool replaced = earlier != null && ScanHistoryRepository.Replace(earlier.id, record);
@@ -216,6 +219,8 @@ namespace GlowUp.Scan
             record.listFrom = !string.IsNullOrEmpty(ScanSession.PendingListFrom) ? ScanSession.PendingListFrom
                 : record.source == "manual" ? "typed" : record.source == "lookup" ? "web" : "pack";
             record.listWebBacked = ScanSession.PendingListWebBacked;
+            // read by the AI from a photo and staged in pending_products: shown with a PENDING APPROVAL badge until an admin approves it
+            record.pendingApproval = record.listFrom == "pending";
             return kindGiven;
         }
 

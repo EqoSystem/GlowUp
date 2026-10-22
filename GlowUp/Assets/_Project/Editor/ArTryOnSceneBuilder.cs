@@ -296,6 +296,14 @@ namespace GlowUp.EditorTools
             A.Set(live, "cameraManager", arCameraManager); A.Set(live, "faceManager", faces); A.Set(live, "makeup", liveMakeup);
             A.Set(live, "display", display); A.Set(live, "viewport", viewport.rectTransform); A.Set(live, "mirrorRoot", mirror.transform);
             A.Set(live, "faceGuide", guided); A.Set(live, "beforeDisplay", beforeDisplay); A.Set(live, "statusText", status); A.Set(live, "guidedCamera", camera);
+            // ---- adaptive quality and the helpers of live tracking: each is its OWN object in the Hierarchy, named for what it does,
+            //      and every number of it is a field in its Inspector (they survive a rebuild of the scene)
+            var qualityController = SceneBuilderCore.Ensure<ArAdaptiveQuality>(SceneBuilderCore.EnsureRoot("AR Quality Controller"));
+            var lightAdapter = SceneBuilderCore.Ensure<ArLightAdapter>(SceneBuilderCore.EnsureRoot("AR Light Adapter"));
+            var faceHold = SceneBuilderCore.Ensure<ArFaceHold>(SceneBuilderCore.EnsureRoot("AR Face Hold"));
+            var mouthMask = SceneBuilderCore.Ensure<ArMouthMask>(SceneBuilderCore.EnsureRoot("AR Mouth Mask"));
+            A.Set(live, "quality", qualityController); A.Set(live, "lightAdapter", lightAdapter);
+            A.Set(live, "faceHold", faceHold); A.Set(live, "mouthMask", mouthMask);
             A.Set(controller, "liveTracking", live);
 
             A.Set(controller, "cameraFeed", camera); A.Set(controller, "makeup", makeup); A.Set(controller, "statusText", status);

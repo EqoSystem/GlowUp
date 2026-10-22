@@ -1,4 +1,5 @@
 using GlowUp.Common;
+using GlowUp.Data;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -40,10 +41,21 @@ namespace GlowUp.Onboarding
         void Start()
         {
             OnboardingSession.LoadDraft();
+            // the skin conditions on offer are the admin website's list (the built-in list while it cannot be reached)
+            ListsRepository.Changed += ApplyLists;
+            ApplyLists();
+            _ = ListsRepository.Refresh();
             if (skinTypeGroup != null && !string.IsNullOrEmpty(OnboardingSession.SkinType)) skinTypeGroup.Select(OnboardingSession.SkinType, false);
             if (conditions != null) conditions.SetSelected(OnboardingSession.SkinConditions);
             if (feedbackText != null) feedbackText.text = "";
             Refresh();
+        }
+
+        void OnDestroy() { ListsRepository.Changed -= ApplyLists; }
+
+        void ApplyLists()
+        {
+            if (this != null && conditions != null) conditions.ApplyOptions(ListsRepository.ConditionLabels());
         }
 
         void Refresh()

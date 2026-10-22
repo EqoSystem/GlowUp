@@ -53,9 +53,30 @@ namespace GlowUp.AR
         [Tooltip("The mask picture setting of the layer materials (do not change unless the materials use another shader)")]
         [SerializeField] private string maskProperty = "_BaseMap";
 
+        [Header("Mouth mask (set by ArMouthMask)")]
+        [Tooltip("The mask picture setting of the layer materials that hides the colour inside an open mouth")]
+        [SerializeField] private string mouthMaskProperty = "_MouthMask";
+        [Tooltip("How open the mouth is (0 to 1) on the layer materials")]
+        [SerializeField] private string mouthOpenProperty = "_MouthOpen";
+
         Material[] layers;                  // this scene's own copies, in the order face, cheeks, eyes, lips, highlight
         readonly Color[] shown = new Color[4];
         int shineOn = -1;
+        int shownLayer = -1;                // the layer that is drawn now (0 face, 1 cheeks, 2 eyes, 3 lips), -1 = none
+
+        // ---- set by the other AR scripts (all of them optional) ----
+        /// <summary>How present the make-up is: 1 = fully, 0 = gone. ArFaceHold lowers it while a lost face fades out.</summary>
+        public float Presence { get; set; } = 1f;
+        /// <summary>The highlight's strength follows the room's brightness (ArLightAdapter): 1 = as the finish says.</summary>
+        public float ShineGain { get; set; } = 1f;
+        /// <summary>The skin colour measured in the picture, at the brightness the layers assume (ArLightAdapter).</summary>
+        public Color SkinSample { get; set; } = Color.white;
+        /// <summary>How far the layers' assumed skin tone moves towards SkinSample (0 to 1).</summary>
+        public float SkinAdapt { get; set; }
+        /// <summary>The brightness (0 to 1) of the skin tone the layers assume.</summary>
+        public float AssumedSkinBrightness => 0.299f * skinUnderneath.r + 0.587f * skinUnderneath.g + 0.114f * skinUnderneath.b;
+        /// <summary>Changes whenever another part of the face is shown (ArFaceTrackingController redraws the face's materials then).</summary>
+        public int ShownLayer => shownLayer;
         static readonly string[] Areas = { ShadeAdvisor.Face, ShadeAdvisor.Cheeks, ShadeAdvisor.Eyes, ShadeAdvisor.Lips };
 
         /// <summary>The materials to put on the tracked face's renderer (created on first use).</summary>
@@ -83,6 +104,37 @@ namespace GlowUp.AR
             }
         }
 
+        /// <summary>
+        /// The materials to draw. With <paramref name="onlyShown"/> (the light pipeline) only the colour layer of the part being
+        /// tried and the highlight: three passes fewer for the phone's graphics chip.
+        /// </summary>
+        public Material[] LayersFor(bool onlyShown)
+        {
+            Material[] all = Layers;
+            if (!onlyShown || shownLayer < 0 || shownLayer >= 4) return all;
+            var some = new System.Collections.Generic.List<Material>();
+            if (all[shownLayer] != null) some.Add(all[shownLayer]);
+            if (all.Length > 4 && all[4] != null) some.Add(all[4]);
+            return some.ToArray();
+        }
+
+        /// <summary>The inside of an open mouth is cut out of the colour layers (ArMouthMask). The same flip as the masks is used.</summary>
+        public void SetMouth(Texture mask, float open)
+        {
+            if (layers == null) return;
+            for (int i = 0; i < 4; i++)
+            {
+                Material m = layers[i];
+                if (m == null) continue;
+                if (m.HasProperty(mouthMaskProperty))
+                {
+                    if (m.GetTexture(mouthMaskProperty) != mask) m.SetTexture(mouthMaskProperty, mask);
+                    if (flipMasksUpsideDown) { m.SetTextureScale(mouthMaskProperty, new Vector2(1f, -1f)); m.SetTextureOffset(mouthMaskProperty, new Vector2(0f, 1f)); }
+                }
+                if (m.HasProperty(mouthOpenProperty)) m.SetFloat(mouthOpenProperty, mask != null ? Mathf.Clamp01(open) : 0f);
+            }
+        }
+
         /// <summary>True when every colour layer has its material.</summary>
         public bool Ready => faceMaterial != null && cheeksMaterial != null && eyesMaterial != null && lipsMaterial != null;
 
@@ -98,13 +150,18 @@ namespace GlowUp.AR
                 if (layers[i] == null) continue;
                 bool on = has && choices.Area == Areas[i];
                 float full = Mathf.Clamp01(choices.Intensity * choices.MaxOpacityFor(Areas[i]) * strengthScale);
-                float alpha = on ? Mathf.Clamp01(full * choices.FinishOpacity) : 0f;
+                float alpha = on ? Mathf.Clamp01(full * choices.FinishOpacity) * Mathf.Clamp01(Presence) : 0f;
                 // a layer that is fading out keeps its own colour while it fades
                 var target = on ? new Color(shade.r, shade.g, shade.b, alpha) : new Color(shown[i].r, shown[i].g, shown[i].b, 0f);
                 shown[i] = Color.Lerp(shown[i], target, t);
                 layers[i].SetColor(colourProperty, shown[i]);
+                // the skin tone moves towards the measured one (not for the lips: they have their own)
+                if (i < 3 && SkinAdapt > 0.001f && layers[i].HasProperty("_SkinBase")) layers[i].SetColor("_SkinBase", Color.Lerp(skinUnderneath, SkinSample, Mathf.Clamp01(SkinAdapt)));
+                else if (i < 3 && layers[i].HasProperty("_SkinBase")) layers[i].SetColor("_SkinBase", skinUnderneath);
                 if (on) { active = i; activeShare = full > 0.001f ? Mathf.Clamp01(shown[i].a / full) : 0f; }
             }
+
+            shownLayer = has ? active : -1;
 
             // the highlight: on the part that is shown, as strong as the finish says; a sparkling finish makes it twinkle
             Material shine = layers.Length > 4 ? layers[4] : null;
@@ -116,7 +173,7 @@ namespace GlowUp.AR
             }
             float twinkle = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * choices.TwinkleSpeed);
             float strength = active >= 0 && shineOn == active
-                ? activeShare * choices.Intensity * (choices.FinishShine + choices.FinishGlitter * 0.6f * twinkle) * shineStrength : 0f;
+                ? activeShare * choices.Intensity * (choices.FinishShine + choices.FinishGlitter * 0.6f * twinkle) * shineStrength * ShineGain * Mathf.Clamp01(Presence) : 0f;
             shine.SetColor(colourProperty, new Color(1f, 1f, 1f, Mathf.Clamp01(strength)));
         }
 

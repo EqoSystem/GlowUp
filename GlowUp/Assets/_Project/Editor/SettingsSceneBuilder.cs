@@ -169,6 +169,17 @@ namespace GlowUp.EditorTools
             TextMeshProUGUI frameStatus = A.Label(frameBlock.transform, "StatusText", "60 frames per second: smoother animations, uses more battery.",
                                                   RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
 
+            // AR Try-On quality: which of the two AR pipelines runs (Automatic decides from the phone and a frame-rate check)
+            Divider(appearance);
+            GameObject arBlock = Block(appearance, "ArQualityBlock");
+            A.Label(arBlock.transform, "Title", "AR Try-On quality", RowTitle, ThemeRole.MainText, FontRole.Label);
+            ChoiceTabs arTabs = Tabs(arBlock.transform, "ArQualityTabs", new[] { "Automatic", "High", "Lighter" }, 0, out _, 32);
+            TextMeshProUGUI arStatus = A.Label(arBlock.transform, "StatusText",
+                "This phone: 4 GB memory, 8-core processor. AR Try-On uses the full pipeline (chosen for it automatically).\nDense face tracking, soft blending, light that follows the room, and make-up that stays off your teeth.",
+                RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            var arQuality = Feature<ArQualitySetting>(features, "ArQualitySetting");
+            A.Set(arQuality, "tabs", arTabs); A.Set(arQuality, "statusText", arStatus);
+
             var quality = Feature<GraphicsQualitySetting>(features, "GraphicsQualitySetting");
             A.Set(quality, "modeTabs", qualityTabs); A.Set(quality, "statusText", qualityStatus); A.Set(quality, "detectButton", detect);
             A.Set(quality, "profile", performanceProfile);

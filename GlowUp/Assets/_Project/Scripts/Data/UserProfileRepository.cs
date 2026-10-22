@@ -93,6 +93,7 @@ namespace GlowUp.Data
                 {
                     var snap = await FirebaseFirestore.DefaultInstance.Collection("users").Document(uid).GetSnapshotAsync()
                         .OrTimeout(Current != null ? 6f : 20f, "Loading your profile");
+                    if (!snap.Metadata.IsFromCache) ReadCounter.Add("user profile document", 1);      // an answer from the phone's own store is not a billed read
                     bool fromCloud = !snap.Metadata.IsFromCache;
                     if (fromCloud) ConnectivityMonitor.ReportAnswer();
                     NoProfileInCloud = fromCloud && !snap.Exists;

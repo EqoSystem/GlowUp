@@ -41,6 +41,10 @@ namespace GlowUp.Onboarding
         void Start()
         {
             OnboardingSession.LoadDraft();
+            // the allergen families on offer are the admin website's list (the built-in list while it cannot be reached)
+            ListsRepository.Changed += ApplyLists;
+            ApplyLists();
+            _ = ListsRepository.Refresh();
             if (allergens != null)
             {
                 // coming back to this step: show the answer given before
@@ -50,6 +54,13 @@ namespace GlowUp.Onboarding
             }
             if (feedbackText != null) feedbackText.text = "";
             Refresh();
+        }
+
+        void OnDestroy() { ListsRepository.Changed -= ApplyLists; }
+
+        void ApplyLists()
+        {
+            if (this != null && allergens != null) allergens.ApplyOptions(ListsRepository.AllergenLabels());
         }
 
         /// <summary>True once the user has answered: an allergen / sensitivity, or "No known allergens".</summary>

@@ -28,6 +28,22 @@ namespace GlowUp.Data
         static List<ProductData> usable;
         static ProductIndex usableIndex, everyIndex;
 
+        // ---- server look-ups, kept for the session (cleared when the catalogue changes, and by Settings > Download now)
+        const int BrandQueryLimit = 100;                  // the largest brand in the Oct 12 backup had 35 products
+        const int BrandPageCap = 5;                       // at most 5 pages of BrandQueryLimit per query
+        const float NotFoundMinutes = 3f;                 // a "not found" answer is trusted this long, and then asked again
+
+        /// <summary>One answer of the server: the product, or null = it was not found (then `at` says when).</summary>
+        class Looked { public ProductData product; public float at; }
+        class OfBrand { public List<ProductData> products; public float at; }
+
+        static readonly Dictionary<string, Looked> lookupCache = new Dictionary<string, Looked>();                  // "brand|name" -> answer
+        static readonly Dictionary<string, OfBrand> brandCache = new Dictionary<string, OfBrand>();                 // brand -> its usable products, fetched once
+        static readonly Dictionary<string, Task<List<ProductData>>> brandFetching = new Dictionary<string, Task<List<ProductData>>>();
+
+        static void ClearLookups() { lookupCache.Clear(); brandCache.Clear(); }
+        static string LookupKey(string brandName, string productName) => TextKey.Normalize(brandName) + "|" + TextKey.Normalize(productName);
+
         /// <summary>
         /// The products the app may use (make-up, Active, brand Active), from the copy on the phone. When that copy has not
         /// been checked for a while and the phone is online, what changed is downloaded first.
@@ -35,6 +51,7 @@ namespace GlowUp.Data
         /// <param name="everything">download the whole list now, whatever its age (Settings > Download now)</param>
         public static async Task<List<ProductData>> LoadActive(bool everything = false)
         {
+            if (everything) ClearLookups();                        // Settings > Download now: nothing asked earlier is trusted any more
             FromPhone();
             await Refresh(everything);
             await BrandRepository.LoadActive(everything);          // a product is only offered while its brand is Active on the website
@@ -93,7 +110,7 @@ namespace GlowUp.Data
         public static void AliasesChanged() { usableIndex = null; }
 
         /// <summary>Called by BrandRepository when a brand was switched on or off: the usable products change with it.</summary>
-        public static void BrandsChanged() { usable = null; usableIndex = null; }
+        public static void BrandsChanged() { usable = null; usableIndex = null; ClearLookups(); }
 
         static async Task Refresh(bool everything)
         {
@@ -136,6 +153,7 @@ namespace GlowUp.Data
                 lastCheck = Time.realtimeSinceStartup;
                 OfflineCache.Save(CacheKey, holder);
                 Changed();
+                ClearLookups();                 // the catalogue just changed: earlier answers (also "not found") may be out of date
             }
             catch (Exception e) { TaskLimits.NoteFailure(e); Debug.LogWarning("Product sync failed, using the saved copy: " + e.Message); }
         }
@@ -148,25 +166,64 @@ namespace GlowUp.Data
         {
             brandName = (brandName ?? "").Trim();
             productName = (productName ?? "").Trim();
-            if (brandName.Length < 2 || productName.Length < 2) return null;
+            if (TextKey.Normalize(brandName).Length < 2 || productName.Length < 2) return null;       // nothing to ask the server with
+
+            // asked before this session: a found product stays valid; "not found" is trusted for NotFoundMinutes
+            string key = LookupKey(brandName, productName);
+            bool retryAfterMiss = false;
+            if (lookupCache.TryGetValue(key, out Looked earlier))
+            {
+                if (earlier.product != null || Time.realtimeSinceStartup - earlier.at < NotFoundMinutes * 60f) return earlier.product;
+                retryAfterMiss = true;                              // the miss is old: ask the server again (with a fresh list of the brand)
+            }
             if (!ConnectivityMonitor.Reachable) throw new InvalidOperationException("Firebase product lookup requires an internet connection.");
             if (!await FirebaseBootstrap.Ready) throw new InvalidOperationException("Firebase is not ready for product lookup.");
 
+            List<ProductData> ofBrand = await ProductsOfBrand(brandName, retryAfterMiss);      // one fetch per brand, whatever the product name is
+            List<ProductIndex.Candidate> found = ProductIndex.Build(ofBrand).Search(brandName, productName, 3);
+            foreach (ProductIndex.Candidate candidate in found)
+                if (candidate != null && candidate.product != null && (candidate.exactName || candidate.score >= ProductIndex.Sure))
+                {
+                    AddLocal(candidate.product);
+                    lookupCache[key] = new Looked { product = candidate.product, at = Time.realtimeSinceStartup };
+                    return candidate.product;
+                }
+            lookupCache[key] = new Looked { product = null, at = Time.realtimeSinceStartup };       // asked and not found: not asked again for a while
+            return null;
+        }
+
+        /// <summary>The usable products of one brand, from the server: one fetch per brand (name variants and parallel callers share it).</summary>
+        /// <param name="refresh">a "not found" answer for this brand has expired: a list older than NotFoundMinutes is fetched again</param>
+        static async Task<List<ProductData>> ProductsOfBrand(string brandName, bool refresh)
+        {
+            string brandKey = TextKey.Normalize(brandName);
+            if (brandCache.TryGetValue(brandKey, out OfBrand have) && !(refresh && Time.realtimeSinceStartup - have.at >= NotFoundMinutes * 60f)) return have.products;
+            if (!brandFetching.TryGetValue(brandKey, out Task<List<ProductData>> task))
+            {
+                task = FetchBrand(brandName, brandKey);
+                brandFetching[brandKey] = task;
+            }
+            try { return await task; }
+            finally { brandFetching.Remove(brandKey); }
+        }
+
+        static async Task<List<ProductData>> FetchBrand(string brandName, string brandKey)
+        {
             CollectionReference products = FirebaseFirestore.DefaultInstance.Collection("products");
             var brandNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { brandName };
             BrandData knownBrand = BrandRepository.FindByName(brandName);
             if (knownBrand != null && !string.IsNullOrWhiteSpace(knownBrand.name)) brandNames.Add(knownBrand.name.Trim());
-            var queries = new List<Task<QuerySnapshot>>();
+            var queries = new List<Task<List<DocumentSnapshot>>>();
             foreach (string name in brandNames)
             {
-                queries.Add(products.WhereEqualTo("brandName", name).GetSnapshotAsync(Source.Server));
-                queries.Add(products.WhereEqualTo("product_identification.brand", name).GetSnapshotAsync(Source.Server));
+                queries.Add(AllPages(products.WhereEqualTo("brandName", name), "products of brand \"" + name + "\" (brandName)"));
+                queries.Add(AllPages(products.WhereEqualTo("product_identification.brand", name), "products of brand \"" + name + "\" (product_identification.brand)"));
             }
-            QuerySnapshot[] snapshots = await Task.WhenAll(queries).OrTimeout(12f, "Looking up this product in Firebase");
+            List<DocumentSnapshot>[] answers = await Task.WhenAll(queries).OrTimeout(12f, "Looking up this product in Firebase");
 
             var matches = new Dictionary<string, ProductData>(StringComparer.Ordinal);
-            foreach (QuerySnapshot result in snapshots)
-                foreach (DocumentSnapshot document in result.Documents)
+            foreach (List<DocumentSnapshot> documents in answers)
+                foreach (DocumentSnapshot document in documents)
                 {
                     ProductData product = Read(document);
                     if (product == null || product.binned || !string.Equals(product.status, "Active", StringComparison.OrdinalIgnoreCase)
@@ -175,15 +232,31 @@ namespace GlowUp.Data
                         || !GlowUp.Scan.ProductScope.IsMakeup(product.cosmeticType, product.name)) continue;
                     matches[product.id] = product;
                 }
+            var list = new List<ProductData>(matches.Values);
+            brandCache[brandKey] = new OfBrand { products = list, at = Time.realtimeSinceStartup };
+            return list;
+        }
 
-            List<ProductIndex.Candidate> found = ProductIndex.Build(matches.Values).Search(brandName, productName, 3);
-            foreach (ProductIndex.Candidate candidate in found)
-                if (candidate != null && candidate.product != null && (candidate.exactName || candidate.score >= ProductIndex.Sure))
+        /// <summary>One query in pages of BrandQueryLimit. A page of exactly the limit may have more behind it: the next page is fetched, up to BrandPageCap pages.</summary>
+        static async Task<List<DocumentSnapshot>> AllPages(Query query, string label)
+        {
+            var all = new List<DocumentSnapshot>();
+            Query page = query.Limit(BrandQueryLimit);
+            for (int i = 0; i < BrandPageCap; i++)
+            {
+                QuerySnapshot snapshot = await page.GetSnapshotAsync(Source.Server);
+                ReadCounter.AddQuery(label, snapshot.Count);
+                foreach (DocumentSnapshot document in snapshot.Documents) all.Add(document);
+                if (snapshot.Count < BrandQueryLimit) return all;
+                if (i == BrandPageCap - 1)
                 {
-                    AddLocal(candidate.product);
-                    return candidate.product;
+                    Debug.LogWarning("Product look-up: " + label + " still had more after " + BrandPageCap + " pages of " + BrandQueryLimit + "; the list may be incomplete.");
+                    break;
                 }
-            return null;
+                Debug.LogWarning("Product look-up: " + label + " returned exactly " + BrandQueryLimit + " documents; fetching the next page.");
+                page = query.StartAfter(all[all.Count - 1]).Limit(BrandQueryLimit);
+            }
+            return all;
         }
 
         /// <summary>One product document. Null for a document without a name.</summary>
@@ -226,6 +299,7 @@ namespace GlowUp.Data
             holder.items.Add(product);
             OfflineCache.Save(CacheKey, holder);
             Changed();
+            lookupCache.Remove(LookupKey(product.brandName, product.name));      // only this product's own answer; the brands' lists stay
         }
 
         /// <summary>Adds 1 to the product's scan counter (the "App Scans" column on the admin website).</summary>

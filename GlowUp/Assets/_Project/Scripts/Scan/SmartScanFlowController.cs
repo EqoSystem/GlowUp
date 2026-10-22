@@ -86,6 +86,16 @@ namespace GlowUp.Scan
         [SerializeField] private string lookUpIdleLabel = "Look it up";
         [SerializeField] private string lookUpWorkingLabel = "Looking it up...";
 
+        [Header("AI photo fallback: a product the catalogue does not have")]
+        [Tooltip("The Scan Snapshot object (its own object in the Hierarchy, with every number and word in its Inspector)")]
+        [SerializeField] private ScanSnapshotController snapshot;
+        [Tooltip("On = when the catalogue has no such product (and no other user has staged it), the photo pop-up is offered")]
+        [SerializeField] private bool offerSnapshotOnCatalogMiss = true;
+        [Tooltip("On = when the scan is stuck and no product has been named, the photo pop-up is offered once")]
+        [SerializeField] private bool offerSnapshotWhenStuck = true;
+        [SerializeField] private string msgSnapshotStuck = "Not getting further? Take one photo of the pack and the AI will read it.";
+        [SerializeField] private string msgFoundStaged = "Found it among products other users sent. It is waiting for an admin's approval.";
+
         [Header("Recognising a product without the AI")]
         [Tooltip("The pop-up \"Is it one of these?\" with its search box")]
         [SerializeField] private ScanShortlistView shortlist;
@@ -127,6 +137,8 @@ namespace GlowUp.Scan
         [Header("Reading")]
         [Tooltip("How many camera pictures a second are checked while scanning (the text reader takes the newest one whenever it is free)")]
         [Range(2f, 24f)] [SerializeField] private float looksPerSecond = 12f;
+        [Tooltip("The product's brand and name read from the label must be the same (ignoring case and spacing) on two readings in a row, at least this many seconds apart, before the server is asked. Typed names and the Look up button never wait.")]
+        [Min(0f)] [SerializeField] private float lookupStableSeconds = 0.5f;
         [Tooltip("Longest side, in pixels, of the picture given to the text reader (smaller = faster)")]
         [SerializeField] private int readPictureSize = 900;
         [Tooltip("After this many pictures in a row that looked out of focus, one is read anyway (and the camera is asked to focus again): the text reader then decides")]
@@ -170,6 +182,30 @@ namespace GlowUp.Scan
         [Header("The scan button's words")]
         [SerializeField] private string scanIdleLabel = "Tap to scan";
         [SerializeField] private string scanPauseLabel = "Tap to pause";
+
+        [Header("The Start Scan button: locked while the app is busy")]
+        [Tooltip("On = from the moment the button is tapped until the result is ready, the button takes no more taps, looks dimmed, and the ring keeps moving. Two taps in a row can never start two scans.")]
+        [SerializeField] private bool lockButtonWhileBusy = true;
+        [Tooltip("The words on the button while the camera is starting")]
+        [SerializeField] private string startingLabel = "Starting...";
+        [Tooltip("The words on the button while the product is being analyzed (and while the result screen is being opened)")]
+        [SerializeField] private string busyLabel = "Analyzing...";
+
+        [Header("When the scan is stuck: what to try next")]
+        [Tooltip("Said one after the other (every few seconds) once the scan is not getting further. Say what the user can do: more light, a clean lens, a steady hand, typing the name in.")]
+        [SerializeField] private string[] stuckTips =
+        {
+            "Try more light: turn towards a window, or switch the flashlight on.",
+            "Wipe the camera lens with a soft cloth.",
+            "Hold the phone steady, about 15 to 20 cm from the label, and let it focus.",
+            "Still nothing? Tap Type it in and write the product's name."
+        };
+        [Tooltip("Seconds between two tips")]
+        [Min(1f)] [SerializeField] private float stuckTipSeconds = 4f;
+        [Tooltip("On = the Type it in button pulses gently while tips are shown, so the way out is easy to see")]
+        [SerializeField] private bool pulseManualButtonWhenStuck = true;
+        [Tooltip("How big the pulse is (0.05 = 5 percent)")]
+        [Range(0f, 0.2f)] [SerializeField] private float manualPulseSize = 0.05f;
         [SerializeField] private string finishNormalLabel = "Finish";
         [Tooltip("The Finish button's words after nobody could name the product (it must stay short: the button is narrow)")]
         [SerializeField] private string finishUnnamedLabel = "Finish anyway";
@@ -272,6 +308,8 @@ namespace GlowUp.Scan
 
         // ---------------------------------------------------------------------------------------
         Stage stage = Stage.Idle;
+        bool snapshotOffered;                        // the photo pop-up is offered at most once per scan
+        float stuckTipTimer; int stuckTipIndex;
         FrameReader reader;
         readonly ScanEvidence evidence = new ScanEvidence();
         readonly ScanGuidance.Words words = new ScanGuidance.Words();
@@ -319,6 +357,8 @@ namespace GlowUp.Scan
         bool shortlistAnswered;                   // the shortlist was shown in this attempt and the user said "none of these"
         string frontChecked = "";                 // the text of the front the product list was last asked about
         string firebaseLookupKey = "";
+        string stableKey = ""; float stableSince;     // the name the label gave on the last reading, and when it first showed
+        bool readCounterStarted;                      // the first scan of this screen was told to ReadCounter
         string barcode = "";
         string ingredientText, ingredientSource = "scan";
         string listFrom = "";                     // where the ingredient list came from: "pack", "inventory", "web" or "typed"
@@ -343,6 +383,7 @@ namespace GlowUp.Scan
             if (sameProductButton != null) sameProductButton.onClick.AddListener(() => { ClosePanel(startOverPanel); StartOver(true, msgSameAgain); });
             if (differentProductButton != null) differentProductButton.onClick.AddListener(() => { ClosePanel(startOverPanel); StartOver(false, msgStartedOver); });
             if (manualEntryButton != null) manualEntryButton.onClick.AddListener(OpenManual);
+            if (snapshot != null) { snapshot.Analysed += OnSnapshotAnalysed; snapshot.NameOnly += OnSnapshotNameOnly; }
             if (manualAnalyseButton != null) manualAnalyseButton.onClick.AddListener(AnalyseManual);
             if (lookUpButton != null) lookUpButton.onClick.AddListener(LookUp);
             if (backButton != null) backButton.onClick.AddListener(() => { StopCamera(); SceneNavigator.Go(backScene); });
@@ -409,6 +450,7 @@ namespace GlowUp.Scan
 
         void OnDestroy()
         {
+            if (snapshot != null) { snapshot.Analysed -= OnSnapshotAnalysed; snapshot.NameOnly -= OnSnapshotNameOnly; }
             if (cameraFeed != null) cameraFeed.Started -= OnCameraStarted;
             if (holdButton != null) { holdButton.ScanStarted -= OnScanStarted; holdButton.ScanPaused -= OnScanPaused; }
         }
@@ -423,6 +465,7 @@ namespace GlowUp.Scan
                 // the first tap switches the camera on; later taps pause or resume the scan
                 stage = Stage.Starting;
                 Say(msgStarting);
+                PaintButtonState();                          // locked at once: no second tap while the camera starts
                 if (cameraFeed != null) cameraFeed.StartCamera(); else OnCameraStarted(false, "No camera view in this scene.");
             }
             pausedFor = 0f; sinceProgress = 0f; stalledSaid = false;
@@ -440,13 +483,16 @@ namespace GlowUp.Scan
             {
                 stage = Stage.Idle;
                 if (holdButton != null) holdButton.LetGo();
-                Say(message + " You can type the product in instead.");
+                PaintButtonState();
+                Say(message + " Check that GlowUp may use the camera in the phone's settings, or type the product in instead.");
                 return;
             }
             if (idlePlaceholder != null) idlePlaceholder.SetActive(false);
             if (guide != null) guide.SetState(ScanGuideOverlay.State.Searching);
             stage = Stage.Scanning;
+            if (!readCounterStarted) { readCounterStarted = true; ReadCounter.NewScan(); }
             nextLook = 0f; pausedFor = 0f; sinceProgress = 0f;
+            PaintButtonState();
             ShowGuidance();
         }
 
@@ -477,6 +523,16 @@ namespace GlowUp.Scan
         // ---------------------------------------------------------------------------------------
         //  While scanning: one look at the camera after another
         // ---------------------------------------------------------------------------------------
+        /// <summary>While the scan is stuck, the Type it in button pulses gently: it is the way out.</summary>
+        void LateUpdate()
+        {
+            if (manualEntryButton == null) return;
+            bool pulse = pulseManualButtonWhenStuck && stalledSaid && stage == Stage.Scanning;
+            float size = pulse ? 1f + manualPulseSize * (0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 4f)) : 1f;
+            Transform t = manualEntryButton.transform;
+            if (!Mathf.Approximately(t.localScale.x, size)) t.localScale = Vector3.one * size;
+        }
+
         void Update()
         {
             if (stage != Stage.Scanning) return;
@@ -503,7 +559,16 @@ namespace GlowUp.Scan
             }
             pausedFor = 0f;
             sinceProgress += Time.unscaledDeltaTime;
-            if (!stalledSaid && sinceProgress > stallSeconds) { stalledSaid = true; Say(msgStalled); ShowButtons(); }
+            if (!stalledSaid && sinceProgress > stallSeconds)
+            {
+                stalledSaid = true; stuckTipTimer = 0f; stuckTipIndex = 0; Say(msgStalled); ShowButtons();
+                if (offerSnapshotWhenStuck && !ProductKnown) OfferSnapshot(msgSnapshotStuck);
+            }
+            if (stalledSaid && stuckTips != null && stuckTips.Length > 0)
+            {
+                stuckTipTimer += Time.unscaledDeltaTime;
+                if (stuckTipTimer >= stuckTipSeconds) { stuckTipTimer = 0f; Say(stuckTips[stuckTipIndex % stuckTips.Length]); stuckTipIndex++; }
+            }
             scanningFor += Time.unscaledDeltaTime;
             if (cameraFeed == null || !cameraFeed.IsPlaying) return;
             if (reader == null || !reader.Available) { if (shownStatus != msgReaderMissing) { Say(msgReaderMissing); shownStatus = msgReaderMissing; } return; }
@@ -708,7 +773,7 @@ namespace GlowUp.Scan
                 if (whole != null) Adopt(whole);
             }
             if (knownProduct == null) ReadPrimaryIdentityFromOcr();
-            StartFirebaseProductLookup();
+            StartFirebaseProductLookup(false);
             // ---- the look of the pack: a product this phone has scanned before. The app ASKS ("Is this ...?"), it does not decide.
             if (identity.shadeName.Length == 0 && evidence.ShadeText.Length > 0) identity.shadeName = evidence.ShadeText;
 
@@ -800,12 +865,26 @@ namespace GlowUp.Scan
         // ---------------------------------------------------------------------------------------
         //  What is said on screen
         // ---------------------------------------------------------------------------------------
+        /// <summary>
+        /// The Start Scan button's state, in one place: while the camera starts or the product is analyzed it is LOCKED (no
+        /// taps, dimmed, "Starting..." / "Analyzing..." on it, the ring keeps moving); otherwise it says "Tap to scan" or "Tap to pause".
+        /// </summary>
+        void PaintButtonState()
+        {
+            bool busy = stage == Stage.Starting || stage == Stage.Recognising || stage == Stage.Leaving;
+            bool locked = lockButtonWhileBusy && busy;
+            if (holdButton != null) holdButton.TapsIgnored = locked;
+            bool scanning = stage == Stage.Scanning && holdButton != null && holdButton.IsScanning;
+            if (ring != null) ring.SetScanning(scanning || locked);
+            if (scanButtonLabel != null)
+                scanButtonLabel.text = locked ? (stage == Stage.Starting ? startingLabel : busyLabel) : (scanning ? scanPauseLabel : scanIdleLabel);
+        }
+
         void ShowGuidance()
         {
-            if (ring != null) ring.SetScanning(IsScanning);
+            PaintButtonState();
             if (stage == Stage.Leaving || stage == Stage.Recognising) return;
             bool scanning = stage == Stage.Scanning && holdButton != null && holdButton.IsScanning;
-            if (scanButtonLabel != null) scanButtonLabel.text = scanning ? scanPauseLabel : scanIdleLabel;
             if (stage != Stage.Scanning) return;
 
             // the status line. A message that was said in its place stays until the status itself changes.
@@ -838,6 +917,7 @@ namespace GlowUp.Scan
         /// </summary>
         void ShowButtons()
         {
+            PaintButtonState();
             bool busy = stage == Stage.Recognising || stage == Stage.Leaving;
             bool scanning = stage == Stage.Scanning && holdButton != null && holdButton.IsScanning;
             bool listComplete = ingredientText != null;
@@ -936,11 +1016,20 @@ namespace GlowUp.Scan
             if (best.Length > 0) identity.productName = best;
         }
 
-        void StartFirebaseProductLookup()
+        /// <param name="confirmed">the name was settled by a step that already checked it (shortlist, AI answer, list lookup): no wait</param>
+        void StartFirebaseProductLookup(bool confirmed)
         {
             if (stage != Stage.Scanning || firebaseLookupOut || knownProduct != null || identity.brandName.Length < 2 || identity.productName.Length < 2) return;
             string key = TextKey.Normalize(identity.brandName) + "|" + TextKey.Normalize(identity.productName);
             if (key == firebaseLookupKey) return;
+            // the label is read piece by piece and often misread: the per-reading call asks the server only when the same brand and name
+            // showed up on two readings in a row, lookupStableSeconds apart (the first sighting only starts the clock).
+            // A label that never reads the same twice is covered by the Look up button and manual type-in, which never wait.
+            if (!confirmed)
+            {
+                if (key != stableKey) { stableKey = key; stableSince = Time.unscaledTime; return; }
+                if (Time.unscaledTime - stableSince < lookupStableSeconds) return;
+            }
             firebaseLookupKey = key;
             firebaseLookupOut = true;
             FirebaseProductLookup(identity.brandName, identity.productName, scanNumber, key);
@@ -968,12 +1057,21 @@ namespace GlowUp.Scan
                     }
                 }
 
+                // not in the catalogue: another user may have staged it from a photo (at most one read; none when looked at recently)
+                if (product == null)
+                {
+                    PendingProductData staged = await PendingProductRepository.FindAsync(brand, name);
+                    if (this == null || scan != scanNumber || stage != Stage.Scanning) return;
+                    if (staged != null && staged.ingredients.Count > 0) { Say(msgFoundStaged); UseStaged(staged); return; }
+                }
+
                 if (await SearchWebAfterCatalogueMiss(brand, name, scan)) return;
                 if (this != null && scan == scanNumber && stage == Stage.Scanning)
                     Say(!ConnectivityMonitor.Online ? msgFirebaseUnavailable
                         : AiCanLook ? msgWebNoMatch
                         : !ProductAiAdvisor.Available ? msgAiUnavailable
                         : product == null ? msgFirebaseMiss : msgFirebaseNoIngredients);
+                if (product == null && offerSnapshotOnCatalogMiss && this != null && scan == scanNumber && stage == Stage.Scanning) OfferSnapshot(null);
             }
             catch (Exception e)
             {
@@ -1276,7 +1374,8 @@ namespace GlowUp.Scan
             UseLookedUpList(knownProduct.ingredients, ListPagesOf(knownProduct), "inventory", false);
         }
 
-        bool PopupOpen => (shortlist != null && shortlist.IsOpen) || (startOverPanel != null && startOverPanel.IsOpen) || (manualPanel != null && manualPanel.IsOpen);
+        bool PopupOpen => (shortlist != null && shortlist.IsOpen) || (startOverPanel != null && startOverPanel.IsOpen) || (manualPanel != null && manualPanel.IsOpen)
+                          || (snapshot != null && snapshot.IsOpen);
 
         /// <summary>What the app's own lists suggest for this scan: by the words read on the front, and by the look of the pack.</summary>
         List<ScanShortlist.Entry> Suggestions()
@@ -1395,12 +1494,14 @@ namespace GlowUp.Scan
         /// </summary>
         void StartOver(bool sameProduct, string message)
         {
+            snapshotOffered = false;
             evidence.Reset();
             for (int i = 0; i < best.Length; i++) best[i] = null;
             ingredientText = null; ingredientSource = "scan"; listFrom = ""; listWebBacked = false; sources.Clear();
             barcode = ""; lastColour = "";
             declined.Clear(); shortlistAnswered = false; frontChecked = "";
             scanNumber++;
+            ReadCounter.NewScan();
             fault = FrameQuality.Fault.None; blurrySkips = 0; differentSeen = 0; sinceProgress = 0f; stalledSaid = false; pausedFor = 0f;
             finishUnnamed = false; lookingUp = false; lookupRequested = false; shownStatus = null; messageOver = null; lastHint = "";
             lock (answerLock) { answerWaiting = false; answerReading = null; }
@@ -1411,7 +1512,7 @@ namespace GlowUp.Scan
             if (textOutlines != null) textOutlines.Clear();
             // the AI's early look, the web check and the look for the shade belong to the scan before (scanNumber tells their answers so)
             scanningFor = 0f; earlyTook = webTook = -1f;
-            firebaseLookupOut = false; firebaseLookupKey = "";
+            firebaseLookupOut = false; firebaseLookupKey = ""; stableKey = "";
             earlyAsked = earlyOut = webAsked = webOut = shadeOut = aiNamed = capSaid = false;
             earlyJpg = null; webList = null;
             capWatch.Reset();
@@ -1527,7 +1628,7 @@ namespace GlowUp.Scan
         /// A named product without a stored list is checked online once. AI visual guesses are confirmed against the
         /// photo; names from OCR, barcode or the user are checked as typed product names. Only a source-backed list is used.
         /// </summary>
-        void MaybeCheckTheWeb() { StartFirebaseProductLookup(); }
+        void MaybeCheckTheWeb() { StartFirebaseProductLookup(true); }
 
         async void WebCheck()
         {
@@ -2005,6 +2106,52 @@ namespace GlowUp.Scan
 
         /// <param name="kind">"inventory" (the app's own product list) or "web" (looked up online)</param>
         /// <param name="webBacked">a list from the web came with pages a live web search really opened</param>
+        // ---------------------------------------------------------------------------------------
+        //  The AI photo fallback (ScanSnapshotController)
+        // ---------------------------------------------------------------------------------------
+        void OfferSnapshot(string why)
+        {
+            if (snapshot == null || snapshotOffered || stage != Stage.Scanning) return;
+            snapshotOffered = true;
+            if (holdButton != null) holdButton.LetGo();        // reading pauses while the pop-up is open
+            snapshot.Offer(why, identity.brandName, identity.productName);        // the live scan comes first; what it read goes along as a hint
+        }
+
+        void OnSnapshotAnalysed(ProductData listed, PendingProductData staged)
+        {
+            if (stage == Stage.Leaving || stage == Stage.Recognising) return;
+            if (listed != null)
+            {
+                Adopt(listed);
+                ShowIdentity();
+                if (HasStoredList(listed)) UseLookedUpList(listed.ingredients, ListPagesOf(listed), "inventory", false);
+                else Say(msgFirebaseNoIngredients);
+                return;
+            }
+            if (staged != null) UseStaged(staged);
+        }
+
+        void OnSnapshotNameOnly(ProductAiAdvisor.Identity who)
+        {
+            if (who == null || stage == Stage.Leaving) return;
+            if (identity.brandName.Length == 0) identity.brandName = who.brandName ?? "";
+            if (identity.productName.Length == 0) identity.productName = who.productName ?? "";
+            if (identity.cosmeticType.Length == 0) identity.cosmeticType = who.cosmeticType ?? "";
+            if (identity.shadeHex.Length == 0 && !string.IsNullOrEmpty(who.shadeHex)) identity.shadeHex = who.shadeHex;
+            ShowIdentity();
+        }
+
+        /// <summary>A staged product (waiting for approval) with its list: analysed at once, the result says PENDING APPROVAL.</summary>
+        void UseStaged(PendingProductData staged)
+        {
+            if (!string.IsNullOrEmpty(staged.brandName)) identity.brandName = staged.brandName;
+            if (!string.IsNullOrEmpty(staged.name)) identity.productName = staged.name;
+            if (!string.IsNullOrEmpty(staged.cosmeticType)) identity.cosmeticType = staged.cosmeticType;
+            if (identity.shadeHex.Length == 0 && !string.IsNullOrEmpty(staged.shadeHex)) identity.shadeHex = staged.shadeHex;
+            ShowIdentity();
+            UseLookedUpList(staged.ingredients, new List<string>(), "pending", false);
+        }
+
         void UseLookedUpList(List<string> ingredients, List<string> from, string kind, bool webBacked)
         {
             ingredientText = string.Join(", ", ingredients);
@@ -2147,6 +2294,7 @@ namespace GlowUp.Scan
         void AnalyseTypedList(string text, string typedName, string typedBrand, string typedType)
         {
             stage = Stage.Leaving;
+            PaintButtonState();
             StopCamera();
             ScanSession.PendingText = text; ScanSession.PendingSource = "manual"; ScanSession.PendingShadeHex = identity.shadeHex;
             ScanSession.PendingListFrom = "typed"; ScanSession.PendingListWebBacked = false;
