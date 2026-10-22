@@ -56,7 +56,9 @@ const AUTO_APPROVE_AI = true;
  * of glowupRules.js, the same in the app). Any other web page, and pages the AI only named from memory, do not count.
  */
 const CREDIBLE_KINDS = ["regulator", "medical", "reference"];
-const hasCredibleSource = (item) => !!item.fdaUnii || (item.webSearched && item.sources.some((s) => CREDIBLE_KINDS.includes(sourceKind(s, ""))));
+// an entry that came from a document import or a user's photo (item.via) is NEVER approved by itself: a person has to look at it
+const NEVER_AUTO = ["document-import", "snapshot"];
+const hasCredibleSource = (item) => !NEVER_AUTO.includes(item.via) && (!!item.fdaUnii || (item.webSearched && item.sources.some((s) => CREDIBLE_KINDS.includes(sourceKind(s, "")))));
 
 let everyIngredient = [];             // every document, also the ones in the Recycle bin
 let ingredients = [];                 // listed: [{ id, name, techName, description, ... }]
@@ -276,6 +278,7 @@ async function loadIngredients() {
                 reviewed: data.reviewed === true,
                 sources: Array.isArray(data.sources) ? data.sources.map((s) => String(s)) : [],
                 fdaUnii: String(data.fdaUnii || "").trim(),
+                via: String(data.via || "").trim().toLowerCase(),
                 webSearched: data.webSearched === true,
                 autoApproved: data.autoApproved === true,
                 folder: cleanFolder(data.folder),

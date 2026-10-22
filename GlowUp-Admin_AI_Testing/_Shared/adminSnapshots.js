@@ -68,7 +68,7 @@ export async function loadPending() {
         return {
             id: d.id, name: String(data.name || ""), brandName: String(data.brandName || ""), cosmeticType: String(data.cosmeticType || ""),
             shadeHex: cleanHex(data.shadeHex), ingredients: asArray(data.ingredients).map(String), hasImage: data.hasImage === true,
-            model: String(data.model || ""), confidence: Number(data.confidence) || 0, createdAtUnix: Number(data.createdAtUnix) || 0,
+            model: String(data.model || ""), confidence: Number(data.confidence) || 0, createdAtUnix: Number(data.createdAtUnix) || 0, createdByUid: String(data.createdByUid || ""),
             variant: String(data.variant || "").slice(0, 60), size: String(data.size || "").slice(0, 40), sourceUrls: httpsLinks(data.sourceUrls)
         };
     }).sort((a, b) => b.createdAtUnix - a.createdAtUnix);
@@ -85,10 +85,12 @@ export function httpsLinks(value) {
 }
 
 /** The photo of a snapshot as a data address ("" when there is none). One read. */
-export async function loadPhoto(id) {
+export async function loadPhoto(id, senderUid) {
     const snapshot = await getDoc(doc(db, "pending_product_images", id));
     noteReads("pending_product_images", 1);
-    const data = snapshot.exists() ? String(snapshot.data().jpegBase64 || "") : "";
+    // a photo is shown only when the same account sent it and the entry (older entries have no sender: shown as before)
+    const sameSender = snapshot.exists() && (!senderUid || String(snapshot.data().createdByUid || "") === senderUid);
+    const data = sameSender ? String(snapshot.data().jpegBase64 || "") : "";
     return data && /^[A-Za-z0-9+/=]+$/.test(data) ? "data:image/jpeg;base64," + data : "";
 }
 
@@ -372,7 +374,7 @@ export function openSnapshotReview(options) {
                 frame.replaceChildren(img);
             };
             if (photos.has(entry.id)) show(photos.get(entry.id));
-            else loadPhoto(entry.id).then((src) => { photos.set(entry.id, src); if (frame.isConnected) show(src); })
+            else loadPhoto(entry.id, entry.createdByUid).then((src) => { photos.set(entry.id, src); if (frame.isConnected) show(src); })
                 .catch((error) => { if (frame.isConnected) frame.textContent = "The photo could not be read. " + describeError(error); });
         }
 
