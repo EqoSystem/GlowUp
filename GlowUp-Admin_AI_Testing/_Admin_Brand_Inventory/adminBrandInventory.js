@@ -65,7 +65,7 @@ const SHOWN_INGREDIENTS = 16;               // names listed in a product's detai
 const VIEW_KEY = "glowup.inventory.view.v1";
 // true = when this page opens, the products of the FDA Philippines catalogue (../_Shared/data/fdaCatalogue.json) that are not
 //        in the inventory yet are added by themselves, without a question. false = only the "..." menu adds them, after a question.
-const AUTO_ADD_FDA_CATALOGUE = true;
+const AUTO_ADD_FDA_CATALOGUE = false;      // off since 2026-10-22: a brand or product deleted for good came back at the next visit of the page
 let catalogueChecked = false;               // the catalogue is looked at once per visit of the page
 // true = a product the app added from a scan is approved by itself (set to Active, with its brand) when the app found it on the
 //        FDA Philippines list of notified cosmetics and that notification is still valid. Everything else keeps waiting for review.
