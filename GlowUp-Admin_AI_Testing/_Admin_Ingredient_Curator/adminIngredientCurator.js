@@ -60,7 +60,10 @@ const CREDIBLE_KINDS = ["regulator", "medical", "reference"];
 const NEVER_AUTO = ["document-import", "snapshot"];
 // ... and it needs a SOURCE LINK of a widely known dermatology, pharmacy or regulator site (CREDIBLE_KINDS above). A claim written into the
 // entry itself (a UNII code, "searched the web") is not enough: only the link counts, and sourceKind judges the real host of the address.
-const hasCredibleSource = (item) => !NEVER_AUTO.includes(item.via) && item.sources.some((s) => CREDIBLE_KINDS.includes(sourceKind(s, "")));
+// Only a WARNING (caution or harmful) is approved by itself: a false warning does little harm, but "safe" or an empty level on a
+// fabricated entry could hide a harmful ingredient, so those wait for a person.
+const hasCredibleSource = (item) => !NEVER_AUTO.includes(item.via) && (item.riskLevel === "caution" || item.riskLevel === "harmful")
+    && item.sources.some((s) => CREDIBLE_KINDS.includes(sourceKind(s, "")));
 
 let everyIngredient = [];             // every document, also the ones in the Recycle bin
 let ingredients = [];                 // listed: [{ id, name, techName, description, ... }]

@@ -29,7 +29,6 @@ namespace GlowUp.Auth
         [SerializeField] private Button forgotPasswordButton;
         [SerializeField] private Button signUpButton;
         [SerializeField] private Button googleButton;
-        [SerializeField] private Button facebookButton;
         [SerializeField] private Button privacyPolicyButton;
         [SerializeField] private Button termsButton;
         [SerializeField] private TextMeshProUGUI legalEntryText;
@@ -37,7 +36,7 @@ namespace GlowUp.Auth
         [Header("Scenes")]
         [SerializeField] private string dashboardScene = SceneNames.Dashboard;
         [SerializeField] private string onboardingScene = SceneNames.Onboarding1;
-        [Tooltip("Where someone who signed in with Google or Facebook goes when they have no skin profile yet (the skin quiz; Step 1 is skipped because the account already exists)")]
+        [Tooltip("Where someone who signed in with Google goes when they have no skin profile yet (the skin quiz; Step 1 is skipped because the account already exists)")]
         [SerializeField] private string socialOnboardingScene = SceneNames.Onboarding2;
         [SerializeField] private bool autoSkipIfSignedIn = true;
 
@@ -68,7 +67,7 @@ namespace GlowUp.Auth
             ClearField(emailInput); ClearField(passwordInput);
 
             Hook(signInButton, SignIn); Hook(forgotPasswordButton, ForgotPassword); Hook(signUpButton, SignUp);
-            Hook(googleButton, () => Social("Google", SocialSignIn.Google)); Hook(facebookButton, () => Social("Facebook", SocialSignIn.Facebook));
+            Hook(googleButton, () => Social("Google"));
             if (privacyPolicyButton != null) Hook(privacyPolicyButton, OpenLegalDocuments);
             if (termsButton != null && termsButton != privacyPolicyButton) Hook(termsButton, OpenLegalDocuments);
             if (privacyPolicyButton == null && termsButton == null)
@@ -125,7 +124,7 @@ namespace GlowUp.Auth
                         catch (Exception e) { Debug.LogWarning("Session restore: " + e.Message); }
                         if (this == null) return;
                     }
-                    // a Google or Facebook account that never finished the skin quiz carries on with it
+                    // a Google account that never finished the skin quiz carries on with it
                     if (!HasSkinProfile(profile) && SocialSignIn.ProviderOf(user) != SocialSignIn.Password) { StartSocialSignUp(user); return; }
                     // a sign-up that was begun on this phone and not finished (Step 1 made its account to confirm the email) carries on there
                     OnboardingSession.LoadDraft();
@@ -239,11 +238,10 @@ namespace GlowUp.Auth
 
         bool socialBusy;
 
-        /// <summary>The Google and Facebook buttons. A first-time user goes on to the sign-up steps (without the password part).</summary>
-        async void Social(string name, string provider)
+        /// <summary>The Google button. A first-time user goes on to the sign-up steps (without the password part).</summary>
+        async void Social(string name)
         {
             if (socialBusy) return;
-            if (provider == SocialSignIn.Facebook && !SocialSignIn.FacebookInstalled) { Fail(string.Format(msgSocialNotConfigured, name)); return; }
             if (!ConnectivityMonitor.Online) { Fail(string.Format(msgSocialNeedsOnline, name)); return; }
 
             socialBusy = true;
@@ -251,7 +249,7 @@ namespace GlowUp.Auth
             try
             {
                 if (!await FirebaseBootstrap.Ready) { Fail(string.Format(msgSocialNotConfigured, name)); return; }
-                SocialSignIn.Outcome outcome = provider == SocialSignIn.Google ? await SocialSignIn.WithGoogle() : await SocialSignIn.WithFacebook();
+                SocialSignIn.Outcome outcome = await SocialSignIn.WithGoogle();
                 if (this == null) return;
                 if (outcome.Cancelled) { Show(""); return; }
                 if (!outcome.Ok) { Fail(outcome.Problem); return; }

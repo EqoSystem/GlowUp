@@ -97,13 +97,20 @@ namespace GlowUp.Data
             }
         }
 
-        /// <summary>The id of the staged entry of a product: "snap_" + brand + "__" + name, letters and digits only.</summary>
+        /// <summary>
+        /// The id of the staged entry of a product for THIS account: "snap_" + brand + "__" + name + "__" + the account's id, at most 110
+        /// characters (the name part is cut, never the account id). Every user has an entry of their own, so nobody can block anybody
+        /// by staging a product first. "" when nobody is signed in.
+        /// </summary>
         public static string IdFor(string brandName, string productName)
         {
+            string uid = UserProfileRepository.CurrentUid;
             string brand = TextKey.Slug(brandName), name = TextKey.Slug(productName);
-            if (name.Length == 0) return "";
-            string id = "snap_" + (brand.Length > 0 ? brand : "nobrand") + "__" + name;
-            return id.Length > 110 ? id.Substring(0, 110) : id;
+            if (name.Length == 0 || string.IsNullOrEmpty(uid)) return "";
+            string tail = "__" + uid;
+            string head = "snap_" + (brand.Length > 0 ? brand : "nobrand") + "__" + name;
+            int room = 110 - tail.Length;
+            return (head.Length > room ? head.Substring(0, room) : head) + tail;
         }
 
         static long Now => DateTimeOffset.UtcNow.ToUnixTimeSeconds();

@@ -99,7 +99,8 @@ namespace GlowUp.EditorTools
             var oldInstagram = Kit.Loose(ct, "InstagramSignInButton");   // removed on request
             if (oldInstagram != null) Object.DestroyImmediate(oldInstagram.gameObject);
             var google = Social(ct, "GoogleSignInButton", IconFactory.Google);
-            var facebook = Social(ct, "FacebookSignInButton", IconFactory.Facebook);
+            var oldFacebook = Kit.Loose(ct, "FacebookSignInButton");     // removed on request: Google is the only social sign-in
+            if (oldFacebook != null) Object.DestroyImmediate(oldFacebook.gameObject);
             // Replace any old external-link buttons with one in-app, read-only entry to both legal documents.
             foreach (string gone in new[] { "PrivacyPolicyLink", "TermsAndConditionsLink" })
             { var old = Kit.Loose(ct, gone); if (old != null) Object.DestroyImmediate(old.gameObject); }
@@ -150,7 +151,7 @@ namespace GlowUp.EditorTools
 
             // "or continue with" + round icon buttons, close together, right under Sign In
             TopAt(orText.transform, card, 0, y, 600, 50); Kit.SetText(orText, null, SmallFont, TextAlignmentOptions.Center); y += 50 + 20;
-            Button[] social = { google, facebook };
+            Button[] social = { google };
             for (int i = 0; i < social.Length; i++)
                 TopAt(social[i].transform, card, (i - (social.Length - 1) / 2f) * (SocialSize + SocialGap), y, SocialSize, SocialSize);
 
@@ -179,7 +180,6 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(flow, "forgotPasswordButton", forgotBtn);
             SceneBuilderCore.SetField(flow, "signUpButton", signUpBtn);
             SceneBuilderCore.SetField(flow, "googleButton", google);
-            SceneBuilderCore.SetField(flow, "facebookButton", facebook);
             SceneBuilderCore.SetField(flow, "legalEntryText", termsText != null ? termsText.GetComponent<TextMeshProUGUI>() : null);
 
             ThemeKit.FinishScene();       // canvas scaler, paper background, input text, round shapes, fonts, colours

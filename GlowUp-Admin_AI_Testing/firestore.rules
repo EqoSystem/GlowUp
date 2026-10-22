@@ -55,7 +55,7 @@ service cloud.firestore {
       return list.size() <= i || (list[i] is string && list[i].size() <= 300 && list[i].matches('https://[^ ]+'));
     }
 
-    // The id of a staged product is made from its brand and name: "snap_<brand>__<name>", each as lower-case letters and digits with "_"
+    // The id of a staged product is made from its brand, its name and the sender: "snap_<brand>__<name>__<uid>", brand and name each as lower-case letters and digits with "_"
     // between the words (PendingProductRepository.IdFor in the app). Nobody can stage a product under another product's id: for names in
     // plain ASCII the id must be exactly what the brand and the name make (cut at 110 characters). A name with accents or another alphabet
     // is folded by the app in a way these rules cannot repeat, so for those the id only has to match the stored key.
@@ -69,11 +69,16 @@ service cloud.firestore {
       let b = slugOf(brand);
       return 'snap_' + (b == '' ? 'nobrand' : b) + '__' + slugOf(name);
     }
-    function idFitsNames(id, data) {
+    // The id ends with "__" + the sender's account id, so every user has an entry of their own and nobody can block another user by staging
+    // a product first. The name part is cut so that the whole id is at most 110 characters.
+    function idFitsNames(id, data, uid) {
+      let tail = '__' + uid;
+      let base = id.replace(tail + '$', '');
       return id == 'snap_' + data.key
+        && id.matches('snap_.+' + tail)
         && (!(plainAscii(data.brandName) && plainAscii(data.name))
-            || id == stagedId(data.brandName, data.name)
-            || (id.size() == 110 && id.matches('[a-z0-9_]+') && stagedId(data.brandName, data.name).matches(id + '.*')));
+            || base == stagedId(data.brandName, data.name)
+            || (base.size() == 110 - tail.size() && base.matches('[a-z0-9_]+') && stagedId(data.brandName, data.name).matches(base + '.*')));
     }
 
     // the UTC day as 20261022: the quota documents are named with it, so a client cannot pick another day
@@ -281,7 +286,7 @@ service cloud.firestore {
       allow create: if signedIn()
         && pendingId.matches('snap_.+') && pendingId.size() <= 110
         && request.resource.data.key is string && request.resource.data.name is string && request.resource.data.brandName is string
-        && idFitsNames(pendingId, request.resource.data)
+        && idFitsNames(pendingId, request.resource.data, request.auth.uid)
         && request.resource.data.keys().hasOnly(['name', 'brandName', 'cosmeticType', 'shadeHex', 'ingredients', 'key', 'status', 'source',
              'isApproved', 'hasImage', 'confidence', 'model', 'createdByUid', 'createdAtUnix', 'variant', 'size', 'sourceUrls'])
         && request.resource.data.createdByUid == request.auth.uid

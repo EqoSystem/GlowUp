@@ -11,7 +11,7 @@ namespace GlowUp.Auth
     ///
     /// Only email addresses are kept, on this phone only, newest first, five at most. NEVER A PASSWORD. An address gets
     /// here when somebody signs in with email and password (online or offline) or finishes signing up with one; a
-    /// Google / Facebook sign-in does not, because that account is not opened by typing its email. The user can take an
+    /// Google sign-in does not, because that account is not opened by typing its email. The user can take an
     /// address off the list on the log-in page; deleting the account takes it off too.
     ///
     /// With / Without are plain logic (covered by SavedAccountsTests); the rest reads and writes the small file.
