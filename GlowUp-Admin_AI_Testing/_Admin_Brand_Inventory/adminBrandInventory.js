@@ -50,6 +50,7 @@ import { mountIngredientPicker } from "../_Shared/adminIngredientPicker.js";
 import { openFacets } from "../_Shared/adminFacets.js";
 import { EXPORT_MAX_ROWS, EXPORT_FILE_PREFIX, toCsv, downloadCsv, today } from "../_Shared/adminExport.js";
 import { countPending, openSnapshotReview } from "../_Shared/adminSnapshots.js";
+import { gs1Hint, VERIFIED_BY_GS1 } from "../_Shared/gs1Hint.js";
 
 const OTHER_TYPE = "__other__";
 const NO_BRAND = "__none__";                // the group for products whose brand no longer exists
@@ -147,6 +148,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     registerData();                   // before the page frame: a saved layout may hold panels that show this data
     mountShell("inventory");
     wireSignOut();
+    wireWebsiteAndGs1Buttons();
     setupNavigationGuard();
     await requireAdmin();
 
@@ -403,6 +405,11 @@ async function loadInventory() {
                 autoApproved: data.autoApproved === true,     // approved by this page itself (the FDA Philippines list confirmed it)
                 aliases: asArray(data.aliases),               // other ways the name is written (kept when two entries are merged)
                 logoUrl: String(data.logoUrl || ""),          // the brand's logo and picture: web addresses only
+                // the brand's own website: "website" is set ONLY by an admin who confirmed it (then its pages are labelled
+                // "Manufacturer's own site"); "websiteSuggested" is what Assist with AI or an import proposed, not trusted
+                website: String(data.website || ""),
+                websiteSuggested: String(data.websiteSuggested || ""),
+                websiteConfirmedAt: toDate(data.websiteConfirmedAt),
                 imageUrl: String(data.imageUrl || ""),
                 addedAt: madeAt(data)
             }, binFields(data));
@@ -561,14 +568,14 @@ function fillReviewFilter() {
     select.value = wanted;
 }
 
-/** The brand a source must belong to, to count as the maker's own site: a product's brand, or a brand's own name. */
-const brandOfEntry = (entry) => ("brandName" in entry ? entry.brandName : entry.name) || "";
+/** The CONFIRMED website whose pages count as the maker's own site: the product's brand's, or the brand's own. */
+const websiteOfEntry = (entry) => ("brandId" in entry ? (brandOf(entry) || {}).website : entry.website) || "";
 
 /** Where an entry came from and whether an admin has checked it, as HTML ("" for an entry typed here). */
 function originText(entry) {
     const origin = originLabel(entry.source) || (entry.needsReview ? "Added automatically" : "");
     if (!origin) return "";
-    const links = sourceLinks(entry.sources || [], brandOfEntry(entry));
+    const links = sourceLinks(entry.sources || [], websiteOfEntry(entry));
     const state = entry.needsReview ? " · needs review" : entry.reviewed ? " · reviewed" : "";
     return escapeHtml(origin + state) + (links ? " · " + links : "");
 }
@@ -629,6 +636,7 @@ function paintInventoryDrafts() {
         const fields = draft.kind === "brand"
             ? `<label class="field">Market <input data-draft-field="market" value="${escapeHtml(draft.draft.market || draft.item.market || "")}" maxlength="40"></label>
                <label class="field">Aliases (comma separated) <input data-draft-field="aliases" value="${escapeHtml((draft.draft.aliases || []).join(", "))}" maxlength="400"></label>`
+              + (draft.draft.websiteSuggested ? `<p class="field-hint">Suggested official website: <code class="small">${escapeHtml(draft.draft.websiteSuggested)}</code>${draft.draft.websiteSeenInSources ? " (a page the AI used is on it)" : " (no page the AI used is on it)"}. Approving keeps it as a SUGGESTION only: confirm it on the Brand form before its pages count as the maker's.</p>` : "")
             : `<label class="field">Ingredient list <textarea data-draft-field="ingredients" rows="4">${escapeHtml((draft.draft.ingredients || []).join(", "))}</textarea></label>`;
         const sources = draft.kind === "brand" ? assistProductSourceLinks(draft.sources) : assistProductSourceLinks(draft.sources);
         return `<article class="suggestion-card" data-draft-index="${index}">
@@ -665,8 +673,8 @@ async function assistSelectedInventory(keys) {
         if (inventoryAiDrafts.some((draft) => draft.key === draftKey)) continue;
         try {
             const payload = entry.kind === "brand"
-                ? { mode: "brand", name: entry.item.name }
-                : { mode: "product", brandName: entry.item.brandName, productName: entry.item.name };
+                ? { mode: "brand", name: entry.item.name, brandWebsite: entry.item.website || "" }
+                : { mode: "product", brandName: entry.item.brandName, productName: entry.item.name, brandWebsite: websiteOfEntry(entry.item) };
             const body = await askInventoryAi(payload);
             if (!body.found) throw new Error(body.message || "No sourced draft was found.");
             inventoryAiDrafts.push({ key: draftKey, kind: entry.kind, item: entry.item, draft: body.draft, sources: body.sources || body.draft.sources || [], model: body.model, searched: body.searched });
@@ -700,6 +708,7 @@ async function approveInventoryDrafts() {
             const market = card.querySelector('[data-draft-field="market"]').value.trim();
             const data = { aliases: mergedAliases, aiAssistModel: entry.model || "", aiAssistSources: entry.sources.map((source) => source.url).filter(Boolean), updatedAt: serverTimestamp() };
             if (!brand.market && market) data.market = market;
+            if (!brand.website && entry.draft && entry.draft.websiteSuggested) data.websiteSuggested = entry.draft.websiteSuggested;
             if (brand.needsReview) Object.assign(data, approval());
             ops.push({ ref: doc(db, "brands", brand.id), data });
             approvedBrandIds.add(brand.id);
@@ -779,7 +788,7 @@ async function assistProductIngredients() {
     setBusy(button, true, "Searching...");
     note.textContent = "Searching for the exact product and ingredient list. This may take up to a minute.";
     try {
-        const body = await askInventoryAi({ mode: "product", brandName: brand.name, productName });
+        const body = await askInventoryAi({ mode: "product", brandName: brand.name, productName, brandWebsite: brand.website || "" });
         if (!dialogIsOpen() || el("productNameInput").value.trim() !== productName || el("productBrandInput").value !== brand.id) return;
         if (!body.found || !body.draft || !Array.isArray(body.draft.ingredients) || body.draft.ingredients.length === 0) {
             note.innerHTML = `<b>No ingredient-list draft was found.</b> ${escapeHtml(body.message || "Check the package or try another spelling.")}<br>${assistProductSourceLinks(body.sources)}`;
@@ -794,7 +803,7 @@ async function assistProductIngredients() {
         assistedProductSources = Array.from(new Set(assistedProductSources.concat(sources))).slice(0, 10);
         showIngredientSummary();
         note.innerHTML = `<b>AI draft only; nothing is saved yet.</b> Compare the list against the package before saving.`
-            + (body.searched === false ? ` <b>${escapeHtml(body.model || "A backup AI")} answered without web search; it gave no verified sources.</b>` : "")
+            + (body.searched === false ? ` <b>${escapeHtml(body.model || "A backup AI")} answered without web search; it gave no source pages.</b>` : "")
             + `<br><b>Sources:</b><br>${assistProductSourceLinks(body.sources)}`
             + (body.notes && body.notes.length ? `<br><span class="field-hint">Provider notes: ${escapeHtml(body.notes.join("; "))}.</span>` : "");
     } catch (error) {
@@ -806,32 +815,40 @@ async function assistProductIngredients() {
 }
 
 async function importInventoryFile(file) {
-    const status = el("inventoryImportStatus"), choose = el("chooseInventoryFileBtn"), dropbox = el("inventoryDropBox");
+    const status = el("inventoryImportStatus"), choose = el("chooseInventoryFileBtn"), dropbox = el("inventoryDropBox"), flagsBox = el("inventoryImportFlags");
     const report = (message, failed) => { status.textContent = message; status.classList.toggle("error", !!failed); };
     setBusy(choose, true, "Analyzing...");
     dropbox.disabled = true;
+    showImportFlags(flagsBox, []);
     report(`Reading "${file.name}" in this browser...`, false);
     try {
         const documentText = await readAdminDocument(file);
         report("Asking the configured AI to extract brand and product fields. The file itself is not uploaded.", false);
         const body = await askInventoryAi({ mode: "import", documentText });
-        if (!body.found || !body.draft || !Array.isArray(body.draft.products) || body.draft.products.length === 0) {
-            report(body.message || "No product records were found. Nothing was saved.", true);
+        const records = body.draft && Array.isArray(body.draft.products) ? body.draft.products : [];
+        const brandRecords = body.draft && Array.isArray(body.draft.brands) ? body.draft.brands : [];
+        if (records.length === 0 && brandRecords.length === 0) {
+            report(body.message || "No product or brand records were found. Nothing was saved.", true);
             return;
         }
-        const result = await saveImportedProducts(body.draft.products);
-        if (result.savedProducts === 0) {
-            report(`Nothing new was saved. ${result.skippedDuplicates} duplicate(s), ${result.skippedScope} out-of-scope product(s), and ${result.skippedInvalid} incomplete record(s) were skipped.`, true);
+        const result = await saveImportedProducts(records, brandRecords, file.name);
+        showImportFlags(flagsBox, result.flagged);
+        const flaggedOut = result.flagged.filter((f) => !f.saved).length;
+        if (result.savedProducts === 0 && result.savedBrands === 0 && result.suggestedLists === 0) {
+            report(`Nothing new was saved. ${result.skippedDuplicates} duplicate(s), ${flaggedOut} flagged as not make-up (see below), and ${result.skippedInvalid} incomplete record(s) were skipped.`, true);
+            if (flaggedOut) notify(`${many(flaggedOut, "record was", "records were")} flagged as skin care or not make-up and not saved.`, "warn");
             return;
         }
         const provider = body.model ? ` Analyzed by ${body.model}.` : "";
-        const skipped = result.skippedDuplicates + result.skippedScope + result.skippedInvalid;
+        const skipped = result.skippedDuplicates + result.skippedInvalid;
         const summary = `Saved ${many(result.savedProducts, "product", "products")} as Pending for review`
             + (result.savedBrands ? ` and ${many(result.savedBrands, "new brand", "new brands")}` : "")
-            + (skipped ? `; skipped ${skipped} duplicate, incomplete, or out-of-scope record(s)` : "")
+            + (result.suggestedLists ? `; ${many(result.suggestedLists, "ingredient list was", "ingredient lists were")} sent to the review queue for products that had none` : "")
+            + (flaggedOut ? `; ${flaggedOut} flagged as skin care or not make-up and NOT saved (see below)` : "")
+            + (skipped ? `; skipped ${skipped} duplicate or incomplete record(s)` : "")
             + `. ${result.withFdaLink} product(s) included an FDA Philippines source link.${provider}`;
         report(summary, false);
-        notify(summary, "ok");
+        notify(summary, flaggedOut ? "warn" : "ok");
         await loadInventory();
     } catch (error) {
         console.error("Importing the inventory file failed: ", error);
@@ -844,61 +861,126 @@ async function importInventoryFile(file) {
     }
 }
 
-async function saveImportedProducts(records) {
+/**
+ * The records an import FLAGGED, under the drop box: skin care and other non-make-up records (not saved: GlowUp lists
+ * make-up only) and make-up whose kind the rule cannot tell (saved as Pending; the app hides it until its kind is set).
+ */
+function showImportFlags(box, flagged) {
+    if (!box) return;
+    box.hidden = flagged.length === 0;
+    if (flagged.length === 0) { box.innerHTML = ""; return; }
+    const out = flagged.filter((f) => !f.saved), unclear = flagged.filter((f) => f.saved);
+    const line = (f) => `<li><b>${escapeHtml(f.name)}</b>${f.brandName ? " (" + escapeHtml(f.brandName) + ")" : ""}${f.cosmeticType ? ", " + escapeHtml(f.cosmeticType) : ""}: ${escapeHtml(f.why)}</li>`;
+    box.innerHTML = (out.length ? `<span class="chip warn">Flagged: skin care or not make-up</span> Not saved. GlowUp lists make-up only.<ul>${out.map(line).join("")}</ul>` : "")
+        + (unclear.length ? `<span class="chip review">Flagged: kind not clear</span> Saved as Pending; open each one and choose its make-up kind, or move it to the Recycle bin.<ul>${unclear.map(line).join("")}</ul>` : "");
+}
+
+/**
+ * Writes what an import found. NEW entries only, all Pending and not reviewed; an existing entry is never changed. The
+ * one exception goes through the existing review queue: an existing product WITHOUT an ingredient list gets the imported
+ * list as a suggestion (productIngredientSuggestions), which an admin applies or dismisses.
+ */
+async function saveImportedProducts(records, brandRecords, fileName) {
     const batch = writeBatch(db);
     const newBrands = new Map();
     const plannedProducts = new Set();
-    let savedProducts = 0, skippedDuplicates = 0, skippedScope = 0, skippedInvalid = 0, withFdaLink = 0;
+    const flagged = [];
+    const uid = auth.currentUser ? auth.currentUser.uid : "";
+    let savedProducts = 0, skippedDuplicates = 0, skippedInvalid = 0, withFdaLink = 0, suggestedLists = 0, writes = 0;
+    const clean = (value, most) => String(value || "").replace(/\s+/g, " ").trim().slice(0, most);
+    const names = (list, most, count) => Array.from(new Map((Array.isArray(list) ? list : []).map((v) => clean(v, most)).filter(Boolean).map((v) => [sameKey(v), v])).values()).slice(0, count);
+    const knownBrand = (name) => everyBrand.find((item) => [item.name, ...item.aliases].some((known) => sameKey(known) === sameKey(name)));
+
+    /** A new Pending brand from what the document says about it (its website only as a SUGGESTION). */
+    const addBrand = (name, info) => {
+        const ref = doc(collection(db, "brands"));
+        const brand = { id: ref.id, name, ref };
+        newBrands.set(sameKey(name), brand);
+        const data = {
+            name, category: "Makeup", market: clean(info.market, 40) || "Global", status: "Pending", scans: 0,
+            aliases: names(info.aliases, 60, 6).filter((alias) => sameKey(alias) !== sameKey(name)),
+            source: "document-import", reviewed: false, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+        };
+        const logoUrl = cleanLink(info.logoUrl), imageUrl = cleanLink(info.imageUrl), suggested = cleanLink(info.websiteSuggested);
+        if (logoUrl) data.logoUrl = logoUrl;
+        if (imageUrl) data.imageUrl = imageUrl;
+        if (suggested && plainLink(suggested)) data.websiteSuggested = suggested;
+        batch.set(ref, data);
+        writes++;
+        return brand;
+    };
 
     records.slice(0, 40).forEach((record) => {
-        const brandName = String(record.brandName || "").replace(/\s+/g, " ").trim().slice(0, 60);
-        const name = String(record.productName || "").replace(/\s+/g, " ").trim().slice(0, 100);
-        const cosmeticType = String(record.cosmeticType || "").replace(/\s+/g, " ").trim().slice(0, 60);
+        const brandName = clean(record.brandName, 60);
+        const name = clean(record.productName, 100);
+        const cosmeticType = clean(record.cosmeticType, 60);
         if (brandName.length < 2 || !name) { skippedInvalid++; return; }
         const scope = productScope(cosmeticType, name);
-        if (scope === "out" || scope === "skincare") { skippedScope++; return; }
-
-        let brand = everyBrand.find((item) => [item.name, ...item.aliases].some((known) => sameKey(known) === sameKey(brandName)));
-        if (brand && brand.binned) { skippedDuplicates++; return; }
-        if (!brand) {
-            brand = newBrands.get(sameKey(brandName));
-            if (!brand) {
-                const ref = doc(collection(db, "brands"));
-                brand = { id: ref.id, name: brandName, ref };
-                newBrands.set(sameKey(brandName), brand);
-                batch.set(ref, {
-                    name: brandName, category: "Makeup", market: "Global", status: "Pending", scans: 0,
-                    source: "document-import", reviewed: false, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-                });
-            }
-        }
-
-        const key = brand.id + "|" + compactName(name);
-        if (plannedProducts.has(key) || everyProduct.some((item) => item.brandId === brand.id && [item.name, ...item.aliases].some((known) => compactName(known) === compactName(name)))) {
-            skippedDuplicates++;
+        // skin care and other non-make-up records are FLAGGED and not saved (make-up only)
+        if (scope === "out" || scope === "skincare") {
+            flagged.push({ name, brandName, cosmeticType, saved: false, why: scope === "skincare" ? `skin care (${scopeWords(cosmeticType, name)})` : `not make-up (${scopeWords(cosmeticType, name)})` });
             return;
         }
-        plannedProducts.add(key);
+
+        let brand = knownBrand(brandName);
+        if (brand && brand.binned) { skippedDuplicates++; return; }
+        if (!brand) brand = newBrands.get(sameKey(brandName)) || addBrand(brandName, { market: record.brandMarket, aliases: record.brandAliases, logoUrl: record.brandLogoUrl, imageUrl: record.brandImageUrl, websiteSuggested: record.brandWebsiteSuggested });
+
         const ingredients = (Array.isArray(record.ingredients) ? record.ingredients : []).map((item) => String(item).trim().slice(0, 100)).filter(Boolean).slice(0, 80);
-        const shades = Array.from(new Set((Array.isArray(record.shades) ? record.shades : []).map(cleanShade).filter((shade) => shade !== null))).slice(0, MAX_SHADES);
         const sources = Array.from(new Set((Array.isArray(record.sources) ? record.sources : []).filter((source) => /^https:\/\//i.test(String(source))))).slice(0, 10);
         if (record.fdaVerifiedLink && /^https:\/\/([a-z0-9-]+\.)*fda\.gov\.ph\//i.test(record.fdaVerifiedLink)) {
             const link = `FDA Philippines verification | ${record.fdaVerifiedLink}`;
             if (!sources.includes(link) && sources.length < 10) sources.unshift(link);
-            withFdaLink++;
         }
-        const ref = doc(collection(db, "products"));
-        batch.set(ref, {
+
+        const key = brand.id + "|" + compactName(name);
+        const existing = everyProduct.find((item) => item.brandId === brand.id && [item.name, ...item.aliases].some((known) => compactName(known) === compactName(name)));
+        if (plannedProducts.has(key) || existing) {
+            // an existing product with NO ingredient list: the imported list goes to the review queue (once)
+            const queued = existing && ingredientSuggestions.some((s) => s.productId === existing.id);
+            if (existing && !existing.binned && existing.ingredients.length === 0 && ingredients.length >= 3 && !queued) {
+                batch.set(doc(collection(db, "productIngredientSuggestions")), {
+                    productId: existing.id, productName: existing.name, brandName: brand.name, ingredients,
+                    sources: sources.length ? sources : [`Imported document: ${clean(fileName, 80)}`],
+                    source: "document-import", status: "Pending", reviewed: false, addedBy: uid, addedAtUnix: Math.floor(Date.now() / 1000)
+                });
+                writes++;
+                suggestedLists++;
+            } else skippedDuplicates++;
+            return;
+        }
+        plannedProducts.add(key);
+        if (scope === "unclear") flagged.push({ name, brandName, cosmeticType, saved: true, why: scopeWords(cosmeticType, name) || "its make-up kind is not clear" });
+        if (sources.some((s) => /fda\.gov\.ph/i.test(s))) withFdaLink++;
+        const shades = Array.from(new Set((Array.isArray(record.shades) ? record.shades : []).map(cleanShade).filter((shade) => shade !== null))).slice(0, MAX_SHADES);
+        const data = {
             name, brandId: brand.id, brandName: brand.name, cosmeticType, description: String(record.description || "").slice(0, 400),
-            ingredients, shades, sources, minAge: 0, status: "Pending", scans: 0, folder: "",
+            aliases: names(record.productAliases, 100, 6).filter((alias) => compactName(alias) !== compactName(name)),
+            ingredients, shades, sources, minAge: Number.isInteger(record.minAge) && record.minAge > 0 && record.minAge < 100 ? record.minAge : 0,
+            status: "Pending", scans: 0, folder: "",
             source: "document-import", reviewed: false, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-        });
+        };
+        const barcode = barcodeKey(record.barcode || "");
+        if (barcode) data.barcode = barcode;
+        const imageUrl = cleanLink(record.imageUrl);
+        if (imageUrl) data.imageUrl = imageUrl;
+        batch.set(doc(collection(db, "products")), data);
+        writes++;
         savedProducts++;
     });
 
-    if (savedProducts === 0) return { savedProducts, savedBrands: 0, skippedDuplicates, skippedScope, skippedInvalid, withFdaLink };
+    // records about a brand only: a NEW brand at most (an existing brand is never changed by an import)
+    (Array.isArray(brandRecords) ? brandRecords : []).slice(0, 40).forEach((record) => {
+        const name = clean(record.name, 60);
+        if (name.length < 2) { skippedInvalid++; return; }
+        if (knownBrand(name) || newBrands.has(sameKey(name))) { skippedDuplicates++; return; }
+        addBrand(name, record);
+    });
+
+    const result = { savedProducts, savedBrands: newBrands.size, suggestedLists, skippedDuplicates, skippedInvalid, withFdaLink, flagged };
+    if (writes === 0) return Object.assign(result, { savedBrands: 0 });
     await batch.commit();
-    return { savedProducts, savedBrands: newBrands.size, skippedDuplicates, skippedScope, skippedInvalid, withFdaLink };
+    return result;
 }
 
 const productsOf = (brandId) => products.filter((p) => p.brandId === brandId);
@@ -925,8 +1007,15 @@ function cleanShade(value) {
     let text = String(value || "").trim().toUpperCase();
     const rgb = text.match(/^RGB\(\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*\)$/);
     if (rgb) return [1, 2, 3].every((i) => Number(rgb[i]) <= 255) ? "#" + [1, 2, 3].map((i) => Number(rgb[i]).toString(16).padStart(2, "0")).join("").toUpperCase() : null;
-    if (text && text[0] !== "#") text = "#" + text;
-    if (/^#[0-9A-F]{3}$/.test(text)) text = "#" + text[1] + text[1] + text[2] + text[2] + text[3] + text[3];
+    // a SHADE NUMBER is never taken for a colour ("#128", "128"): the same rule as normalShade in the Assist with AI server
+    if (text && text[0] !== "#") {
+        if (!/^[0-9A-F]{6}$/.test(text) || !/[A-F]/.test(text)) return null;
+        text = "#" + text;
+    }
+    if (/^#[0-9A-F]{3}$/.test(text)) {
+        if (/^#[0-9]{3}$/.test(text)) return null;
+        text = "#" + text[1] + text[1] + text[2] + text[2] + text[3] + text[3];
+    }
     return /^#[0-9A-F]{6}$/.test(text) ? text : null;
 }
 
@@ -1211,7 +1300,7 @@ function detailRow(p, brand, columns) {
         : `Not make-up (${scopeWords(p.cosmeticType, p.name)}). GlowUp does not list it: move it to the Recycle bin.`;
     const facts = [["Kind", escapeHtml(kind)]];
     if (p.aliases.length > 0) facts.push(["Other names", escapeHtml(p.aliases.join(", "))]);
-    if (p.barcode) facts.push(["Barcode", `<code class="small">${escapeHtml(p.barcode)}</code>`]);
+    if (p.barcode) facts.push(["Barcode", `<code class="small">${escapeHtml(p.barcode)}</code> ${gs1Line(p.barcode)}`]);
     if (!brand) facts.push(["Brand", `<span class="chip warn">its brand is gone: press Edit and choose a brand</span>`]);
     else facts.push(["Brand", escapeHtml(brand.name) + (brand.status !== "Active" ? ` <span class="chip warn">brand ${escapeHtml(brand.status.toLowerCase())}: the app hides its products</span>` : "")]);
 
@@ -1722,6 +1811,7 @@ function openBrandForm(brand) {
     el("brandStatusInput").value = brand && STATUSES.includes(brand.status) ? brand.status : "Active";
     el("brandLogoInput").value = brand ? brand.logoUrl : "";
     el("brandImageInput").value = brand ? brand.imageUrl : "";
+    paintWebsiteBox(brand);
     showReviewNote(el("brandReviewNote"), brand, "brand");
     brandModal.open();
 }
@@ -1738,6 +1828,8 @@ async function saveBrand(event) {
     const logoUrl = cleanLink(el("brandLogoInput").value), imageUrl = cleanLink(el("brandImageInput").value);
 
     if (logoUrl === null) { setFormError(form, "The logo link must be a web address that starts with https://"); el("brandLogoInput").focus(); return; }
+    const website = websiteFromForm(form);
+    if (website === null) return;
     if (imageUrl === null) { setFormError(form, "The picture link must be a web address that starts with https://"); el("brandImageInput").focus(); return; }
     if (!name) { setFormError(form, "Type the brand name."); el("brandNameInput").focus(); return; }
     if (name.length < 2) { setFormError(form, "The brand name is too short."); el("brandNameInput").focus(); return; }
@@ -1754,14 +1846,14 @@ async function saveBrand(event) {
             const mine = renamed ? everyProduct.filter((p) => p.brandId === editingBrandId) : [];
 
             // the brand and (when it was renamed) the brand name stored on each of its products, together
-            const brandData = { name, category: BRAND_CATEGORY, market, status, logoUrl, imageUrl, updatedAt: serverTimestamp() };
+            const brandData = { name, category: BRAND_CATEGORY, market, status, logoUrl, imageUrl, ...websiteFields(website, before), updatedAt: serverTimestamp() };
             if (before && before.needsReview) { brandData.reviewed = true; brandData.reviewedAt = serverTimestamp(); }     // an admin who opens it and saves has checked it
             const writes = [{ ref: doc(db, "brands", editingBrandId), data: brandData }];
             mine.forEach((p) => writes.push({ ref: doc(db, "products", p.id), data: { brandName: name, updatedAt: serverTimestamp() } }));
             await runBatches(writes);
             notify(renamed && mine.length > 0 ? `Brand saved. Its ${many(mine.length, "product now shows", "products now show")} the new name.` : "Brand saved.", "ok");
         } else {
-            await addDoc(collection(db, "brands"), { name, category: BRAND_CATEGORY, market, status, logoUrl, imageUrl, scans: 0, createdAt: serverTimestamp() });
+            await addDoc(collection(db, "brands"), { name, category: BRAND_CATEGORY, market, status, logoUrl, imageUrl, ...websiteFields(website, null), scans: 0, createdAt: serverTimestamp() });
             notify("Brand added. Point at its row and press + to list its products.", "ok");
         }
         brandModal.close();
@@ -1772,6 +1864,78 @@ async function saveBrand(event) {
     } finally {
         setBusy(saveButton, false);
     }
+}
+
+/**
+ * The "Official website" box of the Brand form. The confirmed address is the only one whose pages are labelled
+ * "Manufacturer's own site" (here, in the app and in Assist with AI). A suggestion from Assist with AI or an import is
+ * shown with a "Use this address" button; the barcodes of the brand's products are shown with their GS1 hints.
+ */
+function paintWebsiteBox(brand) {
+    const input = el("brandWebsiteInput"), confirm = el("brandWebsiteConfirm"), state = el("brandWebsiteState"), hints = el("brandWebsiteHints");
+    input.value = brand ? brand.website : "";
+    input.dataset.saved = input.value;
+    confirm.checked = false;
+    const lines = [];
+    if (brand && brand.website) lines.push(`<span class="chip good">Confirmed</span> ${brand.websiteConfirmedAt ? "on " + escapeHtml(brand.websiteConfirmedAt.toLocaleDateString()) : "by an admin"}. Its pages are labelled "Manufacturer's own site".`);
+    else lines.push(`<span class="chip warn">Not confirmed</span> No page counts as this brand's own site until an admin confirms its address.`);
+    if (brand && brand.websiteSuggested && brand.websiteSuggested !== brand.website)
+        lines.push(`Suggested by AI or an import (not checked): <code class="small">${escapeHtml(brand.websiteSuggested)}</code> <button type="button" class="row-btn" data-website-use="${escapeHtml(brand.websiteSuggested)}">Use this address</button>`);
+    state.innerHTML = lines.join("<br>");
+    const barcodes = brand ? Array.from(new Set(everyProduct.filter((p) => p.brandId === brand.id && !p.binned && p.barcode).map((p) => p.barcode))).slice(0, 4) : [];
+    hints.innerHTML = barcodes.length
+        ? "Barcodes of its products (a hint about the company, not proof of the website):<br>" + barcodes.map((code) => `<code class="small">${escapeHtml(code)}</code> ${gs1Line(code)}`).join("<br>")
+        : "";
+}
+
+/** The website typed in the box: "" (none), the address, or null after showing what is wrong (not https, or not confirmed). */
+function websiteFromForm(form) {
+    const input = el("brandWebsiteInput");
+    const value = cleanLink(input.value);
+    if (value === null) { setFormError(form, "The official website must be a web address that starts with https://"); input.focus(); return null; }
+    if (value && !plainLink(value)) { setFormError(form, "Use the plain address of the website (no user name or backslash in it)."); input.focus(); return null; }
+    if (value && value !== input.dataset.saved && !el("brandWebsiteConfirm").checked) {
+        setFormError(form, "Tick the box under the website to confirm you checked that this brand owns it, or clear the address.");
+        el("brandWebsiteConfirm").focus();
+        return null;
+    }
+    return value;
+}
+
+/** The website fields to save: a new or changed address records who confirmed it and when; a cleared one removes both. */
+function websiteFields(website, before) {
+    const old = before ? before.website : "";
+    if (website === old) return {};
+    if (!website) return { website: "", websiteConfirmedBy: "", websiteConfirmedAt: null };
+    return { website, websiteConfirmedBy: auth.currentUser ? auth.currentUser.uid : "", websiteConfirmedAt: serverTimestamp() };
+}
+
+/** True for an address with no user name and no backslash (the same "plain address" the source labels require). */
+function plainLink(url) {
+    try { const parsed = new URL(url); return !parsed.username && !parsed.password && !url.includes(String.fromCharCode(92)); } catch (error) { return false; }
+}
+
+/** A barcode's GS1 hint and a button that opens Verified by GS1 (the barcode is copied first, to paste there). */
+function gs1Line(barcode) {
+    const hint = gs1Hint(barcode);
+    if (!hint.text) return "";
+    return `<span class="field-hint">${escapeHtml(hint.text)}</span>`
+        + (hint.valid ? ` <button type="button" class="row-btn" data-gs1="${escapeHtml(String(barcode).replace(/[^0-9]/g, ""))}" data-tip="Copies the barcode and opens GS1's free search page (about 30 searches a day). Paste it there to see which company licenses it.">Check on Verified by GS1</button>` : "");
+}
+
+/** The two buttons above, wherever they are on the page. */
+function wireWebsiteAndGs1Buttons() {
+    document.addEventListener("click", async (event) => {
+        const use = event.target.closest("[data-website-use]");
+        if (use) { el("brandWebsiteInput").value = use.dataset.websiteUse; el("brandWebsiteConfirm").focus(); return; }
+        const gs1 = event.target.closest("[data-gs1]");
+        if (!gs1) return;
+        event.preventDefault();
+        event.stopPropagation();
+        try { await navigator.clipboard.writeText(gs1.dataset.gs1); notify(`Barcode ${gs1.dataset.gs1} copied. Paste it on the Verified by GS1 page.`, "ok"); }
+        catch (error) { notify(`Copy the barcode ${gs1.dataset.gs1}, then paste it on the Verified by GS1 page.`, "info"); }
+        window.open(VERIFIED_BY_GS1, "_blank", "noopener,noreferrer");
+    }, true);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1822,7 +1986,7 @@ function openProductForm(product, brandId) {
 function showReviewNote(note, entry, kind) {
     if (!entry || !entry.needsReview) { note.textContent = ""; note.style.display = "none"; return; }
     const origin = originLabel(entry.source) || "Added automatically";
-    const links = sourceLinks(entry.sources || [], brandOfEntry(entry));
+    const links = sourceLinks(entry.sources || [], websiteOfEntry(entry));
     note.innerHTML = `<b>${escapeHtml(origin)}.</b> Nobody has checked this ${kind} yet. `
         + (kind === "product" ? "Compare the name, brand, type and ingredient list with the packaging, " : "Check the name and category, ")
         + "set Status to <b>Active</b> if the app should use it, then save: <b>saving marks it as reviewed</b>."

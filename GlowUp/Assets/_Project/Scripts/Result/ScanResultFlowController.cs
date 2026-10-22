@@ -404,6 +404,8 @@ namespace GlowUp.Result
             // the pages the list came from, as buttons (never the FDA's page: that one holds no ingredient lists)
             int shown = 0;
             var kindsShown = new List<string>();
+            // only the brand's CONFIRMED website counts as the maker's own site (an admin checked it on the website)
+            string makerSite = has ? BrandRepository.WebsiteOf(record.brandId, record.brandName) : "";
             if (has && sourceLinkTemplate != null && sourceLinksContent != null)
             {
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -421,7 +423,7 @@ namespace GlowUp.Result
                     SourceLinkButton link = Instantiate(sourceLinkTemplate, sourceLinksContent);
                     link.gameObject.name = "SourceLink_" + SourceLinkButton.SiteName(address);
                     link.gameObject.SetActive(true);
-                    link.Bind(source, record.brandName);
+                    link.Bind(source, makerSite);
                     if (!kindsShown.Contains(link.Kind)) kindsShown.Add(link.Kind);
                     sourceLinks.Add(link.gameObject);
                     shown++;

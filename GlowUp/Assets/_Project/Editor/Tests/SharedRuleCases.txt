@@ -16,7 +16,8 @@
 #   brandid    | brand                   | the id a brand gets when the app adds it from a scan
 #   stoplist   | a piece of label text   | the stoplist entry it holds (nothing = it holds none)
 #   shape      | a piece of label text   | ok or wrong: can it be an ingredient name at all?
-#   sourcekind | a source line | brand   | regulator, medical, maker, reference, public, retailer or other: the KIND of page
+#   sourcekind | a source line | website | regulator, medical, maker, reference, public, retailer or other: the KIND of page
+#              website = the brand's CONFIRMED website (set only by an admin); empty = no page is the maker's
 #              (app: ListSources.SourceKind; website: sourceKind in glowupRules.js; server: api/assist-ingredient.js)
 #   sourcelabel| a kind                  | the words shown next to a source link for that kind
 #   (a source line holds " | " itself, so inside a column its bar is written \u007c)
@@ -155,41 +156,43 @@ sourcekind | https://user@www.fda.gov:443/cosmetics | | other
 sourcekind | https://www.fda.gov:443/cosmetics | | regulator
 sourcekind | https://evil.example\u005c@fda.gov/x | | other
 sourcekind | https://fd\u0430.gov/x | | other
+sourcekind | https://fda.gov.ph.evil.com/x | | other
+sourcekind | https://dermnetnz.org/topics/contact-dermatitis | | medical
+sourcekind | https://skin.harvard.edu/x | | medical
+sourcekind | https://www.nature.com/articles/x | https://www.naturerepublic.com | medical
+sourcekind | INCIDecoder \u007c https://incidecoder.com/ingredients/niacinamide | | reference
+sourcekind | http://www.ewg.org/skindeep/x | | reference
+sourcekind | https://www.paulaschoice.com/ingredient-dictionary/x | | reference
+sourcekind | Open Beauty Facts \u007c https://world.openbeautyfacts.org/product/4800000000000 | | public
+# the maker: ONLY the brand's confirmed website and the pages under it. A name match alone is never enough.
+sourcekind | https://www.maybelline.com.ph/face/fit-me | https://www.maybelline.com.ph | maker
+sourcekind | https://shop.maybelline.com.ph/x | https://www.maybelline.com.ph | maker
+sourcekind | https://www.maybelline.com.ph/face/fit-me | https://maybelline.com.ph/en | maker
+sourcekind | https://www.maybelline.com.ph/face/fit-me | | other
+sourcekind | https://www.maybelline.com/x | https://www.maybelline.com.ph | other
+sourcekind | https://maybelline.com.ph.evil.com/x | https://www.maybelline.com.ph | other
+sourcekind | https://maybelline-offers.xyz/deal | https://www.maybelline.com.ph | other
+sourcekind | https://maybelline.evil.com/x | https://www.maybelline.com.ph | other
+sourcekind | https://maybellineofficial.com/x | https://www.maybelline.com.ph | other
+sourcekind | https://www.maybelline.com.ph/x | https://user@maybelline.com.ph | other
+sourcekind | https://www.paulaschoice.com/products/x | https://www.paulaschoice.com | maker
+sourcekind | https://www.naturerepublic.com/products/x | https://www.naturerepublic.com | maker
+sourcekind | https://www.nyxcosmetics.com/lip/x | https://www.nyxcosmetics.com | maker
+sourcekind | https://absidy.com.ph/x | https://absidy.com | other
+sourcekind | absidy.com \u007c https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc | https://absidy.com | maker
+# shops by their whole address
+sourcekind | Watsons \u007c https://www.watsons.com.ph/p/1 | https://www.maybelline.com.ph | retailer
+sourcekind | https://shopee.ph/maybelline-store | https://www.maybelline.com.ph | retailer
+sourcekind | https://www.sephora.com/product/x | | retailer
+sourcekind | https://watsons-deals.xyz/p | https://www.maybelline.com.ph | other
+sourcekind | https://watsons.xyz/p | | other
 # a pass-through address is known by its own site, never by words elsewhere in the address; its title must be a site name
+sourcekind | https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc | | other
 sourcekind | fda.gov \u007c https://evil.example/?u=google.com/url | | other
 sourcekind | fda.gov \u007c https://evil.example/vertexaisearch.cloud.google.com/x | | other
 sourcekind | fda.gov \u007c https://www.google.com/url?q=x | | regulator
 sourcekind | fda.gov is safe \u007c https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc | | other
-# shops by their whole address, makers only on a usual ending and without generic words
-sourcekind | https://watsons-deals.xyz/p | Maybelline | other
-sourcekind | https://watsons.xyz/p | | other
-sourcekind | https://maybelline.xyz/x | Maybelline | other
-sourcekind | https://maybellineofficial.com/x | Maybelline | other
-sourcekind | https://absidy.com.ph/x | Absidy | maker
-sourcekind | https://fda.gov.ph.evil.com/x | | other
-sourcekind | https://dermnetnz.org/topics/contact-dermatitis | | medical
-sourcekind | https://skin.harvard.edu/x | | medical
-sourcekind | https://www.nature.com/articles/x | Nature Republic | medical
-sourcekind | https://www.naturerepublic.com/products/x | Nature Republic | maker
-sourcekind | INCIDecoder \u007c https://incidecoder.com/ingredients/niacinamide | | reference
-sourcekind | http://www.ewg.org/skindeep/x | | reference
-sourcekind | https://www.paulaschoice.com/ingredient-dictionary/x | | reference
-sourcekind | https://www.paulaschoice.com/products/x | Paula's Choice | maker
-sourcekind | Open Beauty Facts \u007c https://world.openbeautyfacts.org/product/4800000000000 | | public
-sourcekind | https://www.maybelline.com.ph/face/fit-me | Maybelline New York | maker
-sourcekind | https://shop.absidy.com/p/1 | Absidy | maker
-sourcekind | https://www.nyxcosmetics.com/lip/x | NYX Professional Makeup | maker
-sourcekind | https://www.nyx.com/x | NYX Professional Makeup | other
-sourcekind | https://maybelline-offers.xyz/deal | Maybelline | other
-sourcekind | https://maybelline.evil.com/x | Maybelline | other
-sourcekind | https://maybelline.com.evil.ru/x | Maybelline | other
-sourcekind | https://www.maybelline.com.ph/face/fit-me | | other
-sourcekind | Watsons \u007c https://www.watsons.com.ph/p/1 | Maybelline | retailer
-sourcekind | https://shopee.ph/maybelline-store | Maybelline | retailer
-sourcekind | https://www.sephora.com/product/x | | retailer
-sourcekind | absidy.com \u007c https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc | Absidy | maker
-sourcekind | https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc | | other
-sourcekind | https://random-blog.com/review | Maybelline | other
+sourcekind | https://random-blog.com/review | https://www.maybelline.com.ph | other
 sourcekind | GlowUp product inventory | | other
 sourcekind | | | other
 sourcelabel | regulator | Regulator / government

@@ -288,7 +288,7 @@ export function notify(message, kind = "info") {
     toast.className = "toast " + kind;
     toast.textContent = message;
     host.appendChild(toast);
-    window.setTimeout(() => toast.remove(), kind === "error" ? 8000 : 3500);
+    window.setTimeout(() => toast.remove(), kind === "error" || kind === "warn" ? 8000 : 3500);
 }
 
 /** Switches a button off while its action runs, so a double click cannot save twice. */
@@ -433,10 +433,11 @@ export function parseSource(text) {
 
 /**
  * The small label after a source link: what KIND of page it is (Regulator / government, Retailer listing ...), the
- * same words the app shows. Hovering it gives one line of advice. `brandName` = the product's brand ("" for an ingredient).
+ * same words the app shows. Hovering it gives one line of advice. `confirmedWebsite` = the brand's confirmed website
+ * ("" for an ingredient, or a brand without one): only its pages are "Manufacturer's own site".
  */
-export function sourceKindChip(source, brandName) {
-    const kind = describeSourceLine(source, brandName);
+export function sourceKindChip(source, confirmedWebsite) {
+    const kind = describeSourceLine(source, confirmedWebsite);
     return `<span class="chip source-kind${kind.tone ? " " + kind.tone : ""}" title="${escapeHtml(kind.advice)}">${escapeHtml(kind.label)}</span>`;
 }
 
@@ -448,11 +449,11 @@ export const sourceGuideHtml = () => `<span class="field-hint source-guide">${es
  * then the guide line. `emptyHtml` is shown when there is no page. The server's label is used; an older answer without
  * one is labelled here by the same rule.
  */
-export function assistSourceLinks(pages, emptyHtml, brandName = "") {
+export function assistSourceLinks(pages, emptyHtml, confirmedWebsite = "") {
     const shown = (Array.isArray(pages) ? pages : []).filter((page) => page && /^https:\/\//i.test(page.url || "") && parseSource(page.url).url);
     if (shown.length === 0) return emptyHtml;
     return shown.map((page) => {
-        const kind = page.label ? page : describeSourceLine(`${page.site || page.title || ""} | ${page.url}`, brandName);
+        const kind = page.label ? page : describeSourceLine(`${page.site || page.title || ""} | ${page.url}`, confirmedWebsite);
         return `<a class="source-link" href="${escapeHtml(page.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(page.title || page.site || page.url)}</a> `
             + `<span class="chip source-kind${kind.tone ? " " + kind.tone : ""}" title="${escapeHtml(kind.advice || "")}">${escapeHtml(kind.label)}</span>`;
     }).join("<br>") + sourceGuideHtml();
@@ -460,10 +461,10 @@ export function assistSourceLinks(pages, emptyHtml, brandName = "") {
 
 /**
  * Links to the pages an entry's information came from, each with its kind label. Anything that is not a web address
- * shows as plain text. `brandName` = the product's brand, so its maker's own site is recognised ("" for an ingredient).
+ * shows as plain text. `confirmedWebsite` = the brand's confirmed website, so its own pages are recognised ("" for an ingredient).
  */
-export function sourceLinks(sources, brandName = "") {
+export function sourceLinks(sources, confirmedWebsite = "") {
     return (Array.isArray(sources) ? sources : []).map((line) => ({ line, ...parseSource(line) })).filter((s) => s.title || s.url).map((s) => s.url
-        ? `<a class="source-link" href="${escapeHtml(s.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(s.title)}</a> ${sourceKindChip(s.line, brandName)}`
+        ? `<a class="source-link" href="${escapeHtml(s.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(s.title)}</a> ${sourceKindChip(s.line, confirmedWebsite)}`
         : `<span>${escapeHtml(s.title)}</span>`).join(" · ");
 }

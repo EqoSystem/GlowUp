@@ -3,7 +3,7 @@
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const handler = require("../api/assist-ingredient.js");
-const { ingredientImportQuestion, tidyIngredientImport, firstObject, tidy, tidyProduct, tidyBrand, tidyImport, importQuestion, descriptionQuestion, brandQuestion, isCredible, searchResultUrl, chatContent } = handler.helpers;
+const { normalShade, ingredientImportQuestion, tidyIngredientImport, firstObject, tidy, tidyProduct, tidyBrand, tidyImport, importQuestion, descriptionQuestion, brandQuestion, isCredible, searchResultUrl, chatContent } = handler.helpers;
 
 let checks = 0, failed = 0;
 const check = (ok, what) => { checks++; if (!ok) { failed++; console.log("FAILED: " + what); } };
@@ -37,11 +37,23 @@ equal(tidyProduct({ ingredients: ["Mica", "mica", "Dimethicone"], fdaVerifiedLin
 equal(tidyProduct({ ingredients: ["Mica"], fdaVerifiedLink: "https://fda.gov.ph.evil.com/fake" },
     { brandName: "Glow", productName: "Tint" }).fdaVerifiedLink, "", "a look-alike domain is not accepted as an FDA Philippines source");
 equal(tidyBrand({ aliases: ["Glow", "GLOW Cosmetics", "GLOW Cosmetics"], market: "Global", confidence: "high" }, "Glow", [{ url: "https://example.com/official" }]), {
-    name: "Glow", aliases: ["GLOW Cosmetics"], market: "Global", sources: ["https://example.com/official"], confidence: "high"
+    name: "Glow", aliases: ["GLOW Cosmetics"], market: "Global", sources: ["https://example.com/official"], websiteSuggested: "", websiteSeenInSources: false, confidence: "high"
 }, "brand suggestions remove duplicate and same-as-brand aliases and preserve grounded source URLs");
 equal(tidyBrand({ aliases: ["Another"], market: "Not a market" }, "Glow", []), {
-    name: "Glow", aliases: ["Another"], market: "", sources: [], confidence: "low"
+    name: "Glow", aliases: ["Another"], market: "", sources: [], websiteSuggested: "", websiteSeenInSources: false, confidence: "low"
 }, "brand suggestions reject unsupported market values");
+{
+    const suggested = tidyBrand({ officialWebsite: "https://www.glowbeauty.com/about-us" }, "Glow", [{ url: "https://www.glowbeauty.com/products", site: "glowbeauty.com" }]);
+    equal(suggested.websiteSuggested, "https://www.glowbeauty.com/", "a suggested official website is kept as its home page");
+    equal(suggested.websiteSeenInSources, true, "and it is marked when a page the AI used is on that site");
+    equal(tidyBrand({ officialWebsite: "https://glow.com@evil.example/" }, "Glow", []).websiteSuggested, "", "a suggested website with a user name is refused");
+    equal(tidyBrand({ officialWebsite: "http://glowbeauty.com" }, "Glow", []).websiteSuggested, "", "a suggested website must be https");
+}
+equal(normalShade("#128"), "", "a shade NUMBER with # is not a colour");
+equal(normalShade("128"), "", "a bare shade number is not a colour");
+equal(normalShade("120230"), "", "six digits without # are a code, not a colour");
+equal(normalShade("C24B62"), "#C24B62", "a bare six-character colour with a letter is still a colour");
+equal(normalShade("#C46"), "#CC4466", "a short colour with a letter is still a colour");
 const imported = tidyImport({ products: [
     { brandName: "Glow", productName: "Tint", cosmeticType: "Lip Tint", ingredients: ["Mica"], shades: ["#aabbcc", "red", "#AABBCC"], sources: ["https://fda.gov.ph/product", "https://verification.fda.gov.ph/item"], fdaVerifiedLink: "https://verification.fda.gov.ph/item" },
     { brandName: "", productName: "no brand" }
@@ -287,7 +299,32 @@ const { sourceKind, describeSource, SOURCE_KINDS, SEARCH_KINDS } = handler.helpe
     check(seen >= 30, "the source-kind examples were found in SharedRuleCases.txt (" + seen + ")");
 }
 check(describeSource({ url: "https://fda.gov.ph/x", site: "fda.gov.ph" }, "").label === "Regulator / government" && describeSource({ url: "https://fda.gov.ph/x" }, "").advice.length > 10, "a described source carries a label and advice");
-check(describeSource({ url: "https://vertexaisearch.cloud.google.com/grounding-api-redirect/x", site: "absidy.com" }, "Absidy").kind === "maker", "an unresolved search link is labelled by its site's name");
+check(describeSource({ url: "https://vertexaisearch.cloud.google.com/grounding-api-redirect/x", site: "absidy.com" }, "https://absidy.com").kind === "maker", "an unresolved search link is labelled by its site's name");
+check(describeSource({ url: "https://absidy.com/x", site: "absidy.com" }, "").kind === "other", "without a confirmed website no page is the maker's");
+{
+    const doc = "Glow Tint https://glowbeauty.com/tint https://img.glowbeauty.com/tint.jpg https://glowbeauty.com/";
+    const rows = tidyImport({ products: [{ brandName: "Glow", productName: "Tint", cosmeticType: "Lip Tint", shades: ["#128 Warm Nude", "#C24B62"], productAliases: ["Glow Tint", "glow tint"], minAge: 13,
+        barcode: "4800-0000-0000-1", imageUrl: "https://img.glowbeauty.com/tint.jpg", brandMarket: "asia", brandWebsite: "https://glowbeauty.com/", brandLogoUrl: "https://made-up.example/logo.png" }],
+        brands: [{ name: "Bloom", market: "Local", website: "https://not-in-the-document.example/" }] }, [], doc);
+    const p = rows.products[0];
+    equal(p.shades, ["#C24B62"], "an import keeps colours only, never a shade number");
+    equal(p.productAliases, ["Glow Tint"], "an import keeps the product's other names once");
+    equal(p.minAge, 13, "an import keeps the minimum age");
+    equal(p.barcode, "4800000000001", "an import keeps the barcode digits");
+    equal(p.imageUrl, "https://img.glowbeauty.com/tint.jpg", "an import keeps a photo link printed in the document");
+    equal(p.brandMarket, "Asia", "an import keeps a known market");
+    equal(p.brandWebsiteSuggested, "https://glowbeauty.com/", "an import keeps the brand website as a SUGGESTION");
+    equal(p.brandLogoUrl, "", "a link that is not in the document (made up) is dropped");
+    equal(rows.brands.length, 1, "a brand-only record comes through");
+    equal(rows.brands[0].websiteSuggested, "", "a brand website that is not in the document is dropped");
+    const ing = tidyIngredientImport({ ingredients: [{ name: "Linalool", chemicalDescription: "A terpene alcohol.", commonUses: "perfumes, creams", minAge: 3, allergens: ["Fragrance"],
+        avoidConditions: ["Eczema"], avoidSkinTypes: ["dry", "Purple"], highlights: ["Scent"], sources: ["https://ec.europa.eu/cosing/x", "https://invented.example/x"] }] },
+        "Linalool https://ec.europa.eu/cosing/x").ingredients[0];
+    check(ing.chemicalDescription === "A terpene alcohol." && ing.commonUses === "perfumes, creams" && ing.minAge === 3, "an ingredient import keeps the technical text, uses and age");
+    equal(ing.avoidSkinTypes, ["Dry"], "an ingredient import keeps known skin types only");
+    equal(ing.allergens, ["Fragrance"], "an ingredient import passes allergen names on for the Curator to match");
+    equal(ing.sources, ["https://ec.europa.eu/cosing/x"], "an ingredient import keeps only links printed in the document");
+}
 check(!SEARCH_KINDS.product.includes("reference") && SEARCH_KINDS.product.includes("retailer") && SEARCH_KINDS.product.includes("maker"), "a product's list never rests on an ingredient database; makers and retailers count");
 check(SEARCH_KINDS.ingredient.includes("reference") && !SEARCH_KINDS.ingredient.includes("retailer"), "an ingredient's description rests on references, not shops");
 

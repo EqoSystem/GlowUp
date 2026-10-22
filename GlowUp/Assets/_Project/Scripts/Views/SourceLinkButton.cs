@@ -31,17 +31,17 @@ namespace GlowUp.Views
 
         /// <summary>
         /// `source` is a source line as the app keeps it: "page title | https://address" (the title is optional).
-        /// `brandName` = the product's brand, so the maker's own site is recognised. Returns false when the line holds no
-        /// web address; the button is then of no use.
+        /// `confirmedWebsite` = the brand's confirmed website (BrandData.website), so the maker's own site is recognised.
+        /// Returns false when the line holds no web address; the button is then of no use.
         /// </summary>
-        public bool Bind(string source, string brandName = "")
+        public bool Bind(string source, string confirmedWebsite = "")
         {
             Url = AddressIn(source);
             if (Url.Length == 0) return false;
             string name = LabelFor(source, Url);
             int most = Mathf.Max(8, maximumLabelLength);
             if (label != null) label.text = name.Length > most ? name.Substring(0, most - 3).TrimEnd() + "..." : name;
-            Kind = ListSources.SourceKind(source, brandName);
+            Kind = ListSources.SourceKind(source, confirmedWebsite);
             if (kindLabel != null) kindLabel.text = ListSources.LabelOf(Kind);
             return true;
         }

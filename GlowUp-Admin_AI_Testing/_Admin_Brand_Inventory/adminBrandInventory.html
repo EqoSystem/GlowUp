@@ -88,6 +88,8 @@
                 </button>
                 <p class="import-types">Accepted: PDF (.pdf), Excel (.xlsx, .xls), Word (.docx)</p>
                 <p class="field-hint import-status" id="inventoryImportStatus" role="status" aria-live="polite">Ready for readable PDFs, Excel workbooks, and Word documents. Text is extracted in your browser; only the extracted text is analyzed.</p>
+                <!-- what the last import FLAGGED: skin care and other non-make-up records (not saved), and make-up whose kind is unclear (saved, to check) -->
+                <div class="import-flags" id="inventoryImportFlags" hidden></div>
             </section>
 
             <!-- products app users sent as ONE photo: reviewed in a floating window over this page. Nothing is read until it opens,
@@ -220,6 +222,16 @@
                     </div>
                 </div>
                 <span class="field-hint">Only the web address is saved (https). Nothing is uploaded.</span>
+
+                <!-- the brand's own website: only a CONFIRMED address makes its pages "Manufacturer's own site" (here and in the app) -->
+                <div class="field website-box">
+                    <label for="brandWebsiteInput">Official website</label>
+                    <input type="url" id="brandWebsiteInput" maxlength="300" placeholder="https://... (the brand owner's own site, not a shop)" autocomplete="off" inputmode="url">
+                    <label class="field-hint check-line"><input type="checkbox" id="brandWebsiteConfirm"> I checked that this brand owns this address: it is printed on the pack, OR the company on its About or legal page matches the FDA Philippines record, OR the brand's official social accounts link to it.</label>
+                    <span class="field-hint" id="brandWebsiteState"></span>
+                    <span class="field-hint" id="brandWebsiteHints"></span>
+                    <span class="field-hint">An address suggested by AI or an import is never trusted until you confirm it here.</span>
+                </div>
 
                 <p class="form-error" role="alert"></p>
 

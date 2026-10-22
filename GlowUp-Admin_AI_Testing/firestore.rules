@@ -76,7 +76,17 @@ service cloud.firestore {
         && request.resource.data.get('name', '').size() <= 200
         && sizedList('ingredients', 300) && sizedList('shades', 24) && sizedList('sources', 40) && sizedList('aliases', 60)
         && sizedList('tags', 20) && sizedList('ingredientIds', 300) && sizedList('ingredientNotes', 100)
-        && httpsOrEmpty('imageUrl') && httpsOrEmpty('logoUrl');
+        && httpsOrEmpty('imageUrl') && httpsOrEmpty('logoUrl') && httpsOrEmpty('website') && httpsOrEmpty('websiteSuggested');
+    }
+    // A brand's CONFIRMED website (its pages are labelled "Manufacturer's own site" in the app and on the website) may only
+    // be set by an admin who records themself as the one who confirmed it. A suggestion (websiteSuggested) is not trusted.
+    function websiteConfirmedOnCreate() {
+      return request.resource.data.get('website', '') == ''
+        || request.resource.data.get('websiteConfirmedBy', '') == request.auth.uid;
+    }
+    function websiteConfirmedOnUpdate() {
+      return request.resource.data.get('website', '') == resource.data.get('website', '')
+        || websiteConfirmedOnCreate();
     }
 
     // ---- catalogue: the website writes it, the app reads it ---------------------------------
@@ -84,7 +94,7 @@ service cloud.firestore {
       allow read: if true;
       allow delete: if isAdmin();
       // the app may add a brand it met in a scan: always Pending, so the app does not use it until an admin approves it
-      allow create: if adminCatalogueWrite()
+      allow create: if (adminCatalogueWrite() && websiteConfirmedOnCreate())
         || (addedByTheApp()
             && brandId.matches('scan_.*')
             && request.resource.data.keys().hasOnly(['name', 'category', 'market', 'status', 'scans', 'source', 'reviewed', 'addedBy', 'addedAtUnix'])
@@ -96,7 +106,7 @@ service cloud.firestore {
             && request.resource.data.name.size() <= 60
             && request.resource.data.get('category', 'Skincare') in ['Makeup', 'Skincare']);
       // the app may add exactly 1 to "scans" and change nothing else
-      allow update: if adminCatalogueWrite()
+      allow update: if (adminCatalogueWrite() && websiteConfirmedOnUpdate())
         || (signedIn()
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['scans'])
             && request.resource.data.scans == resource.data.get('scans', 0) + 1);
@@ -142,7 +152,9 @@ service cloud.firestore {
     // The app cannot alter the catalogue entry itself or read other users' proposals.
     match /productIngredientSuggestions/{suggestionId} {
       allow read, update, delete: if isAdmin();
-      allow create: if addedByTheApp()
+      // an admin's document import may also queue a list for a product that has none (it is applied or dismissed here)
+      allow create: if isAdmin()
+        || addedByTheApp()
         && request.resource.data.keys().hasOnly([
              'productId', 'productName', 'brandName', 'ingredients', 'sources', 'source', 'status', 'reviewed', 'addedBy', 'addedAtUnix'])
         && request.resource.data.productId is string

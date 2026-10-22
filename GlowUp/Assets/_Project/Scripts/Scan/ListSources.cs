@@ -215,17 +215,10 @@ namespace GlowUp.Scan
             "douglas.de", "priceline.com.au", "chemistwarehouse.com.au", "mercurydrug.com", "southstardrug.com.ph", "landers.ph", "smmarkets.ph"
         };
 
-        /// <summary>A brand's own site may add one of these to the brand's name ("nyxcosmetics.com", "absidybeauty.com").</summary>
-        public static readonly string[] MakerSuffixes = { "", "cosmetics", "beauty", "makeup" };
+        // The MAKER's own site is never guessed from a name (anybody can register "brandcosmetics.com"): it is the brand's
+        // `website` (BrandData.website), which only an admin sets on the website after checking that the brand owns it.
 
-        /// <summary>A maker's own site ends in one of these (an odd ending such as .xyz or .shop is anybody's).</summary>
-        public static readonly string[] MakerEndings =
-        {
-            "com", "net", "org", "co", "ph", "com.ph", "us", "ca", "uk", "co.uk", "com.au", "kr", "co.kr", "jp", "co.jp", "fr", "de", "it", "es",
-            "sg", "com.sg", "my", "com.my", "in", "co.in", "id", "co.id", "th", "co.th", "vn", "com.vn", "tw", "com.tw", "hk", "com.hk", "eu", "ch", "nl", "se"
-        };
-
-        static readonly Regex GovSite = new Regex(@"\.gov(\.[a-z]{2})?$"), EduSite = new Regex(@"\.edu(\.[a-z]{2})?$"), NotLetterOrDigit = new Regex("[^a-z0-9]");
+        static readonly Regex GovSite = new Regex(@"\.gov(\.[a-z]{2})?$"), EduSite = new Regex(@"\.edu(\.[a-z]{2})?$");
         // only a PLAIN address is labelled: http(s), a host of a-z 0-9 . - only (no user name, no other letters), an optional
         // port, and printable ASCII after it. Anything else (a backslash, "user@", look-alike letters) is an Unverified site.
         static readonly Regex StrictAddress = new Regex("^https?://([a-z0-9.-]+)(?::[0-9]{1,5})?([/?#][!-~]*)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
@@ -234,15 +227,17 @@ namespace GlowUp.Scan
 
         /// <summary>
         /// The kind of page of a source line ("page title | https://address", or an address): regulator, medical, maker,
-        /// reference, public, retailer or other. `brandName` = the brand of the product (may be empty: then no page is the maker's).
+        /// reference, public, retailer or other. `confirmedWebsite` = the brand's confirmed website (BrandData.website); empty =
+        /// no page is the maker's.
         /// </summary>
-        public static string SourceKind(string source, string brandName)
+        public static string SourceKind(string source, string confirmedWebsite)
         {
             string host = LabelHost(source);
             if (host.Length == 0) return KindUnverified;
             if (OnSite(host, Regulators) || GovSite.IsMatch(host)) return KindRegulator;
             if (OnSite(host, MedicalBodies) || EduSite.IsMatch(host)) return KindMedical;
-            if (IsMakersSite(host, brandName)) return KindMaker;
+            string maker = MakerHost(confirmedWebsite);
+            if (maker.Length > 0 && OnSite(host, new[] { maker })) return KindMaker;
             if (OnSite(host, References)) return KindReference;
             if (OnSite(host, PublicLists)) return KindPublic;
             if (OnSite(host, RetailerSites)) return KindRetailer;
@@ -258,16 +253,8 @@ namespace GlowUp.Scan
         /// </summary>
         public static string LabelHost(string source)
         {
-            string address = AddressOf(source);
-            Match m = StrictAddress.Match(address);
-            if (!m.Success || address.IndexOf(Backslash) >= 0) return "";
-            string host = m.Groups[1].Value.ToLowerInvariant().TrimEnd('.');
-            string path = m.Groups[2].Value;
-            int cut = path.IndexOfAny(new[] { '?', '#' });
-            if (cut >= 0) path = path.Substring(0, cut);
-            string site = WithoutWww(host);
-            bool redirect = site == "vertexaisearch.cloud.google.com" || (site == "google.com" && path.StartsWith("/url", StringComparison.Ordinal))
-                            || (site == "bing.com" && path.StartsWith("/ck", StringComparison.Ordinal));
+            string host = PlainHost(AddressOf(source), out bool redirect);
+            if (host.Length == 0) return "";
             if (redirect)
             {
                 host = TitleOf(source).ToLowerInvariant().Trim().TrimEnd('.');
@@ -276,48 +263,30 @@ namespace GlowUp.Scan
             return WithoutWww(host);
         }
 
-        /// <summary>Where the site's own name stands in its address: the part before the ending (".com", ".com.ph" ...).</summary>
-        static int OwnNameIndex(string[] parts)
-        {
-            string second = parts[parts.Length - 2];
-            bool countryEnding = parts.Length >= 3 && parts[parts.Length - 1].Length == 2 && Array.IndexOf(new[] { "co", "com", "org", "net", "gov", "edu" }, second) >= 0;
-            return countryEnding ? parts.Length - 3 : parts.Length - 2;
-        }
-
-        /// <summary>"maybelline" for maybelline.com.ph or shop.maybelline.com: the site's own name, without the country ending.</summary>
-        public static string OwnName(string host)
-        {
-            string[] parts = (host ?? "").Split('.');
-            if (parts.Length < 2) return "";
-            return NotLetterOrDigit.Replace(parts[OwnNameIndex(parts)], "");
-        }
-
         /// <summary>
-        /// True when the site's own name IS the brand's name (with at most one of MakerSuffixes after it) and the site has a
-        /// usual ending (MakerEndings). Containing the name is not enough: "maybelline-offers.xyz", "maybelline.evil.com"
-        /// and "maybelline.xyz" are not taken for Maybelline's site.
+        /// The site of a brand's CONFIRMED website ("maybelline.com.ph" for "https://www.maybelline.com.ph/en"); "" when there is
+        /// none, or it is not a plain address, or it is a search engine's pass-through address.
         /// </summary>
-        public static bool IsMakersSite(string host, string brandName)
+        public static string MakerHost(string confirmedWebsite)
         {
-            string[] parts = (host ?? "").Split('.');
-            if (parts.Length < 2) return false;
-            int index = OwnNameIndex(parts);
-            if (Array.IndexOf(MakerEndings, string.Join(".", parts, index + 1, parts.Length - index - 1)) < 0) return false;
-            string own = OwnName(host);
-            string[] words = TextKey.Words(brandName);
-            if (own.Length == 0 || words.Length == 0) return false;
-            var names = new List<string>();
-            string whole = string.Join("", words);
-            if (whole.Length >= 3) names.Add(whole);
-            if (words.Length > 1 && words[0].Length >= 4) names.Add(words[0]);
-            foreach (string name in names)
-                foreach (string suffix in MakerSuffixes)
-                    if (own == name + suffix) return true;
-            // a first word of three letters ("NYX Professional Makeup") only with a word after it: nyxcosmetics.com
-            if (words.Length > 1 && words[0].Length == 3)
-                foreach (string suffix in MakerSuffixes)
-                    if (suffix.Length > 0 && own == words[0] + suffix) return true;
-            return false;
+            string host = PlainHost(AddressOf(confirmedWebsite), out bool redirect);
+            return host.Length == 0 || redirect ? "" : WithoutWww(host);
+        }
+
+        /// <summary>The lower-case host of a plain address ("" when it is not plain), and whether it is a search engine's pass-through address.</summary>
+        static string PlainHost(string address, out bool redirect)
+        {
+            redirect = false;
+            Match m = StrictAddress.Match(address ?? "");
+            if (!m.Success || address.IndexOf(Backslash) >= 0) return "";
+            string host = m.Groups[1].Value.ToLowerInvariant().TrimEnd('.');
+            string path = m.Groups[2].Value;
+            int cut = path.IndexOfAny(new[] { '?', '#' });
+            if (cut >= 0) path = path.Substring(0, cut);
+            string site = WithoutWww(host);
+            redirect = site == "vertexaisearch.cloud.google.com" || (site == "google.com" && path.StartsWith("/url", StringComparison.Ordinal))
+                       || (site == "bing.com" && path.StartsWith("/ck", StringComparison.Ordinal));
+            return host;
         }
 
         static bool OnSite(string host, string[] sites)
@@ -348,7 +317,7 @@ namespace GlowUp.Scan
             {
                 case KindRegulator: return "An official body. The strongest kind of source here.";
                 case KindMedical: return "A medical or scientific publisher. A dermatologist or pharmacist can check the cited study or review.";
-                case KindMaker: return "The maker's own ingredient list. Confirm it against the pack; marketing claims are not evidence.";
+                case KindMaker: return "The brand's own website, confirmed by a GlowUp admin. Its list should match the pack; marketing claims are not evidence.";
                 case KindReference: return "Explains what an ingredient is. Not peer-reviewed, and never proof of what one product contains.";
                 case KindPublic: return "A public list anybody can edit. Use it as a second opinion only.";
                 case KindRetailer: return "A shop's copy of the pack's list. It can be out of date: compare it with your pack.";

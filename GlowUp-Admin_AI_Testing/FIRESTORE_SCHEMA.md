@@ -31,6 +31,9 @@ The admin website and the mobile app use the same Firebase project (`glowup-admi
 | `scans` | number | The app adds 1 each time a scan is found to be this brand: its name is on the scanned label, or the scan is one of its products. |
 | `source`, `reviewed` | text, yes/no | Entries imported from a file use `document-import` and `false` until an admin checks them. |
 | `logoUrl`, `imageUrl` | text | Optional web addresses (https) of the brand's official logo and of a display or pack picture. Only the address is stored, nothing is uploaded. |
+| `website` | text | The brand owner's own website (https), **confirmed by an admin** on the Brand form after checking that the brand owns it (printed on the pack, the same company as on the FDA Philippines record, or linked from the brand's official accounts). Only its pages, and pages under it, are labelled "Manufacturer's own site" in the app, on the website and in Assist with AI. Empty = no page is the maker's. The rules let only an admin set it, and only together with `websiteConfirmedBy` = their own account. |
+| `websiteConfirmedBy`, `websiteConfirmedAt` | text, time | Who confirmed `website`, and when. Cleared together with it. |
+| `websiteSuggested` | text | An address Assist with AI or a document import PROPOSED. Never trusted: it only offers the admin a "Use this address" button on the Brand form. |
 | `aiAssistSources`, `aiAssistModel` | lists/text | Source URLs and model for an admin-reviewed AI suggestion to market or aliases. Existing aliases are merged, not discarded. |
 | `createdAt`, `updatedAt` | time | Set by the website. |
 
@@ -61,6 +64,10 @@ The admin website and the mobile app use the same Firebase project (`glowup-admi
 
 Brand & Product Inventory can extract text from PDF, Excel (`.xlsx`/`.xls`), and Word (`.docx`) files and create new matching entries. Only extracted text is sent to the admin-only AI endpoint; imported records are never activated or used to overwrite a matching existing product. Image-only/scanned PDFs and legacy `.doc` files are not supported.
 
+What an import reads: per product `brandName`, `productName`, `cosmeticType`, `description`, ingredients, shades (colours only: a shade NUMBER such as "#128" is never taken for a colour), sources, the FDA Philippines link, other names (`aliases`), `minAge`, `barcode` and a photo link (`imageUrl`); for a NEW brand its market, other names, logo and picture links, and its website as `websiteSuggested` only. Links are kept only when they are printed in the document or were opened by the web search. A record about a brand alone creates a new Pending brand. Records that are skin care or otherwise not make-up are **flagged** under the drop box and not saved; make-up whose kind is not clear is saved as Pending and flagged. For an existing product that has no ingredient list, the imported list goes to `productIngredientSuggestions` (source `document-import`) for an admin to apply.
+
+The Ingredient Curator's import reads, per ingredient: name, label name, other names, description, technical description (`chemicalDescription`), risk level and caution note (only when the document states them), common uses, minimum age, allergen families, skin conditions (avoid / good), skin types (avoid / good), highlights, and links printed in the document (`sources`). Allergen, condition and highlight NAMES are matched to the page's own lists (`config/lists`); a name the lists do not have is left out and named in the import's summary.
+
 The admin AI assistant drafts ingredient descriptions, product ingredient lists, and brand market/name aliases with source pages. Selected entries can be assisted in bulk, but each draft must be individually checked before the review queue's **Approve reviewed drafts** action saves it. Ingredient assistance changes only the description and its evidence; it does not generate or update risk ratings. Product ingredient assistance only fills an empty list. Gemini is tried first, then Groq, then Mistral when the preceding provider is exhausted. Groq retries with supported current models if a configured model has been retired or returns not found. Backup providers do not return web citations, so their drafts need extra checking.
 
 The selection bar's **Approve All** action applies only to selected entries that are still waiting for review and meet the inventory's existing eligibility checks. In Brand & Product Inventory, a product needs a make-up type, a listed brand and a non-empty ingredient list. The optional `productIngredientSuggestions` collection is admin-only; if its read is denied, the brand and product catalogue remains visible and the page displays a separate Firestore-admin warning.
@@ -74,7 +81,7 @@ The app creates a proposal when a product already in the catalogue has no ingred
 | `productId`, `productName`, `brandName` | text | The existing catalogue product the proposal is for. |
 | `ingredients` | list of text | The AI-found list; 3 to 80 names. |
 | `sources` | list of text | Web pages supporting the lookup. |
-| `source`, `status`, `reviewed` | text, text, yes/no | Always `web`, `Pending`, `false` when created by the app. |
+| `source`, `status`, `reviewed` | text, text, yes/no | `web`, `Pending`, `false` when created by the app; `document-import` when an admin's file import found a list for a product that had none. |
 | `addedBy`, `addedAtUnix` | text, number (seconds) | The signed-in app user and proposal time. |
 
 The app recognises a scan as a product by comparing ingredient lists: at least 4 ingredients must be the same, at least 70% of the product's ingredients must be in the scan, and at least 60% of the scanned ingredients must belong to the product. These limits are Inspector fields on the app's `LoadingSceneController`. A recognised scan takes the product's name, brand, type and shades.
@@ -189,7 +196,7 @@ Every `sources` entry stays `page title | https://address`. The kind of page is 
 |---|---|---|
 | `regulator` | Regulator / government | EU, US FDA, FDA Philippines, NIH, WHO, ASEAN, TGA, Health Canada, gov.uk, ECHA; any `.gov` / `.gov.xx` site |
 | `medical` | Medical / scientific body | CIR, AAD, DermNet, Contact Dermatitis Society, ScienceDirect, Wiley, Springer, Nature, JAMA, BMJ, Mayo Clinic, Cleveland Clinic; any `.edu` / `.edu.xx` site |
-| `maker` | Manufacturer's own site | The site whose own name IS the product's brand, alone or with one of: cosmetics, beauty, makeup (`maybelline.com.ph`, `nyxcosmetics.com`), on a usual ending (.com, .com.ph, .co.uk ...; not .xyz or .shop). Containing the name is not enough (`maybelline-offers.xyz`, `maybelline.evil.com` are not the maker). Still a name match, not a confirmed domain: check it. |
+| `maker` | Manufacturer's own site | ONLY the brand's confirmed `website` and pages under it (confirmed `https://www.maybelline.com.ph` makes `shop.maybelline.com.ph` the maker's too). A site named like the brand is never enough on its own: without a confirmed website no page is the maker's. |
 | `reference` | Ingredient database | Personal Care Products Council, INCI Beauty, INCIDecoder, Paula's Choice dictionary, EWG, CosmeticsInfo |
 | `public` | Public list (anyone can edit) | Open Beauty Facts |
 | `retailer` | Retailer listing | Large shops by their whole address (watsons.com.ph, shopee.ph, lazada.com.ph, sephora.com, mercurydrug.com ...): `SOURCE_RETAILERS` / `ListSources.RetailerSites` |

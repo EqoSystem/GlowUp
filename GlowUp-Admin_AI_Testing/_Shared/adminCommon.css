@@ -562,6 +562,7 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .toast > span { flex: 1; }
 .toast.ok { border-left-color: var(--ok); }
 .toast.error { border-left-color: var(--bad); }
+.toast.warn { border-left-color: var(--warn); }
 
 /* ---- guide badges: a small "i" next to a control; pointing at it shows a short instruction ---- */
 .guide-badge {

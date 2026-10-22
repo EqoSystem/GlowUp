@@ -57,6 +57,7 @@ namespace GlowUp.Data
         public int minAge;
         public bool keyActive;                   // worth highlighting as a chip
         public bool umbrella;                    // a label term that can hide undisclosed ingredients (e.g. Fragrance)
+        public List<string> highlights = new List<string>();          // ids of the custom highlights the admin website lists (config/lists)
         public List<string> aliases = new List<string>();
         public List<string> allergenTags = new List<string>();        // fragrance, paraben, sulfate, formaldehyde, lanolin, essentialoil, nut
         public List<string> avoidForSkinTypes = new List<string>();   // Oily, Normal, Dry, Mix
@@ -83,6 +84,7 @@ namespace GlowUp.Data
     public class BrandData
     {
         public string id, name, category, market, status;
+        public string website = "";              // the brand's CONFIRMED website (an admin checked that the brand owns it); "" = none
         public long scans;
         public bool binned;                      // in the website's Recycle bin: never used, but known, so it is not added a second time
         public List<string> aliases = new List<string>();             // other names the brand is known under
@@ -189,6 +191,7 @@ namespace GlowUp.Data
         public List<string> recommendedShades = new List<string>();
         public bool dermatologistAdvised;
         public bool aiEnhanced;
+        public bool pendingApproval;             // the product came from an AI photo reading (pending_products): an admin has not approved it yet
         public bool deleted;                     // in the recoverable trash
         public bool synced;
 

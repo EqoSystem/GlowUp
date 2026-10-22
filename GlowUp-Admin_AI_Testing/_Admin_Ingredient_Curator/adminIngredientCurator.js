@@ -28,13 +28,13 @@ import {
     notify, describeError, setBusy, setFormError, renderChecks, readChecks, writeChecks, originLabel, sourceLinks, assistSourceLinks, sourceGuideHtml, wireSearch,
     SKIN_TYPES, dialogIsOpen, statusBadge, toneBadge
 } from "../_Shared/adminCommon.js";
-import { matchesSearch } from "../_Shared/glowupRules.js";
+import { matchesSearch, sourceKind, normalizeName } from "../_Shared/glowupRules.js";
 import { auth } from "../_Database/firebase-console.js";
 import { cleanupPlan, ingredientDuplicates, ingredientLookalikes, ingredientIssues, mergeIngredients } from "../_Shared/glowupCatalog.js";
 import { openPlanDialog, openDuplicatesDialog } from "../_Shared/adminCleanup.js";
 import { mountShell, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
 import { readAdminDocument } from "../_Shared/adminDocumentReader.js";
-import { loadLists, optionsOf, allOptions, openListManager } from "../_Shared/adminLists.js";
+import { loadLists, optionsOf, allOptions, openListManager, listsNow } from "../_Shared/adminLists.js";
 import { BUILT_IN_HIGHLIGHTS } from "../_Shared/listRules.js";
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
@@ -50,9 +50,11 @@ const VIEW_KEY = "glowup.curator.view.v1";
 const AUTO_APPROVE_AI = true;
 /**
  * Credible = the name is listed in the US FDA substance registry (it has a UNII code), or the AI really searched the web
- * and gave the pages it used. Pages the AI only named from memory do not count.
+ * and one of the pages it used is a regulator, a medical or scientific body, or an ingredient database (the source labels
+ * of glowupRules.js, the same in the app). Any other web page, and pages the AI only named from memory, do not count.
  */
-const hasCredibleSource = (item) => !!item.fdaUnii || (item.webSearched && item.sources.some((s) => /https?:\/\//i.test(s)));
+const CREDIBLE_KINDS = ["regulator", "medical", "reference"];
+const hasCredibleSource = (item) => !!item.fdaUnii || (item.webSearched && item.sources.some((s) => CREDIBLE_KINDS.includes(sourceKind(s, ""))));
 
 let everyIngredient = [];             // every document, also the ones in the Recycle bin
 let ingredients = [];                 // listed: [{ id, name, techName, description, ... }]
@@ -502,7 +504,7 @@ function renderFromProducts(term, typed) {
                     <dt>In the app</dt><dd>No entry here yet: the app uses its own built-in knowledge for it, or looks it up when it is scanned.</dd>
                 </dl>
                 <div class="detail-actions"><button type="button" class="row-btn main" data-act="write" data-name="${escapeHtml(x.name)}" data-tip="Opens the form with the name filled in. You write what it is and how the app should judge it.">${icon("plus")}Write its entry</button>`
-                    + `<button type="button" class="row-btn" data-act="assist" data-name="${escapeHtml(x.name)}" data-tip-title="Assist with AI" data-tip="The AI searches credible sources and drafts only the ingredient description. Nothing is saved until you have read it and pressed Save.">${icon("sparkle")}Assist with AI</button></div>
+                    + `<button type="button" class="row-btn" data-act="assist" data-name="${escapeHtml(x.name)}" data-tip-title="Assist with AI" data-tip="The AI is asked to use regulators, medical bodies and ingredient databases, and drafts only the ingredient description. Every page it used is listed with its kind. Nothing is saved until you have read it and pressed Save.">${icon("sparkle")}Assist with AI</button></div>
             </div>`;
         return `
             <article class="ingredient-card from-product${open ? " open" : ""}" data-id="new:${escapeHtml(x.key)}" tabindex="0" aria-expanded="${open}">
@@ -571,7 +573,7 @@ function detailOf(item, inBin) {
 
     if (productUseKnown) { const used = usedInProducts(item); facts.push(["In products", used === 0 ? "Not in any listed product yet" : many(used, "listed product", "listed products")]); }
     if (item.folder) facts.push(["Folder", escapeHtml(item.folder)]);
-    if (origin) facts.push(["Added", escapeHtml(origin) + (review ? ` <span class="chip review" data-tip="Until you approve it, the app uses this entry's warnings but never counts it as proof that the ingredient is safe.">needs review</span>` : item.autoApproved ? ` <span class="chip" data-tip="Approved by itself because it came with a credible source (the US FDA substance registry, or pages from a web search). Press Edit to correct it.">approved automatically</span>` : item.reviewed ? " · reviewed" : "")]);
+    if (origin) facts.push(["Added", escapeHtml(origin) + (review ? ` <span class="chip review" data-tip="Until you approve it, the app uses this entry's warnings but never counts it as proof that the ingredient is safe.">needs review</span>` : item.autoApproved ? ` <span class="chip" data-tip="Approved by itself because it came with a credible source: the US FDA substance registry, or a page from a regulator, a medical or scientific body, or an ingredient database that the AI's web search used. Press Edit to correct it.">approved automatically</span>` : item.reviewed ? " · reviewed" : "")]);
     const proof = proofLines(item);
     if (proof.length > 0) facts.push(["Sources", `<span class="source-line">${proof.join("<br>")}</span>`]);
     if (inBin && item.binnedAt) facts.push(["Removed", escapeHtml(timeAgo(new Date(item.binnedAt))) + (item.binnedReason ? ` · ${escapeHtml(item.binnedReason)}` : "")]);
@@ -658,7 +660,7 @@ async function assistWithAi(name) {
     const say = (html) => { note.innerHTML = html; note.style.display = ""; };
     if (!name) return;
     if (assistsToday(false) >= ASSIST_PER_DAY) { say(`Assist with AI was used ${ASSIST_PER_DAY} times today in this browser. Write this entry by hand, or go on tomorrow.`); return; }
-    say(`${icon("sparkle")} <b>Asking the AI about "${escapeHtml(name)}"...</b> It searches credible sources; this can take up to a minute.`);
+    say(`${icon("sparkle")} <b>Asking the AI about "${escapeHtml(name)}"...</b> It is asked to use regulators, medical bodies and ingredient databases; this can take up to a minute.`);
     setBusy(saveButton, true, "Waiting for the AI...");
     try {
         const user = auth.currentUser;
@@ -677,7 +679,7 @@ async function assistWithAi(name) {
         const body = await answer.json().catch(() => ({}));
         if (!answer.ok) throw new Error(body.error || "The AI could not be reached (error " + answer.status + ").");
         if (!dialogIsOpen() || el("ingredientTechInput").value.trim() !== name.trim()) return;      // the form was closed or used for something else meanwhile
-        if (!body.found) { say(`<b>No description draft.</b> ${escapeHtml(body.message || "The AI found nothing credible.")}<br>${assistSources(body.sources)}`); return; }
+        if (!body.found) { say(`<b>No description draft.</b> ${escapeHtml(body.message || "The AI found no source for this name.")}<br>${assistSources(body.sources)}`); return; }
 
         const d = body.draft;
         el("ingredientDescInput").value = d.description;
@@ -729,7 +731,9 @@ async function importIngredientFile(file) {
             return;
         }
         const skipped = result.skippedDuplicates + result.skippedInvalid;
-        const summary = `Saved ${many(result.saved, "ingredient", "ingredients")} as Pending for review` + (skipped ? `; skipped ${skipped} duplicate or incomplete.` : ".") + (body.model ? ` Read by ${body.model}.` : "");
+        const summary = `Saved ${many(result.saved, "ingredient", "ingredients")} as Pending for review` + (skipped ? `; skipped ${skipped} duplicate or incomplete.` : ".")
+            + (result.unmatched.length ? ` Not in your lists, so left out: ${result.unmatched.slice(0, 6).join(", ")}${result.unmatched.length > 6 ? " ..." : ""} (add them with Manage lists, then edit the ingredient).` : "")
+            + (body.model ? ` Read by ${body.model}.` : "");
         report(summary, false);
         notify(summary, "ok");
         await loadIngredients();
@@ -748,6 +752,7 @@ async function importIngredientFile(file) {
 async function saveImportedIngredients(records) {
     const batch = writeBatch(db);
     const planned = new Set();
+    const unmatched = new Set();          // allergen / condition / highlight names the page's lists do not have (left out)
     let saved = 0, skippedDuplicates = 0, skippedInvalid = 0;
     records.slice(0, IMPORT_MAX_ROWS).forEach((record) => {
         const name = String(record.name || "").replace(/\s+/g, " ").trim().slice(0, 80);
@@ -758,13 +763,26 @@ async function saveImportedIngredients(records) {
         if (mine.some((k) => planned.has(k)) || everyIngredient.some((other) => keysOf(other).some((k) => mine.includes(k)))) { skippedDuplicates++; return; }
         mine.forEach((k) => planned.add(k));
         const risk = ["safe", "caution", "harmful"].includes(record.riskLevel) ? record.riskLevel : "";
+        const highlightIds = listIds("highlights", record.highlights, unmatched);
+        const avoidConditions = listIds("conditions", record.avoidConditions, unmatched);
+        const skinTypes = (list) => (Array.isArray(list) ? list : []).filter((type) => SKIN_TYPES.some((option) => option.value === type));
+        const avoidTypes = skinTypes(record.avoidSkinTypes);
+        const sources = (Array.isArray(record.sources) ? record.sources : []).map((url) => String(url)).filter((url) => /^https:\/\//i.test(url))
+            .map((url) => { try { return new URL(url).hostname.replace(/^www\./, "") + " | " + url; } catch (error) { return ""; } }).filter(Boolean).slice(0, 10);
         batch.set(doc(collection(db, "ingredients")), {
             name, techName, aliases,
             description: String(record.description || "").replace(/\s+/g, " ").trim().slice(0, 300),
+            chemicalDescription: String(record.chemicalDescription || "").replace(/\s+/g, " ").trim().slice(0, 400),
             riskLevel: risk,
             cautionNote: String(record.cautionNote || "").replace(/\s+/g, " ").trim().slice(0, 120).replace(/^it\s+/i, "").replace(/\.$/, ""),
-            commonUses: "", minAge: 0, keyActive: false, umbrella: false,
-            allergenTags: [], avoidForSkinTypes: [], goodForSkinTypes: [], avoidForConditions: [], goodForConditions: [],
+            commonUses: String(record.commonUses || "").replace(/\s+/g, " ").trim().slice(0, 120),
+            minAge: Number.isInteger(record.minAge) && record.minAge > 0 && record.minAge < 100 ? record.minAge : 0,
+            keyActive: highlightIds.includes("keyActive"), umbrella: highlightIds.includes("umbrella"),
+            highlights: highlightIds.filter((id) => !BUILT_IN_HIGHLIGHTS.includes(id)),
+            allergenTags: listIds("allergens", record.allergens, unmatched),
+            avoidForSkinTypes: avoidTypes, goodForSkinTypes: skinTypes(record.goodSkinTypes).filter((type) => !avoidTypes.includes(type)),
+            avoidForConditions: avoidConditions, goodForConditions: listIds("conditions", record.goodConditions, unmatched).filter((id) => !avoidConditions.includes(id)),
+            sources,
             folder: "",
             // "ai" + not reviewed is the existing Pending state: the app uses such an entry as a warning at most, never as proof of safety
             source: "ai", reviewed: false, via: "document-import",
@@ -772,9 +790,27 @@ async function saveImportedIngredients(records) {
         });
         saved++;
     });
-    if (saved === 0) return { saved, skippedDuplicates, skippedInvalid };
+    if (saved === 0) return { saved, skippedDuplicates, skippedInvalid, unmatched: Array.from(unmatched) };
     await batch.commit();
-    return { saved, skippedDuplicates, skippedInvalid };
+    return { saved, skippedDuplicates, skippedInvalid, unmatched: Array.from(unmatched) };
+}
+
+/**
+ * The ids of a list (allergens, conditions, highlights) that the names in a document stand for: a name matches an item's
+ * label, id or one of its keywords. A name that matches nothing is noted in `unmatched` and left out (add it to the
+ * list first with "Manage lists", then edit the ingredient).
+ */
+function listIds(kind, names, unmatched) {
+    const items = (listsNow()[kind] || []).filter((item) => !item.retired);
+    const ids = [];
+    (Array.isArray(names) ? names : []).forEach((raw) => {
+        const key = normalizeName(raw);
+        if (!key) return;
+        const item = items.find((it) => normalizeName(it.label) === key || normalizeName(it.id) === key
+            || (it.keywords || []).some((word) => { const w = normalizeName(word); return w && (" " + key + " ").includes(" " + w + " "); }));
+        if (item) { if (!ids.includes(item.id)) ids.push(item.id); } else unmatched.add(String(raw).trim());
+    });
+    return ids;
 }
 
 async function askCuratorAi(name) {

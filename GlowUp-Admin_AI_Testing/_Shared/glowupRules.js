@@ -522,10 +522,8 @@ export const SOURCE_RETAILERS = ["watsons.com.ph", "watsons.com.my", "watsons.co
     "superdrug.com", "cultbeauty.com", "cultbeauty.co.uk", "nykaa.com", "yesstyle.com", "stylevana.com", "sasa.com", "sasa.com.hk",
     "guardian.com.sg", "guardian.com.my", "oliveyoung.com", "oliveyoung.co.kr", "feelunique.com", "beautybay.com", "notino.com", "notino.co.uk",
     "douglas.de", "priceline.com.au", "chemistwarehouse.com.au", "mercurydrug.com", "southstardrug.com.ph", "landers.ph", "smmarkets.ph"];
-export const SOURCE_MAKER_SUFFIXES = ["", "cosmetics", "beauty", "makeup"];
-// a maker's own site ends in one of these (an odd ending such as .xyz or .shop is anybody's)
-export const SOURCE_MAKER_ENDINGS = ["com", "net", "org", "co", "ph", "com.ph", "us", "ca", "uk", "co.uk", "com.au", "kr", "co.kr", "jp", "co.jp", "fr", "de", "it", "es",
-    "sg", "com.sg", "my", "com.my", "in", "co.in", "id", "co.id", "th", "co.th", "vn", "com.vn", "tw", "com.tw", "hk", "com.hk", "eu", "ch", "nl", "se"];
+// The MAKER's own site is never guessed from a name (anybody can register "brandcosmetics.com"): it is the brand's
+// `website`, which only an admin sets, after checking that the brand owns the address (Brand form, "Official website").
 const BACKSLASH = String.fromCharCode(92);
 // only a PLAIN address is labelled: http(s), a host of a-z 0-9 . - only (no user name, no other letters), an optional
 // port, and printable ASCII after it. Anything else (a backslash, "user@", look-alike letters) is an Unverified site.
@@ -534,7 +532,7 @@ const STRICT_ADDRESS = /^https?:\/\/([a-z0-9.-]+)(?::[0-9]{1,5})?([/?#][!-~]*)?$
 export const SOURCE_KINDS = {
     regulator: { label: "Regulator / government", advice: "An official body. The strongest kind of source here.", tone: "good" },
     medical: { label: "Medical / scientific body", advice: "A medical or scientific publisher. A dermatologist or pharmacist can check the cited study or review.", tone: "good" },
-    maker: { label: "Manufacturer's own site", advice: "The maker's own ingredient list. Confirm it against the pack; marketing claims are not evidence.", tone: "" },
+    maker: { label: "Manufacturer's own site", advice: "The brand's own website, confirmed by a GlowUp admin. Its list should match the pack; marketing claims are not evidence.", tone: "" },
     reference: { label: "Ingredient database", advice: "Explains what an ingredient is. Not peer-reviewed, and never proof of what one product contains.", tone: "" },
     public: { label: "Public list (anyone can edit)", advice: "A public list anybody can edit. Use it as a second opinion only.", tone: "" },
     retailer: { label: "Retailer listing", advice: "A shop's copy of the pack's list. It can be out of date: compare it with your pack.", tone: "" },
@@ -595,47 +593,28 @@ export function sourceHost(source) {
     return withoutWww(host);
 }
 
-/** Where the site's own name stands in its address: the part before the ending (".com", ".com.ph" ...). */
-function ownNameIndex(parts) {
-    const second = parts[parts.length - 2];
-    const countryEnding = parts.length >= 3 && parts[parts.length - 1].length === 2 && ["co", "com", "org", "net", "gov", "edu"].includes(second);
-    return countryEnding ? parts.length - 3 : parts.length - 2;
-}
+const onSite = (host, sites) => sites.some((site) => host === site || host.endsWith("." + site));
 
-/** "maybelline" for maybelline.com.ph or shop.maybelline.com: the site's own name, without the country ending. */
-export function sourceOwnName(host) {
-    const parts = text0(host).split(".");
-    if (parts.length < 2) return "";
-    return parts[ownNameIndex(parts)].replace(/[^a-z0-9]/g, "");
+/**
+ * The site of a brand's CONFIRMED website ("maybelline.com.ph" for "https://www.maybelline.com.ph/en"); "" when there is
+ * none, or when it is not a plain address. Its pages, and pages under it (shop.maybelline.com.ph), are the maker's.
+ */
+export function makerHost(confirmedWebsite) {
+    const plain = plainAddress(sourceAddress(confirmedWebsite));
+    return plain && !isRedirect(plain) ? withoutWww(plain.host) : "";
 }
 
 /**
- * True when the site's own name IS the brand's name (at most one SOURCE_MAKER_SUFFIXES word after it) and the site has a
- * usual ending (SOURCE_MAKER_ENDINGS); containing the name is not enough.
+ * regulator, medical, maker, reference, public, retailer or other. `confirmedWebsite` = the brand's `website` (set only by
+ * an admin after checking it); empty = no page counts as the maker's.
  */
-export function isMakersSite(host, brandName) {
-    const parts = text0(host).split(".");
-    if (parts.length < 2 || !SOURCE_MAKER_ENDINGS.includes(parts.slice(ownNameIndex(parts) + 1).join("."))) return false;
-    const own = sourceOwnName(host), words = nameWords(brandName);
-    if (own.length === 0 || words.length === 0) return false;
-    const names = [];
-    const whole = words.join("");
-    if (whole.length >= 3) names.push(whole);
-    if (words.length > 1 && words[0].length >= 4) names.push(words[0]);
-    if (names.some((name) => SOURCE_MAKER_SUFFIXES.some((suffix) => own === name + suffix))) return true;
-    // a first word of three letters ("NYX Professional Makeup") only with a word after it: nyxcosmetics.com
-    return words.length > 1 && words[0].length === 3 && SOURCE_MAKER_SUFFIXES.some((suffix) => suffix.length > 0 && own === words[0] + suffix);
-}
-
-const onSite = (host, sites) => sites.some((site) => host === site || host.endsWith("." + site));
-
-/** regulator, medical, maker, reference, public, retailer or other. `brandName` may be empty (then no page is the maker's). */
-export function sourceKind(source, brandName) {
+export function sourceKind(source, confirmedWebsite) {
     const host = sourceHost(source);
     if (host.length === 0) return "other";
     if (onSite(host, SOURCE_REGULATORS) || /\.gov(\.[a-z]{2})?$/.test(host)) return "regulator";
     if (onSite(host, SOURCE_MEDICAL) || /\.edu(\.[a-z]{2})?$/.test(host)) return "medical";
-    if (isMakersSite(host, brandName)) return "maker";
+    const maker = makerHost(confirmedWebsite);
+    if (maker && onSite(host, [maker])) return "maker";
     if (onSite(host, SOURCE_REFERENCES)) return "reference";
     if (onSite(host, SOURCE_PUBLIC_LISTS)) return "public";
     if (onSite(host, SOURCE_RETAILERS)) return "retailer";
@@ -643,7 +622,7 @@ export function sourceKind(source, brandName) {
 }
 
 /** { kind, label, advice, tone } of a source line. */
-export function describeSourceLine(source, brandName) {
-    const kind = sourceKind(source, brandName);
+export function describeSourceLine(source, confirmedWebsite) {
+    const kind = sourceKind(source, confirmedWebsite);
     return { kind, ...SOURCE_KINDS[kind] };
 }

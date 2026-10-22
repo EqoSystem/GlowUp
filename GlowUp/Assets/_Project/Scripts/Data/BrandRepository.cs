@@ -84,6 +84,7 @@ namespace GlowUp.Data
                     {
                         id = f.Id, name = f.Str("name", "Unnamed Brand"), category = f.Str("category"),
                         market = f.Str("market", "Global"), scans = f.Long("scans"), binned = binned, aliases = f.List("aliases"),
+                        website = f.Str("website"),     // set only by an admin who confirmed the brand owns it: its pages are the maker's own
                         status = binned ? "Inactive" : f.Str("status", "Active")      // a brand in the website's Recycle bin is switched off
                     });
                 }
@@ -124,6 +125,18 @@ namespace GlowUp.Data
         /// and spaces do not matter; when no brand has exactly this name, a brand whose name is this one with words added or
         /// left out is taken ("Maybelline" for "Maybelline New York"). An alias of the brand counts as its name.
         /// </summary>
+        /// <summary>
+        /// The CONFIRMED website of a product's brand (found by its id, else by its name); "" when the brand has none. Only
+        /// pages on it are labelled "Manufacturer's own site" (ListSources.SourceKind).
+        /// </summary>
+        public static string WebsiteOf(string brandId, string brandName)
+        {
+            BrandData brand = null;
+            if (!string.IsNullOrEmpty(brandId)) foreach (BrandData b in All()) if (b != null && b.id == brandId) { brand = b; break; }
+            if (brand == null && !string.IsNullOrWhiteSpace(brandName)) brand = FindByName(brandName);
+            return brand != null && !brand.binned ? (brand.website ?? "") : "";
+        }
+
         public static BrandData FindByName(string name)
         {
             string wanted = TextKey.Compact(name);
