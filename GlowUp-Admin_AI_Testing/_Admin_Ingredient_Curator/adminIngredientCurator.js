@@ -58,7 +58,9 @@ const AUTO_APPROVE_AI = true;
 const CREDIBLE_KINDS = ["regulator", "medical", "reference"];
 // an entry that came from a document import or a user's photo (item.via) is NEVER approved by itself: a person has to look at it
 const NEVER_AUTO = ["document-import", "snapshot"];
-const hasCredibleSource = (item) => !NEVER_AUTO.includes(item.via) && (!!item.fdaUnii || (item.webSearched && item.sources.some((s) => CREDIBLE_KINDS.includes(sourceKind(s, "")))));
+// ... and it needs a SOURCE LINK of a widely known dermatology, pharmacy or regulator site (CREDIBLE_KINDS above). A claim written into the
+// entry itself (a UNII code, "searched the web") is not enough: only the link counts, and sourceKind judges the real host of the address.
+const hasCredibleSource = (item) => !NEVER_AUTO.includes(item.via) && item.sources.some((s) => CREDIBLE_KINDS.includes(sourceKind(s, "")));
 
 let everyIngredient = [];             // every document, also the ones in the Recycle bin
 let ingredients = [];                 // listed: [{ id, name, techName, description, ... }]

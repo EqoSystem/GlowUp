@@ -109,6 +109,8 @@ namespace GlowUp.Scan
         public const int DailyLimit = 5;
         const string DayKey = "snapshot.day", CountKey = "snapshot.count";
 
+        string brandHint = "", productHint = "";      // what the live scan already read of this product (a head start for the web search)
+
         bool busy;
         float lockedUntil;
         int lastShownSecond = -1;
@@ -146,9 +148,10 @@ namespace GlowUp.Scan
         }
 
         /// <summary>Opens the pop-up (the scan screen calls this when the catalogue does not have the product).</summary>
-        public void Offer(string why = null)
+        public void Offer(string why = null, string brandHint = "", string productHint = "")
         {
             if (panel == null) return;
+            this.brandHint = brandHint ?? ""; this.productHint = productHint ?? "";
             if (promptText != null) promptText.text = string.IsNullOrEmpty(why) ? msgPrompt : why;
             if (statusText != null) statusText.text = msgConsent + "\n" + msgHowTo;
             Paint();
@@ -200,7 +203,7 @@ namespace GlowUp.Scan
                 lockedUntil = Time.unscaledTime + CooldownSeconds;
                 CountOne();
                 Paint();
-                ScanPhotoService.Reading read = await ScanPhotoService.Read(jpeg);
+                ScanPhotoService.Reading read = await ScanPhotoService.Read(jpeg, brandHint, productHint);
                 if (this == null) return;
                 switch (read.outcome)
                 {

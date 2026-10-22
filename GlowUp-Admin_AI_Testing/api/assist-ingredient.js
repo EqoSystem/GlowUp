@@ -703,8 +703,8 @@ function brief(notes) {
 module.exports = async (req, res) => {
     try {
         if (req.method !== "POST") return send(res, 405, { error: "Use POST." });
-        const key = process.env.GEMINI_API_KEY;
-        if (!key && !BACKUPS.some((b) => process.env[b.key])) return send(res, 503, { error: "The AI is not set up yet: add GEMINI_API_KEY in Vercel > Project > Settings > Environment Variables, then deploy again." });
+        const key = process.env.GLOWUP_WEB_AI || process.env.GEMINI_API_KEY;
+        if (!key && !BACKUPS.some((b) => process.env[b.key])) return send(res, 503, { error: "The AI is not set up yet: add GLOWUP_WEB_AI in Vercel > Project > Settings > Environment Variables, then deploy again." });
 
         const header = String(req.headers.authorization || "");
         const uid = await adminUid(header.startsWith("Bearer ") ? header.slice(7) : "");

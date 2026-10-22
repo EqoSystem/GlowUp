@@ -34,7 +34,7 @@ namespace GlowUp.Scan
         public static string FunctionUrl = "";
         public static float TimeoutSeconds = 45f;
 
-        public static async Task<Reading> Read(byte[] jpeg)
+        public static async Task<Reading> Read(byte[] jpeg, string brandHint = "", string productHint = "")
         {
             var result = new Reading();
             if (string.IsNullOrEmpty(FunctionUrl) || !FunctionUrl.StartsWith("https://", StringComparison.Ordinal)) { result.outcome = Outcome.NotSetUp; return result; }
@@ -47,7 +47,8 @@ namespace GlowUp.Scan
                 if (user == null) { result.outcome = Outcome.SignIn; return result; }
                 string token = await user.TokenAsync(false).OrTimeout(8f, "Getting the sign-in token");
 
-                string body = "{\"image\":\"" + Convert.ToBase64String(jpeg) + "\"}";
+                // the live scan's own reading (if any) goes along as a head start for the web search; the server cleans it and the photo wins
+                string body = "{\"image\":\"" + Convert.ToBase64String(jpeg) + "\",\"brandHint\":\"" + JsonText(brandHint) + "\",\"productHint\":\"" + JsonText(productHint) + "\"}";
                 using (var request = new UnityWebRequest(FunctionUrl, "POST"))
                 {
                     request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
@@ -88,6 +89,15 @@ namespace GlowUp.Scan
                 Debug.LogWarning("Photo reading failed: " + e.Message);
                 return new Reading();                                         // Down
             }
+        }
+
+        /// <summary>Text made safe to sit inside a JSON string (letters, digits and simple marks only, short).</summary>
+        static string JsonText(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return "";
+            var sb = new StringBuilder();
+            foreach (char c in text) { if (char.IsLetterOrDigit(c) || c == ' ' || c == '.' || c == ',' || c == '\'' || c == '&' || c == '+' || c == '-' || c == '!' || c == ':' || c == '(' || c == ')') sb.Append(c); if (sb.Length >= 100) break; }
+            return sb.ToString().Trim();
         }
 
         static string Str(Dictionary<string, object> json, string key) =>
