@@ -436,6 +436,7 @@ async function loadInventory() {
                 needsReview: data.reviewed === false,
                 autoApproved: data.autoApproved === true,
                 barcode: String(data.barcode || ""),
+                fdaNumber: cleanFdaNumber(data.fdaNumber) || "",
                 imageUrl: String(data.imageUrl || ""),
                 ingredientNotes: Array.isArray(data.ingredientNotes) ? data.ingredientNotes : [],     // per-product caution and share of an ingredient
                 aliases: asArray(data.aliases),
@@ -979,6 +980,7 @@ async function saveImportedProducts(records, brandRecords, fileName) {
             name, brandId: brand.id, brandName: brand.name, cosmeticType, description: String(record.description || "").slice(0, 400),
             aliases: names(record.productAliases, 100, 6).filter((alias) => compactName(alias) !== compactName(name)),
             ingredients, shades, sources, minAge: Number.isInteger(record.minAge) && record.minAge > 0 && record.minAge < 100 ? record.minAge : 0,
+            fdaNumber: cleanFdaNumber(record.fdaNumber) || "",
             status: "Pending", scans: 0, folder: "",
             source: "document-import", reviewed: false, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         };
@@ -2034,7 +2036,7 @@ function openProductForm(product, brandId) {
     el("productDescInput").value = product ? product.description : "";
     el("productIngredientsInput").value = product ? product.ingredients.join(", ") : "";
     el("productImageInput").value = product ? product.imageUrl : "";
-    el("productFdaInput").value = product ? fdaLinkOf(product.sources) : "";
+    el("productFdaInput").value = product ? product.fdaNumber : "";
     el("productIngredientSearch").value = "";
     if (ingredientPicker) ingredientPicker.setNotes(product ? product.ingredientNotes : []);
     el("productMinAgeInput").value = product && product.minAge > 0 ? product.minAge : "";
@@ -2108,7 +2110,7 @@ function exportProductsCsv() {
         { title: "Brand", value: (p) => p.brandName }, { title: "Product", value: (p) => p.name }, { title: "Kind", value: (p) => p.cosmeticType },
         { title: "Shades", value: (p) => p.shades }, { title: "Minimum age", value: (p) => p.minAge }, { title: "Status", value: (p) => p.status },
         { title: "Scans", value: (p) => p.scans }, { title: "Ingredients", value: (p) => p.ingredients },
-        { title: "FDA link", value: (p) => fdaLinkOf(p.sources) }, { title: "Photo link", value: (p) => p.imageUrl }
+        { title: "FDA registration number", value: (p) => p.fdaNumber }, { title: "FDA link", value: (p) => fdaLinkOf(p.sources) }, { title: "Photo link", value: (p) => p.imageUrl }
     ];
     downloadCsv(`${EXPORT_FILE_PREFIX}-products-${today()}.csv`, toCsv(columns, newest));
     notify(`${Math.min(EXPORT_MAX_ROWS, newest.length)} products saved to a file.${newest.length > EXPORT_MAX_ROWS ? " The export holds the newest " + EXPORT_MAX_ROWS + " only." : ""}`, "ok");
@@ -2159,6 +2161,13 @@ function cleanLink(value) {
 }
 
 /** The FDA Philippines page of a product, from its sources ("FDA Philippines verification | https://...") */
+/** An FDA registration (notification) number: letters, digits, hyphens, slashes and single spaces, at most 40 characters; "" when empty, null when it is not one. */
+function cleanFdaNumber(value) {
+    const text = String(value == null ? "" : value).replace(/\s+/g, " ").trim();
+    if (text === "") return "";
+    return /^[A-Za-z0-9][A-Za-z0-9 \-\/]{0,39}$/.test(text) ? text : null;
+}
+
 const fdaLinkOf = (sources) => {
     const entry = (sources || []).find((s) => /fda\.gov\.ph/i.test(s));
     return entry ? (entry.split("|").pop() || "").trim() : "";
@@ -2285,10 +2294,10 @@ async function saveProduct(event) {
     const minAge = toWholeNumber(minAgeText);
     const status = el("productStatusInput").value;
     const shades = Array.from(new Set(formShades.map(cleanShade).filter((s) => s !== null)));
-    const imageUrl = cleanLink(el("productImageInput").value), fdaUrl = cleanLink(el("productFdaInput").value);
+    const imageUrl = cleanLink(el("productImageInput").value), fdaNumber = cleanFdaNumber(el("productFdaInput").value);
 
     if (imageUrl === null) { setFormError(form, "The photo link must be a web address that starts with https://"); el("productImageInput").focus(); return; }
-    if (fdaUrl === null || (fdaUrl && !/^https:\/\/([a-z0-9-]+\.)*fda\.gov\.ph\//i.test(fdaUrl))) { setFormError(form, "The FDA link must be a page of fda.gov.ph (it starts with https://)."); el("productFdaInput").focus(); return; }
+    if (fdaNumber === null) { setFormError(form, "The FDA registration number may have letters, digits, hyphens and slashes only (at most 40 characters)."); el("productFdaInput").focus(); return; }
     if (!name) { setFormError(form, "Type the product name."); el("productNameInput").focus(); return; }
     if (!brand) { setFormError(form, "Choose the brand."); el("productBrandInput").focus(); return; }
     if (!cosmeticType) { setFormError(form, "Choose the cosmetic type."); el("productTypeInput").focus(); return; }
@@ -2302,12 +2311,11 @@ async function saveProduct(event) {
     setFormError(form, "");
 
     // the FDA page lives in the sources, as "FDA Philippines verification | https://..." (the convention of the import and of the scan)
-    const sources = assistedProductSources.filter((s) => !/fda\.gov\.ph/i.test(s));
-    if (fdaUrl) sources.unshift("FDA Philippines verification | " + fdaUrl);
+    const sources = assistedProductSources.slice();          // links already kept (also an FDA page) stay as they are
     const notes = ingredientPicker ? ingredientPicker.getNotes() : [];
     const data = {
         name, brandId: brand.id, brandName: brand.name, cosmeticType, description,
-        ingredients, shades, minAge, status, imageUrl,
+        ingredients, shades, minAge, status, imageUrl, fdaNumber,
         // light summaries kept on the product so that nothing needs a join: the links to the library, how many, and the words a filter uses
         ingredientIds: Array.from(new Set(ingredients.map(libraryIdOf).filter(Boolean))),
         ingredientCount: ingredients.length,

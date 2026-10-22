@@ -13,7 +13,7 @@ import { MAKEUP_TYPES } from "./glowupRules.js";
 
 export const KEYS = {
     BRAND: ["BRAND_NAME", "OTHER_NAMES", "MARKET", "OFFICIAL_WEBSITE", "WEBSITE_EVIDENCE", "LOGO_LINK", "PICTURE_LINK"],
-    PRODUCT: ["BRAND_NAME", "PRODUCT_NAME", "OTHER_NAMES", "COSMETIC_TYPE", "DESCRIPTION", "SHADES", "MINIMUM_AGE", "BARCODE", "PRODUCT_PHOTO_LINK", "FDA_PH_LINK", "INGREDIENTS", "SOURCES"],
+    PRODUCT: ["BRAND_NAME", "PRODUCT_NAME", "OTHER_NAMES", "COSMETIC_TYPE", "DESCRIPTION", "SHADES", "MINIMUM_AGE", "BARCODE", "PRODUCT_PHOTO_LINK", "FDA_PH_LINK", "FDA_REGISTRATION_NUMBER", "INGREDIENTS", "SOURCES"],
     INGREDIENT: ["NAME", "LABEL_NAME", "OTHER_NAMES", "DESCRIPTION", "TECHNICAL_DESCRIPTION", "CAUTION_NOTE", "COMMON_USES", "MINIMUM_AGE", "RISK_LEVEL",
         "ALLERGEN_FAMILY", "AVOID_WITH_CONDITIONS", "GOOD_FOR_CONDITIONS", "AVOID_FOR_SKIN_TYPES", "GOOD_FOR_SKIN_TYPES", "HIGHLIGHTS", "SOURCES"]
 };
@@ -39,6 +39,9 @@ const httpsUrl = (raw) => {
 };
 const httpsLinks = (raw, most) => listOf(raw, 500, most * 2).map(httpsUrl).filter((u, i, all) => u && all.indexOf(u) === i).slice(0, most);
 const age = (raw) => { const n = Number(squeeze(raw)); return Number.isInteger(n) && n > 0 && n < 100 ? n : 0; };
+
+/** The FDA registration number as the website keeps it (letters, digits, hyphens, slashes, single spaces; at most 40), or "". */
+const fdaNumberOf = (raw) => { const t = value(raw, 40); return /^[A-Za-z0-9][A-Za-z0-9 \-\/]{0,39}$/.test(t) ? t : ""; };
 
 /** "#C24B62", "c24b62", "#C46", "rgb(194, 75, 98)" -> "#C24B62"; a shade NUMBER ("#128", "128") or a name -> "". The rule of cleanShade / normalShade. */
 export function hexOf(raw) {
@@ -133,6 +136,7 @@ function product(f) {
         ingredients: listOf(f.INGREDIENTS, 100, 80),
         shades: listOf(f.SHADES, 40, 24).map(hexOf).filter((s, i, all) => s && all.indexOf(s) === i).slice(0, 12),
         fdaVerifiedLink: fda,
+        fdaNumber: fdaNumberOf(f.FDA_REGISTRATION_NUMBER),
         sources: Array.from(new Set(sources.concat(fda ? [fda] : []))).slice(0, 10),
         productAliases: listOf(f.OTHER_NAMES, 100, 6), minAge: age(f.MINIMUM_AGE),
         barcode: squeeze(f.BARCODE).replace(/[^0-9]/g, "").slice(0, 14),

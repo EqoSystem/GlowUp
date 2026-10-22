@@ -34,6 +34,7 @@ MINIMUM_AGE: 0
 BARCODE: 3600 5311-18
 PRODUCT_PHOTO_LINK: https://www.maybelline.com/fitme.jpg
 FDA_PH_LINK: https://verification.fda.gov.ph/products/123
+FDA_REGISTRATION_NUMBER: NN-0000123456
 INGREDIENTS: Aqua | Talc | aqua | Glycerin | N/A
 SOURCES: https://www.maybelline.com/fit-me | http://insecure.example/a | https://retailer.example/p
 
@@ -59,6 +60,9 @@ equal(p.productAliases, ["Fit Me Matte"], "None is not an alias");
 equal(p.shades, ["#C8A27A", "#C24B62", "#0A141E"], "colours only: codes without # and rgb() accepted; a shade number, a name and a repeat dropped");
 equal(p.ingredients, ["Aqua", "Talc", "Glycerin"], "ingredients in order, no repeat, N/A dropped");
 equal(p.barcode, "360053111" + "8", "the barcode keeps its digits only");
+equal(p.fdaNumber, "NN-0000123456", "the FDA registration number is read");
+equal(parseImportText("=== PRODUCT ===\nBRAND_NAME: A1\nPRODUCT_NAME: B1\nFDA_REGISTRATION_NUMBER: N/A").draft.products[0].fdaNumber, "", "N/A is no number");
+equal(parseImportText("=== PRODUCT ===\nBRAND_NAME: A1\nPRODUCT_NAME: B1\nFDA_REGISTRATION_NUMBER: <script>x</script>").draft.products[0].fdaNumber, "", "something that is not a number is left out");
 equal([p.fdaVerifiedLink, p.imageUrl], ["https://verification.fda.gov.ph/products/123", "https://www.maybelline.com/fitme.jpg"], "FDA link and photo link");
 equal(p.sources, ["https://www.maybelline.com/fit-me", "https://retailer.example/p", "https://verification.fda.gov.ph/products/123"], "sources: https only, the FDA page added");
 equal([p.brandMarket, p.brandWebsiteSuggested], ["Global", "https://www.maybelline.com/"], "a product takes its brand's details from the BRAND block");
