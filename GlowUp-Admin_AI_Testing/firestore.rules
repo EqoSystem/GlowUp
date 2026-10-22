@@ -50,6 +50,16 @@ service cloud.firestore {
       return makeupWords(type) || !notFaceWords(type + ' ' + name) || faceWords(type + ' ' + name);
     }
 
+    // item i of a list of links: absent, or text of at most 300 characters starting with https:// (nothing else is accepted)
+    function httpsLink(list, i) {
+      return list.size() <= i || (list[i] is string && list[i].size() <= 300 && list[i].matches('https://[^ ]+'));
+    }
+
+    // the UTC day as 20261022: the quota documents are named with it, so a client cannot pick another day
+    function dayStamp(t) {
+      return string(t.year() * 10000 + t.month() * 100 + t.day());
+    }
+
     // ---- who is an admin -------------------------------------------------------------------
     // Created and removed only by hand in the Firebase console. An account may look up its own
     // entry (the website does this when "REQUIRE_ADMIN_RECORD" is switched on).
@@ -250,7 +260,7 @@ service cloud.firestore {
       allow create: if signedIn()
         && pendingId.matches('snap_.+') && pendingId.size() <= 110
         && request.resource.data.keys().hasOnly(['name', 'brandName', 'cosmeticType', 'shadeHex', 'ingredients', 'key', 'status', 'source',
-             'isApproved', 'hasImage', 'confidence', 'model', 'createdByUid', 'createdAtUnix'])
+             'isApproved', 'hasImage', 'confidence', 'model', 'createdByUid', 'createdAtUnix', 'variant', 'size', 'sourceUrls'])
         && request.resource.data.createdByUid == request.auth.uid
         && request.resource.data.isApproved == false
         && request.resource.data.status == 'pending'
@@ -260,8 +270,38 @@ service cloud.firestore {
         && request.resource.data.cosmeticType is string
         && faceProduct(request.resource.data.cosmeticType, request.resource.data.name)
         && request.resource.data.ingredients is list && request.resource.data.ingredients.size() <= 80
+        && (!('variant' in request.resource.data) || (request.resource.data.variant is string && request.resource.data.variant.size() <= 60))
+        && (!('size' in request.resource.data) || (request.resource.data['size'] is string && request.resource.data['size'].size() <= 40))
+        && (!('sourceUrls' in request.resource.data) || (request.resource.data.sourceUrls is list && request.resource.data.sourceUrls.size() <= 5
+             && httpsLink(request.resource.data.sourceUrls, 0) && httpsLink(request.resource.data.sourceUrls, 1) && httpsLink(request.resource.data.sourceUrls, 2)
+             && httpsLink(request.resource.data.sourceUrls, 3) && httpsLink(request.resource.data.sourceUrls, 4)))
         && request.resource.data.createdAtUnix is number;
       allow update, delete: if isAdmin();
+    }
+
+    // Daily limits of the photo function (api/scan-snapshot.js). The function writes these with the USER'S OWN token, so it needs no
+    // service account. A counter can only go up by exactly 1, the day is the server's day, and the cool-down is checked here.
+    // Keep 5, 150 and 30 equal to PER_UID_DAILY, GLOBAL_DAILY and COOLDOWN_SECONDS in that file.
+    //   <uid>_<day>  one account: count (at most 5), lastAt (at least 30 s after the previous one), uid, day
+    //   all_<day>    everybody: count (at most 150); only accepted in the same commit that moves the caller's own counter
+    match /snapshot_quota/{quotaId} {
+      allow get: if signedIn() && quotaId == request.auth.uid + '_' + dayStamp(request.time);
+      allow list, delete: if false;
+      allow create, update: if signedIn() && (
+        (quotaId == request.auth.uid + '_' + dayStamp(request.time)
+          && request.resource.data.keys().hasOnly(['uid', 'day', 'count', 'lastAt'])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.day == dayStamp(request.time)
+          && request.resource.data.count == (resource == null ? 1 : resource.data.count + 1)
+          && request.resource.data.count <= 5
+          && request.resource.data.lastAt == request.time
+          && (resource == null || request.time >= resource.data.lastAt + duration.value(30, 's')))
+        || (quotaId == 'all_' + dayStamp(request.time)
+          && request.resource.data.keys().hasOnly(['day', 'count'])
+          && request.resource.data.day == dayStamp(request.time)
+          && request.resource.data.count == (resource == null ? 1 : resource.data.count + 1)
+          && request.resource.data.count <= 150
+          && getAfter(/databases/$(database)/documents/snapshot_quota/$(request.auth.uid + '_' + dayStamp(request.time))).data.lastAt == request.time));
     }
 
     // The photo of a snapshot, in its own document so phones never download it: admins read it next to the AI's reading.

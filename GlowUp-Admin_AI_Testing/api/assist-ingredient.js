@@ -774,4 +774,4 @@ module.exports = async (req, res) => {
 };
 
 // for the checks in tests/ (pure helpers; no network)
-module.exports.helpers = { sourceKind, describeSource, makerHost, suggestedWebsite, SOURCE_KINDS, SEARCH_KINDS, normalShade, ingredientImportQuestion, tidyIngredientImport, firstObject, tidy, tidyProduct, tidyBrand, tidyImport, isCredible, hostOf, question, descriptionQuestion, productQuestion, brandQuestion, importQuestion, lookupLinks, searchResultUrl, chatContent, share, order: () => ["Gemini"].concat(BACKUPS.map((b) => b.label)) };
+module.exports.helpers = { sourceKind, describeSource, makerHost, suggestedWebsite, SOURCE_KINDS, SEARCH_KINDS, normalShade, ingredientImportQuestion, tidyIngredientImport, firstObject, tidy, tidyProduct, tidyBrand, tidyImport, isCredible, hostOf, question, descriptionQuestion, productQuestion, brandQuestion, importQuestion, lookupLinks, searchResultUrl, chatContent, share, PROJECT, FIREBASE_WEB_KEY, text, httpsUrl, plainAddress, isRedirect, sourcesOf, withTimeout, order: () => ["Gemini"].concat(BACKUPS.map((b) => b.label)) };

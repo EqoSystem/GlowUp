@@ -15,6 +15,8 @@
 export const MAX_LOADED = 50;                 // waiting entries read when the window opens (one read each)
 export const MAX_NEW_INGREDIENTS = 80;        // ingredients one approval may add to the library
 export const SURE_ABOVE = 0.75;               // the AI's own confidence at or above this counts as "looks right"
+export const SIMILAR_PRODUCT = 0.88;          // a product this alike (0 to 1) is shown as "looks like", the same measure as Find duplicates
+export const SIMILAR_INGREDIENT = 0.93;       // the Ingredient Curator's own limit for names that are nearly the same
 export const APPROVED_DESCRIPTION = "Added from an app user's photo (read by the AI), checked by an admin.";
 const EXIT_MS = 320;                          // how long a card takes to slide out
 
@@ -23,6 +25,7 @@ import { collection, doc, query, where, limit, getDoc, serverTimestamp } from "h
 import { getDocs, getCountFromServer, writeBatch, noteReads } from "./adminStore.js";
 import { sameKey, toList, asArray, describeError, COSMETIC_TYPES, productScope, scopeWords } from "./adminCommon.js";
 import { compactName } from "./glowupRules.js";
+import { similarity } from "./glowupCatalog.js";
 import { icon, askConfirm, toast } from "./adminShell.js";
 
 const make = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; };
@@ -65,9 +68,20 @@ export async function loadPending() {
         return {
             id: d.id, name: String(data.name || ""), brandName: String(data.brandName || ""), cosmeticType: String(data.cosmeticType || ""),
             shadeHex: cleanHex(data.shadeHex), ingredients: asArray(data.ingredients).map(String), hasImage: data.hasImage === true,
-            model: String(data.model || ""), confidence: Number(data.confidence) || 0, createdAtUnix: Number(data.createdAtUnix) || 0
+            model: String(data.model || ""), confidence: Number(data.confidence) || 0, createdAtUnix: Number(data.createdAtUnix) || 0,
+            variant: String(data.variant || "").slice(0, 60), size: String(data.size || "").slice(0, 40), sourceUrls: httpsLinks(data.sourceUrls)
         };
     }).sort((a, b) => b.createdAtUnix - a.createdAtUnix);
+}
+
+/** Links to show: https only, under 300 characters, at most 5, each once. Anything else is dropped. */
+export function httpsLinks(value) {
+    const out = [];
+    asArray(value).forEach((item) => {
+        const text = String(item || "");
+        try { const url = new URL(text); if (url.protocol === "https:" && text.length <= 300 && !out.includes(url.href)) out.push(url.href); } catch (error) { /* not a link */ }
+    });
+    return out.slice(0, 5);
 }
 
 /** The photo of a snapshot as a data address ("" when there is none). One read. */
@@ -109,6 +123,27 @@ export function checkValues(v, context) {
     return "";
 }
 
+/** Adds every ingredient the library lacks as "waiting for review" (source ai) to the batch; answers the library id of each name. */
+function addMissingIngredients(batch, names, libraryIds, now) {
+    const ids = [];
+    let added = 0;
+    names.forEach((n) => {
+        const key = sameKey(n);
+        if (libraryIds.has(key)) { ids.push(libraryIds.get(key)); return; }
+        if (added >= MAX_NEW_INGREDIENTS) return;
+        const ref = doc(collection(db, "ingredients"));
+        batch.set(ref, {
+            name: n, techName: n, description: "", aliases: [], riskLevel: "", cautionNote: "", commonUses: "", minAge: 0, keyActive: false, umbrella: false,
+            highlights: [], allergenTags: [], avoidForSkinTypes: [], goodForSkinTypes: [], avoidForConditions: [], goodForConditions: [], folder: "",
+            source: "ai", reviewed: false, via: "snapshot", createdAt: now, updatedAt: now
+        });
+        libraryIds.set(key, ref.id);
+        ids.push(ref.id);
+        added++;
+    });
+    return ids;
+}
+
 /**
  * Approve: ONE batch. The brand (found, or added as Active), the product (added as Active; an existing entry without a list gets
  * this list), every ingredient the library does not have (added as waiting for review, so the app uses it as a warning at most),
@@ -126,22 +161,7 @@ export async function approveSnapshot(entry, v, context) {
         brandId = ref.id; brandName = v.brand;
         batch.set(ref, { name: v.brand, category: "Makeup", market: "Global", status: "Active", scans: 0, source: "snapshot", reviewed: true, reviewedAt: now, createdAt: now, updatedAt: now });
     }
-    const ids = [];
-    let added = 0;
-    v.ingredients.forEach((n) => {
-        const key = sameKey(n);
-        if (libraryIds.has(key)) { ids.push(libraryIds.get(key)); return; }
-        if (added >= MAX_NEW_INGREDIENTS) return;
-        const ref = doc(collection(db, "ingredients"));
-        batch.set(ref, {
-            name: n, techName: n, description: "", aliases: [], riskLevel: "", cautionNote: "", commonUses: "", minAge: 0, keyActive: false, umbrella: false,
-            highlights: [], allergenTags: [], avoidForSkinTypes: [], goodForSkinTypes: [], avoidForConditions: [], goodForConditions: [], folder: "",
-            source: "ai", reviewed: false, via: "snapshot", createdAt: now, updatedAt: now
-        });
-        libraryIds.set(key, ref.id);
-        ids.push(ref.id);
-        added++;
-    });
+    const ids = addMissingIngredients(batch, v.ingredients, libraryIds, now);
     const existing = brand ? findProduct(brandId, v.name) : null;
     let productId;
     if (existing) {
@@ -166,6 +186,57 @@ export async function approveSnapshot(entry, v, context) {
     if (entry.hasImage) batch.delete(doc(db, "pending_product_images", entry.id));
     await batch.commit();
     return productId;
+}
+
+/**
+ * The product was saved with the Add Product form (prefilled from this snapshot): close the snapshot in ONE batch. The ingredients the
+ * library lacks are added as waiting for review, the product's links to the library are put right, the snapshot is marked approved
+ * and its photo deleted.
+ */
+export async function finishSnapshot(entry, productId, v, context) {
+    const { ids: libraryIds } = lookups(context);
+    const batch = writeBatch(db);
+    const now = serverTimestamp();
+    const ids = addMissingIngredients(batch, v.ingredients, libraryIds, now);
+    batch.update(doc(db, "products", productId), { ingredientIds: Array.from(new Set(ids)), updatedAt: now });
+    batch.update(doc(db, "pending_products", entry.id), {
+        isApproved: true, status: "approved", approvedProductId: productId, reviewedAt: now,
+        name: v.name, brandName: v.brand, cosmeticType: v.kind, shadeHex: v.shade, ingredients: v.ingredients
+    });
+    if (entry.hasImage) batch.delete(doc(db, "pending_product_images", entry.id));
+    await batch.commit();
+}
+
+/** Products of the same brand (any brand when the brand is new) whose names are alike but not the same: [{ name, score }], best first, at most 3. */
+export function similarProducts(v, context) {
+    const { findBrand, findProduct } = lookups(context);
+    const brand = findBrand(v.brand);
+    if (!v.name || (brand && findProduct(brand.id, v.name))) return [];
+    const found = [];
+    (context.products || []).forEach((p) => {
+        if (p.binned || (brand && p.brandId !== brand.id)) return;
+        const score = Math.max(...[p.name, ...(p.aliases || [])].map((n) => similarity(v.name, n)));
+        if (score >= SIMILAR_PRODUCT) found.push({ name: p.name, score });
+    });
+    return found.sort((a, b) => b.score - a.score).slice(0, 3);
+}
+
+/** For each ingredient the library lacks: the library entry it nearly equals (Map of sameKey(name) -> { name, score }). */
+export function similarIngredients(names, context) {
+    const { ids } = lookups(context);
+    const out = new Map();
+    const library = (context.library || []).filter((e) => e && e.name);
+    names.forEach((n) => {
+        const key = sameKey(n);
+        if (!key || ids.has(key) || out.has(key)) return;
+        let best = null;
+        library.forEach((e) => {
+            const score = Math.max(...[e.name, e.techName, ...(e.aliases || [])].filter(Boolean).map((x) => similarity(n, x)));
+            if (score >= SIMILAR_INGREDIENT && (!best || score > best.score)) best = { name: e.name, score };
+        });
+        if (best) out.set(key, best);
+    });
+    return out;
 }
 
 /** Reject: the snapshot and its photo are deleted. */
@@ -287,6 +358,7 @@ export function openSnapshotReview(options) {
     function buildCard(entry) {
         const ctx = options.context();
         const { risks, findBrand, findProduct } = lookups(ctx);
+        const closeIngredients = similarIngredients(entry.ingredients, ctx);
         const card = make("article", "snapx-card");
 
         // ---- left: the photo the user took (read only now, when this card is on screen)
@@ -350,7 +422,9 @@ export function openSnapshotReview(options) {
             toList(listBox.value).forEach((n) => {
                 const k = sameKey(n), known = risks.has(k), risk = known ? risks.get(k) : "";
                 const pill = make("span", "snapx-pill " + (known ? (risk || "auto") : "new"), n);
-                pill.title = known ? (risk ? `In the library: ${risk}` : "In the library: the app decides") : "Not in the library yet: added as waiting for review";
+                const near = !known && closeIngredients.get(k);
+                pill.title = known ? (risk ? `In the library: ${risk}` : "In the library: the app decides")
+                    : near ? `Nearly equal to "${near.name}" in the library. Added as waiting for review unless you correct the spelling.` : "Not in the library yet: added as waiting for review";
                 pills.appendChild(pill);
             });
         };
@@ -370,8 +444,24 @@ export function openSnapshotReview(options) {
         legend.append(make("span", "", "Green safe · amber caution · red harmful · dashed new."));
         listField.append(listHead, pills, listBox, legend);
 
+        // what else the AI read, kept apart from the name; the pages it used (https only; text is set as text, never as markup)
+        const extra = make("div", "snapx-extra");
+        if (entry.variant || entry.size) extra.append(make("p", "snapx-details", [entry.variant && "Shade or variant: " + entry.variant, entry.size && "Size: " + entry.size].filter(Boolean).join("   ")));
+        if (entry.sourceUrls.length > 0) {
+            const links = make("p", "snapx-sources", "Pages the AI used: ");
+            entry.sourceUrls.forEach((url, index) => {
+                const link = make("a", "", new URL(url).hostname.replace(/^www\./, ""));
+                link.href = url; link.target = "_blank"; link.rel = "noopener noreferrer nofollow";
+                links.append(index > 0 ? ", " : "", link);
+            });
+            extra.append(links);
+        } else extra.append(make("p", "snapx-sources", "No web sources were found: this reading comes from the photo alone."));
+        const alike = similarProducts({ brand: entry.brandName, name: entry.name }, ctx);
+        if (alike.length > 0) extra.append(make("p", "snapx-similar", "Looks like a product already listed: " + alike.map((a) => `"${a.name}" (${Math.round(a.score * 100)}%)`).join(", ") + ". Compare before you approve."));
+        if (closeIngredients.size > 0) extra.append(make("p", "snapx-similar", `${closeIngredients.size} ingredient${closeIngredients.size === 1 ? "" : "s"} nearly equal one in the library (hover the dashed pills). Add them as new only if they are different.`));
+        const badge = make("p", "snapx-badge", "Pending approval · unverified · AI-generated");
         const error = make("p", "snapx-error"); error.setAttribute("role", "alert");
-        right.append(summary, rows, listField, error);
+        right.append(summary, badge, rows, extra, listField, error);
 
         // ---- actions
         const actions = make("div", "snapx-actions");
@@ -384,10 +474,13 @@ export function openSnapshotReview(options) {
         const reject = make("button", "btn danger", "Reject"); reject.type = "button";
         const edit = make("button", "btn", "Edit & Approve"); edit.type = "button";
         const approve = make("button", "save-btn snapx-approve", "Approve & Publish"); approve.type = "button";
-        actions.append(nav, make("span", "spacer"), reject, edit, approve);
+        const toForm = make("button", "btn", "Open in Add Product form"); toForm.type = "button";
+        toForm.title = "Check and save it with the same form as a product you add by hand. The brand is added first when it is new.";
+        if (typeof options.onOpenForm !== "function") toForm.hidden = true;
+        actions.append(nav, make("span", "spacer"), reject, edit, toForm, approve);
 
         const values = () => ({ brand: brandBox.value.replace(/\s+/g, " ").trim(), name: nameBox.value.replace(/\s+/g, " ").trim(), kind: kindBox.value, shade: cleanHex(shadeBox.value), ingredients: toList(listBox.value) });
-        const lock = (on) => { busy = on; [reject, edit, approve, back, next].forEach((b) => { b.disabled = on || (b === back && at === 0) || (b === next && at >= queue.length - 1); }); };
+        const lock = (on) => { busy = on; [reject, edit, toForm, approve, back, next].forEach((b) => { b.disabled = on || (b === back && at === 0) || (b === next && at >= queue.length - 1); }); };
 
         edit.addEventListener("click", async () => {
             if (!editing) {
@@ -403,6 +496,7 @@ export function openSnapshotReview(options) {
             await doApprove();
         });
         approve.addEventListener("click", doApprove);
+        toForm.addEventListener("click", () => { const v = values(); finish(); options.onOpenForm(entry, v); });
         reject.addEventListener("click", async () => {
             if (!(await askConfirm({ title: "Reject this snapshot?", message: "The entry and its photo are deleted. Users who scanned it keep their own result.", confirmLabel: "Reject", danger: true }))) return;
             lock(true);

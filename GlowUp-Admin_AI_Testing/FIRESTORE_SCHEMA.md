@@ -129,6 +129,8 @@ When a scanned product is not in `products` (and nobody staged it yet), the app 
 | document id (`product_id`) | text | `snap_<brand>__<name>`, made by the app. |
 | `brandName`, `name` (`brand_name`, `product_name`) | text | What the AI read. Field names follow the rest of this database (camelCase). |
 | `cosmeticType`, `shadeHex` | text | Make-up only (the rules check the kind). |
+| `variant`, `size` | text | Optional. Shade name or finish (at most 60), net content as printed (at most 40). Kept apart from the name. |
+| `sourceUrls` | list of text | Optional. At most 5 web pages the AI search used; each starts with `https://`, at most 300 characters. A search engine's redirect address is never stored. |
 | `ingredients` (`extracted_ingredients`) | list of text | Read from the photo only, at most 80. |
 | `hasImage` (instead of `image_url`) | yes/no | The photo is in `pending_product_images` under the same id. Firebase Storage is not used: it needs the Blaze plan. |
 | `isApproved` (`is_approved`) | yes/no | `false` from the app. The website sets `true` (with `status: "approved"`, `approvedProductId`, `reviewedAt`) when an admin approves. |
@@ -136,6 +138,8 @@ When a scanned product is not in `products` (and nobody staged it yet), the app 
 | `status`, `source`, `key`, `confidence`, `model`, `createdAtUnix` | | `pending`, `snapshot`, the comparable name, how sure the AI was (0 to 1), which AI, when. |
 
 `pending_product_images/{same id}`: `jpegBase64` (a JPG of at most about 80 KB, max 1080 px; WebP cannot be made in Unity), `bytes`, `createdByUid`, `createdAtUnix`. Only admins can read it; phones never download it. It is deleted when the entry is approved or rejected.
+
+`snapshot_quota/{uid}_{yyyymmdd}` and `snapshot_quota/all_{yyyymmdd}` (limits of the photo function `api/scan-snapshot.js`): `count` (goes up by 1 only), `lastAt` (own document: at least 30 s apart), `uid`, `day` (the UTC day). At most 5 photos per account and 150 for everybody per day. The function writes them with the user's own sign-in, so no service account is needed. Residual risk: anonymous accounts are free and a reinstall makes a new one, so the per-account limit is a speed bump; the global cap is the real ceiling, and a script with sign-ins can use it up (5 per account) without ever reaching the AI. Old counters stay (no cleanup job); they can be deleted in the console.
 
 **Approve** (website: the Pending Snapshot Reviews window in Brand & Product Inventory) is one batch: the brand (found by name, or added as Active), the product (added as Active with `source: "snapshot"`; an existing entry without a list gets this list), every ingredient the library does not have (added with `source: "ai"`, `reviewed: false`, `via: "snapshot"`, so the Curator lists it as waiting and the app uses it as a warning at most), and the pending entry marked approved. **Reject** deletes the entry and its photo.
 

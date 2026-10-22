@@ -1366,6 +1366,12 @@ body.snapx-open { overflow: hidden; }
 .snapx-pill.caution { border-color: color-mix(in srgb, var(--warn) 55%, transparent); background: color-mix(in srgb, var(--warn) 12%, transparent); }
 .snapx-pill.harmful { border-color: color-mix(in srgb, var(--bad) 55%, transparent); background: color-mix(in srgb, var(--bad) 12%, transparent); font-weight: 650; }
 .snapx-pill.new { border-style: dashed; color: var(--text-2); }
+.snapx-badge { margin: 0; width: fit-content; padding: 3px 10px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 600; color: var(--text); border: 1px dashed color-mix(in srgb, var(--warn) 70%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); }
+.snapx-extra { display: flex; flex-direction: column; gap: 6px; }
+.snapx-details, .snapx-sources { margin: 0; font-size: var(--fs-sm); color: var(--muted); overflow-wrap: anywhere; }
+.snapx-sources a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.snapx-sources a:focus-visible { outline: 2px solid var(--focus, currentColor); outline-offset: 2px; }
+.snapx-similar { margin: 0; padding: 8px 10px; border-radius: var(--radius-sm); font-size: var(--fs-sm); line-height: 1.4; background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--text); }
 .snapx-legend { margin: 0; font-size: var(--fs-xs); color: var(--muted); }
 .snapx-error { margin: 0; min-height: 1.2em; color: var(--bad); font-size: var(--fs-sm); }
 .snapx-actions { grid-area: actions; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid var(--border); }
