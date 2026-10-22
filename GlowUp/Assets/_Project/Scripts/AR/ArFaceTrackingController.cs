@@ -94,6 +94,12 @@ namespace GlowUp.AR
         [SerializeField] private float stableAfterSeconds = 4f;
         [Tooltip("The phone's question about the camera comes when the screen has been on show this long. Asked in the very first moment, it stood over a screen that was not drawn yet.")]
         [SerializeField] private float askAfterSeconds = 0.4f;
+        [Tooltip("After the camera question closes, wait until the app is in front again for this long before the AR camera opens (opening it while the app is still coming back can leave a black screen)")]
+        [Min(0f)] [SerializeField] private float settleAfterPermissionSeconds = 0.8f;
+        [Tooltip("The longest wait for Google's check of AR support; after that the guided preview is used")]
+        [Min(2f)] [SerializeField] private float availabilityTimeoutSeconds = 10f;
+        [Tooltip("The longest wait for the install of Google's AR service (the time the app is away does not count)")]
+        [Min(10f)] [SerializeField] private float installTimeoutSeconds = 120f;
 
         [Header("Wording")]
         [SerializeField] private string msgChecking = "Getting the camera ready...";
@@ -113,6 +119,7 @@ namespace GlowUp.AR
         const string GuardName = "ar-live-tracking";
         bool guarding;
         float liveSince;
+        int recoveries;                              // restarts after the app came back to an empty screen (at most 2 per visit)
 
         RenderTexture picture, beforePicture;
         ARCameraBackground background;
@@ -133,6 +140,7 @@ namespace GlowUp.AR
         public void Begin()
         {
             if (routine != null || IsLive) return;
+            recoveries = 0;
             routine = StartCoroutine(Run());
         }
 
@@ -257,8 +265,22 @@ namespace GlowUp.AR
                 callbacks.PermissionDeniedAndDontAskAgain += _ => { answered = true; };
                 Permission.RequestUserPermission(Permission.Camera, callbacks);
                 float asked = 0f;
-                while (!answered && asked < 60f) { asked += Time.unscaledDeltaTime; yield return null; }
+                while (!answered && asked < 60f)
+                {
+                    asked += Time.unscaledDeltaTime; yield return null;
+                    // the answer can arrive without the callbacks (the activity was recreated behind the question): ask the phone itself
+                    if (!answered && Application.isFocused && Permission.HasUserAuthorizedPermission(Permission.Camera)) { granted = true; answered = true; }
+                }
                 allowed = granted;
+                // the question has just closed: the app is still coming back to the front. Opening the AR camera in that moment can leave a
+                // black screen until the app is restarted, so wait until the app is in front again and has had a moment to draw.
+                float settled = 0f, front = 0f;
+                while (settled < settleAfterPermissionSeconds && front < 5f)
+                {
+                    front += Time.unscaledDeltaTime;
+                    if (Application.isFocused) settled += Time.unscaledDeltaTime;
+                    yield return null;
+                }
             }
 #endif
             if (!allowed)
@@ -278,11 +300,11 @@ namespace GlowUp.AR
 
             // 2. can this phone track faces?
             if (ARSession.state == ARSessionState.None || ARSession.state == ARSessionState.CheckingAvailability)
-                yield return ARSession.CheckAvailability();
+                yield return Within(ARSession.CheckAvailability(), availabilityTimeoutSeconds);
             if (ARSession.state == ARSessionState.NeedsInstall && offerToInstallArServices)
             {
                 Say(msgInstalling);
-                yield return ARSession.Install();
+                yield return Within(ARSession.Install(), installTimeoutSeconds);
             }
             if (ARSession.state < ARSessionState.Ready) { UseGuidedPreview("this phone has no AR face tracking available (" + ARSession.state + ")"); yield break; }
 
@@ -320,6 +342,33 @@ namespace GlowUp.AR
             Say(msgLookingForFace);
             routine = null;
             ModeDecided?.Invoke(true);
+        }
+
+        /// <summary>Runs another routine for at most `seconds` (time spent while the app is paused does not count), then gives up on it.</summary>
+        static IEnumerator Within(IEnumerator work, float seconds)
+        {
+            float elapsed = 0f;
+            while (elapsed < seconds && work.MoveNext())
+            {
+                yield return work.Current;
+                elapsed += Time.unscaledDeltaTime;
+            }
+        }
+
+        /// <summary>
+        /// Back in front after leaving the app (a permission question, the Play Store page of Google's AR service, a call): when nothing
+        /// is on screen (no live tracking, no guided camera) and the camera is allowed, the start is made again instead of leaving a black screen.
+        /// </summary>
+        void OnApplicationFocus(bool focus)
+        {
+#if UNITY_ANDROID && !UNITY_EDITOR
+            if (!focus || routine != null || IsLive || !isActiveAndEnabled || recoveries >= 2) return;
+            if (guidedCamera != null && guidedCamera.IsPlaying) return;
+            if (!Permission.HasUserAuthorizedPermission(Permission.Camera)) return;
+            recoveries++;
+            Debug.Log("[GlowUp] AR Try-On: the screen was left empty while the app was away; starting it again.");
+            routine = StartCoroutine(Run());
+#endif
         }
 
         // ---------------------------------------------------------------------------------------
