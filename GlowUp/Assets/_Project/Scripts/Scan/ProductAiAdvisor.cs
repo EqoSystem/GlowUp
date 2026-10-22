@@ -205,7 +205,7 @@ namespace GlowUp.Scan
             "BRAND OR PRODUCT NAME? The BRAND is the company or label that makes the product: usually its logo, written the same way on everything it sells. " +
             "The PRODUCT NAME is what this ONE product or line is called, usually printed next to the kind of product (\"SuperStay Matte Ink\", \"Fit Me Matte + Poreless\"). " +
             "Never put the brand into productName. Never use the kind of product alone (\"Lipstick\", \"Loose Powder\"), a slogan, a claim (\"Long lasting\", \"24H\") " +
-            "or the shade as the product name. When only one name is printed, decide which of the two it is, and leave the other empty.\n";
+            "or the shade as the product name. A phrase that says what the product does or how it finishes (\"Natural-Flex Finish\", \"Full Coverage\", \"Matte Finish\") is a claim, not the name: the name is usually the biggest word on the front (\"EverLock+\"), and a brand can be printed small or along the side. When only one name is printed, decide which of the two it is, and leave the other empty.\n";
 
         /// <summary>
         /// Reads the AI's answer to Identify (the JSON object in its text). Kept apart from the asking so that the reading
@@ -220,6 +220,7 @@ namespace GlowUp.Scan
             result.model = model ?? "";
             result.productName = Text(json, "productName"); result.brandName = Text(json, "brandName"); result.cosmeticType = Text(json, "cosmeticType");
             result.productName = WithoutBrand(result.productName, result.brandName);
+            if (LooksLikeFinishClaim(result.productName)) result.productName = "";           // "Natural-Flex Finish" is what the pack promises, not its name
             result.shadeName = Text(json, "shadeName");
             string hex = Text(json, "shadeHex");
             result.shadeHex = hex.Length == 7 && hex[0] == '#' && ColorUtility.TryParseHtmlString(hex, out _) ? hex.ToUpperInvariant() : "";
@@ -239,6 +240,17 @@ namespace GlowUp.Scan
         /// A product name without its brand in front: "Maybelline SuperStay Matte Ink" by Maybelline is "SuperStay Matte Ink".
         /// A "name" that is nothing but the brand is no product name at all.
         /// </summary>
+        /// <summary>A short phrase that only says what the product does ("Natural-Flex Finish", "Full Coverage"): a claim, not a name.</summary>
+        public static bool LooksLikeFinishClaim(string name)
+        {
+            string key = TextKey.Normalize(name);
+            if (key.Length == 0) return false;
+            string[] words = key.Split(' ');
+            if (words.Length > 3) return false;
+            string last = words[words.Length - 1];
+            return words.Length >= 2 && (last == "finish" || last == "coverage" || last == "formula" || last == "wear");
+        }
+
         public static string WithoutBrand(string productName, string brandName)
         {
             string name = (productName ?? "").Trim(), brand = (brandName ?? "").Trim();

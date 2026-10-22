@@ -118,6 +118,11 @@ namespace GlowUp.EditorTools
             var boost = SceneBuilderCore.Ensure<ScreenBrightnessBoost>(sun.gameObject);
             A.Set(boost, "screen", (int)ScreenBrightnessBoost.CameraScreen.Scanner); A.Set(boost, "toggleButton", sun); A.Set(boost, "toggleIcon", sunIcon);
 
+            // ---- the photo button: under the sun, shown when the scan takes long; one photo goes to the web search ----
+            Button photoFallback = CameraButton(viewport.transform, "PhotoFallbackButton", IconFactory.CameraIcon, out Image photoFallbackIcon);
+            A.At(photoFallback.transform, A.TR, new Vector2(-24, -128), new Vector2(92, 92));
+            photoFallback.gameObject.SetActive(false);
+
             // ---- the flashlight: its button, and the question that appears when it is dark ----
             GameObject lightHelper = A.Node(viewport.transform, "LightAssistant", typeof(ScanLightAssistant));
             A.Fill(lightHelper.transform);
@@ -400,7 +405,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "startOverPanel", startOverPopup.panel);
             A.Set(controller, "productQuestion", productQuestion); A.Set(controller, "shortlist", shortlistView);
             A.Set(controller, "sameProductButton", sameProduct); A.Set(controller, "differentProductButton", differentProduct);
-            A.Set(controller, "manualEntryButton", manualEntry); A.Set(controller, "backButton", s.back);
+            A.Set(controller, "manualEntryButton", manualEntry); A.Set(controller, "photoButton", photoFallback); A.Set(controller, "backButton", s.back);
             A.Set(controller, "statusText", status);
             A.Set(controller, "manualPanel", manual.panel); A.Set(controller, "manualInput", manualInput);
             A.Set(controller, "manualProductInput", manualProduct); A.Set(controller, "manualBrandInput", manualBrand); A.Set(controller, "manualTypeDropdown", manualType);

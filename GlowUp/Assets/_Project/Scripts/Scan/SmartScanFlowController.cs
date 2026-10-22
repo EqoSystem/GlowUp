@@ -93,6 +93,12 @@ namespace GlowUp.Scan
         [SerializeField] private bool offerSnapshotOnCatalogMiss = true;
         [Tooltip("On = when the scan is stuck and no product has been named, the photo pop-up is offered once")]
         [SerializeField] private bool offerSnapshotWhenStuck = true;
+        [Tooltip("The camera button on the scan screen: a photo of the product is sent to the web search. It appears when the scan takes long.")]
+        [SerializeField] private Button photoButton;
+        [Tooltip("The photo button appears after the scan has run this many seconds without finishing")]
+        [Min(1f)] [SerializeField] private float photoButtonAfterSeconds = 6f;
+        [SerializeField] private string msgPhotoHint = "Slow or read wrong? Tap the camera button to take a photo of the product.";
+        [SerializeField] private string msgPhotoOffer = "Not reading it right? Take a photo of the product: GlowUp's AI searches the web for it.";
         [SerializeField] private string msgSnapshotStuck = "Not getting further? Take one photo of the pack and the AI will read it.";
         [SerializeField] private string msgFoundStagedOwn = "Found it among the products you sent. It is waiting for an admin's approval.";
 
@@ -299,6 +305,11 @@ namespace GlowUp.Scan
 
         // ---------------------------------------------------------------------------------------
         Stage stage = Stage.Idle;
+        bool photoHintSaid;
+        // the shade is the colour the camera keeps seeing: it is taken once it has stayed the same for a while and then it stays
+        string shadeCandidate = "", lockedShade = "";
+        int shadeStableCount;
+        const int ShadeStableReadings = 5;
         bool snapshotOffered;                        // the photo pop-up is offered at most once per scan
         float stuckTipTimer; int stuckTipIndex;
         FrameReader reader;
@@ -374,6 +385,7 @@ namespace GlowUp.Scan
             if (sameProductButton != null) sameProductButton.onClick.AddListener(() => { ClosePanel(startOverPanel); StartOver(true, msgSameAgain); });
             if (differentProductButton != null) differentProductButton.onClick.AddListener(() => { ClosePanel(startOverPanel); StartOver(false, msgStartedOver); });
             if (manualEntryButton != null) manualEntryButton.onClick.AddListener(OpenManual);
+            if (photoButton != null) { photoButton.onClick.AddListener(OnPhotoButton); photoButton.gameObject.SetActive(false); }
             if (snapshot != null) { snapshot.Analysed += OnSnapshotAnalysed; snapshot.NameOnly += OnSnapshotNameOnly; }
             if (manualAnalyseButton != null) manualAnalyseButton.onClick.AddListener(AnalyseManual);
             if (lookUpButton != null) lookUpButton.onClick.AddListener(LookUp);
@@ -517,11 +529,29 @@ namespace GlowUp.Scan
         /// <summary>While the scan is stuck, the Type it in button pulses gently: it is the way out.</summary>
         void LateUpdate()
         {
+            ShowPhotoButtonIfSlow();
             if (manualEntryButton == null) return;
             bool pulse = pulseManualButtonWhenStuck && stalledSaid && stage == Stage.Scanning;
             float size = pulse ? 1f + manualPulseSize * (0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 4f)) : 1f;
             Transform t = manualEntryButton.transform;
             if (!Mathf.Approximately(t.localScale.x, size)) t.localScale = Vector3.one * size;
+        }
+
+        /// <summary>The camera button shows while a scan has run for a while without finishing (wrong or slow): it takes ONE photo for the web search.</summary>
+        void ShowPhotoButtonIfSlow()
+        {
+            if (photoButton == null || snapshot == null) return;
+            bool want = stage == Stage.Scanning && scanningFor >= photoButtonAfterSeconds && !snapshot.IsOpen;
+            if (want == photoButton.gameObject.activeSelf) return;
+            photoButton.gameObject.SetActive(want);
+            if (want && !photoHintSaid) { photoHintSaid = true; Say(msgPhotoHint); }
+        }
+
+        void OnPhotoButton()
+        {
+            if (snapshot == null || stage != Stage.Scanning) return;
+            if (holdButton != null) holdButton.LetGo();        // reading pauses while the pop-up is open
+            snapshot.Offer(msgPhotoOffer, identity.brandName, identity.productName);
         }
 
         void Update()
@@ -620,7 +650,8 @@ namespace GlowUp.Scan
                 if (cameraFeed.FramePixels(frame, out int wide, out int high)) { framePixelsHigh = high; frameWide = wide; frameHigh = high; }
                 string colour = cameraFeed.DominantColourHex(frame);         // only what is inside the scan frame, not the hand or the table round it
                 if (!string.IsNullOrEmpty(colour)) lastColour = colour;
-                if (capWatch.Hidden && capWatch.Look(colour)) ShadeLook();    // a new colour stays in view: the cap is probably off now
+                StabiliseShade(colour);
+                if (capWatch.Hidden && capWatch.Look(colour)) { lockedShade = ""; shadeCandidate = ""; shadeStableCount = 0; ShadeLook(); }    // a new colour stays in view: the cap is probably off now
             }
             if (sentCloseLook) { closeLooksSent++; lastEnlarge = enlarge; }
             sentSharpness = measure.sharpness; sentAt = Time.unscaledTime;
@@ -936,6 +967,24 @@ namespace GlowUp.Scan
             foreach (ScanCheckItem item in new[] { productCheck, brandCheck, typeCheck, shadeCheck }) if (item != null) item.SetWorking(on);
         }
 
+        /// <summary>
+        /// The colour the camera sees changes with every picture (light, hand, angle). It becomes the shade only after ShadeStableReadings readings in a
+        /// row agree, and then it stays (until Start over, or the cap comes off), so the shown colour does not keep changing.
+        /// </summary>
+        void StabiliseShade(string colour)
+        {
+            if (lockedShade.Length > 0 || string.IsNullOrEmpty(colour) || capWatch.Hidden) return;
+            if (shadeCandidate.Length > 0 && SameColour(shadeCandidate, colour)) shadeStableCount++;
+            else { shadeCandidate = colour; shadeStableCount = 1; }
+            if (shadeStableCount >= ShadeStableReadings) { lockedShade = shadeCandidate; ShowIdentity(); }
+        }
+
+        static bool SameColour(string a, string b)
+        {
+            Color x = ShadeAdvisor.Parse(a, Color.clear), y = ShadeAdvisor.Parse(b, Color.clear);
+            return Mathf.Abs(x.r - y.r) < 0.06f && Mathf.Abs(x.g - y.g) < 0.06f && Mathf.Abs(x.b - y.b) < 0.06f;
+        }
+
         void ShowIdentity()
         {
             if (productCheck != null && identity.productName.Length > 0) productCheck.SetFound(identity.productName);
@@ -946,7 +995,7 @@ namespace GlowUp.Scan
             // WITH THE CAP ON (the AI saw it) the colour the camera sees is the cap's or the tube's: it is never the shade.
             string hex = identity.shadeHex;
             if (hex.Length == 0 && ShadeAdvisor.IsColourCosmetic(identity.cosmeticType) && !capWatch.Hidden)
-                hex = evidence.ShadeHex.Length > 0 ? evidence.ShadeHex : (ProductKnown ? lastColour : "");
+                hex = lockedShade;                       // not the colour of this very picture: the one that stayed the same
             hex = ShadeAdvisor.ShadeFor(identity.cosmeticType, hex);          // a face powder is white, whatever colour its box has
             if (ShadeAdvisor.IsFacePowder(identity.cosmeticType)) identity.shadeHex = hex;
             if (hex.Length == 0 && identity.shadeName.Length == 0)
@@ -1490,6 +1539,7 @@ namespace GlowUp.Scan
             for (int i = 0; i < best.Length; i++) best[i] = null;
             ingredientText = null; ingredientSource = "scan"; listFrom = ""; listWebBacked = false; sources.Clear();
             barcode = ""; lastColour = "";
+            shadeCandidate = lockedShade = ""; shadeStableCount = 0; photoHintSaid = false;
             declined.Clear(); shortlistAnswered = false; frontChecked = "";
             scanNumber++;
             ReadCounter.NewScan();
@@ -1932,7 +1982,7 @@ namespace GlowUp.Scan
             if (ingredientText == null) return;
             ScanSession.PendingText = ingredientText; ScanSession.PendingSource = ingredientSource;
             // with the cap on, the colour the camera saw is the pack's: no shade is handed on rather than a wrong one
-            ScanSession.PendingShadeHex = identity.shadeHex.Length > 0 ? identity.shadeHex : capWatch.Hidden ? "" : evidence.ShadeHex.Length > 0 ? evidence.ShadeHex : lastColour;
+            ScanSession.PendingShadeHex = identity.shadeHex.Length > 0 ? identity.shadeHex : capWatch.Hidden ? "" : lockedShade.Length > 0 ? lockedShade : evidence.ShadeHex.Length > 0 ? evidence.ShadeHex : lastColour;
             ScanSession.PendingProductName = identity.productName; ScanSession.PendingBrandName = identity.brandName;
             ScanSession.PendingCosmeticType = identity.cosmeticType;
             ScanSession.PendingOfficialIngredientSource = knownProduct != null ? knownProduct.officialIngredientSource : "";
