@@ -45,6 +45,7 @@ namespace GlowUp.Data
     public class PendingProductData
     {
         public string id = "", name = "", brandName = "", cosmeticType = "", shadeHex = "", model = "";
+        public string createdByUid = "";         // who sent it: only the sender's own entry is ever used for a verdict
         public List<string> ingredients = new List<string>();
         public bool isApproved;
         public long savedAtUnix;
@@ -61,6 +62,9 @@ namespace GlowUp.Data
     /// <summary>
     /// The staging area for products the app's catalogue does not have yet ("pending_products", see FIRESTORE_SCHEMA.md).
     ///
+    ///   OWN ENTRIES ONLY: an entry another user staged is unverified, and anyone signed in can stage the first one for a product, so it is
+    ///   never used for a verdict on this phone (it would be a way to hide an allergen from other users). Only the sender's own entry is
+    ///   found again; for everybody else the product is read from their own photo, and an admin's approval puts it in the catalogue.
     ///   Find:   the copy on the phone first (0 reads); then ONE read of the document whose id is made from the brand and the
     ///           name, so every user who snaps the same product lands on the same entry. A miss is remembered for a while, so the
     ///           same unknown product does not cost a read on every scan.
@@ -104,13 +108,16 @@ namespace GlowUp.Data
 
         static long Now => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
+        /// <summary>True when the entry was sent from this account (an entry without a sender is nobody's).</summary>
+        static bool IsMine(string senderUid) => !string.IsNullOrEmpty(senderUid) && senderUid == UserProfileRepository.CurrentUid;
+
         /// <summary>The copy on the phone, or null (no read).</summary>
         public static PendingProductData FindLocal(string brandName, string productName)
         {
             string id = IdFor(brandName, productName);
             if (id.Length == 0) return null;
             PendingProductData kept = Cache.items.Find(p => p.id == id);
-            if (kept == null) return null;
+            if (kept == null || !IsMine(kept.createdByUid)) return null;       // a copy of someone else's entry (older builds kept them) is not used
             return Now - kept.savedAtUnix <= KeepHours * 3600f ? kept : null;
         }
 
@@ -133,10 +140,11 @@ namespace GlowUp.Data
                 ReadCounter.Add("pending_products lookup", 1);
                 if (!snapshot.Exists) { RememberMiss(id); return null; }
                 var f = new FirestoreFields(snapshot);
+                if (!IsMine(f.Str("createdByUid"))) { RememberMiss(id); return null; }        // another user's entry: unverified, not used
                 var found = new PendingProductData
                 {
                     id = id, name = f.Str("name"), brandName = f.Str("brandName"), cosmeticType = f.Str("cosmeticType"), shadeHex = f.Str("shadeHex"),
-                    model = f.Str("model"), ingredients = f.List("ingredients"), isApproved = f.Bool("isApproved"), savedAtUnix = Now
+                    model = f.Str("model"), createdByUid = f.Str("createdByUid"), ingredients = f.List("ingredients"), isApproved = f.Bool("isApproved"), savedAtUnix = Now
                 };
                 Keep(found);
                 return found.isApproved ? null : found;
@@ -164,7 +172,7 @@ namespace GlowUp.Data
             var kept = new PendingProductData
             {
                 id = id, name = record.name, brandName = record.brandName, cosmeticType = record.cosmeticType, shadeHex = record.shadeHex,
-                model = record.model, ingredients = new List<string>(record.ingredients), isApproved = false, savedAtUnix = Now
+                model = record.model, createdByUid = uid ?? "", ingredients = new List<string>(record.ingredients), isApproved = false, savedAtUnix = Now
             };
             Keep(kept);
             return kept;

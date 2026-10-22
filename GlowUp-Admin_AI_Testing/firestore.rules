@@ -273,7 +273,7 @@ service cloud.firestore {
 
     // ---- AI photo snapshots: products the catalogue does not have, read by the AI from one photo -------------
     // Staged here, NOT in "products", so unverified user content never mixes with the curated catalogue. Signed-in app users
-    // may read them (the same product scanned by another user shows the staged result, marked PENDING APPROVAL) and create
+    // may read them (the app uses only the sender's OWN entry; another user's entry is unverified and never feeds a verdict) and create
     // one: always pending, never approved, their own id, make-up only, short lists. Only an admin approves, edits or deletes.
     // The id is made from the brand and the name ("snap_<brand>__<name>"), so the same product is ONE entry for everybody.
     match /pending_products/{pendingId} {

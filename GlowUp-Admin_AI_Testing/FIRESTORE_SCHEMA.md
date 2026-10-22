@@ -122,7 +122,7 @@ The allergen, skin type and condition ids must be spelled exactly. The website's
 
 ### `pending_products/{id}` (AI photo snapshots, waiting for an admin)
 
-When a scanned product is not in `products` (and nobody staged it yet), the app offers to take ONE photo. The AI reads the brand, name, kind, shade and the printed ingredient list; the result is analysed at once and shown with a **PENDING APPROVAL** badge. The id is `snap_<brand>__<name>` (letters, digits and underscores), so every user who snaps the same product lands on the same entry. Kept apart from `products` so unverified user content never mixes with the curated catalogue.
+**The app uses only the sender's own entry** (`createdByUid` = the signed-in account): anyone signed in can stage the first entry for a product, so another user's entry is unverified and is never used for a verdict on another phone. When a scanned product is not in `products`, the app offers to take ONE photo. The AI reads the brand, name, kind, shade and the printed ingredient list; the result is analysed at once and shown with a **PENDING APPROVAL** badge. The id is `snap_<brand>__<name>` (letters, digits and underscores), so every user who snaps the same product lands on the same entry. Kept apart from `products` so unverified user content never mixes with the curated catalogue.
 
 | Field (PDF name) | Type | Notes |
 |---|---|---|

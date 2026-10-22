@@ -93,7 +93,7 @@ namespace GlowUp.Scan
         [SerializeField] private string msgNoWebSources = "No web sources were found: this reading comes from the photo alone.";
         [SerializeField] private string msgNothing = "The AI could not read a product in the photo. Try more light, wipe the lens, show the front of the pack, or type it in.";
         [SerializeField] private string msgNoList = "Found {0}, but no ingredient list could be read. Turn the pack to its ingredient list and take another photo.";
-        [SerializeField] private string msgFromOthers = "Another user already sent this product: its reading is used. It is waiting for an admin's approval.";
+        [SerializeField] private string msgFromYou = "You already sent this product: its reading is used. It is waiting for an admin's approval.";
 
         /// <summary>
         /// The photo gave a result. listed = the product IS in the catalogue (the AI read its name); otherwise staged = the staged
@@ -227,10 +227,10 @@ namespace GlowUp.Scan
                 ProductData listed = who.productName.Length > 0 ? ProductRepository.Index.Exact(who.brandName, who.productName) : null;
                 if (listed != null) { Close(); Analysed?.Invoke(listed, null); return; }
 
-                // another user may have snapped this product already: their entry is used (and costs no AI)
+                // the user's OWN earlier photo of this product is used again (no AI cost); another user's entry never is
                 PendingProductData staged = who.productName.Length > 0 ? await PendingProductRepository.FindAsync(who.brandName, who.productName) : null;
                 if (this == null) return;
-                if (staged != null && staged.ingredients.Count > 0) { Say(msgFromOthers); Close(); Analysed?.Invoke(null, staged); return; }
+                if (staged != null && staged.ingredients.Count > 0) { Say(msgFromYou); Close(); Analysed?.Invoke(null, staged); return; }
 
                 if (reading.ingredients.Count == 0 || who.productName.Length == 0)
                 {

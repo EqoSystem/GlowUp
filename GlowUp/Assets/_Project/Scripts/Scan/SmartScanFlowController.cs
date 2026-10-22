@@ -94,7 +94,7 @@ namespace GlowUp.Scan
         [Tooltip("On = when the scan is stuck and no product has been named, the photo pop-up is offered once")]
         [SerializeField] private bool offerSnapshotWhenStuck = true;
         [SerializeField] private string msgSnapshotStuck = "Not getting further? Take one photo of the pack and the AI will read it.";
-        [SerializeField] private string msgFoundStaged = "Found it among products other users sent. It is waiting for an admin's approval.";
+        [SerializeField] private string msgFoundStagedOwn = "Found it among the products you sent. It is waiting for an admin's approval.";
 
         [Header("Recognising a product without the AI")]
         [Tooltip("The pop-up \"Is it one of these?\" with its search box")]
@@ -1057,12 +1057,12 @@ namespace GlowUp.Scan
                     }
                 }
 
-                // not in the catalogue: another user may have staged it from a photo (at most one read; none when looked at recently)
+                // not in the catalogue: the user's own earlier photo of it may be staged (at most one read; none when looked at recently). Entries of other users are never used.
                 if (product == null)
                 {
                     PendingProductData staged = await PendingProductRepository.FindAsync(brand, name);
                     if (this == null || scan != scanNumber || stage != Stage.Scanning) return;
-                    if (staged != null && staged.ingredients.Count > 0) { Say(msgFoundStaged); UseStaged(staged); return; }
+                    if (staged != null && staged.ingredients.Count > 0) { Say(msgFoundStagedOwn); UseStaged(staged); return; }
                 }
 
                 if (await SearchWebAfterCatalogueMiss(brand, name, scan)) return;
