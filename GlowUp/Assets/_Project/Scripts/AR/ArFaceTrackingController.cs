@@ -119,6 +119,7 @@ namespace GlowUp.AR
         const string GuardName = "ar-live-tracking";
         bool guarding;
         float liveSince;
+        Coroutine blackWatch;
         int recoveries;                              // restarts after the app came back to an empty screen (at most 2 per visit)
 
         RenderTexture picture, beforePicture;
@@ -342,6 +343,34 @@ namespace GlowUp.AR
             Say(msgLookingForFace);
             routine = null;
             ModeDecided?.Invoke(true);
+            if (blackWatch != null) StopCoroutine(blackWatch);
+            blackWatch = StartCoroutine(WatchForBlackPicture());
+        }
+
+        /// <summary>
+        /// Right after live tracking starts: the camera can run (its light is on) while the picture stays pure black, which happens
+        /// the first time the camera is allowed. When that lasts 2.5 s, the guided preview is used instead of leaving a black screen.
+        /// Only the first 12 seconds are watched, so a covered lens later on does not switch the mode.
+        /// </summary>
+        IEnumerator WatchForBlackPicture()
+        {
+            yield return new WaitForSecondsRealtime(1.5f);
+            int black = 0;
+            while (IsLive && picture != null && Time.unscaledTime - liveSince < 12f)
+            {
+                yield return new WaitForSecondsRealtime(0.5f);
+                if (!IsLive || picture == null) break;
+                black = BlackFrameProbe.LooksBlack(picture) ? black + 1 : 0;
+                if (black < 5) continue;
+                Debug.Log("[GlowUp] AR Try-On: the live picture stayed black although the camera runs; the guided preview is used instead.");
+                blackWatch = null;
+                EndGuard();
+                StopLive();
+                yield return null; yield return null;           // give the phone a moment to hand the camera back
+                UseGuidedPreview("the live picture stayed black");
+                yield break;
+            }
+            blackWatch = null;
         }
 
         /// <summary>Runs another routine for at most `seconds` (time spent while the app is paused does not count), then gives up on it.</summary>
@@ -404,6 +433,7 @@ namespace GlowUp.AR
 
         void StopLive()
         {
+            if (blackWatch != null) { StopCoroutine(blackWatch); blackWatch = null; }
             StopHelpers();
             if (subscribed)
             {

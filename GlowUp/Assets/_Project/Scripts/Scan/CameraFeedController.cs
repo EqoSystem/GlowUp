@@ -169,6 +169,37 @@ namespace GlowUp.Scan
             if (display != null) { display.texture = cam; display.enabled = true; display.color = Color.white; }
             Layout(true);
             Started?.Invoke(true, "");
+            StartCoroutine(WatchForBlackPicture());
+        }
+
+        /// <summary>
+        /// The camera can run (its light is on) while the picture stays pure black, which happens the first time the camera is allowed.
+        /// For the first 12 seconds the picture is checked; 2.5 s of black and the camera is stopped and started again (at most twice).
+        /// </summary>
+        IEnumerator WatchForBlackPicture()
+        {
+            float started = Time.unscaledTime;
+            int black = 0, restarts = 0;
+            yield return new WaitForSecondsRealtime(1.5f);
+            while (cam != null && Time.unscaledTime - started < 12f)
+            {
+                yield return new WaitForSecondsRealtime(0.5f);
+                if (cam == null) yield break;
+                black = cam.isPlaying && GlowUp.Common.BlackFrameProbe.LooksBlack(cam) ? black + 1 : 0;
+                if (black < 5) continue;
+                black = 0;
+                if (restarts >= 2) { Started?.Invoke(false, "The camera picture stays black. Close other apps that use the camera, then try again."); yield break; }
+                restarts++;
+                Debug.Log("[GlowUp] Camera: the picture stayed black although the camera runs; starting it again (" + restarts + ").");
+                cam.Stop();
+                yield return new WaitForSecondsRealtime(0.4f);
+                if (cam == null) yield break;
+                cam.Play();
+                float t = 0f;
+                while (cam != null && cam.width <= 32 && t < 5f) { t += Time.unscaledDeltaTime; yield return null; }
+                started = Time.unscaledTime;                    // watch again after each restart
+                yield return new WaitForSecondsRealtime(1.5f);
+            }
         }
 
         public void StopCamera()
