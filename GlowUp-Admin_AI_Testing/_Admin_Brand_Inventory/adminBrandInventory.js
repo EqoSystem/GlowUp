@@ -44,7 +44,8 @@ import { mountShell, placeInHeader, paginate, renderPager, icon, BIN_ICON, openM
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
-import { readAdminDocument } from "../_Shared/adminDocumentReader.js";
+import { readAdminDocument, AI_TEXT_CHARACTERS } from "../_Shared/adminDocumentReader.js";
+import { parseImportText } from "../_Shared/importFormat.js";
 import { nearShade } from "../_Shared/listRules.js";
 import { mountIngredientPicker } from "../_Shared/adminIngredientPicker.js";
 import { openFacets } from "../_Shared/adminFacets.js";
@@ -829,8 +830,22 @@ async function importInventoryFile(file) {
     report(`Reading "${file.name}" in this browser...`, false);
     try {
         const documentText = await readAdminDocument(file);
-        report("Asking the configured AI to extract brand and product fields. The file itself is not uploaded.", false);
-        const body = await askInventoryAi({ mode: "import", documentText });
+        // a file in the GlowUp import format is read as it is, with no AI; any other document is read by the AI as before
+        const keyed = parseImportText(documentText);
+        if (keyed.kind === "ingredients") { report("This file lists ingredients. Import it in the Ingredient Curator.", true); return; }
+        if (keyed.kind === "mixed") { report("This file mixes brands or products with ingredients. Split it into two files: brands and products here, ingredients in the Ingredient Curator.", true); return; }
+        if (keyed.kind === "inventory" && (keyed.draft.products.length > 40 || keyed.draft.brands.length > 40)) {
+            report(`This file has ${keyed.draft.products.length} products and ${keyed.draft.brands.length} brands. At most 40 of each can be imported at once: split the file.`, true);
+            return;
+        }
+        let body;
+        if (keyed.kind === "inventory") {
+            report("Reading the file's own fields. No AI is used.", false);
+            body = { draft: keyed.draft, plain: true, notes: keyed.notes, message: keyed.notes.join(" ") };
+        } else {
+            report("Asking the configured AI to extract brand and product fields. The file itself is not uploaded.", false);
+            body = await askInventoryAi({ mode: "import", documentText: documentText.slice(0, AI_TEXT_CHARACTERS) });
+        }
         const records = body.draft && Array.isArray(body.draft.products) ? body.draft.products : [];
         const brandRecords = body.draft && Array.isArray(body.draft.brands) ? body.draft.brands : [];
         if (records.length === 0 && brandRecords.length === 0) {
@@ -845,7 +860,8 @@ async function importInventoryFile(file) {
             if (flaggedOut) notify(`${many(flaggedOut, "record was", "records were")} flagged as skin care or not make-up and not saved.`, "warn");
             return;
         }
-        const provider = body.model ? ` Analyzed by ${body.model}.` : "";
+        const provider = body.plain ? " Read straight from the file's fields, no AI." + (body.notes.length ? " " + body.notes.slice(0, 3).join(" ") + (body.notes.length > 3 ? ` (and ${body.notes.length - 3} more)` : "") : "")
+            : body.model ? ` Analyzed by ${body.model}.` : "";
         const skipped = result.skippedDuplicates + result.skippedInvalid;
         const summary = `Saved ${many(result.savedProducts, "product", "products")} as Pending for review`
             + (result.savedBrands ? ` and ${many(result.savedBrands, "new brand", "new brands")}` : "")

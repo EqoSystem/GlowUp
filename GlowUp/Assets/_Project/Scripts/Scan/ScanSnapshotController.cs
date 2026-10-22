@@ -56,8 +56,8 @@ namespace GlowUp.Scan
         [SerializeField] private bool keepPhotoForAdmin = true;
 
         [Header("The server function (holds the AI key; this phone holds none for this path)")]
-        [Tooltip("The https address of the photo function on Vercel, e.g. https://glowup-admin.vercel.app/api/scan-snapshot. Empty = the photo path is off.")]
-        [SerializeField] private string functionUrl = "";
+        [Tooltip("The https address of the photo function on Vercel, Empty = the photo path is off. A scene saved before this field existed takes this default.")]
+        [SerializeField] private string functionUrl = "https://glowup-admin-snowy.vercel.app/api/scan-snapshot";
         [Tooltip("The longest wait for the server's answer, in seconds. One request, never repeated.")]
         [Range(10f, 55f)] [SerializeField] private float functionTimeoutSeconds = 45f;
 

@@ -1,5 +1,6 @@
 const MAX_FILE_BYTES = 15 * 1024 * 1024;
-const MAX_TEXT_CHARACTERS = 30000;
+const MAX_TEXT_CHARACTERS = 200000;       // the plain import reads all of it; the AI import sends only its first 30,000 characters (AI_TEXT_CHARACTERS)
+export const AI_TEXT_CHARACTERS = 30000;
 
 function loadScript(src) {
     return new Promise((resolve, reject) => {

@@ -33,7 +33,8 @@ import { auth } from "../_Database/firebase-console.js";
 import { cleanupPlan, ingredientDuplicates, ingredientLookalikes, ingredientIssues, mergeIngredients } from "../_Shared/glowupCatalog.js";
 import { openPlanDialog, openDuplicatesDialog } from "../_Shared/adminCleanup.js";
 import { mountShell, placeInHeader, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
-import { readAdminDocument } from "../_Shared/adminDocumentReader.js";
+import { readAdminDocument, AI_TEXT_CHARACTERS } from "../_Shared/adminDocumentReader.js";
+import { parseImportText } from "../_Shared/importFormat.js";
 import { loadLists, optionsOf, allOptions, openListManager, listsNow } from "../_Shared/adminLists.js";
 import { BUILT_IN_HIGHLIGHTS } from "../_Shared/listRules.js";
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
@@ -703,20 +704,36 @@ async function importIngredientFile(file) {
     const extension = String(file.name || "").split(".").pop().toLowerCase();
     if (!IMPORT_TYPES.includes(extension)) { report("Only .docx, .xlsx and .pdf files are accepted. The file was not read.", true); return; }
     if (file.size > IMPORT_MAX_BYTES) { report("The file is larger than 5 MB. Split it into smaller files and try again.", true); return; }
-    if (assistsToday(false) >= ASSIST_PER_DAY) { report(`The AI was used ${ASSIST_PER_DAY} times today in this browser. Try again tomorrow.`, true); return; }
     setBusy(choose, true, "Analyzing...");
     dropbox.disabled = true;
     try {
         report(`Reading "${file.name}" in this browser...`, false);
         const documentText = await readAdminDocument(file);
-        report("Asking the AI to pick out the ingredients. Only the extracted text is sent, not the file.", false);
-        const body = await askCuratorApi({ mode: "ingredientImport", documentText });
-        assistsToday(true);
+        // a file in the GlowUp import format is read as it is, with no AI; any other document is read by the AI as before
+        const keyed = parseImportText(documentText);
+        if (keyed.kind === "inventory") { report("This file lists brands or products. Import it in Brand & Product Inventory.", true); return; }
+        if (keyed.kind === "mixed") { report("This file mixes ingredients with brands or products. Split it into two files.", true); return; }
+        let body;
+        if (keyed.kind === "ingredients") {
+            report("Reading the file's own fields. No AI is used.", false);
+            body = { found: keyed.draft.ingredients.length > 0, draft: keyed.draft, plain: true, notes: keyed.notes, message: keyed.notes.join(" ") };
+        } else {
+            if (assistsToday(false) >= ASSIST_PER_DAY) { report(`The AI was used ${ASSIST_PER_DAY} times today in this browser. Try again tomorrow.`, true); return; }
+            report("Asking the AI to pick out the ingredients. Only the extracted text is sent, not the file.", false);
+            body = await askCuratorApi({ mode: "ingredientImport", documentText: documentText.slice(0, AI_TEXT_CHARACTERS) });
+            assistsToday(true);
+        }
         if (!body.found || !body.draft || !Array.isArray(body.draft.ingredients) || body.draft.ingredients.length === 0) {
             report(body.message || "No ingredient records were found. Nothing was saved.", true);
             return;
         }
-        const result = await saveImportedIngredients(body.draft.ingredients);
+        // saved in groups of IMPORT_MAX_ROWS (one batch each)
+        const result = { saved: 0, skippedDuplicates: 0, skippedInvalid: 0, unmatched: [] };
+        for (let from = 0; from < body.draft.ingredients.length; from += IMPORT_MAX_ROWS) {
+            const part = await saveImportedIngredients(body.draft.ingredients.slice(from, from + IMPORT_MAX_ROWS));
+            result.saved += part.saved; result.skippedDuplicates += part.skippedDuplicates; result.skippedInvalid += part.skippedInvalid;
+            part.unmatched.forEach((name) => { if (!result.unmatched.includes(name)) result.unmatched.push(name); });
+        }
         if (result.saved === 0) {
             report(`Nothing new was saved. ${result.skippedDuplicates} already in the list or the Recycle bin, ${result.skippedInvalid} incomplete.`, true);
             return;
@@ -724,7 +741,7 @@ async function importIngredientFile(file) {
         const skipped = result.skippedDuplicates + result.skippedInvalid;
         const summary = `Saved ${many(result.saved, "ingredient", "ingredients")} as Pending for review` + (skipped ? `; skipped ${skipped} duplicate or incomplete.` : ".")
             + (result.unmatched.length ? ` Not in your lists, so left out: ${result.unmatched.slice(0, 6).join(", ")}${result.unmatched.length > 6 ? " ..." : ""} (add them with Manage lists, then edit the ingredient).` : "")
-            + (body.model ? ` Read by ${body.model}.` : "");
+            + (body.plain ? " Read straight from the file's fields, no AI." + (body.notes.length ? " " + body.notes.slice(0, 3).join(" ") : "") : body.model ? ` Read by ${body.model}.` : "");
         report(summary, false);
         notify(summary, "ok");
         await loadIngredients();
