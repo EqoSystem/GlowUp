@@ -34,13 +34,16 @@
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "public, max-age=300, stale-while-revalidate=1800"
+          "value": "public, max-age=0, must-revalidate"
         }
       ]
     }
   ],
   "functions": {
     "api/assist-ingredient.js": {
+      "maxDuration": 60
+    },
+    "api/scan-snapshot.js": {
       "maxDuration": 60
     }
   }
