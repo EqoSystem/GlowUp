@@ -1169,16 +1169,26 @@ button.tile.small { width: auto; }
 .tool-group { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0; }
 .tool-group.end { margin-left: auto; flex-wrap: nowrap; }
 
-/* ---- Inventory toolbar: row 1 = search, brand, actions; row 2 = sort and how the list looks ---- */
-.toolbar.inv-tools { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 190px) auto; align-items: center; gap: 10px; }
-.inv-tools .search-container { flex: none; max-width: none; min-width: 0; }
-.inv-tools .toolbar-select { width: 100%; max-width: none; min-width: 0; }
-.inv-tools .tool-group.view { grid-column: 1 / -1; justify-content: flex-start; }
-.inv-tools .tool-group.end { justify-content: flex-end; }
+/* ---- the search toolbar of Inventory and the Ingredient Curator, in the order it is used:
+        1 search (left)  2 narrow the list (dropdowns, Sort, Filters)  3 act (More, Add: right) ---- */
+.toolbar.inv-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.inv-tools .search-container { flex: 1 1 260px; max-width: none; min-width: 260px; }
+.inv-tools .toolbar-select { flex: 0 1 180px; width: auto; max-width: 220px; min-width: 140px; }
+.inv-tools .tool-group.narrow { flex: none; flex-wrap: nowrap; }
+.inv-tools .tool-group.end { flex: none; margin-left: auto; justify-content: flex-end; }
 @media (max-width: 700px) {
-    .toolbar.inv-tools { grid-template-columns: minmax(0, 1fr) auto; }
-    .inv-tools .search-container { grid-column: 1 / -1; }
+    .inv-tools .search-container { flex-basis: 100%; min-width: 0; }
+    .inv-tools .toolbar-select { flex: 1 1 140px; max-width: none; }
 }
+
+/* ---- Pending Snapshot Reviews: a button in the table's bar, with a count badge (both pages) ---- */
+.snapshots-chip { gap: 8px; }
+.count-badge { min-width: 24px; height: 22px; padding: 0 7px; border-radius: 999px; display: inline-grid; place-items: center; font-size: var(--fs-xs); font-weight: 700;
+    font-variant-numeric: tabular-nums; background: var(--surface-3); color: var(--text-2); }
+.snapshots-chip.has-waiting { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+.snapshots-chip.has-waiting .count-badge { background: var(--accent); color: #fff; }
+/* read by screen readers, not shown */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
 /* ---- right-hand column in the default layout: panels marked data-right stay on the right edge ---- */
 .board.pinned > .panel[data-right] { grid-column: calc(13 - var(--w, 4)) / span var(--w, 4); }

@@ -182,7 +182,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("inventoryApproveAllBtn").addEventListener("click", approveInventoryDrafts);
 
     wireSearch(el("inventorySearchInput"), el("inventorySearchClear"), fromFirstPage);
-    el("brandFilterSelect").addEventListener("change", fromFirstPage);
+    // the brand dropdown also says how the list is drawn: "All brands, grouped" or "All products, one list" (it replaced the
+    // Brands / All products pills, which did the same job twice)
+    el("brandFilterSelect").addEventListener("change", () => {
+        const value = el("brandFilterSelect").value;
+        view.mode = value === FLAT_LIST ? "all" : "brands";
+        saveView();
+        if (org.view.kind === "bin") org.show({ kind: "all" }); else fromFirstPage();
+    });
     el("reviewFilterSelect").addEventListener("change", fromFirstPage);
     document.querySelectorAll(".stat[data-show]").forEach((tile) => tile.addEventListener("click", () => {
         if (!tile.dataset.show) resetAllFilters();
@@ -190,7 +197,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }));
     el("addMenuBtn").addEventListener("click", (event) => openMenu(event.currentTarget, [
         { label: "Brand", icon: "tag", description: "A new brand: name, category, market, status.", run: () => openBrandForm(null) },
-        { label: "Product", icon: "lipstick", description: "A make-up product of a listed brand.", disabled: brands.length === 0, run: () => openProductForm(null, el("brandFilterSelect").value) }
+        { label: "Product", icon: "lipstick", description: "A make-up product of a listed brand.", disabled: brands.length === 0, run: () => openProductForm(null, brandFilterValue()) }
     ]));
     el("moreMenuBtn").addEventListener("click", (event) => {
         const allClosed = shownGroups.length > 0 && shownGroups.every((g) => closed.has(g.id));
@@ -210,13 +217,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     el("sortMenuBtn").addEventListener("click", (event) => openMenu(event.currentTarget, [{ heading: "Order of the list" }].concat(
         SORTS.map((s) => ({ label: s.label, checked: s.id === view.sort, run: () => { view.sort = s.id; saveView(); fromFirstPage(); } })))));
-    el("viewSwitch").addEventListener("click", (event) => {
-        const button = event.target.closest("[data-mode]");
-        if (!button) return;
-        view.mode = button.dataset.mode === "all" ? "all" : "brands";
-        saveView();
-        if (org.view.kind === "bin") org.show({ kind: "all" }); else fromFirstPage();
-    });
     // Rows or Cards: only how the same rows are drawn (CSS), so every click, drag, selection and the pager work the same
     el("inventoryLayoutSwitch").addEventListener("click", (event) => {
         const button = event.target.closest("[data-layout]");
@@ -580,6 +580,11 @@ function originText(entry) {
     return escapeHtml(origin + state) + (links ? " · " + links : "");
 }
 
+/** The dropdown's choice that lists every product in one list (no brand rows). */
+const FLAT_LIST = "__all_products";
+/** The brand the list is narrowed to ("" = every brand). */
+const brandFilterValue = () => { const value = el("brandFilterSelect").value; return value === FLAT_LIST ? "" : value; };
+
 function fillBrandSelects() {
     const filter = el("brandFilterSelect");
     // the first time, an address ending in ?brand=ID opens on that brand
@@ -587,8 +592,8 @@ function fillBrandSelects() {
     filter.dataset.ready = "1";
     const option = (b) => `<option value="${escapeHtml(b.id)}">${escapeHtml(b.name || "Unnamed Brand")}${b.status === "Active" ? "" : " (" + escapeHtml(b.status) + ")"}</option>`;
     const offered = brands.filter((b) => !brandOut(b));
-    filter.innerHTML = `<option value="">All brands</option>` + offered.map(option).join("");
-    filter.value = offered.some((b) => b.id === wanted) ? wanted : "";
+    filter.innerHTML = `<option value="">All brands, grouped</option><option value="${FLAT_LIST}">All products, one list</option>` + offered.map(option).join("");
+    filter.value = offered.some((b) => b.id === wanted) ? wanted : view.mode === "all" ? FLAT_LIST : "";
     el("productBrandInput").innerHTML = `<option value="">Choose a brand</option>` + brands.map(option).join("");
 }
 
@@ -1049,7 +1054,7 @@ function weightOf(p) {
 // The counts, the toolbar and the table
 // ---------------------------------------------------------------------------------------------
 /** The brand chosen in the toolbar (or null), and the folder that is open (or ""): every panel narrows to them. */
-const focusBrand = () => brands.find((b) => b.id === el("brandFilterSelect").value) || null;
+const focusBrand = () => brands.find((b) => b.id === brandFilterValue()) || null;
 const focusFolder = () => (org && org.view.kind === "folder" ? org.view.name : "");
 /** True for a product inside what the page is narrowed to (the chosen brand and the open folder). */
 const inFocus = (p) => { const b = focusBrand(), f = focusFolder(); return (!b || p.brandId === b.id) && (!f || sameKey(p.folder) === sameKey(f)); };
@@ -1075,7 +1080,10 @@ function paintStats() {
 function paintToolbar() {
     const inBin = org.view.kind === "bin";
     el("sortNow").textContent = sortNow().short;
-    el("viewSwitch").querySelectorAll("[data-mode]").forEach((button) => { const on = !inBin && button.dataset.mode === view.mode; button.classList.toggle("on", on); button.setAttribute("aria-pressed", String(on)); });
+    // the dropdown always shows how the list is drawn (a search or a count tile sets it back to "every brand")
+    const select = el("brandFilterSelect");
+    if (select.value === "" && view.mode === "all") select.value = FLAT_LIST;
+    if (select.value === FLAT_LIST && view.mode !== "all") select.value = "";
     el("inventoryQuick").innerHTML = (quick && !inBin ? `<button type="button" class="filter-chip" data-clear="quick" data-tip="Showing only these products. Click to show all again.">${escapeHtml(QUICK[quick].label)}${icon("x")}</button>` : "")
         + (facetCount() > 0 && !inBin ? `<button type="button" class="filter-chip" data-clear="facets" data-tip="Filters are on. Click to switch them off.">Filters (${facetCount()})${icon("x")}</button>` : "");
     el("filterNow").textContent = facetCount() > 0 ? " " + facetCount() : "";
@@ -1144,7 +1152,7 @@ function renderList(now) {
     const body = el("inventoryTableBody");
     const typed = el("inventorySearchInput").value;
     const term = sameKey(typed);                            // "" when nothing is searched for
-    const brandFilter = el("brandFilterSelect").value;
+    const brandFilter = brandFilterValue();
     const show = el("reviewFilterSelect").value;            // "" | "review" | "out"
     const folder = now.kind === "folder" ? now.name : "";
     const flat = view.mode === "all";
@@ -2390,7 +2398,7 @@ function registerHelpers() {
     registerAssist("tools", () => {
         if (!ready()) return [];
         const parts = [];
-        const typed = el("inventorySearchInput").value.trim(), brand = brands.find((b) => b.id === el("brandFilterSelect").value), show = el("reviewFilterSelect").value, now = org.view;
+        const typed = el("inventorySearchInput").value.trim(), brand = brands.find((b) => b.id === brandFilterValue()), show = el("reviewFilterSelect").value, now = org.view;
         if (typed) parts.push(`search "${typed}"`);
         if (brand) parts.push(`brand ${brand.name}`);
         if (now.kind === "folder") parts.push(`folder "${now.name}"`);

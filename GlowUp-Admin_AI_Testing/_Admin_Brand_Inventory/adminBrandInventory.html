@@ -46,31 +46,29 @@
 
             <!-- find and add -->
             <section class="panel" data-panel="tools" data-label="Search and actions" data-w="8">
+                <!-- left to right, the order you use them: 1 search, 2 narrow the list, 3 act -->
                 <div class="toolbar inv-tools">
                     <div class="search-container">
                         <i data-icon="search"></i>
                         <input type="text" placeholder="Search brands and products" class="search-input" id="inventorySearchInput" autocomplete="off" aria-label="Search brands and products">
                         <button type="button" class="search-clear" id="inventorySearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
                     </div>
-                    <select id="brandFilterSelect" class="toolbar-select" aria-label="Show one brand only">
-                        <option value="">All brands</option>
+                    <!-- one brand, or every brand grouped, or every product in one list (this replaced the Brands / All products pills) -->
+                    <select id="brandFilterSelect" class="toolbar-select" aria-label="Which brand, and how the list is drawn">
+                        <option value="">All brands, grouped</option>
                     </select>
                     <!-- what to show is chosen with the count tiles below; this box only keeps the choice -->
                     <select id="reviewFilterSelect" aria-label="What to show" hidden>
                         <option value="">Everything</option>
                     </select>
+                    <div class="tool-group narrow">
+                        <button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most scanned, newest, type, or what needs attention first." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button>
+                        <button type="button" class="btn" id="filterMenuBtn" aria-haspopup="dialog" aria-expanded="false" data-tip-title="Filters" data-tip="Narrow the list by kind, status and a few facts at once, then press Apply filters." data-tip-preview="Nothing is read from the database: it only looks through what is already loaded."><i data-icon="sliders"></i>Filters<span class="sort-now" id="filterNow"></span></button>
+                    </div>
                     <div class="tool-group end">
                         <span id="inventoryNotes"></span>
                         <button type="button" class="icon-btn" id="moreMenuBtn" aria-label="More" aria-haspopup="menu" data-tip-title="More" data-tip="Clean up, find duplicates, open or close every brand, add the FDA Philippines catalogue."><i data-icon="more"></i></button>
                         <button type="button" class="primary-btn" id="addMenuBtn" aria-haspopup="menu" data-tip-title="Add" data-tip="Add a brand, or a product to a brand that is listed already." data-tip-preview="Choose Brand or Product; a form opens."><i data-icon="plus"></i>Add</button>
-                    </div>
-                    <div class="tool-group view">
-                        <button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most scanned, newest, type, or what needs attention first." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button>
-                        <button type="button" class="btn" id="filterMenuBtn" aria-haspopup="dialog" aria-expanded="false" data-tip-title="Filters" data-tip="Narrow the list by kind, status and a few facts at once, then press Apply filters." data-tip-preview="Nothing is read from the database: it only looks through what is already loaded."><i data-icon="sliders"></i>Filters<span class="sort-now" id="filterNow"></span></button>
-                        <div class="segmented" id="viewSwitch" role="group" aria-label="How the products are listed">
-                            <button type="button" class="seg" data-mode="brands" data-tip-title="Brands" data-tip="Each brand with its products under it."><i data-icon="layers"></i>Brands</button>
-                            <button type="button" class="seg" data-mode="all" data-tip-title="All products" data-tip="Every product in one list, without the brand rows." data-tip-preview="Ten at a time, in the order chosen with Sort."><i data-icon="list"></i>All products</button>
-                        </div>
                     </div>
                 </div>
             </section>
@@ -90,20 +88,6 @@
                 <p class="field-hint import-status" id="inventoryImportStatus" role="status" aria-live="polite">Ready for readable PDFs, Excel workbooks, and Word documents. Text is extracted in your browser; only the extracted text is analyzed.</p>
                 <!-- what the last import FLAGGED: skin care and other non-make-up records (not saved), and make-up whose kind is unclear (saved, to check) -->
                 <div class="import-flags" id="inventoryImportFlags" hidden></div>
-            </section>
-
-            <!-- products app users sent as ONE photo: reviewed in a floating window over this page. Nothing is read until it opens,
-                 except one count for the badge. The labels are fixed text; only the number waits for data. -->
-            <section class="panel snapshots-panel" data-panel="snapshots" data-label="Pending snapshot reviews" data-w="4" data-right>
-                <div class="panel-head">
-                    <h3 class="panel-title">Pending snapshots</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Pending snapshot reviews" data-tip="When a scanned product is not in the catalogue, the app offers to take one photo. The AI reads the brand, name, kind, shade and ingredient list. Users see that reading marked PENDING APPROVAL until you approve it here." data-tip-preview="Opens a review window over this page: one snapshot at a time, photo next to the reading.">i</button>
-                </div>
-                <button type="button" class="snapshots-open" id="snapshotReviewBtn" aria-haspopup="dialog">
-                    <span class="snapshots-icon"><i data-icon="camera"></i></span>
-                    <span class="snapshots-text"><strong>Pending Snapshot Reviews</strong><small id="snapshotReviewHint">One at a time: the photo next to what the AI read.</small></span>
-                    <span class="snapshots-count skeleton" id="snapshotCount" aria-label="Snapshots waiting">00</span>
-                </button>
             </section>
 
             <!-- the counts; a click on one filters the table -->
@@ -144,6 +128,9 @@
                     <span class="panel-count" id="inventoryCountLine"></span>
                     <span id="inventoryQuick"></span>
                     <span class="spacer"></span>
+                    <!-- products app users sent as ONE photo: reviewed in a floating window over this page. Nothing is read until it
+                         opens, except one count for the badge (remembered for 10 minutes, shared with the Ingredient Curator) -->
+                    <button type="button" class="btn snapshots-chip" id="snapshotReviewBtn" aria-haspopup="dialog" data-tip-title="Pending Snapshot Reviews" data-tip="Products app users sent as one photo, with what the AI read. Opens a review window over this page: one at a time, the photo next to the reading." data-tip-preview="Approve &amp; Publish, Edit, or Reject each one."><i data-icon="camera"></i>Pending Snapshot Reviews<span class="count-badge skeleton" id="snapshotCount" aria-label="Snapshots waiting">00</span><span class="sr-only" id="snapshotReviewHint"></span></button>
                     <!-- the same line as the Ingredient Curator's list: how it is shown, how many, which page -->
                     <div class="segmented" id="inventoryLayoutSwitch" role="group" aria-label="How the inventory is shown">
                         <button type="button" class="seg" data-layout="rows" aria-pressed="true" data-tip-title="Rows" data-tip="One product per line, in a table."><i data-icon="list"></i>Rows</button>

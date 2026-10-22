@@ -100,3 +100,10 @@ Mobile app (`GlowUp/Assets/_Project/`):
 - [x] R8c. Document import: skin care and other non-make-up records are FLAGGED under the drop box (not saved); make-up of unclear kind is saved and flagged.
 - [x] R8d. Misleading words fixed: the Curator's "credible source" auto-approval now needs a regulator / medical / ingredient-database page (it accepted any page); "The AI searches credible sources", "found nothing credible" and "no verified sources" reworded.
 - [x] R8e. Imports read every form field: products (other names, minimum age, barcode, photo link, brand market / other names / logo / picture, website as a suggestion, brand-only records; existing products without a list get a review-queue suggestion) and ingredients (technical description, common uses, minimum age, allergen families, conditions, skin types, highlights matched to the lists, links). A shade NUMBER ("#128") is never saved as a colour.
+
+## Round 9 (2026-10-22: one toolbar order, no duplicates, snapshot reviews on both pages)
+- [x] R9a. Both pages: toolbar in the order it is used: search (left), the dropdowns + Sort (+ Filters), then More and Add (right). It wraps instead of squeezing the search box (min 260 px).
+- [x] R9b. Inventory: the Brands / All products pills are gone; the brand dropdown now offers "All brands, grouped" and "All products, one list" (same two views, one control).
+- [x] R9c. Curator: the Quick actions panel is gone (its tiles repeated the count cards, the dropdowns and the + Ingredient button).
+- [x] R9d. "Pending Snapshot Reviews" button with a count badge in the table bar of BOTH pages (the separate Inventory panel is gone). Same floating review window (photo left, AI reading right, Approve & Publish / Edit / Reject). The count is remembered for 10 minutes and shared, so the two pages cost one count read, not two; on the Curator the brands come from the saved copy (only changed entries are read).
+- [x] R9e. POSITIONS_VERSION = 6 (panels removed). No new reads elsewhere; the static frame still draws first.

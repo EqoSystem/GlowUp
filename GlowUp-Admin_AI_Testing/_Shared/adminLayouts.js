@@ -27,7 +27,7 @@ import { setFoldPage, foldButton, FOLD_PARTS, paintFold, toggleFold, foldedNow, 
 const LAYOUT_KEY = "glowup.layouts.v1";
 // Version of the DEFAULT panel positions. A saved page older than this loses its saved order and sizes (names, fonts,
 // colours, views, added panels and groups stay) so the new default positions show. Raise it whenever a page's default order or widths change.
-const POSITIONS_VERSION = 5;
+const POSITIONS_VERSION = 6;
 const MAX_PROFILES = 4;
 const MAX_ADDED = 12;                             // data panels one page of a layout can hold
 const FONTS = [

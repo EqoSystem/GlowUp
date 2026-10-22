@@ -46,13 +46,8 @@
 
             <!-- find and add -->
             <section class="panel" data-panel="tools" data-label="Search and actions" data-w="8">
-                <div class="panel-head">
-                    <h3 class="panel-title">Search and filters</h3>
-                    <span class="spacer"></span>
-                    <button type="button" class="icon-btn" id="moreMenuBtn" aria-label="More" aria-haspopup="menu" data-tip-title="More" data-tip="Clean up entries that are not ingredients, and find duplicates."><i data-icon="more"></i></button>
-                    <button type="button" class="primary-btn" id="addIngredientBtn" data-guide="Add an ingredient with its plain-words definition." data-guide-preview="Opens a form. Only the first three boxes are required."><i data-icon="plus"></i>Ingredient</button>
-                </div>
-                <div class="toolbar">
+                <!-- left to right, the order you use them: 1 search, 2 narrow the list, 3 act (the same order as Brand & Product Inventory) -->
+                <div class="toolbar inv-tools cur-tools">
                     <div class="search-container">
                         <i data-icon="search"></i>
                         <input type="text" placeholder="Search ingredients" class="search-input" id="ingredientSearchInput" autocomplete="off" aria-label="Search ingredients">
@@ -68,7 +63,13 @@
                         <option value="safe">Safe</option>
                         <option value="auto">App decides</option>
                     </select>
-                    <button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most harmful, waiting for review, most used, or newest." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button>
+                    <div class="tool-group narrow">
+                        <button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most harmful, waiting for review, most used, or newest." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button>
+                    </div>
+                    <div class="tool-group end">
+                        <button type="button" class="icon-btn" id="moreMenuBtn" aria-label="More" aria-haspopup="menu" data-tip-title="More" data-tip="Clean up entries that are not ingredients, and find duplicates."><i data-icon="more"></i></button>
+                        <button type="button" class="primary-btn" id="addIngredientBtn" data-guide="Add an ingredient with its plain-words definition." data-guide-preview="Opens a form. Only the first three boxes are required."><i data-icon="plus"></i>Ingredient</button>
+                    </div>
                 </div>
             </section>
 
@@ -100,21 +101,6 @@
                 </div>
             </section>
 
-            <!-- what to do next: the same tiles as the Dashboard's Quick actions, built from counts the page already holds -->
-            <section class="panel" data-panel="actions" data-label="Quick actions" data-w="4" data-right>
-                <div class="panel-head">
-                    <h3 class="panel-title">Quick actions</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Quick actions" data-tip="Shortcuts to the work that is waiting. A blue tile only appears when something needs review.">i</button>
-                </div>
-                <div class="tile-stack">
-                    <div class="tile-stack" id="curatorQuickTiles"></div>
-                    <div class="tile-pair">
-                        <button type="button" class="tile small" id="quickAddIngredient" data-tip-title="Add an ingredient" data-tip="Opens the form for a new ingredient, with its plain-words definition."><i data-icon="plus"></i><span class="tile-title">Add ingredient</span></button>
-                        <a href="../_Admin_Brand_Inventory/adminBrandInventory.html" class="tile small" data-tip-title="Brands &amp; products" data-tip="Add or edit brands and the make-up and face products listed under them." data-tip-preview="Opens the Brand &amp; Product Inventory."><i data-icon="box"></i><span class="tile-title">Brands &amp; products</span></a>
-                    </div>
-                </div>
-            </section>
-
             <!-- the ingredients -->
             <section class="panel" data-panel="list" data-label="Ingredient list" data-w="8" data-source="ingredients">
                 <div class="panel-head">
@@ -124,6 +110,9 @@
                     <span class="panel-count" id="ingredientCountLine"></span>
                     <span id="ingredientQuick"></span>
                     <span class="spacer"></span>
+                    <!-- products app users sent as ONE photo: the same review window as in Brand & Product Inventory. The badge's number
+                         is shared with that page (remembered for 10 minutes); nothing else is read until the window opens -->
+                    <button type="button" class="btn snapshots-chip" id="snapshotReviewBtn" aria-haspopup="dialog" data-tip-title="Pending Snapshot Reviews" data-tip="Products app users sent as one photo, with what the AI read. Opens a review window over this page: one at a time, the photo next to the reading." data-tip-preview="Approve &amp; Publish, Edit, or Reject each one."><i data-icon="camera"></i>Pending Snapshot Reviews<span class="count-badge skeleton" id="snapshotCount" aria-label="Snapshots waiting">00</span><span class="sr-only" id="snapshotReviewHint"></span></button>
                     <div class="segmented" id="listLayoutSwitch" role="group" aria-label="How the ingredients are listed">
                         <button type="button" class="seg" data-layout="rows" aria-pressed="true" data-tip-title="Rows" data-tip="One ingredient per line: name, scientific name and how the app judges it."><i data-icon="list"></i>Rows</button>
                         <button type="button" class="seg" data-layout="cards" aria-pressed="false" data-tip-title="Cards" data-tip="Ingredients as cards, several side by side."><i data-icon="layers"></i>Cards</button>

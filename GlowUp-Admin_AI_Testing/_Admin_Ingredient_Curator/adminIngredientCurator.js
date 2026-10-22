@@ -39,6 +39,7 @@ import { BUILT_IN_HIGHLIGHTS } from "../_Shared/listRules.js";
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
+import { countPending, openSnapshotReview } from "../_Shared/adminSnapshots.js";
 
 const pageState = { page: 1, size: 10 };          // the list shows ten ingredients at a time
 const BATCH_LIMIT = 400;                          // Firestore allows 500 writes in one batch
@@ -61,6 +62,8 @@ let ingredients = [];                 // listed: [{ id, name, techName, descript
 let binIngredients = [];              // in the Recycle bin
 let productUse = new Map();           // ingredient key -> number of catalogue products that list it
 let productUseKnown = false;
+let snapshotsWaiting = null;          // the Pending Snapshot Reviews badge (null = not counted yet)
+let catalogProducts = [];             // the products, as the snapshot review window needs them: [{ id, brandId, name, aliases, ingredients, binned }]
 let editingIngredientId = null;
 let modal = null;
 let fromProducts = [];                // ingredient names the inventory's products list that the Curator has no entry for: [{ key, name, products[] }]
@@ -175,11 +178,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         SORTS.map((s) => ({ label: s.label, checked: s.id === view.sort, run: () => { view.sort = s.id; try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) { /* private window */ } fromFirstPage(); } })))));
     el("ingredientQuick").addEventListener("click", () => { quick = ""; fromFirstPage(); });
     el("addIngredientBtn").addEventListener("click", () => openIngredientForm(null));
-    el("quickAddIngredient").addEventListener("click", () => openIngredientForm(null));
-    el("curatorQuickTiles").addEventListener("click", (event) => {
-        const tile = event.target.closest(".tile[data-source]");
-        if (tile) narrow(tile.dataset.source || "", tile.dataset.risk || "");
-    });
+    // Pending Snapshot Reviews: the badge (one count read at most, shared with Inventory) and the review window
+    el("snapshotReviewBtn").addEventListener("click", openSnapshots);
+    countPending().then((n) => { snapshotsWaiting = n; paintSnapshotCount(); }).catch((error) => { console.warn("Could not count the snapshots: ", error); paintSnapshotCount(true); });
     Array.from(el("listLayoutSwitch").querySelectorAll(".seg")).forEach((button) => button.addEventListener("click", () => {
         view.layout = button.dataset.layout === "cards" ? "cards" : "rows";
         try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) { /* private window */ }
@@ -313,6 +314,8 @@ async function loadIngredients() {
         const productSnapshot = await getDocs(collection(db, "products"));
         const checkedBrands = new Set();
         const listedBy = new Map();
+        catalogProducts = productSnapshot.docs.map((d) => ({ id: d.id, brandId: String(d.data().brandId || ""), name: String(d.data().name || ""),
+            aliases: asArray(d.data().aliases), ingredients: asArray(d.data().ingredients), binned: d.data().binned === true }));
         productSnapshot.forEach((d) => {
             if (d.data().binned === true) return;
             if (d.data().source === "fdaph" || /FDA Philippines: notified as/i.test(String(d.data().description || ""))) checkedBrands.add(String(d.data().brandName || "").trim());
@@ -406,21 +409,8 @@ function proofLines(item) {
     return lines;
 }
 
-/** The Quick actions tiles: only what waits gets a tile. Numbers already loaded; nothing is asked of the database. */
-function paintQuick() {
-    const review = ingredients.filter(needsReview).length;
-    const harmful = ingredients.filter((i) => i.riskLevel === "harmful").length;
-    const unexplained = productUseKnown ? fromProducts.length : 0;
-    const tiles = [];
-    if (review > 0) tiles.push(`<button type="button" class="tile review" data-source="review" data-risk="" data-tip-title="Ingredients waiting for review" data-tip="Ingredients the app's AI lookup or an import found. Until you approve one, the app uses its warnings but never counts it as proof of safety." data-tip-preview="Shows only these entries.">${icon("inbox")}<span class="tile-title">${many(review, "ingredient", "ingredients")} waiting for review</span>${icon("right")}</button>`);
-    if (unexplained > 0) tiles.push(`<button type="button" class="tile" data-source="${FROM_PRODUCTS}" data-risk="" data-tip-title="Not explained yet" data-tip="Ingredients that listed products contain and that have no entry here yet." data-tip-preview="Shows only these names.">${icon("lipstick")}<span class="tile-title">${unexplained} from products, not explained</span>${icon("right")}</button>`);
-    if (harmful > 0) tiles.push(`<button type="button" class="tile" data-source="" data-risk="harmful" data-tip-title="Marked harmful" data-tip="Ingredients marked Harmful here." data-tip-preview="Shows only these entries.">${icon("alert")}<span class="tile-title">${harmful} marked harmful</span>${icon("right")}</button>`);
-    el("curatorQuickTiles").innerHTML = tiles.length ? tiles.join("") : `<p class="field-hint">Nothing is waiting for you.</p>`;
-}
-
 /** The four counts above the list; a click on one filters the list. */
 function paintStats() {
-    paintQuick();
     const inBin = org.view.kind === "bin";
     const source = el("ingredientSourceFilter").value, risk = el("ingredientRiskFilter").value;
     const tiles = [
@@ -1367,5 +1357,43 @@ function registerData() {
         open: (i) => openIngredientForm(i),
         // a tile that is removed goes to the Recycle bin (it can be restored there)
         bin: (rows) => org.toBin(rows.map((i) => i.id))
+    });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Pending Snapshot Reviews (the same window as in Brand & Product Inventory)
+// ---------------------------------------------------------------------------------------------
+/** The badge on the Pending Snapshot Reviews button. */
+function paintSnapshotCount(failed) {
+    const count = el("snapshotCount"), button = el("snapshotReviewBtn");
+    count.classList.remove("skeleton");
+    count.textContent = failed ? "–" : String(snapshotsWaiting || 0);
+    button.classList.toggle("has-waiting", (snapshotsWaiting || 0) > 0);
+    el("snapshotReviewHint").textContent = failed ? "The count could not be read. Open it to look anyway."
+        : snapshotsWaiting > 0 ? `${many(snapshotsWaiting, "snapshot waits", "snapshots wait")} for review.` : "Nothing is waiting.";
+}
+
+/**
+ * Opens the review window. The brands come from the page's saved copy (only entries changed since the last visit are read);
+ * the products and the ingredient library are what this page already holds.
+ */
+async function openSnapshots() {
+    let brandList = [];
+    try {
+        const brandSnapshot = await getDocs(collection(db, "brands"));
+        brandList = brandSnapshot.docs.map((d) => ({ id: d.id, name: String(d.data().name || ""), aliases: asArray(d.data().aliases), binned: d.data().binned === true }));
+    } catch (error) {
+        notify("The brand list could not be read, so snapshots cannot be approved right now. " + describeError(error), "error");
+        return;
+    }
+    openSnapshotReview({
+        context: () => ({
+            brands: brandList,
+            products: catalogProducts,
+            library: everyIngredient.filter((i) => !i.binned).map((i) => ({ id: i.id, name: i.name, techName: i.techName, aliases: i.aliases, riskLevel: i.riskLevel }))
+        }),
+        onLoaded: (n) => { if (snapshotsWaiting === null || n > snapshotsWaiting) { snapshotsWaiting = n; paintSnapshotCount(); } },
+        onProcessed: () => { snapshotsWaiting = Math.max(0, (snapshotsWaiting || 1) - 1); paintSnapshotCount(); },
+        onClose: async (approved) => { if (approved > 0) await loadIngredients(); }
     });
 }

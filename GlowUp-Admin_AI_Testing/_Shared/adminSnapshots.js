@@ -33,11 +33,29 @@ const calm = () => window.matchMedia && window.matchMedia("(prefers-reduced-moti
 // ---------------------------------------------------------------------------------------------
 // Data
 // ---------------------------------------------------------------------------------------------
-/** How many snapshots wait (one count query = 1 read). */
-export async function countPending() {
+// The badge's number is remembered for a while on this computer, so opening Brand & Product Inventory and the Ingredient
+// Curator one after the other costs ONE count read, not one per page (and none at all within COUNT_FRESH_MS).
+const COUNT_KEY = "glowup.snapshots.count.v1";
+const COUNT_FRESH_MS = 10 * 60 * 1000;
+
+/** How many snapshots wait (one count query = 1 read; a number remembered in the last 10 minutes costs none). */
+export async function countPending(force) {
+    if (!force) {
+        try {
+            const kept = JSON.parse(localStorage.getItem(COUNT_KEY) || "null");
+            if (kept && Number.isInteger(kept.n) && kept.n >= 0 && Date.now() - kept.at < COUNT_FRESH_MS) return kept.n;
+        } catch (error) { /* private window: read it */ }
+    }
     const answer = await getCountFromServer(query(collection(db, "pending_products"), where("isApproved", "==", false)));
+    rememberPendingCount(answer.data().count);
     return answer.data().count;
 }
+
+/** Keeps the badge's number (after a count, a load, or an approve / reject in the window). */
+export function rememberPendingCount(n) {
+    try { localStorage.setItem(COUNT_KEY, JSON.stringify({ n: Math.max(0, Math.floor(Number(n) || 0)), at: Date.now() })); } catch (error) { /* not kept */ }
+}
+const keptPendingCount = () => { try { const kept = JSON.parse(localStorage.getItem(COUNT_KEY) || "null"); return kept && Number.isInteger(kept.n) ? kept.n : null; } catch (error) { return null; } };
 
 /** The waiting snapshots, newest first (one read each, at most MAX_LOADED). */
 export async function loadPending() {
@@ -427,6 +445,7 @@ export function openSnapshotReview(options) {
         setTimeout(() => {
             queue.splice(at, 1);
             busy = false;
+            { const kept = keptPendingCount(); if (kept !== null) rememberPendingCount(kept - 1); }
             if (options.onProcessed) options.onProcessed();
             paint("next");
         }, calm() ? 0 : EXIT_MS);
@@ -436,6 +455,7 @@ export function openSnapshotReview(options) {
     stage.appendChild(make("div", "snapx-loading", "Loading the waiting snapshots..."));
     loadPending().then((list) => {
         queue = list; total = list.length; at = 0;
+        if (queue.length < MAX_LOADED) rememberPendingCount(queue.length);      // all of them were read: the exact number
         if (options.onLoaded) options.onLoaded(queue.length);
         paint("");
     }).catch((error) => {
