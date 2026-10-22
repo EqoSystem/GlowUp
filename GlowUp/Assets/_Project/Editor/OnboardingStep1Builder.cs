@@ -86,6 +86,11 @@ namespace GlowUp.EditorTools
             InfoBadge(content, retypeLabel, "RetypeHelperText", "Needed. It must match your password exactly.");
             var mReq = Checklist(content, "Retype", new[] { "Passwords match" });
 
+            // the phone's keyboard must not cover what belongs to a field: the email's check line, the password's rules, the "match" row
+            KeyboardKit.KeepVisible(email, Loose(content, "EmailCheckText"), useAnotherEmail);
+            KeyboardKit.KeepVisible(pw, pReq);
+            KeyboardKit.KeepVisible(retype, mReq);
+
             // ---- calendar popup (covers the panel while open) ----
             var popup = BuildDatePopup(c.card);
             var field = SceneBuilderCore.Ensure<DatePickerField>(bday.gameObject);
