@@ -436,7 +436,7 @@ async function loadInventory() {
                 needsReview: data.reviewed === false,
                 autoApproved: data.autoApproved === true,
                 barcode: String(data.barcode || ""),
-                fdaNumber: cleanFdaNumber(data.fdaNumber) || "",
+                fdaNumber: String(data.fdaNumber || "").replace(/\s+/g, " ").trim().slice(0, 40),
                 imageUrl: String(data.imageUrl || ""),
                 ingredientNotes: Array.isArray(data.ingredientNotes) ? data.ingredientNotes : [],     // per-product caution and share of an ingredient
                 aliases: asArray(data.aliases),
@@ -2161,11 +2161,11 @@ function cleanLink(value) {
 }
 
 /** The FDA Philippines page of a product, from its sources ("FDA Philippines verification | https://...") */
-/** An FDA registration (notification) number: letters, digits, hyphens, slashes and single spaces, at most 40 characters; "" when empty, null when it is not one. */
+/** An FDA registration (notification) number: letters, digits and . , # ( ) _ - / and single spaces, at most 40 characters; "" when empty, null when it is not one. */
 function cleanFdaNumber(value) {
     const text = String(value == null ? "" : value).replace(/\s+/g, " ").trim();
     if (text === "") return "";
-    return /^[A-Za-z0-9][A-Za-z0-9 \-\/]{0,39}$/.test(text) ? text : null;
+    return /^[A-Za-z0-9][A-Za-z0-9 .,#()_\-\/]{0,39}$/.test(text) ? text : null;
 }
 
 const fdaLinkOf = (sources) => {
@@ -2297,7 +2297,7 @@ async function saveProduct(event) {
     const imageUrl = cleanLink(el("productImageInput").value), fdaNumber = cleanFdaNumber(el("productFdaInput").value);
 
     if (imageUrl === null) { setFormError(form, "The photo link must be a web address that starts with https://"); el("productImageInput").focus(); return; }
-    if (fdaNumber === null) { setFormError(form, "The FDA registration number may have letters, digits, hyphens and slashes only (at most 40 characters)."); el("productFdaInput").focus(); return; }
+    if (fdaNumber === null) { setFormError(form, "The FDA registration number may have letters, digits and . , # ( ) _ - / only (at most 40 characters)."); el("productFdaInput").focus(); return; }
     if (!name) { setFormError(form, "Type the product name."); el("productNameInput").focus(); return; }
     if (!brand) { setFormError(form, "Choose the brand."); el("productBrandInput").focus(); return; }
     if (!cosmeticType) { setFormError(form, "Choose the cosmetic type."); el("productTypeInput").focus(); return; }

@@ -40,8 +40,8 @@ const httpsUrl = (raw) => {
 const httpsLinks = (raw, most) => listOf(raw, 500, most * 2).map(httpsUrl).filter((u, i, all) => u && all.indexOf(u) === i).slice(0, most);
 const age = (raw) => { const n = Number(squeeze(raw)); return Number.isInteger(n) && n > 0 && n < 100 ? n : 0; };
 
-/** The FDA registration number as the website keeps it (letters, digits, hyphens, slashes, single spaces; at most 40), or "". */
-const fdaNumberOf = (raw) => { const t = value(raw, 40); return /^[A-Za-z0-9][A-Za-z0-9 \-\/]{0,39}$/.test(t) ? t : ""; };
+/** The FDA registration number as the website keeps it (letters, digits and . , # ( ) _ - /; at most 40), or "". */
+const fdaNumberOf = (raw) => { const t = value(raw, 40); return /^[A-Za-z0-9][A-Za-z0-9 .,#()_\-\/]{0,39}$/.test(t) ? t : ""; };
 
 /** "#C24B62", "c24b62", "#C46", "rgb(194, 75, 98)" -> "#C24B62"; a shade NUMBER ("#128", "128") or a name -> "". The rule of cleanShade / normalShade. */
 export function hexOf(raw) {

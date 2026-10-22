@@ -14,7 +14,7 @@ The website reads this format as it is (`_Shared/importFormat.js`): **no AI is u
 
 ## Product
 `BRAND_NAME`, `PRODUCT_NAME`, `OTHER_NAMES`, `COSMETIC_TYPE` (one of the 17 make-up types), `DESCRIPTION`, `SHADES` (`#RRGGBB` only),
-`MINIMUM_AGE`, `BARCODE`, `PRODUCT_PHOTO_LINK`, `FDA_PH_LINK` (a fda.gov.ph page), `FDA_REGISTRATION_NUMBER` (the FDA Philippines notification number; letters, digits, hyphens, slashes), `INGREDIENTS` (INCI, printed order), `SOURCES` (https pages)
+`MINIMUM_AGE`, `BARCODE`, `PRODUCT_PHOTO_LINK`, `FDA_PH_LINK` (a fda.gov.ph page), `FDA_REGISTRATION_NUMBER` (the FDA Philippines notification number; letters, digits and . , # ( ) _ - /), `INGREDIENTS` (INCI, printed order), `SOURCES` (https pages)
 
 ## Ingredient
 `NAME`, `LABEL_NAME`, `OTHER_NAMES`, `DESCRIPTION`, `TECHNICAL_DESCRIPTION`, `CAUTION_NOTE`, `COMMON_USES`, `MINIMUM_AGE`,
