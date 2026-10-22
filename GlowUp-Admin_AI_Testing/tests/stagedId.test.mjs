@@ -11,7 +11,7 @@ const slugOf = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_
 const plainAscii = (t) => /^[ -~]*$/.test(t);
 const stagedId = (brand, name) => { const b = slugOf(brand); return "snap_" + (b === "" ? "nobrand" : b) + "__" + slugOf(name); };
 const idFitsNames = (id, d) => id === "snap_" + d.key && (!(plainAscii(d.brandName) && plainAscii(d.name)) || id === stagedId(d.brandName, d.name)
-    || (id.length === 110 && new RegExp("^" + id + ".*$").test(stagedId(d.brandName, d.name))));
+    || (id.length === 110 && /^[a-z0-9_]+$/.test(id) && new RegExp("^" + id + ".*$").test(stagedId(d.brandName, d.name))));
 
 // ---- the app: TextKey.Normalize / Slug and PendingProductRepository.IdFor
 const normalize = (t) => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
@@ -31,6 +31,10 @@ check(!idFitsNames("snap_other__thing", { ...d }), "an id that is not the key is
 check(!idFitsNames(id, { ...d, key: "something_else" }), "a key that is not the id is refused");
 check(!idFitsNames(id, { ...d, brandName: "Revlon" }), "the right id with another brand is refused");
 check(!idFitsNames("snap_maybelline_new_york__fit_me_matte", { brandName: "Maybelline New York", name: "Fit Me Matte!!", key: "maybelline_new_york__fit_me_matte" }) === false, "punctuation in the name does not change the slug");
+// a long id that is a pattern, not a name, cannot pass the cut-off branch
+const longBrand = "B".repeat(60), longName = "N".repeat(100);
+const pattern = ("snap_" + ".*".repeat(55)).slice(0, 110);
+check(!idFitsNames(pattern, { brandName: longBrand, name: longName, key: pattern.slice(5) }), "an id made of regex characters is refused in the cut-off branch");
 // accents: the app folds them, the rules cannot: only the key has to fit
 ({ id, d } = entry("Lancôme", "Teint Idole Ultra Wear"));
 check(idFitsNames(id, d), "an accented brand is accepted when the id is the key");
@@ -39,7 +43,7 @@ check(!idFitsNames(id, { ...d, key: "other" }), "and refused when it is not");
 // ---- the rules file still says what this test repeats
 const rules = readFileSync(new URL("../firestore.rules", import.meta.url), "utf8");
 for (const line of ["t.lower().replace('[^a-z0-9]+', '_').replace('^_+|_+$', '')", "t.matches('[ -~]*')", "return 'snap_' + (b == '' ? 'nobrand' : b) + '__' + slugOf(name);",
-    "id == 'snap_' + data.key", "stagedId(data.brandName, data.name).matches(id + '.*')", "idFitsNames(pendingId, request.resource.data)",
+    "id == 'snap_' + data.key", "id.size() == 110 && id.matches('[a-z0-9_]+') && stagedId(data.brandName, data.name).matches(id + '.*')", "idFitsNames(pendingId, request.resource.data)",
     "existsAfter(/databases/$(database)/documents/pending_products/$(pendingId))", "getAfter(/databases/$(database)/documents/pending_products/$(pendingId)).data.createdByUid == request.auth.uid",
     "getAfter(/databases/$(database)/documents/pending_products/$(pendingId)).data.hasImage == true"])
     check(rules.includes(line), "firestore.rules contains: " + line.slice(0, 70));

@@ -73,7 +73,7 @@ service cloud.firestore {
       return id == 'snap_' + data.key
         && (!(plainAscii(data.brandName) && plainAscii(data.name))
             || id == stagedId(data.brandName, data.name)
-            || (id.size() == 110 && stagedId(data.brandName, data.name).matches(id + '.*')));
+            || (id.size() == 110 && id.matches('[a-z0-9_]+') && stagedId(data.brandName, data.name).matches(id + '.*')));
     }
 
     // the UTC day as 20261022: the quota documents are named with it, so a client cannot pick another day
