@@ -56,7 +56,7 @@ namespace GlowUp.Scan
         [SerializeField] private bool keepPhotoForAdmin = true;
 
         [Header("The server function (holds the AI key; this phone holds none for this path)")]
-        [Tooltip("The https address of the photo function on Vercel, Empty = the photo path is off. A scene saved before this field existed takes this default.")]
+        [Tooltip("The https address of the photo function on Vercel, Empty = the built-in address of GlowUp's own function is used.")]
         [SerializeField] private string functionUrl = "https://glowup-admin-snowy.vercel.app/api/scan-snapshot";
         [Tooltip("The longest wait for the server's answer, in seconds. One request, never repeated.")]
         [Range(10f, 55f)] [SerializeField] private float functionTimeoutSeconds = 45f;
@@ -117,8 +117,16 @@ namespace GlowUp.Scan
 
         public bool IsOpen => panel != null && panel.IsOpen;
 
+        /// <summary>Used when the Inspector's address is empty (a scene saved before the address was set keeps an empty value, which would switch the photo path off).</summary>
+        const string DefaultFunctionUrl = "https://glowup-admin-snowy.vercel.app/api/scan-snapshot";
+
         void Awake()
         {
+            // A scene saved by an older build keeps the words of that build: the old defaults are replaced by the new ones. A word the
+            // project owner changed by hand is not an old default, so it is kept.
+            Upgrade(ref msgPrompt, "Product not in catalog yet! Tap to take a quick photo for live AI analysis.", "This product was not found in the catalogue.");
+            Upgrade(ref idleLabel, "Take photo", "Take a photo of the product");
+            Upgrade(ref msgNoAi, "The AI is not set up on this phone, so the photo cannot be read. Type the product in instead.", "Photo reading is not set up yet. Type the product in by hand.");
             if (takePhotoButton != null) takePhotoButton.onClick.AddListener(Take);
             if (cancelButton != null) cancelButton.onClick.AddListener(Close);
             if (spinner != null) spinner.gameObject.SetActive(false);
@@ -139,11 +147,16 @@ namespace GlowUp.Scan
 
         void OnValidate() { if (lowestQuality > startQuality) lowestQuality = startQuality; }
 
+        static void Upgrade(ref string current, string oldDefault, string newDefault)
+        {
+            if (string.IsNullOrWhiteSpace(current) || current == oldDefault) current = newDefault;
+        }
+
         void ApplyNumbers()
         {
             PendingProductRepository.RememberMissMinutes = rememberMissMinutes;
             PendingProductRepository.KeepHours = keepStagedHours;
-            ScanPhotoService.FunctionUrl = (functionUrl ?? "").Trim();
+            ScanPhotoService.FunctionUrl = string.IsNullOrWhiteSpace(functionUrl) ? DefaultFunctionUrl : functionUrl.Trim();
             ScanPhotoService.TimeoutSeconds = functionTimeoutSeconds;
         }
 
@@ -193,7 +206,7 @@ namespace GlowUp.Scan
             {
                 if (cameraFeed == null || !cameraFeed.IsPlaying) { Say(msgNoCamera); return; }
                 if (!ConnectivityMonitor.Online) { Say(msgOffline); return; }
-                if (string.IsNullOrEmpty(functionUrl)) { Say(msgNoAi); return; }
+                if (string.IsNullOrEmpty(ScanPhotoService.FunctionUrl)) { Say(msgNoAi); return; }
                 if (SentToday() >= DailyLimit) { Say(string.Format(msgDailyLimit, DailyLimit)); return; }
 
                 byte[] jpeg = Photo();
