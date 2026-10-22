@@ -189,11 +189,13 @@ Every `sources` entry stays `page title | https://address`. The kind of page is 
 |---|---|---|
 | `regulator` | Regulator / government | EU, US FDA, FDA Philippines, NIH, WHO, ASEAN, TGA, Health Canada, gov.uk, ECHA; any `.gov` / `.gov.xx` site |
 | `medical` | Medical / scientific body | CIR, AAD, DermNet, Contact Dermatitis Society, ScienceDirect, Wiley, Springer, Nature, JAMA, BMJ, Mayo Clinic, Cleveland Clinic; any `.edu` / `.edu.xx` site |
-| `maker` | Manufacturer's own site | The site whose own name IS the product's brand, alone or with one of: cosmetics, beauty, makeup, official, ph, store, shop (`maybelline.com.ph`, `nyxcosmetics.com`). Containing the name is not enough (`maybelline-offers.xyz` is not the maker). |
+| `maker` | Manufacturer's own site | The site whose own name IS the product's brand, alone or with one of: cosmetics, beauty, makeup (`maybelline.com.ph`, `nyxcosmetics.com`), on a usual ending (.com, .com.ph, .co.uk ...; not .xyz or .shop). Containing the name is not enough (`maybelline-offers.xyz`, `maybelline.evil.com` are not the maker). Still a name match, not a confirmed domain: check it. |
 | `reference` | Ingredient database | Personal Care Products Council, INCI Beauty, INCIDecoder, Paula's Choice dictionary, EWG, CosmeticsInfo |
 | `public` | Public list (anyone can edit) | Open Beauty Facts |
-| `retailer` | Retailer listing | Large shops (Watsons, Lazada, Shopee, Sephora, Mercury Drug ...): the app's `ListSources.Retailers` |
-| `other` | Unverified site | Everything else |
+| `retailer` | Retailer listing | Large shops by their whole address (watsons.com.ph, shopee.ph, lazada.com.ph, sephora.com, mercurydrug.com ...): `SOURCE_RETAILERS` / `ListSources.RetailerSites` |
+| `other` | Unverified site | Everything else, and every address that is not plain: a user name in front of the site (`https://fda.gov@evil.com`), a backslash, or letters outside a-z 0-9 . - in the site's name. Such addresses are also never shown as links. |
+
+A search engine's pass-through address (Google's grounding link, `google.com/url`, `bing.com/ck`) is recognised by its own site, never by words elsewhere in the address; it is then labelled by its page title, and only when that title is a plain site name.
 
 Each label has one line of advice (hover it on the website), and every list of links ends with a caution line for careful readers. The rule lives in `_Shared/glowupRules.js` (`sourceKind`), the app's `ListSources.SourceKind` and `api/assist-ingredient.js`; all three are tested against the `sourcekind` / `sourcelabel` lines of the app's `Editor/Tests/SharedRuleCases.txt`.
 

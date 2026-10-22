@@ -511,12 +511,25 @@ export const SOURCE_MEDICAL = ["cir-safety.org", "cir-reports.cir-safety.org", "
     "nature.com", "jamanetwork.com", "bmj.com", "mayoclinic.org", "clevelandclinic.org"];
 export const SOURCE_REFERENCES = ["personalcarecouncil.org", "incibeauty.com", "incidecoder.com", "paulaschoice.com", "ewg.org", "cosmeticsinfo.org"];
 export const SOURCE_PUBLIC_LISTS = ["openbeautyfacts.org"];
-// the app's ListSources.Retailers: large shops whose product pages copy the list printed on the pack (a piece of the site's name)
-export const SOURCE_RETAILERS = ["watsons", "lazada", "shopee", "sephora", "ulta.com", "boots.com", "lookfantastic", "beautymnl", "zalora", "amazon.", "walmart.com", "target.com",
-    "superdrug.com", "cultbeauty", "nykaa", "yesstyle", "stylevana", "sasa.com", "guardian.com", "oliveyoung", "feelunique", "beautybay", "notino", "douglas.",
-    "priceline.com.au", "chemistwarehouse", "mercurydrug", "southstardrug", "landers.ph", "sm-markets", "smmarkets", "calyxta", "glamourbox"];
-export const SOURCE_MAKER_SUFFIXES = ["", "cosmetics", "beauty", "makeup", "official", "ph", "store", "shop"];
-const SOURCE_REDIRECTS = ["vertexaisearch.cloud.google.com", "google.com/url", "bing.com/ck"];
+// large shops whose product pages copy the list printed on the pack: their WHOLE web addresses (matched like the lists
+// above, never as a piece of a name, so "watsons-deals.xyz" is not Watsons)
+export const SOURCE_RETAILERS = ["watsons.com.ph", "watsons.com.my", "watsons.com.sg", "watsons.co.th", "watsons.com.hk", "watsons.com.tw", "watsons.co.id", "watsons.vn",
+    "lazada.com.ph", "lazada.com.my", "lazada.sg", "lazada.co.th", "lazada.co.id", "lazada.vn",
+    "shopee.ph", "shopee.com.my", "shopee.sg", "shopee.co.th", "shopee.co.id", "shopee.vn", "shopee.tw",
+    "sephora.com", "sephora.ph", "sephora.sg", "sephora.my", "sephora.co.uk", "sephora.com.au", "sephora.fr",
+    "ulta.com", "boots.com", "lookfantastic.com", "beautymnl.com", "zalora.com.ph", "zalora.com.my", "zalora.sg",
+    "amazon.com", "amazon.co.uk", "amazon.de", "amazon.co.jp", "amazon.com.au", "amazon.ca", "walmart.com", "target.com",
+    "superdrug.com", "cultbeauty.com", "cultbeauty.co.uk", "nykaa.com", "yesstyle.com", "stylevana.com", "sasa.com", "sasa.com.hk",
+    "guardian.com.sg", "guardian.com.my", "oliveyoung.com", "oliveyoung.co.kr", "feelunique.com", "beautybay.com", "notino.com", "notino.co.uk",
+    "douglas.de", "priceline.com.au", "chemistwarehouse.com.au", "mercurydrug.com", "southstardrug.com.ph", "landers.ph", "smmarkets.ph"];
+export const SOURCE_MAKER_SUFFIXES = ["", "cosmetics", "beauty", "makeup"];
+// a maker's own site ends in one of these (an odd ending such as .xyz or .shop is anybody's)
+export const SOURCE_MAKER_ENDINGS = ["com", "net", "org", "co", "ph", "com.ph", "us", "ca", "uk", "co.uk", "com.au", "kr", "co.kr", "jp", "co.jp", "fr", "de", "it", "es",
+    "sg", "com.sg", "my", "com.my", "in", "co.in", "id", "co.id", "th", "co.th", "vn", "com.vn", "tw", "com.tw", "hk", "com.hk", "eu", "ch", "nl", "se"];
+const BACKSLASH = String.fromCharCode(92);
+// only a PLAIN address is labelled: http(s), a host of a-z 0-9 . - only (no user name, no other letters), an optional
+// port, and printable ASCII after it. Anything else (a backslash, "user@", look-alike letters) is an Unverified site.
+const STRICT_ADDRESS = /^https?:\/\/([a-z0-9.-]+)(?::[0-9]{1,5})?([/?#][!-~]*)?$/i;
 
 export const SOURCE_KINDS = {
     regulator: { label: "Regulator / government", advice: "An official body. The strongest kind of source here.", tone: "good" },
@@ -552,34 +565,57 @@ function sourceTitle(source) {
     return (cut > 0 ? s.slice(0, cut) : sourceAddress(s).length === 0 ? s : "").trim();
 }
 
-/** The site a source line points to: lower case, no "www.", user name or port. A search engine's pass-through address: its page title. */
+const withoutWww = (host) => (host.startsWith("www.") ? host.slice(4) : host);
+
+/** { host, path } of a plain address (see STRICT_ADDRESS), or null. */
+function plainAddress(address) {
+    const m = STRICT_ADDRESS.exec(address);
+    if (!m || address.includes(BACKSLASH)) return null;
+    return { host: m[1].toLowerCase().replace(/\.+$/, ""), path: (m[2] || "").split(/[?#]/)[0] };
+}
+
+/** A search engine's pass-through address: decided by its HOST (and path), never by words elsewhere in the address. */
+function isRedirect(plain) {
+    const host = withoutWww(plain.host);
+    return host === "vertexaisearch.cloud.google.com" || (host === "google.com" && plain.path.startsWith("/url")) || (host === "bing.com" && plain.path.startsWith("/ck"));
+}
+
+/**
+ * The site a source line points to: lower case, without "www." ("" for an address that is not plain). A search engine's
+ * pass-through address: its page title, when that title is a site name and nothing else.
+ */
 export function sourceHost(source) {
-    const address = sourceAddress(source);
-    if (address.length === 0) return "";
-    const start = address.indexOf("://") < 0 ? 0 : address.indexOf("://") + 3;
-    const ends = ["/", "?", "#"].map((c) => address.indexOf(c, start)).filter((i) => i >= 0);
-    let host = address.slice(start, ends.length ? Math.min(...ends) : address.length).toLowerCase();
-    const lower = address.toLowerCase();
-    if (SOURCE_REDIRECTS.some((r) => lower.includes(r))) host = sourceTitle(source).toLowerCase();
-    const at = host.lastIndexOf("@");
-    if (at >= 0) host = host.slice(at + 1);
-    const colon = host.indexOf(":");
-    if (colon >= 0) host = host.slice(0, colon);
-    host = host.trim().replace(/\.+$/, "");
-    return host.startsWith("www.") ? host.slice(4) : host;
+    const plain = plainAddress(sourceAddress(source));
+    if (!plain) return "";
+    let host = plain.host;
+    if (isRedirect(plain)) {
+        host = sourceTitle(source).toLowerCase().trim().replace(/\.+$/, "");
+        if (!/^[a-z0-9.-]+$/.test(host)) return "";
+    }
+    return withoutWww(host);
+}
+
+/** Where the site's own name stands in its address: the part before the ending (".com", ".com.ph" ...). */
+function ownNameIndex(parts) {
+    const second = parts[parts.length - 2];
+    const countryEnding = parts.length >= 3 && parts[parts.length - 1].length === 2 && ["co", "com", "org", "net", "gov", "edu"].includes(second);
+    return countryEnding ? parts.length - 3 : parts.length - 2;
 }
 
 /** "maybelline" for maybelline.com.ph or shop.maybelline.com: the site's own name, without the country ending. */
 export function sourceOwnName(host) {
     const parts = text0(host).split(".");
     if (parts.length < 2) return "";
-    const second = parts[parts.length - 2];
-    const countryEnding = parts.length >= 3 && parts[parts.length - 1].length === 2 && ["co", "com", "org", "net", "gov", "edu"].includes(second);
-    return (countryEnding ? parts[parts.length - 3] : second).replace(/[^a-z0-9]/g, "");
+    return parts[ownNameIndex(parts)].replace(/[^a-z0-9]/g, "");
 }
 
-/** True when the site's own name IS the brand's name (at most one SOURCE_MAKER_SUFFIXES word after it); containing it is not enough. */
+/**
+ * True when the site's own name IS the brand's name (at most one SOURCE_MAKER_SUFFIXES word after it) and the site has a
+ * usual ending (SOURCE_MAKER_ENDINGS); containing the name is not enough.
+ */
 export function isMakersSite(host, brandName) {
+    const parts = text0(host).split(".");
+    if (parts.length < 2 || !SOURCE_MAKER_ENDINGS.includes(parts.slice(ownNameIndex(parts) + 1).join("."))) return false;
     const own = sourceOwnName(host), words = nameWords(brandName);
     if (own.length === 0 || words.length === 0) return false;
     const names = [];
@@ -602,7 +638,7 @@ export function sourceKind(source, brandName) {
     if (isMakersSite(host, brandName)) return "maker";
     if (onSite(host, SOURCE_REFERENCES)) return "reference";
     if (onSite(host, SOURCE_PUBLIC_LISTS)) return "public";
-    if (SOURCE_RETAILERS.some((shop) => host.includes(shop))) return "retailer";
+    if (onSite(host, SOURCE_RETAILERS)) return "retailer";
     return "other";
 }
 

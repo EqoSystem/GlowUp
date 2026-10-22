@@ -422,6 +422,11 @@ export function parseSource(text) {
     let title = cut >= 0 ? raw.slice(0, cut).trim() : "";
     const url = cut >= 0 ? raw.slice(cut + 3).trim() : raw;
     if (!/^https?:\/\/[^\s"'<>]+$/i.test(url)) return { title: title || raw, url: "" };
+    // a user name in front of the site ("https://fda.gov@evil.com") or a backslash can open another site than the one the
+    // address seems to name: such an address is shown as plain text, never as a link
+    let parsed = null;
+    try { parsed = new URL(url); } catch (error) { parsed = null; }
+    if (!parsed || parsed.username || parsed.password || url.includes(String.fromCharCode(92))) return { title: title || raw, url: "" };
     if (!title) { try { title = new URL(url).hostname.replace(/^www\./, ""); } catch (error) { title = url; } }
     return { title, url };
 }
@@ -444,7 +449,7 @@ export const sourceGuideHtml = () => `<span class="field-hint source-guide">${es
  * one is labelled here by the same rule.
  */
 export function assistSourceLinks(pages, emptyHtml, brandName = "") {
-    const shown = (Array.isArray(pages) ? pages : []).filter((page) => page && /^https:\/\//i.test(page.url || ""));
+    const shown = (Array.isArray(pages) ? pages : []).filter((page) => page && /^https:\/\//i.test(page.url || "") && parseSource(page.url).url);
     if (shown.length === 0) return emptyHtml;
     return shown.map((page) => {
         const kind = page.label ? page : describeSourceLine(`${page.site || page.title || ""} | ${page.url}`, brandName);

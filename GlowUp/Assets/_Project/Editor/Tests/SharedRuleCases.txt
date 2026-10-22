@@ -150,7 +150,22 @@ sourcekind | FDA Philippines verification \u007c https://verification.fda.gov.ph
 sourcekind | https://pubchem.ncbi.nlm.nih.gov/compound/Niacinamide | | regulator
 sourcekind | https://www.health.gov.au/topics/cosmetics | | regulator
 sourcekind | https://www.state.gov/x | | regulator
-sourcekind | https://user@www.fda.gov:443/cosmetics | | regulator
+# a user name in front of the site, or a backslash, can make a browser open ANOTHER site than the one it seems to name: never labelled
+sourcekind | https://user@www.fda.gov:443/cosmetics | | other
+sourcekind | https://www.fda.gov:443/cosmetics | | regulator
+sourcekind | https://evil.example\u005c@fda.gov/x | | other
+sourcekind | https://fd\u0430.gov/x | | other
+# a pass-through address is known by its own site, never by words elsewhere in the address; its title must be a site name
+sourcekind | fda.gov \u007c https://evil.example/?u=google.com/url | | other
+sourcekind | fda.gov \u007c https://evil.example/vertexaisearch.cloud.google.com/x | | other
+sourcekind | fda.gov \u007c https://www.google.com/url?q=x | | regulator
+sourcekind | fda.gov is safe \u007c https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc | | other
+# shops by their whole address, makers only on a usual ending and without generic words
+sourcekind | https://watsons-deals.xyz/p | Maybelline | other
+sourcekind | https://watsons.xyz/p | | other
+sourcekind | https://maybelline.xyz/x | Maybelline | other
+sourcekind | https://maybellineofficial.com/x | Maybelline | other
+sourcekind | https://absidy.com.ph/x | Absidy | maker
 sourcekind | https://fda.gov.ph.evil.com/x | | other
 sourcekind | https://dermnetnz.org/topics/contact-dermatitis | | medical
 sourcekind | https://skin.harvard.edu/x | | medical

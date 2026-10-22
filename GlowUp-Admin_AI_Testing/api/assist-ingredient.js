@@ -373,11 +373,22 @@ const SOURCE_MEDICAL = ["cir-safety.org", "cir-reports.cir-safety.org", "aad.org
     "nature.com", "jamanetwork.com", "bmj.com", "mayoclinic.org", "clevelandclinic.org"];
 const SOURCE_REFERENCES = ["personalcarecouncil.org", "incibeauty.com", "incidecoder.com", "paulaschoice.com", "ewg.org", "cosmeticsinfo.org"];
 const SOURCE_PUBLIC_LISTS = ["openbeautyfacts.org"];
-const SOURCE_RETAILERS = ["watsons", "lazada", "shopee", "sephora", "ulta.com", "boots.com", "lookfantastic", "beautymnl", "zalora", "amazon.", "walmart.com", "target.com",
-    "superdrug.com", "cultbeauty", "nykaa", "yesstyle", "stylevana", "sasa.com", "guardian.com", "oliveyoung", "feelunique", "beautybay", "notino", "douglas.",
-    "priceline.com.au", "chemistwarehouse", "mercurydrug", "southstardrug", "landers.ph", "sm-markets", "smmarkets", "calyxta", "glamourbox"];
-const SOURCE_MAKER_SUFFIXES = ["", "cosmetics", "beauty", "makeup", "official", "ph", "store", "shop"];
-const SOURCE_REDIRECTS = ["vertexaisearch.cloud.google.com", "google.com/url", "bing.com/ck"];
+// whole web addresses of large shops (matched like the lists above, never as a piece of a name)
+const SOURCE_RETAILERS = ["watsons.com.ph", "watsons.com.my", "watsons.com.sg", "watsons.co.th", "watsons.com.hk", "watsons.com.tw", "watsons.co.id", "watsons.vn",
+    "lazada.com.ph", "lazada.com.my", "lazada.sg", "lazada.co.th", "lazada.co.id", "lazada.vn",
+    "shopee.ph", "shopee.com.my", "shopee.sg", "shopee.co.th", "shopee.co.id", "shopee.vn", "shopee.tw",
+    "sephora.com", "sephora.ph", "sephora.sg", "sephora.my", "sephora.co.uk", "sephora.com.au", "sephora.fr",
+    "ulta.com", "boots.com", "lookfantastic.com", "beautymnl.com", "zalora.com.ph", "zalora.com.my", "zalora.sg",
+    "amazon.com", "amazon.co.uk", "amazon.de", "amazon.co.jp", "amazon.com.au", "amazon.ca", "walmart.com", "target.com",
+    "superdrug.com", "cultbeauty.com", "cultbeauty.co.uk", "nykaa.com", "yesstyle.com", "stylevana.com", "sasa.com", "sasa.com.hk",
+    "guardian.com.sg", "guardian.com.my", "oliveyoung.com", "oliveyoung.co.kr", "feelunique.com", "beautybay.com", "notino.com", "notino.co.uk",
+    "douglas.de", "priceline.com.au", "chemistwarehouse.com.au", "mercurydrug.com", "southstardrug.com.ph", "landers.ph", "smmarkets.ph"];
+const SOURCE_MAKER_SUFFIXES = ["", "cosmetics", "beauty", "makeup"];
+const SOURCE_MAKER_ENDINGS = ["com", "net", "org", "co", "ph", "com.ph", "us", "ca", "uk", "co.uk", "com.au", "kr", "co.kr", "jp", "co.jp", "fr", "de", "it", "es",
+    "sg", "com.sg", "my", "com.my", "in", "co.in", "id", "co.id", "th", "co.th", "vn", "com.vn", "tw", "com.tw", "hk", "com.hk", "eu", "ch", "nl", "se"];
+const BACKSLASH = String.fromCharCode(92);
+// only a PLAIN address is labelled (no user name, no backslash, a-z 0-9 . - in the host, printable ASCII after it)
+const STRICT_ADDRESS = /^https?:\/\/([a-z0-9.-]+)(?::[0-9]{1,5})?([/?#][!-~]*)?$/i;
 const SOURCE_KINDS = {
     regulator: { label: "Regulator / government", advice: "An official body. The strongest kind of source here.", tone: "good" },
     medical: { label: "Medical / scientific body", advice: "A medical or scientific publisher. A dermatologist or pharmacist can check the cited study or review.", tone: "good" },
@@ -413,31 +424,42 @@ function sourceTitle(source) {
     const cut = s.lastIndexOf(" | ");
     return (cut > 0 ? s.slice(0, cut) : sourceAddress(s).length === 0 ? s : "").trim();
 }
+const withoutWww = (host) => (host.startsWith("www.") ? host.slice(4) : host);
+function plainAddress(address) {
+    const m = STRICT_ADDRESS.exec(address);
+    if (!m || address.includes(BACKSLASH)) return null;
+    return { host: m[1].toLowerCase().replace(/\.+$/, ""), path: (m[2] || "").split(/[?#]/)[0] };
+}
+/** A search engine's pass-through address: decided by its HOST (and path), never by words elsewhere in the address. */
+function isRedirect(plain) {
+    const host = withoutWww(plain.host);
+    return host === "vertexaisearch.cloud.google.com" || (host === "google.com" && plain.path.startsWith("/url")) || (host === "bing.com" && plain.path.startsWith("/ck"));
+}
 function sourceHost(source) {
-    const address = sourceAddress(source);
-    if (address.length === 0) return "";
-    const start = address.indexOf("://") < 0 ? 0 : address.indexOf("://") + 3;
-    const ends = ["/", "?", "#"].map((c) => address.indexOf(c, start)).filter((i) => i >= 0);
-    let host = address.slice(start, ends.length ? Math.min(...ends) : address.length).toLowerCase();
-    const lower = address.toLowerCase();
-    if (SOURCE_REDIRECTS.some((r) => lower.includes(r))) host = sourceTitle(source).toLowerCase();
-    const at = host.lastIndexOf("@");
-    if (at >= 0) host = host.slice(at + 1);
-    const colon = host.indexOf(":");
-    if (colon >= 0) host = host.slice(0, colon);
-    host = host.trim().replace(/\.+$/, "");
-    return host.startsWith("www.") ? host.slice(4) : host;
+    const plain = plainAddress(sourceAddress(source));
+    if (!plain) return "";
+    let host = plain.host;
+    if (isRedirect(plain)) {
+        host = sourceTitle(source).toLowerCase().trim().replace(/\.+$/, "");
+        if (!/^[a-z0-9.-]+$/.test(host)) return "";
+    }
+    return withoutWww(host);
+}
+function ownNameIndex(parts) {
+    const second = parts[parts.length - 2];
+    const countryEnding = parts.length >= 3 && parts[parts.length - 1].length === 2 && ["co", "com", "org", "net", "gov", "edu"].includes(second);
+    return countryEnding ? parts.length - 3 : parts.length - 2;
 }
 function sourceOwnName(host) {
     const parts = String(host || "").split(".");
     if (parts.length < 2) return "";
-    const second = parts[parts.length - 2];
-    const countryEnding = parts.length >= 3 && parts[parts.length - 1].length === 2 && ["co", "com", "org", "net", "gov", "edu"].includes(second);
-    return (countryEnding ? parts[parts.length - 3] : second).replace(/[^a-z0-9]/g, "");
+    return parts[ownNameIndex(parts)].replace(/[^a-z0-9]/g, "");
 }
 /** The brand's words as the shared name key gives them (lower case, no accents, letters and digits only). */
 const brandWords = (brand) => String(brand || "").toLowerCase().normalize("NFD").replace(/\p{M}/gu, "").replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean);
 function isMakersSite(host, brandName) {
+    const parts = String(host || "").split(".");
+    if (parts.length < 2 || !SOURCE_MAKER_ENDINGS.includes(parts.slice(ownNameIndex(parts) + 1).join("."))) return false;
     const own = sourceOwnName(host), words = brandWords(brandName);
     if (own.length === 0 || words.length === 0) return false;
     const names = [];
@@ -457,7 +479,7 @@ function sourceKind(source, brandName) {
     if (isMakersSite(host, brandName)) return "maker";
     if (onSite(host, SOURCE_REFERENCES)) return "reference";
     if (onSite(host, SOURCE_PUBLIC_LISTS)) return "public";
-    if (SOURCE_RETAILERS.some((shop) => host.includes(shop))) return "retailer";
+    if (onSite(host, SOURCE_RETAILERS)) return "retailer";
     return "other";
 }
 /** A source page plus its kind, label, advice and tone (the page's own fields are kept). An unresolved search link is named by its site. */

@@ -198,10 +198,39 @@ namespace GlowUp.Scan
         /// <summary>Public lists that anybody can edit.</summary>
         public static readonly string[] PublicLists = { "openbeautyfacts.org" };
 
+        /// <summary>
+        /// Large shops for the LABEL, by their whole web address (matched like the lists above, never as a piece of a name, so
+        /// "watsons-deals.xyz" is not Watsons). Retailers above stays as it is for KindOf.
+        /// </summary>
+        public static readonly string[] RetailerSites =
+        {
+            "watsons.com.ph", "watsons.com.my", "watsons.com.sg", "watsons.co.th", "watsons.com.hk", "watsons.com.tw", "watsons.co.id", "watsons.vn",
+            "lazada.com.ph", "lazada.com.my", "lazada.sg", "lazada.co.th", "lazada.co.id", "lazada.vn",
+            "shopee.ph", "shopee.com.my", "shopee.sg", "shopee.co.th", "shopee.co.id", "shopee.vn", "shopee.tw",
+            "sephora.com", "sephora.ph", "sephora.sg", "sephora.my", "sephora.co.uk", "sephora.com.au", "sephora.fr",
+            "ulta.com", "boots.com", "lookfantastic.com", "beautymnl.com", "zalora.com.ph", "zalora.com.my", "zalora.sg",
+            "amazon.com", "amazon.co.uk", "amazon.de", "amazon.co.jp", "amazon.com.au", "amazon.ca", "walmart.com", "target.com",
+            "superdrug.com", "cultbeauty.com", "cultbeauty.co.uk", "nykaa.com", "yesstyle.com", "stylevana.com", "sasa.com", "sasa.com.hk",
+            "guardian.com.sg", "guardian.com.my", "oliveyoung.com", "oliveyoung.co.kr", "feelunique.com", "beautybay.com", "notino.com", "notino.co.uk",
+            "douglas.de", "priceline.com.au", "chemistwarehouse.com.au", "mercurydrug.com", "southstardrug.com.ph", "landers.ph", "smmarkets.ph"
+        };
+
         /// <summary>A brand's own site may add one of these to the brand's name ("nyxcosmetics.com", "absidybeauty.com").</summary>
-        public static readonly string[] MakerSuffixes = { "", "cosmetics", "beauty", "makeup", "official", "ph", "store", "shop" };
+        public static readonly string[] MakerSuffixes = { "", "cosmetics", "beauty", "makeup" };
+
+        /// <summary>A maker's own site ends in one of these (an odd ending such as .xyz or .shop is anybody's).</summary>
+        public static readonly string[] MakerEndings =
+        {
+            "com", "net", "org", "co", "ph", "com.ph", "us", "ca", "uk", "co.uk", "com.au", "kr", "co.kr", "jp", "co.jp", "fr", "de", "it", "es",
+            "sg", "com.sg", "my", "com.my", "in", "co.in", "id", "co.id", "th", "co.th", "vn", "com.vn", "tw", "com.tw", "hk", "com.hk", "eu", "ch", "nl", "se"
+        };
 
         static readonly Regex GovSite = new Regex(@"\.gov(\.[a-z]{2})?$"), EduSite = new Regex(@"\.edu(\.[a-z]{2})?$"), NotLetterOrDigit = new Regex("[^a-z0-9]");
+        // only a PLAIN address is labelled: http(s), a host of a-z 0-9 . - only (no user name, no other letters), an optional
+        // port, and printable ASCII after it. Anything else (a backslash, "user@", look-alike letters) is an Unverified site.
+        static readonly Regex StrictAddress = new Regex("^https?://([a-z0-9.-]+)(?::[0-9]{1,5})?([/?#][!-~]*)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        static readonly Regex SiteNameOnly = new Regex("^[a-z0-9.-]+$");
+        const char Backslash = (char)92;
 
         /// <summary>
         /// The kind of page of a source line ("page title | https://address", or an address): regulator, medical, maker,
@@ -216,27 +245,43 @@ namespace GlowUp.Scan
             if (IsMakersSite(host, brandName)) return KindMaker;
             if (OnSite(host, References)) return KindReference;
             if (OnSite(host, PublicLists)) return KindPublic;
-            foreach (string shop in Retailers) if (host.Contains(shop)) return KindRetailer;
+            if (OnSite(host, RetailerSites)) return KindRetailer;
             return KindUnverified;
         }
 
+        static string WithoutWww(string host) => host.StartsWith("www.", StringComparison.Ordinal) ? host.Substring(4) : host;
+
         /// <summary>
-        /// The site a source line points to, lower case, without "www.", a user name or a port ("" when there is none).
-        /// A search engine's pass-through address hides the real site: then the page title stands in for it.
+        /// The site a source line points to, lower case, without "www." ("" for an address that is not plain: see StrictAddress).
+        /// A search engine's pass-through address (known by its OWN site, never by words elsewhere in the address) hides the
+        /// real site: then the page title stands in for it, when that title is a site name and nothing else.
         /// </summary>
         public static string LabelHost(string source)
         {
             string address = AddressOf(source);
-            if (address.Length == 0) return "";
-            string host = HostOf(address);
-            string lower = address.ToLowerInvariant();
-            foreach (string redirect in Redirects) if (lower.Contains(redirect)) { host = TitleOf(source).ToLowerInvariant(); break; }
-            int at = host.LastIndexOf('@');
-            if (at >= 0) host = host.Substring(at + 1);
-            int colon = host.IndexOf(':');
-            if (colon >= 0) host = host.Substring(0, colon);
-            host = host.Trim().TrimEnd('.');
-            return host.StartsWith("www.", StringComparison.Ordinal) ? host.Substring(4) : host;
+            Match m = StrictAddress.Match(address);
+            if (!m.Success || address.IndexOf(Backslash) >= 0) return "";
+            string host = m.Groups[1].Value.ToLowerInvariant().TrimEnd('.');
+            string path = m.Groups[2].Value;
+            int cut = path.IndexOfAny(new[] { '?', '#' });
+            if (cut >= 0) path = path.Substring(0, cut);
+            string site = WithoutWww(host);
+            bool redirect = site == "vertexaisearch.cloud.google.com" || (site == "google.com" && path.StartsWith("/url", StringComparison.Ordinal))
+                            || (site == "bing.com" && path.StartsWith("/ck", StringComparison.Ordinal));
+            if (redirect)
+            {
+                host = TitleOf(source).ToLowerInvariant().Trim().TrimEnd('.');
+                if (!SiteNameOnly.IsMatch(host)) return "";
+            }
+            return WithoutWww(host);
+        }
+
+        /// <summary>Where the site's own name stands in its address: the part before the ending (".com", ".com.ph" ...).</summary>
+        static int OwnNameIndex(string[] parts)
+        {
+            string second = parts[parts.Length - 2];
+            bool countryEnding = parts.Length >= 3 && parts[parts.Length - 1].Length == 2 && Array.IndexOf(new[] { "co", "com", "org", "net", "gov", "edu" }, second) >= 0;
+            return countryEnding ? parts.Length - 3 : parts.Length - 2;
         }
 
         /// <summary>"maybelline" for maybelline.com.ph or shop.maybelline.com: the site's own name, without the country ending.</summary>
@@ -244,17 +289,20 @@ namespace GlowUp.Scan
         {
             string[] parts = (host ?? "").Split('.');
             if (parts.Length < 2) return "";
-            string second = parts[parts.Length - 2];
-            bool countryEnding = parts.Length >= 3 && parts[parts.Length - 1].Length == 2 && Array.IndexOf(new[] { "co", "com", "org", "net", "gov", "edu" }, second) >= 0;
-            return NotLetterOrDigit.Replace(countryEnding ? parts[parts.Length - 3] : second, "");
+            return NotLetterOrDigit.Replace(parts[OwnNameIndex(parts)], "");
         }
 
         /// <summary>
-        /// True when the site's own name IS the brand's name (with at most one of MakerSuffixes after it). Containing the name
-        /// is not enough: "maybelline-offers.xyz" and "maybelline.evil.com" are not Maybelline's site.
+        /// True when the site's own name IS the brand's name (with at most one of MakerSuffixes after it) and the site has a
+        /// usual ending (MakerEndings). Containing the name is not enough: "maybelline-offers.xyz", "maybelline.evil.com"
+        /// and "maybelline.xyz" are not taken for Maybelline's site.
         /// </summary>
         public static bool IsMakersSite(string host, string brandName)
         {
+            string[] parts = (host ?? "").Split('.');
+            if (parts.Length < 2) return false;
+            int index = OwnNameIndex(parts);
+            if (Array.IndexOf(MakerEndings, string.Join(".", parts, index + 1, parts.Length - index - 1)) < 0) return false;
             string own = OwnName(host);
             string[] words = TextKey.Words(brandName);
             if (own.Length == 0 || words.Length == 0) return false;

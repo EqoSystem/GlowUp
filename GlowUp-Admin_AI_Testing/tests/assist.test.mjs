@@ -272,12 +272,14 @@ const { sourceKind, describeSource, SOURCE_KINDS, SEARCH_KINDS } = handler.helpe
 {
     const { readFileSync } = await import("node:fs");
     const casesFile = new URL("../../GlowUp/Assets/_Project/Editor/Tests/SharedRuleCases.txt", import.meta.url);
-    const bar = String.fromCharCode(92) + "u007c";              // how a "|" inside a column is written in the list
+    // in the list a special character is written as a backslash, the letter u and its code (four digits)
+    const code = new RegExp(String.fromCharCode(92, 92) + "u([0-9a-fA-F]{4})", "g");
+    const decode = (text) => text.replace(code, (whole, hex) => String.fromCharCode(parseInt(hex, 16)));
     let seen = 0;
     for (const raw of readFileSync(casesFile, "utf8").split(/\r?\n/)) {
         const line = raw.trim();
         if (!line.startsWith("sourcekind |") && !line.startsWith("sourcelabel |")) continue;
-        const parts = line.split("|").map((p) => p.trim().split(bar).join("|"));
+        const parts = line.split("|").map((p) => decode(p.trim()));
         seen++;
         if (parts[0] === "sourcekind") equal(sourceKind(parts[1], parts[2]), parts[3], "server source kind: " + line);
         else equal((SOURCE_KINDS[parts[1]] || {}).label, parts[2], "server source label: " + line);

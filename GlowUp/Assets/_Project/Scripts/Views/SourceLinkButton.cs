@@ -61,7 +61,11 @@ namespace GlowUp.Views
             int end = at;
             while (end < source.Length && !char.IsWhiteSpace(source[end]) && source[end] != '|' && source[end] != '"' && source[end] != '<' && source[end] != '>') end++;
             string address = source.Substring(at, end - at).TrimEnd('.', ',', ';', ')', ']');
+            // a user name in front of the site ("https://fda.gov@evil.com") or a backslash can open another site than the
+            // one the address seems to name: such an address is not made into a button
+            if (address.IndexOf((char)92) >= 0) return "";
             return Uri.TryCreate(address, UriKind.Absolute, out Uri uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps) && uri.Host.Contains(".")
+                   && string.IsNullOrEmpty(uri.UserInfo)
                 ? address : "";
         }
 
