@@ -107,3 +107,11 @@ Mobile app (`GlowUp/Assets/_Project/`):
 - [x] R9c. Curator: the Quick actions panel is gone (its tiles repeated the count cards, the dropdowns and the + Ingredient button).
 - [x] R9d. "Pending Snapshot Reviews" button with a count badge in the table bar of BOTH pages (the separate Inventory panel is gone). Same floating review window (photo left, AI reading right, Approve & Publish / Edit / Reject). The count is remembered for 10 minutes and shared, so the two pages cost one count read, not two; on the Curator the brands come from the saved copy (only changed entries are read).
 - [x] R9e. POSITIONS_VERSION = 6 (panels removed). No new reads elsewhere; the static frame still draws first.
+
+## Round 10 (New4.pdf: Inventory and Curator layout)
+- [x] R10a. Header: the search box sits beside the page title; Add / + Ingredient and More sit at the right end, next to the layout button (`placeInHeader` in adminShell.js, called after `mountShell`).
+- [x] R10b. The filter bar is ONE row of dropdowns (Inventory: brand / how the list is drawn; Curator: origin and risk level).
+- [x] R10c. Sort (and Filters on Inventory) sit in the table's bar, right after the table title; one row with the pager.
+- [x] R10d. Removed (the red X marks and the buttons): the Rows / Cards switch (the table is rows only), the count line under the title, and the "1-10 of N" text of the pager (it keeps "< Page 1 of N >").
+- [x] R10e. "Needs your attention": the helper strips (sorted-by hint, "Next: ...", clean-up line, ...) are combined into ONE panel at the top of both pages. Most important first, a colour and a word per level: Urgent (red), Check (amber), Next (blue), Good (green), Tip (grey); each row keeps its action button. It folds with the panel arrow and, folded, says "2 urgent · 1 to check" (`registerAssist(..., { notes })` in adminAssist.js).
+- [x] R10f. Pending Snapshot Reviews is a panel in the right column under the Import panel on both pages (the table-bar button of Round 9 is gone). POSITIONS_VERSION = 7.

@@ -32,7 +32,7 @@ import { matchesSearch, sourceKind, normalizeName } from "../_Shared/glowupRules
 import { auth } from "../_Database/firebase-console.js";
 import { cleanupPlan, ingredientDuplicates, ingredientLookalikes, ingredientIssues, mergeIngredients } from "../_Shared/glowupCatalog.js";
 import { openPlanDialog, openDuplicatesDialog } from "../_Shared/adminCleanup.js";
-import { mountShell, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
+import { mountShell, placeInHeader, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
 import { readAdminDocument } from "../_Shared/adminDocumentReader.js";
 import { loadLists, optionsOf, allOptions, openListManager, listsNow } from "../_Shared/adminLists.js";
 import { BUILT_IN_HIGHLIGHTS } from "../_Shared/listRules.js";
@@ -120,9 +120,10 @@ const QUICK = {
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
-    try { const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || "{}"); if (SORTS.some((s) => s.id === saved.sort)) view.sort = saved.sort; if (saved.layout === "cards") view.layout = "cards"; } catch (error) { /* first visit */ }
+    try { const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || "{}"); if (SORTS.some((s) => s.id === saved.sort)) view.sort = saved.sort; } catch (error) { /* first visit */ }
     registerData();                   // before the page frame: a saved layout may hold panels that show this data
     mountShell("curator");
+    placeInHeader(".search-container", "headerActions");      // search beside the title, + Ingredient and More beside the layout button
     wireSignOut();
     setupNavigationGuard();
     await requireAdmin();
@@ -1292,7 +1293,7 @@ function registerHelpers() {
         const review = ingredients.filter(needsReview).length;
         if (review > 0) return [{ tone: "info", text: `Next: ${many(review, "ingredient the app's AI found waits", "ingredients the app's AI found wait")} for your review. Until then the app uses the warnings but never counts ${review === 1 ? "it" : "them"} as proof of safety.`, label: reviewing() ? "Show all" : "Show them", run: () => narrow(reviewing() ? "" : "review", "") }];
         return [{ tone: "ok", text: "Every ingredient has been checked by an admin." }];
-    });
+    }, { notes: "notesList" });
 
     registerAssist("tools", () => {
         if (!ready()) return [];
@@ -1309,7 +1310,7 @@ function registerHelpers() {
             { text: `Sorted by ${sortNow().short}. Search also finds other spellings and words in the definition.` },
             { text: "Drag a card onto a folder or the bin. Ctrl+click picks several cards; Shift+click picks a range." }
         ];
-    });
+    }, { notes: "notesList" });
 
     registerAssist("list", () => {
         if (!ready()) return [];
@@ -1330,7 +1331,7 @@ function registerHelpers() {
         if (fdaBrands.length > 0) lines.push({ tone: "ok", text: `Brands checked on the FDA Philippines list (${fdaBrands.length}): ${fdaBrands.slice(0, 10).join(", ")}${fdaBrands.length > 10 ? ` and ${fdaBrands.length - 10} more` : ""}. The FDA list names products, not ingredients, so their ingredients arrive here when the products are scanned.`, label: "Open the inventory", run: () => { window.location.href = "../_Admin_Brand_Inventory/adminBrandInventory.html"; } });
         lines.push({ text: "A card shows the name and the scientific name. Click it for everything else; double-click to edit." });
         return lines;
-    });
+    }, { notes: "notesList" });
 }
 
 // ---------------------------------------------------------------------------------------------

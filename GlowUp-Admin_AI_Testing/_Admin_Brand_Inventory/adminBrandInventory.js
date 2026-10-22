@@ -40,7 +40,7 @@ import {
 import { matchesSearch, compactName, barcodeKey } from "../_Shared/glowupRules.js";
 import { cleanupPlan, productDuplicates, brandDuplicates, mergeProducts, mergeBrands, nameWithoutBrand } from "../_Shared/glowupCatalog.js";
 import { openPlanDialog, openDuplicatesDialog } from "../_Shared/adminCleanup.js";
-import { mountShell, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
+import { mountShell, placeInHeader, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
@@ -144,9 +144,10 @@ const QUICK = {
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
-    try { const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || "{}"); if (saved.mode === "all") view.mode = "all"; if (saved.layout === "cards") view.layout = "cards"; if (SORTS.some((s) => s.id === saved.sort)) view.sort = saved.sort; } catch (error) { /* first visit */ }
+    try { const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || "{}"); if (saved.mode === "all") view.mode = "all"; if (SORTS.some((s) => s.id === saved.sort)) view.sort = saved.sort; } catch (error) { /* first visit */ }
     registerData();                   // before the page frame: a saved layout may hold panels that show this data
     mountShell("inventory");
+    placeInHeader(".search-container", "headerActions");      // search beside the title, Add and More beside the layout button
     wireSignOut();
     wireWebsiteAndGs1Buttons();
     setupNavigationGuard();
@@ -2393,7 +2394,7 @@ function registerHelpers() {
         const onList = listed().filter(QUICK.fda.test).length;
         if (onList > 0) lines.push({ tone: "ok", text: `${many(onList, "product", "products")} of ${many(checked.length, "brand", "brands")} are on the FDA Philippines list: ${checked.slice(0, 8).map((b) => b.name).join(", ")}${checked.length > 8 ? ` and ${checked.length - 8} more` : ""}.`, label: quick === "fda" ? "Show all" : "Show them", run: () => setQuick("fda") });
         return lines;
-    }, { badge: "inventoryNotes" });
+    }, { notes: "notesList" });
 
     registerAssist("tools", () => {
         if (!ready()) return [];
@@ -2411,7 +2412,7 @@ function registerHelpers() {
             { text: `Sorted by ${sortNow().short}, ${view.mode === "all" ? "every product in one list" : "grouped by brand"}. Search also finds a type, for example "lipstick".` },
             { text: "Drag a row onto a folder or the bin. Ctrl+click picks several rows; Shift+click picks a range." }
         ];
-    }, { badge: "inventoryNotes" });
+    }, { notes: "notesList" });
 
     registerAssist("table", () => {
         if (!ready()) return [];
@@ -2431,7 +2432,7 @@ function registerHelpers() {
         if (inBin > 0) lines.push({ text: `${many(inBin, "entry is", "entries are")} in the Recycle bin.`, label: "Open the bin", run: () => org.show({ kind: "bin" }) });
         lines.push({ text: "Click a product for its details. Double-click it to edit. Drag rows onto a folder or the bin." });
         return lines;
-    });
+    }, { notes: "notesList" });
 }
 
 // ---------------------------------------------------------------------------------------------

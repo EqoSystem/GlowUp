@@ -9,10 +9,12 @@
 //
 // The text is always written with textContent, never as HTML.
 import { icon, toast, infoBadge, refreshInfoWindow } from "./adminShell.js";
+import { setPanelSummary } from "./adminFold.js";
 
 const OFF_KEY = "glowup.assist.off.v1";
 const providers = new Map();          // panel id -> what the page registered
 const shown = new Map();              // panel id -> which of its lines shows
+const notesOf = new Map();            // panel id -> id of the list (in a notes panel) that carries its lines, most important first
 const badgeOf = new Map();            // panel id -> id of the slot whose info badge carries its lines (instead of a strip in the panel)
 let pageName = "";
 
@@ -29,6 +31,7 @@ export function setAssistPage(page) { pageName = String(page || ""); }
 export function registerAssist(panelId, provider, options) {
     providers.set(panelId, provider);
     if (options && options.badge) badgeOf.set(panelId, String(options.badge)); else badgeOf.delete(panelId);
+    if (options && options.notes) notesOf.set(panelId, String(options.notes)); else notesOf.delete(panelId);
     paint(panelId);
 }
 
@@ -49,6 +52,45 @@ function paintBadge(slotId) {
     badge.dataset.tone = ["bad", "warn", "info"].find((tone) => lines.some((line) => line.tone === tone)) || "";
     if (lines.length > 1) badge.dataset.count = String(lines.length);
     slot.appendChild(badge);
+}
+
+/**
+ * The lines of every helper that shares a notes panel, as ONE list, most important first: Urgent (red), Check (amber),
+ * Next (blue), Good (green), Tip (grey). Each row can carry the button of its line. The panel folds like any other panel and
+ * says how many lines of each level it holds while it is folded. Nothing is replaced until a helper has something to say.
+ */
+const LEVELS = { bad: [0, "Urgent"], warn: [1, "Check"], info: [2, "Next"], ok: [3, "Good"], "": [4, "Tip"] };
+function paintNotes(slotId) {
+    const slot = document.getElementById(slotId);
+    if (!slot) return;
+    const lines = [];
+    notesOf.forEach((id, panelId) => {
+        if (id !== slotId || assistHidden(panelId)) return;
+        try { const provider = providers.get(panelId); (provider ? provider() || [] : []).forEach((line) => { if (line && line.text) lines.push(line); }); }
+        catch (error) { console.warn("A helper could not work out what to say: ", error); }
+    });
+    if (lines.length === 0) return;
+    const level = (line) => (LEVELS[line.tone || ""] || LEVELS[""]);
+    lines.sort((a, b) => level(a)[0] - level(b)[0]);
+    slot.replaceChildren();
+    lines.forEach((line) => {
+        const row = document.createElement("div");
+        row.className = "note-row"; row.dataset.tone = line.tone || "";
+        const badge = document.createElement("span"); badge.className = "note-level"; badge.textContent = level(line)[1];
+        const text = document.createElement("span"); text.className = "note-text"; text.textContent = line.text;
+        row.append(badge, text);
+        if (line.label && line.run) {
+            const act = document.createElement("button"); act.type = "button"; act.className = "btn small note-act"; act.textContent = line.label;
+            if (line.tip) act.dataset.tip = line.tip;
+            act.addEventListener("click", () => line.run());
+            row.appendChild(act);
+        }
+        slot.appendChild(row);
+    });
+    const count = (tone) => lines.filter((line) => (line.tone || "") === tone).length;
+    const parts = [["bad", "urgent"], ["warn", "to check"], ["info", "next"]].map(([tone, word]) => [count(tone), word]).filter(([n]) => n > 0).map(([n, word]) => n + " " + word);
+    const panel = slot.closest(".panel");
+    if (panel) setPanelSummary(panel.dataset.panel, parts.length ? parts.join(" · ") : "All good");
 }
 
 /** Draws the helper of one panel again (or of every panel when no id is given). */
@@ -94,6 +136,12 @@ function build(panelId) {
 }
 
 function paint(panelId, stepped) {
+    if (notesOf.has(panelId)) {
+        paintNotes(notesOf.get(panelId));
+        const own = document.querySelector(`.board .panel[data-panel="${CSS.escape(panelId)}"] > .panel-inner > .assist`);
+        if (own) own.remove();
+        return;
+    }
     if (badgeOf.has(panelId)) {
         paintBadge(badgeOf.get(panelId));
         const own = document.querySelector(`.board .panel[data-panel="${CSS.escape(panelId)}"] > .panel-inner > .assist`);

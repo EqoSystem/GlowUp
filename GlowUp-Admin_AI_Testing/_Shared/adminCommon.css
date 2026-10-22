@@ -1386,3 +1386,36 @@ body.snapx-open { overflow: hidden; }
 }
 /* a question asked from inside the review window (Reject?) comes above it */
 body.snapx-open .modal-overlay { z-index: 3000; }
+
+/* ---- New4.pdf: Inventory and Curator ---- */
+/* the search box lives in the page header, beside the title; Add / More sit at the right end next to the layout button */
+.topbar.has-search .topbar-titles { flex: 0 0 auto; }
+.topbar > .search-container { flex: 1 1 260px; max-width: 520px; min-width: 160px; margin: 0 auto 0 8px; }
+.topbar-tools .tool-group.end { margin-left: 0; flex-wrap: nowrap; }
+@media (max-width: 800px) { .topbar { flex-wrap: wrap; } .topbar > .search-container { order: 3; flex-basis: 100%; max-width: none; margin: 0; } }
+/* the filter bar: ONE row of dropdowns (the buttons moved to the header and to the table's bar) */
+.toolbar.inv-tools { flex-wrap: nowrap; }
+.inv-tools .toolbar-select { flex: 1 1 200px; max-width: 320px; min-width: 120px; }
+/* Sort and Filters sit in the table's bar, right after its title */
+.table-tools { display: inline-flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
+.table-tools .btn { padding-block: 5px; white-space: nowrap; }
+/* no "1-10 of 50 brands" text and no count line: the pager keeps only "< Page 1 of 5 >" */
+.pager-range { display: none; }
+/* Needs your attention: one list, most important first, a colour and a word per level */
+.notes-list { display: flex; flex-direction: column; gap: 8px; }
+.note-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--surface-2);
+    border-left: 4px solid var(--border); }
+.note-level { flex: none; min-width: 58px; text-align: center; padding: 2px 8px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700; letter-spacing: .02em;
+    background: var(--surface-3); color: var(--text-2); }
+.note-text { flex: 1; min-width: 0; font-size: var(--fs-sm); line-height: 1.45; }
+.note-act { flex: none; white-space: nowrap; }
+.note-row[data-tone="bad"] { border-left-color: var(--bad); background: color-mix(in srgb, var(--bad) 9%, var(--surface-2)); }
+.note-row[data-tone="bad"] .note-level { background: var(--bad); color: var(--bg); }
+.note-row[data-tone="warn"] { border-left-color: var(--warn); background: color-mix(in srgb, var(--warn) 9%, var(--surface-2)); }
+.note-row[data-tone="warn"] .note-level { background: var(--warn); color: var(--bg); }
+.note-row[data-tone="info"] { border-left-color: var(--info); background: color-mix(in srgb, var(--info) 8%, var(--surface-2)); }
+.note-row[data-tone="info"] .note-level { background: var(--info); color: var(--bg); }
+.note-row[data-tone="ok"] { border-left-color: var(--ok); }
+.note-row[data-tone="ok"] .note-level { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok); }
+.note-row[data-tone=""] .note-text { color: var(--muted); }
+@media (max-width: 700px) { .note-row { flex-wrap: wrap; } .note-text { flex-basis: 100%; order: 3; } }

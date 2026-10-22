@@ -200,6 +200,20 @@ function addRefreshDataButton(topbar) {
  * Builds the sidebar and the top bar round the page's <main class="main-content" data-title data-subtitle>.
  * Call it first on every admin page. page = "dashboard" | "inventory" | "curator".
  */
+/**
+ * Moves a page's search box into the header, beside the title, and its action buttons (Add, More) to the right end of the header,
+ * next to the layout button. Call it right after mountShell (which draws the header buttons).
+ */
+export function placeInHeader(searchSelector, actionsId) {
+    const bar = document.querySelector(".topbar");
+    if (!bar) return;
+    const search = document.querySelector(".board " + searchSelector);
+    const tools = bar.querySelector(".topbar-tools");
+    const actions = document.getElementById(actionsId);
+    if (search) { bar.classList.add("has-search"); bar.insertBefore(search, tools); }
+    if (actions && tools) tools.insertBefore(actions, tools.firstChild);
+}
+
 export function mountShell(page) {
     const main = document.querySelector("main.main-content");
     document.body.classList.add("app");
@@ -780,7 +794,7 @@ export function renderPager(host, state, total, onChange, noun = "items") {
     const pages = Math.max(1, Math.ceil(total / state.size));
     if (total <= state.size) { host.innerHTML = ""; return; }
     const from = (state.page - 1) * state.size + 1, to = Math.min(total, state.page * state.size);
-    host.innerHTML = `<span>${from}-${to} of ${total} ${esc(noun)}</span>
+    host.innerHTML = `<span class="pager-range">${from}-${to} of ${total} ${esc(noun)}</span>
         <span class="btn-group">
             <button type="button" class="icon-btn" data-go="-1" aria-label="Previous page"${state.page <= 1 ? " disabled" : ""}>${icon("left")}</button>
             <span class="page-now">Page ${state.page} of ${pages}</span>
