@@ -34,11 +34,11 @@ import { collection, doc, serverTimestamp } from "https://www.gstatic.com/fireba
 import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed } from "../_Shared/adminStore.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
-    statusBadge, statusGuide, normalizeStatus, notify, describeError, setBusy, setFormError, originLabel, sourceLinks, assistSourceLinks, sourceGuideHtml, COSMETIC_TYPES, STATUSES,
+    statusBadge, toneBadge, statusGuide, normalizeStatus, notify, describeError, setBusy, setFormError, originLabel, sourceLinks, assistSourceLinks, sourceGuideHtml, COSMETIC_TYPES, STATUSES,
     productScope, notMakeup, scopeWords, categoryOutOfScope, BRAND_CATEGORY, wireSearch, dialogIsOpen
 } from "../_Shared/adminCommon.js";
 import { matchesSearch, compactName, barcodeKey } from "../_Shared/glowupRules.js";
-import { cleanupPlan, productDuplicates, brandDuplicates, mergeProducts, mergeBrands, nameWithoutBrand } from "../_Shared/glowupCatalog.js";
+import { productVisibility, cleanupPlan, productDuplicates, brandDuplicates, mergeProducts, mergeBrands, nameWithoutBrand } from "../_Shared/glowupCatalog.js";
 import { openPlanDialog, openDuplicatesDialog } from "../_Shared/adminCleanup.js";
 import { mountShell, placeInHeader, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
@@ -400,6 +400,7 @@ async function loadInventory() {
                 category: data.category || "",
                 market: data.market || "Global",
                 status: normalizeStatus(data.status),
+                rawStatus: String(data.status || ""),          // as stored: an empty one is NOT Active for the app (see productVisibility)
                 scans: toWholeNumber(data.scans),
                 source: String(data.source || "").trim().toLowerCase(),
                 reviewed: data.reviewed === true,
@@ -429,6 +430,7 @@ async function loadInventory() {
                 shades: asArray(data.shades).map(cleanShade).filter((s) => s !== null),
                 minAge: toWholeNumber(data.minAge),
                 status: normalizeStatus(data.status),
+                rawStatus: String(data.status || ""),
                 scans: toWholeNumber(data.scans),
                 source: String(data.source || "").trim().toLowerCase(),
                 sources: Array.isArray(data.sources) ? data.sources.map((s) => String(s)) : [],
@@ -504,7 +506,7 @@ async function loadInventory() {
             const stamp = () => ({ status: "Active", reviewed: true, autoApproved: true, reviewedAt: serverTimestamp(), updatedAt: serverTimestamp() });
             try {
                 await runBatches(fresh.map((p) => ({ ref: doc(db, "products", p.id), data: stamp() })).concat(freshBrands.map((b) => ({ ref: doc(db, "brands", b.id), data: stamp() }))));
-                fresh.concat(freshBrands).forEach((x) => { x.status = "Active"; x.reviewed = true; x.needsReview = false; });
+                fresh.concat(freshBrands).forEach((x) => { x.status = "Active"; x.rawStatus = "Active"; x.reviewed = true; x.needsReview = false; });
                 notify(`${many(fresh.length, "scanned product", "scanned products")} confirmed by FDA Philippines: approved automatically.`, "ok");
             } catch (error) {
                 console.warn("Automatic approval did not work: ", error);       // they simply stay "waiting for review"
@@ -528,7 +530,7 @@ async function loadInventory() {
         if (waiting.length > 0) {
             try {
                 await runBatches(waiting.map((b) => ({ ref: doc(db, "brands", b.id), data: { status: "Active", reviewed: true, autoApproved: true, reviewedAt: serverTimestamp(), updatedAt: serverTimestamp() } })));
-                waiting.forEach((b) => { b.status = "Active"; b.reviewed = true; b.needsReview = false; });
+                waiting.forEach((b) => { b.status = "Active"; b.rawStatus = "Active"; b.reviewed = true; b.needsReview = false; });
                 notify(`${waiting.map((b) => b.name).join(", ")}: on the FDA Philippines list, approved automatically.`, "ok");
                 afterChange();
             } catch (error) { console.warn("Automatic approval of the brand did not work: ", error); }
@@ -1320,7 +1322,7 @@ function brandRow(brand, productCount, columns) {
     const about = [brand.category, brand.market].filter((t) => t).map(escapeHtml).join(" · ");
     const out = brandOut(brand);
     const buttons = [];
-    if (brand.needsReview && !out) buttons.push(actionButton("row-btn approve", "approve-brand", brand.id, icon("check"), "Approve", "You have checked this brand: set it to Active.", "It asks first. Its products stay as they are."));
+    if (brand.status === "Pending" && !out) buttons.push(`<button type="button" class="row-btn approve" data-act="approve-brand" data-id="${escapeHtml(brand.id)}" data-tip-title="Approve brand" data-tip="You have checked this brand: set it to Active. Its products are approved separately.">${icon("check")}Approve brand</button>`);
     buttons.push(actionButton("", "add-product", brand.id, icon("plus"), "Add product", "Add a product to this brand.", "Opens the product form with this brand chosen."));
     buttons.push(actionButton("", "edit-brand", brand.id, icon("edit"), "Edit brand", "Change the name, category, market or status.", "Opens the brand form."));
     buttons.push(actionButton("row-btn danger", "bin-brand", brand.id, BIN_ICON, "Recycle bin", "Remove this brand together with its products.", "They go to the Recycle bin and can be restored."));
@@ -1358,10 +1360,25 @@ function productRow(p, brand, flat) {
             <td class="type-cell">${escapeHtml(p.cosmeticType || "–")}</td>
             <td class="shade-cell">${shadeCell}</td>
             <td class="scan-count text-right">${p.scans}</td>
-            <td class="status-cell">${statusBadge(p.status)}</td>
+            <td class="status-cell">${productStatusCell(p, brand)}</td>
             <td class="text-right">${rowActions(buttons)}</td>
         </tr>` + (open ? detailRow(p, brand, flat ? 7 : 6) : "");
 }
+
+/**
+ * The status of a product as the app sees it (productVisibility: the app's own rule). A product that is not Active keeps its
+ * status badge; an Active one says whether the app really shows it.
+ */
+function productStatusCell(p, brand) {
+    const { live, reason } = productVisibility(p, brand);
+    if (live) return toneBadge("Live", "ok", "The app shows this product.");
+    if (reason === "not-makeup") return toneBadge("Hidden (not make-up)", "bad", "The app lists make-up only, so it hides this product.");
+    if (reason === "brand-pending") return toneBadge("Approved · Hidden (brand pending)", "warn", "The product is approved, but its brand is not, so the app hides it.") + `<div class="field-hint warn">${BRAND_HINT}</div>`;
+    if (reason === "brand-not-active" || reason === "brand-binned") return toneBadge("Approved · Hidden (brand " + (reason === "brand-binned" ? "in the Recycle bin" : "not active") + ")", "warn", "The product is approved, but its brand is switched off, so the app hides it.");
+    if (reason === "product-not-active" && p.status === "Active") return toneBadge("Hidden (no status)", "warn", "The product has no status in the database, so the app hides it. Edit it and save.");
+    return statusBadge(p.status);
+}
+const BRAND_HINT = "Approve the brand too so users can see this product.";
 
 /** Everything else about a product: shown under its row when the row is clicked. */
 function detailRow(p, brand, columns) {
@@ -2371,14 +2388,18 @@ async function approveBrand(brand, button) {
     if (!(await sure(question, "Approve", false))) return;
 
     button.disabled = true;
+    // the badge changes at once; if the write fails, the old state comes back
+    const before = { status: brand.status, rawStatus: brand.rawStatus, reviewed: brand.reviewed, needsReview: brand.needsReview };
+    Object.assign(brand, { status: "Active", rawStatus: "Active", reviewed: true, needsReview: false });
+    afterChange();
     try {
         await updateDoc(doc(db, "brands", brand.id), approval());
         notify("Brand approved.", "ok");
-        await loadInventory();
     } catch (error) {
         console.error("Error approving brand: ", error);
+        Object.assign(brand, before);
+        afterChange();
         notify("The brand was not approved. " + describeError(error), "error");
-        button.disabled = false;
     }
 }
 
@@ -2388,20 +2409,18 @@ async function approveProduct(product, button) {
     if (!brand) { notify(`"${product.name}" has no brand. Open it with Edit, choose its brand and save.`, "error"); return; }
     if (product.ingredients.length === 0) { notify(`"${product.name}" has no ingredient list, so the app cannot check it. Open it with Edit and paste the list.`, "error"); return; }
 
-    const brandToo = brand.needsReview;             // its brand arrived the same way and is still waiting: approve them together
+    // a product and its brand are approved separately: approving one never approves the other
     let question = `Approve "${product.name}"?\n\nIt becomes Active: the app can recognise it in scans and recommend it to the users it suits. Check its name, type and ingredient list first.`;
-    if (brandToo) question += `\n\nIts brand "${brand.name}" is also waiting for review and will be approved with it.`;
+    if (brand.status !== "Active") question += `\n\nIts brand "${brand.name}" is ${brand.status} and is NOT approved by this. The app hides the product until the brand is approved too.`;
     if (!(await sure(question, "Approve", false))) return;
 
     button.disabled = true;
     try {
-        const batch = writeBatch(db);
-        batch.update(doc(db, "products", product.id), approval());
-        if (brandToo) batch.update(doc(db, "brands", brand.id), approval());
-        await batch.commit();
-        if (!brandToo && brand.status !== "Active") notify(`Product approved. Its brand "${brand.name}" is ${brand.status}, so the app keeps hiding it until the brand is Active.`, "info");
-        else notify(brandToo ? "Product and its brand approved." : "Product approved.", "ok");
-        await loadInventory();
+        await updateDoc(doc(db, "products", product.id), approval());
+        Object.assign(product, { status: "Active", rawStatus: "Active", reviewed: true, needsReview: false });
+        afterChange();
+        if (brand.status !== "Active") notify(`Product approved. ${BRAND_HINT} ("${brand.name}" is ${brand.status}.)`, "info");
+        else notify("Product approved.", "ok");
     } catch (error) {
         console.error("Error approving product: ", error);
         notify("The product was not approved. " + describeError(error), "error");

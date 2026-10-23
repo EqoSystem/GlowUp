@@ -550,3 +550,28 @@ export function planTotals(plan) {
     plan.steps.forEach((step) => step.changes.forEach((change) => { totals[change.action]++; totals.byCollection[change.collection][change.action]++; }));
     return totals;
 }
+
+/**
+ * Whether the app shows a product, and if not why. THE SAME RULE as the app's: ProductRepository.Usable() and
+ * BrandRepository.IsSwitchedOff() (GlowUp/Assets/_Project/Scripts/Data/). Change one, change the other.
+ *   - the product is not in the Recycle bin and its status is "Active" (an EMPTY status is NOT Active)
+ *   - its brand, when found by brandId, is not in the Recycle bin and its status is "Active" (a brand that is not found
+ *     does not hide the product)
+ *   - the product is make-up (a kind that is unclear is hidden too)
+ * The status is read from rawStatus (what the database holds) when the page keeps it, else from status. normalizeStatus
+ * turns an empty status into "Active" for display, which is not what the app does.
+ * Answers { live, reason }: reason is "live", "binned", "product-not-active", "not-makeup", "brand-binned",
+ * "brand-pending" or "brand-not-active".
+ */
+export function productVisibility(product, brand) {
+    const statusOf = (item) => text(item.rawStatus !== undefined ? item.rawStatus : item.status).trim().toLowerCase();
+    if (!product || product.binned === true) return { live: false, reason: "binned" };
+    if (statusOf(product) !== "active") return { live: false, reason: "product-not-active" };
+    if (judgeProduct(product.cosmeticType, product.name).kind !== "makeup") return { live: false, reason: "not-makeup" };
+    if (brand) {
+        if (brand.binned === true) return { live: false, reason: "brand-binned" };
+        const brandStatus = statusOf(brand);
+        if (brandStatus !== "active") return { live: false, reason: brandStatus === "pending" ? "brand-pending" : "brand-not-active" };
+    }
+    return { live: true, reason: "live" };
+}

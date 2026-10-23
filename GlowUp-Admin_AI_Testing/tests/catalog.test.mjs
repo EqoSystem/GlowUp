@@ -194,6 +194,26 @@ equal(sameName.steps.find((s) => s.id === "names").changes[0].fields.aliases, ["
 equal(c.cleanupPlan(brands, products, ingredients, { only: ["ingredients"] }).steps.map((s) => s.id), ["ingredients"], "a plan can be limited to some steps");
 
 // ---------------------------------------------------------------------------------------------
+// productVisibility: the same rule as the app (ProductRepository.Usable / BrandRepository.IsSwitchedOff)
+// ---------------------------------------------------------------------------------------------
+const seen = (p, b) => c.productVisibility(p, b).reason;
+const lip = (more) => product("pv", "b_pv", "Brand", "Matte Lipstick", "Lipstick", more);
+const okBrand = (more) => brand("b_pv", "Brand", "Makeup", more);
+equal(seen(lip(), okBrand()), "live", "an Active make-up product of an Active brand is live");
+equal(seen(lip(), okBrand({ status: "Pending" })), "brand-pending", "approved product, Pending brand: hidden");
+equal(seen(lip(), okBrand({ status: "Inactive" })), "brand-not-active", "approved product, Inactive brand: hidden");
+equal(seen(lip(), okBrand({ binned: true })), "brand-binned", "a brand in the Recycle bin hides its products");
+equal(seen(lip(), null), "live", "a missing brand does not hide the product (the app only hides on a found brand)");
+equal(seen(lip({ status: "" }), okBrand()), "product-not-active", "an empty product status is NOT Active");
+equal(seen(lip({ status: "Active", rawStatus: "" }), okBrand()), "product-not-active", "an empty stored status counts even when the page shows Active");
+equal(seen(lip(), okBrand({ status: "Active", rawStatus: "" })), "brand-not-active", "an empty brand status is NOT Active");
+equal(seen(lip({ status: " active " }), okBrand({ status: "ACTIVE" })), "live", "the app trims and ignores capitals in a status");
+equal(seen(lip({ status: "Pending" }), okBrand()), "product-not-active", "a Pending product is hidden");
+equal(seen(lip({ binned: true }), okBrand()), "binned", "a product in the Recycle bin is hidden");
+equal(seen(product("pv2", "b_pv", "Brand", "Face Wash Gel", "Cleanser"), okBrand({ status: "Pending" })), "not-makeup", "a non-make-up product says so, even under a Pending brand");
+equal(c.productVisibility(product("pv3", "b_pv", "Brand", "Face Wash Gel", "Cleanser"), okBrand()).live, false, "a non-make-up product is not live");
+
+// ---------------------------------------------------------------------------------------------
 console.log(`checks made: ${checks}`);
 if (failures.length > 0) {
     console.log("\nFAILED: " + failures.length + " check(s)\n");

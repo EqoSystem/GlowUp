@@ -106,6 +106,7 @@ namespace GlowUp.Data
         /// <summary>
         /// True when this brand is on the website's list but switched off there (Pending, Inactive or in the Recycle bin).
         /// Its products are then left out of recommendations and alternatives. Call LoadActive() first.
+        /// The website mirrors this rule in productVisibility() (GlowUp-Admin_AI_Testing/_Shared/glowupCatalog.js): change one, change the other.
         /// </summary>
         public static bool IsSwitchedOff(string brandId)
         {

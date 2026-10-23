@@ -58,7 +58,8 @@ namespace GlowUp.Data
             return Usable();
         }
 
-        /// <summary>The products the app may use, from what is on the phone right now (no download). Call LoadActive() once first.</summary>
+        /// <summary>The products the app may use, from what is on the phone right now (no download). Call LoadActive() once first.
+        /// The website mirrors this rule in productVisibility() (GlowUp-Admin_AI_Testing/_Shared/glowupCatalog.js): change one, change the other.</summary>
         public static List<ProductData> Usable()
         {
             FromPhone();
