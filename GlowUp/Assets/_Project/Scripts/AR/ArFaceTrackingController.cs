@@ -49,6 +49,10 @@ namespace GlowUp.AR
         [Tooltip("AR Mouth Mask: keeps the make-up off the teeth and tongue when the mouth opens")]
         [SerializeField] private ArMouthMask mouthMask;
 
+        [Header("Debug")]
+        [Tooltip("On = frames per second and frame time are shown while live tracking runs (also switched on by PlayerPrefs int GlowUp.ArDebug = 1)")]
+        [SerializeField] private bool debugOverlay;
+
         [Header("Where the picture shows")]
         [SerializeField] private RawImage display;
         [SerializeField] private RectTransform viewport;
@@ -567,10 +571,18 @@ namespace GlowUp.AR
             if (usingMouth) mouthMask.BeginSession(makeup);
             if (quality != null) quality.TierChanged += OnTierChanged;
             dressedLayer = int.MinValue;
+            if (ArDebugOverlay.FlagOn(debugOverlay))
+            {
+                if (overlay == null && !TryGetComponent(out overlay)) overlay = gameObject.AddComponent<ArDebugOverlay>();
+                overlay.Begin(quality, lightAdapter);
+            }
         }
+
+        ArDebugOverlay overlay;
 
         void StopHelpers()
         {
+            if (overlay != null) overlay.End();
             if (quality != null) { quality.TierChanged -= OnTierChanged; quality.EndSession(); }
             if (usingLight && lightAdapter != null) lightAdapter.EndSession();
             if (usingHold && faceHold != null) faceHold.EndSession();
