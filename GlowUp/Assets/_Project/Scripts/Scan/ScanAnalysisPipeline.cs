@@ -237,6 +237,12 @@ namespace GlowUp.Scan
                 record.recommendedShades = ShadeAdvisor.Recommend(profile.skinTone, ShadeAdvisor.AreaFor(record.cosmeticType));
             }
             record.productShades = new List<string>(known.shades ?? new List<string>());
+            record.productShadeCodes = new List<string>(known.shadeCodes ?? new List<string>());
+            // the shade code read on the pack ("12A") picks the admin's colour for it, when the website lists the product's codes.
+            // It is more trustworthy than the colour the camera saw (light, the cap, the tube), so it replaces that one.
+            string readCode = !string.IsNullOrWhiteSpace(record.shadeName) ? record.shadeName : ScanSession.PendingShadeName;   // ApplyRecognised copies it later
+            string coded = ShadeCode.HexFor(readCode, record.productShadeCodes, record.productShades);
+            if (coded.Length > 0) record.shadeHex = coded;
             if (string.IsNullOrWhiteSpace(record.shadeName) && !string.IsNullOrWhiteSpace(known.shadeColor))
             {
                 if (ColorUtility.TryParseHtmlString(known.shadeColor, out _)) record.shadeHex = known.shadeColor.Trim();

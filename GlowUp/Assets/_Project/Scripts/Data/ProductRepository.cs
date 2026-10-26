@@ -285,7 +285,7 @@ namespace GlowUp.Data
                 skinCareActiveIngredients = f.NestedList("key_ingredient_breakdown", "skin_care_active_ingredients"),
                 baseTextureFormulators = f.NestedList("key_ingredient_breakdown", "base_texture_formulators"),
                 pigmentsPreservatives = f.NestedList("key_ingredient_breakdown", "pigments_preservatives"),
-                shades = shades, sources = sources, fdaNumber = f.Str("fdaNumber"),
+                shades = shades, shadeCodes = f.List("shadeCodes"), sources = sources, fdaNumber = f.Str("fdaNumber"),
                 binned = f.Bool("binned"), aliases = f.List("aliases")
             };
         }

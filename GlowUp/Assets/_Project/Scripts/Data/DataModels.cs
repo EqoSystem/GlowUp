@@ -107,6 +107,7 @@ namespace GlowUp.Data
         public List<string> baseTextureFormulators = new List<string>();
         public List<string> pigmentsPreservatives = new List<string>();
         public List<string> shades = new List<string>();              // hex colours, e.g. #C24B62
+        public List<string> shadeCodes = new List<string>();          // OPTIONAL: the shade codes as printed ("12A", "131"), in the same order as shades ("" = not known)
         public List<string> sources = new List<string>();             // pages the entry's details came from, each as "page title | address" (written on the website)
         public string fdaNumber;                 // the FDA Philippines notification number the website keeps with the product ("" = none on file)
         public bool binned;                      // in the website's Recycle bin: never used, but known, so it is not added a second time
@@ -188,6 +189,7 @@ namespace GlowUp.Data
         public List<string> listOnlyHere = new List<string>();        // "differs": a few names only the shown list has
         public List<string> listOnlyThere = new List<string>();       // "differs": a few names only the second place has
         public List<string> productShades = new List<string>();
+        public List<string> productShadeCodes = new List<string>();   // the product's shade codes as printed, same order as productShades (empty when the website has none)
         public List<string> recommendedShades = new List<string>();
         public bool dermatologistAdvised;
         public bool aiEnhanced;

@@ -38,10 +38,12 @@ namespace GlowUp.AR
         [SerializeField] private string productNone = "Choose a product to try on";
         [SerializeField] private Button changeProductButton;
 
-        [Header("Where the colour goes (tabs in this order: Lips, Cheeks, Eyes, Face)")]
+        [Header("Where the colour goes (tabs in this order: Lips, Cheeks, Eyes, Face, Brows)")]
         [SerializeField] private ChoiceTabs areaTabs;
         [Tooltip("On = only the part the product is made for can be chosen (a lipstick: Lips only). Off = every part can be chosen.")]
         [SerializeField] private bool onlyMatchingArea = true;
+        [Tooltip("Said in the guided preview when brows are chosen: brow colour needs live face tracking")]
+        [SerializeField] private string msgBrowsNeedLive = "Brow colour needs live face tracking, which this phone does not offer. Try lips, cheeks or eyes here.";
 
         [Header("Finish (tabs in the order of Finish Names)")]
         [SerializeField] private ChoiceTabs finishTabs;
@@ -173,7 +175,34 @@ namespace GlowUp.AR
         }
 
         /// <summary>Live tracking shows its picture: the card goes. (The guided preview tells through OnCameraStarted.)</summary>
-        void OnModeDecided(bool live) { if (live && cameraCard != null) cameraCard.Hide(); }
+        void OnModeDecided(bool live)
+        {
+            modeKnown = true;
+            if (live && cameraCard != null) cameraCard.Hide();
+            RefreshAreaTabs();
+            if (!live && CurrentArea() == ShadeAdvisor.Brows) Say(msgBrowsNeedLive);
+        }
+
+        /// <summary>
+        /// Which part tabs can be tapped: only the part the product is made for (when that rule is on), and Brows only while live
+        /// face tracking runs (the guided preview has no brow shapes). Before the mode is known, Brows counts as possible.
+        /// </summary>
+        void RefreshAreaTabs()
+        {
+            if (areaTabs == null) return;
+            string area = record != null ? ShadeAdvisor.AreaFor(record.cosmeticType) : null;
+            bool guidedOnly = liveTracking == null || (modeKnown && !liveTracking.IsLive);
+            for (int i = 0; i < ShadeAdvisor.Areas.Length; i++)
+            {
+                bool matching = !onlyMatchingArea || area == null || ShadeAdvisor.Areas[i] == area;
+                bool drawable = ShadeAdvisor.Areas[i] != ShadeAdvisor.Brows || !guidedOnly;
+                areaTabs.SetAvailable(i, matching && drawable);
+            }
+        }
+
+        bool modeKnown;
+        string CurrentArea() => areaTabs != null ? ShadeAdvisor.Areas[Mathf.Clamp(areaTabs.SelectedIndex, 0, ShadeAdvisor.Areas.Length - 1)]
+            : record != null ? ShadeAdvisor.AreaFor(record.cosmeticType) : ShadeAdvisor.Lips;
 
         void OnCameraStarted(bool ok, string message)
         {
@@ -220,12 +249,9 @@ namespace GlowUp.AR
                     : string.Format(productFormat, record.Title, string.IsNullOrWhiteSpace(record.cosmeticType) ? "Cosmetic" : record.cosmeticType);
 
             string area = record != null ? ShadeAdvisor.AreaFor(record.cosmeticType) : ShadeAdvisor.Lips;
-            if (areaTabs != null)
-            {
-                areaTabs.Select(Array.IndexOf(ShadeAdvisor.Areas, area), false);
-                for (int i = 0; i < ShadeAdvisor.Areas.Length; i++)
-                    areaTabs.SetAvailable(i, !onlyMatchingArea || record == null || ShadeAdvisor.Areas[i] == area);
-            }
+            if (areaTabs != null) areaTabs.Select(Array.IndexOf(ShadeAdvisor.Areas, area), false);
+            RefreshAreaTabs();
+            if (area == ShadeAdvisor.Brows && modeKnown && liveTracking != null && !liveTracking.IsLive) Say(msgBrowsNeedLive);
 
             // the finish: what the scan saw on the product, otherwise a sensible guess from the kind of product
             string finish = record != null ? (record.finish ?? "") : "";
@@ -300,6 +326,18 @@ namespace GlowUp.AR
             selected = button;
             foreach (ShadeButton b in AllShadeButtons()) if (b != null) b.SetSelected(b == button);
             if (makeup != null) makeup.SetShade(button.Shade);
+            ArDebugOverlay.ShadeNote = DescribeShade(button);
+        }
+
+        /// <summary>For the debug overlay: "12A -> #B5463F" when the product's shade code is known, otherwise the hex.</summary>
+        string DescribeShade(ShadeButton button)
+        {
+            string hex = "#" + ColorUtility.ToHtmlStringRGB(button.Shade);
+            if (record == null || record.productShades == null || record.productShadeCodes == null) return hex;
+            for (int i = 0; i < record.productShades.Count && i < record.productShadeCodes.Count; i++)
+                if (string.Equals(record.productShades[i], hex, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(record.productShadeCodes[i]))
+                    return record.productShadeCodes[i].Trim() + " -> " + hex;
+            return hex;
         }
 
         void ApplyFinish(int index)
@@ -367,6 +405,7 @@ namespace GlowUp.AR
                     catch (Exception e) { Debug.LogWarning("AR Try-On: " + e.Message); continue; }
                     made.source = "recommendation"; made.brandId = product.brandId; made.productId = product.id;
                     made.productShades = new List<string>(product.shades ?? new List<string>());
+                    made.productShadeCodes = new List<string>(product.shadeCodes ?? new List<string>());
                     if (string.IsNullOrEmpty(made.shadeHex) && made.productShades.Count > 0) made.shadeHex = made.productShades[0];
                     if (!ProductScope.CanTryOn(made)) continue;
                     saved.Add(made); found++;
