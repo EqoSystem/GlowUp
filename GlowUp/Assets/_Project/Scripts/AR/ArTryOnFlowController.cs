@@ -152,6 +152,15 @@ namespace GlowUp.AR
             if (record == null) OpenPicker();
         }
 
+        // the phone's own back key always leaves the screen (closing the product picker first), even when the camera picture is wrong
+        void Update()
+        {
+            if (!Input.GetKeyDown(KeyCode.Escape)) return;
+            if (pickerPanel != null && pickerPanel.IsOpen) { pickerPanel.Hide(); return; }
+            StopCamera();
+            SceneNavigator.Go(backScene);
+        }
+
         void OnDestroy()
         {
             if (cameraFeed != null) cameraFeed.Started -= OnCameraStarted;

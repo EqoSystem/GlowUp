@@ -125,6 +125,7 @@ namespace GlowUp.AR
         public event Action<bool> ModeDecided;
 
         const string GuardName = "ar-live-tracking";
+        static bool reloadedAfterPermission;
         bool guarding;
         float liveSince;
         Coroutine blackWatch;
@@ -281,6 +282,18 @@ namespace GlowUp.AR
                     if (!answered && Application.isFocused && Permission.HasUserAuthorizedPermission(Permission.Camera)) { granted = true; answered = true; }
                 }
                 allowed = granted;
+                // The phone pauses and resumes the app around its question. Opening the AR camera in the middle of that has left a black screen
+                // with the camera light on (reported on phones, 2026-10-26). So after a first "allow" the screen is simply loaded again: the
+                // camera is then already allowed, no question, no pause, a clean start. Once per app run.
+                if (granted && !reloadedAfterPermission)
+                {
+                    reloadedAfterPermission = true;
+                    Debug.Log("[GlowUp] AR Try-On: the camera was just allowed; loading the screen again for a clean start.");
+                    routine = null;
+                    if (quality != null) quality.EndSession();
+                    UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
+                    yield break;
+                }
                 // the question has just closed: the app is still coming back to the front. Opening the AR camera in that moment can leave a
                 // black screen until the app is restarted, so wait until the app is in front again and has had a moment to draw.
                 float settled = 0f, front = 0f;
