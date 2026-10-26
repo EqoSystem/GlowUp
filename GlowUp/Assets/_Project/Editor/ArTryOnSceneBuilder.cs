@@ -289,6 +289,8 @@ namespace GlowUp.EditorTools
             if (layers.eyes != null) A.Set(liveMakeup, "eyesMaterial", layers.eyes);
             if (layers.lips != null) A.Set(liveMakeup, "lipsMaterial", layers.lips);
             if (layers.shine != null) A.Set(liveMakeup, "shineMaterial", layers.shine);
+            if (layers.brows != null) A.Set(liveMakeup, "browsMaterial", layers.brows);
+            if (layers.gloss != null) A.Set(liveMakeup, "glossMaterial", layers.gloss);
             Kit.SetArray(liveMakeup, "shineMasks", layers.shineMasks);
 
             var live = SceneBuilderCore.Ensure<ArFaceTrackingController>(controller.gameObject);
@@ -302,8 +304,11 @@ namespace GlowUp.EditorTools
             var lightAdapter = SceneBuilderCore.Ensure<ArLightAdapter>(SceneBuilderCore.EnsureRoot("AR Light Adapter"));
             var faceHold = SceneBuilderCore.Ensure<ArFaceHold>(SceneBuilderCore.EnsureRoot("AR Face Hold"));
             var mouthMask = SceneBuilderCore.Ensure<ArMouthMask>(SceneBuilderCore.EnsureRoot("AR Mouth Mask"));
+            var browMask = SceneBuilderCore.Ensure<ArBrowMask>(SceneBuilderCore.EnsureRoot("AR Brow Mask"));
+            var meshSmoother = SceneBuilderCore.Ensure<ArMeshSmoother>(SceneBuilderCore.EnsureRoot("AR Mesh Smoother"));
             A.Set(live, "quality", qualityController); A.Set(live, "lightAdapter", lightAdapter);
             A.Set(live, "faceHold", faceHold); A.Set(live, "mouthMask", mouthMask);
+            A.Set(live, "browMask", browMask); A.Set(live, "meshSmoother", meshSmoother);
             A.Set(controller, "liveTracking", live);
 
             A.Set(controller, "cameraFeed", camera); A.Set(controller, "makeup", makeup); A.Set(controller, "statusText", status);

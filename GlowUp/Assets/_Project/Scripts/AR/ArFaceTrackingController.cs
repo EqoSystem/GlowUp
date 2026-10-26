@@ -48,9 +48,13 @@ namespace GlowUp.AR
         [SerializeField] private ArFaceHold faceHold;
         [Tooltip("AR Mouth Mask: keeps the make-up off the teeth and tongue when the mouth opens")]
         [SerializeField] private ArMouthMask mouthMask;
+        [Tooltip("AR Brow Mask: makes the brow mask from the tracked face (without it, brows show no colour)")]
+        [SerializeField] private ArBrowMask browMask;
+        [Tooltip("AR Mesh Smoother: takes the trembling out of the face mesh (full pipeline)")]
+        [SerializeField] private ArMeshSmoother meshSmoother;
 
         [Header("Debug")]
-        [Tooltip("On = frames per second and frame time are shown while live tracking runs (also switched on by PlayerPrefs int GlowUp.ArDebug = 1)")]
+        [Tooltip("On = the debug overlay (frames per second, frame times, pipeline, tracking, shade) is shown while live tracking runs. Development builds and the Editor only; also PlayerPrefs int GlowUp.ArDebug = 1, or three fingers held on the screen for a second.")]
         [SerializeField] private bool debugOverlay;
 
         [Header("Where the picture shows")]
@@ -132,7 +136,7 @@ namespace GlowUp.AR
         Coroutine routine;
         int frames;
         bool subscribed, hadFace, saidAnything;
-        bool usingLight, usingHold, usingMouth;     // which helpers were started for this live session
+        bool usingLight, usingHold, usingMouth, usingBrow, usingSmooth;     // which helpers were started for this live session
         int dressedLayer = int.MinValue;            // the colour layer the faces are dressed in now (light pipeline: only the shown one)
         string lastSaid = "";
         float lastSeen = -100f;
@@ -563,22 +567,38 @@ namespace GlowUp.AR
         // ---------------------------------------------------------------------------------------
         void StartHelpers()
         {
-            usingLight = lightAdapter != null && (quality == null || quality.LightAdaptation);
-            usingHold = faceHold != null && (quality == null || quality.HoldLostFace);
-            usingMouth = mouthMask != null && (quality == null || quality.MouthMask);
-            if (usingLight) lightAdapter.BeginSession(arCamera, makeup);
-            if (usingHold) faceHold.BeginSession(faceManager, makeup);
-            if (usingMouth) mouthMask.BeginSession(makeup);
+            usingLight = usingHold = usingMouth = usingBrow = usingSmooth = false;
+            SyncHelpers();
             if (quality != null) quality.TierChanged += OnTierChanged;
             dressedLayer = int.MinValue;
-            if (ArDebugOverlay.FlagOn(debugOverlay))
+            foreach (ARFace f in faceManager.trackables) Dress(f);     // a face found during the start-up gets this pipeline's highlight too
+            if (ArDebugOverlay.Allowed)
             {
                 if (overlay == null && !TryGetComponent(out overlay)) overlay = gameObject.AddComponent<ArDebugOverlay>();
-                overlay.Begin(quality, lightAdapter);
+                overlay.Begin(quality, lightAdapter, this, makeup, ArDebugOverlay.FlagOn(debugOverlay));
             }
         }
 
         ArDebugOverlay overlay;
+
+        /// <summary>
+        /// Starts the helpers the current pipeline wants and stops the ones it does not (at the start, and when the frame-time
+        /// check moves the phone down or tries the full pipeline again).
+        /// </summary>
+        void SyncHelpers()
+        {
+            bool wantLight = lightAdapter != null && (quality == null || quality.LightAdaptation);
+            bool wantHold = faceHold != null && (quality == null || quality.HoldLostFace);
+            bool wantMouth = mouthMask != null && (quality == null || quality.MouthMask);
+            bool wantBrow = browMask != null;                                                   // made once per face: both pipelines
+            bool wantSmooth = meshSmoother != null && (quality == null || quality.MeshSmoothing);
+            if (wantLight != usingLight) { if (wantLight) lightAdapter.BeginSession(arCamera, makeup); else lightAdapter.EndSession(); usingLight = wantLight; }
+            if (wantHold != usingHold) { if (wantHold) faceHold.BeginSession(faceManager, makeup); else faceHold.EndSession(); usingHold = wantHold; }
+            if (wantMouth != usingMouth) { if (wantMouth) mouthMask.BeginSession(makeup); else mouthMask.EndSession(); usingMouth = wantMouth; }
+            if (wantBrow != usingBrow) { if (wantBrow) browMask.BeginSession(makeup); else browMask.EndSession(); usingBrow = wantBrow; }
+            if (wantSmooth != usingSmooth) { if (wantSmooth) meshSmoother.BeginSession(); else meshSmoother.EndSession(); usingSmooth = wantSmooth; }
+            if (makeup != null) makeup.UseGloss = makeup.HasGloss && (quality == null || quality.MovingHighlight);
+        }
 
         void StopHelpers()
         {
@@ -587,25 +607,32 @@ namespace GlowUp.AR
             if (usingLight && lightAdapter != null) lightAdapter.EndSession();
             if (usingHold && faceHold != null) faceHold.EndSession();
             if (usingMouth && mouthMask != null) mouthMask.EndSession();
-            usingLight = usingHold = usingMouth = false;
+            if (usingBrow && browMask != null) browMask.EndSession();
+            if (usingSmooth && meshSmoother != null) meshSmoother.EndSession();
+            usingLight = usingHold = usingMouth = usingBrow = usingSmooth = false;
             if (makeup != null) makeup.Presence = 1f;
         }
 
-        /// <summary>The frame-rate check moved this phone to the light pipeline while AR Try-On was open.</summary>
+        /// <summary>The frame-time check moved this phone to the other pipeline while AR Try-On was open.</summary>
         void OnTierChanged()
         {
             if (!IsLive || quality == null) return;
-            if (usingLight && !quality.LightAdaptation) { lightAdapter.EndSession(); usingLight = false; }
-            if (usingMouth && !quality.MouthMask) { mouthMask.EndSession(); usingMouth = false; }
+            SyncHelpers();
             if (picture != null)
             {
                 RenderTexture old = picture;
-                PreparePicture();                    // a smaller picture
+                PreparePicture();                    // the picture size of the new pipeline
+                display.color = Color.white;         // PreparePicture hides a new picture until it has arrived; this one is live already
                 old.Release(); Destroy(old);
                 if (compare) ReleaseBefore();        // the before picture is drawn again at the new size
             }
             dressedLayer = int.MinValue;             // every face is dressed again
+            foreach (ARFace f in faceManager.trackables) Dress(f);
         }
+
+        /// <summary>For the debug overlay: Tracking, Held (lost for a moment), Lost, or Off.</summary>
+        public string TrackingStateText => !IsLive ? "Off" : trackedNow ? "Tracking" : heldNow ? "Held" : "Lost";
+        bool trackedNow, heldNow;
 
         /// <summary>In the light pipeline only the colour layer being tried is drawn: when another part is chosen, the faces get that layer.</summary>
         void RedressWhenLayerChanged()
@@ -660,8 +687,11 @@ namespace GlowUp.AR
             // the helpers: light and mouth follow a tracked face; a lost face is held for a moment and fades
             if (usingLight) lightAdapter.FaceVisible = seen;
             if (usingMouth) { if (tracked != null) mouthMask.Step(tracked); else mouthMask.Lost(); }
+            if (usingBrow && tracked != null) browMask.Step(tracked);
+            if (usingSmooth) meshSmoother.Follow(tracked);
             bool holding = false;
             if (usingHold) { faceHold.Step(); holding = faceHold.IsHolding; }
+            trackedNow = seen; heldNow = holding;
             RedressWhenLayerChanged();
 
             string say = hasFace ? msgTracking

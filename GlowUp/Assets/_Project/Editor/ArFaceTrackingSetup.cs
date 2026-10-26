@@ -40,7 +40,7 @@ namespace GlowUp.EditorTools
         const string ArCoreSettingsPath = "Assets/XR/Settings/ARCoreSettings.asset";
 
         /// <summary>The four layer materials, in drawing order: face, cheeks, eyes, lips.</summary>
-        public class Layers { public Material face, cheeks, eyes, lips, shine; public Texture2D[] shineMasks = new Texture2D[0]; }
+        public class Layers { public Material face, cheeks, eyes, lips, shine, brows, gloss; public Texture2D[] shineMasks = new Texture2D[0]; }
 
         [MenuItem("GlowUp/Set Up AR Face Tracking (ARCore)")]
         static void RunFromMenu()
@@ -359,6 +359,10 @@ namespace GlowUp.EditorTools
             // the highlight of the finishes (satin, glossy, shimmer, metallic): white, drawn on top; its mask is swapped to the part that is shown
             layers.shine = Layer("ArMakeup_5_Shine", "face_shine_lips", 4, new Color(1f, 1f, 1f, 0f), false);
             layers.shineMasks = new[] { Mask("face_shine_face"), Mask("face_shine_cheeks"), Mask("face_shine_eyes"), Mask("face_shine_lips") };
+            // the brows: the same tint as the other parts, but the mask is made from the tracked face at run time (ArBrowMask)
+            layers.brows = RuntimeMaskLayer("ArMakeup_6_Brows", "FaceMakeupBlend.shader", 2, new Color(0.35f, 0.25f, 0.20f, 0f));
+            // the full pipeline's highlight that follows the face's surface; its mask is the part being tried (set at run time)
+            layers.gloss = RuntimeMaskLayer("ArMakeup_7_Gloss", "FaceMakeupGloss.shader", 5, new Color(1f, 1f, 1f, 0f));
             bool complete = layers.face != null && layers.cheeks != null && layers.eyes != null && layers.lips != null;
             notes?.Add(complete ? "- Face layers: the four masks and materials are in place (Assets/_Project/Textures/FaceMakeup, Assets/_Project/Materials)."
                                 : "- Face layers: a mask picture or the URP Unlit shader is missing, so a layer could not be made.");
@@ -413,6 +417,24 @@ namespace GlowUp.EditorTools
             material.SetShaderPassEnabled("DepthOnly", false);
             material.renderQueue = (int)RenderQueue.Transparent + order;       // face first, lips last
             material.SetTexture("_BaseMap", mask);
+            material.SetColor("_BaseColor", colour);                           // invisible until the app sets a shade
+            EditorUtility.SetDirty(material);
+            return material;
+        }
+
+        /// <summary>
+        /// A layer whose mask is set at run time (no picture in Assets): made with one of our own shaders, drawn after the
+        /// camera picture in the transparent queue (+ order). Null when the shader is missing.
+        /// </summary>
+        static Material RuntimeMaskLayer(string materialName, string shaderFile, int order, Color colour)
+        {
+            Shader shader = AssetDatabase.LoadAssetAtPath<Shader>(ShaderFolder + shaderFile);
+            if (shader == null) { Debug.LogWarning("[GlowUp] Shader not found: " + ShaderFolder + shaderFile); return null; }
+            string path = MaterialFolder + materialName + ".mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null) { material = new Material(shader); AssetDatabase.CreateAsset(material, path); }
+            if (material.shader != shader) material.shader = shader;
+            material.renderQueue = (int)RenderQueue.Transparent + order;
             material.SetColor("_BaseColor", colour);                           // invisible until the app sets a shade
             EditorUtility.SetDirty(material);
             return material;
