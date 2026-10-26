@@ -62,3 +62,6 @@ desktop.ini
 
 # 8. Graphify output (made again by the tool)
 graphify-out/
+
+.vercel
+.env*
