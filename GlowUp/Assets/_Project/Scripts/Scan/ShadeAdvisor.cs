@@ -12,8 +12,9 @@ namespace GlowUp.Scan
     /// </summary>
     public static class ShadeAdvisor
     {
-        public const string Lips = "Lips", Cheeks = "Cheeks", Eyes = "Eyes", Face = "Face";
-        public static readonly string[] Areas = { Lips, Cheeks, Eyes, Face };
+        public const string Lips = "Lips", Cheeks = "Cheeks", Eyes = "Eyes", Face = "Face", Brows = "Brows";
+        /// <summary>The parts of the face, in the order of the AR Try-On tabs. Brows can only be shown by live face tracking.</summary>
+        public static readonly string[] Areas = { Lips, Cheeks, Eyes, Face, Brows };
         static readonly string[] Tones = { "Fair", "Light", "Medium", "Tan", "Deep", "Dark" };
 
         // the skin-tone colours used on the onboarding tiles (also the base for foundation suggestions)
@@ -49,15 +50,27 @@ namespace GlowUp.Scan
             new[] { "#C99A52", "#AD7430", "#8F4A35", "#6E3F22", "#4F5F3A", "#4C2E5C" }
         };
 
+        // brows: taupe and ash on fair skin, deeper browns to soft black on deep skin (cool, neutral and warm in each row)
+        static readonly string[][] BrowShades =
+        {
+            new[] { "#A08872", "#8E7660", "#9C8068", "#7A6250", "#6E5A4C", "#5A4A40" },
+            new[] { "#8E7460", "#7C624E", "#86684F", "#6C5444", "#5E4A3E", "#4E3E35" },
+            new[] { "#7A5E48", "#6A503D", "#745438", "#5A4434", "#4E3B2F", "#3E3029" },
+            new[] { "#66503E", "#5A4433", "#604430", "#4C392C", "#3F3027", "#33281F" },
+            new[] { "#4E3C30", "#433328", "#4A3326", "#382B22", "#2E241D", "#241C17" },
+            new[] { "#3A2D25", "#30251E", "#352419", "#271E18", "#1F1813", "#161210" }
+        };
+
         /// <summary>Which area of the face a product type is applied to.</summary>
         public static string AreaFor(string cosmeticType)
         {
             string t = (cosmeticType ?? "").ToLowerInvariant();
             if (t.Contains("lip")) return Lips;
-            if (t.Contains("blush") || t.Contains("bronzer") || t.Contains("highlighter")) return Cheeks;
+            if (t.Contains("brow")) return Brows;              // before "eye": an eyebrow pencil is a brow product
+            if (t.Contains("blush") || t.Contains("bronzer") || t.Contains("highlighter") || t.Contains("contour")) return Cheeks;
             if (t.Contains("eye") || t.Contains("mascara")) return Eyes;
-            if (t.Contains("foundation") || t.Contains("concealer") || t.Contains("powder")) return Face;
-            return Lips;        // skincare has no colour of its own; lips are the default preview
+            if (t.Contains("foundation") || t.Contains("concealer") || t.Contains("powder") || t.Contains("primer") || t.Contains("setting")) return Face;
+            return Lips;        // a kind with no part of its own; lips are the default preview
         }
 
         /// <summary>The colour a face powder is shown in: white. Its box or its beige look in the pan says nothing about how it looks on skin.</summary>
@@ -89,6 +102,7 @@ namespace GlowUp.Scan
             if (i < 0) i = 2;                                    // no tone saved: use the middle of the range
             if (area == Cheeks) return new List<string>(CheekShades[i]);
             if (area == Eyes) return new List<string>(EyeShades[i]);
+            if (area == Brows) return new List<string>(BrowShades[i]);
             if (area == Face) return FoundationShades(i);
             return new List<string>(LipShades[i]);
         }

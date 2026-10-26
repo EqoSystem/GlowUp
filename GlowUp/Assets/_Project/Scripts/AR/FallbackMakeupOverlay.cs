@@ -49,6 +49,8 @@ namespace GlowUp.AR
         [Range(0f, 1f)] [SerializeField] private float cheeksMax = 0.55f;
         [Range(0f, 1f)] [SerializeField] private float eyesMax = 0.62f;
         [Range(0f, 1f)] [SerializeField] private float faceMax = 0.34f;
+        [Tooltip("Brows: live face tracking only (the guided preview has no brow shapes)")]
+        [Range(0f, 1f)] [SerializeField] private float browsMax = 0.7f;
 
         [Header("Finish (the texture of the colour)")]
         [SerializeField] private FinishLook[] finishes =
@@ -106,12 +108,15 @@ namespace GlowUp.AR
         public float FinishGlitter => glitterNow;
         public float FinishBrighten => brightenNow;
         public float TwinkleSpeed => twinkleSpeed;
+        /// <summary>The name of the finish chosen now (matte, satin, glossy, shimmer, metallic).</summary>
+        public string FinishName => look != null ? look.name : "matte";
         /// <summary>The strongest opacity allowed for a part of the face (the Inspector values above).</summary>
         public float MaxOpacityFor(string part)
         {
             if (part == ShadeAdvisor.Cheeks) return cheeksMax;
             if (part == ShadeAdvisor.Eyes) return eyesMax;
             if (part == ShadeAdvisor.Face) return faceMax;
+            if (part == ShadeAdvisor.Brows) return browsMax;
             return lipsMax;
         }
 
