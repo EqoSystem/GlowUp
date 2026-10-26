@@ -36,8 +36,39 @@ namespace GlowUp.EditorTools
             EditorApplication.Exit(built ? 0 : 1);
         }
 
+        public const string TestFolder = "Builds/Android";
+        public const string TestFileName = "GlowUp-AR-debug.apk";
+
+        /// <summary>
+        /// Menu: GlowUp > Build Test APK (development). A DEVELOPMENT build for testing on a phone: the AR debug overlay can be
+        /// shown (three fingers held on the screen for a second), and the app's messages reach `adb logcat -s Unity`.
+        /// Saved as Builds/Android/GlowUp-AR-debug.apk, signed with Unity's debug key (a release needs the team's own keystore).
+        /// </summary>
+        [MenuItem("GlowUp/Build Test APK (development)", false, 301)]
+        static void BuildTestFromMenu()
+        {
+            bool built = Build(out string message, TestFolder, TestFileName, true);
+            EditorUtility.DisplayDialog("GlowUp: test build", message, "OK");
+            if (built) EditorUtility.RevealInFinder(TestFolder + "/" + TestFileName);
+        }
+
+        /// <summary>
+        /// For Unity's command line, with the Editor closed:
+        /// Unity.exe -batchmode -nographics -projectPath &lt;GlowUp&gt; -buildTarget Android -executeMethod GlowUp.EditorTools.AndroidApkBuilder.BuildAndroidDebug -logFile build.log
+        /// (no -quit: it closes Unity itself). Exit code 0 = built.
+        /// </summary>
+        public static void BuildAndroidDebug()
+        {
+            bool built = Build(out string message, TestFolder, TestFileName, true);
+            Debug.Log("[GlowUp] Android test build: " + message);
+            EditorApplication.Exit(built ? 0 : 1);
+        }
+
         /// <summary>Builds the APK. Returns true when it was built; `message` says where it is, or what went wrong.</summary>
-        public static bool Build(out string message)
+        public static bool Build(out string message) => Build(out message, OutputFolder, FileName, EditorUserBuildSettings.development);
+
+        /// <summary>Builds an APK into `folder`/`file`; `development` = a development build.</summary>
+        public static bool Build(out string message, string folder, string file, bool development)
         {
             if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android)
             {
@@ -59,8 +90,8 @@ namespace GlowUp.EditorTools
             ArFaceTrackingSetup.Apply(notes);
             BrandingSetup.Apply(notes);
 
-            Directory.CreateDirectory(OutputFolder);
-            string path = OutputFolder + "/" + FileName;
+            Directory.CreateDirectory(folder);
+            string path = folder + "/" + file;
             EditorUserBuildSettings.buildAppBundle = false;         // an .apk can be copied to a phone and installed; an .aab cannot
 
             var options = new BuildPlayerOptions
@@ -69,7 +100,7 @@ namespace GlowUp.EditorTools
                 locationPathName = path,
                 target = BuildTarget.Android,
                 targetGroup = BuildTargetGroup.Android,
-                options = EditorUserBuildSettings.development ? BuildOptions.Development : BuildOptions.None
+                options = development ? BuildOptions.Development : BuildOptions.None
             };
             BuildReport report = BuildPipeline.BuildPlayer(options);
             BuildSummary summary = report.summary;
