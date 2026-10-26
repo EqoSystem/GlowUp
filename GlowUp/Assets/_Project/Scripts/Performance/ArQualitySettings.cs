@@ -94,6 +94,17 @@ namespace GlowUp.Performance
             Changed?.Invoke();
         }
 
+        /// <summary>A trial of the full pipeline kept up: the mark of an earlier slow check is removed (Automatic only).</summary>
+        public static void ForgetSlow()
+        {
+            Initialise();
+            if (Choice != ArQualityChoice.Automatic || !FoundSlow) return;
+            FoundSlow = false;
+            PlayerPrefs.DeleteKey(SlowKey);
+            PlayerPrefs.Save();
+            Changed?.Invoke();
+        }
+
         /// <summary>For the Settings page: what this phone is and what it gets.</summary>
         public static string DescribeDevice()
         {
