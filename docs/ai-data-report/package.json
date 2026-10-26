@@ -1,0 +1,8 @@
+{
+  "name": "glowup-ai-data-report",
+  "private": true,
+  "type": "module",
+  "description": "Builds docs/ai-data-report/GlowUp_AI_Data_Report.pdf with the installed Google Chrome.",
+  "scripts": { "build": "node build.mjs", "check": "node check.mjs" },
+  "devDependencies": { "mermaid": "11.4.1", "pdfjs-dist": "4.10.38" }
+}

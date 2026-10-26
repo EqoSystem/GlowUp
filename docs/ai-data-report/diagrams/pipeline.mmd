@@ -1,0 +1,18 @@
+flowchart TD
+  A["Tap to scan<br/>camera 1920x1080"] --> B["Picture check<br/>dark / glare / moving / blur dropped"]
+  B --> C["ML Kit text + barcode<br/>(phone, offline)"]
+  C --> D["Five zones merged over pictures<br/>Front, Ingredients, Codes, Shade, Around"]
+  D --> E{"Barcode or exact name<br/>in phone index? score >= 0.86"}
+  E -->|yes| K["Catalogue product<br/>+ admin's ingredient list"]
+  E -->|no| F{"Pack look of an<br/>earlier scan? >= 0.70"}
+  F -->|"yes: asks 'Is this ...?'"| K
+  F -->|no| G{"Online and AI budget left?<br/>(2 per visit)"}
+  G -->|yes| H["Gemini: one picture + text<br/>accepted >= 0.45, 25-35 s time-out"]
+  G -->|no| J["Shortlist >= 0.45, typed name,<br/>or one photo for an admin"]
+  H -->|named| L["List: pack first, then a<br/>sourced web page"]
+  H -->|not named| J
+  J --> L
+  K --> M["Analysis ON THE PHONE<br/>against the saved profile"]
+  L --> M
+  M --> N["safe / caution / harmful<br/>reasons, sources, shades"]
+  M -.-> O["Background: FDA Philippines,<br/>Open Beauty Facts by barcode"]

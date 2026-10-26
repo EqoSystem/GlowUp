@@ -1,0 +1,54 @@
+<h1><span class="part">Part 4 · Manual mode (belief B5)</span>13. What "Manual mode" is in this project</h1>
+<p><b>Finding.</b> There is no switch, page or field called "Manual mode". {V:grep "manual" over _Admin_*, _Shared (only the scan source "typed in" on the Dashboard, _Admin_Dashboard/adminDashboard.js lines 327, 512)}
+The nearest behaviour is <b>an admin writing the entry by hand</b> instead of using Assist with AI. The website sends admins there in three cases: the AI found no source ("The AI found no source for this name. It may be a misread label or a trade name."), every AI provider refused ("Try again later, or write the entry by hand"), or the daily limit of AI assists in the browser was used ("Write this entry by hand, or go on tomorrow"). {V:api/assist-ingredient.js lines 688, 768; _Admin_Ingredient_Curator/adminIngredientCurator.js lines 662, 682, 695}
+A draft written by a backup AI without a web search is marked as such, names no sources, and all its boxes start unchecked. {V:_Admin_Ingredient_Curator/adminIngredientCurator.js line 689}</p>
+<p><b>Belief B5 ("some brands/products have no credible sources, so admins must use Manual mode") is true in substance.</b> Safe panel wording: <i>"When Assist with AI finds no source page, the admin enters the data by hand from the packaging or the brand, and the entry stays Pending until it is reviewed."</i> Do not call it "Manual mode" unless the team adds that name to the website.</p>
+<figure data-diagram="manual"><figcaption>When an admin falls back to writing an entry by hand</figcaption></figure>
+
+<h1>14. Why a credible source is sometimes missing</h1>
+<table data-caption="Factors that force a hand-written entry, and what the admin should do" class="compact">
+  <thead><tr><th style="width:24%">Factor</th><th style="width:40%">Why it blocks a sourced entry</th><th>What the admin does</th></tr></thead>
+  <tbody>
+    <tr><td>Independent or local brand</td><td>No published INCI list, no indexed site.</td><td>Type the list from the pack; photograph the pack for the team's records; mark Pending until a second person checks.</td></tr>
+    <tr><td>Manufacturer did not publish ingredients</td><td>Product page shows claims only.</td><td>Pack in hand; retailer page as a second source.</td></tr>
+    <tr><td>List only on the packaging</td><td>Nothing online to link.</td><td>Hand entry; note "from packaging, date" in the description.</td></tr>
+    <tr><td>Regional formulation</td><td>Same name, different list per country.</td><td>Use the Philippine pack or the PH site; keep the market.</td></tr>
+    <tr><td>Reformulated or discontinued</td><td>Old lists stay online.</td><td>Check the date; prefer the newest pack.</td></tr>
+    <tr><td>Shade-specific lists</td><td>CI colourant numbers differ per shade.</td><td>Enter the base list; keep colourants after "may contain".</td></tr>
+    <tr><td>"Parfum" / fragrance blends</td><td>Hides components.</td><td>Keep "Fragrance"; the app marks it as an umbrella term. {V:Scripts/Data/DataModels.cs line 59}</td></tr>
+    <tr><td>Marketing names vs INCI</td><td>"Hyaluronic complex" is not an INCI name.</td><td>Use the INCI name; put the marketing name in aliases.</td></tr>
+    <tr><td>Conflicting sources</td><td>Two lists disagree.</td><td>Follow the hierarchy in Section 12; record both.</td></tr>
+    <tr><td>Paywalled / not indexed pages</td><td>The AI's web search cannot open them.</td><td>Hand entry with the page title in sources.</td></tr>
+    <tr><td>Marketplace-only listing</td><td>Seller-typed, unverifiable.</td><td>Not a source on its own; needs the pack.</td></tr>
+    <tr><td>Non-English label</td><td>Names in another language.</td><td>Translate to INCI; keep the printed name as an alias.</td></tr>
+    <tr><td>Blurry admin photo</td><td>Letters unreadable.</td><td>Retake; never guess a name.</td></tr>
+    <tr><td>Look-alike or counterfeit listing</td><td>Same pack, different maker.</td><td>Check the FDA Philippines record and the company name.</td></tr>
+  </tbody>
+</table>
+<p>{I:the factors are general cosmetic-data guidance written for this report; the project's own handling of each is cited where it exists}</p>
+
+<h1>15. Hand-entry checklist and verification status</h1>
+<h3>Checklist for an admin writing an entry by hand</h3>
+<ol class="checklist">
+  <li>Pack in hand (or a sharp photo of the back label); the market where it was bought.</li>
+  <li>Brand chosen from the list (not typed again); product name exactly as printed.</li>
+  <li>Cosmetic type from the 17 make-up types; the form refuses skin care. {V:_Admin_Brand_Inventory/adminBrandInventory.js lines 2318-2320}</li>
+  <li>Ingredients in printed order, INCI names, one per comma.</li>
+  <li>Shades as hex colours measured as in Section 24, not shade numbers.</li>
+  <li>Barcode digits; FDA Philippines notification number if found.</li>
+  <li>Source: the page title and https address, or "from packaging" with the date in the description.</li>
+  <li>Status Pending until a second admin checks; then Active.</li>
+</ol>
+<h3>Verification status: what exists, and a proposal</h3>
+<p>Today an entry's trust is spread over <code>status</code>, <code>reviewed</code>, <code>source</code> and, for AI ingredients, <code>webSearched</code>. {V:FIRESTORE_SCHEMA.md lines 163-191} The app shows "PENDING APPROVAL" for snapshot entries, "Found by the AI lookup; not yet reviewed" for unreviewed AI ingredients, and where each list came from. {V:FIRESTORE_SCHEMA.md lines 125, 190; Scripts/Data/DataModels.cs line 179}
+There is no single verification field. {N:a verification status field on products and ingredients}</p>
+<table data-caption="Proposed verification status values and how the app should present each (not built)" class="compact">
+  <thead><tr><th style="width:30%">Value (proposal)</th><th style="width:35%">Meaning</th><th>Wording in the app</th></tr></thead>
+  <tbody>
+    <tr><td><code>verified-manufacturer</code></td><td>List matches the brand's confirmed site.</td><td>"List from the brand's own site"</td></tr>
+    <tr><td><code>verified-registry</code></td><td>Identity confirmed on the FDA Philippines record.</td><td>"Registered with FDA Philippines" (identity only)</td></tr>
+    <tr><td><code>manual-packaging</code></td><td>Typed by an admin from the pack.</td><td>"Typed from the packaging by the GlowUp team"</td></tr>
+    <tr><td><code>unverified</code></td><td>No source on file.</td><td>"Not yet verified: read the pack you hold"</td></tr>
+  </tbody>
+</table>
+<p>Rule to add with it: <code>verified-*</code> requires at least one entry in <code>sources</code>. It could be derived from the existing fields first, without a schema change.</p>

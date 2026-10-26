@@ -1,0 +1,51 @@
+<section class="cover">
+  <div class="kicker">Capstone defence report</div>
+  <h1 class="title" data-notoc>GlowUp</h1>
+  <div class="sub">AI Smart Analysis, ingredient data, database rules and the AR try-on: how they really work, checked against the code, with the honest wording to use in front of a panel.</div>
+  <div class="rule"></div>
+  <div class="meta">
+    Generated from the repository on 26 October 2026<br>
+    Branch <code>feature/unity-ar-face-mesh-tryon</code> (made from <code>scan-miss-flow</code>, last shared commit <code>87c6162</code>)<br>
+    Mobile app: Unity 2022.3 (Android) &nbsp;·&nbsp; Website: static HTML/JS on Vercel &nbsp;·&nbsp; Database: Firebase Cloud Firestore
+  </div>
+  <div class="note">
+    Every project-specific statement carries an evidence tag and the file it came from. Where the repository does not say something,
+    the report says so instead of guessing. No secret is reproduced: API keys, the Firebase web configuration, admin e-mail and password
+    and environment values appear only by name.
+  </div>
+</section>
+
+<h1 data-notoc><span class="part">Before you start</span>How to read this report</h1>
+
+<h3>Evidence tags</h3>
+<table data-caption="Legend of the evidence tags">
+  <thead><tr><th style="width:24%">Tag</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><span class="tag tag-v">Verified</span> <span class="src">(path)</span></td><td>Seen directly in code, configuration, data or a commit message. Open the path to check it.</td></tr>
+    <tr><td><span class="tag tag-i">Inferred</span> <span class="src">(basis)</span></td><td>A strong conclusion from several files, or from a measurement recorded outside the code (the basis is named).</td></tr>
+    <tr><td><span class="tag tag-n">Not found</span></td><td>Searched for and not in the repository. Nothing was invented to fill the gap. Every one is repeated in Part 9, "Open Items for the Team".</td></tr>
+  </tbody>
+</table>
+<p>Tag count in this edition: <!--COUNTS-->.</p>
+
+<h3>How paths are written</h3>
+<p>Paths that start with <code>Scripts/</code>, <code>Editor/</code>, <code>Shaders/</code>, <code>Materials/</code> or <code>Legal/</code> are under <code>GlowUp/Assets/_Project/</code>.
+Paths that start with <code>_Shared/</code>, <code>_Admin_</code>, <code>api/</code>, <code>tests/</code>, <code>tools/</code>, or name <code>firestore.rules</code>,
+<code>FIRESTORE_SCHEMA.md</code>, <code>IMPORT_FORMAT.md</code>, are under <code>GlowUp-Admin_AI_Testing/</code>. "Line N" means the file as of 26 October 2026.</p>
+
+<h3>What was read</h3>
+<ul>
+  <li>Read: the app's own code (<code>GlowUp/Assets/_Project/</code>), the admin website (<code>GlowUp-Admin_AI_Testing/</code>), <code>firestore.rules</code>, the schema and import documents, and the Git history.</li>
+  <li>Not read: <code>Library/</code>, <code>Plugins/</code> (except our own Java file names), <code>StreamingAssets/</code> and SDK folders, as the project's <code>CLAUDE.md</code> asks.
+  For the Unity version and AR package versions, three setting lines and the package names were looked up once (Unity 2022.3.62f3, AR Foundation and ARCore XR Plugin 5.2.2, URP 14.0.12);
+  every other build setting is cited from the Editor scripts that set it.</li>
+  <li>The live Firebase project and the live website were <b>not</b> contacted. Nothing was deployed.</li>
+</ul>
+
+<h3>Words used for status</h3>
+<p><b>Built</b> = the code exists. <b>Checked</b> = automated tests or a desktop check ran it. <b>Not proven on a phone</b> = no record of a run on a real Android phone. Most phone-side features are in the third group.</p>
+
+<h1 data-notoc><span class="part">Contents</span>Table of contents</h1>
+<!--TOC-->
+<h3>List of figures</h3>
+<!--LOF-->

@@ -1,0 +1,76 @@
+<h1><span class="part">Part 7 · Shade data and true colour (belief B4)</span>21a. Shade codes versus colours</h1>
+<div class="box pink"><h4>The team's shade workflow (core idea)</h4>
+<p>Make-up brands label shades with codes such as "131" or "12A", not with colour values. When a user scans a product, the AI cannot read an actual colour from such a code. So the admin (1) records the shade code exactly as printed, (2) looks up the real colour and enters its hex code, and (3) the system links code to hex to the AR render.</p></div>
+<h3>What the code does today</h3>
+<table data-caption="The shade workflow: belief vs code" class="compact">
+  <thead><tr><th style="width:30%">Step of the workflow</th><th style="width:14%">Today</th><th>Evidence</th></tr></thead>
+  <tbody>
+    <tr><td>Admin records the shade code</td><td><b>Missing</b></td><td>A product has <code>shades</code> = hex colours only; the form and the import refuse a shade number as a colour. {V:FIRESTORE_SCHEMA.md line 51; _Admin_Brand_Inventory/adminBrandInventory.js lines 1032-1046} {N:a shade code field on products}</td></tr>
+    <tr><td>Admin enters the hex</td><td class="ok">Built</td><td>Up to 12 hex shades per product, colour picker or typed code, reorderable. {V:_Admin_Brand_Inventory/adminBrandInventory.js lines 58, 2193-2219}</td></tr>
+    <tr><td>Scan reads the code on the pack</td><td class="ok">Built</td><td><code>ScanZones.ShadeIn</code> finds "Shade 12A", "120 Classic Ivory" or a 1-3 digit number with an optional letter, and refuses "30 ML" or "24H WEAR". {V:Scripts/Scan/ScanZones.cs lines 75-115}</td></tr>
+    <tr><td>Code linked to the admin's hex</td><td><b>Missing</b></td><td>The read code is kept as <code>shadeName</code> and shown as text; nothing maps it to one of the product's hexes. {V:Scripts/Scan/ScanAnalysisPipeline.cs lines 213, 240-243; Scripts/Scan/SmartScanFlowController.cs lines 1001-1008}</td></tr>
+    <tr><td>AR shows the colour</td><td class="ok">Built</td><td>AR offers, in order: the colour seen in the scan, then every catalogue hex of the product, then six shades recommended for the user's skin tone. {V:Scripts/AR/ArTryOnFlowController.cs lines 241-264}</td></tr>
+  </tbody>
+</table>
+<p><b>Verdict on B4: partly true.</b> If admins enter hexes, AR Try-On shows those colours. But the code-to-hex link the team describes does not exist yet: the user still has to tap the right swatch, because the app does not know which hex belongs to the printed "12A".</p>
+
+<h3>Matching a printed code: variants and camera mistakes</h3>
+<table data-caption="How shade-code variants compare with today's keys" class="compact">
+  <thead><tr><th style="width:30%">Variants</th><th style="width:30%">Normalised key (TextKey.Normalize)</th><th>Compact key (no spaces)</th></tr></thead>
+  <tbody>
+    <tr><td>"12A", "12a"</td><td>"12a"</td><td>"12a"</td></tr>
+    <tr><td>"12 A", "12-A"</td><td>"12 a" (differs from "12a")</td><td>"12a" (same)</td></tr>
+    <tr><td>"No. 131", "#131"</td><td>"no 131" / "131"</td><td>"no131" / "131" (prefix must be removed)</td></tr>
+    <tr><td>"I3I" (1 read as I), "13O"</td><td>not equal to "131" / "130"</td><td>equal only after folding 0/O, 1/I/l, 5/S, 8/B</td></tr>
+  </tbody>
+</table>
+<p>{V:Scripts/Data/TextKey.cs Normalize, Compact, Squash} The ingredient matcher already folds 0/O and 1/l/I (<code>Squash</code>), but nothing applies it to shade codes, and 8/B and 5/S are not folded anywhere. Per-brand code formats (Maybelline "120", MAC "NC20", local brands "Shade 03") are not modelled. {N:per-brand shade code formats}</p>
+<p><b>Code read, no hex yet:</b> the scan's shade line shows the code as text and no swatch (unless the camera saw a steady colour); AR starts on the product's first hex or a recommended shade. {V:Scripts/Scan/SmartScanFlowController.cs lines 1001-1008; Scripts/AR/ArTryOnFlowController.cs lines 256-258}</p>
+
+<h1>22. How a shade is defined today, and how AR reads it</h1>
+<table data-caption="Shade fields today" class="compact">
+  <thead><tr><th style="width:26%">Field</th><th style="width:16%">Exists?</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Hex colour (<code>shades[]</code>)</td><td class="ok">Yes</td><td>"#RRGGBB", at most 12 on the form (24 in the rules). {V:firestore.rules line 113}</td></tr>
+    <tr><td>Shade code as printed</td><td>No</td><td>{N:a shade code field on products}</td></tr>
+    <tr><td>Display name</td><td>No</td><td>The scan's <code>shadeName</code> lives only in the user's scan record. {V:Scripts/Data/DataModels.cs line 167}</td></tr>
+    <tr><td>Finish</td><td>Scan / AR only</td><td>The scan may report one (matte, satin, glossy, shimmer, metallic); otherwise AR guesses from the kind (gloss: glossy, foundation: matte, else satin). {V:Scripts/Data/DataModels.cs line 170; Scripts/AR/ArTryOnFlowController.cs lines 230-238} {N:a finish field on products}</td></tr>
+    <tr><td>Coverage / opacity</td><td>AR only</td><td>The user's strength slider times a fixed maximum per area (lips 0.78, cheeks 0.55, eyes 0.62, face 0.34). {V:Scripts/AR/FallbackMakeupOverlay.cs lines 48-51} {N:a coverage field on products}</td></tr>
+    <tr><td>Undertone, CIELAB</td><td>No</td><td>{N:undertone or CIELAB shade fields}</td></tr>
+  </tbody>
+</table>
+
+<h1>23. Honest accuracy statement</h1>
+<p>A hex value is a <b>reference colour</b>, not a guarantee of what the user sees. What changes the colour on screen:</p>
+<ul>
+  <li><b>The phone's display</b>: calibration, brightness, night-light / blue-light filters.</li>
+  <li><b>The room</b>: warm lamps, cool daylight, dim light; the selfie camera's own white balance and exposure.</li>
+  <li><b>The user's skin and lips</b>: the colour is laid over the camera picture, so a sheer shade on deep lips looks deeper than on pale lips, as in real life. The AR shader multiplies the picture by the ratio of shade to an assumed skin colour; it can at most double the brightness of a pixel, so a very light shade on very deep lips cannot be fully reached. {V:Shaders/FaceMakeupBlend.shader lines 8-10, 63-66}</li>
+  <li><b>Opacity and finish</b>: matte, satin, gloss and shimmer reflect light differently.</li>
+</ul>
+<div class="box gold"><p><b>What the team can truthfully claim:</b> <i>"AR Try-On shows each shade consistently and faithful to the reference colour the admin entered, adapted to the user's lighting and skin. It is a preview, not an exact colour match; the real product can look different on your skin and screen."</i>
+Do not claim "the real colour of the product" or "exact colour".</p></div>
+
+<h1>24. Getting shade data right (admin guidance)</h1>
+<ol>
+  <li><b>Best source</b>: a colour value the manufacturer publishes (rare). Otherwise:</li>
+  <li><b>Swatch photo under neutral light</b>: swatch the product on white card next to a grey/white reference card, daylight-balanced light (about 5000-6500 K), no filters; take the hex from the middle of the swatch after setting the white balance on the reference card.</li>
+  <li><b>Colour reader</b> (a cheap colourimeter) gives the most repeatable value.</li>
+  <li>Never take the hex from a retailer's product photo of the tube (packaging colour, retouching) and never from the box.</li>
+</ol>
+<table data-caption="Recommended shade fields (proposal; optional, safe defaults)" class="compact">
+  <thead><tr><th style="width:22%">Field</th><th style="width:22%">Type, default</th><th>Validation</th></tr></thead>
+  <tbody>
+    <tr><td><code>code</code></td><td>text, ""</td><td>As printed, at most 20 characters; unique within the product (folded key).</td></tr>
+    <tr><td><code>name</code></td><td>text, ""</td><td>At most 40 characters.</td></tr>
+    <tr><td><code>hex</code> (sRGB)</td><td>text, required</td><td><code>^#[0-9A-F]{6}$</code>; not a shade number.</td></tr>
+    <tr><td><code>lab</code></td><td>3 numbers, optional</td><td>L 0-100, a and b -128..127.</td></tr>
+    <tr><td><code>finish</code></td><td>text, ""</td><td>matte | satin | glossy | shimmer | metallic.</td></tr>
+    <tr><td><code>coverage</code></td><td>number, 0.7</td><td>0 to 1.</td></tr>
+    <tr><td><code>shimmer</code>, <code>gloss</code></td><td>number, 0</td><td>0 to 1.</td></tr>
+    <tr><td><code>undertone</code></td><td>text, ""</td><td>warm | neutral | cool.</td></tr>
+  </tbody>
+</table>
+
+<h1>25. The shade data flow</h1>
+<figure data-diagram="shade-flow"><figcaption>Shade data from the admin form to the AR renderer (solid = built today, dashed = missing link)</figcaption></figure>

@@ -1,0 +1,29 @@
+<h1><span class="part">Part 10 · Panel questions</span>33. Likely questions and honest answers</h1>
+<dl class="qa">
+  <dt>1. Why do you store image links instead of the images?</dt>
+  <dd>Firebase Storage needs the paid Blaze plan, our data must stay on the free tier, and linking avoids copying brand photos. Links can break; only admins see them, and the app never depends on them. (Section 19)</dd>
+  <dt>2. Why does the AI not recognise products from images?</dt>
+  <dd>It does see one picture when the phone cannot name the product. What we do not do, by design, is compare scans with catalogue photos: worn and scratched packs make that unreliable and slow. The phone reads the barcode and printed name first, offline. A small on-phone model recognises packs the same phone scanned before, and only asks the user. (Section 20)</dd>
+  <dt>3. How fast is a scan?</dt>
+  <dd>For a product in our catalogue the match is an in-memory look-up on the phone; we have not yet timed full scans on phones and will before the final demo. The AI step has a 25 to 35 second time-out. (Section 20, latency table)</dd>
+  <dt>4. Where do your ingredient lists come from, and are they credible?</dt>
+  <dd>From the pack, from admins who type or import them with a source, or from a web page the app can show. Ingredient databases explain ingredients but are never accepted as one product's list. Everything not typed by an admin waits for review. (Sections 8, 10, 12)</dd>
+  <dt>5. What if a brand has no credible source?</dt>
+  <dd>The admin enters the list by hand from the packaging and keeps it Pending until it is reviewed. (Section 13)</dd>
+  <dt>6. Is the AR colour the real colour of the product?</dt>
+  <dd>It is a faithful reference: the hex the admin measured, laid over the camera picture so the lips' own texture and light stay, adapted to the room. Screens, lighting and skin change what you see, so it is a preview, not an exact match. (Section 23)</dd>
+  <dt>7. How do you handle "Aqua" vs "Water" and camera misreadings?</dt>
+  <dd>One normalisation rule in app and website, aliases (Water: aqua, eau, purified water), a close-spelling limit of 0.85, and a key that evens out 0/O and 1/l/I. (Section 9)</dd>
+  <dt>8. Who can change the database?</dt>
+  <dd>Only accounts listed as admins can write the catalogue. The app can only create Pending entries, add 1 to scan counts, and write the user's own profile and history. Everything not listed in the rules is closed. (Section 28)</dd>
+  <dt>9. Do you store or upload users' faces?</dt>
+  <dd>No. AR Try-On processes the camera picture and face mesh on the phone in memory only; nothing is saved or uploaded. Product scan pictures go to the AI only when the app cannot name the product. (Part 11)</dd>
+  <dt>10. Is the result medical advice?</dt>
+  <dd>No. A result means nothing in the list is flagged for the saved profile; users with a skin condition should consult a dermatologist. (Section 11)</dd>
+  <dt>11. Why only make-up, and how do you protect users with a chronic skin condition?</dt>
+  <dd>The project scope is make-up. For those users, a product is suggested only when its list has a source, every ingredient is known and none is flagged; skin care is never suggested. (Section 6)</dd>
+  <dt>12. Will it scale?</dt>
+  <dd>Phones download only changed entries and search in memory; the website keeps lists in the browser. The free tier limits reads, so the design avoids mass updates and stored verdicts. We have not load-tested it. (Section 30)</dd>
+  <dt>13. What accuracy do you claim?</dt>
+  <dd>We do not claim a recognition percentage from phones. The only numbers we have are desktop checks of the pack-look model (94 of 100 at the medium limit on program-varied photos), which is why it only asks and never decides. (Section 20)</dd>
+</dl>

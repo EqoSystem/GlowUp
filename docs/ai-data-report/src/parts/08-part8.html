@@ -1,0 +1,98 @@
+<h1><span class="part">Part 8 · Database rules</span>26. How brand, product and ingredient data is stored</h1>
+<p><b>In plain words.</b> One Firestore database serves the app and the website. Each brand, each product and each ingredient is one document. A product carries its own ingredient list as names (copied from the pack), not as links that must be followed, so the phone can analyse a product from one document plus its own ingredient table. {V:FIRESTORE_SCHEMA.md lines 5-18, 115-118}</p>
+<figure data-diagram="erd"><figcaption>Collections and how they relate (fields abridged)</figcaption></figure>
+<table data-caption="Design choices in the data model" class="compact">
+  <thead><tr><th style="width:26%">Choice</th><th>What and why</th></tr></thead>
+  <tbody>
+    <tr><td>Product to ingredient</td><td><b>Embedded array of names</b> (<code>ingredients[]</code>) plus a light summary of ids (<code>ingredientIds[]</code>). Why: no join and no mass update; the verdict is worked out at read time, so an ingredient's new warning applies to every product at once; a stored verdict would go stale. Per-product notes live on the product (<code>ingredientNotes</code>). {V:FIRESTORE_SCHEMA.md lines 54-56, 117-118}</td></tr>
+    <tr><td>Product to brand</td><td>Reference id <code>brandId</code> plus a copy of <code>brandName</code>; renaming a brand on the website updates the copies. {V:FIRESTORE_SCHEMA.md lines 45-46}</td></tr>
+    <tr><td>Shades</td><td>Embedded <code>shades[]</code> of hex text on the product; no shade collection. {V:FIRESTORE_SCHEMA.md line 51}</td></tr>
+    <tr><td>Document ids</td><td>Website entries: random Firestore ids. App entries: <code>scan_&lt;brand&gt;__&lt;name&gt;</code> made from the normalised names, so the same product scanned twice is one id; AI ingredients <code>ai_</code>; snapshots <code>snap_&lt;brand&gt;__&lt;name&gt;__&lt;uid&gt;</code>. {V:Scripts/Scan/ScannedProductPublisher.cs lines 19, 107; firestore.rules lines 58-82}</td></tr>
+    <tr><td>Search keys</td><td><code>tags[]</code> (kind, brand, has-shades, no-ingredient-list, fda-listed; at most 20) for one-query filters on the website; normalised keys are computed in memory, not stored. {V:FIRESTORE_SCHEMA.md line 57; Scripts/Data/TextKey.cs}</td></tr>
+    <tr><td>Indexes</td><td>No composite index file. The phone's sync uses single-field <code>updatedAt</code> queries, which Firestore indexes automatically. {V:firebase.json; Scripts/Data/CatalogSync.cs line 93} {N:firestore.indexes.json (composite indexes)}</td></tr>
+    <tr><td>Why Firestore</td><td>One shared database for a static website and a Unity app, the Firebase sign-in both already use, offline copies on the phone, and the free tier. {I:FIRESTORE_SCHEMA.md "what keeps the free tier safe"; Scripts/Data/FirebaseBootstrap.cs; CLAUDE.md "Both share one Firestore database"} A written comparison with SQL databases is not in the repository. {N:a written database comparison}</td></tr>
+  </tbody>
+</table>
+
+<h1>27. Data integrity rules</h1>
+<table data-caption="Integrity rules: where each is enforced" class="compact">
+  <thead><tr><th style="width:24%">Rule</th><th style="width:14%">Applies to</th><th style="width:36%">Enforced where</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr><td>Make-up only (no skin care, hair, body)</td><td>products</td><td>Admin form refuses; import flags; app hides; rules check app-added products with an older, looser word list. {V:_Admin_Brand_Inventory/adminBrandInventory.js lines 2319-2321; Scripts/Data/ProductRepository.cs line 76; firestore.rules lines 37-51}</td><td>Partly: rules looser, admin writes not checked by rules.</td></tr>
+    <tr><td>Brand category Makeup</td><td>brands</td><td>Website writes "Makeup"; rules still accept an app-added brand with "Skincare". {V:firestore.rules line 143}</td><td>Gap in rules.</td></tr>
+    <tr><td>Required fields</td><td>products</td><td>Form: name, brand, type, ingredients. Rules: only name is text for admins. {V:adminBrandInventory.js lines 2317-2322; firestore.rules lines 109-116}</td><td>Client only for admins.</td></tr>
+    <tr><td>No duplicates (brand + name)</td><td>products</td><td>Form refuses same compact name or alias in a brand; app ids are deterministic; "Find duplicates". {V:adminBrandInventory.js line 2323; Scripts/Scan/ScannedProductPublisher.cs line 107}</td><td>Client and app; not in rules (rules cannot query).</td></tr>
+    <tr><td>No duplicate shade</td><td>products</td><td>Form refuses a repeated hex. {V:adminBrandInventory.js line 2286}</td><td>Client only.</td></tr>
+    <tr><td>Ingredient list format</td><td>products</td><td>Split on , ; and line breaks; repeats dropped. {V:_Shared/adminCommon.js lines 163-167}</td><td>Client only.</td></tr>
+    <tr><td>Maximum lengths</td><td>all catalogue</td><td>Rules: name 200, ingredients 300, shades 24, sources 40, aliases 60, tags 20. {V:firestore.rules lines 109-116}</td><td>Enforced.</td></tr>
+    <tr><td>Image link format</td><td>products, brands</td><td>https only, at most 300 characters. {V:firestore.rules lines 103-115}</td><td>Enforced; no domain list.</td></tr>
+    <tr><td>Hex format</td><td>products.shades</td><td>Form <code>cleanShade</code>. {V:adminBrandInventory.js lines 1032-1046}</td><td>Client only.</td></tr>
+    <tr><td>Status values</td><td>brands, products</td><td>Form drop-down; app-added must be Pending. {V:firestore.rules lines 138, 166}</td><td>Admin values not checked by rules.</td></tr>
+    <tr><td>Source required for "verified"</td><td>-</td><td>No verification field exists. {N:a verification status field on products and ingredients}</td><td>Missing.</td></tr>
+    <tr><td>Soft delete</td><td>catalogue</td><td>Recycle bin (<code>binned</code>, status Inactive); only "Delete forever" deletes. {V:FIRESTORE_SCHEMA.md lines 217-232}</td><td>Website practice; rules allow admin delete.</td></tr>
+    <tr><td>Audit fields</td><td>catalogue</td><td><code>createdAt</code>, <code>updatedAt</code>, <code>reviewedAt</code>, <code>addedBy</code> (app), <code>websiteConfirmedBy</code>. No "updatedBy". {V:FIRESTORE_SCHEMA.md lines 38, 63, 172; firestore.rules lines 119-126} {N:an audit log or updatedBy field}</td><td>Partly.</td></tr>
+  </tbody>
+</table>
+
+<h1>28. Firestore Security Rules, explained</h1>
+<table data-caption="What the live rules file allows (firestore.rules)" class="compact">
+  <thead><tr><th style="width:20%">Path</th><th style="width:14%">Read</th><th style="width:26%">Write</th><th>Validation</th></tr></thead>
+  <tbody>
+    <tr><td><code>admins/{uid}</code></td><td>Own entry only</td><td>Nobody (console only)</td><td>-</td></tr>
+    <tr><td><code>brands</code></td><td>Anyone</td><td>Admins; app: create <code>scan_</code> Pending, +1 scans</td><td>Field allow-list for app; lengths and https for admins; confirmed website only by the confirming admin.</td></tr>
+    <tr><td><code>products</code></td><td>Anyone</td><td>Admins; app: create <code>scan_</code> Pending (make-up words), +1 scans</td><td>App: allow-list, barcode digits, 1-80 ingredients, at most 12 shades, 10 sources.</td></tr>
+    <tr><td><code>ingredients</code></td><td>Anyone</td><td>Admins; app: create <code>ai_</code></td><td>App: allow-list, riskLevel enum, lengths.</td></tr>
+    <tr><td><code>productIngredientSuggestions</code></td><td>Admins</td><td>App create (3-80 names, 1-10 sources); admins all</td><td>Allow-list.</td></tr>
+    <tr><td><code>users/{uid}</code>, <code>/scans</code></td><td>Owner</td><td>Owner</td><td>None.</td></tr>
+    <tr><td><code>scanActivity</code></td><td>Admins</td><td>Any signed-in account creates</td><td>Allow-list, status enum.</td></tr>
+    <tr><td><code>pending_products</code></td><td>Any signed-in account</td><td>Own entry create; admins update/delete</td><td>Id tied to names and uid, make-up words, https source links.</td></tr>
+    <tr><td><code>pending_product_images</code></td><td>Admins</td><td>Own create (base64 at most 120,000 characters)</td><td>Must match an own pending entry.</td></tr>
+    <tr><td><code>snapshot_quota</code></td><td>Own counter</td><td>+1 only, 5 per account, 150 per day, 30 s apart</td><td>Day from server time.</td></tr>
+    <tr><td><code>config/lists</code></td><td>Anyone</td><td>Admins</td><td>Shape and sizes.</td></tr>
+  </tbody>
+</table>
+<p>{V:firestore.rules lines 92-365}</p>
+<h3>What is too open, or missing</h3>
+<ul>
+  <li><b>No rule says <code>allow read, write: if true</code>.</b> Everything not listed is closed. {V:firestore.rules line 367}</li>
+  <li><b>Catalogue read is public</b>, including Pending, Inactive and binned entries and the <code>addedBy</code> account id of app-added entries. The app needs to read every entry (to never add a product twice), so restricting it needs an app change first. {V:firestore.rules lines 130, 152, 215; Scripts/Data/ProductRepository.cs header "every product the database holds"}</li>
+  <li><b>Admin writes are only lightly checked</b>: no status, category, cosmetic type or hex checks, no field allow-list. {V:firestore.rules lines 97-116}</li>
+  <li><b>App-added brands may say "Skincare".</b> {V:firestore.rules line 143}</li>
+  <li><b>Any signed-in account</b> (anonymous accounts too) can add <code>scanActivity</code> notes and read every <code>pending_products</code> entry (with the sender's account id). {V:firestore.rules lines 249-256, 285; FIRESTORE_SCHEMA.md line 142}</li>
+  <li><b>Admin check</b> is a document read per request (<code>exists(admins/uid)</code>); custom claims are not used. {V:firestore.rules lines 19-21} {N:Firebase custom claims for admins}</li>
+  <li>Whether the file in the repository is the one published: last recorded publish 22 October 2026. {I:project notes; no deployment record in the repository} {N:a deployment record of the rules}</li>
+</ul>
+<p><b>Proposed hardened ruleset:</b> <code>docs/ai-data-report/proposed.firestore.rules</code>. It keeps every path as it is and tightens the catalogue: status and category values, make-up kinds by the app's own list of 17, hex shades, a field allow-list for admin writes, optional custom-claim admins, and no "Skincare" from the app. <b>It is not deployed and must be tested on the Firestore emulator with the website's own flows before anyone publishes it.</b></p>
+
+<h1>29. How the data is protected</h1>
+<table data-caption="Security practices" class="compact">
+  <thead><tr><th style="width:28%">Practice</th><th>State</th></tr></thead>
+  <tbody>
+    <tr><td>Admin-only catalogue writes</td><td>Yes, by <code>admins/{uid}</code>; the website also turns non-admins away at login (<code>REQUIRE_ADMIN_RECORD</code>). {V:FIRESTORE_SCHEMA.md lines 281-292}</td></tr>
+    <tr><td>Least privilege for the app</td><td>Create-only Pending entries and +1 counters; cannot change or delete catalogue entries. {V:firestore.rules lines 27-35}</td></tr>
+    <tr><td>Admin pages</td><td>Static pages; every write is checked by the rules, not by the page. The AI function checks the admin by REST. {V:api/assist-ingredient.js; FIRESTORE_SCHEMA.md line 292}</td></tr>
+    <tr><td>Server secrets</td><td>The website's AI key is a Vercel environment variable. {V:CLAUDE.md; api/assist-ingredient.js header}</td></tr>
+    <tr><td>App secret</td><td>The app calls Gemini from the phone with a key inside the app (<code>Scripts/Security/SecureProfileStore.cs</code>, kept out of Git). A key inside an APK can be extracted. {V:.gitignore line 7; Scripts/Scan/ProductAiAdvisor.cs line 89} Recommendation: move phone AI calls behind the Vercel function (as the photo snapshot already is) and restrict the key.</td></tr>
+    <tr><td>Backups / exports</td><td>Website CSV export (newest 100 products). {V:FIRESTORE_SCHEMA.md line 119} {N:scheduled Firestore backups}</td></tr>
+    <tr><td>Separate dev and prod</td><td>One project, <code>glowup-admin-portal</code>. {V:CLAUDE.md} {N:a separate test Firebase project}</td></tr>
+    <tr><td>App Check</td><td>{N:Firebase App Check}</td></tr>
+  </tbody>
+</table>
+
+<h1>30. Queries and performance</h1>
+<ul>
+  <li><b>Phone:</b> catalogue copies on the phone; entries changed since the last sync are fetched (<code>updatedAt</code>, <code>createdAt</code>, <code>binnedAt</code>, <code>reviewedAt</code>), every 10 minutes at most, with a whole download every 24 hours; reads are counted in the log. {V:Scripts/Data/CatalogSync.cs lines 16, 93, 146; Scripts/Scan/ScanRules.cs lines 34-36; Scripts/Data/ReadCounter.cs}</li>
+  <li><b>Scan:</b> no Firestore query in the normal path (the phone index); one read by id for an own snapshot entry, a miss remembered 30 minutes. {V:FIRESTORE_SCHEMA.md line 146}</li>
+  <li><b>Website:</b> lists kept in the browser, only changes downloaded; search, filters and export cost no reads. {V:FIRESTORE_SCHEMA.md line 119}</li>
+  <li><b>Pagination:</b> the review window loads at most 50 waiting snapshots. {V:FIRESTORE_SCHEMA.md line 146}</li>
+</ul>
+<table data-caption="The team's data-model fixes (belief B7)" class="compact">
+  <thead><tr><th style="width:24%">Problem</th><th>Status in the code</th></tr></thead>
+  <tbody>
+    <tr><td>Duplicates</td><td>Fixed going forward: deterministic app ids, form duplicate check, "Find duplicates" and "Clean up" (to the bin, never deleted). Whether the clean-up was run on the live data is not recorded. {V:Scripts/Scan/ScannedProductPublisher.cs line 107; FIRESTORE_SCHEMA.md line 253} {N:record of the clean-up run on the live database}</td></tr>
+    <tr><td>Slow look-ups</td><td>Fixed: in-memory phone index and change-only sync. {V:Scripts/Data/ProductIndex.cs; Scripts/Data/CatalogSync.cs}</td></tr>
+    <tr><td>Messy names</td><td>One normalisation rule in the app and the website, tested on both sides. {V:Scripts/Data/TextKey.cs header; FIRESTORE_SCHEMA.md line 241}</td></tr>
+    <tr><td>Inconsistent lists</td><td>Parser and stoplist on the phone; list splitting on the website; no INCI dictionary. {V:Scripts/Scan/IngredientTextParser.cs; _Shared/adminCommon.js} {N:an INCI / CosIng reference list to validate names}</td></tr>
+  </tbody>
+</table>
+<p>B7 (stay on Firestore and fix the data model) matches the code: there is no second database. {V:FIRESTORE_SCHEMA.md line 3}</p>

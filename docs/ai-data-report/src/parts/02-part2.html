@@ -1,0 +1,79 @@
+<h1><span class="part">Part 2 · How AI Smart Analysis works</span>4. The pipeline, step by step</h1>
+<p><b>In plain words.</b> Almost everything happens on the phone. The internet is used only to keep the catalogue copy fresh, and, when the phone cannot name the product, for one AI question with a picture, one web look-up of the ingredient list, an FDA Philippines check and an Open Beauty Facts second opinion by barcode.</p>
+<figure data-diagram="pipeline"><figcaption>From the camera to the result: where each step runs and what happens when it fails</figcaption></figure>
+
+<table data-caption="Each step of the scan, where it runs, and its limits" class="compact">
+  <thead><tr><th style="width:15%">Step</th><th style="width:22%">Engine (where)</th><th>What it does, with the limits in the code</th></tr></thead>
+  <tbody>
+    <tr><td>Capture</td><td>Unity <code>WebCamTexture</code> (phone)</td><td>The scan screen's builder asks for 1920 x 1080 (the class default is 1280 x 720). One tap starts the scan, a second tap pauses it (the class is still named <code>HoldToScanButton</code>). Focus lock, flashlight, light boost. {V:Editor/SmartScanSceneBuilder.cs line 399; Scripts/Scan/CameraFeedController.cs lines 33-34; Scripts/Scan/HoldToScanButton.cs header}</td></tr>
+    <tr><td>Picture check</td><td><code>FrameQuality</code> (phone)</td><td>Pictures that are dark (below 0.14), glaring (0.97 brightness over 18% of the picture), moving (above 0.12) or blurry (below 0.4) are dropped. {V:Scripts/Scan/ScanRules.cs lines 48-58}</td></tr>
+    <tr><td>Text and barcode</td><td>Google ML Kit text recognition 16.0.1 and barcode scanning 17.2.0 (phone, no internet); Tesseract only in the Editor</td><td>Lines below 0.3 confidence are ignored, 0.55 counts as clear. {V:Scripts/Scan/ScanRules.cs lines 62-64; Scripts/Scan/OcrService.cs; ML Kit versions from the app's Gradle template, our own GlowUp lines}</td></tr>
+    <tr><td>Front label only</td><td><code>ScanEvidence.PrimaryLabelOnly</code></td><td>Matching uses the front-label lines and the barcode; the small print of the ingredient list does not steer the product match. {V:Scripts/Scan/ScanEvidence.cs line 116}</td></tr>
+    <tr><td>Multi-angle merge</td><td><code>ScanEvidence</code>, <code>ScanTextMerger</code></td><td>Five zones fill: Front, Ingredients, Codes, Shade, Around. Each line is kept in its best reading over all pictures. The scan finishes when all zones are full or the ring completes. {V:Scripts/Scan/ScanEvidence.cs header and lines 235-256; Scripts/Scan/SmartScanFlowController.cs line 826}</td></tr>
+    <tr><td>Catalogue match</td><td><code>ProductIndex</code> (phone, in memory)</td><td>Look-up by barcode, by brand + name key, by alias, and by word. A score of 0.86 or more is taken as the product; 0.45 or more goes to a shortlist. {V:Scripts/Data/ProductIndex.cs lines 6-17, 35-37}</td></tr>
+    <tr><td>Pack look</td><td>MediaPipe Image Embedder, MobileNet V3 small, 4 MB (phone)</td><td>Compared only with packs this phone scanned before (up to six looks per product). 0.70 or more asks "Is this ...?" at once; 0.55 only together with a word of the name. Never decides alone. {V:Scripts/Scan/ScanRules.cs lines 82-86; commit 50e5558}</td></tr>
+    <tr><td>AI identify</td><td>Google Gemini REST API from the phone; model chain in <code>GeminiApiConfig_Default.asset</code>: gemini-3.8-flash, gemini-3.6-flash, gemini-flash-latest</td><td>One JPEG picture plus the text read. Accepted at confidence 0.45 or more. Asked early, in the background, as soon as the scan has no name (<code>aiHelpAfterSeconds</code> = 0). Time-out 25 s, 35 s with web search. At most 2 recognitions and 2 list look-ups per visit of the scan screen. {V:Scripts/Scan/SmartScanFlowController.cs lines 126, 130-132, 1163; Scripts/Scan/ProductAiAdvisor.cs lines 27, 165, 321; Scripts/Scan/AiBudget.cs lines 20-22; Scripts/Scanning/GeminiApiConfig_Default.asset}</td></tr>
+    <tr><td>Ingredient list</td><td>Pack text, then catalogue, then a sourced web page</td><td>A web list is taken only with a source page the app can show that is not an ingredient database. {V:Scripts/Scan/ListSources.cs; Scripts/Scan/ProductAiAdvisor.cs FindIngredients}</td></tr>
+    <tr><td>Analysis</td><td><code>ProductAnalysisEngine</code> (phone)</td><td>Each ingredient against the saved profile; verdict rules in Section 6. Nothing about the user is sent to the AI. {V:Scripts/Scan/ProductAnalysisEngine.cs; Scripts/Scan/ProductRecommender.cs header}</td></tr>
+    <tr><td>Checks in the background</td><td>FDA Philippines portal, Open Beauty Facts, openFDA substance registry</td><td>FDA badge fills in later; Open Beauty Facts by barcode only. {V:Scripts/Scan/PhFdaVerification.cs; Scripts/Scan/OpenBeautyFacts.cs; Scripts/Scan/FdaSubstanceRegistry.cs}</td></tr>
+  </tbody>
+</table>
+
+<h1>5. Which details are used, and what the user sees</h1>
+<h3>Inputs the analysis uses</h3>
+<table data-caption="Inputs of the analysis and where each comes from" class="compact">
+  <thead><tr><th style="width:24%">Input</th><th>Source and use</th></tr></thead>
+  <tbody>
+    <tr><td>Label text, barcode</td><td>Camera (ML Kit). Text finds brand, name, shade text, ingredient list; barcode is the fastest match. {V:Scripts/Scan/ScanEvidence.cs; Scripts/Data/ProductIndex.cs byBarcode}</td></tr>
+    <tr><td>Brand name, brand aliases, brand status</td><td><code>brands</code>. Only Active brands are used. {V:FIRESTORE_SCHEMA.md brands; Scripts/Data/DataModels.cs lines 84-90}</td></tr>
+    <tr><td>Product name, aliases, barcode, cosmetic type, status</td><td><code>products</code>; Pending and binned entries are not used. {V:Scripts/Data/ProductRepository.cs lines 264-290}</td></tr>
+    <tr><td>Ingredient list</td><td><code>products.ingredients</code> (names as printed). {V:Scripts/Data/ProductRepository.cs line 274}</td></tr>
+    <tr><td>Shades</td><td><code>products.shades</code>, hex colours only. {V:Scripts/Data/DataModels.cs line 109}</td></tr>
+    <tr><td>Ingredient facts</td><td><code>ingredients</code> merged with the app's built-in table; the website's values win. {V:FIRESTORE_SCHEMA.md line 111}</td></tr>
+    <tr><td>User profile</td><td>Phone (and the user's own <code>users/{uid}</code>): age, skin type, skin tone, conditions, allergens. {V:Scripts/Data/DataModels.cs lines 8-21}</td></tr>
+  </tbody>
+</table>
+<p><b>Fields the app does NOT read</b> (they help admins only): <code>imageUrl</code>, <code>logoUrl</code>, <code>tags</code>, <code>ingredientIds</code>, <code>ingredientNotes</code>, <code>folder</code>. {V:grep of Scripts/ for these names: no hit; Scripts/Data/ProductRepository.cs Read()}
+Important consequence: a per-product caution note an admin writes in <code>ingredientNotes</code> is shown on the website but <b>does not change the app's result</b>. {N:app support for products.ingredientNotes}</p>
+
+<h3>Outputs shown to the user</h3>
+<p>Verdict (safe / caution / harmful), one-line summary, "Why this result?", each ingredient with its level and reason, key actives and umbrella-term warnings, the four matches (skin type, allergens, concerns, age), product shades and recommended shades, the finish, the FDA Philippines status, where the list came from (pack, inventory, web, typed) with its pages, and a second-source check ("matched" or "differs"). {V:Scripts/Data/DataModels.cs ScanRecord lines 141-196}</p>
+
+<h3>"Files": how admin documents become data</h3>
+<p>The Brand &amp; Product Inventory and the Ingredient Curator accept PDF, Excel and Word files. Two paths:</p>
+<ol>
+  <li><b>The GlowUp import format</b> (blocks <code>=== PRODUCT ===</code> with <code>KEY: value</code> lines, lists with <code> | </code>; Excel row 1 = keys): read as it is by <code>_Shared/importFormat.js</code>, <b>no AI</b>. {V:IMPORT_FORMAT.md}</li>
+  <li><b>Any other document</b>: its text is extracted in the browser (<code>_Shared/adminDocumentReader.js</code>) and only the text is sent to the admin-only function <code>api/assist-ingredient.js</code>, which returns records. Image-only PDFs and old <code>.doc</code> files are not supported. {V:FIRESTORE_SCHEMA.md line 65}</li>
+</ol>
+<p>Either way: imported records arrive as <b>Pending / not reviewed</b>, never overwrite an existing product, skin care is flagged and not saved, and a shade NUMBER is never taken for a colour. Limits: 40 products / 60 ingredients per file. {V:FIRESTORE_SCHEMA.md line 67; IMPORT_FORMAT.md; _Admin_Brand_Inventory/adminBrandInventory.js lines 1032-1046}</p>
+
+<h1>6. How ingredients are flagged, and the chronic-condition rule</h1>
+<table data-caption="Rules of the analysis for one user" class="compact">
+  <thead><tr><th style="width:22%">Input</th><th>Rule</th></tr></thead>
+  <tbody>
+    <tr><td>Allergens</td><td>An ingredient in one of the user's allergen families becomes <b>harmful</b>. {V:Scripts/Scan/ProductAnalysisEngine.cs}</td></tr>
+    <tr><td>Skin type</td><td>In <code>avoidForSkinTypes</code>: caution. In <code>goodForSkinTypes</code>: a positive note. {V:Scripts/Data/DataModels.cs lines 63-66}</td></tr>
+    <tr><td>Skin conditions</td><td>In <code>avoidForConditions</code>: caution ("May aggravate ..."). {V:Scripts/Data/DataModels.cs line 64}</td></tr>
+    <tr><td>Age</td><td>Ingredient or product <code>minAge</code> above the user's age: caution / not suggested. {V:Scripts/Scan/ProductRecommender.cs header item 3}</td></tr>
+    <tr><td>Ingredient's own level</td><td><code>riskLevel</code> safe / caution / harmful. An unreviewed AI entry may warn but never clears: its "safe" becomes "unknown". {V:Scripts/Scan/ProductAnalysisEngine.cs lines 69, 126}</td></tr>
+    <tr><td>Verdict</td><td>Any harmful: harmful. Any caution: caution. If fewer than 50% of the names can be checked: an "incomplete" caution. Otherwise safe. {V:Scripts/Scan/ScanRules.cs line 24 (minimumCheckedShare 0.5); Scripts/Scan/ProductAnalysisEngine.cs lines 148-152}</td></tr>
+  </tbody>
+</table>
+<div class="box gold"><h4>Chronic skin condition (belief B6): verified</h4>
+<p>A product is suggested only if it is make-up, has an ingredient list, the user is old enough, and no ingredient is flagged. For a user who saved a skin condition, two more rules: the list must come from a source (an admin typed or reviewed it, or pages are on file), and every ingredient must be known (0 unknown allowed by default). Skin care is never suggested. A suggestion means "no ingredients flagged for your profile", never "safe" or "good for your condition". {V:Scripts/Scan/ProductRecommender.cs header}
+The make-up-only rule is written twice, word for word, in the app and on the website, and tested against the same example lists. {V:FIRESTORE_SCHEMA.md "Make-up only"; Scripts/Scan/ProductScope.cs; _Shared/glowupRules.js}</p>
+<p>One gap: the database rules still accept a brand the app adds with category <code>Skincare</code>, and their make-up check for app-added products is looser than the app's. {V:firestore.rules lines 37-51, 143; FIRESTORE_SCHEMA.md line 251}</p></div>
+
+<h1>7. Failure modes and fallbacks</h1>
+<table data-caption="What the app does when something goes wrong" class="compact">
+  <thead><tr><th style="width:20%">Situation</th><th style="width:44%">What the app does</th><th>What the user sees</th></tr></thead>
+  <tbody>
+    <tr><td>Unreadable label (dark, blur, glare)</td><td>Bad pictures are dropped; the light assistant and flashlight help. {V:Scripts/Scan/FrameQuality.cs; Scripts/Scan/ScanLightAssistant.cs}</td><td>A hint to fix light or hold still; the ring does not fill.</td></tr>
+    <tr><td>Scratched or partly missing name</td><td>Squashed keys forgive camera mistakes; word scores feed the shortlist; pack-look memory; "Look it up" opens the shortlist without a name. {V:Scripts/Data/TextKey.cs; Scripts/Scan/ScanShortlist.cs; Scripts/Scan/PackagingMemory.cs}</td><td>"Is this ...?" or a top-3 list to pick from.</td></tr>
+    <tr><td>Faded shade</td><td>The shade is never taken from pack memory; the camera's colour counts only when it stays the same in several pictures, and never while the cap is on. {V:Scripts/Scan/SmartScanFlowController.cs lines 993-1001; Scripts/Scan/CapShadeWatch.cs}</td><td>No shade, or the user picks one in AR Try-On.</td></tr>
+    <tr><td>Product not in the database</td><td>AI with one picture (online, within the budget); typed name; one photo for an admin (5 per account per day, 150 for everybody). A named product is saved as Pending <code>scan_</code>. {V:api/scan-snapshot.js lines 17-21; Scripts/Scan/ScannedProductPublisher.cs lines 19, 107}</td><td>Result from the pack's own list, marked as such; or PENDING APPROVAL.</td></tr>
+    <tr><td>Low confidence</td><td>Below 0.86 never taken silently; below 0.45 not offered; AI below 0.45 ignored. {V:Scripts/Data/ProductIndex.cs lines 35-37; Scripts/Scan/SmartScanFlowController.cs line 126}</td><td>Shortlist, or "Finish without a name".</td></tr>
+    <tr><td>Two close matches</td><td>Ties are broken by evidence (how much of the text the product explains); both stay in the shortlist. {V:Scripts/Data/ProductIndex.cs lines 30-31}</td><td>A shortlist, never a silent pick.</td></tr>
+    <tr><td>Offline</td><td>Catalogue copy and built-in ingredient table work offline; unknown ingredients stay "unknown", never safe; writes wait in the sync queue. {V:Scripts/Data/OfflineCache.cs; Scripts/Data/SyncQueue.cs; Scripts/Scan/ProductAnalysisEngine.cs line 61}</td><td>A normal result for known products; "not checked" for the rest.</td></tr>
+  </tbody>
+</table>

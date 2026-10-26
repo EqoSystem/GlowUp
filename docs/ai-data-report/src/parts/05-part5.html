@@ -1,0 +1,45 @@
+<h1><span class="part">Part 5 · Good definitions, better scans (belief B1)</span>16. Which fields the phone reads, and what each one changes</h1>
+<p><b>In plain words.</b> The phone can only recognise a product it has in its copy, and it can only use a product that is <b>Active</b>, not in the Recycle bin, whose brand is switched on, and whose kind is clearly make-up. Every other entry, however well written, is invisible to the scan. {V:Scripts/Data/ProductRepository.cs lines 61-80}</p>
+<table data-caption="Each field, how the phone uses it, and what a poor definition does" class="compact">
+  <thead><tr><th style="width:17%">Field</th><th style="width:38%">How the phone uses it</th><th>If it is poorly defined</th></tr></thead>
+  <tbody>
+    <tr><td><code>barcode</code></td><td>Exact look-up, the fastest match (one dictionary step). {V:Scripts/Data/ProductIndex.cs lines 78-79}</td><td>Missing: the scan falls back to reading the name, which needs a clear front label.</td></tr>
+    <tr><td>Brand <code>name</code> as printed</td><td>Found in the label text; "a brand the app knows is as good as two pictures" for the Front zone. {V:FIRESTORE_SCHEMA.md line 26; Scripts/Scan/ScanEvidence.cs line 240}</td><td>A spelling that differs from the pack: the brand is not seen, the scan is slower, and AI help is used more.</td></tr>
+    <tr><td>Product <code>name</code></td><td>Comparable key and word index; "Sure" from 0.86. {V:Scripts/Data/ProductIndex.cs lines 35-37}</td><td>Brand repeated in the name, shade in the name, or marketing words: lower scores, more shortlists.</td></tr>
+    <tr><td><code>aliases</code> (brand, product)</td><td>Indexed like names. {V:Scripts/Data/ProductIndex.cs header}</td><td>Missing common misspellings or old names: a worn pack is not matched.</td></tr>
+    <tr><td><code>cosmeticType</code></td><td>Decides make-up-only visibility, the AR area and whether a shade is expected. {V:Scripts/Data/ProductRepository.cs line 76; FIRESTORE_SCHEMA.md line 47}</td><td>An unclear kind hides the product from the app entirely.</td></tr>
+    <tr><td><code>status</code>, brand status</td><td>Only Active is used. {V:Scripts/Data/ProductRepository.cs line 72}</td><td>Left on Pending: never recognised, never recommended.</td></tr>
+    <tr><td><code>ingredients</code></td><td>The list analysed for the user; matched by normalised name and close spelling. {V:Scripts/Scan/IngredientKnowledge.cs line 29}</td><td>Mixed separators or two names in one entry: names the app cannot match count as "not checked"; below 50% checked the result is an "incomplete" caution.</td></tr>
+    <tr><td><code>shades</code></td><td>Offered in AR Try-On; the first one is used when nothing else is known. {V:Scripts/AR/ArTryOnFlowController.cs lines 241-251, 369-370}</td><td>Shade numbers typed as colours are refused by the form; wrong hexes give a wrong try-on colour.</td></tr>
+    <tr><td><code>sources</code></td><td>Needed for users with a skin condition: an unsourced, unreviewed list is not recommended to them. {V:Scripts/Scan/ProductRecommender.cs header items 5-6}</td><td>No source: the product is never suggested to those users.</td></tr>
+  </tbody>
+</table>
+<p><b>Search keys and indexes.</b> The phone builds its own index in memory once per catalogue load; Firestore indexes play no part in a scan. {V:Scripts/Data/ProductIndex.cs header; Scripts/Data/ProductRepository.cs line 83} The website keeps <code>tags</code> (at most 20) so one filter is one query. {V:FIRESTORE_SCHEMA.md line 57}</p>
+<p><b>Duplicates.</b> The product form refuses a second product of the same brand with the same compact name or alias; "Find duplicates" and "Clean up" list near-duplicates; nothing is deleted. {V:_Admin_Brand_Inventory/adminBrandInventory.js line 2323; FIRESTORE_SCHEMA.md line 253} Two Active entries for one product split the scan counts and can both reach a shortlist.</p>
+
+<h1>17. Definition Quality Checklist</h1>
+<table data-caption="Checks before a product is publishable: which exist, which are missing" class="compact">
+  <thead><tr><th style="width:46%">Check</th><th style="width:16%">Exists?</th><th>Where / proposal</th></tr></thead>
+  <tbody>
+    <tr><td>Name, brand and make-up type present</td><td class="ok">Yes</td><td>Product form. {V:_Admin_Brand_Inventory/adminBrandInventory.js lines 2317-2319}</td></tr>
+    <tr><td>Not skin care / hair / body</td><td class="ok">Yes</td><td>Form refuses; unclear kinds only as Pending. {V:same, lines 2319-2321}</td></tr>
+    <tr><td>Ingredient list not empty</td><td class="ok">Yes</td><td>{V:same, line 2322}</td></tr>
+    <tr><td>No duplicate name or alias in the brand</td><td class="ok">Yes</td><td>{V:same, line 2323}</td></tr>
+    <tr><td>Shades are real colours, not shade numbers</td><td class="ok">Yes</td><td><code>cleanShade</code>. {V:same, lines 1032-1046}</td></tr>
+    <tr><td>Photo link starts with https://</td><td class="ok">Yes</td><td>Form and rules. {V:same, line 2316; firestore.rules line 115}</td></tr>
+    <tr><td>FDA number characters</td><td class="ok">Yes</td><td>{V:same, line 2317}</td></tr>
+    <tr><td>Every ingredient exists in the Curator</td><td>Partly</td><td>The form lists names the Curator lacks but still saves. {V:_Admin_Brand_Inventory/adminBrandInventory.js notCurated} Proposal: warn before Active.</td></tr>
+    <tr><td>Barcode present for packs that have one</td><td>No</td><td>Proposal: warning when empty. {N:barcode-present check}</td></tr>
+    <tr><td>At least one source before Active</td><td>No</td><td>Proposal: required for Active. {N:source-required-for-Active check}</td></tr>
+    <tr><td>Name does not repeat the brand or the shade</td><td>No</td><td>Proposal: hint when the brand name is inside the product name. {N:brand-in-product-name hint}</td></tr>
+    <tr><td>Shade codes recorded with their hex</td><td>No</td><td>No field exists (Part 7). {N:shade code field}</td></tr>
+  </tbody>
+</table>
+
+<h1>18. Verdict on belief B1</h1>
+<div class="box gold">
+<p><b>Partly true.</b> The true part: for a product that is Active, clearly make-up, with a correct printed name, aliases and a barcode, the phone matches it from its own copy without the internet, and uses the admin's list at once. {V:Scripts/Data/ProductIndex.cs; Scripts/Data/ProductRepository.cs lines 61-83}
+What is not shown: "great results" and "quickly" have never been measured on a phone. {N:measured time to result and recognition rate on a phone}
+A correct definition also cannot help when the pack is unreadable, the product is not in the catalogue, or the entry is still Pending.</p>
+<p><b>Safe panel wording:</b> <i>"The scan is only as good as the catalogue. When admins enter a product's printed name, other names, barcode and ingredient list correctly and set it Active, the phone can recognise it from its own copy, offline, without asking the AI. We have not yet measured the time on phones; that is our next test."</i></p>
+</div>

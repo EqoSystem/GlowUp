@@ -1,0 +1,10 @@
+flowchart TD
+  A["Admin product form<br/>hex swatches (max 12)"] -->|"shades: ['#B5463F', ...]"| F[("products/{id}")]
+  F -->|"phone sync"| P["ProductData.shades"]
+  S["Scan: ScanZones.ShadeIn<br/>reads '12A' on the pack"] --> R["ScanRecord.shadeName = '12A'<br/>(shown as text)"]
+  P --> R2["ScanRecord.productShades"]
+  R -.->|"missing: code to hex<br/>(no code field)"| H["the hex of shade 12A"]
+  R2 --> AR["AR Try-On swatches:<br/>scan colour, product hexes,<br/>skin-tone suggestions"]
+  H -.-> AR
+  AR --> M["FallbackMakeupOverlay<br/>area, shade, strength, finish"]
+  M --> L["ArFaceMakeup:<br/>mask layers on the face mesh"]

@@ -1,0 +1,34 @@
+<h1><span class="part">Part 1 · The one-page picture</span>1. What AI Smart Analysis does</h1>
+
+<div class="box pink">
+<p><b>In five sentences.</b> The user points the phone's camera at a make-up product and taps the scan button.
+The phone reads the words and the barcode on the pack by itself, many times a second, without the internet.
+It looks for what it read in its own copy of the product list that the admins keep on the website, and, when it finds the product, it takes the ingredient list the admins entered.
+It then checks every ingredient against the user's own saved profile (allergies, skin type, skin conditions, age) on the phone and gives one answer: safe, caution or harmful, with the reasons.
+Only when the phone cannot name the product does it ask an online AI (a limited number of times), offer a short list to choose from, let the user type the name, or take one photo for an admin to approve.</p>
+</div>
+<p>{V:Scripts/Scan/SmartScanFlowController.cs header; Scripts/Scan/ScanAnalysisPipeline.cs header; Scripts/Data/ProductIndex.cs header; Scripts/Scan/ProductAnalysisEngine.cs}</p>
+
+<h1>2. The core idea for developers</h1>
+<p><b>The team's sentence: "the app recognises a product by matching what it reads against what admins defined."</b> This is <b>correct for the main path</b>, with three additions the panel may ask about:</p>
+<ol>
+  <li>The match runs on the phone against a <b>local copy</b> of the catalogue, not against Firestore at scan time. The copy is refreshed in the background with only the entries changed since the last sync (<code>updatedAt</code>). {V:Scripts/Data/CatalogSync.cs lines 16, 93; Scripts/Data/ProductIndex.cs header}</li>
+  <li>Besides text and barcode, the phone remembers the <b>look of packs it scanned before</b> (a small on-device picture model) and asks "Is this ...?". It never compares a scan with catalogue photos. {V:Scripts/Scan/PackagingMemory.cs, Scripts/Scan/PackEmbedder.cs, commit 50e5558}</li>
+  <li>When nothing matches, an online AI (Google Gemini) is shown <b>one picture</b> of the scan and the text read, and may look the product up on the web. Its answer is accepted only with a usable source page, and a new product it names is saved only as <b>Pending</b> for an admin. {V:Scripts/Scan/ProductAiAdvisor.cs lines 141-379; firestore.rules lines 151-179}</li>
+</ol>
+<figure data-diagram="onepage"><figcaption>The one-page picture: admins define the data, the phone matches against its copy of it</figcaption></figure>
+
+<h1>3. Glossary</h1>
+<table data-caption="Words used in this report">
+  <thead><tr><th style="width:22%">Word</th><th>Meaning here</th></tr></thead>
+  <tbody>
+    <tr><td>INCI</td><td>International Nomenclature of Cosmetic Ingredients: the standard ingredient names printed on packs ("Aqua", "Dimethicone", "CI 77491"). The import format asks for INCI names in printed order. {V:IMPORT_FORMAT.md, Product keys}</td></tr>
+    <tr><td>OCR</td><td>Optical character recognition: turning a camera picture into text. On Android the app uses Google ML Kit's on-device text recogniser; in the Unity Editor it uses Tesseract. {V:Scripts/Scan/OcrService.cs, Scripts/Scan/MlKitTextReader.cs}</td></tr>
+    <tr><td>Normalisation</td><td>Turning a name into one comparable key: lower case, accents removed, every non-letter/non-digit becomes a space, spaces collapsed. "L'Oréal PARIS" and "l oreal paris" give the same key. The website uses the same rule. {V:Scripts/Data/TextKey.cs lines 6-15}</td></tr>
+    <tr><td>Squashed key</td><td>A key with the camera's usual confusions evened out: no spaces, "rn" as "m", "vv" as "w", 0/o as one letter, 1/l/i as one letter. {V:Scripts/Data/TextKey.cs Squash}</td></tr>
+    <tr><td>Confidence score</td><td>A number from 0 to 1 for how sure a match is. Catalogue match: 0.86 or more = taken without asking ("Sure"), 0.45 or more = shown in a shortlist ("Possible"). AI answers: accepted from 0.45. {V:Scripts/Data/ProductIndex.cs lines 35-37}</td></tr>
+    <tr><td>Manual mode</td><td>No feature of this name exists in the code. The nearest behaviour is an admin writing an entry by hand without Assist with AI (Part 4). {V:grep "manual" over _Admin_*, _Shared: only the scan source "typed in"}</td></tr>
+    <tr><td>Verification status</td><td>No single field of this name exists. What exists: <code>status</code> (Active, Pending, Inactive), <code>reviewed</code> (yes/no), <code>source</code> (where an entry came from) and <code>webSearched</code> on AI ingredients. Part 4 proposes one. {V:FIRESTORE_SCHEMA.md "Entries that were not typed on the website"}</td></tr>
+    <tr><td>Pending</td><td>An entry the app or an import added that an admin has not approved. The app never recommends it or recognises scans as it. {V:FIRESTORE_SCHEMA.md "How the app treats them"}</td></tr>
+  </tbody>
+</table>

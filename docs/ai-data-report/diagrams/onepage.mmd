@@ -1,0 +1,12 @@
+flowchart TD
+  A["Admin website<br/>Brand & Product Inventory,<br/>Ingredient Curator"] -->|"writes brands, products,<br/>ingredients (admins only)"| F[("Cloud Firestore<br/>glowup-admin-portal")]
+  F -->|"changed entries only<br/>(updatedAt sync)"| C["Phone copy of the catalogue<br/>+ look-up index"]
+  S["Camera on the phone"] --> R["ML Kit reads text<br/>and barcode (no internet)"]
+  R --> M{"Match in the<br/>phone copy?"}
+  C --> M
+  M -->|"yes: barcode, exact name,<br/>alias, words"| L["Admin's ingredient list"]
+  M -->|"no"| X["Fallbacks: pack-look memory,<br/>shortlist, AI with one picture,<br/>typed name, photo for an admin"]
+  X --> L2["List from the pack,<br/>a sourced web page or Pending"]
+  L --> V["Check against the user's<br/>profile ON THE PHONE"]
+  L2 --> V
+  V --> O["Result: safe / caution / harmful,<br/>reasons, sources, AR shades"]

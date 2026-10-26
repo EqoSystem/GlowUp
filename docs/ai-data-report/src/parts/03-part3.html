@@ -1,0 +1,93 @@
+<h1><span class="part">Part 3 · Ingredient lists</span>8. How an ingredient list reaches the database</h1>
+<p><b>In plain words.</b> There are five doors into the database for an ingredient list. Only one of them makes a list "live" at once: an admin typing or pasting it on the product form. Every other door creates something an admin must approve first.</p>
+<figure data-diagram="ingredient-path"><figcaption>The five ways an ingredient list reaches Firestore, and which ones need an admin's approval</figcaption></figure>
+<table data-caption="The doors, their input format and what they write" class="compact">
+  <thead><tr><th style="width:20%">Door</th><th style="width:30%">Input</th><th>What is written</th></tr></thead>
+  <tbody>
+    <tr><td>1. Product form (admin)</td><td>Text pasted into the ingredients box; split on commas, semicolons and line breaks, spaces tidied, exact repeats dropped</td><td><code>products/{random id}</code>, status as chosen; the form refuses to save without a list. {V:_Shared/adminCommon.js lines 163-167; _Admin_Brand_Inventory/adminBrandInventory.js saveProduct (lines 2298-2340)}</td></tr>
+    <tr><td>2. File import (admin)</td><td>GlowUp import format (<code>INGREDIENTS</code> in INCI, printed order, <code> | </code> between names) or any PDF / Excel / Word read by the AI</td><td>New products as <b>Pending</b>, <code>source: document-import</code>, <code>reviewed: false</code>; a list for an existing product without one goes to <code>productIngredientSuggestions</code>. {V:IMPORT_FORMAT.md; FIRESTORE_SCHEMA.md line 67}</td></tr>
+    <tr><td>3. App scan of the pack</td><td>Camera text after the word "Ingredients", cut at commas, cleaned</td><td><code>products/scan_&lt;brand&gt;__&lt;name&gt;</code>, Pending, the user's id, at most 80 names. {V:Scripts/Scan/IngredientTextParser.cs header; Scripts/Scan/ScannedProductPublisher.cs lines 19, 107; firestore.rules lines 157-179}</td></tr>
+    <tr><td>4. App web look-up</td><td>AI answer with a usable source page</td><td><code>productIngredientSuggestions</code> (3 to 80 names, 1 to 10 sources) for a catalogue product with no list. {V:firestore.rules lines 189-212}</td></tr>
+    <tr><td>5. Photo snapshot</td><td>One JPEG (at most 80 KB) read by the AI on the server</td><td><code>pending_products</code> + <code>pending_product_images</code>; approval writes the product. {V:FIRESTORE_SCHEMA.md lines 123-144; api/scan-snapshot.js lines 17-21}</td></tr>
+  </tbody>
+</table>
+
+<h3>A fake sample, end to end (door 2, GlowUp import format)</h3>
+<pre class="mono small">=== PRODUCT ===
+BRAND_NAME: Sample Beauty
+PRODUCT_NAME: Velvet Lip Cream
+COSMETIC_TYPE: Lipstick
+SHADES: #B5463F | #C24B62
+INGREDIENTS: Isododecane | Dimethicone | Trimethylsiloxysilicate | Aqua | Tocopherol | CI 77491
+SOURCES: Sample Beauty Velvet Lip Cream | https://example.com/velvet-lip-cream</pre>
+<p>Resulting document (shape only; the id is made by Firestore):</p>
+<pre class="mono small">products/AbC123... {
+  name: "Velvet Lip Cream", brandId: "&lt;id of Sample Beauty&gt;", brandName: "Sample Beauty",
+  cosmeticType: "Lipstick", shades: ["#B5463F", "#C24B62"],
+  ingredients: ["Isododecane", "Dimethicone", "Trimethylsiloxysilicate", "Aqua", "Tocopherol", "CI 77491"],
+  sources: ["Sample Beauty Velvet Lip Cream | https://example.com/velvet-lip-cream"],
+  status: "Pending", source: "document-import", reviewed: false, scans: 0, createdAt: &lt;server time&gt; }</pre>
+<p>{I:IMPORT_FORMAT.md keys and FIRESTORE_SCHEMA.md products fields; the sample values are invented}</p>
+
+<h1>9. How an ingredient list is defined and cleaned</h1>
+<table data-caption="Format rules for an ingredient list" class="compact">
+  <thead><tr><th style="width:26%">Rule</th><th>What the code does</th></tr></thead>
+  <tbody>
+    <tr><td>Canonical names</td><td>"The names from the packaging" (products); INCI in printed order (import format). There is no INCI dictionary in the repository to validate a name against. {V:FIRESTORE_SCHEMA.md line 50; IMPORT_FORMAT.md} {N:an INCI / CosIng reference list to validate names}</td></tr>
+    <tr><td>Order</td><td>Kept as on the label ("in the order of the label"). The app does not use the order for concentration. {V:Scripts/Scan/IngredientTextParser.cs ParsedList.ingredients}</td></tr>
+    <tr><td>Separators</td><td>Website: comma, semicolon, line break. Import: <code> | </code>. App camera text: commas, a name wrapped over two lines is joined, two known names whose comma was missed are split. {V:_Shared/adminCommon.js line 166; IMPORT_FORMAT.md; Scripts/Scan/IngredientTextParser.cs header}</td></tr>
+    <tr><td>Case and accents</td><td>Compared by the normalised key, the same rule on the website. {V:Scripts/Data/TextKey.cs lines 6-15}</td></tr>
+    <tr><td>Spelling / camera mistakes</td><td>Close spellings match at 0.85; the squashed key evens out 0/O, 1/l/I, rn/m. {V:Scripts/Scan/IngredientKnowledge.cs line 29; Scripts/Data/TextKey.cs Squash}</td></tr>
+    <tr><td>Aliases</td><td>"Water (Aqua)" and "Aqua/Water/Eau" give one ingredient; the built-in Water entry has the aliases aqua, eau, purified water, deionized water. {V:Scripts/Scan/IngredientTextParser.cs header; Scripts/Scan/IngredientKnowledge.cs line 303}</td></tr>
+    <tr><td>Not ingredients</td><td>Net weight, "made in", batch codes, web addresses, advertising and "free of" claims are thrown away (stoplist). {V:Scripts/Scan/IngredientStoplist.cs; Scripts/Scan/IngredientTextParser.cs header}</td></tr>
+    <tr><td>Shade-dependent colourants</td><td>Names behind "may contain" or "+/-" are kept apart as "depends on the shade"; CI numbers are left out when two lists are compared. {V:Scripts/Scan/IngredientTextParser.cs; Scripts/Scan/ListSources.cs line 378}</td></tr>
+    <tr><td>Duplicates</td><td>Exact repeats dropped on the website; the app keeps one entry per known ingredient. {V:_Shared/adminCommon.js lines 164-167; commit 7a5003e "no duplicate ingredients"}</td></tr>
+    <tr><td>Link to the master record</td><td>By name (normalised) at analysis time; the website also stores <code>ingredientIds</code> as a light summary. {V:FIRESTORE_SCHEMA.md lines 54, 117}</td></tr>
+  </tbody>
+</table>
+<h3>Shape of an ingredient record</h3>
+<p><code>name</code>, <code>techName</code> (label name, matched against scans), <code>description</code>, <code>aliases[]</code>, <code>riskLevel</code> (safe | caution | harmful | empty), <code>cautionNote</code>, <code>commonUses</code>, <code>minAge</code>, <code>keyActive</code>, <code>umbrella</code>, <code>chemicalDescription</code>, <code>highlights[]</code>, <code>allergenTags[]</code>, <code>avoidFor/goodFor SkinTypes[]</code> and <code>Conditions[]</code>, <code>sources[]</code> ("page title | https://address"), <code>source</code>, <code>reviewed</code>, <code>fdaUnii</code>, <code>webSearched</code>. Only name, techName and description are required. {V:FIRESTORE_SCHEMA.md lines 91-113, 163-177}
+There is no separate "function" field (emollient, colourant); <code>commonUses</code> is the nearest. {N:an ingredient "function" field}</p>
+
+<h1>10. Credible sources</h1>
+<h3>Sources the project actually uses</h3>
+<table data-caption="Sources found in code, data or documents" class="compact">
+  <thead><tr><th style="width:34%">Source</th><th>How it is used</th></tr></thead>
+  <tbody>
+    <tr><td>FDA Philippines Verification Portal</td><td>Product notification look-up by name in the background; FDA badge on the result; manual check by admins. {V:Scripts/Scan/PhFdaVerification.cs; FIRESTORE_SCHEMA.md line 215}</td></tr>
+    <tr><td>US FDA "Prohibited &amp; Restricted Ingredients in Cosmetics"</td><td>Source of the <code>fda_</code> seed ingredients. {V:FIRESTORE_SCHEMA.md line 184}</td></tr>
+    <tr><td>openFDA substance registry</td><td>Confirms an ingredient name is a registered substance (UNII). Says nothing about safety. {V:Scripts/Scan/FdaSubstanceRegistry.cs; FIRESTORE_SCHEMA.md line 175}</td></tr>
+    <tr><td>Open Beauty Facts (ODbL)</td><td>Seed products of 9 October 2026 and a second opinion by barcode; credited on every imported product. {V:Scripts/Scan/OpenBeautyFacts.cs; FIRESTORE_SCHEMA.md line 193}</td></tr>
+    <tr><td>Sources the AI is told to prefer</td><td>fda.gov; fda.gov.ph and the ASEAN Cosmetic Directive annexes; EU CosIng; Cosmetic Ingredient Review; PubChem; Watsons Philippines listings. {V:Scripts/Scan/IngredientResearcher.cs lines 37-45}</td></tr>
+    <tr><td>Brand websites</td><td>Labelled "Manufacturer's own site" only when an admin confirmed the brand owns the site. {V:FIRESTORE_SCHEMA.md line 34}</td></tr>
+  </tbody>
+</table>
+<p>Naming a site in the label list (regulator, medical, reference ...) does not mean the project took data from it. The built-in ingredient table carries no per-entry citation. {V:FIRESTORE_SCHEMA.md lines 199-207} {N:per-entry citations for the built-in ingredient table}</p>
+
+<h3>Suggested credible sources: team must confirm before citing</h3>
+<table data-caption="Suggested credible sources (not yet used by the project unless said above)" class="compact">
+  <thead><tr><th style="width:24%">Source</th><th style="width:38%">Authoritative for</th><th>Limits</th></tr></thead>
+  <tbody>
+    <tr><td>Manufacturer pages and the pack</td><td>The current list of one specific product.</td><td>Marketing content; formulas change by region and over time.</td></tr>
+    <tr><td>FDA Philippines notifications and advisories</td><td>Whether a product is notified for sale in the Philippines; banned-product advisories.</td><td>No ingredient lists; manual portal.</td></tr>
+    <tr><td>ASEAN Cosmetic Directive annexes</td><td>Prohibited and restricted substances (Philippine legal basis).</td><td>Legal lists, not plain-language text.</td></tr>
+    <tr><td>EU CosIng</td><td>INCI names, functions, EU restrictions.</td><td>A database, not a safety assessment.</td></tr>
+    <tr><td>Cosmetic Ingredient Review (CIR)</td><td>Expert safety assessments with concentration limits.</td><td>US context; not every ingredient reviewed.</td></tr>
+    <tr><td>DermNet; American Academy of Dermatology</td><td>Plain-language dermatology (contact dermatitis, rosacea, acne).</td><td>General, not product-specific.</td></tr>
+    <tr><td>PubMed; PubChem</td><td>Studies on irritation and allergy rates; chemical identity.</td><td>Needs careful selection; not cosmetic-use specific.</td></tr>
+  </tbody>
+</table>
+
+<h1>11. Links to dermatology and pharmacology references</h1>
+<ul>
+  <li><b>How a description links to a reference:</b> each ingredient keeps <code>sources[]</code> as "page title | https://address". The kind of page (regulator, medical, maker, reference, public, retailer, other) is worked out when shown, by one rule in the app, the website and the server, tested against shared cases. {V:FIRESTORE_SCHEMA.md lines 195-213; Scripts/Scan/ListSources.cs SourceKind; _Shared/glowupRules.js sourceKind}</li>
+  <li><b>How a link is validated:</b> only plain <code>https://</code> addresses are shown as links; an address with a user name in front, a backslash or odd characters is labelled "Unverified site" and never shown as a link. Assist with AI keeps only links that were printed in the document or opened by its web search. {V:FIRESTORE_SCHEMA.md lines 67, 207}</li>
+  <li><b>When a link breaks:</b> nothing checks old links. {N:a periodic link checker for sources and image links} The entry keeps its text; the user can still read the title.</li>
+</ul>
+<div class="box warn"><h4>Disclaimer (use it on slides and in the app)</h4>
+<p>GlowUp is an informational tool. It does not diagnose, treat or prevent any skin condition. A result means "nothing in this list is flagged for your saved profile", not "safe for you". Ingredient data may be incomplete or out of date, and manufacturers change formulas. Users with a skin condition or a past reaction should consult a dermatologist and read the label of the product they hold. {V:Scripts/Scan/ProductRecommender.cs header; Legal/PrivacyPolicyAndTerms.txt}</p></div>
+
+<h1>12. Source hierarchy when sources disagree</h1>
+<p>The app already has an order of trust for one product's list, best first: (1) the user's own pack read by the camera, (2) the GlowUp inventory, (3) the brand's official site or store, (4) a large retailer's copy, (5) Open Beauty Facts, (6) any other page that can be shown. Ingredient databases (CosIng, INCI Decoder, EWG) explain ingredients but are never the source of one product's list. {V:Scripts/Scan/ListSources.cs lines 8-21}</p>
+<p><b>How a conflict is recorded:</b> two lists agree when 85% of the longer list matches (at least 4 names; colourant numbers and "may contain" names left out). The scan keeps <code>listCheck</code> = "matched" or "differs", which second place it was, its date, how many names differ, and a few names on each side. The shown list never changes because of the second source. {V:Scripts/Scan/ListSources.cs lines 350-352, 433-444; Scripts/Data/DataModels.cs lines 183-189}</p>
+<p><b>Suggested rule for admins (to adopt):</b> current pack in hand &gt; manufacturer page for the same country &gt; FDA Philippines record (for identity, not the list) &gt; large retailer page &gt; Open Beauty Facts &gt; anything else. When two disagree, keep the higher one, put the other in <code>sources</code> with the date, and write the difference in the product's description until a pack is checked.</p>

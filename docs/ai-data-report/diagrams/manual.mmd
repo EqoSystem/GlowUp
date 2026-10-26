@@ -1,0 +1,12 @@
+flowchart TD
+  A["Admin opens a new or empty entry"] --> B{"Assist with AI<br/>used today < limit?"}
+  B -->|no| H["Write the entry by hand"]
+  B -->|yes| C["AI web search for sources"]
+  C --> D{"Found a usable<br/>source page?"}
+  D -->|no| H
+  D -->|"backup AI, no web search"| E["Draft without sources:<br/>every box unchecked"]
+  D -->|yes| F["Draft with sources:<br/>admin checks each field"]
+  E --> G["Admin checks against<br/>the pack or links"]
+  F --> G
+  H --> G
+  G --> I["Saved; Pending until reviewed,<br/>then Active"]

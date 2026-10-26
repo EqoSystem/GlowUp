@@ -1,0 +1,60 @@
+erDiagram
+  BRANDS ||--o{ PRODUCTS : "brandId (+ brandName copy)"
+  PRODUCTS }o--o{ INGREDIENTS : "ingredients[] names, ingredientIds[] summary"
+  PRODUCTS ||--o{ PRODUCT_INGREDIENT_SUGGESTIONS : "productId"
+  USERS ||--o{ SCANS : "users/{uid}/scans"
+  PENDING_PRODUCTS ||--o| PENDING_PRODUCT_IMAGES : "same id"
+  BRANDS {
+    string name
+    string category "Makeup"
+    string status "Active|Pending|Inactive"
+    list aliases
+    string website "admin-confirmed"
+    string logoUrl "https link"
+  }
+  PRODUCTS {
+    string name
+    string brandId
+    string cosmeticType "17 make-up kinds"
+    list ingredients "names as printed"
+    list shades "#RRGGBB"
+    list sources "title | url"
+    string imageUrl "https link"
+    string barcode
+    string status
+  }
+  INGREDIENTS {
+    string name
+    string techName "label name"
+    string riskLevel "safe|caution|harmful"
+    list aliases
+    list allergenTags
+    list avoidForConditions
+    list sources
+    bool reviewed
+  }
+  PRODUCT_INGREDIENT_SUGGESTIONS {
+    string productId
+    list ingredients
+    list sources
+    string status "Pending"
+  }
+  USERS {
+    string skinType
+    list skinConditions
+    list knownAllergens
+  }
+  SCANS {
+    string status
+    list ingredients
+    string shadeName
+  }
+  PENDING_PRODUCTS {
+    string name
+    string brandName
+    string createdByUid
+    bool isApproved
+  }
+  PENDING_PRODUCT_IMAGES {
+    string jpegBase64 "about 80 KB"
+  }

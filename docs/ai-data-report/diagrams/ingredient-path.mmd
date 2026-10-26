@@ -1,0 +1,10 @@
+flowchart LR
+  A1["1. Admin pastes the list<br/>on the product form"] -->|"live at once<br/>(status chosen by admin)"| P[("products")]
+  A2["2. Admin imports a file<br/>(format or AI-read)"] -->|"Pending, reviewed false"| P
+  A2 -->|"list for a product<br/>that has none"| S[("productIngredientSuggestions")]
+  A3["3. App reads the pack"] -->|"Pending scan_ entry"| P
+  A4["4. App web look-up<br/>with a source page"] --> S
+  A5["5. One photo of an<br/>unknown product"] --> Q[("pending_products<br/>+ pending_product_images")]
+  S -->|"admin applies"| P
+  Q -->|"admin approves"| P
+  P -->|"Active only"| APP["Phone copy used by scans<br/>and recommendations"]

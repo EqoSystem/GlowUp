@@ -1,0 +1,67 @@
+<h1><span class="part">Part 6 · Product images (beliefs B2, B3)</span>19. Why image links instead of stored images</h1>
+<p><b>Belief B2 is true, and the code gives the main reason.</b> Brands and products keep only web addresses (<code>imageUrl</code>, <code>logoUrl</code>); nothing is uploaded. The schema says why: Firebase Cloud Storage needs the Blaze (pay-as-you-go) plan on new projects, and no Storage rules exist. {V:FIRESTORE_SCHEMA.md lines 33, 53, 121, 135} {V:firebase.json (Firestore only, no storage section)}</p>
+<table data-caption="Reasons for links instead of files, checked one by one" class="compact">
+  <thead><tr><th style="width:28%">Candidate reason</th><th style="width:16%">Status</th><th>Detail</th></tr></thead>
+  <tbody>
+    <tr><td>Storage billing / plan</td><td>{V:FIRESTORE_SCHEMA.md line 121}</td><td>Cloud Storage needs Blaze; the project stays on the free tier.</td></tr>
+    <tr><td>Storage and bandwidth growth</td><td>{I:FIRESTORE_SCHEMA.md "what keeps the free tier safe"}</td><td>Hundreds of products with several photos each would grow with the catalogue; links cost nothing to store.</td></tr>
+    <tr><td>Upload size and format</td><td>{V:FIRESTORE_SCHEMA.md line 140}</td><td>Unity cannot make WebP; the one place photos are kept (snapshots) holds a JPEG of at most about 80 KB as base64 inside Firestore and deletes it at review.</td></tr>
+    <tr><td>Copyright / brand permission</td><td>{I:no licence text in the repository}</td><td>Copying a brand's studio photo into our storage is reproduction; linking to the brand's own page is lower risk. Not stated in the code.</td></tr>
+    <tr><td>Maintenance</td><td>{I:no image pipeline exists}</td><td>No resizing, thumbnails or clean-up job to keep.</td></tr>
+  </tbody>
+</table>
+<h3>Downsides of links, and mitigation</h3>
+<ul>
+  <li><b>Link rot</b> and <b>brand site changes</b>: the address stops working. No link checker exists. {N:a periodic link checker for image links} Mitigation: a monthly script that requests each address and lists failures for admins.</li>
+  <li><b>Hot-link blocking</b>: some sites refuse pictures shown on another site. Mitigation: a plain placeholder when the picture does not load.</li>
+  <li><b>Slow loads</b>, <b>mixed content</b>: only https is accepted, so mixed-content warnings cannot happen. {V:firestore.rules line 115; _Admin_Brand_Inventory/adminBrandInventory.js line 2316}</li>
+  <li><b>Who sees the images:</b> only admins. The app does not read <code>imageUrl</code> or <code>logoUrl</code> at all, so a broken link never affects a user. {V:grep of Scripts/ for imageUrl, logoUrl: no hit}</li>
+</ul>
+
+<h1>20. Why the AI does not match scans with catalogue images (belief B3)</h1>
+<div class="box pink"><h4>The team's reason (primary)</h4>
+<p>A product in a user's hand often looks different from its catalogue picture: worn packaging, incomplete or scratched letters, faded printing. That makes picture matching uncertain. The team's priority is a fast result, so the main goal is to avoid latency. Picture-based recognition needs heavier work (a model on each picture and a comparison against many reference pictures) and behaves unpredictably on worn products, which hurts both speed and reliability.</p></div>
+<h3>What the code actually does</h3>
+<ol>
+  <li><b>Text and barcode first, on the phone.</b> Barcode and name look-ups are in-memory dictionary steps over the phone's copy. {V:Scripts/Data/ProductIndex.cs header}</li>
+  <li><b>A small picture model does run on the phone</b>, but it compares a scan only with packs <b>this phone</b> scanned before, never with catalogue images, and it only asks "Is this ...?". {V:Scripts/Scan/PackagingMemory.cs; Scripts/Scan/PackEmbedder.cs; commit 50e5558}</li>
+  <li><b>The online AI does see a picture</b> of the scan (one JPEG) when the phone cannot name the product. {V:Scripts/Scan/ProductAiAdvisor.cs line 165}</li>
+  <li><b>Catalogue images are not used anywhere in recognition.</b> The app never downloads them. {V:grep of Scripts/ for imageUrl: no hit}</li>
+</ol>
+<p><b>So "the AI cannot use product images" is not accurate.</b> The accurate statement: <i>the app does not use catalogue images for recognition, by design.</i></p>
+
+<h3>Evidence for the team's reasoning</h3>
+<ul>
+  <li>The old colour-and-pattern signature found the same pack again in about 1 of 100 desktop tries; the picture model in 94 of 100 at the medium limit, with 16 wrong matches in 1000 from packs of one product line that really look alike. That is why the app asks and never decides by the look alone. {V:commit 50e5558 message}</li>
+  <li>A desktop check of the same picture model on 24 made-up brand word marks put the right brand first in 67% of cases with the same colours, 41% on another background and 21% light-on-dark, with no limit that separated right from wrong marks. {I:developer's desktop check of 13 October 2026, recorded outside the repository}</li>
+  <li>There is no vector search in Firestore; matching many reference images would need a separate index. {V:FIRESTORE_SCHEMA.md line 121}</li>
+</ul>
+<h3>Why catalogue images are a poor reference</h3>
+<p>Studio photo vs real-world scan (angle, glare, background), wear and scratches, regional packaging, batch and redesign changes, products that differ only by shade, and hundreds of near-identical shades in one line. Building it properly would need a labelled dataset per product, an embedding index, a larger model on the phone, and per-shade confusion handling.</p>
+
+<h3>Latency budget</h3>
+<table data-caption="Where time goes in a scan (limits from the code; phone timings not measured)" class="compact">
+  <thead><tr><th style="width:28%">Step</th><th style="width:38%">Cost (from the code or a recorded measurement)</th><th>Where it runs</th></tr></thead>
+  <tbody>
+    <tr><td>Catalogue look-up (barcode, name)</td><td>In-memory dictionary steps; no network. Phone time {N:measured on a phone}</td><td>Phone</td></tr>
+    <tr><td>Text and barcode reading</td><td>One picture at a time, always the newest. {V:Scripts/Scan/FrameReader.cs header} Phone time {N:measured on a phone}</td><td>Phone (ML Kit)</td></tr>
+    <tr><td>Pack-look model</td><td>One picture at a time on its own thread. {V:commit 50e5558} Phone time {N:measured on a phone}</td><td>Phone (MediaPipe)</td></tr>
+    <tr><td>AI recognition</td><td>Time-out 25 s (35 s with web search). {V:Scripts/Scan/ProductAiAdvisor.cs lines 27, 321}</td><td>Google Gemini</td></tr>
+    <tr><td>FDA Philippines check</td><td>12 to 15 s per search, in the background. {I:developer's measurement of 11 October 2026 recorded outside the repository; Scripts/Scan/PhFdaVerification.cs}</td><td>verification.fda.gov.ph</td></tr>
+    <tr><td>Open Beauty Facts by barcode</td><td>0.6 to 5 s, cached 30 days. {I:developer's measurement of 12 October 2026; Scripts/Scan/OpenBeautyFacts.cs}</td><td>openbeautyfacts.org</td></tr>
+    <tr><td>Image matching against the catalogue (not built)</td><td>Would add a download of reference pictures or an index, plus one model run per comparison set.</td><td>Not built</td></tr>
+  </tbody>
+</table>
+<p><b>Measurement to take before the demo:</b> time from tap to result for (a) a barcode product, (b) a name-only product, (c) a product the catalogue lacks, five times each on the demo phone.</p>
+<div class="box gold"><p><b>Safe panel wording:</b> <i>"The app does not use catalogue photos for recognition, by design. Worn or scratched packs make photo matching unreliable and slow, so the phone first reads the barcode and the printed name and matches them against our catalogue, offline. Only when that fails is one picture sent to the AI, and a small on-phone model can recognise a pack the same phone has scanned before."</i></p></div>
+
+<h1>21. Where the image link is stored and shown</h1>
+<table data-caption="Image link fields" class="compact">
+  <thead><tr><th style="width:24%">Field</th><th style="width:36%">Validation</th><th>Shown where</th></tr></thead>
+  <tbody>
+    <tr><td><code>products.imageUrl</code></td><td>https:// only, at most 300 characters (rules); the form refuses anything else. {V:firestore.rules lines 103-115; _Admin_Brand_Inventory/adminBrandInventory.js line 2316}</td><td>Product form, CSV export column "Photo link". {V:_Admin_Brand_Inventory/adminBrandInventory.js lines 2055, 2130}</td></tr>
+    <tr><td><code>brands.logoUrl</code>, <code>brands.imageUrl</code></td><td>Same. {V:_Admin_Brand_Inventory/adminBrandInventory.js lines 1916-1921}</td><td>Brand form.</td></tr>
+    <tr><td>Allowed domains</td><td>None: any https address is accepted. {N:an allowed-domain list for image links}</td><td>-</td></tr>
+    <tr><td>Import / AI</td><td>Kept only when the address is printed in the document or was opened by the web search. {V:FIRESTORE_SCHEMA.md line 67; api/assist-ingredient.js line 365}</td><td>-</td></tr>
+  </tbody>
+</table>
