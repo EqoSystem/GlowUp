@@ -252,6 +252,11 @@ namespace GlowUp.Scan
         [Tooltip("Said while the AI is asked. Honest about the wait: a product the app has never seen takes the slow way the first time.")]
         [SerializeField] private string msgAiLooking = "This product is new to GlowUp. Recognising it takes a little longer the first time...";
         [Tooltip("The app and the AI could not name the product")]
+        [Header("Name and brand read, kind and shade not")]
+        [SerializeField] private string similarTitle = "Is it one of these?";
+        [SerializeField] private string similarMessage = "We read the name and the brand but not the kind of make-up or the shade. Tap the product if it is one of these, for a faster and surer result.";
+        [SerializeField] private string similarNoneLabel = "None of these";
+        [SerializeField] private string msgNoSimilar = "No similar product is saved. Try scanning again, or tap Finish to go on with what was read.";
         [SerializeField] private string msgNotSure = "We could not name this product. Type its name, start over, or tap Finish anyway.";
         [Tooltip("The AI has been asked as often as it may be in one visit of this screen")]
         [SerializeField] private string msgAiLimit = "The AI has been asked as often as it may be for now. Type the product's name, or tap Finish anyway.";
@@ -356,6 +361,7 @@ namespace GlowUp.Scan
         bool rescanSame = true;                   // ... true = the same product again, false = a different product (it replaces that scan too)
         readonly HashSet<string> declined = new HashSet<string>();       // products the user said "no" to in this scan
         int scanNumber;
+        bool detailsAnswered;                     // the "similar products" question (name and brand read, kind and shade not) was shown or answered in this attempt
         bool shortlistAnswered;                   // the shortlist was shown in this attempt and the user said "none of these"
         string frontChecked = "";                 // the text of the front the product list was last asked about
         string firebaseLookupKey = "";
@@ -420,11 +426,13 @@ namespace GlowUp.Scan
             rescanOf = ScanSession.RescanOf; rescanSame = ScanSession.RescanSameProduct;
             ScanSession.RescanOf = null; ScanSession.RescanSameProduct = true;
             ScanSession.ClearPending();
-            if (rescanOf != null && rescanSame)
+            // A scan again starts from NOTHING: the user usually rescans because the app recognised the product wrongly, so the
+            // name, brand, kind and shade of the earlier scan are not taken over, and that product is not offered again in the
+            // shortlist of this scan (the earlier result is still replaced by the new one).
+            if (rescanOf != null)
             {
-                identity.productName = (rescanOf.productName ?? "").Trim(); identity.brandName = (rescanOf.brandName ?? "").Trim();
-                identity.cosmeticType = (rescanOf.cosmeticType ?? "").Trim();
-                if (ProductKnown) { evidence.ProductKnown(); ShowIdentity(); }
+                string earlierKey = TextKey.Normalize(rescanOf.brandName) + "|" + TextKey.Normalize(rescanOf.productName);
+                if (earlierKey.Length > 1) declined.Add(earlierKey);
             }
 
             // coming back from a scan that could not be analysed, or that was stopped because the product is not make-up
@@ -1427,11 +1435,11 @@ namespace GlowUp.Scan
         /// Opens "Is it one of these?". `named` runs after the user chose or typed a product, `noneOfThese` when they said
         /// none fits. "Scan again" starts a fresh ring.
         /// </summary>
-        void OpenShortlist(string title, string message, string noneLabel, Action named, Action noneOfThese)
+        void OpenShortlist(string title, string message, string noneLabel, Action named, Action noneOfThese, List<ScanShortlist.Entry> entries = null)
         {
             if (shortlist == null) { noneOfThese?.Invoke(); return; }
             if (holdButton != null) holdButton.LetGo();
-            shortlist.Show(title, message, Suggestions(), noneLabel,
+            shortlist.Show(title, message, entries ?? Suggestions(), noneLabel,
                 (entry, typedName) =>
                 {
                     TakeEntry(entry);
@@ -1540,7 +1548,7 @@ namespace GlowUp.Scan
             ingredientText = null; ingredientSource = "scan"; listFrom = ""; listWebBacked = false; sources.Clear();
             barcode = ""; lastColour = "";
             shadeCandidate = lockedShade = ""; shadeStableCount = 0; photoHintSaid = false;
-            declined.Clear(); shortlistAnswered = false; frontChecked = "";
+            declined.Clear(); shortlistAnswered = false; detailsAnswered = false; frontChecked = "";
             scanNumber++;
             ReadCounter.NewScan();
             fault = FrameQuality.Fault.None; blurrySkips = 0; differentSeen = 0; sinceProgress = 0f; stalledSaid = false; pausedFor = 0f;
@@ -1879,7 +1887,36 @@ namespace GlowUp.Scan
                 NotSure(msgNotSure);
                 return;
             }
+            // The name and the brand were read but neither the kind of make-up nor the shade: the result would be thin and the AI may have
+            // named the wrong product. Products of the inventory with a similar name and brand are offered for a fast, sure result.
+            if (!detailsAnswered && NameWithoutDetails())
+            {
+                detailsAnswered = true;
+                List<ScanShortlist.Entry> similar = ScanShortlist.Typed(ProductRepository.Index, identity.productName, identity.brandName)
+                    .FindAll(e => !declined.Contains(e.Key));
+                if (similar.Count > 0 && shortlist != null)
+                {
+                    OpenShortlist(similarTitle, similarMessage, similarNoneLabel, FinishAttempt, FinishAttempt, similar);
+                    return;
+                }
+                // nothing similar is saved: say so, and let the user scan again; Finish once more goes on with what was read
+                stage = cameraFeed != null && cameraFeed.IsPlaying ? Stage.Scanning : Stage.Idle;
+                if (holdButton != null) holdButton.Usable = true;
+                ShowButtons();
+                Say(msgNoSimilar);
+                return;
+            }
             Finish();
+        }
+
+        /// <summary>True when the scan has a product name and a brand from the camera or the AI, but no kind of make-up and no shade, and it is not a product of the inventory.</summary>
+        bool NameWithoutDetails()
+        {
+            if (knownProduct != null) return false;
+            if (identity.productName.Length == 0 || identity.brandName.Length == 0) return false;
+            if (identity.cosmeticType.Length > 0 || identity.shadeHex.Length > 0 || identity.shadeName.Length > 0) return false;
+            if (evidence.ShadeText.Length > 0 || evidence.ShadeHex.Length > 0 || lockedShade.Length > 0) return false;
+            return true;
         }
 
         bool HasPictures() { foreach (Kept kept in best) if (kept != null) return true; return false; }
