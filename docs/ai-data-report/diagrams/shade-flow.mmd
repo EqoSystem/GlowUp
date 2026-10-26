@@ -1,10 +1,12 @@
 flowchart TD
   A["Admin product form<br/>hex swatches (max 12)"] -->|"shades: ['#B5463F', ...]"| F[("products/{id}")]
-  F -->|"phone sync"| P["ProductData.shades"]
-  S["Scan: ScanZones.ShadeIn<br/>reads '12A' on the pack"] --> R["ScanRecord.shadeName = '12A'<br/>(shown as text)"]
-  P --> R2["ScanRecord.productShades"]
-  R -.->|"missing: code to hex<br/>(no code field)"| H["the hex of shade 12A"]
-  R2 --> AR["AR Try-On swatches:<br/>scan colour, product hexes,<br/>skin-tone suggestions"]
-  H -.-> AR
-  AR --> M["FallbackMakeupOverlay<br/>area, shade, strength, finish"]
-  M --> L["ArFaceMakeup:<br/>mask layers on the face mesh"]
+  A2["PROPOSED: a code box per swatch<br/>(not on the website yet)"] -.->|"shadeCodes: ['12A', ...]"| F
+  F -->|"phone sync"| P["ProductData.shades<br/>+ optional shadeCodes"]
+  S["Scan: ScanZones.ShadeIn<br/>reads '12A' on the pack"] --> R["ScanRecord.shadeName = '12A'"]
+  R --> SC{"ShadeCode.Find<br/>(this branch)"}
+  P --> SC
+  SC -->|"code found"| H["ScanRecord.shadeHex =<br/>the admin's hex for 12A"]
+  SC -->|"no codes / no match"| R2["product hexes offered,<br/>user taps one"]
+  H --> AR["AR Try-On starts on that shade"]
+  R2 --> AR
+  AR --> L["ArFaceMakeup: tint layers and<br/>moving gloss on the face mesh"]

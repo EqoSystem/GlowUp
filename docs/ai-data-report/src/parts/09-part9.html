@@ -22,7 +22,7 @@
     <tr><td>B1</td><td>Partly true</td><td>"When admins define a product correctly and set it Active, the phone recognises it from its own copy, offline. We have not yet measured the time on phones." (Section 18)</td></tr>
     <tr><td>B2</td><td>True</td><td>"We store web links, not files: Firebase Storage needs the paid Blaze plan, and links avoid copying brand photos. Only admins see them; the app does not use them." (Section 19)</td></tr>
     <tr><td>B3</td><td>Wrong as worded</td><td>"The app does not use catalogue photos for recognition, by design, to keep results fast and predictable on worn packs. The phone reads the barcode and printed name first; the AI sees one picture only when that fails." (Section 20)</td></tr>
-    <tr><td>B4</td><td>Partly true</td><td>"Admins enter each shade's colour as a hex code and AR shows it as a faithful reference, adapted to the user's light. The link from a printed shade code to its hex is being added." (Sections 21a-23)</td></tr>
+    <tr><td>B4</td><td>Partly true</td><td>"Admins enter each shade's colour as a hex code and AR shows it as a faithful reference, adapted to the user's light. The app can link a printed shade code to its hex once admins enter the codes; the website field for them is the next step." (Sections 21a-23)</td></tr>
     <tr><td>B5</td><td>True in substance; no "Manual mode" exists by that name</td><td>"When Assist with AI finds no source, the admin enters the data by hand from the packaging, and it stays Pending until reviewed." (Section 13)</td></tr>
     <tr><td>B6</td><td>True</td><td>"The catalogue is make-up only. For a user with a skin condition we suggest only make-up whose list has a source and whose every ingredient we know, with nothing flagged. We never say it is safe for their condition." (Section 6)</td></tr>
     <tr><td>B7</td><td>True</td><td>"We stay on Firestore; duplicates, slow look-ups and messy names are handled in the code; the live clean-up still has to be run and recorded." (Section 30)</td></tr>
@@ -30,7 +30,10 @@
 </table>
 <h3>Other findings to act on</h3>
 <ol class="checklist">
-  <li>Brow, Contour, Primer and Setting Spray products are sent to the Lips area in AR Try-On and in shade suggestions (<code>ShadeAdvisor.AreaFor</code> has no case for them). {V:Scripts/Scan/ShadeAdvisor.cs lines 53-61}</li>
+  <li>Brow, Contour, Primer and Setting Spray products were sent to the Lips area in AR Try-On and in shade suggestions (<code>ShadeAdvisor.AreaFor</code> had no case for them). <b>Fixed on the feature branch</b> (Brows, Cheeks, Face). {V:Scripts/Scan/ShadeAdvisor.cs AreaFor}</li>
+  <li>After an automatic pipeline change the live AR picture stayed transparent. <b>Fixed on the feature branch.</b> {V:Scripts/AR/ArFaceTrackingController.cs OnTierChanged}</li>
+  <li>Three older <code>HoldToScanTests</code> fail (tap toggling, "Aqua" vs "Water" naming, the Front zone). They fail without the AR changes too; the scan code or the tests need updating. {V:Editor/Tests/HoldToScanTests.cs lines 49, 346, 365 (from the test report)}</li>
+  <li>Shade codes: the website needs a code box per swatch and an import key before the app's code-to-hex link has any data. {N:website form field and import key for shade codes}</li>
   <li>Per-product caution notes (<code>ingredientNotes</code>) are not read by the app. {V:grep of Scripts/ for ingredientNotes: no hit}</li>
   <li>The phone calls Gemini with a key inside the app; move those calls behind the server function. {V:Scripts/Scan/ProductAiAdvisor.cs line 89}</li>
   <li>The rules accept app-added brands with category Skincare. {V:firestore.rules line 143}</li>

@@ -1,0 +1,76 @@
+<h1>35. What this branch changes in AR Try-On</h1>
+<p><b>In plain words.</b> The colour was already on the real face mesh. This branch makes it steadier and more lifelike, adds brows, lets the phone move back up to the richer mode when it can, and gives testers an on-screen panel. Nothing in the database or the website was changed.</p>
+<figure data-diagram="ar-pipeline"><figcaption>AR Try-On on this branch: from the camera to the drawn layers, and what each pipeline uses</figcaption></figure>
+<table data-caption="Changes on branch feature/unity-ar-face-mesh-tryon" class="compact">
+  <thead><tr><th style="width:24%">Change</th><th>What it does, and where</th></tr></thead>
+  <tbody>
+    <tr><td>Highlight follows the face</td><td>New shader <code>GlowUp/FaceMakeupGloss</code>: a Blinn-Phong highlight on the mesh normals with a soft light just above the screen. Glossy = small sharp spot (sharpness 90), satin = wide soft sheen (14), shimmer = sparkle cells that twinkle, metallic = highlight tinted by the shade; none on an open mouth. Full pipeline only. {V:Shaders/FaceMakeupGloss.shader; Scripts/AR/ArFaceMakeup.cs}</td></tr>
+    <tr><td>Steadier mesh</td><td><code>ArMeshSmoother</code>: One Euro filter on the 468 vertices, in face space (the head pose is not smoothed, so colour never trails the head). Still face: cut-off 1.5 Hz; fast mouth movement: cut-off rises with speed. No allocation per frame. Full pipeline. {V:Scripts/AR/ArMeshSmoother.cs; Scripts/AR/OneEuroFilter.cs}</td></tr>
+    <tr><td>Brows</td><td><code>ArBrowMask</code> makes a soft brow mask from the tracked face's own UVs (canonical brow points), once per face; the brow layer uses the same tint shader. New Brows tab, available only with live tracking; brow products now go to Brows. {V:Scripts/AR/ArBrowMask.cs; Scripts/AR/FaceMaskPainter.cs; Scripts/Scan/ShadeAdvisor.cs}</td></tr>
+    <tr><td>Tiers both ways</td><td>Frame times measured in 1.5 s windows the whole visit (average and 95th percentile). Down to Light below 20 fps or above 80 ms p95; after an automatic move down, one trial of Full per visit when Light has been steady (at its cap, p95 below 45 ms) for 20 s; kept after 3 good windows. User choices High / Light are never changed. {V:Scripts/Performance/ArTierPolicy.cs; Scripts/AR/ArAdaptiveQuality.cs}</td></tr>
+    <tr><td>Bug fixed</td><td>After a pipeline change the live picture was rebuilt but left transparent (dark screen). It is now shown again at once. {V:Scripts/AR/ArFaceTrackingController.cs OnTierChanged}</td></tr>
+    <tr><td>Debug overlay</td><td>Tier, trial, fps, average / p95 / worst ms, tracking state, smoothing, gloss mode, light, shade "code -&gt; hex", part and finish; "Next test shade" cycles 9 built-in test shades offline. Editor and development builds only; three fingers held 1 s to show or hide. {V:Scripts/AR/ArDebugOverlay.cs; Scripts/AR/ArTestShades.cs}</td></tr>
+    <tr><td>Shade code to hex</td><td>Section 21a. {V:Scripts/Scan/ShadeCode.cs}</td></tr>
+    <tr><td>Test build</td><td>Menu <i>GlowUp &gt; Build Test APK (development)</i> and <code>AndroidApkBuilder.BuildAndroidDebug</code> for batch mode; output <code>Builds/Android/GlowUp-AR-debug.apk</code>. {V:Editor/AndroidApkBuilder.cs; GlowUp/BUILD_AND_INSTALL.md}</td></tr>
+  </tbody>
+</table>
+
+<h1>36. Tiers and budgets</h1>
+<table data-caption="What each pipeline draws, and its budget" class="compact">
+  <thead><tr><th style="width:30%">Feature</th><th style="width:35%">Full (mid / high phones)</th><th>Light (low phones)</th></tr></thead>
+  <tbody>
+    <tr><td>Chosen by (Automatic)</td><td>RAM at least 5500 MB (mid range between 3800 and 5500 also Full by default)</td><td>RAM below 3800 MB, or moved down by the frame-time check</td></tr>
+    <tr><td>Picture height</td><td>1280 px</td><td>540 px</td></tr>
+    <tr><td>Colour layers drawn</td><td>All five parts</td><td>Only the part being tried</td></tr>
+    <tr><td>Highlight</td><td>Moving gloss (mesh normals), sparkle</td><td>Fixed highlight picture, twinkle</td></tr>
+    <tr><td>Mesh smoothing</td><td>On</td><td>Off</td></tr>
+    <tr><td>Light adaptation, mouth mask</td><td>On</td><td>Off</td></tr>
+    <tr><td>Brow mask, lost-face hold</td><td>On</td><td>On</td></tr>
+    <tr><td>Frame cap</td><td>The app's own (Settings)</td><td>30 fps</td></tr>
+    <tr><td>Budget</td><td>at least 20 fps average, p95 at most 80 ms (else moves down)</td><td>steady = at its cap with p95 below 45 ms</td></tr>
+  </tbody>
+</table>
+<p>{V:Scripts/AR/ArAdaptiveQuality.cs; Scripts/Performance/PerformanceProfile.cs}
+Face tracking itself runs at the selfie camera's rate (about 30 per second) on both; ARCore decides it, so a lower tracking rate with interpolation was not added. {I:ARCore delivers one face update per camera frame}</p>
+
+<h1>37. How the colour blends (the math, not a phone photo)</h1>
+<p>No phone or ARCore-capable emulator was available, so there are no screenshots of the try-on on a face. {N:before/after screenshots of AR Try-On on a phone}
+Instead, the table below applies the shader's own formula (the C# copy <code>ArColorMath.Tint</code>, tested) in linear light to bare lips of different depths. The lips' own light is kept, so the same lipstick looks deeper on deeper lips, as in real life; very light shades on very deep lips stop at double the brightness.</p>
+<table data-caption="Tint math on bare lips of six depths (computed with the shader's formula, full strength)" class="compact" id="tintdemo">
+  <thead><tr><th>Bare lips</th><th>T01 Classic red #B3202E</th><th>T03 Warm nude #B9786A</th><th>T04 Pale pink #F2A7B8</th><th>T02 Cool berry #7E2448</th></tr></thead>
+  <tbody></tbody>
+</table>
+<script>
+(function () {
+  const lin = (c) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const srgb = (c) => (c <= 0.0031308 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055);
+  const hex = (h) => [1, 3, 5].map((i) => lin(parseInt(h.substr(i, 2), 16) / 255));
+  const out = (rgb) => "#" + rgb.map((c) => Math.round(Math.min(1, Math.max(0, srgb(c))) * 255).toString(16).padStart(2, "0")).join("");
+  const skin = [0.72, 0.45, 0.45].map(lin);            // ArFaceMakeup lipsUnderneath (an sRGB colour)
+  const tint = (p, s) => p.map((v, i) => Math.min(1, v * 2 * Math.min(1, Math.max(0, 0.5 * s[i] / Math.max(skin[i], 0.08)))));
+  const lips = ["#E8A8A0", "#D98C86", "#B9706A", "#93524C", "#6E3C38", "#4A2826"];
+  const shades = ["#B3202E", "#B9786A", "#F2A7B8", "#7E2448"];
+  const sw = (c) => `<span style="display:inline-block;width:42px;height:18px;border-radius:4px;background:${c};vertical-align:middle"></span> <code>${c}</code>`;
+  document.querySelector("#tintdemo tbody").innerHTML = lips.map((l) => `<tr><td>${sw(l)}</td>${shades.map((s) => `<td>${sw(out(tint(hex(l), hex(s))))}</td>`).join("")}</tr>`).join("");
+})();
+</script>
+<p>{V:Scripts/AR/ArColorMath.cs; Shaders/FaceMakeupBlend.shader} The bare-lip colours are illustrative values, not measured from people.</p>
+<div class="box warn"><h4>Known limit: pale shades on deep lips</h4>
+<p>Look at the pale pink column: on the two deepest lips it stays brown. A real opaque pale lipstick covers dark lips; the tint blend can only multiply the picture (at most x2), so it behaves like a sheer balm. This is a fairness issue for users with deep lips and must be checked on real phones. Proposed fix (not built): a second, light pigment pass whose strength follows the product's <i>coverage</i> (proposed shade field, Section 24), mixing in at most about a third of the shade colour scaled by the lips' own brightness, so texture stays visible. It needs tuning on several skin tones, so it was not added without a phone.</p></div>
+
+<h1>38. Tests and evidence</h1>
+<ul>
+  <li><b>Automated:</b> 46 new EditMode tests (One Euro smoothing, tier policy, 95th percentile, shade codes, tint and gloss math, areas, brow suggestions, test shades), all passing; whole suite 271 of 274 in Unity batch mode on 26 October 2026. The 3 failures (<code>HoldToScanTests</code>) fail the same way on the branch without these changes (228 of 231), so they are older. {V:Editor/Tests/ArUpgradeTests.cs; batch test runs of 26 October 2026}</li>
+  <li><b>Build checks:</b> the AR scene was rebuilt by its builder in batch mode; an Edit-mode picture shows the five part tabs in one row. The APK result is in Section 39.</li>
+  <li><b>Not done (no device):</b> frame rate, p95 frame time, memory, CPU/GPU load, thermal behaviour, screenshots in bright / normal / dim light, several skin tones, mouth open, head turns, face lost and found, quick shade switching, permission denied, background and resume, 5-minute session. {N:AR fps / frame time measured on a phone} All must be run on real phones (one with 3-4 GB RAM, one with 6 GB or more, one without ARCore) using the debug overlay; <code>GlowUp/BUILD_AND_INSTALL.md</code> has the 10-step checklist.</li>
+  <li><b>Unproven assumptions:</b> ARCore's face mesh uses the same point numbering as MediaPipe's canonical mesh (the mouth mask already relied on it); every phone gives mesh normals (if not, the gloss falls back to the mask only).</li>
+</ul>
+
+<h1>39. APK, rollback and merge</h1>
+<p id="apk-result"><b>APK built</b> on 26 October 2026 in Unity batch mode (5.1 minutes): <code>GlowUp/Builds/Android/GlowUp-AR-debug.apk</code>, 212,378,863 bytes (about 203 MB, a development build with IL2CPP for ARMv7 and ARM64, ARCore libraries included), signed with Unity's debug key. It is not in Git (<code>GlowUp/Builds/</code> is ignored). It has not been installed on a phone yet. {V:batch build log of 26 October 2026; Editor/AndroidApkBuilder.cs BuildAndroidDebug}</p>
+<ul>
+  <li><b>Switch a feature off without code:</b> untick <i>Full Mesh Smoothing</i> or <i>Full Moving Highlight</i> or <i>Try Full Again</i> on <i>AR Quality Controller</i>; untick <i>Smooth</i> on <i>AR Mesh Smoother</i>; clear <i>Gloss Material</i> on <i>ArFaceMakeup</i> (the old fixed highlight comes back); remove <i>AR Brow Mask</i> from the controller (no brows). The guided preview path is unchanged.</li>
+  <li><b>Undo everything:</b> <code>git checkout scan-miss-flow</code> (the branch was never merged); to delete it: <code>git branch -D feature/unity-ar-face-mesh-tryon</code>.</li>
+  <li><b>Undo one change:</b> <code>git revert &lt;commit&gt;</code> on the branch.</li>
+  <li><b>Keep it:</b> <code>git checkout scan-miss-flow &amp;&amp; git merge --no-ff feature/unity-ar-face-mesh-tryon</code>, then rebuild the AR scene in the Editor (<i>GlowUp &gt; Build Scene</i>) if it was rebuilt again on the other branch.</li>
+</ul>

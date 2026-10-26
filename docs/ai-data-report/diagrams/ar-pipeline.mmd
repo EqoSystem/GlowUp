@@ -1,0 +1,16 @@
+flowchart TD
+  A["Front camera (ARCore)"] --> B["ARCameraBackground<br/>picture 1280 px (Full) / 540 px (Light)"]
+  A --> C["ARFaceManager: 468-point face mesh"]
+  C --> D["ArMeshSmoother: One Euro on vertices<br/>(Full)"]
+  C --> E["ArBrowMask: brow mask from UVs<br/>(once per face)"]
+  C --> F["ArMouthMask: inside of the mouth<br/>(Full)"]
+  B --> G["ArLightAdapter: skin hue, highlight gain<br/>(Full)"]
+  D --> H["ArFaceMakeup layers on the mesh"]
+  E --> H
+  F --> H
+  G --> H
+  H --> I["Tint layers: face, cheeks, eyes,<br/>lips, brows (FaceMakeupBlend)"]
+  H --> J{"Pipeline"}
+  J -->|Full| K["Moving gloss + sparkle<br/>(FaceMakeupGloss)"]
+  J -->|Light| L["Fixed highlight picture"]
+  M["ArAdaptiveQuality + ArTierPolicy<br/>frame-time windows"] -.->|"down / one trial up"| J

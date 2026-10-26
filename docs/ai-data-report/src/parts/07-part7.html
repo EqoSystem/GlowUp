@@ -12,7 +12,11 @@
     <tr><td>AR shows the colour</td><td class="ok">Built</td><td>AR offers, in order: the colour seen in the scan, then every catalogue hex of the product, then six shades recommended for the user's skin tone. {V:Scripts/AR/ArTryOnFlowController.cs lines 241-264}</td></tr>
   </tbody>
 </table>
-<p><b>Verdict on B4: partly true.</b> If admins enter hexes, AR Try-On shows those colours. But the code-to-hex link the team describes does not exist yet: the user still has to tap the right swatch, because the app does not know which hex belongs to the printed "12A".</p>
+<p><b>Verdict on B4: partly true.</b> If admins enter hexes, AR Try-On shows those colours. But the code-to-hex link the team describes did not exist: the user still had to tap the right swatch, because the app did not know which hex belongs to the printed "12A".</p>
+<div class="box gold"><h4>Added on branch feature/unity-ar-face-mesh-tryon (app side only)</h4>
+<p>The app now reads an <b>optional</b> product field <code>shadeCodes</code> (the codes as printed, in the same order as <code>shades</code>). When a scanned product is matched to a catalogue product that has codes, the code read on the pack picks the admin's hex, and AR Try-On starts on that colour. {V:Scripts/Scan/ShadeCode.cs; Scripts/Scan/ScanAnalysisPipeline.cs ApplyCatalogueProduct; Scripts/Data/ProductRepository.cs Read}
+Matching ignores capitals, spaces, dashes, "#", "No." and "Shade", tries the first word of a longer reading ("120 Classic Ivory"), and then evens out O/0, I/l/1, S/5, B/8, Z/2, but only when exactly one code fits. Tested by 16 unit tests. {V:Editor/Tests/ArUpgradeTests.cs}
+<b>Still missing:</b> the website has no box for the codes and the import has no key for them, so no product has codes yet. That is a schema change for the team to approve (proposed form: one code box next to each hex swatch; proposed rule: <code>shadeCodes</code> at most 12 texts of 20 characters, in <code>proposed.firestore.rules</code>). {N:website form field and import key for shade codes}</p></div>
 
 <h3>Matching a printed code: variants and camera mistakes</h3>
 <table data-caption="How shade-code variants compare with today's keys" class="compact">
@@ -73,4 +77,4 @@ Do not claim "the real colour of the product" or "exact colour".</p></div>
 </table>
 
 <h1>25. The shade data flow</h1>
-<figure data-diagram="shade-flow"><figcaption>Shade data from the admin form to the AR renderer (solid = built today, dashed = missing link)</figcaption></figure>
+<figure data-diagram="shade-flow"><figcaption>Shade data from the admin form to the AR renderer (dashed = proposed website field, not built)</figcaption></figure>
