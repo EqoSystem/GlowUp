@@ -59,6 +59,36 @@ export function hexOf(raw) {
     return /^#[0-9A-F]{6}$/.test(color) ? color : "";
 }
 
+/**
+ * A shade CODE as it is printed on a pack ("119", "N20", "12A", "02"): capitals, letters and digits with . - / and spaces, at most 16
+ * characters, or "" when there is none. A leading "#", "No." or "Shade" is dropped (the app ignores them too, see ShadeCode.cs).
+ * Make-up brands label shades with codes, never with colours, so the website keeps the code next to the colour (hexOf above never
+ * accepts "119" as a colour).
+ */
+export function shadeCodeOf(raw) {
+    const code = squeeze(raw).toUpperCase().replace(/^(?:SHADE\s+|NO\.\s*|NO\s+|#\s*)/, "").trim();
+    return NOTHING.has(code.toLowerCase()) || !/^[A-Z0-9][A-Z0-9 .\-\/]{0,15}$/.test(code) ? "" : code;
+}
+
+/**
+ * Shades as the website keeps them: colours ("#RRGGBB", in the order AR Try-On shows them) and, at the same place, the shade code
+ * printed on the pack ("" = not known). Something that is not a colour is dropped together with its code; a colour listed twice keeps
+ * its first place (and takes the second one's code when the first has none).
+ */
+export function pairShades(rawShades, rawCodes, most = 24) {
+    const shades = [], codes = [];
+    const list = Array.isArray(rawShades) ? rawShades : [], codeList = Array.isArray(rawCodes) ? rawCodes : [];
+    list.forEach((raw, index) => {
+        const hex = hexOf(raw);
+        if (!hex) return;
+        const code = shadeCodeOf(codeList[index]);
+        const at = shades.indexOf(hex);
+        if (at >= 0) { if (!codes[at]) codes[at] = code; return; }
+        if (shades.length < most) { shades.push(hex); codes.push(code); }
+    });
+    return { shades, codes };
+}
+
 /** The address of a brand's own home page ("https://host/"), or "". The page still asks an admin to confirm it. */
 function homePage(raw) {
     const url = httpsUrl(raw);

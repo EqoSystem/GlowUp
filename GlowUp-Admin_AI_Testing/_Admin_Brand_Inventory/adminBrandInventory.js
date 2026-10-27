@@ -13,6 +13,7 @@
 //                       minAge, status, scans, createdAt, updatedAt }
 //   - ingredients: the names printed on the packaging; the app checks each one against the user's profile
 //   - shades: colours as "#RRGGBB"; AR Try-On offers them for this product
+//   - shadeCodes: the shade code printed on the pack ("119", "N20") at the same place as its colour, "" = not known
 //   - "scans": the app adds 1 each time a scan is recognised as this product (its ingredient list matches)
 //   - the app only uses a product when its status AND its brand's status are "Active"
 //
@@ -45,7 +46,7 @@ import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
 import { readAdminDocument, AI_TEXT_CHARACTERS } from "../_Shared/adminDocumentReader.js";
-import { parseImportText } from "../_Shared/importFormat.js";
+import { parseImportText, pairShades, shadeCodeOf } from "../_Shared/importFormat.js";
 import { nearShade } from "../_Shared/listRules.js";
 import { mountIngredientPicker } from "../_Shared/adminIngredientPicker.js";
 import { openFacets } from "../_Shared/adminFacets.js";
@@ -96,6 +97,7 @@ let curatorKnown = false;
 let editingBrandId = null;
 let editingProductId = null;
 let formShades = [];                        // the shades being edited in the open product form
+let formShadeCodes = [];                    // the shade codes printed on the pack ("119", "N20"), at the same places as formShades ("" = not known)
 let assistedProductSources = [];
 let brandModal = null;
 let productModal = null;
@@ -419,6 +421,7 @@ async function loadInventory() {
         });
         everyProduct = productSnapshot.docs.map((d) => {
             const data = d.data();
+            const paired = pairShades(data.shades, data.shadeCodes);
             return Object.assign({
                 id: d.id,
                 name: data.name || data.productName || "",
@@ -427,7 +430,8 @@ async function loadInventory() {
                 cosmeticType: data.cosmeticType || data.category || "",
                 description: data.description || "",
                 ingredients: asArray(data.ingredients),
-                shades: asArray(data.shades).map(cleanShade).filter((s) => s !== null),
+                shades: paired.shades,
+                shadeCodes: paired.codes,
                 minAge: toWholeNumber(data.minAge),
                 status: normalizeStatus(data.status),
                 rawStatus: String(data.status || ""),
@@ -1346,9 +1350,11 @@ function brandRow(brand, productCount, columns) {
 function productRow(p, brand, flat) {
     const open = p.id === openId;
     const shadeCell = p.shades.length === 0 ? DASH
-        : p.shades.slice(0, 5).map((s) => `<span class="swatch" style="background:${escapeHtml(s)}" title="${escapeHtml(s)}"></span>`).join("") + (p.shades.length > 5 ? `<span class="muted small">+${p.shades.length - 5}</span>` : "");
+        : p.shades.slice(0, 5).map((s, at) => `<span class="swatch" style="background:${escapeHtml(s)}" title="${escapeHtml(((p.shadeCodes || [])[at] ? (p.shadeCodes[at] + " · ") : "") + s)}"></span>`).join("") + (p.shades.length > 5 ? `<span class="muted small">+${p.shades.length - 5}</span>` : "");
     const buttons = [];
-    if (p.needsReview && !isOut(p) && !isUnclear(p)) buttons.push(actionButton("row-btn approve", "approve-product", p.id, icon("check"), "Approve", "You have checked this product: set it to Active.", "It asks first. The app then uses it."));
+    const together = approvalFor(p, brand);
+    if (together) buttons.push(actionButton("row-btn approve", "approve-with-brand", p.id, icon("check"), together.label, together.tip, "It asks first. Both are saved together or not at all."));
+    else if (p.needsReview && !isOut(p) && !isUnclear(p)) buttons.push(actionButton("row-btn approve", "approve-product", p.id, icon("check"), "Approve", "You have checked this product: set it to Active.", "It asks first. The app then uses it."));
     buttons.push(actionButton("row-btn danger", "bin-product", p.id, BIN_ICON, "Recycle bin", "Remove this product.", "It goes to the Recycle bin and can be restored."));
 
     return `
@@ -1400,7 +1406,11 @@ function detailRow(p, brand, columns) {
         const rest = p.ingredients.length - SHOWN_INGREDIENTS;
         facts.push(["Ingredients", `<span class="muted">${p.ingredients.length} listed${missing.size > 0 ? ` · ${missing.size} not in the Ingredient Curator (amber)` : ""}</span><br>${chips}${rest > 0 ? `<span class="muted small">and ${rest} more</span>` : ""}`]);
     }
-    if (p.shades.length > 0) facts.push(["Shades", p.shades.map((s) => `<span class="swatch" style="background:${escapeHtml(s)}"></span><code class="small">${escapeHtml(s)}</code>`).join(" &nbsp;")]);
+    if (p.shades.length > 0) {
+        const coded = (p.shadeCodes || []).filter(Boolean).length;
+        facts.push(["Shades", p.shades.map((s, at) => `<span class="swatch" style="background:${escapeHtml(s)}"></span>${(p.shadeCodes || [])[at] ? `<strong class="small">${escapeHtml(p.shadeCodes[at])}</strong> ` : ""}<code class="small">${escapeHtml(s)}</code>`).join(" &nbsp;")
+            + (coded === 0 ? `<br><span class="chip warn" data-tip="Brands print a shade code on the pack (such as 119 or N20), not a colour. Press Edit and type the code next to each colour: the app then finds the colour from the code it reads on a scanned pack.">no shade codes</span>` : "")]);
+    }
     if (p.minAge > 0) facts.push(["Minimum age", `${p.minAge}+`]);
     if (p.description) facts.push(["Description", escapeHtml(p.description)]);
     if (p.folder) facts.push(["Folder", escapeHtml(p.folder)]);
@@ -1410,7 +1420,9 @@ function detailRow(p, brand, columns) {
     const button = (cls, act, iconHtml, label, tip) => `<button type="button" class="row-btn ${cls}" data-act="${act}" data-id="${escapeHtml(p.id)}" data-tip="${escapeHtml(tip)}">${iconHtml}${label}</button>`;
     const buttons = [button("main", "edit-product", icon("edit"), "Edit", "Change the name, brand, type, ingredients, shades or status.")];
     if (p.ingredients.length === 0 && !isOut(p)) buttons.push(button("", "assist-product", icon("sparkle"), "Assist with AI", "Search for a draft ingredient list, then check it against the product package."));
-    if (p.needsReview && scope === "makeup") buttons.push(button("approve", "approve-product", icon("check"), "Approve", "You have checked it: set it to Active."));
+    const together = approvalFor(p, brand);
+    if (together) buttons.push(button("approve", "approve-with-brand", icon("check"), together.label, together.tip));
+    else if (p.needsReview && scope === "makeup") buttons.push(button("approve", "approve-product", icon("check"), "Approve", "You have checked it: set it to Active."));
     buttons.push(button("", "folder-product", icon("folder"), "Folder", "Put it in a folder, or take it out."));
     buttons.push(`<span class="spacer"></span>`, button("danger", "bin-product", BIN_ICON, "Recycle bin", "Remove it. It can be restored from the Recycle bin."));
 
@@ -2059,6 +2071,7 @@ function openProductForm(product, brandId) {
     el("productMinAgeInput").value = product && product.minAge > 0 ? product.minAge : "";
     el("productStatusInput").value = product && STATUSES.includes(product.status) ? product.status : "Active";
     formShades = product ? product.shades.slice() : [];
+    formShadeCodes = product ? formShades.map((_, at) => (product.shadeCodes || [])[at] || "") : [];
     shadeAdding = false; shadeMessage = "";
 
     showOtherTypeBox();
@@ -2125,7 +2138,7 @@ function exportProductsCsv() {
     const newest = listed().slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
     const columns = [
         { title: "Brand", value: (p) => p.brandName }, { title: "Product", value: (p) => p.name }, { title: "Kind", value: (p) => p.cosmeticType },
-        { title: "Shades", value: (p) => p.shades }, { title: "Minimum age", value: (p) => p.minAge }, { title: "Status", value: (p) => p.status },
+        { title: "Shades", value: (p) => p.shades }, { title: "Shade codes", value: (p) => p.shadeCodes || [] }, { title: "Minimum age", value: (p) => p.minAge }, { title: "Status", value: (p) => p.status },
         { title: "Scans", value: (p) => p.scans }, { title: "Ingredients", value: (p) => p.ingredients },
         { title: "FDA registration number", value: (p) => p.fdaNumber }, { title: "FDA link", value: (p) => fdaLinkOf(p.sources) }, { title: "Photo link", value: (p) => p.imageUrl }
     ];
@@ -2191,8 +2204,10 @@ const fdaLinkOf = (sources) => {
 };
 
 // ----- shades -----
-// Each shade is "#RRGGBB" (the app and AR Try-On read them in this order). The admin adds one by typing a hex code or
-// picking a colour (nothing is added by itself), edits one by its picker or its code, moves it earlier or later, or removes it.
+// Each shade is "#RRGGBB" (the app and AR Try-On read them in this order) and may have its SHADE CODE, the number or letters the brand
+// prints on the pack ("119", "N20", "12A"). The app reads that code from the pack and finds the colour with it. The admin adds one by
+// typing a hex code or picking a colour (nothing is added by itself), edits one by its picker, its hex or its code, moves it earlier or
+// later (the code goes with it), or removes it.
 let shadeAdding = false, shadeMessage = "", shadeDraft = "#C24B62", shadeNearOk = "";
 
 function renderShadeEditor() {
@@ -2201,6 +2216,7 @@ function renderShadeEditor() {
         <span class="shade-item" data-index="${index}">
             <label class="shade-swatch" style="${swatch(shade)}" title="Pick a colour"><input type="color" class="shade-picker" value="${escapeHtml(shade.toLowerCase())}" data-index="${index}" aria-label="Pick the colour of shade ${index + 1}"></label>
             <input type="text" class="shade-hex" value="${escapeHtml(shade)}" maxlength="22" spellcheck="false" autocomplete="off" data-index="${index}" aria-label="Hex code of shade ${index + 1}">
+            <input type="text" class="shade-code" value="${escapeHtml(formShadeCodes[index] || "")}" maxlength="16" spellcheck="false" autocomplete="off" placeholder="Code" data-index="${index}" title="The shade code printed on the pack, such as 119 or N20" aria-label="Shade code of shade ${index + 1}, as printed on the pack">
             <button type="button" data-move="-1" data-index="${index}" title="Move earlier" aria-label="Move shade ${index + 1} earlier"${index === 0 ? " disabled" : ""}>‹</button>
             <button type="button" data-move="1" data-index="${index}" title="Move later" aria-label="Move shade ${index + 1} later"${index === formShades.length - 1 ? " disabled" : ""}>›</button>
             <button type="button" data-remove="${index}" title="Remove this shade" aria-label="Remove shade ${index + 1}">×</button>
@@ -2210,6 +2226,7 @@ function renderShadeEditor() {
         tail = `<span class="shade-item shade-new">
             <label class="shade-swatch" style="${swatch(shadeDraft)}" title="Pick a colour"><input type="color" class="shade-picker" id="newShadePicker" value="${escapeHtml(shadeDraft.toLowerCase())}" aria-label="Pick a colour for the new shade"></label>
             <input type="text" class="shade-hex" id="newShadeHex" value="${escapeHtml(shadeDraft)}" maxlength="22" spellcheck="false" autocomplete="off" placeholder="#C24B62" aria-label="Hex code of the new shade">
+            <input type="text" class="shade-code" id="newShadeCode" value="" maxlength="16" spellcheck="false" autocomplete="off" placeholder="Code" title="The shade code printed on the pack, such as 119 or N20" aria-label="Shade code of the new shade, as printed on the pack">
             <button type="button" class="row-btn" id="confirmShadeBtn">Add</button>
             <button type="button" id="cancelShadeBtn" title="Cancel" aria-label="Cancel adding a shade">×</button>
         </span>`;
@@ -2220,9 +2237,12 @@ function renderShadeEditor() {
 }
 
 function addShadeFromDraft() {
-    const field = el("newShadeHex");
+    const field = el("newShadeHex"), codeField = el("newShadeCode");
     const shade = cleanShade(field ? field.value : "");
-    if (shade === null) { shadeMessage = "Type a colour such as #C24B62, or pick one with the colour box."; renderShadeEditor(); return; }
+    const typedCode = codeField ? codeField.value.trim() : "", code = shadeCodeOf(typedCode);
+    if (shade === null) { shadeMessage = "Type a colour such as #C24B62, or pick one with the colour box. A shade number such as 119 goes in the Code box."; renderShadeEditor(); return; }
+    if (typedCode && !code) { shadeMessage = "That is not a shade code. Use the letters and digits printed on the pack, such as 119 or N20."; renderShadeEditor(); return; }
+    if (code && formShadeCodes.some((other) => other === code)) { shadeMessage = "Code " + code + " belongs to another shade of this product already."; renderShadeEditor(); return; }
     if (formShades.includes(shade)) { shadeMessage = shade + " is in the list already."; renderShadeEditor(); return; }
     if (formShades.length >= MAX_SHADES) return;
     // a colour that is almost one already in the list: said once, and the same colour again means "add anyway"
@@ -2230,6 +2250,7 @@ function addShadeFromDraft() {
     if (near && shadeNearOk !== shade) { shadeNearOk = shade; shadeMessage = shade + " looks almost like " + near + ", which is in the list. Press Add again to add it anyway."; renderShadeEditor(); return; }
     shadeNearOk = "";
     formShades.push(shade);
+    formShadeCodes.push(code);
     shadeDraft = shade;
     shadeMessage = "";
     shadeAdding = formShades.length < MAX_SHADES;
@@ -2244,11 +2265,12 @@ function onShadeClick(event) {
     if (button.id === "addShadeBtn") { shadeAdding = true; shadeMessage = ""; renderShadeEditor(); const field = el("newShadeHex"); if (field) field.select(); return; }
     if (button.id === "confirmShadeBtn") { addShadeFromDraft(); return; }
     if (button.id === "cancelShadeBtn") { shadeAdding = false; shadeMessage = ""; renderShadeEditor(); return; }
-    if (button.hasAttribute("data-remove")) formShades.splice(Number(button.getAttribute("data-remove")), 1);
+    if (button.hasAttribute("data-remove")) { const at = Number(button.getAttribute("data-remove")); formShades.splice(at, 1); formShadeCodes.splice(at, 1); }
     else if (button.hasAttribute("data-move")) {
         const from = Number(button.getAttribute("data-index")), to = from + Number(button.getAttribute("data-move"));
         if (to < 0 || to >= formShades.length) return;
         formShades.splice(to, 0, formShades.splice(from, 1)[0]);
+        formShadeCodes.splice(to, 0, formShadeCodes.splice(from, 1)[0] || "");
     } else return;
     shadeMessage = "";
     renderShadeEditor();
@@ -2278,6 +2300,7 @@ function onShadeInput(event) {
 /** A code typed into an existing shade: kept when it is a colour, put back (with a note) when it is not. */
 function onShadeChange(event) {
     const input = event.target;
+    if (input.classList.contains("shade-code") && input.id !== "newShadeCode") { onShadeCodeChange(input); return; }
     if (!input.classList.contains("shade-hex") || input.id === "newShadeHex") return;
     const index = Number(input.getAttribute("data-index"));
     if (!(index >= 0 && index < formShades.length)) return;
@@ -2288,10 +2311,21 @@ function onShadeChange(event) {
     renderShadeEditor();
 }
 
+/** A shade code typed into an existing shade: kept when it is a code (or empty), put back with a note when it is not or another shade has it. */
+function onShadeCodeChange(input) {
+    const index = Number(input.getAttribute("data-index"));
+    if (!(index >= 0 && index < formShades.length)) return;
+    const typed = input.value.trim(), code = shadeCodeOf(typed);
+    if (typed && !code) shadeMessage = "That is not a shade code. Use the letters and digits printed on the pack, such as 119 or N20.";
+    else if (code && formShadeCodes.some((other, at) => at !== index && other === code)) shadeMessage = "Code " + code + " belongs to another shade of this product already.";
+    else { formShadeCodes[index] = code; shadeMessage = ""; }
+    renderShadeEditor();
+}
+
 function onShadeKey(event) {
-    if (event.key !== "Enter" || !event.target.classList.contains("shade-hex")) return;
+    if (event.key !== "Enter" || !(event.target.classList.contains("shade-hex") || event.target.classList.contains("shade-code"))) return;
     event.preventDefault();
-    if (event.target.id === "newShadeHex") addShadeFromDraft(); else event.target.blur();
+    if (event.target.id === "newShadeHex" || event.target.id === "newShadeCode") addShadeFromDraft(); else event.target.blur();
 }
 
 // ----- saving -----
@@ -2310,7 +2344,7 @@ async function saveProduct(event) {
     const minAgeText = el("productMinAgeInput").value.trim();
     const minAge = toWholeNumber(minAgeText);
     const status = el("productStatusInput").value;
-    const shades = Array.from(new Set(formShades.map(cleanShade).filter((s) => s !== null)));
+    const { shades, codes: shadeCodes } = pairShades(formShades, formShadeCodes, MAX_SHADES);
     const imageUrl = cleanLink(el("productImageInput").value), fdaNumber = cleanFdaNumber(el("productFdaInput").value);
 
     if (imageUrl === null) { setFormError(form, "The photo link must be a web address that starts with https://"); el("productImageInput").focus(); return; }
@@ -2333,6 +2367,8 @@ async function saveProduct(event) {
     const data = {
         name, brandId: brand.id, brandName: brand.name, cosmeticType, description,
         ingredients, shades, minAge, status, imageUrl, fdaNumber,
+        // the codes printed on the pack, at the same places as the shades: the app reads a code on a scanned pack and finds the colour (ShadeCode.cs)
+        shadeCodes: shadeCodes.some(Boolean) ? shadeCodes : [],
         // light summaries kept on the product so that nothing needs a join: the links to the library, how many, and the words a filter uses
         ingredientIds: Array.from(new Set(ingredients.map(libraryIdOf).filter(Boolean))),
         ingredientCount: ingredients.length,
@@ -2428,6 +2464,50 @@ async function approveProduct(product, button) {
     }
 }
 
+/**
+ * What the one-button approval of a product row can do: approve the product AND its brand, or only the brand of a product that is
+ * Active already. The app uses a product only while its brand is Active too, so a product whose brand still waits stays invisible
+ * ("Approved · Hidden (brand pending)"): the app then says the product is not in the catalogue, ingredient list or not. null = nothing
+ * to offer (the plain Approve button, or no button).
+ */
+function approvalFor(p, brand) {
+    if (!brand || isOut(p) || isUnclear(p) || brandOut(brand) || brand.status !== "Pending") return null;
+    if (p.needsReview) return { product: true, brand: true, label: "Approve with brand", tip: `You have checked this product and its brand "${brand.name}": set both to Active.` };
+    if (p.status === "Active") return { product: false, brand: true, label: "Approve brand", tip: `The product is approved but its brand "${brand.name}" is not, so the app hides the product. Approve the brand.` };
+    return null;
+}
+
+/** The product and its brand become Active together (one write: both or none). */
+async function approveWithBrand(product, button) {
+    const brand = brands.find((b) => b.id === product.brandId);
+    const plan = brand ? approvalFor(product, brand) : null;
+    if (!plan) { notify(`"${product.name}" has nothing waiting to be approved together with its brand.`, "info"); return; }
+    if (plan.product && product.ingredients.length === 0) { notify(`"${product.name}" has no ingredient list, so the app cannot check it. Open it with Edit and paste the list.`, "error"); return; }
+
+    const unknown = plan.product ? notCurated(product.ingredients).length : 0;
+    const question = plan.product
+        ? `Approve "${product.name}" and its brand "${brand.name}"?\n\nBoth become Active: the app can then find the product, with its ingredient list, when a user scans it. Check the name, the kind and the ingredient list first.`
+          + (unknown > 0 ? `\n\n${many(unknown, "ingredient is", "ingredients are")} not in the Ingredient Curator yet. They stay as they are: the app shows the list and tells the user that there is no information about them yet.` : "")
+        : `Approve the brand "${brand.name}"?\n\nIt becomes Active: the app can then find "${product.name}" when a user scans it.`;
+    if (!(await sure(question, plan.product ? "Approve both" : "Approve brand", false))) return;
+
+    button.disabled = true;
+    const ops = [];
+    if (plan.product) ops.push({ ref: doc(db, "products", product.id), data: approval() });
+    ops.push({ ref: doc(db, "brands", brand.id), data: approval() });
+    try {
+        await runBatches(ops);
+        if (plan.product) Object.assign(product, { status: "Active", rawStatus: "Active", reviewed: true, needsReview: false });
+        Object.assign(brand, { status: "Active", rawStatus: "Active", reviewed: true, needsReview: false });
+        afterChange();
+        notify(plan.product ? "Product and brand approved." : "Brand approved.", "ok");
+    } catch (error) {
+        console.error("Error approving product and brand: ", error);
+        notify("Nothing was approved. " + describeError(error), "error");
+        button.disabled = false;
+    }
+}
+
 // ---------------------------------------------------------------------------------------------
 // Clicks in the table
 // ---------------------------------------------------------------------------------------------
@@ -2458,6 +2538,7 @@ function onTableClick(event) {
     else if (act === "edit-brand" && brand) openBrandForm(brand);
     else if (act === "bin-brand" && brand) org.toBin(["b:" + brand.id]);
     else if (act === "approve-product" && product) approveProduct(product, button);
+    else if (act === "approve-with-brand" && product) approveWithBrand(product, button);
     else if (act === "edit-product" && product) openProductForm(product, null);
     else if (act === "assist-product" && product) { openProductForm(product, null); assistProductIngredients(); }
     else if (act === "folder-product" && product) org.chooseFolder(button, ["p:" + product.id]);

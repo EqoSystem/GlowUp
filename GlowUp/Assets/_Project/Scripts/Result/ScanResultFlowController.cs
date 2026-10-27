@@ -47,6 +47,12 @@ namespace GlowUp.Result
         [Tooltip("The pattern chip. Hidden when the app runs and copied once per highlighted ingredient.")]
         [SerializeField] private IngredientChipView chipTemplate;
         [SerializeField] private int maximumChips = 8;
+        [Tooltip("Under the chips: a reminder, shown only when some ingredients have no reviewed information yet (a product's list is shown whole even then)")]
+        [SerializeField] private TextMeshProUGUI noInfoText;
+        [Tooltip("{0} = how many ingredients have no information, {1} = how many the list has")]
+        [TextArea] [SerializeField] private string noInfoSomeWords = "{0} of the {1} ingredients show \"Not checked\": GlowUp has no reviewed information or trusted source for them yet. The list itself comes from the product. Their entries are still waiting for review, so they count neither for nor against this result.";
+        [Tooltip("{0} = how many ingredients the list has (none of them has information)")]
+        [TextArea] [SerializeField] private string noInfoAllWords = "None of the {0} ingredients has reviewed information in GlowUp yet, so all show \"Not checked\". The list itself comes from the product. Their entries are still waiting for review, so this result is not a safety verdict: check the label, or ask a dermatologist.";
         [SerializeField] private Button allIngredientsButton;
         [SerializeField] private TextMeshProUGUI allIngredientsLabel;
         [Tooltip("{0} = number of ingredients")]
@@ -286,6 +292,7 @@ namespace GlowUp.Result
             if (age != null) age.Bind(record.ageMatch);
 
             ShowChips();
+            if (noInfoText != null) { string reminder = NoInfoLine(); noInfoText.gameObject.SetActive(reminder.Length > 0); noInfoText.text = reminder; }
             ShowIngredientBreakdown();
             ShowProof();
             ShowShades();
@@ -334,6 +341,20 @@ namespace GlowUp.Result
                 chip.Clicked += name => { if (ingredientSheet != null) ingredientSheet.Show(record, name); };
                 chips.Add(chip.gameObject);
             }
+        }
+
+        /// <summary>
+        /// Why some ingredients of the list show "Not checked": GlowUp has no reviewed information or source for them yet. "" when every
+        /// ingredient has a level. The list is never cut down to the known ingredients: an admin's list is shown whole.
+        /// </summary>
+        string NoInfoLine()
+        {
+            List<IngredientFinding> findings = record != null ? record.findings : null;
+            if (findings == null || findings.Count == 0) return "";
+            int unknown = 0;
+            foreach (IngredientFinding f in findings) if (f != null && (string.IsNullOrEmpty(f.level) || f.level == "unknown")) unknown++;
+            if (unknown == 0) return "";
+            return unknown == findings.Count ? string.Format(noInfoAllWords, findings.Count) : string.Format(noInfoSomeWords, unknown, findings.Count);
         }
 
         void ShowIngredientBreakdown()
@@ -520,6 +541,7 @@ namespace GlowUp.Result
             string text = ExplanationForDisplay(record.explanation);
             var extra = new List<string>();
             if (fdaBadge == null && !string.IsNullOrWhiteSpace(record.fdaLine)) extra.Add("<b>FDA Philippines</b>\n" + record.fdaLine);
+            if (noInfoText == null && NoInfoLine().Length > 0) extra.Add("<b>Ingredients with no information yet</b>\n" + NoInfoLine());
             if (listSourceText == null && ListFrom(record) == "web")
             {
                 var pages = new List<string>();

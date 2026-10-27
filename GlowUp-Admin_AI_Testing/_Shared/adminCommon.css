@@ -1232,6 +1232,7 @@ button.tile.small { width: auto; }
 .shade-swatch { position: relative; flex: none; width: 26px; height: 26px; border-radius: 50%; overflow: hidden; border: 1px solid var(--border); cursor: pointer; }
 .shade-item .shade-picker { position: absolute; inset: -6px; width: 40px; height: 40px; opacity: 0; cursor: pointer; border: 0; padding: 0; }
 .shade-item .shade-hex { width: 92px; padding: 4px 6px; font: 12px/1.2 ui-monospace, Consolas, monospace; border-radius: 8px; }
+.shade-item .shade-code { width: 72px; padding: 4px 6px; font: 12px/1.2 ui-monospace, Consolas, monospace; border-radius: 8px; text-transform: uppercase; }
 .shade-item button:disabled { opacity: .3; cursor: default; }
 .shade-item.shade-new { border-style: dashed; border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
 .shade-msg { flex-basis: 100%; color: var(--bad); }

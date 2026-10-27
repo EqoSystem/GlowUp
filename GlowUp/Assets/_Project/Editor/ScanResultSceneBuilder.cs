@@ -156,6 +156,12 @@ namespace GlowUp.EditorTools
             A.Set(chipView, "safeIcon", IconFactory.Check); A.Set(chipView, "cautionIcon", IconFactory.Warning);
             A.Set(chipView, "harmfulIcon", IconFactory.Close); A.Set(chipView, "unknownIcon", IconFactory.Info);
 
+            // a reminder why some chips say "Not checked": no reviewed information for those ingredients yet (shown only when that is so)
+            TextMeshProUGUI noInfo = A.Label(ingredients.transform, "NoInfoText",
+                "2 of the 12 ingredients show \"Not checked\": GlowUp has no reviewed information or trusted source for them yet. The list itself comes from the product. Their entries are still waiting for review, so they count neither for nor against this result.",
+                SmallSize, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            noInfo.gameObject.SetActive(false);                                  // the controller shows it when a result needs it; tick it active to see and restyle it
+
             Button allIngredients = A.PillButton(ingredients.transform, "AllIngredientsButton", "See all ingredients", ButtonSize, ThemeRole.InputBackground, ThemeRole.MainText, IconFactory.ListIcon);
             A.Size(allIngredients, -1, Tap);
             A.Outline(allIngredients.transform, ThemeRole.Accent, Tap);
@@ -297,6 +303,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "fdaBadge", fdaBadge); A.Set(controller, "fdaVerificationButton", fdaVerification);
             A.Set(controller, "pendingBadge", pendingBadge); A.Set(controller, "pendingBadgeText", pendingTitle); A.Set(controller, "pendingDetailText", pendingDetail);
             A.Set(controller, "listSourceText", listSource); A.Set(controller, "listCheckText", listCheck);
+            A.Set(controller, "noInfoText", noInfo);
             A.Set(controller, "sourceLinksContent", links.transform); A.Set(controller, "sourceLinkTemplate", linkTemplate);
             A.Set(controller, "sourceGuideText", sourceGuide);
             A.Set(controller, "shadeCard", shade); Kit.SetArray(controller, "shadeSwatches", swatches); A.Set(controller, "shadeCaption", shadeCaption);

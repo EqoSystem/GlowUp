@@ -425,10 +425,12 @@ namespace GlowUp.EditorTools
             A.TopStrip(snapStatus.transform, 232, 150, 48, 48);
             A.ShrinkWrapped(snapStatus, 20);
             Button snapCancel = A.PillButton(snap.box, "CancelButton", "Not now", 34, ThemeRole.SurfaceAlt, ThemeRole.MainText);
-            A.BottomStrip(snapCancel.transform, 44, 112, 48, 512);
+            A.BottomStrip(snapCancel.transform, 44, 112, 48, 642);
             A.Outline(snapCancel.transform, ThemeRole.Accent, 112f);
-            Button snapTake = A.PillButton(snap.box, "TakePhotoButton", "Take photo", 34, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.CameraIcon);
-            A.BottomStrip(snapTake.transform, 44, 112, 512, 48);
+            // "Take a photo of the product" needs the wider button; the label gets smaller instead of running over the icon
+            Button snapTake = A.PillButton(snap.box, "TakePhotoButton", "Take a photo of the product", 32, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.CameraIcon);
+            A.Shrink(A.LabelOf(snapTake), 22);
+            A.BottomStrip(snapTake.transform, 44, 112, 322, 48);
             // the spinner turns at the right end of the button while the AI reads the photo (inactive until then)
             Image snapSpinner = A.Icon(snapTake.transform, "Spinner", IconFactory.Sync, 40, ThemeRole.ButtonText);
             A.At(snapSpinner.transform, A.MR, new Vector2(-34, 0), new Vector2(40, 40));

@@ -127,6 +127,13 @@ namespace GlowUp.Scan
             Upgrade(ref msgPrompt, "Product not in catalog yet! Tap to take a quick photo for live AI analysis.", "This product was not found in the catalogue.");
             Upgrade(ref idleLabel, "Take photo", "Take a photo of the product");
             Upgrade(ref msgNoAi, "The AI is not set up on this phone, so the photo cannot be read. Type the product in instead.", "Photo reading is not set up yet. Type the product in by hand.");
+            // a scene built before the wider button holds this long label in a narrow one: it gets smaller instead of running over the icon
+            if (takePhotoLabel != null && !takePhotoLabel.enableAutoSizing)
+            {
+                takePhotoLabel.enableWordWrapping = false; takePhotoLabel.enableAutoSizing = true;
+                takePhotoLabel.fontSizeMax = takePhotoLabel.fontSize; takePhotoLabel.fontSizeMin = 18f;
+                takePhotoLabel.overflowMode = TextOverflowModes.Ellipsis;
+            }
             if (takePhotoButton != null) takePhotoButton.onClick.AddListener(Take);
             if (cancelButton != null) cancelButton.onClick.AddListener(Close);
             if (spinner != null) spinner.gameObject.SetActive(false);

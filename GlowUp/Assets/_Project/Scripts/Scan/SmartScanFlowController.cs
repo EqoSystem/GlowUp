@@ -157,6 +157,8 @@ namespace GlowUp.Scan
         [SerializeField] private ScanFocusAssistant focusAssistant;
         [Tooltip("The corner marks that show the block of text the tracer follows (TextTraceView). Optional.")]
         [SerializeField] private TextTraceView textTrace;
+        [Tooltip("On = the product is told apart from its surroundings by where the words stand: only the words on the product (the group of lines that holds the brand, or a make-up kind, nearest the middle) are used and outlined, and a box is drawn round the product. Off = every word in the frame counts.")]
+        [SerializeField] private bool detectProduct = true;
         [Tooltip("On = when the letters of the text in view are small, every other picture the text reader gets is a CLOSE LOOK: only that block of text, enlarged. Off = every picture is the whole frame.")]
         [SerializeField] private bool closeLooksAtSmallPrint = true;
         [Tooltip("Letters lower than this many camera pixels count as small print")]
@@ -759,7 +761,12 @@ namespace GlowUp.Scan
             // a close look showed one part of the frame: its places become places of the frame, like every other reading's
             bool closeLook = sentCloseLook;
             if (closeLook) TextTracer.ToFrame(reading, sentPart);
-            reading = ScanEvidence.PrimaryLabelOnly(reading);
+            // PRODUCT DETECTION: only the words that stand on the product are used, not a keyboard's or a laptop badge's in the same picture
+            // (a close look is one block of the product already)
+            ProductRegion.Result onProduct = new ProductRegion.Result { reading = reading };
+            if (detectProduct && !closeLook)
+                onProduct = ProductRegion.Find(reading, frameHigh > 0 ? (float)frameWide / frameHigh : 0f, words => FindBrand(words) != null, ScanEvidence.UsableLine);
+            reading = ScanEvidence.PrimaryLabelOnly(onProduct.reading);
             tracer.Take(reading, framePixelsHigh, closeLook);
             ShowTrace();
             readLines = 0; readSure = 0f;
@@ -767,7 +774,13 @@ namespace GlowUp.Scan
                 if (line != null && line.confidence >= ScanEvidence.UsableLine && !string.IsNullOrWhiteSpace(line.text)) { readLines++; readSure += line.confidence; }
             if (readLines > 0) readSure /= readLines;
             ShowReadout();
-            if (textOutlines != null) textOutlines.Show(FrameReader.BoxesOf(reading, ScanEvidence.UsableLine));
+            if (textOutlines != null)
+            {
+                // the outline of each line on the product, and one box round the whole product
+                var shown = new List<Rect>(FrameReader.BoxesOf(reading, ScanEvidence.UsableLine));
+                if (onProduct.found) shown.Add(onProduct.box);
+                textOutlines.Show(shown.ToArray());
+            }
             string text = reading.Text(ScanEvidence.UsableLine);
 
             // ---- what the app's own lists know from the primary label (works offline)
@@ -1056,6 +1069,8 @@ namespace GlowUp.Scan
                 foreach (string type in ProductScope.MakeupTypes)
                     candidate = Regex.Replace(candidate, @"\b" + Regex.Escape(type) + @"\b", " ", RegexOptions.IgnoreCase);
                 candidate = Regex.Replace(candidate, @"\b(new|improved|shade|color|colour|cosmetic|beauty|spf|uva|uvb)\b", " ", RegexOptions.IgnoreCase);
+                // a wear claim ("up to 30h", "24 hr") is not a name, however long the line is
+                candidate = Regex.Replace(candidate, @"\b(?:up\s*to\s*)?\d+\s*(?:h|hr|hrs|hour|hours)\b", " ", RegexOptions.IgnoreCase);
                 candidate = Regex.Replace(candidate, @"\s+", " ").Trim(' ', '-', ':', ',', '|');
                 if (candidate.Length < 3 || candidate.Length > 80 || IngredientStoplist.SmallPrintHit(candidate) != null
                     || IngredientStoplist.WrongShape(candidate)) continue;
@@ -1321,35 +1336,50 @@ namespace GlowUp.Scan
         /// <summary>True when a brand the app knows stands in the text. The first one found is taken over when no brand is known yet.</summary>
         bool BrandIn(string text)
         {
-            if (string.IsNullOrWhiteSpace(text)) return false;
+            BrandData brand = FindBrand(text);
+            if (brand == null) return false;
+            if (identity.brandName.Length == 0) identity.brandName = brand.name.Trim();
+            return true;
+        }
+
+        /// <summary>
+        /// The brand the app knows that stands in the text, or null (nothing is changed). A name written out in the text wins over a
+        /// name read with small mistakes, and of several written-out names the longest wins ("Maybelline New York" over "New York").
+        /// </summary>
+        BrandData FindBrand(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return null;
             string seen = " " + TextKey.Normalize(text) + " ";
-            string[] lines = text.Split('\n');
+            BrandData exact = null; int exactLength = 0;
             foreach (BrandData brand in brands)
             {
                 string name = TextKey.Normalize(brand != null ? brand.name : "");
                 if (name.Length < 3) continue;
-                bool found = seen.Contains(" " + name + " ");
-                if (!found && brand.aliases != null)
+                int length = seen.Contains(" " + name + " ") ? name.Length : 0;
+                if (brand.aliases != null)
                     foreach (string alias in brand.aliases)
                     {
                         string key = TextKey.Normalize(alias);
-                        if (key.Length >= 3 && seen.Contains(" " + key + " ")) { found = true; break; }
+                        if (key.Length >= 3 && key.Length > length && seen.Contains(" " + key + " ")) length = key.Length;
                     }
-                if (!found)
-                    foreach (string line in lines)
-                    {
-                        if (string.IsNullOrWhiteSpace(line)) continue;
-                        if (ProductIndex.BrandsAgree(line, brand.name)) { found = true; break; }
-                        if (brand.aliases != null)
-                            foreach (string alias in brand.aliases)
-                                if (ProductIndex.BrandsAgree(line, alias)) { found = true; break; }
-                        if (found) break;
-                    }
-                if (!found) continue;
-                if (identity.brandName.Length == 0) identity.brandName = brand.name.Trim();
-                return true;
+                if (length > exactLength) { exact = brand; exactLength = length; }
             }
-            return false;
+            if (exact != null) return exact;
+
+            string[] lines = text.Split('\n');
+            foreach (BrandData brand in brands)
+            {
+                if (TextKey.Normalize(brand != null ? brand.name : "").Length < 3) continue;
+                foreach (string line in lines)
+                {
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    if (ProductIndex.BrandsAgree(line, brand.name)) return brand;
+                    if (brand.aliases != null)
+                        foreach (string alias in brand.aliases)
+                            if (ProductIndex.BrandsAgree(line, alias)) return brand;
+                }
+            }
+            return null;
         }
 
         /// <summary>The lines of a text, each once (the front of a pack is read many times while it is held up).</summary>

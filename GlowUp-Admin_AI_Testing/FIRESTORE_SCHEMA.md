@@ -49,6 +49,7 @@ The admin website and the mobile app use the same Firebase project (`glowup-admi
 | `description` | text | Optional. |
 | `ingredients` | list of text | The names from the packaging. |
 | `shades` | list of text | Colours as `#RRGGBB`. Used by AR Try-On. |
+| `shadeCodes` | list of text | Optional. The shade code printed on the pack (`119`, `N20`, `12A`), at the same place as its colour in `shades`; `""` = not known. Capitals, letters and digits with `. - /` and spaces, at most 16 characters. The app reads a code on a scanned pack and picks the colour with it (`ShadeCode.cs`). Only an admin writes it, so the rules need no change. |
 | `sources` | list of text | Supporting web pages. The FDA Philippines verification link is the entry that reads `FDA Philippines verification | https://...fda.gov.ph/...` (the product form has its own box for it). |
 | `imageUrl` | text | Optional web address (https) of a photo of the bottle, tube or compact. |
 | `ingredientIds` | list of text | Light summary kept by the website's product form: the ids of the library ingredients this product's names match. It links a product to its ingredients without a join. |

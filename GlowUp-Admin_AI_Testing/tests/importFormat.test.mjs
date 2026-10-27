@@ -1,6 +1,6 @@
 // Checks of the plain import (_Shared/importFormat.js): the file format of the GlowUp prompt is read WITHOUT any AI or network.
 //   Run: node tests/importFormat.test.mjs
-import { parseImportText, hexOf } from "../_Shared/importFormat.js";
+import { parseImportText, hexOf, shadeCodeOf, pairShades } from "../_Shared/importFormat.js";
 
 let checks = 0, failed = 0;
 const check = (ok, what) => { checks++; if (!ok) { failed++; console.log("FAILED: " + what); } };
@@ -126,6 +126,18 @@ equal(parseImportText("Brand: Revlon\nProduct: ColorStay\nIngredients: Aqua, Tal
 equal(parseImportText("").kind, "", "empty text");
 equal(parseImportText(FILE + "\n=== INGREDIENT ===\nNAME: Aqua").kind, "mixed", "brands and ingredients in one file are refused");
 equal([hexOf("#128"), hexOf("128"), hexOf("120"), hexOf("#abc"), hexOf("Nude")], ["", "", "", "#AABBCC", ""], "shade numbers and names are never colours");
+
+// ---- shade codes: what is printed on the pack, kept next to the colour
+equal([shadeCodeOf("119"), shadeCodeOf(" n20 "), shadeCodeOf("No. 12A"), shadeCodeOf("Shade 130"), shadeCodeOf("#02"), shadeCodeOf("NOIR")],
+    ["119", "N20", "12A", "130", "02", "NOIR"], "codes as printed on packs");
+equal([shadeCodeOf(""), shadeCodeOf("N/A"), shadeCodeOf("a code that is far too long to be one"), shadeCodeOf("<b>1</b>"), shadeCodeOf(null)],
+    ["", "", "", "", ""], "no code, or not a code");
+equal(pairShades(["#e8c9a5", "Nude", "#C24B62", "#E8C9A5"], ["119", "999", "", "120"]),
+    { shades: ["#E8C9A5", "#C24B62"], codes: ["119", ""] }, "a name is dropped with its code; a repeated colour keeps its first place");
+equal(pairShades(["#E8C9A5", "#E8C9A5"], ["", "120"]), { shades: ["#E8C9A5"], codes: ["120"] }, "a repeated colour takes the code it was missing");
+equal(pairShades(["#E8C9A5"], undefined), { shades: ["#E8C9A5"], codes: [""] }, "an old product has no codes");
+equal(pairShades("nothing", 5), { shades: [], codes: [] }, "not lists");
+equal(pairShades(["#111111", "#222222", "#333333"], ["1", "2", "3"], 2), { shades: ["#111111", "#222222"], codes: ["1", "2"] }, "at most as many as allowed");
 
 console.log("checks made: " + checks);
 console.log(failed === 0 ? "ALL PASSED" : failed + " FAILED");
