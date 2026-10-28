@@ -79,6 +79,10 @@ namespace GlowUp.Scan
         /// <summary>The size of the picture the camera really gives, in its own pixels (it may differ from the size that was asked for). 0 x 0 while it is off.</summary>
         public Vector2Int PictureSize => IsPlaying ? new Vector2Int(cam.width, cam.height) : Vector2Int.zero;
         public bool IsFrontCamera { get; private set; }
+        /// <summary>The view the picture fills (UprightArgb with no frame gives exactly what is inside it).</summary>
+        public RectTransform Viewport => viewport;
+        /// <summary>True when the picture is shown like a mirror (the selfie camera): a point of the upright picture is turned round left to right on screen.</summary>
+        public bool ShowsMirrored => IsFrontCamera && mirrorFrontCamera;
         /// <summary>Raised once: true + "" when the camera is running, false + reason when it cannot start.</summary>
         public event Action<bool, string> Started;
         /// <summary>Raised when the camera was running and is closed (its flashlight goes out with it).</summary>

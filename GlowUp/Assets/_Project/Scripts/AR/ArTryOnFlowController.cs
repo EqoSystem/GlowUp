@@ -120,7 +120,7 @@ namespace GlowUp.AR
             if (lessButton != null) lessButton.onClick.AddListener(() => { if (intensitySlider != null) intensitySlider.value = Mathf.Clamp01(intensitySlider.value - intensityStep); });
             if (moreButton != null) moreButton.onClick.AddListener(() => { if (intensitySlider != null) intensitySlider.value = Mathf.Clamp01(intensitySlider.value + intensityStep); });
             if (cameraFeed != null) cameraFeed.Started += OnCameraStarted;
-            if (liveTracking != null) liveTracking.ModeDecided += OnModeDecided;
+            if (liveTracking != null) { liveTracking.ModeDecided += OnModeDecided; liveTracking.FollowsFaceChanged += RefreshAreaTabs; }
             if (cameraCard != null) cameraCard.ActionPressed += OnCameraCardAction;
             if (pickerSearchInput != null) pickerSearchInput.onValueChanged.AddListener(_ => FillPicker());
         }
@@ -164,7 +164,7 @@ namespace GlowUp.AR
         void OnDestroy()
         {
             if (cameraFeed != null) cameraFeed.Started -= OnCameraStarted;
-            if (liveTracking != null) liveTracking.ModeDecided -= OnModeDecided;
+            if (liveTracking != null) { liveTracking.ModeDecided -= OnModeDecided; liveTracking.FollowsFaceChanged -= RefreshAreaTabs; }
         }
         void StopCamera()
         {
@@ -200,7 +200,7 @@ namespace GlowUp.AR
         {
             if (areaTabs == null) return;
             string area = record != null ? ShadeAdvisor.AreaFor(record.cosmeticType) : null;
-            bool guidedOnly = liveTracking == null || (modeKnown && !liveTracking.IsLive);
+            bool guidedOnly = liveTracking == null || (modeKnown && !liveTracking.FollowsFace);
             for (int i = 0; i < ShadeAdvisor.Areas.Length; i++)
             {
                 bool matching = !onlyMatchingArea || area == null || ShadeAdvisor.Areas[i] == area;
@@ -260,7 +260,7 @@ namespace GlowUp.AR
             string area = record != null ? ShadeAdvisor.AreaFor(record.cosmeticType) : ShadeAdvisor.Lips;
             if (areaTabs != null) areaTabs.Select(Array.IndexOf(ShadeAdvisor.Areas, area), false);
             RefreshAreaTabs();
-            if (area == ShadeAdvisor.Brows && modeKnown && liveTracking != null && !liveTracking.IsLive) Say(msgBrowsNeedLive);
+            if (area == ShadeAdvisor.Brows && modeKnown && liveTracking != null && !liveTracking.FollowsFace) Say(msgBrowsNeedLive);
 
             // the finish: what the scan saw on the product, otherwise a sensible guess from the kind of product
             string finish = record != null ? (record.finish ?? "") : "";

@@ -108,6 +108,8 @@ namespace GlowUp.AR
         public float FinishGlitter => glitterNow;
         public float FinishBrighten => brightenNow;
         public float TwinkleSpeed => twinkleSpeed;
+        /// <summary>The material of the shapes (shader GlowUp/UiMakeupBlend): the guided try-on that follows the face draws with the same blend.</summary>
+        public Material ShapeMaterial => lips != null ? lips.material : null;
         /// <summary>The name of the finish chosen now (matte, satin, glossy, shimmer, metallic).</summary>
         public string FinishName => look != null ? look.name : "matte";
         /// <summary>The strongest opacity allowed for a part of the face (the Inspector values above).</summary>

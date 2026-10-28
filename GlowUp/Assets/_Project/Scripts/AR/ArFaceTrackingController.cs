@@ -74,6 +74,8 @@ namespace GlowUp.AR
 
         [Header("Guided preview (used whenever live tracking is not possible)")]
         [SerializeField] private CameraFeedController guidedCamera;
+        [Tooltip("On = the guided preview finds the face in the camera picture with the phone's own face finder (MediaPipe, ArGuidedFace) and draws the make-up on it, so the colour follows the face on every phone. Off = the fixed face outline.")]
+        [SerializeField] private bool followFaceInGuidedPreview = true;
 
         [Header("Behaviour")]
         [Tooltip("Off = always use the guided preview")]
@@ -123,6 +125,11 @@ namespace GlowUp.AR
         public bool IsLive { get; private set; }
         /// <summary>Raised once per start: true = live tracking, false = guided preview.</summary>
         public event Action<bool> ModeDecided;
+        /// <summary>True while the make-up is drawn on the real face: live tracking, or the guided preview that follows the face (ArGuidedFace).</summary>
+        public bool FollowsFace => IsLive || (guidedFace != null && guidedFace.Following);
+        /// <summary>Raised when the guided preview starts or stops following the face.</summary>
+        public event Action FollowsFaceChanged;
+        ArGuidedFace guidedFace;
 
         const string GuardName = "ar-live-tracking";
         static bool reloadedAfterPermission;
@@ -159,6 +166,7 @@ namespace GlowUp.AR
         {
             if (routine != null) { StopCoroutine(routine); routine = null; }
             EndGuard();
+            StopGuidedFace();
             StopLive();
         }
 
@@ -357,6 +365,7 @@ namespace GlowUp.AR
 
             // 4. live
             IsLive = true; hadFace = false; lastSeen = -100f; liveSince = Time.unscaledTime;
+            StopGuidedFace();
             StartHelpers();
             HideFaceFromOtherCameras();
             if (faceGuide != null) faceGuide.SetActive(false);
@@ -431,8 +440,34 @@ namespace GlowUp.AR
             Debug.Log("[GlowUp] AR Try-On uses the guided preview: " + reason + ".");
             if (faceGuide != null) faceGuide.SetActive(true);
             if (guidedCamera != null) guidedCamera.StartCamera();
+            StartGuidedFace();
             ModeDecided?.Invoke(false);
             if (!string.IsNullOrEmpty(noteForTheUser) && isActiveAndEnabled) StartCoroutine(ShowNote(noteForTheUser));
+        }
+
+        /// <summary>
+        /// The guided preview follows the face (ArGuidedFace, made here at run time: no scene change is needed). Its layers go inside the
+        /// before/after clip of the guide, so the split cuts them; the old outline and shapes are hidden while the face is followed.
+        /// </summary>
+        void StartGuidedFace()
+        {
+            if (!followFaceInGuidedPreview || guidedCamera == null || makeup == null || faceGuide == null) return;
+            if (guidedFace == null)
+            {
+                if (!TryGetComponent(out guidedFace)) guidedFace = gameObject.AddComponent<ArGuidedFace>();
+                guidedFace.FollowingChanged += _ => FollowsFaceChanged?.Invoke();
+            }
+            RectMask2D clip = faceGuide.GetComponentInChildren<RectMask2D>(true);
+            Transform parent = clip != null ? clip.transform : faceGuide.transform;
+            var hide = new List<GameObject>(2);
+            foreach (Transform child in faceGuide.GetComponentsInChildren<Transform>(true))
+                if (child.name == "FaceGuide" || child.name == "GuideOutline") hide.Add(child.gameObject);
+            guidedFace.Begin(guidedCamera, makeup, quality, parent, hide.ToArray(), Say);
+        }
+
+        void StopGuidedFace()
+        {
+            if (guidedFace != null) guidedFace.End();
         }
 
         // shown once the guided camera is running (its own start-up message comes first)

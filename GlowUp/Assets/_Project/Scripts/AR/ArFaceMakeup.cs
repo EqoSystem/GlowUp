@@ -198,6 +198,13 @@ namespace GlowUp.AR
             if (glossMaskOn != null && shownLayer == Brows) glossMaskOn = null;      // the gloss takes the new mask on the next frame
         }
 
+        /// <summary>The colour layer `i` shows now (0 face, 1 cheeks, 2 eyes, 3 lips, 4 brows; alpha = strength). The guided try-on that follows the face copies it.</summary>
+        public Color LayerColour(int i) => made && i >= 0 && i < shown.Length ? shown[i] : new Color(1f, 1f, 1f, 0f);
+
+        /// <summary>The skin colour layer `i` assumes under it: the lips and brows have their own, the others follow the measured skin.</summary>
+        public Color SkinUnderFor(int i) => i == 3 ? lipsUnderneath : i == Brows ? browsUnderneath
+            : SkinAdapt > 0.001f ? Color.Lerp(skinUnderneath, SkinSample, Mathf.Clamp01(SkinAdapt)) : skinUnderneath;
+
         /// <summary>True when every colour layer has its material (the brow layer is optional).</summary>
         public bool Ready => faceMaterial != null && cheeksMaterial != null && eyesMaterial != null && lipsMaterial != null;
 
