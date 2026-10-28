@@ -64,4 +64,4 @@ GlowUp/Assets/Plugins/Android/*
 # JSON: keep only the two deploy configs
 *.json
 !firebase.json
-!vercel.json
+!vercel.jsonbin/
