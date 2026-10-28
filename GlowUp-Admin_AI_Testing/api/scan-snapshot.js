@@ -12,7 +12,7 @@
 "use strict";
 
 const assist = require("./assist-ingredient.js").helpers;
-const { PROJECT, FIREBASE_WEB_KEY, firstObject, normalShade, text, httpsUrl, plainAddress, isRedirect, sourcesOf, withTimeout } = assist;
+const { PROJECT, FIREBASE_WEB_KEY, KEY_REFERER, firstObject, normalShade, text, httpsUrl, plainAddress, isRedirect, sourcesOf, withTimeout } = assist;
 
 const COOLDOWN_SECONDS = 30;
 const PER_UID_DAILY = 5;
@@ -37,7 +37,7 @@ async function userOf(idToken) {
     if (!idToken || idToken.length > 4000) return "";
     try {
         const answer = await withTimeout("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" + FIREBASE_WEB_KEY,
-            { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken }) }, AUTH_SECONDS);
+            { method: "POST", headers: { "Content-Type": "application/json", Referer: KEY_REFERER }, body: JSON.stringify({ idToken }) }, AUTH_SECONDS);
         if (!answer.ok) return "";
         const user = ((await answer.json()).users || [])[0];
         return user && !user.disabled && /^[A-Za-z0-9]{1,128}$/.test(user.localId || "") ? user.localId : "";

@@ -17,6 +17,9 @@
 
 const PROJECT = "glowup-admin-portal";
 const FIREBASE_WEB_KEY = "AIzaSyAkb23xQ69a2Q4tpucGty9yDEoH0ab1JDM";      // the website's public Firebase key (it is in every page); NOT the AI key
+// The key only works from the website's own addresses (an HTTP-referrer restriction in Google Cloud, set on 28 October 2026). A server call has
+// no page behind it, so it names the production address itself. If the website moves to another address, add it to the key's list first.
+const KEY_REFERER = "https://glowup-admin-snowy.vercel.app/";
 const AI_SECONDS = 40;              // the longest ONE call to an AI may take
 const TOTAL_SECONDS = 50;           // all the calls together: Vercel stops this function at 60 seconds, the answer must be out before that
 const BACKUP_SECONDS = 10;          // kept back for each service that is still to come, so a slow Gemini cannot use up the time of Groq and Mistral
@@ -48,7 +51,7 @@ async function withTimeout(url, options, seconds) {
 async function adminUid(idToken) {
     if (!idToken) return "";
     const who = await withTimeout("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" + FIREBASE_WEB_KEY,
-        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken }) }, 10);
+        { method: "POST", headers: { "Content-Type": "application/json", Referer: KEY_REFERER }, body: JSON.stringify({ idToken }) }, 10);
     if (!who.ok) return "";
     const user = ((await who.json()).users || [])[0];
     if (!user || !user.localId) return "";
@@ -774,4 +777,4 @@ module.exports = async (req, res) => {
 };
 
 // for the checks in tests/ (pure helpers; no network)
-module.exports.helpers = { sourceKind, describeSource, makerHost, suggestedWebsite, SOURCE_KINDS, SEARCH_KINDS, normalShade, ingredientImportQuestion, tidyIngredientImport, firstObject, tidy, tidyProduct, tidyBrand, tidyImport, isCredible, hostOf, question, descriptionQuestion, productQuestion, brandQuestion, importQuestion, lookupLinks, searchResultUrl, chatContent, share, PROJECT, FIREBASE_WEB_KEY, text, httpsUrl, plainAddress, isRedirect, sourcesOf, withTimeout, order: () => ["Gemini"].concat(BACKUPS.map((b) => b.label)) };
+module.exports.helpers = { sourceKind, describeSource, makerHost, suggestedWebsite, SOURCE_KINDS, SEARCH_KINDS, normalShade, ingredientImportQuestion, tidyIngredientImport, firstObject, tidy, tidyProduct, tidyBrand, tidyImport, isCredible, hostOf, question, descriptionQuestion, productQuestion, brandQuestion, importQuestion, lookupLinks, searchResultUrl, chatContent, share, PROJECT, KEY_REFERER, FIREBASE_WEB_KEY, text, httpsUrl, plainAddress, isRedirect, sourcesOf, withTimeout, order: () => ["Gemini"].concat(BACKUPS.map((b) => b.label)) };
