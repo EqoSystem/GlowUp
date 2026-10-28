@@ -281,10 +281,23 @@ namespace GlowUp.Scan
                 foreach (string part in l.Split(new[] { '/', ',', '(', ')' }, StringSplitOptions.RemoveEmptyEntries))
                 {
                     string p = part.Trim();
-                    if (p.Length >= 4 && name.Contains(p)) return label;
+                    if (p.Length >= 4 && name.Contains(p) && !(IsPlainAlcoholWord(p) && IsFattyAlcohol(name))) return label;
                 }
             }
             return null;
+        }
+
+        // "Alcohol" typed on its own means the drying kind (Alcohol Denat., Ethanol, Isopropyl Alcohol). The fatty alcohols (Cetyl, Cetearyl, Stearyl ...
+        // Alcohol) only share the word: they soften and thicken, and are not what a person who avoids alcohol means. Benzyl Alcohol is NOT excused:
+        // it is a preservative and fragrance component, so it still matches (a warning too many is safer than one too few).
+        static readonly string[] FattyAlcoholStarts = { "cetyl", "cetearyl", "cetostearyl", "stearyl", "isostearyl", "behenyl", "myristyl", "lauryl", "arachidyl", "oleyl", "lanolin" };
+
+        static bool IsPlainAlcoholWord(string typed) => typed == "alcohol" || typed == "alcohols";
+
+        static bool IsFattyAlcohol(string lowerName)
+        {
+            foreach (string start in FattyAlcoholStarts) if (lowerName.Contains(start + " alcohol")) return true;
+            return false;
         }
 
         static readonly string[] ConditionKeys = { "acne", "eczema", "psoriasis", "rosacea", "seborrheic", "melasma", "contact" };

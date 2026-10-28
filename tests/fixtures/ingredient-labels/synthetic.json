@@ -1,0 +1,88 @@
+[
+  {
+    "id": "clean-comma-list",
+    "kind": "synthetic",
+    "note": "A clean block with the word Ingredients and commas.",
+    "ocrText": "Ingredients: Water, Glycerin, Dimethicone, Mica, Silica, Phenoxyethanol, Tocopherol",
+    "expected": ["Water", "Glycerin", "Dimethicone", "Mica", "Silica", "Phenoxyethanol", "Tocopherol"]
+  },
+  {
+    "id": "capitals-and-label-noise",
+    "kind": "synthetic",
+    "note": "Capitals, a full stop, and weight / origin lines after the list.",
+    "ocrText": "INGREDIENTS: TALC, MICA, DIMETHICONE, SILICA, PHENOXYETHANOL, CAPRYLYL GLYCOL.\nNET WT. 8.5 g / 0.29 OZ\nMADE IN CHINA\nBatch L2304A  EXP 01/2028",
+    "expected": ["Talc", "Mica", "Dimethicone", "Silica", "Phenoxyethanol", "Caprylyl Glycol"]
+  },
+  {
+    "id": "directions-before-list",
+    "kind": "synthetic",
+    "note": "Usage text in front of the list.",
+    "ocrText": "DIRECTIONS: Apply evenly on the face with a brush.\nINGREDIENTS: Talc, Mica, Silica, Kaolin, Zinc Stearate, Tocopheryl Acetate",
+    "expected": ["Talc", "Mica", "Silica", "Kaolin", "Zinc Stearate", "Tocopheryl Acetate"]
+  },
+  {
+    "id": "wrapped-lines",
+    "kind": "synthetic",
+    "note": "The label wraps in the middle of names.",
+    "ocrText": "Ingredients: Water, Sodium\nLaureth Sulfate, Glycerin, Cocamidopropyl\nBetaine, Phenoxyethanol, Citric Acid",
+    "expected": ["Water", "Sodium Laureth Sulfate", "Glycerin", "Cocamidopropyl Betaine", "Phenoxyethanol", "Citric Acid"]
+  },
+  {
+    "id": "no-anchor-word",
+    "kind": "synthetic",
+    "note": "The word Ingredients was not read; the list is glued to other text.",
+    "ocrText": "POWDER 8.5g Talc, Mica, Silica\nDimethicone, Kaolin, Phenoxyethanol 12M",
+    "expected": ["Talc", "Mica", "Silica", "Dimethicone", "Kaolin", "Phenoxyethanol"]
+  },
+  {
+    "id": "may-contain-tail",
+    "kind": "synthetic",
+    "note": "Shade-dependent colours after May contain.",
+    "ocrText": "Ingredients: Talc, Mica, Dimethicone, Silica. May contain: CI 77491, CI 77492, CI 77891",
+    "expected": ["Talc", "Mica", "Dimethicone", "Silica"],
+    "mayContain": ["CI 77491", "CI 77492", "CI 77891"]
+  },
+  {
+    "id": "plus-minus-tail",
+    "kind": "synthetic",
+    "note": "The +/- convention for shade-dependent colours.",
+    "ocrText": "INGREDIENTS: Isododecane, Trimethylsiloxysilicate, Mica, Silica, Tocopherol, +/- CI 77491, CI 77492, CI 77499",
+    "expected": ["Isododecane", "Trimethylsiloxysilicate", "Mica", "Silica", "Tocopherol"],
+    "mayContain": ["CI 77491", "CI 77492", "CI 77499"]
+  },
+  {
+    "id": "slash-synonyms-and-brackets",
+    "kind": "synthetic",
+    "note": "Aqua/Water/Eau and Fragrance (Parfum) are one ingredient each.",
+    "ocrText": "Ingredients: Aqua/Water/Eau, Glycerin, Parfum (Fragrance), Phenoxyethanol, Mica",
+    "expected": ["Water", "Glycerin", "Fragrance", "Phenoxyethanol", "Mica"]
+  },
+  {
+    "id": "marketing-claims-are-not-ingredients",
+    "kind": "synthetic",
+    "note": "Free-of claims near the list name an ingredient to say it is NOT there.",
+    "ocrText": "Paraben-free, Fragrance free, Alcohol Free\nIngredients: Water, Glycerin, Dimethicone, Talc, Mica",
+    "expected": ["Water", "Glycerin", "Dimethicone", "Talc", "Mica"]
+  },
+  {
+    "id": "ocr-confusions",
+    "kind": "synthetic",
+    "note": "Zero for O, one for l, rn for m: what a phone camera really delivers.",
+    "ocrText": "INGREDIENTS: Water, Dimethic0ne, Glycerin, Tocopheryl Acetate, Phenoxyethan0l, Sorbitan 1sostearate",
+    "expected": ["Water", "Dimethicone", "Glycerin", "Tocopheryl Acetate", "Phenoxyethanol", "Sorbitan Isostearate"]
+  },
+  {
+    "id": "semicolons-and-bullets",
+    "kind": "synthetic",
+    "note": "Other separators than commas.",
+    "ocrText": "Ingredients: Water; Glycerin; Dimethicone; Mica; Silica",
+    "expected": ["Water", "Glycerin", "Dimethicone", "Mica", "Silica"]
+  },
+  {
+    "id": "alcohol-denat-and-fatty-alcohol",
+    "kind": "synthetic",
+    "note": "A drying alcohol and a fatty alcohol on one label (both must be read).",
+    "ocrText": "Ingredients: Alcohol Denat., Water, Cetearyl Alcohol, Glycerin, Fragrance, Phenoxyethanol",
+    "expected": ["Alcohol Denat.", "Water", "Cetearyl Alcohol", "Glycerin", "Fragrance", "Phenoxyethanol"]
+  }
+]

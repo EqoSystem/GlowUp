@@ -44,6 +44,8 @@ GlowUp-Admin_AI_Testing/firebase_unity_sdk_*/
 .vercel/
 .env*
 node_modules/
+tools/ScannerEval/bin/
+tools/ScannerEval/obj/
 firestore-debug.log
 *.bak
 

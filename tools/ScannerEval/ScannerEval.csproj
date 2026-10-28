@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Measures the app's own label reader (IngredientTextParser) on labelled examples: ingredient-level precision and recall.
+    It loads the app's compiled assembly, so it runs the real code, not a copy. Needs the .NET 8 SDK and a Unity compile of the project
+    (open the project in Unity once, or build: Unity writes GlowUp/Library/ScriptAssemblies/Assembly-CSharp.dll).
+      From the repository root: dotnet run, with the project tools/ScannerEval and the fixture folder tests/fixtures/ingredient-labels as the argument
+      (the exact command is in tools/ScannerEval/README.md)
+    Other Unity version or install folder:  -p:UnityManaged="D:/Unity/2022.3.62f3/Editor/Data/Managed"
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <NoWarn>CS0618;CS1701;CS1702</NoWarn>
+    <UnityManaged Condition="'$(UnityManaged)' == ''">C:/Program Files/Unity/Hub/Editor/2022.3.62f3/Editor/Data/Managed</UnityManaged>
+    <AppAssembly Condition="'$(AppAssembly)' == ''">$(MSBuildThisFileDirectory)../../GlowUp/Library/ScriptAssemblies/Assembly-CSharp.dll</AppAssembly>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Assembly-CSharp"><HintPath>$(AppAssembly)</HintPath></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(UnityManaged)/UnityEngine.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(UnityManaged)/UnityEngine/UnityEngine.CoreModule.dll</HintPath></Reference>
+    <Reference Include="UnityEngine.JSONSerializeModule"><HintPath>$(UnityManaged)/UnityEngine/UnityEngine.JSONSerializeModule.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

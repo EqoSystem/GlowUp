@@ -245,5 +245,32 @@ namespace GlowUp.Tests
             Assert.IsFalse(IngredientResearcher.IsOneIngredientName("Long Lasting"));
             Assert.IsFalse(IngredientResearcher.IsOneIngredientName("May Contain"));
         }
+
+        // ------------------------------------------------------------------------------------ an allergen typed in by the user
+        static bool FlagsAllergen(string typedAllergen, params string[] ingredients)
+        {
+            var who = new UserProfileData { skinType = "Normal", knownAllergens = new List<string> { typedAllergen } };
+            ScanRecord record = ProductAnalysisEngine.Analyse(new List<string>(ingredients), "", who, null, null, null, null, new List<string>());
+            return record.allergenMatch != null && record.allergenMatch.level == "bad";
+        }
+
+        [Test]
+        public void AnAlcoholAllergenFlagsDryingAlcoholsButNotFattyAlcohols()
+        {
+            Assert.IsTrue(FlagsAllergen("Alcohol", "Water", "Alcohol Denat.", "Mica"), "Alcohol Denat. is the drying kind");
+            Assert.IsTrue(FlagsAllergen("alcohol", "Water", "Isopropyl Alcohol"), "Isopropyl Alcohol too, typed in small letters");
+            Assert.IsTrue(FlagsAllergen("Alcohol", "Water", "Benzyl Alcohol"), "Benzyl Alcohol is not excused: it is a preservative and fragrance component");
+            Assert.IsFalse(FlagsAllergen("Alcohol", "Water", "Cetearyl Alcohol", "Mica"), "Cetearyl Alcohol is a fatty alcohol: it only shares the word");
+            Assert.IsFalse(FlagsAllergen("Alcohol", "Water", "Stearyl Alcohol", "Glycerin"), "Stearyl Alcohol too");
+            Assert.IsFalse(FlagsAllergen("Alcohol", "Water", "Cetyl Alcohol", "Glycerin"), "Cetyl Alcohol too");
+            Assert.IsTrue(FlagsAllergen("Alcohol", "Cetearyl Alcohol", "Alcohol Denat."), "a product with both is still flagged for the drying one");
+        }
+
+        [Test]
+        public void AMoreSpecificTypedAllergenStillMatchesItsOwnName()
+        {
+            Assert.IsTrue(FlagsAllergen("Cetearyl Alcohol", "Water", "Cetearyl Alcohol"), "someone who is allergic to Cetearyl Alcohol itself is warned");
+            Assert.IsFalse(FlagsAllergen("Cetearyl Alcohol", "Water", "Alcohol Denat."), "and is not warned about a different alcohol");
+        }
     }
 }
