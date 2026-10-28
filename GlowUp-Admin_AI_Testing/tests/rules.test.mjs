@@ -152,6 +152,38 @@ check(!rules.matchesSearch("lipstick", []) && !rules.matchesSearch("lipstick", [
 check(rules.matchesSearch("maybelline lipstick", ["Superstay Matte Ink", "Maybelline", "Lipstick"]), "words may be found in different fields (name, brand, kind)");
 
 // ---------------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------------
+// Evidence tiers: which risk level a source may support (docs/DATA_SOURCE_POLICY.md)
+// ---------------------------------------------------------------------------------------------
+equal(rules.evidenceTier("Annex II | https://eur-lex.europa.eu/eli/reg/2009/1223/oj", ""), 1, "an EU regulation page is tier 1");
+equal(rules.evidenceTier("FDA PH | https://verification.fda.gov.ph/x", ""), 1, "FDA Philippines is tier 1");
+equal(rules.evidenceTier("US FDA | https://www.fda.gov/cosmetics/cosmetic-ingredients", ""), 1, "US FDA is tier 1");
+equal(rules.evidenceTier("PubChem | https://pubchem.ncbi.nlm.nih.gov/compound/1", ""), 2, "PubChem is labelled a regulator by sourceKind, but it is not regulation: tier 2");
+equal(rules.evidenceTier("WHO | https://www.who.int/x", ""), 2, "who.int is tier 2");
+equal(rules.evidenceTier("CIR | https://cir-reports.cir-safety.org/x", ""), 2, "CIR is tier 2");
+equal(rules.evidenceTier("DermNet | https://dermnetnz.org/topics/x", ""), 2, "DermNet is tier 2");
+equal(rules.evidenceTier("INCIDecoder | https://incidecoder.com/ingredients/x", ""), 3, "an ingredient database is tier 3");
+equal(rules.evidenceTier("Shop | https://www.watsons.com.ph/p/1", ""), 4, "a retailer is tier 4");
+equal(rules.evidenceTier("OBF | https://world.openbeautyfacts.org/product/1", ""), 4, "a public list is tier 4");
+equal(rules.evidenceTier("Brand | https://www.maybelline.com.ph/x", "https://www.maybelline.com.ph"), 4, "the maker's confirmed site is tier 4");
+equal(rules.evidenceTier("Blog | https://some-blog.example/x", ""), 0, "an unknown site supports nothing");
+equal(rules.evidenceTier("https://fda.gov@evil.com/x", ""), 0, "a look-alike address supports nothing");
+equal(rules.evidenceTier("no address at all", ""), 0, "a line without an address supports nothing");
+
+const EU = "Annex II | https://eur-lex.europa.eu/x", CIR = "CIR | https://cir-reports.cir-safety.org/x", DB = "INCIDecoder | https://incidecoder.com/x", SHOP = "Shop | https://www.watsons.com.ph/p/1";
+check(rules.evidenceProblem("harmful", [EU]) === "", "harmful is backed by a tier 1 page");
+check(rules.evidenceProblem("harmful", [DB, EU]) === "", "harmful is backed when one of several pages is tier 1");
+check(rules.evidenceProblem("harmful", [CIR]) !== "", "harmful is NOT backed by a tier 2 page");
+check(rules.evidenceProblem("harmful", [DB]) !== "", "harmful is NOT backed by an ingredient database");
+check(rules.evidenceProblem("harmful", [SHOP]) !== "", "harmful is NOT backed by a retailer");
+check(rules.evidenceProblem("harmful", []) !== "" && rules.evidenceProblem("harmful", undefined) !== "", "harmful with no source is not backed");
+check(rules.evidenceProblem("caution", [EU]) === "" && rules.evidenceProblem("caution", [CIR]) === "", "caution is backed by tier 1 or tier 2");
+check(rules.evidenceProblem("caution", [DB]) !== "", "caution is NOT backed by an ingredient database alone");
+check(rules.evidenceProblem("caution", []) !== "", "caution with no source is not backed");
+check(rules.evidenceProblem("safe", []) === "" && rules.evidenceProblem("", []) === "", "safe and an empty level need no source");
+equal(rules.bestEvidenceTier([SHOP, DB, CIR]), 2, "the strongest page decides");
+equal(rules.bestEvidenceTier([]), 0, "no pages: no tier");
+
 console.log(`make-up examples: ${scopeLines.length}, shared-rule examples: ${sharedLines.length}, checks made: ${checks}`);
 if (failures.length > 0) {
     console.log("\nFAILED: " + failures.length + " check(s)\n");

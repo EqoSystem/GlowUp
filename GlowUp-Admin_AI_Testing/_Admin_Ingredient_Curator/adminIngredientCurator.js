@@ -28,7 +28,7 @@ import {
     notify, describeError, setBusy, setFormError, renderChecks, readChecks, writeChecks, originLabel, sourceLinks, assistSourceLinks, sourceGuideHtml, wireSearch,
     SKIN_TYPES, dialogIsOpen, statusBadge, toneBadge
 } from "../_Shared/adminCommon.js";
-import { matchesSearch, sourceKind, normalizeName } from "../_Shared/glowupRules.js";
+import { matchesSearch, normalizeName, evidenceProblem } from "../_Shared/glowupRules.js";
 import { auth } from "../_Database/firebase-console.js";
 import { cleanupPlan, ingredientDuplicates, ingredientLookalikes, ingredientIssues, mergeIngredients } from "../_Shared/glowupCatalog.js";
 import { openPlanDialog, openDuplicatesDialog } from "../_Shared/adminCleanup.js";
@@ -51,19 +51,20 @@ const VIEW_KEY = "glowup.curator.view.v1";
 // false = every such entry waits for review, and until then the app never counts it as proof that an ingredient is safe.
 const AUTO_APPROVE_AI = true;
 /**
- * Credible = the name is listed in the US FDA substance registry (it has a UNII code), or the AI really searched the web
- * and one of the pages it used is a regulator, a medical or scientific body, or an ingredient database (the source labels
- * of glowupRules.js, the same in the app). Any other web page, and pages the AI only named from memory, do not count.
+ * Credible = the AI really searched the web and one of the pages it used backs up the rating it gave: a regulator for
+ * "harmful", a regulator or a medical or scientific body for "caution" (the evidence tiers of glowupRules.js). Any other
+ * web page, an ingredient database, and pages the AI only named from memory, do not count.
  */
-const CREDIBLE_KINDS = ["regulator", "medical", "reference"];
 // an entry that came from a document import or a user's photo (item.via) is NEVER approved by itself: a person has to look at it
 const NEVER_AUTO = ["document-import", "snapshot"];
-// ... and it needs a SOURCE LINK of a widely known dermatology, pharmacy or regulator site (CREDIBLE_KINDS above). A claim written into the
-// entry itself (a UNII code, "searched the web") is not enough: only the link counts, and sourceKind judges the real host of the address.
+// ... and it needs a SOURCE LINK that backs up its rating by the evidence tiers of docs/DATA_SOURCE_POLICY.md (evidenceProblem in glowupRules.js):
+// "harmful" needs a regulator's page, "caution" a regulator's or a medical / scientific body's page. An ingredient database alone is not enough
+// (it explains what an ingredient is, it does not rate it). A claim written into the entry itself (a UNII code, "searched the web") is not enough:
+// only the link counts, and sourceKind judges the real host of the address.
 // Only a WARNING (caution or harmful) is approved by itself: a false warning does little harm, but "safe" or an empty level on a
 // fabricated entry could hide a harmful ingredient, so those wait for a person.
 const hasCredibleSource = (item) => !NEVER_AUTO.includes(item.via) && (item.riskLevel === "caution" || item.riskLevel === "harmful")
-    && item.sources.some((s) => CREDIBLE_KINDS.includes(sourceKind(s, "")));
+    && evidenceProblem(item.riskLevel, item.sources) === "";
 
 let everyIngredient = [];             // every document, also the ones in the Recycle bin
 let ingredients = [];                 // listed: [{ id, name, techName, description, ... }]
@@ -124,7 +125,8 @@ const sortNow = () => SORTS.find((s) => s.id === view.sort) || SORTS[0];
 const QUICK = {
     broken: { label: "Broken \"Used in\" text", test: (item) => item.usesBroken },
     noNote: { label: "Flagged without a caution note", test: (item) => (item.riskLevel === "harmful" || item.riskLevel === "caution") && !item.cautionNote },
-    unused: { label: "Not in any listed product", test: (item) => productUseKnown && usedInProducts(item) === 0 }
+    unused: { label: "Not in any listed product", test: (item) => productUseKnown && usedInProducts(item) === 0 },
+    noEvidence: { label: "Harmful without a regulator's page", test: (item) => item.riskLevel === "harmful" && evidenceProblem("harmful", item.sources) !== "" }
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -946,7 +948,10 @@ async function approveIngredientDrafts() {
 }
 
 async function approveSelectedIngredients(keys) {
-    const selected = keys.map((id) => everyIngredient.find((item) => item.id === id && !item.binned && needsReview(item))).filter((item) => item);
+    const waiting = keys.map((id) => everyIngredient.find((item) => item.id === id && !item.binned && needsReview(item))).filter((item) => item);
+    // a "harmful" rating without a regulator's page is not approved in bulk (docs/DATA_SOURCE_POLICY.md); it is edited one by one
+    const selected = waiting.filter((item) => !(item.riskLevel === "harmful" && evidenceProblem("harmful", item.sources)));
+    if (selected.length < waiting.length) notify(`${many(waiting.length - selected.length, "harmful entry was", "harmful entries were")} left out: no regulator's page backs the rating. Use Edit on each.`, "warn");
     if (!selected.length) {
         notify("No selected ingredients are AI entries waiting for review.", "info");
         return;
@@ -1221,6 +1226,11 @@ async function saveIngredient(event) {
         Object.assign(data, { source: "aiassist", reviewed: true, reviewedAt: serverTimestamp(), webSearched: assisted.sources.length > 0, model: assisted.model,
             sources: assisted.sources.map((p) => `${p.title || p.site || "web page"} | ${p.url}`) });
 
+    // "Harmful" must be backed by a regulator's page (docs/DATA_SOURCE_POLICY.md). An entry that was already harmful can still be saved
+    // (its other fields); it is listed under "Harmful without a regulator's page" until a page is added.
+    const unbacked = data.riskLevel === "harmful" && !(before && before.riskLevel === "harmful") ? evidenceProblem("harmful", data.sources) : "";
+    if (unbacked) { setFormError(form, unbacked); el("ingredientSourcesInput").focus(); return; }
+
     setBusy(saveButton, true, "Saving...");
     try {
         if (editingIngredientId) {
@@ -1275,6 +1285,8 @@ function onListClick(event) {
 /** Marks an AI-found entry as checked, unchanged. To correct it first, use Edit: saving there marks it reviewed too. */
 async function approveIngredient(item, button) {
     if (button.disabled) return;
+    const unbacked = item.riskLevel === "harmful" ? evidenceProblem("harmful", item.sources) : "";
+    if (unbacked) { notify(`"${titleOf(item)}" was not approved. ${unbacked} Use Edit to add the page or to change the rating.`, "error"); return; }
     button.disabled = true;
     try {
         await updateDoc(doc(db, "ingredients", item.id), { reviewed: true, reviewedAt: serverTimestamp() });
@@ -1350,6 +1362,8 @@ function registerHelpers() {
         if (notReal + twice > 0) lines.push({ tone: "warn", text: [notReal > 0 ? `${many(notReal, "entry is", "entries are")} not an ingredient (a note, joined names or label text)` : "", twice > 0 ? `${many(twice, "ingredient has", "ingredients have")} more than one entry` : ""].filter((t) => t).join("; ") + ".", label: "Clean up", run: openCleanUp, tip: "You see every entry with the reason and confirm first. Nothing is deleted." });
         if (review > 0) lines.push({ tone: "info", text: `${many(review, "AI-found entry waits", "AI-found entries wait")} for review.`, label: showLabel(reviewing()), run: () => narrow(reviewing() ? "" : "review", "") });
         if (noNote > 0) lines.push({ tone: "warn", text: `${many(noNote, "flagged ingredient has", "flagged ingredients have")} no caution note, so app users see the warning without a reason.`, label: showLabel(quick === "noNote"), run: () => setQuick("noNote") });
+        const noEvidence = count("noEvidence");
+        if (noEvidence > 0) lines.push({ tone: "warn", text: `${many(noEvidence, "ingredient is", "ingredients are")} rated Harmful without a regulator's page. Add the page (EU, ASEAN, FDA Philippines or US FDA) or lower the rating to Caution.`, label: showLabel(quick === "noEvidence"), run: () => setQuick("noEvidence") });
         if (unused > 0) lines.push({ text: `${many(unused, "ingredient is", "ingredients are")} not in any listed product yet.`, label: showLabel(quick === "unused"), run: () => setQuick("unused") });
         if (binIngredients.length > 0) lines.push({ text: `${many(binIngredients.length, "ingredient is", "ingredients are")} in the Recycle bin.`, label: "Open the bin", run: () => org.show({ kind: "bin" }) });
         if (fromProducts.length > 0) lines.push({ tone: "info", text: `${many(fromProducts.length, "ingredient that products in the inventory list has", "ingredients that products in the inventory list have")} no entry here yet. Most used: ${fromProducts.slice(0, 4).map((x) => x.name).join(", ")}.`, label: "Show them", run: () => narrow(FROM_PRODUCTS, "") });

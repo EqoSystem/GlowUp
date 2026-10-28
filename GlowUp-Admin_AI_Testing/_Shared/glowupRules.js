@@ -626,3 +626,48 @@ export function describeSourceLine(source, confirmedWebsite) {
     const kind = sourceKind(source, confirmedWebsite);
     return { kind, ...SOURCE_KINDS[kind] };
 }
+
+// =============================================================================================
+//  6. Evidence tiers: which risk level a source may support (docs/DATA_SOURCE_POLICY.md)
+// =============================================================================================
+// Built on sourceKind above, which is NOT changed (the app and the Assist with AI server keep their own copies of it).
+//   tier 1  regulation: EU, ASEAN, FDA Philippines, US FDA and other regulators. May support "harmful" (prohibited or restricted).
+//   tier 2  safety-assessment and scientific bodies: CIR, DermNet, journals, universities; also nih.gov and who.int. May support "caution".
+//   tier 3  ingredient databases (INCI Beauty, INCIDecoder, CosmeticsInfo ...). Name, aliases, function, plain description only.
+//   tier 4  packaging side: the maker's confirmed site, retailers, public lists. Which ingredients a product contains, nothing about risk.
+//   0       a page that is not recognised: supports nothing.
+// The rule never says "unsafe"; it only decides how a rating must be backed up before it is kept.
+
+/** nih.gov (PubChem, PubMed) and who.int are labelled "regulator / government" by sourceKind but publish studies and databases, not regulation. */
+const NOT_REGULATION = ["nih.gov", "who.int"];
+const REGULATION_SITES = SOURCE_REGULATORS.filter((site) => !NOT_REGULATION.includes(site));
+
+/** 1 to 4 (see above), or 0 when the page is not recognised. `confirmedWebsite` is the brand's confirmed site, as for sourceKind. */
+export function evidenceTier(source, confirmedWebsite) {
+    const kind = sourceKind(source, confirmedWebsite);
+    if (kind === "regulator") return onSite(sourceHost(source), REGULATION_SITES) ? 1 : 2;
+    if (kind === "medical") return 2;
+    if (kind === "reference") return 3;
+    if (kind === "maker" || kind === "retailer" || kind === "public") return 4;
+    return 0;
+}
+
+/** The weakest tier number a risk level needs (a LOWER number is a stronger source): harmful needs tier 1, caution tier 1 or 2. */
+export const RISK_NEEDS_TIER = { harmful: 1, caution: 2 };
+
+/** The strongest tier among the sources (1 is the strongest); 0 when none of them is recognised. */
+export function bestEvidenceTier(sources) {
+    const tiers = (Array.isArray(sources) ? sources : []).map((source) => evidenceTier(source, "")).filter((tier) => tier > 0);
+    return tiers.length > 0 ? Math.min(...tiers) : 0;
+}
+
+/** "" when the sources back the risk level up, otherwise one sentence that says what is missing. "safe" and an empty level need nothing. */
+export function evidenceProblem(riskLevel, sources) {
+    const need = RISK_NEEDS_TIER[riskLevel];
+    if (!need) return "";
+    const best = bestEvidenceTier(sources);
+    if (best > 0 && best <= need) return "";
+    return riskLevel === "harmful"
+        ? "Harmful means a regulator prohibits or restricts the ingredient in cosmetics. Add the regulator's page (EU Cosmetics Regulation, ASEAN, FDA Philippines or US FDA) as a reference link, or choose Caution."
+        : "Caution needs a regulator's page or a page of a medical or scientific body (CIR, DermNet, a journal) as a reference link.";
+}
