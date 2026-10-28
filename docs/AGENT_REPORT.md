@@ -93,14 +93,40 @@ All website checks: `npm test` -> 13 files, ALL PASSED. Rules: `npm run test:rul
 1. **Publish the rules**: Firebase console > Firestore > Rules > paste `GlowUp-Admin_AI_Testing/firestore.rules` > Publish. Run `npm run test:rules` first.
 2. **Fill the contact details** in `Legal/PrivacyPolicyAndTerms.txt` (two `[add your support email here]`), and name a data protection officer.
 3. **Rotate or move the app's Gemini key**: it is compiled into the APK (`SecureProfileStore.cs`, ignored by Git, never in history). Restrict it in Google Cloud, or move the phone's AI calls behind a Vercel function.
-4. **Restrict the Firebase web / Android API keys** (they are public by design, in `firebase-console.js`, `api/assist-ingredient.js`, `google-services.json`) and **turn on App Check** (no App Check code exists yet).
+4. ~~Restrict the Firebase web key~~ **done on 28 October** (see "Follow-up" below). Still open: **turn on App Check** (no App Check code exists yet); the Android key and the Gemini keys (see below).
 5. Optionally **set the `admin` custom claim** with the Admin SDK for scripts.
-6. **Deploy the website** (`npx vercel --prod` from `GlowUp-Admin_AI_Testing/`) to get the import, OCR and evidence changes live, then try one import of each kind.
+6. ~~Deploy the website~~ **done on 28 October**. Still to do by a person: sign in and try one import of each kind (PDF, scanned PDF, Word, Excel, CSV).
 7. **Rebuild the app** in Unity and run the EditMode tests (Test Runner); the alcohol fix and the privacy text are in the app.
 8. Decide: separate consent for health data, parent confirmation for 13 to 17, birthday vs year and month, deleting a user's suggestions and snapshots with their account (`PRIVACY_NOTES.md` section 4).
 9. Add **real** fixtures to `tests/fixtures/ingredient-labels` (OCR text from the phone, list typed from the pack) and run `npm run eval:scanner`.
 10. Fill `tools/templates/t1_restricted_template.csv` from the regulation's annexes; review `cosing-restricted-review.csv` if CosIng is imported.
 11. Update the thesis text (`THESIS_FIXES.md`).
+
+## Follow-up on 28 October 2026 (the owner approved: "redeploy the website, restrict the API")
+
+- **Website deployed** to Vercel production twice (commit `c63b878`, then `35fa179`). Live at `https://glowup-admin-snowy.vercel.app`; the new code is
+  served; `tests/`, `tools/` and the rules file are not (404). The second production address `glowup-admin-eqo-system-s-projects.vercel.app`
+  is behind Vercel's own login (Deployment Protection).
+- **Firebase browser key restricted** (Google Cloud > APIs & Services > Credentials > "Browser key (auto created by Firebase)", project
+  `glowup-admin-portal`), done with the Firebase CLI login `azcueta176@gmail.com`. Its API list (27 Firebase services) is unchanged; it now works only
+  from `https://glowup-admin-snowy.vercel.app/*`, `https://glowup-admin-eqo-system-s-projects.vercel.app/*`, `https://glowup-admin-portal.firebaseapp.com/*`
+  and `https://glowup-admin-portal.web.app/*`. Before it accepted any site.
+  - The two Vercel functions call Google from the server, where there is no page, so they now send the production address as referrer
+    (`KEY_REFERER` in `api/assist-ingredient.js`, commit `35fa179`, deployed **before** the restriction).
+  - Checked after the change: with no referrer, and with another site, Google answers 403 "Requests from referer ... are blocked"; with each
+    website address it answers normally. On the live site, in a separate headless Chrome, a sign-in with an invented address reached Firebase
+    (`auth/invalid-credential`) and a public catalogue read worked.
+  - **If the website moves** to another address (a custom domain, a new Vercel project), add it to the key's referrer list first, and change
+    `KEY_REFERER`. Vercel preview addresses (`glowup-admin-<hash>-...vercel.app`) are not on the list. Local `vercel dev` on localhost is blocked too.
+  - **To undo**: same console page, Application restrictions > None.
+- **Not restricted, on purpose:**
+  - The **Android key** (`google-services.json`) is also the key the Unity **Editor** uses (`google-services-desktop.json`). Limiting it to the Android app
+    (package + signing SHA-1) would stop sign-in and Firestore in Play mode, and every teammate's debug keystore has its own SHA-1. It stays limited to the
+    Firebase APIs, as it already was.
+  - The **Gemini keys** in Google Cloud ("Gemini API Key" in `glowup-admin-portal`, "glowup-web-ai" in `gen-lang-client-0388484674`) were already limited to
+    the Gemini API only. An application restriction is not possible without breaking them: the Vercel functions have no fixed IP, and the app's direct
+    calls send no Android headers. The app's own AI key (`SecureProfileStore.cs`) did not match any key the CLI account can read; it may live in a
+    project this account cannot see (`glowup-9df1e` refused the listing). The real fix stays: move the app's AI calls behind a Vercel function.
 
 ## Open risks
 
