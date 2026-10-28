@@ -1,7 +1,10 @@
 # GlowUp import file format
 
 The website reads this format as it is (`_Shared/importFormat.js`): **no AI is used**, nothing is guessed, and a value that is
-`N/A`, `None` or empty stays empty. Any other document is still read by the AI as before.
+`N/A`, `None` or empty stays empty. A document that labels each product with `Brand:`, `Product:` and `Ingredients:` lines (a product sheet, a
+PDF or Word export of one) is also read without AI by `_Shared/ingredientBlock.js`: a product needs a brand, a name and at least 3 ingredient names,
+its make-up kind comes from a `Kind:` line or from the product name, and a product that lacks any of them is left out and named in the import's
+notes. Any other document is still read by the AI as before.
 
 - Word / PDF: one block per record, started by `=== BRAND ===`, `=== PRODUCT ===` or `=== INGREDIENT ===`; `KEY: value` lines; lists with ` | `.
 - Excel: one sheet; row 1 = the KEYS; one record per row.

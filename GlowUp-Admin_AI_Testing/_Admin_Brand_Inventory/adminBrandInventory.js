@@ -47,6 +47,7 @@ import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganize
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
 import { readAdminDocument, AI_TEXT_CHARACTERS } from "../_Shared/adminDocumentReader.js";
 import { parseImportText, pairShades, shadeCodeOf } from "../_Shared/importFormat.js";
+import { parseLabeledProducts } from "../_Shared/ingredientBlock.js";
 import { nearShade } from "../_Shared/listRules.js";
 import { mountIngredientPicker } from "../_Shared/adminIngredientPicker.js";
 import { openFacets } from "../_Shared/adminFacets.js";
@@ -850,8 +851,20 @@ async function importInventoryFile(file) {
             report("Reading the file's own fields. No AI is used.", false);
             body = { draft: keyed.draft, plain: true, notes: keyed.notes, message: keyed.notes.join(" ") };
         } else {
-            report("Asking the configured AI to extract brand and product fields. The file itself is not uploaded.", false);
-            body = await askInventoryAi({ mode: "import", documentText: documentText.slice(0, AI_TEXT_CHARACTERS) });
+            // a document that labels each product ("Brand:", "Product:", "Ingredients:") is read here too, with no AI and no quota; only a document
+            // this cannot read goes to the AI
+            const labeled = parseLabeledProducts(documentText);
+            if (labeled.kind === "inventory" && labeled.draft.products.length > 40) {
+                report(`This file has ${labeled.draft.products.length} products. At most 40 can be imported at once: split the file.`, true);
+                return;
+            }
+            if (labeled.kind === "inventory") {
+                report("Reading the labelled Brand / Product / Ingredients lines. No AI is used.", false);
+                body = { draft: labeled.draft, plain: true, notes: labeled.notes, message: labeled.notes.join(" ") };
+            } else {
+                report("Asking the configured AI to extract brand and product fields. The file itself is not uploaded.", false);
+                body = await askInventoryAi({ mode: "import", documentText: documentText.slice(0, AI_TEXT_CHARACTERS) });
+            }
         }
         const records = body.draft && Array.isArray(body.draft.products) ? body.draft.products : [];
         const brandRecords = body.draft && Array.isArray(body.draft.brands) ? body.draft.brands : [];
