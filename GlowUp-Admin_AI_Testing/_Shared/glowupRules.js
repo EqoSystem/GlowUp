@@ -632,8 +632,8 @@ export function describeSourceLine(source, confirmedWebsite) {
 // =============================================================================================
 // Built on sourceKind above, which is NOT changed (the app and the Assist with AI server keep their own copies of it).
 //   tier 1  regulation: EU, ASEAN, FDA Philippines, US FDA and other regulators. May support "harmful" (prohibited or restricted).
-//   tier 2  safety-assessment and scientific bodies: CIR, DermNet, journals, universities; also nih.gov and who.int. May support "caution".
-//   tier 3  ingredient databases (INCI Beauty, INCIDecoder, CosmeticsInfo ...). Name, aliases, function, plain description only.
+//   tier 2  safety-assessment and scientific bodies: CIR, DermNet, journals, universities; also nih.gov (PubMed) and who.int. May support "caution".
+//   tier 3  ingredient databases (INCI Beauty, INCIDecoder, CosmeticsInfo, PubChem, EU CosIng ...). Name, aliases, function, plain description only.
 //   tier 4  packaging side: the maker's confirmed site, retailers, public lists. Which ingredients a product contains, nothing about risk.
 //   0       a page that is not recognised: supports nothing.
 // The rule never says "unsafe"; it only decides how a rating must be backed up before it is kept.
@@ -642,10 +642,18 @@ export function describeSourceLine(source, confirmedWebsite) {
 const NOT_REGULATION = ["nih.gov", "who.int"];
 const REGULATION_SITES = SOURCE_REGULATORS.filter((site) => !NOT_REGULATION.includes(site));
 
+/** Ingredient DATABASES that sit on a regulator's host: PubChem (nih.gov) and the EU's CosIng (europa.eu). They explain what a substance is (tier 3); they are not regulation. */
+function isDatabasePage(source) {
+    const plain = plainAddress(sourceAddress(source));
+    if (!plain) return false;
+    const host = withoutWww(plain.host), path = plain.path.toLowerCase();
+    return host === "pubchem.ncbi.nlm.nih.gov" || (onSite(host, ["europa.eu"]) && (path.includes("/cosing") || path.includes("cosmetic-ingredient-database")));
+}
+
 /** 1 to 4 (see above), or 0 when the page is not recognised. `confirmedWebsite` is the brand's confirmed site, as for sourceKind. */
 export function evidenceTier(source, confirmedWebsite) {
     const kind = sourceKind(source, confirmedWebsite);
-    if (kind === "regulator") return onSite(sourceHost(source), REGULATION_SITES) ? 1 : 2;
+    if (kind === "regulator") return isDatabasePage(source) ? 3 : onSite(sourceHost(source), REGULATION_SITES) ? 1 : 2;
     if (kind === "medical") return 2;
     if (kind === "reference") return 3;
     if (kind === "maker" || kind === "retailer" || kind === "public") return 4;

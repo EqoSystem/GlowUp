@@ -1,0 +1,12 @@
+{
+  "name": "glowup",
+  "private": true,
+  "description": "Convenience scripts for the checks of the GlowUp repository. The Unity app itself is built with Unity; there is nothing to install here.",
+  "scripts": {
+    "test": "node GlowUp-Admin_AI_Testing/tests/run-all.mjs",
+    "test:rules": "npm --prefix GlowUp-Admin_AI_Testing/tests/rules test",
+    "emulators": "npm --prefix GlowUp-Admin_AI_Testing/tests/rules run emulators",
+    "seed:dev": "node GlowUp-Admin_AI_Testing/tools/seedDev.mjs",
+    "eval:scanner": "dotnet run --project tools/ScannerEval -- tests/fixtures/ingredient-labels"
+  }
+}

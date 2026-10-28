@@ -139,6 +139,17 @@ equal(pairShades(["#E8C9A5"], undefined), { shades: ["#E8C9A5"], codes: [""] }, 
 equal(pairShades("nothing", 5), { shades: [], codes: [] }, "not lists");
 equal(pairShades(["#111111", "#222222", "#333333"], ["1", "2", "3"], 2), { shades: ["#111111", "#222222"], codes: ["1", "2"] }, "at most as many as allowed");
 
+// a plain .csv file (the reader gives its text as it is, without a "SHEET:" line): row 1 holds the keys
+{
+    const csv = "NAME,LABEL_NAME,OTHER_NAMES,RISK_LEVEL,SOURCES\nGlycerin,Glycerin,Glycerine | Glycerol,,\n\"Alcohol Denat., test\",Alcohol Denat.,,caution,https://eur-lex.europa.eu/x\n";
+    const out = parseImportText(csv);
+    equal(out.kind, "ingredients", "a plain CSV with ingredient keys is read as ingredients");
+    equal(out.draft.ingredients.map((i) => i.name), ["Glycerin", "Alcohol Denat., test"], "csv: the names, a quoted comma stays inside the name");
+    equal(out.draft.ingredients[0].aliases, ["Glycerine", "Glycerol"], "csv: a list in one cell");
+    equal(out.draft.ingredients[1].riskLevel + "|" + out.draft.ingredients[1].sources.length, "caution|1", "csv: the risk level and the source link");
+    equal(parseImportText("BRAND_NAME,PRODUCT_NAME,COSMETIC_TYPE,INGREDIENTS\nExamplebrand,Velvet Lipstick,Lipstick,Mica | Talc | Silica\n").draft.products.length, 1, "csv: a product row");
+}
+
 console.log("checks made: " + checks);
 console.log(failed === 0 ? "ALL PASSED" : failed + " FAILED");
 process.exit(failed === 0 ? 0 : 1);

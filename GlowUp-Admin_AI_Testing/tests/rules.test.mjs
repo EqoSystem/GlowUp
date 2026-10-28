@@ -158,7 +158,10 @@ check(rules.matchesSearch("maybelline lipstick", ["Superstay Matte Ink", "Maybel
 equal(rules.evidenceTier("Annex II | https://eur-lex.europa.eu/eli/reg/2009/1223/oj", ""), 1, "an EU regulation page is tier 1");
 equal(rules.evidenceTier("FDA PH | https://verification.fda.gov.ph/x", ""), 1, "FDA Philippines is tier 1");
 equal(rules.evidenceTier("US FDA | https://www.fda.gov/cosmetics/cosmetic-ingredients", ""), 1, "US FDA is tier 1");
-equal(rules.evidenceTier("PubChem | https://pubchem.ncbi.nlm.nih.gov/compound/1", ""), 2, "PubChem is labelled a regulator by sourceKind, but it is not regulation: tier 2");
+equal(rules.evidenceTier("PubChem | https://pubchem.ncbi.nlm.nih.gov/compound/1", ""), 3, "PubChem is a database, although sourceKind labels nih.gov a regulator: tier 3");
+equal(rules.evidenceTier("PubMed | https://pubmed.ncbi.nlm.nih.gov/123/", ""), 2, "PubMed (a study) is tier 2");
+equal(rules.evidenceTier("CosIng | https://ec.europa.eu/growth/tools-databases/cosing/details/12345", ""), 3, "EU CosIng is a database: tier 3, not regulation");
+equal(rules.evidenceTier("CosIng | https://single-market-economy.ec.europa.eu/sectors/cosmetics/cosmetic-ingredient-database_en", ""), 3, "the new CosIng address is tier 3 too");
 equal(rules.evidenceTier("WHO | https://www.who.int/x", ""), 2, "who.int is tier 2");
 equal(rules.evidenceTier("CIR | https://cir-reports.cir-safety.org/x", ""), 2, "CIR is tier 2");
 equal(rules.evidenceTier("DermNet | https://dermnetnz.org/topics/x", ""), 2, "DermNet is tier 2");

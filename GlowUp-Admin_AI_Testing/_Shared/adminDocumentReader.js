@@ -68,7 +68,7 @@ async function readWord(file) {
 
 /** Reads supported office/PDF formats in this browser; only extracted text is sent to the admin AI endpoint. */
 export async function readAdminDocument(file) {
-    if (!file) throw new Error("Choose a PDF, Excel, or Word document.");
+    if (!file) throw new Error("Choose a PDF, Excel, Word, CSV or text file.");
     if (file.size > MAX_FILE_BYTES) throw new Error("The document is larger than 15 MB. Split it into smaller files and try again.");
     const extension = (file.name.split(".").pop() || "").toLowerCase();
     const isPdf = extension === "pdf" || file.type === "application/pdf";
@@ -76,7 +76,8 @@ export async function readAdminDocument(file) {
     if (isPdf) text = await readPdf(file);
     else if (["xlsx", "xls"].includes(extension)) text = await readSpreadsheet(file);
     else if (extension === "docx") text = await readWord(file);
-    else throw new Error("Use a PDF, .xlsx/.xls Excel workbook, or .docx Word document.");
+    else if (["csv", "txt"].includes(extension) || file.type === "text/csv" || file.type === "text/plain") text = await file.text();      // plain text: no library, nothing leaves the browser
+    else throw new Error("Use a PDF, .xlsx/.xls Excel workbook, .docx Word document, .csv or .txt file.");
     const clean = String(text || "").replace(/\u0000/g, "").trim().slice(0, MAX_TEXT_CHARACTERS);
     if (clean.length < 20) {
         if (isPdf) throw new Error("No selectable text was found in this PDF. It may be scanned; use a text-based PDF or convert it with OCR first.");

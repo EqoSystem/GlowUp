@@ -85,13 +85,13 @@
                     <h3 class="panel-title">Import from a file</h3>
                     <span class="spacer"></span>
                     <button type="button" class="btn" id="chooseInventoryFileBtn"><i data-icon="upload"></i>Choose file</button>
-                    <input id="inventoryFileInput" type="file" accept=".pdf,.xlsx,.xls,.docx,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+                    <input id="inventoryFileInput" type="file" accept=".pdf,.xlsx,.xls,.docx,.csv,.txt,text/csv,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
                 </div>
                 <button type="button" id="inventoryDropBox" class="import-dropbox" aria-describedby="inventoryImportHint">
                     <span class="import-drop-icon"><i data-icon="upload"></i></span>
                     <span><strong>Drop a PDF, Excel, or Word file here</strong><small id="inventoryImportHint">Reads brand, product, cosmetic type, ingredients, source links, and shade colors. Imported entries are saved as Pending for admin review.</small></span>
                 </button>
-                <p class="import-types">Accepted: PDF (.pdf), Excel (.xlsx, .xls), Word (.docx)</p>
+                <p class="import-types">Accepted: PDF (.pdf), Excel (.xlsx, .xls), Word (.docx), CSV (.csv), text (.txt)</p>
                 <p class="field-hint import-status" id="inventoryImportStatus" role="status" aria-live="polite">Ready for readable PDFs, Excel workbooks, and Word documents. Text is extracted in your browser; only the extracted text is analyzed.</p>
                 <!-- what the last import FLAGGED: skin care and other non-make-up records (not saved), and make-up whose kind is unclear (saved, to check) -->
                 <div class="import-flags" id="inventoryImportFlags" hidden></div>
