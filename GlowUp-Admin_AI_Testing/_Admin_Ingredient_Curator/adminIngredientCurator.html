@@ -92,7 +92,7 @@
                 </div>
                 <button type="button" id="ingredientDropBox" class="import-dropbox" aria-describedby="ingredientImportHint">
                     <span class="import-drop-icon"><i data-icon="upload"></i></span>
-                    <span><strong>Drop a PDF, Excel, or Word file here</strong><small id="ingredientImportHint">Only ingredient data is accepted: name, scientific name, other names and description. Brand and product data in the file is ignored.</small></span>
+                    <span><strong>Drop a PDF, Excel, or Word file here</strong><small id="ingredientImportHint">Only ingredient data is accepted: name, INCI name, other names and description. Brand and product data in the file is ignored.</small></span>
                 </button>
                 <p class="import-types">Accepted: PDF (.pdf), Excel (.xlsx), Word (.docx), CSV (.csv), text (.txt). Up to 5 MB.</p>
                 <p class="field-hint import-status" id="ingredientImportStatus" role="status" aria-live="polite">The text is read in your browser; only the extracted text is sent to the AI. Entries are saved as Pending for your review.</p>
@@ -129,13 +129,13 @@
                 <div class="panel-head">
                     <button type="button" class="pick" data-pick-all role="checkbox" aria-checked="false" aria-label="Select all shown" data-tip="Select every ingredient shown here."></button>
                     <h3 class="panel-title">Ingredients</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Ingredients" data-tip="A card shows the name and the scientific name. Click it for everything else; double-click to edit. An entry here takes priority over the app's own built-in wording." data-tip-preview="Drag cards onto a folder or the Recycle bin. The small box picks a card; Ctrl+click picks several.">i</button>
+                    <button type="button" class="guide-badge" data-tip-title="Ingredients" data-tip="A card shows the name and the INCI name. Click it for everything else; double-click to edit. An entry here takes priority over the app's own built-in wording." data-tip-preview="Drag cards onto a folder or the Recycle bin. The small box picks a card; Ctrl+click picks several.">i</button>
                     <span class="panel-count" hidden id="ingredientCountLine"></span>
                     <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most harmful, waiting for review, most used, or newest." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button></span>
                     <span id="ingredientQuick"></span>
                     <span class="spacer"></span>
                     <div class="segmented" hidden id="listLayoutSwitch" role="group" aria-label="How the ingredients are listed">
-                        <button type="button" class="seg" data-layout="rows" aria-pressed="true" data-tip-title="Rows" data-tip="One ingredient per line: name, scientific name and how the app judges it."><i data-icon="list"></i>Rows</button>
+                        <button type="button" class="seg" data-layout="rows" aria-pressed="true" data-tip-title="Rows" data-tip="One ingredient per line: name, INCI name and how the app judges it."><i data-icon="list"></i>Rows</button>
                         <button type="button" class="seg" data-layout="cards" aria-pressed="false" data-tip-title="Cards" data-tip="Ingredients as cards, several side by side."><i data-icon="layers"></i>Cards</button>
                     </div>
                     <div class="pager" id="ingredientPagerTop"></div>
@@ -175,7 +175,7 @@
                         <input type="text" id="ingredientNameInput" maxlength="80" placeholder="e.g., Vitamin B3" autocomplete="off">
                     </div>
                     <div class="field">
-                        <label for="ingredientTechInput">Technical / Scientific Name <span class="required">*</span></label>
+                        <label for="ingredientTechInput">INCI Name (as printed on labels) <span class="required">*</span></label>
                         <input type="text" id="ingredientTechInput" maxlength="120" placeholder="e.g., Niacinamide" autocomplete="off">
                         <span class="field-hint">As it is printed on labels. The app matches scanned text against this name.</span>
                     </div>

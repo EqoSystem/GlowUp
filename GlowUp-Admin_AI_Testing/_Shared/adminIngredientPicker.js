@@ -221,7 +221,7 @@ export function mountIngredientPicker(options) {
         const cancel = make("button", "cancel-btn", "Cancel"); cancel.type = "button";
         const save = make("button", "save-btn", "Create and add"); save.type = "submit";
         actions.append(cancel, save);
-        form.append(field("Ingredient name", nameInput), field("Technical / scientific name", techInput), field("Plain-words definition", descInput), field("How the app judges it", riskInput), error, actions);
+        form.append(field("Ingredient name", nameInput), field("INCI name (as printed on labels)", techInput), field("Plain-words definition", descInput), field("How the app judges it", riskInput), error, actions);
         frame.box.append(note, form);
         cancel.addEventListener("click", () => frame.close());
         form.addEventListener("submit", async (event) => {

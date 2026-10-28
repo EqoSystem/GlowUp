@@ -545,7 +545,7 @@ function cardOf(item, inBin) {
                 <span class="spacer"></span>
                 <div class="btn-group row-actions">${buttons.join("")}</div>
             </header>
-            <div class="card-sub"><p class="ingredient-tech">${escapeHtml(item.techName || "No scientific name")}</p>${review ? statusBadge("Pending") : ""}${toneBadge(RISK_NAMES[item.riskLevel || "auto"], toneOfRisk(item.riskLevel), riskText)}</div>
+            <div class="card-sub"><p class="ingredient-tech">${escapeHtml(item.techName || "No INCI name")}</p>${review ? statusBadge("Pending") : ""}${toneBadge(RISK_NAMES[item.riskLevel || "auto"], toneOfRisk(item.riskLevel), riskText)}</div>
             ${open ? detailOf(item, inBin) : ""}
         </article>`;
 }
@@ -1188,7 +1188,7 @@ async function saveIngredient(event) {
     const avoidTypes = types.avoid, goodTypes = types.good, avoidConditions = conditions.avoid, goodConditions = conditions.good;
 
     if (!name) { setFormError(form, "Type the ingredient name."); el("ingredientNameInput").focus(); return; }
-    if (!techName) { setFormError(form, "Type the technical / scientific name (the name printed on labels)."); el("ingredientTechInput").focus(); return; }
+    if (!techName) { setFormError(form, "Type the INCI name (the name printed on labels)."); el("ingredientTechInput").focus(); return; }
     if (!description) { setFormError(form, "Write a short user-friendly definition."); el("ingredientDescInput").focus(); return; }
     // reference links: one per line, "Title | https://..." or just the address; only https is kept
     const sourceLines = el("ingredientSourcesInput").value.split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
@@ -1371,7 +1371,7 @@ function registerHelpers() {
         if (binIngredients.length > 0) lines.push({ text: `${many(binIngredients.length, "ingredient is", "ingredients are")} in the Recycle bin.`, label: "Open the bin", run: () => org.show({ kind: "bin" }) });
         if (fromProducts.length > 0) lines.push({ tone: "info", text: `${many(fromProducts.length, "ingredient that products in the inventory list has", "ingredients that products in the inventory list have")} no entry here yet. Most used: ${fromProducts.slice(0, 4).map((x) => x.name).join(", ")}.`, label: "Show them", run: () => narrow(FROM_PRODUCTS, "") });
         if (fdaBrands.length > 0) lines.push({ tone: "ok", text: `Brands checked on the FDA Philippines list (${fdaBrands.length}): ${fdaBrands.slice(0, 10).join(", ")}${fdaBrands.length > 10 ? ` and ${fdaBrands.length - 10} more` : ""}. The FDA list names products, not ingredients, so their ingredients arrive here when the products are scanned.`, label: "Open the inventory", run: () => { window.location.href = "../_Admin_Brand_Inventory/adminBrandInventory.html"; } });
-        lines.push({ text: "A card shows the name and the scientific name. Click it for everything else; double-click to edit." });
+        lines.push({ text: "A card shows the name and the INCI name. Click it for everything else; double-click to edit." });
         return lines;
     }, { notes: "notesList" });
 }
