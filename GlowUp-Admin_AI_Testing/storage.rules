@@ -1,0 +1,14 @@
+rules_version = '2';
+
+// GlowUp does not use Firebase Storage (it needs the paid Blaze plan; pictures are kept as web addresses, and the one photo a snapshot
+// needs is a small JPEG inside Firestore: pending_product_images). This file closes Storage completely, so that turning it on later
+// cannot expose anything. It is NOT listed in firebase.json on purpose: publishing it would need Storage to be set up first.
+// To use Storage one day: add { "storage": { "rules": "storage.rules" } } to firebase.json, then write rules that allow only
+// admins (custom claim admin = true) to write, and nobody to list.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

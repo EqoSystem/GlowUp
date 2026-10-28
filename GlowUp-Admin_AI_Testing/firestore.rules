@@ -15,9 +15,13 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // An admin is an account whose UID is the id of a document in "admins".
+    // An admin is an account whose UID is the id of a document in "admins", OR an account that carries the custom claim admin = true
+    // (set with the Firebase Admin SDK, never from a browser or the app: a claim cannot be changed by its owner). The website's login
+    // gate still looks at "admins"; the claim is for scripts and tools that sign in as an admin. Neither path can be set from the app.
     function isAdmin() {
-      return signedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+      return signedIn()
+        && (request.auth.token.get('admin', false) == true
+            || exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
     }
 
     function isOwner(uid) {
@@ -246,13 +250,20 @@ service cloud.firestore {
     }
 
     // ---- anonymous scan notes for the dashboard: the app adds them, only admins read them ----
+    // The sizes are generous (the app sends at most 10 flagged names); they only stop a script from filling the dashboard with huge notes.
     match /scanActivity/{activityId} {
       allow create: if signedIn()
         && request.resource.data.keys().hasOnly([
              'productName', 'brandId', 'brandName', 'cosmeticType', 'status', 'source', 'scannedAtUnix',
              'ingredientCount', 'harmfulCount', 'cautionCount', 'allergenFlagged', 'flaggedIngredients'])
         && request.resource.data.status in ['safe', 'caution', 'harmful']
-        && request.resource.data.scannedAtUnix is number;
+        && request.resource.data.scannedAtUnix is number
+        && request.resource.data.get('productName', '') is string && request.resource.data.get('productName', '').size() <= 200
+        && request.resource.data.get('brandId', '') is string && request.resource.data.get('brandId', '').size() <= 200
+        && request.resource.data.get('brandName', '') is string && request.resource.data.get('brandName', '').size() <= 200
+        && request.resource.data.get('cosmeticType', '') is string && request.resource.data.get('cosmeticType', '').size() <= 100
+        && request.resource.data.get('source', '') is string && request.resource.data.get('source', '').size() <= 20
+        && request.resource.data.get('flaggedIngredients', []) is list && request.resource.data.get('flaggedIngredients', []).size() <= 50;
       allow read, delete: if isAdmin();
     }
 
@@ -278,11 +289,14 @@ service cloud.firestore {
 
     // ---- AI photo snapshots: products the catalogue does not have, read by the AI from one photo -------------
     // Staged here, NOT in "products", so unverified user content never mixes with the curated catalogue. Signed-in app users
-    // may read them (the app uses only the sender's OWN entry; another user's entry is unverified and never feeds a verdict) and create
-    // one: always pending, never approved, their own id, make-up only, short lists. Only an admin approves, edits or deletes.
+    // may read their OWN entry and create one: always pending, never approved, their own id, make-up only, short lists. Only an admin approves, edits or deletes.
     // The id is made from the brand and the name ("snap_<brand>__<name>"), so the same product is ONE entry for everybody.
+    // Read: the sender's own entry, or an admin. The app only ever reads the entry whose id ends with the user's own id, so another user's
+    // entry (a product name and the sender's id) is no longer readable by every signed-in account. A document that does not exist may be
+    // asked for (resource == null), so the app still gets "not found" instead of an error.
     match /pending_products/{pendingId} {
-      allow read: if signedIn();
+      allow get: if signedIn() && (resource == null || resource.data.createdByUid == request.auth.uid || isAdmin());
+      allow list: if isAdmin();
       allow create: if signedIn()
         && pendingId.matches('snap_.+') && pendingId.size() <= 110
         && request.resource.data.key is string && request.resource.data.name is string && request.resource.data.brandName is string

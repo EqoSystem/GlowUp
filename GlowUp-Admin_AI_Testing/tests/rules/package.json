@@ -1,0 +1,14 @@
+{
+  "name": "glowup-rules-tests",
+  "private": true,
+  "type": "module",
+  "description": "Checks firestore.rules against the Firestore emulator. Needs Java 11 or newer on the PATH (see ../../../docs/AGENT_REPORT.md, How to run and test).",
+  "scripts": {
+    "test": "firebase emulators:exec --config ../../firebase.json --only firestore --project demo-glowup \"node firestore.rules.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "3.0.4",
+    "firebase": "10.14.1",
+    "firebase-tools": "13.29.1"
+  }
+}

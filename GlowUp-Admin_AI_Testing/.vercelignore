@@ -2,6 +2,7 @@
 firebase_unity_sdk_13.17.0
 google-services*.json
 firestore.rules
+storage.rules
 FIRESTORE_SCHEMA.md
 *.md
 
