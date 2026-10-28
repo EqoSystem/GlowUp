@@ -1,0 +1,24 @@
+flowchart TB
+  A["Admin"]
+  Q1(("2.1 Fill product form<br/>or import a file"))
+  Q2(("2.2 Validate: https links,<br/>FDA number, name, brand,<br/>type, make-up scope,<br/>ingredients, age, duplicate"))
+  Q3(("2.3 Link ingredients:<br/>ingredientIds, count,<br/>notes, tags"))
+  Q4(("2.4 Write product<br/>(rules: adminCatalogueWrite)"))
+  Q5(("2.5 Approve: status Active,<br/>reviewed true"))
+  Q6(("3.0 App sync:<br/>changed entries only"))
+  D1[("D1 products")]
+  D1b[("D1 ingredients")]
+  DS[("browser copy<br/>adminStore.js")]
+  D5[("D5 phone ProductIndex")]
+  A --> Q1
+  Q1 --> Q2
+  Q2 -->|"error message on the form"| A
+  Q2 --> Q3
+  D1b --> Q3
+  Q3 --> Q4
+  Q4 --> D1
+  Q4 --> DS
+  A --> Q5
+  Q5 --> D1
+  D1 --> Q6
+  Q6 --> D5

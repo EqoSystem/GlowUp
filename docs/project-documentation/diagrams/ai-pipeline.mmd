@@ -1,0 +1,22 @@
+flowchart TB
+  c0["Tap Start Scan<br/>(camera on, Full HD)"] --> c1["Frame quality gate:<br/>dark, glare, moving, blurry"]
+  c1 -->|"bad: hint Hold steadier"| c0
+  c1 -->|"good"| c2["ML Kit on phone:<br/>text lines + confidence + barcode"]
+  c2 --> c3["Keep primary-label lines only<br/>(ScanEvidence.PrimaryLabelOnly)"]
+  c3 --> c4{"Barcode or exact name<br/>in local ProductIndex?"}
+  c4 -->|"yes"| ok["Product known:<br/>use its stored ingredient list"]
+  c4 -->|"no"| c5{"Pack look matches a pack<br/>this phone saw?<br/>(MobileNet embedding)"}
+  c5 -->|"yes"| q["Ask: Is this ...?"]
+  q -->|"yes"| ok
+  c5 -->|"no"| c6["Firestore look-up by<br/>brand + name"]
+  c6 -->|"found with list"| ok
+  c6 -->|"miss"| c7{"Own staged snapshot?"}
+  c7 -->|"yes"| ok2["Use staged list<br/>(PENDING APPROVAL)"]
+  c7 -->|"no, online, AI budget left"| c8["Gemini: Identify photo,<br/>then ConfirmOnWeb with sources"]
+  c8 -->|"same product + sourced list"| ok3["Use web list<br/>(source shown)"]
+  c8 -->|"no"| c9["Offer: one photo snapshot,<br/>shortlist, type it in"]
+  ok --> an["ProductAnalysisEngine:<br/>allergens, skin type, conditions, age"]
+  ok2 --> an
+  ok3 --> an
+  an --> v["Verdict safe / caution / harmful<br/>+ count not checked"]
+  v --> r["Result screen"]

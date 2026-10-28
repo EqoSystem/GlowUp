@@ -1,0 +1,110 @@
+<h1><span class="part">Appendices</span>Appendix A. File map (important files)</h1>
+<table data-caption="Important files, one line each" class="compact">
+<thead><tr><th style="width:44%">File</th><th>What it is</th></tr></thead>
+<tbody>
+<tr><td><code>CLAUDE.md</code>, <code>CLEANUP_LOG.md</code></td><td>Project rules and folder map; clean-up record and key check of 20 Oct 2026</td></tr>
+<tr><td colspan="2"><b>App (GlowUp/Assets/_Project/)</b></td></tr>
+<tr><td><code>Scripts/Scan/SmartScanFlowController.cs</code></td><td>The scanner screen: reading loop, recognition chain, AI calls, typed entry, snapshot</td></tr>
+<tr><td><code>Scripts/Scan/ScanAnalysisPipeline.cs</code></td><td>Work done in the loading screen: lists, analysis, FDA, OBF, saving</td></tr>
+<tr><td><code>Scripts/Scan/ProductAnalysisEngine.cs</code></td><td>Ingredient-by-ingredient verdict against the profile</td></tr>
+<tr><td><code>Scripts/Scan/ProductRecommender.cs</code></td><td>Who may be recommended what</td></tr>
+<tr><td><code>Scripts/Scan/ProductScope.cs</code></td><td>Make-up-only rule</td></tr>
+<tr><td><code>Scripts/Scan/ProductAiAdvisor.cs</code>, <code>IngredientResearcher.cs</code></td><td>Gemini prompts for products and unknown ingredients</td></tr>
+<tr><td><code>Scripts/Scan/ScanEvidence.cs</code>, <code>ScanTextMerger.cs</code>, <code>FrameQuality.cs</code>, <code>ScanRules.cs</code></td><td>Quality gate, zones, merging, tunable numbers</td></tr>
+<tr><td><code>Scripts/Scan/PackEmbedder.cs</code>, <code>PackagingMemory.cs</code></td><td>Pack-look model and memory</td></tr>
+<tr><td><code>Scripts/Scan/ListSources.cs</code>, <code>OpenBeautyFacts.cs</code>, <code>PhFdaVerification.cs</code>, <code>FdaSubstanceRegistry.cs</code></td><td>List sources, second opinion, FDA checks</td></tr>
+<tr><td><code>Scripts/Scan/ScanSnapshotController.cs</code>, <code>ScanPhotoService.cs</code></td><td>One-photo fallback to the server function</td></tr>
+<tr><td><code>Scripts/Data/*.cs</code></td><td>Repositories, CatalogSync, ProductIndex, OfflineCache, SyncQueue, models</td></tr>
+<tr><td><code>Scripts/AR/*.cs</code>, <code>Shaders/FaceMakeupBlend.shader</code></td><td>AR Try-On</td></tr>
+<tr><td><code>Scripts/Auth/*.cs</code>, <code>Scripts/Onboarding/*.cs</code></td><td>Log-in, sign-up, profile steps, Terms</td></tr>
+<tr><td><code>Scripts/Security/SecureProfileStore.cs</code></td><td>Holds the app's AI key; NOT in Git (must be copied in by hand)</td></tr>
+<tr><td><code>Editor/*SceneBuilder.cs</code>, <code>SceneBuilderCore.cs</code>, <code>AllScenesBuilder.cs</code></td><td>Generate every scene</td></tr>
+<tr><td><code>Editor/ArFaceTrackingSetup.cs</code>, <code>AndroidApkBuilder.cs</code>, <code>GlowUpProjectSetup.cs</code></td><td>Android build settings, Gradle libraries, APK build</td></tr>
+<tr><td><code>Editor/Tests/</code></td><td>231 EditMode tests, <code>MakeupScopeCases.txt</code>, <code>SharedRuleCases.txt</code></td></tr>
+<tr><td><code>Legal/PrivacyPolicyAndTerms.txt</code></td><td>In-app Privacy Policy and Terms (draft)</td></tr>
+<tr><td><code>Assets/Plugins/Android/GlowUp*.java</code></td><td>Java bridges: text reader, frame reader, barcode, pack embedder, hand reader, torch, screen, autofill</td></tr>
+<tr><td colspan="2"><b>Website (GlowUp-Admin_AI_Testing/)</b></td></tr>
+<tr><td><code>firestore.rules</code></td><td>Database security rules</td></tr>
+<tr><td><code>FIRESTORE_SCHEMA.md</code>, <code>IMPORT_FORMAT.md</code></td><td>Data contract; import file format</td></tr>
+<tr><td><code>vercel.json</code>, <code>firebase.json</code>, <code>.firebaserc</code>, <code>.vercelignore</code></td><td>Hosting, headers, functions; Firebase CLI</td></tr>
+<tr><td><code>_Index/</code>, <code>_Admin_*/</code></td><td>The five pages</td></tr>
+<tr><td><code>_Shared/adminCommon.js</code>, <code>adminStore.js</code>, <code>pageFrame.js</code>, <code>adminShell.js</code></td><td>Guard, data copy, frame, shell</td></tr>
+<tr><td><code>_Shared/glowupRules.js</code>, <code>glowupCatalog.js</code>, <code>importFormat.js</code></td><td>Shared rules, catalogue checks, plain import</td></tr>
+<tr><td><code>api/assist-ingredient.js</code>, <code>api/scan-snapshot.js</code></td><td>AI server functions</td></tr>
+<tr><td><code>tests/*.test.mjs</code>, <code>tools/*.mjs</code></td><td>Tests; read-only backup and clean-up report</td></tr>
+</tbody></table>
+
+<h1><span class="part">Appendices</span>Appendix B. Environment and configuration names (no values)</h1>
+<table data-caption="Configuration and secret names" class="compact">
+<thead><tr><th style="width:32%">Name</th><th style="width:24%">Where</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>GLOWUP_WEB_AI</code> (fallback <code>GEMINI_API_KEY</code>)</td><td>Vercel environment</td><td>Gemini key for both functions</td></tr>
+<tr><td><code>GEMINI_MODELS</code></td><td>Vercel environment</td><td>Comma-separated model order</td></tr>
+<tr><td><code>GROQ_API_KEY</code>, <code>GROQ_MODEL</code></td><td>Vercel environment</td><td>First backup for Assist with AI</td></tr>
+<tr><td><code>MISTRAL_API_KEY</code>, <code>MISTRAL_MODEL</code></td><td>Vercel environment</td><td>Second backup</td></tr>
+<tr><td><code>OPENROUTER_API_KEY</code>, <code>OPENROUTER_MODEL</code></td><td>Vercel environment</td><td>Optional last backup</td></tr>
+<tr><td><code>VERCEL_OIDC_TOKEN</code></td><td><code>.env.local</code> (git-ignored)</td><td>Short-lived Vercel CLI token; delete after use</td></tr>
+<tr><td>Firebase web config: <code>apiKey</code>, <code>authDomain</code>, <code>projectId</code>, <code>storageBucket</code>, <code>messagingSenderId</code>, <code>appId</code></td><td><code>_Database/firebase-console.js</code>; web key also in <code>api/assist-ingredient.js</code></td><td>Public client config; restrict the key in Google Cloud</td></tr>
+<tr><td><code>google-services.json</code></td><td><code>GlowUp/Assets/</code></td><td>Android Firebase config (package name, SHA fingerprints)</td></tr>
+<tr><td><code>SecureProfileStore.GetApiKey()</code></td><td><code>Scripts/Security/SecureProfileStore.cs</code> (git-ignored)</td><td>The app's Gemini key</td></tr>
+<tr><td><code>GeminiApiConfig_Default.asset</code></td><td><code>Scripts/Scanning/</code></td><td>Model chain and base URL (no key)</td></tr>
+<tr><td><code>REQUIRE_ADMIN_RECORD</code></td><td><code>_Shared/adminCommon.js</code></td><td>Refuse non-admin accounts at log-in (true)</td></tr>
+<tr><td><code>ScanRules.asset</code>, <code>PerformanceProfile.asset</code></td><td><code>_Project/Resources/</code></td><td>Tunable scan, sync, AI and performance numbers</td></tr>
+<tr><td><code>functionUrl</code> (Inspector)</td><td>ScanSnapshotController</td><td>Address of <code>/api/scan-snapshot</code></td></tr>
+<tr><td>PlayerPrefs <code>GlowUp.ArDebug</code></td><td>Phone</td><td>Switches on the AR fps overlay</td></tr>
+<tr><td>PlayerPrefs <code>GlowUp.OfflineHash.&lt;email&gt;</code></td><td>Phone</td><td>Argon2id verifier for offline log-in</td></tr>
+<tr><td><code>COOLDOWN_SECONDS</code>, <code>PER_UID_DAILY</code>, <code>GLOBAL_DAILY</code></td><td><code>api/scan-snapshot.js</code> (must equal the rules)</td><td>Snapshot limits 30 s, 5, 150</td></tr>
+</tbody></table>
+
+<h1><span class="part">Appendices</span>Appendix C. Glossary</h1>
+<table data-caption="Glossary" class="compact">
+<thead><tr><th style="width:22%">Term</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>INCI</td><td>International Nomenclature of Cosmetic Ingredients: the standard ingredient names printed on cosmetics (e.g. "Aqua", "CI 77491").</td></tr>
+<tr><td>OCR</td><td>Optical character recognition: turning a picture of text into text. GlowUp uses Google ML Kit on the phone.</td></tr>
+<tr><td>AR</td><td>Augmented reality: drawing virtual make-up over the live camera picture of the face.</td></tr>
+<tr><td>ARCore / AR Foundation</td><td>Google's AR service on Android / Unity's layer over it.</td></tr>
+<tr><td>Face mesh / landmark</td><td>A 3-D surface (mesh) or set of points (landmarks) that follows the face; GlowUp uses ARCore's mesh.</td></tr>
+<tr><td>Embedding</td><td>A list of numbers that describes a picture; similar pictures give similar numbers.</td></tr>
+<tr><td>MobileNet / MediaPipe</td><td>A small image model / Google's on-device ML toolkit that runs it.</td></tr>
+<tr><td>LLM / Gemini</td><td>Large language model; Gemini is Google's, used here with images and web search.</td></tr>
+<tr><td>Firestore</td><td>Google's NoSQL document database in Firebase.</td></tr>
+<tr><td>Security rules</td><td>Server-side conditions in Firestore that allow or refuse each read and write.</td></tr>
+<tr><td>Collection / document</td><td>A named group of records / one record (JSON-like) in Firestore.</td></tr>
+<tr><td>Vercel function</td><td>A small server program run on demand by the website host.</td></tr>
+<tr><td>UNII</td><td>Unique Ingredient Identifier of the US FDA substance registry.</td></tr>
+<tr><td>FDA PH notification</td><td>A cosmetic product's registration with the Philippine FDA before sale.</td></tr>
+<tr><td>Argon2id</td><td>A password-hashing method resistant to guessing attacks; used for offline log-in.</td></tr>
+<tr><td>Skeleton loading</td><td>Grey placeholder bars shown where data will appear.</td></tr>
+<tr><td>Umbrella term</td><td>A label word such as "Fragrance" that can hide several undisclosed substances.</td></tr>
+<tr><td>Pending / reviewed</td><td>Status of an entry that an admin has not yet approved / has checked.</td></tr>
+<tr><td>IL2CPP, ARM64</td><td>Unity's C#-to-C++ build; 64-bit ARM processors.</td></tr>
+<tr><td>App Check</td><td>Firebase service that lets only genuine app/site builds call the backend (not used).</td></tr>
+<tr><td>RA 10173</td><td>Philippine Data Privacy Act of 2012.</td></tr>
+</tbody></table>
+
+<h1><span class="part">Appendices</span>Appendix D. Open Items for the Team</h1>
+<h3>D.1 Resolve first (ranked)</h3>
+<ol class="checklist">
+<li>Put the full capstone paper into <code>docs/</code> and re-check Part I; fix the methodology chapter's outdated statements (Facebook sign-in, 148 tests, "Gemini only for ingredients", "ML Kit reads the ingredient list", hold-to-scan).</li>
+<li>Decide and say clearly whether the scanner is "hold to scan" or "tap to start / pause" (the code is tap); update the paper or the code.</li>
+<li>Run the 20-product alpha test on the Samsung Galaxy A16 under different lighting; record recognition rate, time to result and errors.</li>
+<li>Publish the current <code>firestore.rules</code> (or confirm it is published) and write the date into <code>FIRESTORE_SCHEMA.md</code>.</li>
+<li>Move the app's Gemini calls behind a Vercel function and rotate the key that is inside existing APKs.</li>
+<li>Measure AR on the test phone with the debug overlay (fps, frame ms) and note which pipeline it chose.</li>
+<li>Finish the Privacy Policy: real support e-mail, remove Facebook, cite RA 10173, retention periods.</li>
+<li>Confirm package versions from <code>Packages/manifest.json</code> and <code>ProjectSettings/ProjectVersion.txt</code> (AR Foundation, ARCore, URP, TextMeshPro, Test Framework, Mobile Notifications, Unity).</li>
+<li>Apply the rule tightening of §30.3 (scan counter, scanActivity sizes, Skincare category, pending read, per-user limits).</li>
+<li>Decide what an empty <code>riskLevel</code> means (today: safe) for users with a skin condition.</li>
+</ol>
+<h3>D.2 Every "Not found" item in this document</h3>
+<!--NOTFOUND-->
+<h3>D.3 Other unclear points</h3>
+<ul class="checklist">
+<li>Whether the live website matches the latest commit (the document did not contact the live site).</li>
+<li>Whether the clean-up and duplicate merges were run on the live database.</li>
+<li>Whether the AI provider retains product pictures sent with the project's key.</li>
+<li>Whether <code>Assets/Scripts/</code> (Tesseract, IAP) and <code>Scripts/AI/ProductScanner.cs</code> are still needed (ProductScanner is still referenced by two scenes).</li>
+<li>Whether one shared admin account is acceptable to the panel or each admin should have their own.</li>
+<li>The team's reason for staying on Firestore instead of Supabase, in one paragraph for the paper.</li>
+</ul>

@@ -1,0 +1,17 @@
+flowchart TB
+  subgraph ADMIN["Admin side"]
+    a1["Admin logs in"] --> a2["Adds / imports / approves<br/>brands, products, ingredients"]
+    a2 --> a3[("Firestore catalogue<br/>Active, reviewed")]
+  end
+  subgraph APPS["User side"]
+    u1["App downloads catalogue<br/>(changes only)"] --> u2["User builds skin profile"]
+    u2 --> u3["Scan / type a product"]
+    u3 --> u4["Recognise product,<br/>get ingredient list"]
+    u4 --> u5["Analyse ingredients<br/>against profile (on phone)"]
+    u5 --> u6["Result, alerts,<br/>safer alternatives"]
+    u6 --> u7["AR Try-On with<br/>the product's shades"]
+    u6 --> u8[("Recent Scans + anonymous<br/>scanActivity note")]
+  end
+  a3 --> u1
+  u4 -.->|"unknown product: Pending entries,<br/>snapshots, list suggestions"| a2
+  u8 -.->|"dashboard counts"| a2

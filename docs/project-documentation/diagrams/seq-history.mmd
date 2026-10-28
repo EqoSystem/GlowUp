@@ -1,0 +1,18 @@
+sequenceDiagram
+  autonumber
+  participant P as ScanAnalysisPipeline
+  participant H as ScanHistoryRepository
+  participant C as OfflineCache<br/>(JSON file)
+  participant Q as SyncQueue
+  participant F as Firestore
+  participant RS as RecentScanActivitiesScene
+  P->>H: Add(record) or Replace(same id) on re-scan
+  H->>C: save list on the phone
+  H->>Q: EnqueueSet users/uid/scans/id
+  alt online
+    Q->>F: write
+  else offline
+    Q->>Q: keep, retry when ConnectivityMonitor says reachable
+  end
+  RS->>H: list (phone copy, works offline)
+  RS->>H: remove (to trash), restore, rename (phone only)

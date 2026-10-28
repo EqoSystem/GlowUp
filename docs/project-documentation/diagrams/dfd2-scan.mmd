@@ -1,0 +1,43 @@
+flowchart TB
+  U["User"]
+  C1(("6.1 Camera frame<br/>+ quality gate"))
+  C2(("6.2 On-device read:<br/>primary label lines<br/>+ barcode"))
+  C3(("6.3 Match local<br/>ProductIndex"))
+  C4(("6.4 Firestore look-up<br/>brand + name"))
+  C5(("6.5 Own staged<br/>snapshot?"))
+  C6(("6.6 AI identify +<br/>web confirm (Gemini)"))
+  C7(("6.7 Photo snapshot<br/>server function"))
+  C8(("6.8 Shortlist / typed<br/>entry / ask user"))
+  C9(("7.1 Analyse vs<br/>skin profile"))
+  C10(("7.2 FDA PH check,<br/>OBF second opinion"))
+  C11(("8.1 Save history,<br/>anonymous note"))
+  D5[("D5 phone cache:<br/>index, ingredients, profile")]
+  D1[("D1 products")]
+  D4[("D4 pending_products")]
+  D2[("D2 users/uid/scans")]
+  D3[("D3 scanActivity")]
+  U --> C1
+  C1 --> C2
+  C2 --> C3
+  D5 --> C3
+  C3 -->|"miss"| C4
+  D1 --> C4
+  C4 -->|"miss"| C5
+  D4 --> C5
+  C5 -->|"miss, online"| C6
+  C6 -->|"no sourced list"| C7
+  C7 --> D4
+  C3 -->|"unsure"| C8
+  U --> C8
+  C3 -->|"product + list"| C9
+  C4 -->|"product + list"| C9
+  C5 -->|"own entry"| C9
+  C6 -->|"sourced list"| C9
+  C7 -->|"AI reading"| C9
+  C8 -->|"chosen / typed"| C9
+  D5 --> C9
+  C9 --> C10
+  C10 --> C11
+  C11 --> D2
+  C11 --> D3
+  C9 -->|"result screen"| U

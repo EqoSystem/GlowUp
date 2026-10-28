@@ -1,0 +1,94 @@
+erDiagram
+  BRANDS ||--o{ PRODUCTS : "brandId"
+  PRODUCTS }o--o{ INGREDIENTS : "names and ingredientIds"
+  USERS ||--o{ SCANS : "users/uid/scans"
+  USERS ||--o{ SUGGESTIONS : "uid"
+  USERS ||--o{ PENDING_PRODUCTS : "createdByUid"
+  PENDING_PRODUCTS ||--o| PENDING_PRODUCT_IMAGES : "same id"
+  PRODUCTS ||--o{ PRODUCT_INGREDIENT_SUGGESTIONS : "productId"
+  CONFIG_LISTS ||--o{ INGREDIENTS : "list ids"
+  BRANDS {
+    string name
+    string category
+    string market
+    string status
+    number scans
+    string website
+    bool binned
+  }
+  PRODUCTS {
+    string name
+    string brandId FK
+    string brandName
+    string cosmeticType
+    list ingredients
+    list ingredientIds
+    list shades
+    list sources
+    string barcode
+    string fdaNumber
+    number minAge
+    string status
+    bool reviewed
+  }
+  INGREDIENTS {
+    string name
+    string techName
+    string description
+    string riskLevel
+    list aliases
+    list allergenTags
+    list avoidForConditions
+    list avoidForSkinTypes
+    bool reviewed
+  }
+  USERS {
+    string firstName
+    string email
+    string birthday
+    number age
+    string skinType
+    string skinTone
+    list skinConditions
+    list knownAllergens
+  }
+  SCANS {
+    string productName
+    string status
+    list findings
+    number scannedAtUnix
+  }
+  SCAN_ACTIVITY {
+    string productName
+    string status
+    number scannedAtUnix
+    bool allergenFlagged
+  }
+  PENDING_PRODUCTS {
+    string brandName
+    string name
+    list ingredients
+    string createdByUid
+    bool isApproved
+  }
+  SUGGESTIONS {
+    string text
+    string uid
+    string status
+  }
+  PENDING_PRODUCT_IMAGES {
+    string jpegBase64
+    string createdByUid
+  }
+  PRODUCT_INGREDIENT_SUGGESTIONS {
+    string productId
+    list ingredients
+    list sources
+    string status
+  }
+  CONFIG_LISTS {
+    number version
+    list allergens
+    list conditions
+    list highlights
+  }

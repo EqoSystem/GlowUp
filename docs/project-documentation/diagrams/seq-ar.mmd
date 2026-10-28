@@ -1,0 +1,22 @@
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant A as ARTryOnScene<br/>ArTryOnFlowController
+  participant T as ArFaceTrackingController
+  participant K as AR Foundation<br/>ARCore
+  participant M as ArFaceMakeup<br/>+ shaders
+  participant O as FallbackMakeupOverlay
+  U->>A: open (from result, recommendation, picker)
+  A->>A: product shades + ShadeAdvisor shades for skin tone
+  A->>T: Run()
+  T->>T: camera permission (asked after 0.4 s), crash mark check
+  T->>K: CheckAvailability, start session, front camera
+  alt live tracking works
+    K-->>T: face mesh every frame
+    T->>M: mesh + area, shade, strength, finish
+    M-->>U: tinted face in camera box
+  else any check fails
+    T->>O: guided preview with face outline
+    O-->>U: colour shapes over camera picture
+  end
+  Note over T,M: Frames stay in memory. No face image is saved or sent.

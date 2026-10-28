@@ -1,0 +1,22 @@
+sequenceDiagram
+  autonumber
+  actor A as Admin
+  participant W as Inventory / Curator page
+  participant S as adminStore.js<br/>(browser copy)
+  participant F as Firestore + rules
+  participant P as Phone (CatalogSync)
+  A->>W: open page
+  W->>S: lists
+  alt kept copy
+    S-->>W: at once (0 reads), then only changes
+  else first visit
+    S->>F: download collection once
+  end
+  A->>W: Save form
+  W->>W: checks (name, brand, type, make-up scope, list, links, duplicate)
+  W->>F: addDoc / updateDoc with updatedAt
+  F->>F: isAdmin() + adminCatalogueWrite()
+  F-->>W: ok or permission denied
+  W->>S: refresh changed entries
+  P->>F: next sync: entries with newer updatedAt
+  F-->>P: changed product

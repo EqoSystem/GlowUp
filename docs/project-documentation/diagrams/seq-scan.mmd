@@ -1,0 +1,35 @@
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant S as AiSmartAnalysisScene<br/>SmartScanFlowController
+  participant R as FrameReader<br/>(ML Kit, Java)
+  participant I as ProductRepository<br/>ProductIndex (phone)
+  participant F as Firestore
+  participant G as Gemini API
+  participant L as LoadingScene<br/>ScanAnalysisPipeline
+  participant X as FDA PH portal /<br/>Open Beauty Facts
+  U->>S: tap Start Scan
+  loop each good camera frame
+    S->>R: upright picture
+    R-->>S: text lines, confidence, barcode
+    S->>I: barcode / name in text?
+  end
+  alt product known with list
+    I-->>S: ProductData + ingredients
+  else not on phone
+    S->>F: products where brand + name (FindByBrandAndNameAsync)
+    F-->>S: product or nothing
+    S->>F: pending_products own entry (FindAsync)
+    S->>G: Identify(photo) + ConfirmOnWeb (AiBudget 2 + 2)
+    G-->>S: identity + sourced list, or a question
+  end
+  S->>L: GoViaLoading(analysis)
+  L->>L: ProductAnalysisEngine.Analyse (profile on phone)
+  par beside the analysis
+    L->>X: FDA PH search (12-15 s), OBF by barcode
+  and unknown ingredients
+    L->>G: IngredientResearcher (names only)
+    L->>F: create ingredients/ai_... (reviewed false)
+  end
+  L->>F: users/uid/scans (SyncQueue), scanActivity note, scans +1
+  L-->>U: AiSmartAnalysisResultScene

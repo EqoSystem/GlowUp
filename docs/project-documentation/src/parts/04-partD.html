@@ -1,0 +1,170 @@
+<h1><span class="part">Part D · Admin website</span>15. Page inventory</h1>
+<p class="small">Paths in this part are relative to <code>GlowUp-Admin_AI_Testing/</code>.</p>
+<table data-caption="Pages of the admin website">
+<thead><tr><th style="width:20%">Page</th><th style="width:33%">Route / file</th><th>Who can open it</th></tr></thead>
+<tbody>
+<tr><td>Admin log-in</td><td><code>/</code> redirects to <code>/_Index/index.html</code> (+ <code>indexApp.js</code>)</td><td>Anyone; only accounts listed in <code>admins</code> get past it. {V:vercel.json redirects, _Index/indexApp.js lines 58-78}</td></tr>
+<tr><td>Dashboard</td><td><code>/_Admin_Dashboard/adminDashboard.html</code></td><td>Admins (sign-in guard on every page). {V:_Shared/adminCommon.js lines 84-91}</td></tr>
+<tr><td>Brand &amp; Product Inventory</td><td><code>/_Admin_Brand_Inventory/adminBrandInventory.html</code></td><td>Admins</td></tr>
+<tr><td>Ingredient Curator</td><td><code>/_Admin_Ingredient_Curator/adminIngredientCurator.html</code></td><td>Admins</td></tr>
+<tr><td>Recycle Bin</td><td><code>/_Admin_Recycle_Bin/adminRecycleBin.html</code> (icon in the page header, not in the menu)</td><td>Admins {V:commit 4cd88ea, _Admin_Recycle_Bin/adminRecycleBin.js}</td></tr>
+<tr><td>API: Assist with AI / import</td><td><code>/api/assist-ingredient</code> (POST)</td><td>Signed-in admins only (token checked with Google, then own <code>admins</code> document). {V:api/assist-ingredient.js lines 1-11, 56}</td></tr>
+<tr><td>API: scan snapshot</td><td><code>/api/scan-snapshot</code> (POST)</td><td>Any signed-in app user, rate limited. {V:api/scan-snapshot.js lines 1-19}</td></tr>
+</tbody></table>
+
+<h1><span class="part">Part D · Admin website</span>16. How an admin navigates, and how data is managed</h1>
+<h2>16.1 Menu map</h2>
+<p>A sidebar (foldable to icons, with a flowing highlight) lists Dashboard, Brand &amp; Product Inventory and Ingredient Curator; the top bar shows the page title, the layout name, a theme button and the Recycle Bin icon. The frame is drawn at once by <code>pageFrame.js</code>; only data areas show loading shapes. {V:_Shared/pageFrame.js lines 1-10, 37-39, _Shared/adminShell.js header, docs/UI_CHANGES.md}</p>
+<h2>16.2 How the files are organised</h2>
+<ul>
+<li>One folder per page (<code>_Admin_*</code>) with its HTML, CSS and JS. {V:folder structure}</li>
+<li><code>_Shared/</code>: sign-in guard and helpers (<code>adminCommon.js</code>), the frame (<code>pageFrame.js</code>, <code>adminShell.js</code>), the browser copy of the data (<code>adminStore.js</code>), panels and layouts (<code>adminWidgets.js</code>, <code>adminLayouts.js</code>, <code>layoutRules.js</code>), folders and bin (<code>adminOrganizer.js</code>), clean-up (<code>adminCleanup.js</code>, <code>glowupCatalog.js</code>), rules shared with the app (<code>glowupRules.js</code>), imports (<code>adminDocumentReader.js</code>, <code>importFormat.js</code>), lists (<code>adminLists.js</code>, <code>listRules.js</code>), snapshots (<code>adminSnapshots.js</code>), export (<code>adminExport.js</code>), barcode hints (<code>gs1Hint.js</code>). {V:_Shared/*.js headers}</li>
+<li><code>_Database/firebase-console.js</code>: Firebase initialisation shared by every page. {V:_Database/firebase-console.js, CLEANUP_LOG.md "loaded by nine pages"}</li>
+<li><code>api/</code>: the two Vercel functions. <code>tests/</code> and <code>tools/</code>: Node scripts, not deployed. {V:.vercelignore}</li>
+</ul>
+<h2>16.3 Data management</h2>
+<table data-caption="Data management features of the website" class="compact">
+<thead><tr><th style="width:22%">Feature</th><th>How</th></tr></thead>
+<tbody>
+<tr><td>Create / read / update</td><td>Forms write with <code>addDoc</code> / <code>updateDoc</code> and <code>serverTimestamp()</code>; lists are kept in memory and <code>localStorage</code>, then only changes are downloaded (opening the Inventory used to read about 715 documents each time). {V:_Admin_Brand_Inventory/adminBrandInventory.js lines 2298-2377, _Shared/adminStore.js header}</td></tr>
+<tr><td>Delete</td><td>"Remove" moves to the Recycle bin (<code>binned</code>, <code>binnedAt</code>, <code>statusBeforeBin</code>, status Inactive). Only "Delete forever" / "Empty bin" deletes, after saving a JSON backup to the admin's computer. {V:FIRESTORE_SCHEMA.md "Folders and the Recycle bin", _Admin_Recycle_Bin/adminRecycleBin.js header}</td></tr>
+<tr><td>Bulk actions</td><td>Pick several (box, Ctrl/Shift-click), drag to a folder or the bin; "Approve All" only for eligible waiting entries; bulk Assist with AI with individual approval. {V:_Shared/adminOrganizer.js header, FIRESTORE_SCHEMA.md}</td></tr>
+<tr><td>Search, filters</td><td>Search box, brand and review filters, "Apply filters" panel; all on loaded data, no extra reads. {V:_Admin_Brand_Inventory/adminBrandInventory.html, _Shared/adminFacets.js}</td></tr>
+<tr><td>Pagination</td><td>"10 per page" pager for long lists. {V:_Shared/adminShell.js header}</td></tr>
+<tr><td>Validation</td><td>Form checks (§17) and a second lock in the rules (<code>adminCatalogueWrite</code>). {V:firestore.rules lines 100-116}</td></tr>
+<tr><td>Duplicate prevention</td><td>Same brand + same compact name (or alias) is refused, also when the copy is in the bin; "Find duplicates" groups possible copies for a merge. {V:adminBrandInventory.js lines 2326-2327, _Shared/adminCleanup.js}</td></tr>
+<tr><td>Clean up</td><td>Proposed changes in steps, applied one step at a time after confirmation; a read-only dry run is also available from Node. {V:_Shared/adminCleanup.js, tools/cleanupReport.mjs}</td></tr>
+<tr><td>Export</td><td>CSV built in the browser, at most 100 newest products, formula-injection safe. {V:_Shared/adminExport.js, FIRESTORE_SCHEMA.md}</td></tr>
+<tr><td>Audit / logging</td><td>Only per-entry stamps: <code>createdAt</code>, <code>updatedAt</code>, <code>reviewedAt</code>, <code>websiteConfirmedBy</code>. {V:FIRESTORE_SCHEMA.md} {N:an audit log of who changed what}</td></tr>
+</tbody></table>
+
+<h1><span class="part">Part D · Admin website</span>17. Add Brand, Add Product, Add Ingredient</h1>
+<h2>17.1 Add New Brand</h2>
+<table data-caption="Brand form fields" class="compact">
+<thead><tr><th style="width:22%">Field</th><th style="width:14%">Required</th><th>Rule</th></tr></thead>
+<tbody>
+<tr><td>Brand Name</td><td>Yes</td><td>At least 2 characters, at most 60; refused when the name or an alias already exists (also in the bin). {V:adminBrandInventory.html brandNameInput maxlength 60, adminBrandInventory.js lines 1907-1927}</td></tr>
+<tr><td>Category</td><td>Fixed</td><td>Saved as <code>Makeup</code>. {V:adminBrandInventory.js line 1944 (BRAND_CATEGORY)}</td></tr>
+<tr><td>Market</td><td>No</td><td>Defaults to Global (max 40). {V:FIRESTORE_SCHEMA.md}</td></tr>
+<tr><td>Status</td><td>Yes</td><td>Active, Pending, Inactive; the app uses only Active brands.</td></tr>
+<tr><td>Logo link, Picture link</td><td>No</td><td>Must start with <code>https://</code>, max 300; only the address is stored (no upload). {V:adminBrandInventory.js lines 1918-1921}</td></tr>
+<tr><td>Official website + "confirmed" box</td><td>No</td><td>Saved only with the confirming admin's id; rules enforce it. {V:firestore.rules lines 117-126}</td></tr>
+</tbody></table>
+<h2>17.2 Add Product</h2>
+<table data-caption="Product form fields and checks, in the order the code checks them" class="compact">
+<thead><tr><th style="width:22%">Field</th><th style="width:12%">Required</th><th>Rule and error shown</th></tr></thead>
+<tbody>
+<tr><td>Product photo link</td><td>No</td><td>"The photo link must be a web address that starts with https://"</td></tr>
+<tr><td>FDA registration number</td><td>No</td><td>Letters, digits and . , # ( ) _ - / only, at most 40.</td></tr>
+<tr><td>Product Name</td><td>Yes</td><td>Max 100. "Type the product name."</td></tr>
+<tr><td>Brand</td><td>Yes</td><td>Chosen from the brand list (this is the link: <code>brandId</code> + a copy of <code>brandName</code>).</td></tr>
+<tr><td>Cosmetic Type</td><td>Yes</td><td>One of the 17 kinds or "Other"; skin care / not make-up is refused ("GlowUp lists make-up only ..."); an unclear kind may only be saved as Pending.</td></tr>
+<tr><td>Ingredients</td><td>Yes</td><td>Pasted list or pills from the ingredient picker; "Paste the ingredient list. The app cannot check or recommend a product without it."</td></tr>
+<tr><td>Minimum Age</td><td>No</td><td>Whole number 0-99.</td></tr>
+<tr><td>Description</td><td>No</td><td>Max 400.</td></tr>
+<tr><td>Shades</td><td>No</td><td>Colour editor; <code>#RRGGBB</code> values used by AR Try-On.</td></tr>
+<tr><td>Status</td><td>Yes</td><td>Active / Pending / Inactive.</td></tr>
+<tr><td>(duplicate check)</td><td>-</td><td>Same brand already has this name or alias, or it is in the Recycle bin.</td></tr>
+</tbody></table>
+<p>{V:_Admin_Brand_Inventory/adminBrandInventory.js lines 2298-2327, adminBrandInventory.html lines 300-320}</p>
+<p><b>What is written:</b> <code>name, brandId, brandName, cosmeticType, description, ingredients, shades, minAge, status, imageUrl, fdaNumber, ingredientIds, ingredientCount, ingredientNotes, tags, updatedAt</code> (+ <code>scans: 0, folder, createdAt</code> on create); saving an entry that was waiting for review marks it reviewed. {V:adminBrandInventory.js lines 2333-2355}</p>
+<p><b>Linking to ingredients:</b> each name in the list is looked up in the loaded ingredient library; matches become <code>ingredientIds</code>; per-product notes (caution, percent) go to <code>ingredientNotes</code>. A pill that does not match is dashed and can create the ingredient on the spot. Verdicts are never stored on a product: the app works them out when it reads the product. {V:_Shared/adminIngredientPicker.js header, FIRESTORE_SCHEMA.md "How the data is split"}</p>
+<p><b>Success / error:</b> a toast "Product added." / "Product saved."; on failure the form shows "The product was not saved." with the Firebase reason (for example permission denied). {V:adminBrandInventory.js lines 2351-2373}</p>
+<p><b>Image upload:</b> none; images are https links only. {V:FIRESTORE_SCHEMA.md "Not built"}</p>
+<h2>17.3 Add Ingredient</h2>
+<table data-caption="Ingredient form fields" class="compact">
+<thead><tr><th style="width:26%">Field</th><th style="width:12%">Required</th><th>Rule</th></tr></thead>
+<tbody>
+<tr><td>Ingredient Name</td><td>Yes</td><td>Max 80; no other entry may use the same name or alias.</td></tr>
+<tr><td>Technical / Scientific Name</td><td>Yes</td><td>The label (INCI) name the app matches scans against; max 120.</td></tr>
+<tr><td>User-Friendly Definition</td><td>Yes</td><td>Max 600.</td></tr>
+<tr><td>What the chemical is</td><td>No</td><td>Technical description, max 600.</td></tr>
+<tr><td>Also Known As</td><td>No</td><td>Aliases, max 300 characters.</td></tr>
+<tr><td>Reference links</td><td>No</td><td>Each line must contain an https address; max 900.</td></tr>
+<tr><td>Risk Level</td><td>No</td><td>safe / caution / harmful / empty ("let the app decide").</td></tr>
+<tr><td>Minimum Age</td><td>No</td><td>0-99.</td></tr>
+<tr><td>Caution Note, Commonly Used In</td><td>No</td><td>Max 160 each.</td></tr>
+<tr><td>Key active, Umbrella term</td><td>No</td><td>Highlights in the app's result chips.</td></tr>
+<tr><td>Allergen family, Avoid / Good per skin type and per condition</td><td>No</td><td>Ids from <code>config/lists</code>; one Avoid / Good row per item.</td></tr>
+</tbody></table>
+<p>{V:_Admin_Ingredient_Curator/adminIngredientCurator.html, adminIngredientCurator.js lines 1165-1250, commit 0768878}</p>
+
+<h1><span class="part">Part D · Admin website</span>18. How brands, products and ingredients are injected</h1>
+<p>There are six ways data reaches the database. None of them can make an entry live without an admin, except the admin's own form.</p>
+<table data-caption="All injection paths" class="compact">
+<thead><tr><th style="width:22%">Path</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>1. Admin forms</td><td>Written as typed (Active if the admin chooses). {V:§17}</td></tr>
+<tr><td>2. File import (PDF, Excel .xlsx/.xls, Word .docx)</td><td>Text extracted in the browser; the GlowUp import format is parsed without AI, any other document is read by the AI function; records saved as Pending, <code>source: document-import</code>, <code>reviewed: false</code>. Image-only PDFs and legacy .doc are not supported. {V:IMPORT_FORMAT.md, _Shared/importFormat.js, _Shared/adminDocumentReader.js, FIRESTORE_SCHEMA.md}</td></tr>
+<tr><td>3. Assist with AI</td><td>Drafts a description or an empty product list, with sources; each draft must be checked before "Approve reviewed drafts". Gemini, then Groq, then Mistral. {V:FIRESTORE_SCHEMA.md, api/assist-ingredient.js}</td></tr>
+<tr><td>4. The app, during scans</td><td>Pending <code>scan_</code> products/brands, unreviewed <code>ai_</code> ingredients, <code>productIngredientSuggestions</code>, <code>pending_products</code>. {V:firestore.rules, Scripts/Scan/ScannedProductPublisher.cs, Scripts/Scan/IngredientResearcher.cs}</td></tr>
+<tr><td>5. One-time seed data</td><td><code>starter_</code> and <code>fda_</code> ingredients and <code>obf_</code> products, dated 9 October 2026. {V:FIRESTORE_SCHEMA.md source table}</td></tr>
+<tr><td>6. FDA Philippines catalogue file</td><td><code>_Shared/data/fdaCatalogue.json</code> used by the Inventory; since 22 Oct it is no longer added automatically on every visit. {V:git ls-files, commit fc2086b} {I:the import of 278 products came from this route, commit 9188bc2}</td></tr>
+</tbody></table>
+<h2>18.1 The import pipeline, step by step</h2>
+<ol>
+<li>Admin drops a file on "Import from a file" (Inventory: brands + products; Curator: ingredients). {V:adminBrandInventory.html line 92}</li>
+<li><code>adminDocumentReader.js</code> extracts the text in the browser. {V:_Shared/adminDocumentReader.js}</li>
+<li><code>importFormat.js</code> tries the plain format: blocks <code>=== BRAND ===</code>, <code>=== PRODUCT ===</code>, <code>=== INGREDIENT ===</code>, <code>KEY: value</code> lines, lists with <code>" | "</code>, or an Excel sheet whose row 1 holds the keys. <code>N/A</code>, <code>None</code> and empty stay empty; nothing is guessed. {V:_Shared/importFormat.js header, IMPORT_FORMAT.md}</li>
+<li>Otherwise the text goes to <code>/api/assist-ingredient</code> (admin token checked) and the AI returns the same draft shape. {V:_Shared/importFormat.js header}</li>
+<li>Cleaning: whitespace collapsed; text cut to field limits; at most 40 products and 40 brands per file (ingredients saved in groups of 60); names de-duplicated by a comparable key; only https sources; shades only <code>#RRGGBB</code> (a shade number like "#128" is never a colour); minimum age 1-99 or 0. {V:adminBrandInventory.js lines 908-1000, IMPORT_FORMAT.md}</li>
+<li>Make-up check: skin care / not make-up records are flagged and not saved; unclear kinds are saved as Pending and flagged. {V:FIRESTORE_SCHEMA.md, adminBrandInventory.js}</li>
+<li>Duplicates: a product that already exists is skipped; if it has no ingredient list, the imported list (3+ names) goes to <code>productIngredientSuggestions</code> for review. {V:adminBrandInventory.js}</li>
+<li>Write in a batch; the page shows a summary (saved, duplicates skipped, invalid, FDA links, lists suggested) and the flagged records. {V:adminBrandInventory.js line 909-910}</li>
+<li>Admin reviews and approves each entry (status Active, reviewed true). {V:adminBrandInventory.js lines 2382-2423}</li>
+</ol>
+<p><b>INCI names:</b> ingredients are matched by name, technical (label) name and aliases through a normalised key (case, accents, punctuation and spaces ignored), and close misreadings are forgiven at a similarity of 0.85. There is no official INCI dictionary in the project. {V:Scripts/Data/TextKey.cs, Scripts/Scan/ScanRules.cs line 22} {N:an INCI / CosIng reference dataset in the repository}</p>
+<h2>18.2 Sample (fake) input and the resulting document</h2>
+<div class="two">
+<div class="box"><h4>Input block (Word / PDF)</h4>
+<pre class="mono" style="white-space:pre-wrap;margin:0">=== PRODUCT ===
+BRAND_NAME: Sample Beauty
+PRODUCT_NAME: Velvet Matte Lip Tint
+COSMETIC_TYPE: Lip Tint
+SHADES: #B03A48 | #D2697A
+MINIMUM_AGE: N/A
+BARCODE: 4800000000000
+FDA_REGISTRATION_NUMBER: N/A
+INGREDIENTS: Water | Glycerin | Propylene Glycol | CI 15850
+SOURCES: https://example.com/velvet-matte</pre></div>
+<div class="box"><h4>Resulting <code>products/{auto-id}</code></h4>
+<pre class="mono" style="white-space:pre-wrap;margin:0">{ name: "Velvet Matte Lip Tint",
+  brandId: "&lt;id of Sample Beauty&gt;",
+  brandName: "Sample Beauty",
+  cosmeticType: "Lip Tint",
+  ingredients: ["Water","Glycerin",
+    "Propylene Glycol","CI 15850"],
+  shades: ["#B03A48","#D2697A"],
+  sources: ["https://example.com/velvet-matte"],
+  minAge: 0, barcode: "4800000000000",
+  status: "Pending", scans: 0,
+  source: "document-import", reviewed: false,
+  createdAt: &lt;server time&gt;, updatedAt: &lt;server time&gt; }</pre></div>
+</div>
+<p class="small">The brand, if new, is created as <code>{ name, category: "Makeup", market: "Global", status: "Pending", source: "document-import", reviewed: false }</code>. The values are invented for illustration. {I:field set from adminBrandInventory.js saveImportedProducts and IMPORT_FORMAT.md}</p>
+
+<h1><span class="part">Part D · Admin website</span>19. Website features and layout</h1>
+<ul>
+<li><b>Dashboard panels:</b> Scans today, Allergen matches today, Brands, Products, Ingredients, Quick actions, Inventory / Ingredients / Photos waiting for review, Brands &amp; products, Recent activity, Today's results, Most scanned brands, Suggestions from app users (mark reviewed or dismissed). {V:_Admin_Dashboard/adminDashboard.html tip titles, _Admin_Dashboard/adminDashboard.js header}</li>
+<li><b>Inventory:</b> "Needs your attention" helper, Import from a file, Pending snapshots (review window: photo next to the AI reading, Approve &amp; Publish, Edit &amp; Approve, Reject), Web ingredient lists to review, AI drafts to review, brand and product tables with Live/Hidden badges by the app's visibility rule, Approve brand / product. {V:adminBrandInventory.html, _Shared/adminSnapshots.js header, commit fc225bb}</li>
+<li><b>Curator:</b> ingredient list with source and risk filters, import box, AI drafts, editable Allergen / Condition / Highlight lists (<code>config/lists</code>, versioned). {V:adminIngredientCurator.html, _Shared/adminLists.js}</li>
+<li><b>Layouts:</b> up to 4 named layouts per shared login; panels can be moved, resized, shown as list / row / grid / graph, combined, hidden; "Auto resize" closes gaps; panels fold. {V:_Shared/adminLayouts.js header, _Shared/adminWidgets.js header, commit 5c3be1b}</li>
+<li><b>Modals and helpers:</b> one confirm dialog, one name dialog, small "i" guide badges, one-line helpers per panel. {V:_Shared/adminShell.js, _Shared/adminAssist.js}</li>
+<li><b>Light / dark:</b> theme button, follows the computer until chosen. {V:_Shared/adminShell.js header}</li>
+<li><b>Responsive behaviour:</b> sidebar folds to icons; no separate mobile layout is documented. {I:docs/UI_CHANGES.md item 1} {N:a tested phone-width layout of the admin site}</li>
+</ul>
+
+<h1><span class="part">Part D · Admin website</span>20. Admin authentication and authorisation</h1>
+<table data-caption="Layers that keep a normal user out of admin pages and data">
+<thead><tr><th style="width:22%">Layer</th><th>What it does</th></tr></thead>
+<tbody>
+<tr><td>Identity</td><td>Firebase Auth e-mail + password on the log-in page; the password box has a show/hide eye. {V:_Index/indexApp.js lines 3, 76}</td></tr>
+<tr><td>Admin list</td><td>An admin is an account whose UID is a document id in <code>admins</code>. The rules let an account read only its own entry, and nobody can write the collection from a client. {V:firestore.rules lines 18-21, 92-95}</td></tr>
+<tr><td>Log-in refusal</td><td><code>REQUIRE_ADMIN_RECORD = true</code>: a non-admin is signed out at the log-in page. {V:_Shared/adminCommon.js line 20, _Index/indexApp.js lines 60, 77-78}</td></tr>
+<tr><td>Route guard</td><td>Every page runs <code>onAuthStateChanged</code>; no user or not an admin → signed out and sent to the log-in page. {V:_Shared/adminCommon.js lines 84-91}</td></tr>
+<tr><td>Data rules (the real lock)</td><td>Catalogue writes need <code>isAdmin()</code>; dashboard data needs <code>isAdmin()</code> to read. Even if someone opened a page's HTML, the database refuses. {V:firestore.rules}</td></tr>
+<tr><td>Server functions</td><td>The AI function checks the ID token with Google (<code>accounts:lookup</code>) and then reads the caller's own <code>admins</code> document with the caller's token. {V:api/assist-ingredient.js lines 1-11, 56}</td></tr>
+<tr><td>Session</td><td>Firebase's browser session; sign-out clears the cached lists from <code>localStorage</code>. {V:_Shared/adminStore.js header}</td></tr>
+<tr><td>Headers</td><td><code>X-Frame-Options: DENY</code>, <code>nosniff</code>, strict referrer, <code>noindex, nofollow</code>. {V:vercel.json}</td></tr>
+<tr><td>Shared account</td><td>One admin sign-in is shared by a few people (layouts are kept per person's name). Individual admin accounts would allow accountability. {V:_Shared/adminLayouts.js header} </td></tr>
+</tbody></table>

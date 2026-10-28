@@ -1,0 +1,74 @@
+<h1><span class="part">Part A · Start here</span>1. Project summary</h1>
+
+<div class="box pink">
+<p><b>The problem.</b> People buy make-up without understanding its ingredient list, and someone with sensitive skin, an allergy or a chronic skin condition cannot easily tell whether a product may cause a reaction. Shared testers in shops are also a hygiene concern, so trying a shade before buying is hard. {I:docs/GlowUp_Methodology_Replacement.pdf p.19, "survey of 502 residents ... hygiene of testers, ingredient understanding, shade matching"}</p>
+<p><b>The solution.</b> GlowUp is an Android app that recognises a make-up product with the phone camera (or by typing its name), finds its ingredient list, and compares every ingredient with the user's own skin profile: allergens, skin type, skin conditions and age. It shows a simple verdict (safe, caution, harmful), explains why, suggests make-up that has nothing flagged for that person, and lets the user try the product's shades on their own face with augmented reality. {V:Scripts/Scan/ScanAnalysisPipeline.cs, Scripts/Scan/ProductAnalysisEngine.cs, Scripts/Scan/ProductRecommender.cs, Scripts/AR/ArTryOnFlowController.cs}</p>
+<p><b>Who it is for.</b> End users (app) who wear make-up, and administrators (website) who keep the shared brand, product and ingredient database correct. Both use one Firebase project and one Firestore database. {V:GlowUp-Admin_AI_Testing/FIRESTORE_SCHEMA.md, GlowUp-Admin_AI_Testing/.firebaserc}</p>
+<p><b>What it is not.</b> It is not a medical tool: every result says it is general information, and the app recommends seeing a dermatologist when something is flagged. It checks make-up only, never skin care, hair, body, nail or fragrance products. {V:Scripts/Scan/ProductScope.cs, Legal/PrivacyPolicyAndTerms.txt §4 Terms, Scripts/Scan/ProductAnalysisEngine.cs line 209}</p>
+</div>
+
+<h1><span class="part">Part A · Start here</span>2. Objectives, scope, target users and limitations</h1>
+
+<h2>2.1 Objectives</h2>
+<p>The capstone paper is not in the repository, so the objectives below are reconstructed from the methodology chapter and from what the code does. The team must confirm the exact wording against the paper (Appendix D). {N:capstone paper (objectives chapter) in the repository}</p>
+<table data-caption="Objectives as they appear in the code">
+<thead><tr><th style="width:30%">Objective</th><th>Where the code meets it</th></tr></thead>
+<tbody>
+<tr><td>Recognise a make-up product from the camera, quickly, and also without its packaging</td><td>Barcode + name on the pack, pack-look memory, catalogue look-up, AI photo identification, typed entry, photo snapshot. {V:Scripts/Scan/SmartScanFlowController.cs, Scripts/Scan/PackagingMemory.cs, Scripts/Scan/ScanSnapshotController.cs}</td></tr>
+<tr><td>Cross-check every ingredient with the user's skin profile and alert the user</td><td>Allergens, skin type, conditions, age; Safety Alert pop-up with vibration. {V:Scripts/Scan/ProductAnalysisEngine.cs, Scripts/Result/SafetyAlertPopup.cs}</td></tr>
+<tr><td>Keep a skin profile (5-step onboarding)</td><td>Steps 1-5 + Terms; stored in <code>users/{uid}</code> and on the phone. {V:Scripts/Onboarding/OnboardingStep1FlowController.cs ... Step5, Scripts/Data/UserProfileRepository.cs}</td></tr>
+<tr><td>Recommend make-up that suits the profile, stricter for chronic skin conditions</td><td>{V:Scripts/Scan/ProductRecommender.cs}</td></tr>
+<tr><td>AR virtual try-on in real time</td><td>ARCore face tracking with a guided-preview fallback. {V:Scripts/AR/ArFaceTrackingController.cs}</td></tr>
+<tr><td>An admin portal that manages brands, products and ingredients with plain-language definitions</td><td>Dashboard, Brand &amp; Product Inventory, Ingredient Curator, Recycle Bin. {V:GlowUp-Admin_AI_Testing/_Admin_*}</td></tr>
+</tbody></table>
+
+<h2>2.2 Scope</h2>
+<ul>
+<li><b>Make-up only.</b> 17 make-up kinds (lipstick, lip gloss, lip tint, lip liner, foundation, concealer, primer, powder, blush, bronzer, highlighter, contour, eyeshadow, eyeliner, mascara, brow, setting spray). Skin care and hair/body/nail/fragrance are refused; unclear kinds (tinted moisturizer, BB/CC cream, lip balm, lip oil, tinted sunscreen) are held as Pending. The same rule is written in C# and JavaScript and tested against the same example files. {V:Scripts/Scan/ProductScope.cs, GlowUp-Admin_AI_Testing/_Shared/glowupRules.js, Editor/Tests/MakeupScopeCases.txt, Editor/Tests/SharedRuleCases.txt}</li>
+<li><b>Platform.</b> Android phones. The build tooling targets Android only (IL2CPP, ARMv7 + ARM64, OpenGL ES 3, minimum API 23). {V:Editor/ArFaceTrackingSetup.cs lines 99-147} An iOS build is not configured. {I:no iOS build settings in _Project/Editor; only vendor iOS files of the Facebook SDK exist}</li>
+<li><b>Region.</b> The Philippines: products are checked against the FDA Philippines verification portal, and the AI look-up gives the local market's rules priority. {V:Scripts/Scan/PhFdaVerification.cs, Scripts/Scan/IngredientResearcher.cs}</li>
+</ul>
+
+<h2>2.3 Target users</h2>
+<table data-caption="Target users and what each can do">
+<thead><tr><th style="width:18%">User</th><th>Uses</th><th>Can</th><th>Cannot</th></tr></thead>
+<tbody>
+<tr><td>End user</td><td>Android app</td><td>Own profile and scan history; read the catalogue; add Pending entries, suggestions, scan notes, one staged photo entry per product. {V:GlowUp-Admin_AI_Testing/firestore.rules}</td><td>Change or delete catalogue entries; read other users' data; read scan notes.</td></tr>
+<tr><td>Administrator</td><td>Admin website</td><td>Create, edit, approve, bin and delete brands, products, ingredients; read dashboard data; review suggestions and snapshots. {V:GlowUp-Admin_AI_Testing/firestore.rules}</td><td>Read users' profiles or scan histories; make another account an admin. {V:firestore.rules lines 92-95, 240-246}</td></tr>
+<tr><td>Project owner</td><td>Firebase console</td><td>Add/remove documents in <code>admins</code>; publish rules. {V:GlowUp-Admin_AI_Testing/FIRESTORE_SCHEMA.md "Admin accounts"}</td><td></td></tr>
+</tbody></table>
+
+<h2>2.4 Limitations</h2>
+<table data-caption="Limitations: stated in the project and found while reading the code">
+<thead><tr><th style="width:20%">Area</th><th>Limitation</th></tr></thead>
+<tbody>
+<tr><td>Offline use</td><td>Recognition of catalogue products and the ingredient check work offline for ingredients the phone knows. The AI identification, web list look-up, FDA Philippines check, Open Beauty Facts and the photo snapshot need the internet. {V:Scripts/Scan/ScanAnalysisPipeline.cs header, Scripts/Scan/ProductAiAdvisor.cs "ONLINE ONLY"}</td></tr>
+<tr><td>Lighting</td><td>Frames that are too dark, glared, moving or blurred are thrown away (thresholds in Scan Rules). A flashlight can be switched on. AR face tracking struggles in the dark; a low-light hint and a white "screen light" frame help. {V:Scripts/Scan/FrameQuality.cs, Scripts/Scan/ScanRules.cs, Scripts/AR/ArLightAdapter.cs, Scripts/AR/ScreenLightFrame.cs}</td></tr>
+<tr><td>Ingredient lists from the camera</td><td>In the current branch the live scan reads only the <b>front label and barcode</b>; ingredient lists come from the catalogue, the web look-up, the photo snapshot or typed text, not from OCR of the pack's small print (<code>captureIngredients</code> is passed as <code>false</code>). {V:Scripts/Scan/SmartScanFlowController.cs line 786, Scripts/Scan/ScanEvidence.cs lines 112-133, 201-202}</td></tr>
+<tr><td>Product coverage</td><td>The catalogue is small: about 700 documents across the three lists. {V:Scripts/Data/CatalogSync.cs header} One import added 278 make-up products of 38 brands from the owner's brand list. {I:commit 9188bc2 message} An unknown product needs internet and an admin's approval before it is recommended.</td></tr>
+<tr><td>Ingredient coverage</td><td>An ingredient the app does not know is "not checked" and never counted as safe; with too many of them the result is "incomplete". {V:Scripts/Scan/ProductAnalysisEngine.cs lines 59-64, 143-184} But an ingredient entry whose <code>riskLevel</code> is empty is treated as "safe" unless the built-in table knows better. {V:Scripts/Scan/ProductAnalysisEngine.cs line 72, GlowUp-Admin_AI_Testing/IMPORT_FORMAT.md}</td></tr>
+<tr><td>Shade accuracy</td><td>Suggested shades come from a fixed table of six colours per skin tone and face area; AR colour depends on the screen, camera and light. {V:Scripts/Scan/ShadeAdvisor.cs, Legal/PrivacyPolicyAndTerms.txt Terms §5}</td></tr>
+<tr><td>Device support</td><td>Live AR needs ARCore face tracking and a 64-bit build; other phones get the guided preview. Finger signs and the pack-look model need Android 7.0+. {V:Scripts/AR/ArFaceTrackingController.cs, Scripts/Common/HandLandmarkReader.cs, Scripts/Scan/PackEmbedder.cs}</td></tr>
+<tr><td>Accuracy figures</td><td>No measured recognition accuracy, OCR accuracy or AR frame rate on a phone is recorded in the repository. The only measured figures are desktop checks of the pack-look model (94% found at 0.55 with 1.6% wrong; 68% at 0.70 with 0.4% wrong, on 76 public photos). {V:Scripts/Scan/PackagingMemory.cs header} {N:phone-measured recognition accuracy, OCR accuracy, AR fps}</td></tr>
+<tr><td>AI quota</td><td>The AI is limited per scan visit (2 recognitions, 2 list look-ups by default) and the photo function to 5 per account and 150 for everybody per day. {V:Scripts/Scan/ScanRules.cs lines 40-42, GlowUp-Admin_AI_Testing/api/scan-snapshot.js lines 17-19}</td></tr>
+<tr><td>Medical scope</td><td>Informational only; never a diagnosis or a treatment. {V:Scripts/Scan/ProductScope.cs header, Legal/PrivacyPolicyAndTerms.txt}</td></tr>
+</tbody></table>
+
+<h1><span class="part">Part A · Start here</span>3. Stages of development</h1>
+<p>The repository's Git history starts on 11 October 2026 with a "Baseline" commit, so everything before it has no dated record in the repository. Dates after it come from 103 commit messages. {V:git log (162a4ab ... 87c6162)}</p>
+<figure data-diagram="timeline"><figcaption>Development timeline from the Git history (dates before 11 October 2026 are not recorded)</figcaption></figure>
+<table data-caption="Stages of development and their evidence">
+<thead><tr><th style="width:18%">Stage</th><th>What happened</th><th style="width:30%">Evidence</th></tr></thead>
+<tbody>
+<tr><td>Requirements</td><td>Survey, proposal, scope and limitations; later a 10-phase improvement brief.</td><td>{I:docs/GlowUp_Methodology_Replacement.pdf p.19; no dated record}</td></tr>
+<tr><td>Data design</td><td>Collections and rules designed together; schema document; make-up-only rule shared by app and site; product index and incremental sync.</td><td>{V:FIRESTORE_SCHEMA.md; commits 0dfc384, 2fa3d42, 9b3632f (12 Oct)}</td></tr>
+<tr><td>Backend</td><td>No own server for the app's data: Firestore + rules. Two Vercel functions for AI (admin assist, scan snapshot).</td><td>{V:api/assist-ingredient.js, api/scan-snapshot.js; commits e8def9d (13 Oct), 042b151 (22 Oct)}</td></tr>
+<tr><td>Mobile UI</td><td>Screens generated by Editor builder scripts; themes, skeleton loading, swipe row, bottom-bar pill, keyboard avoider.</td><td>{V:Editor/*SceneBuilder.cs; commits 337ae1f, 4f2550b, 13a3ef5}</td></tr>
+<tr><td>Scanner</td><td>Hold-to-scan parts 1-3, recognition without AI parts 1-3, list sources, focus lock + text tracer, early AI, typed entry, scan-miss flow; the button is now tap-to-start / tap-to-pause.</td><td>{V:commits 95ebd9a-845a476, 59d68d4-50e5558, 5eb89de, 9692d1a, 47af5ff, 042b151; Scripts/Scan/HoldToScanButton.cs header}</td></tr>
+<tr><td>Recommendation</td><td>Make-up only and stricter rules for skin conditions.</td><td>{V:commit 0dfc384; Scripts/Scan/ProductRecommender.cs}</td></tr>
+<tr><td>AR</td><td>ARCore face tracking (before Git), worn-look shaders, camera card, quality tiers, debug overlay.</td><td>{V:commits 7a5003e, 8fd027d, 12aa3fe, 87c6162} {I:face tracking predates the baseline commit}</td></tr>
+<tr><td>Admin site</td><td>Recycle Bin, one status badge, store/frame, Assist with AI, layouts, lists CRUD, export, snapshot reviews, FDA registration number.</td><td>{V:commits d5c850c, ea3d4f1, 9d6a3eb, 6042f90, 749fff0, 989ec84}</td></tr>
+<tr><td>Security</td><td>Rules for app-added entries; staged-product hardening; source-label spoofing fixes; Facebook sign-in removed; AI key kept out of Git.</td><td>{V:commits 0a735ba, 42a53a3, ec8ef85, 62c3be0; .gitignore lines 4-7}</td></tr>
+<tr><td>Testing</td><td>231 Unity EditMode tests; 11 website test suites (all passed on 24 Oct 2026 when run for this document).</td><td>{V:Editor/Tests/*.cs ([Test] count), GlowUp-Admin_AI_Testing/tests/*.test.mjs}</td></tr>
+<tr><td>Deployment / demo</td><td>Website on Vercel; APK built from the Editor menu. The newest rules file was committed "NOT deployed".</td><td>{V:vercel.json, Editor/AndroidApkBuilder.cs, commit 6042f90 message} {N:record that the latest firestore.rules is published}</td></tr>
+</tbody></table>

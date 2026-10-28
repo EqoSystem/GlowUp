@@ -108,6 +108,8 @@ namespace GlowUp.Scan
         [SerializeField] private string shortlistTitle = "Is it one of these?";
         [SerializeField] private string shortlistMessage = "We are not sure which product this is. Tap it, or type its name.";
         [SerializeField] private string shortlistNoneLabel = "None of these";
+        [Tooltip("The catalogue has this brand and name in more than one kind of make-up and the pack does not say which")]
+        [SerializeField] private string msgWhichKind = "This name is in the catalogue as more than one kind of make-up. Tap the one you are holding.";
         [Tooltip("The title of that pop-up after the AI could not name the product either, and when a list is to be looked up for a product without a name")]
         [SerializeField] private string notSureTitle = "Which product is it?";
         [SerializeField] private string notSureNoneLabel = "Finish without a name";
@@ -1037,7 +1039,8 @@ namespace GlowUp.Scan
         static ProductData ProductIn(string text)
         {
             if (string.IsNullOrWhiteSpace(text)) return null;
-            List<ProductIndex.Candidate> found = ProductRepository.Index.InText(text, 1);
+            // the kind read on the pack ("Foundation") chooses between products that share a name and differ in kind
+            List<ProductIndex.Candidate> found = ProductRepository.Index.InText(text, 1, ProductScope.TypeFromLabel(text));
             return found.Count > 0 && found[0].exactName && found[0].score >= ProductIndex.Sure ? found[0].product : null;
         }
 
@@ -1102,10 +1105,13 @@ namespace GlowUp.Scan
         {
             try
             {
-                ProductData product = ProductRepository.Index.Exact(brand, name);
+                // the kind read on the pack ("Foundation") chooses between products that share this name
+                ProductData product = ProductRepository.Index.Exact(brand, name, identity.cosmeticType);
+                List<ProductData> sameName = ProductRepository.Index.SameNameDifferentKind(brand, name, identity.cosmeticType);
+                if (sameName.Count > 1) { AskWhichKind(sameName); return; }
                 if (product == null || product.ingredients == null || product.ingredients.Count == 0)
                 {
-                    ProductData current = await ProductRepository.FindByBrandAndNameAsync(brand, name);
+                    ProductData current = await ProductRepository.FindByBrandAndNameAsync(brand, name, identity.cosmeticType);
                     if (current != null) product = current;
                 }
                 if (this == null || scan != scanNumber || stage != Stage.Scanning || key != firebaseLookupKey) return;
@@ -1454,6 +1460,18 @@ namespace GlowUp.Scan
 
         bool PopupOpen => (shortlist != null && shortlist.IsOpen) || (startOverPanel != null && startOverPanel.IsOpen) || (manualPanel != null && manualPanel.IsOpen)
                           || (snapshot != null && snapshot.IsOpen);
+
+        /// <summary>
+        /// The catalogue holds this brand and name in more than one kind of make-up ("Fit Me": a foundation and a concealer) and the pack
+        /// does not say which: the user taps the one they hold. Nothing is guessed.
+        /// </summary>
+        void AskWhichKind(List<ProductData> products)
+        {
+            if (stage != Stage.Scanning || PopupOpen || shortlist == null) return;
+            var entries = new List<ScanShortlist.Entry>();
+            foreach (ProductData product in products) { ScanShortlist.Entry entry = ScanShortlist.Of(product); entry.score = 1f; entry.byText = true; entries.Add(entry); }
+            OpenShortlist(shortlistTitle, msgWhichKind, shortlistNoneLabel, ContinueScanning, () => { }, entries);
+        }
 
         /// <summary>What the app's own lists suggest for this scan: by the words read on the front, and by the look of the pack.</summary>
         List<ScanShortlist.Entry> Suggestions()

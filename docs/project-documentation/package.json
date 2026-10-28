@@ -1,0 +1,8 @@
+{
+  "name": "glowup-project-documentation",
+  "private": true,
+  "type": "module",
+  "description": "Builds docs/project-documentation/GlowUp_Project_Documentation.pdf with the installed Google Chrome.",
+  "scripts": { "build": "node build.mjs", "check": "node check.mjs" },
+  "devDependencies": { "mermaid": "11.4.1", "pdfjs-dist": "4.10.38" }
+}

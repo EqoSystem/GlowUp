@@ -1,0 +1,74 @@
+<h1><span class="part">Part G · Security</span>30. Firebase / Firestore rules</h1>
+<p><b>In plain words.</b> Anyone may read the make-up catalogue. Only accounts listed as admins may change it. A signed-in app user may add new entries only in a narrow, marked-as-unreviewed form, add exactly 1 to a scan counter, and read and write only their own profile and history. Everything not listed is closed. {V:GlowUp-Admin_AI_Testing/firestore.rules}</p>
+<p>Files: <code>firestore.rules</code> (370 lines), <code>firebase.json</code> (points at it), no <code>storage.rules</code> and no index file. {V:GlowUp-Admin_AI_Testing/firebase.json} {N:storage.rules (Storage not used)}</p>
+<h2>30.1 Helper functions</h2>
+<ul>
+<li><code>signedIn()</code>: a Firebase sign-in exists. <code>isAdmin()</code>: signed in and <code>admins/{uid}</code> exists. <code>isOwner(uid)</code>: the signed-in account is that uid. {V:firestore.rules lines 14-25}</li>
+<li><code>addedByTheApp()</code>: <code>addedBy</code> is the caller, <code>reviewed == false</code>, <code>addedAtUnix</code> is a number. {V:lines 30-35}</li>
+<li><code>faceProduct()</code>: make-up word in the type, or no hair/body word, or a face word nearby. {V:lines 40-51}</li>
+<li><code>adminCatalogueWrite()</code>: admin, name text ≤ 200, lists capped (ingredients 300, shades 24, sources 40, aliases 60, tags 20, ingredientIds 300, notes 100), links https ≤ 300. {V:lines 100-116}</li>
+<li><code>idFitsNames()</code>, <code>dayStamp()</code>: staged product ids must be made from brand + name + the sender's uid; quota documents are named with the server's UTC day. {V:lines 58-87}</li>
+</ul>
+<h2>30.2 Who can do what</h2>
+<table data-caption="Firestore access by collection" class="compact">
+<thead><tr><th style="width:19%">Collection / path</th><th style="width:15%">Read</th><th style="width:25%">Write</th><th>Validation</th></tr></thead>
+<tbody>
+<tr><td><code>admins/{uid}</code></td><td>Own entry only</td><td>Nobody (console)</td><td>-</td></tr>
+<tr><td><code>brands/{id}</code></td><td>Everyone</td><td>Admin create/update/delete; app create <code>scan_*</code>; any signed-in user <code>scans</code> +1</td><td>Admin shape check; confirmed website needs <code>websiteConfirmedBy</code> = caller; app: fixed keys, Pending, scans 0, name 2-60, category Makeup or Skincare</td></tr>
+<tr><td><code>products/{id}</code></td><td>Everyone</td><td>Same pattern; app create <code>scan_*</code></td><td>App: fixed keys, Pending, barcode digits ≤ 20, name 1-100, <code>faceProduct</code>, 1-80 ingredients, ≤ 12 shades, ≤ 10 sources</td></tr>
+<tr><td><code>ingredients/{id}</code></td><td>Everyone</td><td>Admin; app create <code>ai_*</code></td><td>App: fixed keys, source ai, name 3-80, description ≤ 700, riskLevel in list, ≤ 10 aliases/sources</td></tr>
+<tr><td><code>productIngredientSuggestions</code></td><td>Admin</td><td>Admin; app create</td><td>3-80 ingredients, 1-10 sources, source web, Pending</td></tr>
+<tr><td><code>users/{uid}</code>, <code>/scans</code></td><td>Owner</td><td>Owner</td><td>None on shape</td></tr>
+<tr><td><code>scanActivity</code></td><td>Admin</td><td>Any signed-in create; admin delete</td><td>Fixed keys, status in safe/caution/harmful, time is a number</td></tr>
+<tr><td><code>allergenSuggestions</code>, <code>conditionSuggestions</code></td><td>Admin</td><td>Signed-in create (own uid); admin update/delete</td><td>Text 1-100, status pending</td></tr>
+<tr><td><code>pending_products</code></td><td>Any signed-in user</td><td>Signed-in create (own id); admin update/delete</td><td>Id from brand/name/uid, fixed keys, not approved, pending, snapshot, make-up, ≤ 80 ingredients, ≤ 5 https sources</td></tr>
+<tr><td><code>pending_product_images</code></td><td>Admin</td><td>Creator, only for own entry with <code>hasImage</code>; no update</td><td>Base64 ≤ 120,000 characters</td></tr>
+<tr><td><code>snapshot_quota</code></td><td>Own today's counter</td><td>+1 only, ≤ 5 per user (30 s apart), ≤ 150 total</td><td>Server time, day stamp</td></tr>
+<tr><td><code>config/{docId}</code></td><td>Everyone</td><td>Admin, only <code>lists</code></td><td>Fixed keys, version number, ≤ 40 items each</td></tr>
+<tr><td>anything else</td><td>No</td><td>No</td><td>Closed by default</td></tr>
+</tbody></table>
+<p>{V:GlowUp-Admin_AI_Testing/firestore.rules lines 92-368}</p>
+<h2>30.3 Rules that are too open, and fixes</h2>
+<p>No rule says <code>allow read, write: if true</code>. The public reads are deliberate. The points below are weaker than they could be. {V:firestore.rules}</p>
+<table data-caption="Rule findings and recommended fixes" class="compact">
+<thead><tr><th style="width:4%">#</th><th style="width:34%">Finding</th><th>Recommended fix</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Any signed-in account can add 1 to <code>scans</code> on any brand or product as often as it likes, inflating "Most scanned brands". {V:lines 145-148, 181-184}</td><td>Count scans from <code>scanActivity</code> on the dashboard, or allow +1 only with a matching new <code>scanActivity</code> in the same batch (<code>getAfter</code>).</td></tr>
+<tr><td>2</td><td><code>scanActivity</code> create checks keys and status but not sizes: <code>productName</code> and <code>flaggedIngredients</code> can be very long, and any account can flood the dashboard. {V:lines 249-257}</td><td>Add size limits (name ≤ 100, list ≤ 80) and the number types of the counts.</td></tr>
+<tr><td>3</td><td><code>users/{uid}</code> accepts any fields and sizes from the owner. {V:lines 240-246}</td><td>Validate the profile's keys and list sizes; an owner can otherwise store large data at the project's cost.</td></tr>
+<tr><td>4</td><td>App-created brands may still use <code>category: "Skincare"</code>, and <code>faceProduct()</code> is looser than the make-up rule of the app and site. {V:line 143, FIRESTORE_SCHEMA.md "Make-up only"}</td><td>Allow only <code>Makeup</code>; tighten <code>faceProduct</code> to the 17 kinds when the rules are next published (already planned in the schema).</td></tr>
+<tr><td>5</td><td>Any signed-in user can read every staged <code>pending_products</code> entry, including the sender's uid. {V:line 285}</td><td>Allow <code>get</code> only for ids ending in the caller's uid; keep <code>list</code> admin-only.</td></tr>
+<tr><td>6</td><td>Nothing limits how many <code>scan_</code> / <code>ai_</code> / suggestion documents one account creates. {V:lines 133-143, 157-179, 220-236, 260-277}</td><td>A per-user daily counter like <code>snapshot_quota</code>.</td></tr>
+<tr><td>7</td><td>Whether the latest rules are published is not recorded: commit 6042f90 says "rules NOT deployed", and four later commits changed the file. {V:git log -- firestore.rules}</td><td>Publish, then note the date in <code>FIRESTORE_SCHEMA.md</code>.</td></tr>
+</tbody></table>
+<p>The website repository has a rules test (<code>tests/rules.test.mjs</code>, passed on 24 Oct 2026) for the shared make-up rule and staged ids; the earlier 126 emulator checks are not in the repository. {V:tests/rules.test.mjs, tests/stagedId.test.mjs, FIRESTORE_SCHEMA.md line 305} {N:a Firestore emulator test suite for firestore.rules}</p>
+
+<h1><span class="part">Part G · Security</span>31. Project security overview</h1>
+<table data-caption="Security controls on both platforms" class="compact">
+<thead><tr><th style="width:17%">Area</th><th style="width:41%">Mobile app</th><th>Website and functions</th></tr></thead>
+<tbody>
+<tr><td>Authentication</td><td>Firebase Auth (e-mail/password, Google), verified e-mail before sign-up continues, real-domain e-mail rule, Argon2id offline verifier in PlayerPrefs (19 MiB, 2 passes). {V:Scripts/Auth/*.cs, Scripts/Auth/Argon2idHasher.cs lines 18-21, 57-90}</td><td>Firebase Auth e-mail/password; admin list check. {V:_Index/indexApp.js}</td></tr>
+<tr><td>Authorisation</td><td>Rules: owner-only personal data. {V:firestore.rules}</td><td>Rules: <code>isAdmin()</code>; function checks the admin document with the caller's token. {V:api/assist-ingredient.js}</td></tr>
+<tr><td>Transport</td><td>HTTPS to Firebase, Gemini, FDA, OBF, DNS-over-HTTPS. {V:URLs in Scripts/Scan/*.cs}</td><td>HTTPS (Vercel); security headers. {V:vercel.json}</td></tr>
+<tr><td>API keys</td><td class="miss">The Gemini key is compiled into the app (<code>SecureProfileStore.GetApiKey()</code>); the file is kept out of Git, but anyone with the APK can extract the key and spend its quota. {V:Scripts/Scan/ProductAiAdvisor.cs line 31, Scripts/Scan/IngredientResearcher.cs line 78, .gitignore lines 4-7}</td><td>AI keys only as Vercel environment variables. The Firebase web key is in the page (public by design); it should be restricted in Google Cloud. {V:api/*.js, CLEANUP_LOG.md "Secrets and keys"}</td></tr>
+<tr><td>App Check</td><td colspan="2">Not used: any client with the public web key can call Firestore and the functions as long as it has a sign-in. {N:Firebase App Check}</td></tr>
+<tr><td>Input validation</td><td>Forms validate live; typed text parsed defensively. {V:Scripts/Onboarding/OnboardingStep1FlowController.cs, Scripts/Common/InputSpaceGuard.cs, Scripts/Common/ProfanityFilter.cs}</td><td>Form checks; text added with <code>textContent</code>, never as HTML; CSV formula-injection guard; source links that are not plain addresses are not shown as links. {V:_Shared/adminIngredientPicker.js, _Shared/adminExport.js, FIRESTORE_SCHEMA.md "other"}</td></tr>
+<tr><td>File uploads</td><td>Snapshot: one JPEG ≤ 80 KB, no EXIF block, ≤ 1080 px. {V:api/scan-snapshot.js lines 15-60, Scripts/Scan/ScanSnapshotController.cs line 48}</td><td>Import: .pdf, .xlsx, .xls, .docx; text only is sent to the AI; about 25,000 characters per file. {V:FIRESTORE_SCHEMA.md, IMPORT_FORMAT.md}</td></tr>
+<tr><td>Rate limiting</td><td><code>AiBudget</code> per scan visit (client side, can be bypassed by a modified app). {V:Scripts/Scan/AiBudget.cs}</td><td>Snapshot quotas enforced by rules + function; assist function admin-only with time budgets. {V:firestore.rules lines 310-333, api/assist-ingredient.js lines 20-23}</td></tr>
+<tr><td>Logging</td><td>Unity console only; read counter in development builds. {V:Scripts/Data/ReadCounter.cs}</td><td>Browser console and Vercel function logs. {N:central security / audit logging}</td></tr>
+<tr><td>Dependencies</td><td>Unity packages and Firebase SDK 13.17.0; not audited in the repository. {N:dependency audit report}</td><td>Firebase JS 10.12.0 from gstatic without Subresource Integrity; no <code>package.json</code>, so no <code>npm audit</code>. {V:_Database/firebase-console.js, CLEANUP_LOG.md}</td></tr>
+<tr><td>Face / camera data</td><td>Not saved, not sent (§24). {V:Scripts/AR/*.cs}</td><td>Snapshot images admin-only, deleted at review. {V:firestore.rules}</td></tr>
+<tr><td>Privacy notice</td><td>Draft Privacy Policy + Terms inside the app; still names Facebook sign-in and has a placeholder support e-mail. {V:Legal/PrivacyPolicyAndTerms.txt lines 69, 113, 128}</td><td>Admins cannot read users' data. {V:firestore.rules}</td></tr>
+</tbody></table>
+<h2>31.1 Data Privacy Act of 2012 (Republic Act 10173)</h2>
+<p>The Philippine Data Privacy Act is the applicable law for a Philippine app that stores names, birthdays, e-mails and health-related skin information. It is not cited anywhere in the repository. {I:the app targets the Philippines (PhFdaVerification.cs)} {N:any reference to RA 10173 in the legal text or documents} What the project already does in its spirit: purpose-limited collection, consent at Terms, owner-only access, deletion of the account and its data, no profile data sent to the AI, local processing of camera data. What is missing: a named data protection contact, a real support e-mail, retention periods, and a breach procedure. {V:Legal/PrivacyPolicyAndTerms.txt, Scripts/Settings/AccountActions.cs}</p>
+
+<h1><span class="part">Part G · Security</span>32. Database security in practice</h1>
+<ul>
+<li><b>Roles:</b> three in practice: public reader, signed-in app user, admin (by <code>admins</code> document). No custom claims. {V:firestore.rules} {N:Firebase custom claims}</li>
+<li><b>Least privilege:</b> the app's writes are narrow (create-only, fixed keys, Pending); admins cannot read personal data; the AI function uses the caller's own token instead of a service account. {V:firestore.rules, api/scan-snapshot.js header}</li>
+<li><b>Admin-only collections:</b> <code>scanActivity</code>, suggestions, <code>productIngredientSuggestions</code>, <code>pending_product_images</code> are readable only through <code>isAdmin()</code>. {V:firestore.rules}</li>
+<li><b>Backups / exports:</b> <code>tools/downloadCatalogue.mjs</code> saves the three public collections; the Recycle Bin downloads a JSON copy before deleting forever. Personal data is not backed up by these tools. No scheduled Firestore export is configured. {V:tools/downloadCatalogue.mjs header, _Admin_Recycle_Bin/adminRecycleBin.js header} {N:scheduled Firestore backups / point-in-time recovery}</li>
+<li><b>Environments:</b> one Firebase project for development, testing and the demo; the app's tests run on pure logic, not on the live database. {V:.firebaserc} {N:separate test / staging Firebase project}</li>
+<li><b>Shared admin login:</b> one admin account is shared by several people, so changes cannot be traced to a person. {V:_Shared/adminLayouts.js header}</li>
+</ul>

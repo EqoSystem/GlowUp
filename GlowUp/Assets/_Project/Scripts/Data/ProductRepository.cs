@@ -163,7 +163,7 @@ namespace GlowUp.Data
         /// Queries the existing Firebase products collection for a product identified by its printed brand and name.
         /// The network requests are asynchronous and use the server so a cache miss is not mistaken for a missing product.
         /// </summary>
-        public static async Task<ProductData> FindByBrandAndNameAsync(string brandName, string productName)
+        public static async Task<ProductData> FindByBrandAndNameAsync(string brandName, string productName, string kindHint = "")
         {
             brandName = (brandName ?? "").Trim();
             productName = (productName ?? "").Trim();
@@ -181,7 +181,7 @@ namespace GlowUp.Data
             if (!await FirebaseBootstrap.Ready) throw new InvalidOperationException("Firebase is not ready for product lookup.");
 
             List<ProductData> ofBrand = await ProductsOfBrand(brandName, retryAfterMiss);      // one fetch per brand, whatever the product name is
-            List<ProductIndex.Candidate> found = ProductIndex.Build(ofBrand).Search(brandName, productName, 3);
+            List<ProductIndex.Candidate> found = ProductIndex.Build(ofBrand).Search(brandName, productName, 3, kindHint);
             foreach (ProductIndex.Candidate candidate in found)
                 if (candidate != null && candidate.product != null && (candidate.exactName || candidate.score >= ProductIndex.Sure))
                 {

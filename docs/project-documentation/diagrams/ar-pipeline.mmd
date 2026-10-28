@@ -1,0 +1,16 @@
+flowchart TB
+  o["AR Try-On opens<br/>(product from result, recommendation or picker)"] --> k1{"Live tracking on,<br/>camera allowed?"}
+  k1 -->|"no"| fb["Guided preview:<br/>CameraFeedController +<br/>FallbackMakeupOverlay"]
+  k1 -->|"yes"| k2{"ARCore available,<br/>64-bit process,<br/>no crash mark?"}
+  k2 -->|"no"| fb
+  k2 -->|"yes"| k3["Start AR Session + XR Origin:<br/>front camera, face tracking"]
+  k3 --> k4{"3 frames + face<br/>subsystem running?"}
+  k4 -->|"no"| fb
+  k4 -->|"yes"| m["ARCore face mesh"]
+  m --> l["ArFaceMakeup: colour layers + shine<br/>(face, cheeks, eyes, lips);<br/>shader GlowUp/FaceMakeupBlend tints skin"]
+  l --> q["ArAdaptiveQuality: Full or Light<br/>(memory + frame-rate check)"]
+  q -->|"Full"| f["ArLightAdapter, ArMouthMask,<br/>ArFaceHold"]
+  q -->|"Light"| g["one layer, no light adaptation,<br/>frame-rate cap"]
+  f --> s["Screen: swatches, finish,<br/>strength, before/after split"]
+  g --> s
+  fb --> s

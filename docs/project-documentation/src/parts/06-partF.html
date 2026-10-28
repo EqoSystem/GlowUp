@@ -1,0 +1,140 @@
+<h1><span class="part">Part F · Data</span>25. Database type and management</h1>
+<p><b>In plain words.</b> GlowUp uses Cloud Firestore, a NoSQL document database: data is stored as documents (like small JSON records) inside named collections, not as tables with joins. One project serves both the app and the website. The phone keeps its own copy and works offline; the website keeps a copy in the browser. {V:Scripts/Data/FirebaseBootstrap.cs, Scripts/Data/OfflineCache.cs, GlowUp-Admin_AI_Testing/_Shared/adminStore.js}</p>
+<p><b>Why Firestore fits</b> (no written reason in the repository): the team already used Firebase Auth; Firestore has a Unity SDK with offline persistence and a JavaScript SDK for a static website; security rules replace a custom backend; the free tier needs no server. The decision to stay on Firestore instead of moving to Supabase is the team's own and is not recorded in the repository. {I:Scripts/Data/FirebaseBootstrap.cs, _Database/firebase-console.js, FIRESTORE_SCHEMA.md "keeps the free tier safe"} {N:a written comparison Firestore vs Supabase / SQL in the repository}</p>
+<h2>25.1 Collection tree</h2>
+<pre class="mono" style="white-space:pre-wrap;font-size:8pt;background:#FAFAFA;padding:3mm;border:1px solid #eee">
+(default) database, project glowup-admin-portal
+├── brands/{id}                       public read · admin write · app: create scan_* Pending, scans +1
+├── products/{id}                     public read · admin write · app: create scan_* Pending, scans +1
+├── ingredients/{id}                  public read · admin write · app: create ai_* unreviewed
+├── config/lists                      public read · admin write (one document, versioned)
+├── productIngredientSuggestions/{id} app create · admin read/process
+├── pending_products/{snap_brand__name__uid}   signed-in read/create · admin approve/delete
+├── pending_product_images/{same id}  creator create · admin read/delete
+├── snapshot_quota/{uid_day | all_day} counters, +1 only
+├── scanActivity/{id}                 app create (anonymous) · admin read/delete
+├── allergenSuggestions/{id}          app create (own uid) · admin read/update/delete
+├── conditionSuggestions/{id}         app create (own uid) · admin read/update/delete
+├── users/{uid}                       owner only
+│   └── scans/{scanId}                owner only
+└── admins/{uid}                      own read · console only
+</pre>
+<p>{V:GlowUp-Admin_AI_Testing/firestore.rules, GlowUp-Admin_AI_Testing/FIRESTORE_SCHEMA.md}</p>
+<h2>25.2 Document shapes and relationships</h2>
+<figure data-diagram="erd" class="tall"><figcaption>Entity-relationship view of the Firestore collections (main fields)</figcaption></figure>
+<ul>
+<li><b>Brand → product:</b> <code>products.brandId</code> holds the brand's document id, plus a copy of <code>brandName</code> (renaming a brand updates the copies). {V:FIRESTORE_SCHEMA.md products}</li>
+<li><b>Product → ingredient:</b> by name (<code>ingredients[]</code>, as printed) and, as a light summary, by id (<code>ingredientIds[]</code>); per-product notes in <code>ingredientNotes</code>. No safety verdict is stored on a product. {V:FIRESTORE_SCHEMA.md "How the data is split"}</li>
+<li><b>Ingredient → lists:</b> ids of <code>config/lists</code> items in <code>allergenTags</code>, <code>avoidForConditions</code>, <code>highlights</code> ... Ids never change; labels can. {V:FIRESTORE_SCHEMA.md config/lists}</li>
+<li><b>Types:</b> text, number, yes/no, list, map, server timestamp; app-written times are Unix seconds (<code>addedAtUnix</code>, <code>scannedAtUnix</code>). {V:FIRESTORE_SCHEMA.md field tables}</li>
+</ul>
+<h2>25.3 Indexes, queries, caching, consistency</h2>
+<ul>
+<li><b>Indexes:</b> no <code>firestore.indexes.json</code>; only single-field queries are used, which Firestore indexes automatically. {V:GlowUp-Admin_AI_Testing/firebase.json} {N:firestore.indexes.json (composite indexes)}</li>
+<li><b>App queries:</b> changed entries by <code>updatedAt</code> / <code>createdAt</code> / <code>addedAtUnix</code> greater than the newest stamp seen; products by <code>brandName</code> in pages. {V:Scripts/Data/CatalogSync.cs lines 93-95, Scripts/Data/ProductRepository.cs lines 220-258}</li>
+<li><b>App caching:</b> first run downloads everything (about 700 documents); then only changes, a count check to detect deletions, a full download once a day, nothing within 10 minutes of the last check. {V:Scripts/Data/CatalogSync.cs header, Scripts/Scan/ScanRules.cs lines 34-36}</li>
+<li><b>Look-ups on the phone:</b> <code>ProductIndex</code> tables by barcode, brand + name, alias, word — no database read per scan for known products. {V:Scripts/Data/ProductIndex.cs header}</li>
+<li><b>Website caching:</b> lists kept in memory and <code>localStorage</code>, wiped on sign-out; changes only. {V:_Shared/adminStore.js header}</li>
+<li><b>Offline writes:</b> <code>SyncQueue</code> replays queued writes; a write refused for good is dropped so it cannot block others. {V:Scripts/Data/SyncQueue.cs header}</li>
+<li><b>Consistency:</b> verdicts computed when read (no stale copies); binning sets status Inactive in the same write; <code>config/lists</code> refuses to overwrite a newer version. {V:FIRESTORE_SCHEMA.md}</li>
+<li><b>Read counting:</b> <code>ReadCounter</code> logs reads per call, scan and session in development builds. {V:Scripts/Data/ReadCounter.cs}</li>
+</ul>
+<h2>25.4 Data-model fixes and their status</h2>
+<table data-caption="The data-model problems named by the team and what the code does about them" class="compact">
+<thead><tr><th style="width:18%">Problem</th><th>Fix in the code</th><th style="width:16%">Status</th></tr></thead>
+<tbody>
+<tr><td>Duplicates</td><td>Same brand + compact name refused on forms and imports; <code>ProductIndex.Every</code> stops the app adding a product twice; re-scan replaces the earlier scan; "Find duplicates" merges into one entry (old name kept as alias). {V:adminBrandInventory.js lines 2326-2327, Scripts/Data/ProductRepository.cs header, commit 6702528, _Shared/adminCleanup.js}</td><td>Built. Whether the clean-up was applied to live data is not recorded. {N:record of the clean-up run on the live database}</td></tr>
+<tr><td>Slow look-ups</td><td>Local index + incremental sync (app); browser copy + changes only (site); dashboard count queries. {V:commits 2fa3d42, a599aa4}</td><td>Built; no timing measured. {N:measured read counts / timings before and after}</td></tr>
+<tr><td>Messy names</td><td>One normaliser on both sides (<code>TextKey</code> / <code>normalizeName</code>): capitals, accents, punctuation, spaces ignored; aliases; names learned on the phone. {V:Scripts/Data/TextKey.cs, _Shared/glowupRules.js header, Scripts/Data/LocalAliases.cs}</td><td>Built, tested against shared cases. {V:Editor/Tests/SharedRuleCases.txt, tests/rules.test.mjs}</td></tr>
+<tr><td>Inconsistent ingredient lists</td><td>One master record per ingredient; products link by id; parser rejects claims and label text; clean-up finds ingredient entries that are label text; order of trust for list sources. {V:FIRESTORE_SCHEMA.md, Scripts/Scan/IngredientStoplist.cs, _Shared/glowupCatalog.js header, Scripts/Scan/ListSources.cs}</td><td>Built.</td></tr>
+<tr><td>Hair / body / skin-care products</td><td>Make-up-only rule on app, site and (looser) rules; "Not make-up" group moved to the bin. {V:Scripts/Scan/ProductScope.cs, _Shared/glowupRules.js, firestore.rules faceProduct()}</td><td>Built; rules still hold the older, looser check. {V:FIRESTORE_SCHEMA.md "Make-up only"}</td></tr>
+<tr><td>Legacy product fields</td><td>The app still reads an older nested schema (<code>product_identification</code>, <code>official_ingredient_list</code>). {V:Scripts/Data/ProductRepository.cs header, line 221}</td><td>Two shapes live side by side. {I:ProductRepository.cs queries both}</td></tr>
+</tbody></table>
+
+<h1><span class="part">Part F · Data</span>26. How brand and product information is obtained and organised</h1>
+<h2>26.1 Where the information comes from</h2>
+<ul>
+<li>Admins typing or importing documents (owner's brand list, brand sites, FDA Philippines records). {V:§18; commits 9188bc2, c0eb4f5}</li>
+<li>Open Beauty Facts (seed products and a barcode second opinion); the US FDA prohibited/restricted page (seed ingredients). {V:FIRESTORE_SCHEMA.md source table, Scripts/Scan/OpenBeautyFacts.cs}</li>
+<li>App users' scans (Pending entries, web-found lists, photo snapshots), always reviewed by an admin before use. {V:firestore.rules}</li>
+<li>AI drafts with source pages, approved one by one. {V:FIRESTORE_SCHEMA.md}</li>
+</ul>
+<h2>26.2 How they are organised and narrowed</h2>
+<table data-caption="Organisation and filtering dimensions" class="compact">
+<thead><tr><th style="width:22%">Dimension</th><th>In the project?</th></tr></thead>
+<tbody>
+<tr><td>Category</td><td>Brands: always Makeup. {V:FIRESTORE_SCHEMA.md}</td></tr>
+<tr><td>Product type</td><td>17 make-up kinds; decides the AR area. {V:FIRESTORE_SCHEMA.md cosmeticType}</td></tr>
+<tr><td>Brand, market</td><td>Brand link; market Global / Local / Asia / Europe / North America. {V:IMPORT_FORMAT.md}</td></tr>
+<tr><td>Shade</td><td>Hex colours per product. {V:FIRESTORE_SCHEMA.md shades}</td></tr>
+<tr><td>Finish</td><td>Only as an AR setting, not a product field. {V:Scripts/AR/FallbackMakeupOverlay.cs} {N:a finish field on products}</td></tr>
+<tr><td>Price</td><td>{N:price field or filter}</td></tr>
+<tr><td>Skin-type suitability, ingredient flags</td><td>Through ingredient fields (avoid/good for skin type and condition, allergen families), evaluated per user. {V:FIRESTORE_SCHEMA.md ingredients}</td></tr>
+<tr><td>Status / review / visibility</td><td>Active, Pending, Inactive; reviewed; binned; Live/Hidden badge. {V:FIRESTORE_SCHEMA.md, commit fc225bb}</td></tr>
+<tr><td>Search tags</td><td><code>tags</code>: kind, brand, has-shades, no-ingredient-list, fda-listed (max 20). {V:FIRESTORE_SCHEMA.md tags}</td></tr>
+<tr><td>Folders</td><td>Admin-only arrangement. {V:FIRESTORE_SCHEMA.md folder}</td></tr>
+<tr><td>Make-up-only enforcement</td><td>Form refusal, import flags, app filter, rule check on app-created entries. {V:§2.2}</td></tr>
+</tbody></table>
+
+<h1><span class="part">Part F · Data</span>27. Credible sources</h1>
+<h2>27.1 Sources the project actually uses or names</h2>
+<table data-caption="Sources found in the repository" class="compact">
+<thead><tr><th style="width:26%">Source</th><th>How it is used</th></tr></thead>
+<tbody>
+<tr><td>FDA Philippines Verification Portal (verification.fda.gov.ph)</td><td>Product notification look-up by name (12-15 s per search); badge on the result; manual check link. {V:Scripts/Scan/PhFdaVerification.cs}</td></tr>
+<tr><td>US FDA "Prohibited &amp; Restricted Ingredients in Cosmetics"</td><td>Source of the <code>fda_</code> seed ingredients. {V:FIRESTORE_SCHEMA.md}</td></tr>
+<tr><td>openFDA substance registry (api.fda.gov)</td><td>Confirms an ingredient name exists (UNII); says nothing about safety. {V:Scripts/Scan/FdaSubstanceRegistry.cs}</td></tr>
+<tr><td>Open Beauty Facts (ODbL)</td><td>Seed products and barcode second opinion; credited. {V:Scripts/Scan/OpenBeautyFacts.cs, FIRESTORE_SCHEMA.md}</td></tr>
+<tr><td>Preferred sources given to the AI</td><td>fda.gov; fda.gov.ph and the ASEAN Cosmetic Directive annexes; EU CosIng; Cosmetic Ingredient Review (cir-safety.org); PubChem. {V:Scripts/Scan/IngredientResearcher.cs lines 39-43}</td></tr>
+<tr><td>Source-kind labels (classification only)</td><td>Regulators (EU, US FDA, FDA PH, NIH, WHO, ASEAN, TGA, Health Canada, gov.uk, ECHA, .gov), medical bodies (CIR, AAD, DermNet, Contact Dermatitis Society, ScienceDirect, Wiley, Springer, Nature, JAMA, BMJ, Mayo Clinic, Cleveland Clinic, .edu), ingredient databases (PCPC, INCI Beauty, INCIDecoder, Paula's Choice, EWG, CosmeticsInfo), retailers, Open Beauty Facts. {V:FIRESTORE_SCHEMA.md "What kind of page a source is", _Shared/glowupRules.js sourceKind}</td></tr>
+<tr><td>Brand official websites</td><td>Only when an admin confirmed the brand owns the site. {V:FIRESTORE_SCHEMA.md brands.website}</td></tr>
+<tr><td>GS1 "Verified by GS1"</td><td>Opened for an admin to see which company owns a barcode. {V:_Shared/gs1Hint.js}</td></tr>
+</tbody></table>
+<p>Naming a site in the label list does not mean the project took data from it. No paper, article or dataset citation (for example a dermatology journal) is stored with the built-in ingredient table. {V:Scripts/Scan/IngredientKnowledge.cs header} {N:per-entry citations for the built-in ingredient knowledge}</p>
+<h2>27.2 Suggested credible sources (team must confirm before citing)</h2>
+<table data-caption="Suggested credible sources: NOT used by the project unless stated above" class="compact">
+<thead><tr><th style="width:24%">Source</th><th>Authoritative for</th><th style="width:28%">Limits</th></tr></thead>
+<tbody>
+<tr><td>Cosmetic Ingredient Review (CIR)</td><td>US expert safety assessments of cosmetic ingredients, with concentration limits.</td><td>US context; not every ingredient reviewed.</td></tr>
+<tr><td>EU CosIng</td><td>INCI names, functions, EU Annex restrictions.</td><td>Database, not a safety assessment; EU law.</td></tr>
+<tr><td>FDA Philippines cosmetic notification and advisories</td><td>Whether a product is notified for sale in the Philippines; banned-product advisories.</td><td>No ingredient lists; manual portal.</td></tr>
+<tr><td>ASEAN Cosmetic Directive annexes</td><td>Prohibited / restricted substances in ASEAN, the Philippine legal basis.</td><td>Legal lists, not plain-language descriptions.</td></tr>
+<tr><td>DermNet</td><td>Plain-language dermatology for conditions such as contact dermatitis, rosacea.</td><td>Educational, not product-specific.</td></tr>
+<tr><td>American Academy of Dermatology</td><td>Patient guidance on cosmetics for acne, eczema, rosacea.</td><td>General advice.</td></tr>
+<tr><td>PubMed / peer-reviewed articles</td><td>Evidence on irritation and allergy rates (e.g. patch-test studies).</td><td>Needs careful selection; access may be limited.</td></tr>
+<tr><td>PubChem / DrugBank</td><td>Chemical identity, pharmacology of drug-grade compounds (e.g. salicylic acid).</td><td>Not cosmetic-use specific.</td></tr>
+<tr><td>Official brand websites</td><td>The current ingredient list of one product.</td><td>Marketing content; formulas change by region.</td></tr>
+</tbody></table>
+
+<h1><span class="part">Part F · Data</span>28. Ingredient information, references and flags</h1>
+<ul>
+<li><b>How descriptions link to sources:</b> each ingredient has <code>sources</code> ("page title | https://address"); the kind of page is worked out when shown (regulator, medical, maker, reference, public, retailer, other) by the same rule in app, site and server, tested against shared cases. Assist with AI keeps only regulator, medical and reference pages for an ingredient's description. The Curator auto-approves a draft only on a known dermatology/pharmacy/regulator link, and only warnings. {V:FIRESTORE_SCHEMA.md, Scripts/Scan/ListSources.cs, _Shared/glowupRules.js, api/assist-ingredient.js, commits f4da39b, 62c3be0}</li>
+<li><b>Flags:</b> <code>riskLevel</code> harmful = prohibited/restricted by a regulator; caution = documented concern (allergen/irritant); umbrella terms (e.g. Fragrance) warn that hidden substances are possible; allergen families; condition and skin-type flags; minimum age. {V:IMPORT_FORMAT.md, FIRESTORE_SCHEMA.md ingredients}</li>
+<li><b>Unreviewed AI entries</b> may warn but never clear an ingredient. {V:Scripts/Scan/ProductAnalysisEngine.cs line 126}</li>
+<li><b>Built-in knowledge:</b> the app ships its own table of common ingredients; the website's entry always wins. {V:Scripts/Scan/IngredientKnowledge.cs header}</li>
+</ul>
+<div class="box warn"><h4>Disclaimer</h4>
+<p>GlowUp is an informational tool. It does not diagnose, treat or prevent any skin condition. A result means "nothing in this list is flagged for your saved profile", not "safe for you". Ingredient data may be incomplete or out of date, and manufacturers change formulas. Users with a skin condition or a past reaction should consult a dermatologist and read the label of the product they hold. This wording follows the app's own Terms. {V:Legal/PrivacyPolicyAndTerms.txt Terms §4, Scripts/Scan/ProductRecommender.cs header}</p></div>
+
+<h1><span class="part">Part F · Data</span>29. Communication map</h1>
+<p>The app and the website never talk to each other directly. They stay in sync only through the shared Firestore database: the website writes the catalogue with <code>updatedAt</code> stamps; the phone downloads entries with newer stamps; the phone writes Pending entries, suggestions and scan notes that the website reads. {V:Scripts/Data/CatalogSync.cs, FIRESTORE_SCHEMA.md}</p>
+<table data-caption="Feature, caller, service and database path" class="compact">
+<thead><tr><th style="width:15%">Feature</th><th style="width:27%">Screen / page → service</th><th>Collections, paths, functions</th></tr></thead>
+<tbody>
+<tr><td>Scan</td><td>AiSmartAnalysisScene → FrameReader, ProductRepository, ProductAiAdvisor; LoadingScene → ScanAnalysisPipeline</td><td>read <code>products</code>, <code>ingredients</code>, own <code>pending_products</code>; write <code>users/{uid}/scans</code>, <code>scanActivity</code>, <code>brands/products.scans</code>, <code>ingredients/ai_*</code>, <code>products/scan_*</code>, <code>productIngredientSuggestions</code>; Gemini; FDA PH; OBF; openFDA</td></tr>
+<tr><td>Search / typed</td><td>Scan pop-up → TypedEntry, ProductIndex, ProductAiAdvisor.FindTyped</td><td>phone index; Gemini</td></tr>
+<tr><td>Recommendation</td><td>Dashboard / Result → ProductRecommender, ProductAnalysisEngine</td><td>phone copies of <code>products</code>, <code>brands</code>, <code>ingredients</code>, profile</td></tr>
+<tr><td>AR</td><td>ARTryOnScene → ArFaceTrackingController, ArFaceMakeup</td><td>none (product shades from the phone copy)</td></tr>
+<tr><td>History</td><td>Recent Scans → ScanHistoryRepository, SyncQueue</td><td><code>users/{uid}/scans</code></td></tr>
+<tr><td>Admin CRUD</td><td>Inventory / Curator → adminStore.js, Firestore SDK</td><td><code>brands</code>, <code>products</code>, <code>ingredients</code>, <code>config/lists</code></td></tr>
+<tr><td>Bulk import</td><td>Inventory / Curator → adminDocumentReader.js, importFormat.js, <code>/api/assist-ingredient</code></td><td>same + <code>productIngredientSuggestions</code></td></tr>
+<tr><td>Photo snapshot</td><td>Scan → ScanSnapshotController → <code>/api/scan-snapshot</code></td><td><code>snapshot_quota</code>, <code>pending_products</code>, <code>pending_product_images</code>; admin review</td></tr>
+</tbody></table>
+<figure data-diagram="seq-scan" class="tall"><figcaption>Sequence: scan, recognise, analyse, save</figcaption></figure>
+<figure data-diagram="seq-typed"><figcaption>Sequence: typed product name or ingredient list (search)</figcaption></figure>
+<figure data-diagram="seq-recommend"><figcaption>Sequence: recommendations on the dashboard</figcaption></figure>
+<figure data-diagram="seq-ar"><figcaption>Sequence: AR Try-On</figcaption></figure>
+<figure data-diagram="seq-history"><figcaption>Sequence: scan history and offline sync</figcaption></figure>
+<figure data-diagram="seq-admin"><figcaption>Sequence: admin create / update and how the app receives it</figcaption></figure>
+<figure data-diagram="seq-import"><figcaption>Sequence: bulk import from a file</figcaption></figure>
+<figure data-diagram="seq-snapshot"><figcaption>Sequence: photo snapshot of an unknown product and admin review</figcaption></figure>

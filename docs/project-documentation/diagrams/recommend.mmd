@@ -1,0 +1,17 @@
+flowchart TB
+  p["Each catalogue product the app may use<br/>(make-up, Active, brand Active, not binned)"] --> r1{"Make-up?"}
+  r1 -->|"no"| x1["Never suggested"]
+  r1 -->|"yes"| r2{"Has an ingredient list?"}
+  r2 -->|"no"| x2["Not suggested"]
+  r2 -->|"yes"| r3{"User old enough<br/>(minAge)?"}
+  r3 -->|"no"| x3["Not suggested"]
+  r3 -->|"yes"| r4{"User saved a<br/>skin condition?"}
+  r4 -->|"yes"| r5{"List has a source<br/>(reviewed, pages, admin)?"}
+  r5 -->|"no"| x4["Not suggested"]
+  r5 -->|"yes"| r6["Analyse ingredients for this user"]
+  r4 -->|"no"| r6
+  r6 --> r7{"Status safe?"}
+  r7 -->|"no"| x5["Not suggested"]
+  r7 -->|"yes"| r8{"Condition: unknown<br/>ingredients within limit (0)?"}
+  r8 -->|"no"| x6["Not suggested"]
+  r8 -->|"yes, or no condition"| ok["Suggested: no ingredients<br/>flagged for your profile"]

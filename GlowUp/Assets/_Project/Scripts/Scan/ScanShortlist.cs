@@ -146,7 +146,7 @@ namespace GlowUp.Scan
             return false;
         }
 
-        static Entry Of(ProductData product)
+        public static Entry Of(ProductData product)
         {
             return new Entry { product = product, productName = (product.name ?? "").Trim(), brandName = (product.brandName ?? "").Trim(), cosmeticType = (product.cosmeticType ?? "").Trim() };
         }
@@ -155,7 +155,8 @@ namespace GlowUp.Scan
         static void Add(List<Entry> found, Entry entry)
         {
             string key = entry.Key;
-            Entry had = found.Find(other => other.Key == key);
+            // two products of the inventory with the same name and a different kind ("Fit Me": a foundation and a concealer) are two choices
+            Entry had = found.Find(other => other.Key == key && !(other.product != null && entry.product != null && other.product.id != entry.product.id));
             if (had == null) { found.Add(entry); return; }
             // the look of the pack and the words on it point to the same product: that counts for more than either alone
             bool another = (entry.byLook && !had.byLook) || (entry.byText && !had.byText);

@@ -1,0 +1,83 @@
+<h1><span class="part">Part H · Developer practices</span>33. Naming conventions</h1>
+<table data-caption="Naming conventions with real examples and inconsistencies" class="compact">
+<thead><tr><th style="width:15%">Thing</th><th style="width:40%">Convention and examples</th><th>Inconsistencies found</th></tr></thead>
+<tbody>
+<tr><td>C# files / classes</td><td>PascalCase, one class per file, role suffix: <code>SmartScanFlowController.cs</code>, <code>ProductRepository.cs</code>, <code>ArTryOnSceneBuilder.cs</code>, <code>HoldToScanButton.cs</code>. {V:Scripts/, Editor/}</td><td>File names in lower case after the first word: <code>Scanning/Geminiapiclient.cs</code> (class <code>GeminiApiClient</code>), <code>Geminiapiconfig.cs</code>, <code>Geminiscanmodels.cs</code>, <code>Networking/Unitywebrequestawaiter.cs</code>. <code>ARTryOnManager</code> next to <code>ArTryOnFlowController</code>. <code>HoldToScanButton</code> is now a tap button. {V:file names}</td></tr>
+<tr><td>Folders (app)</td><td>By feature: <code>Scan</code>, <code>AR</code>, <code>Auth</code>, <code>Data</code>, <code>Onboarding</code>, <code>Settings</code>, <code>Views</code>, <code>Theme</code>. {V:Scripts/}</td><td>Overlapping folders: <code>AI/</code>, <code>Scan/</code> and <code>Scanning/</code>; <code>Net/</code> and <code>Networking/</code>; old code in <code>Assets/Scripts/</code> outside <code>_Project</code>. {V:folder structure}</td></tr>
+<tr><td>Namespaces</td><td><code>GlowUp.&lt;Area&gt;</code>: GlowUp.Scan (52 files), GlowUp.Common (52), GlowUp.EditorTools (38), GlowUp.AppSettings (22), GlowUp.Tests (21), GlowUp.Data (20) ... {V:namespace count over Scripts and Editor}</td><td><code>GlowUp.Net</code> and <code>GlowUp.Networking</code> both exist; Settings folder uses namespace <code>GlowUp.AppSettings</code>.</td></tr>
+<tr><td>Variables / fields</td><td>camelCase private fields with <code>[SerializeField]</code> (<code>minimumAiConfidence</code>, <code>offerSnapshotOnCatalogMiss</code>); user-facing texts as fields prefixed <code>msg</code>, <code>status</code>, <code>hint</code>. {V:Scripts/Scan/SmartScanFlowController.cs}</td><td>-</td></tr>
+<tr><td>Scenes</td><td>PascalCase + <code>Scene</code>: <code>UserDashboardScene</code>, <code>OnboardingStep3Scene</code>. {V:Scenes/}</td><td><code>LogInScene</code> (capital I), <code>ARTryOnScene</code> (AR) vs scripts <code>Ar...</code>; <code>AiSmartAnalysisScene</code> for the scanner.</td></tr>
+<tr><td>Website files</td><td>camelCase with an <code>admin</code> prefix: <code>adminStore.js</code>, <code>adminBrandInventory.js</code>; shared rules without it: <code>glowupRules.js</code>, <code>importFormat.js</code>. {V:_Shared/}</td><td>Page folders use <code>_Title_Case</code> with underscores (<code>_Admin_Brand_Inventory</code>), unlike the files inside.</td></tr>
+<tr><td>Functions (JS)</td><td>camelCase verbs: <code>saveProduct</code>, <code>approveBrand</code>, <code>loadInventory</code>. {V:adminBrandInventory.js}</td><td>-</td></tr>
+<tr><td>Collections</td><td>camelCase plural: <code>brands</code>, <code>scanActivity</code>, <code>productIngredientSuggestions</code>. {V:firestore.rules}</td><td>snake_case: <code>pending_products</code>, <code>pending_product_images</code>, <code>snapshot_quota</code> (named after a PDF spec). {V:FIRESTORE_SCHEMA.md "Field (PDF name)"}</td></tr>
+<tr><td>Fields</td><td>camelCase (<code>brandName</code>, <code>scannedAtUnix</code>); app times end in <code>Unix</code>. {V:FIRESTORE_SCHEMA.md}</td><td>Legacy nested snake_case product schema still read (<code>product_identification</code>). {V:Scripts/Data/ProductRepository.cs}</td></tr>
+<tr><td>Document ids</td><td>Prefix shows the origin: <code>scan_</code>, <code>ai_</code>, <code>starter_</code>, <code>fda_</code>, <code>obf_</code>, <code>snap_&lt;brand&gt;__&lt;name&gt;__&lt;uid&gt;</code>. {V:FIRESTORE_SCHEMA.md, Scripts/Data/PendingProductRepository.cs lines 105-113}</td><td>The schema document still describes the snap id without the <code>__&lt;uid&gt;</code> tail. {V:FIRESTORE_SCHEMA.md line 125 vs firestore.rules line 58}</td></tr>
+<tr><td>Routes</td><td>Folder paths for pages; kebab-case for functions (<code>/api/assist-ingredient</code>, <code>/api/scan-snapshot</code>). {V:vercel.json}</td><td>-</td></tr>
+<tr><td>Branches</td><td><code>main</code>, <code>improvements-2026-10</code>, <code>ui-layout-changes</code>, <code>scan-miss-flow</code>. {V:git branch}</td><td>Mixed: dated vs topic names.</td></tr>
+<tr><td>Commits</td><td>One plain-English sentence, "Area: what changed and why" (<code>Inventory: Approve brand button ...</code>). {V:git log}</td><td>A few lower-case prefixes (<code>admin:</code>, <code>unity:</code>) and "checkpoint" commits. {V:commits 4a2aa71, a599aa4, 13a3ef5}</td></tr>
+<tr><td>Tests</td><td>App: <code>&lt;Feature&gt;Tests.cs</code> + shared case files; site: <code>&lt;area&gt;.test.mjs</code>. {V:Editor/Tests/, tests/}</td><td>-</td></tr>
+</tbody></table>
+
+<h1><span class="part">Part H · Developer practices</span>34. File and folder organisation</h1>
+<div>
+<div>
+<h3>Mobile app</h3>
+<pre class="mono" style="white-space:pre;font-size:7.8pt;background:#FAFAFA;padding:2mm;border:1px solid #eee">GlowUp/                      Unity project
+└─ Assets/
+   ├─ _Project/                OUR code and assets
+   │  ├─ Scripts/
+   │  │  ├─ Scan/              scanner, recognition, analysis,
+   │  │  │                     recommender, rules (52 files)
+   │  │  ├─ Scanning/          Gemini client + config
+   │  │  ├─ AI/                older scanner + Firestore helper
+   │  │  ├─ AR/                face tracking, make-up layers
+   │  │  ├─ Auth/              log-in, sign-up, Argon2id
+   │  │  ├─ Data/              repositories, cache, sync,
+   │  │  │                     product index, models
+   │  │  ├─ Onboarding/        Steps 1-5, Terms
+   │  │  ├─ Dashboard/ Recent/ Result/ Settings/
+   │  │  ├─ Common/            navigation, effects, camera,
+   │  │  │                     e-mail checks, finger signs
+   │  │  ├─ Views/ Theme/ UI/  reusable UI pieces
+   │  │  ├─ Performance/ Notifications/ Net/ Networking/
+   │  │  └─ Security/          SecureProfileStore.cs (NOT in Git)
+   │  ├─ Editor/              scene builders, setup, APK build
+   │  │  └─ Tests/            231 EditMode tests + case files
+   │  ├─ Scenes/              15 generated scenes
+   │  ├─ Shaders/ Materials/ Textures/ Sprites/ Fonts/
+   │  ├─ Audio/ Branding/ Prefabs/
+   │  ├─ Resources/           ScanRules, PerformanceProfile,
+   │  │                       throw-away e-mail domains
+   │  └─ Legal/               Privacy Policy + Terms
+   ├─ Plugins/Android/GlowUp*.java   our Java bridges
+   ├─ Scripts/                older Tesseract / IAP code
+   └─ FacebookSDK/, Firebase/, ... vendor SDKs</pre>
+</div>
+<div>
+<h3>Website, functions, scripts, data</h3>
+<pre class="mono" style="white-space:pre;font-size:7.8pt;background:#FAFAFA;padding:2mm;border:1px solid #eee">GlowUp-Admin_AI_Testing/     admin website (Vercel)
+├─ _Index/                    log-in page
+├─ _Admin_Dashboard/          dashboard page
+├─ _Admin_Brand_Inventory/    brands + products page
+├─ _Admin_Ingredient_Curator/ ingredients page
+├─ _Admin_Recycle_Bin/        bin page
+├─ _Shared/                   modules used by every page
+│  └─ data/fdaCatalogue.json  FDA PH catalogue extract
+├─ _Database/firebase-console.js   Firebase init
+├─ api/                       Vercel functions (AI)
+├─ tests/                     11 Node test suites
+├─ tools/                     backup + clean-up report
+├─ firestore.rules            database security rules
+├─ firebase.json .firebaserc  Firebase CLI config
+├─ vercel.json .vercelignore  hosting, headers, functions
+├─ FIRESTORE_SCHEMA.md        data contract
+└─ IMPORT_FORMAT.md           import file format
+
+docs/                         PDFs and task notes
+├─ project-documentation/     THIS document + generator
+_quarantine/                  moved files, restorable
+graphify-out/                 code knowledge graph
+CLAUDE.md CLEANUP_LOG.md      project notes</pre>
+</div>
+</div>
+<p><b>What belongs where.</b> App logic that has no Unity dependency (rules, parsers, index) is written as pure classes so it can be unit-tested; screen objects are never edited by hand but changed in the builder and regenerated; Android-only native code goes in <code>Plugins/Android/GlowUp*.java</code>; website logic shared by pages goes in <code>_Shared/</code>; anything secret goes in a Vercel environment variable, never in a file. {V:Scripts/Scan/ProductScope.cs "Pure logic", Editor/SceneBuilderCore.cs, CLAUDE.md, api/assist-ingredient.js header}</p>

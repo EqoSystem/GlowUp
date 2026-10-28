@@ -1,0 +1,11 @@
+flowchart LR
+  U["User"]
+  A["Admin"]
+  S["External sources<br/>Gemini, FDA PH portal,<br/>Open Beauty Facts, openFDA"]
+  P(("0<br/>GlowUp system<br/>(app + website + Firestore)"))
+  U -->|"account details, skin profile,<br/>camera frames, typed text"| P
+  P -->|"verdict, alerts, recommendations,<br/>AR preview, history"| U
+  A -->|"brands, products, ingredients,<br/>approvals, imports"| P
+  P -->|"counts, scan notes, suggestions,<br/>items waiting for review"| A
+  P -->|"product photo or name,<br/>ingredient names, barcode"| S
+  S -->|"identity, ingredient lists,<br/>registry answers"| P

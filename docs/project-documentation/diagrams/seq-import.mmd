@@ -1,0 +1,26 @@
+sequenceDiagram
+  autonumber
+  actor A as Admin
+  participant W as Inventory / Curator page
+  participant D as adminDocumentReader.js
+  participant M as importFormat.js<br/>(plain, no AI)
+  participant V as api/assist-ingredient.js<br/>(Vercel)
+  participant G as Gemini, then Groq, Mistral
+  participant F as Firestore
+  A->>W: drop PDF / Excel / Word file
+  W->>D: extract text in the browser
+  D-->>W: text
+  W->>M: parse GlowUp import format
+  alt text is in the format
+    M-->>W: draft records
+  else any other document
+    W->>V: text + Firebase ID token
+    V->>V: accounts:lookup + own admins doc
+    V->>G: extract records (fixed provider order)
+    G-->>V: JSON
+    V-->>W: draft records + notes
+  end
+  W->>W: make-up check, duplicates, flag skin care
+  W->>F: new brands/products Pending, reviewed false
+  W->>F: productIngredientSuggestions for products without a list
+  W-->>A: summary + flagged records

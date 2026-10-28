@@ -243,6 +243,9 @@ namespace GlowUp.Scan
             string readCode = !string.IsNullOrWhiteSpace(record.shadeName) ? record.shadeName : ScanSession.PendingShadeName;   // ApplyRecognised copies it later
             string coded = ShadeCode.HexFor(readCode, record.productShadeCodes, record.productShades);
             if (coded.Length > 0) record.shadeHex = coded;
+            // a product the website lists with ONE shade is that shade: no code is needed to tell which one it is
+            else if (record.productShades.Count == 1 && string.IsNullOrWhiteSpace(record.shadeName) && ColorUtility.TryParseHtmlString(record.productShades[0] ?? "", out _))
+                record.shadeHex = record.productShades[0].Trim();
             if (string.IsNullOrWhiteSpace(record.shadeName) && !string.IsNullOrWhiteSpace(known.shadeColor))
             {
                 if (ColorUtility.TryParseHtmlString(known.shadeColor, out _)) record.shadeHex = known.shadeColor.Trim();

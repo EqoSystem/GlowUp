@@ -1,0 +1,49 @@
+<section class="cover">
+  <div class="kicker">Capstone project documentation</div>
+  <h1 class="title" data-notoc>GlowUp</h1>
+  <div class="sub">A make-up scanner app that reads a product, checks its ingredients against the user's own skin profile, suggests safer make-up and lets the user try shades on with AR, plus an admin website that curates the shared database.</div>
+  <div class="rule"></div>
+  <div class="meta">
+    STI College San Jose Del Monte<br>
+    Generated from the repository on 24 October 2026<br>
+    Branch <code>scan-miss-flow</code>, last commit <code>87c6162</code> (23 October 2026)<br>
+    Mobile app: Unity (Android) &nbsp;·&nbsp; Website: static HTML/JS on Vercel &nbsp;·&nbsp; Database: Firebase Cloud Firestore
+  </div>
+  <div class="note">
+    Every project-specific statement in this document was taken from files in the repository and carries a tag and the file it came from.
+    Where the repository does not say something, the document says so instead of guessing. Secrets (API keys, the Firebase web key,
+    admin e-mail and password, environment values) are not reproduced anywhere: only their names and purpose are given.
+  </div>
+</section>
+
+<h1 data-notoc><span class="part">Before you start</span>How to read this document</h1>
+
+<h3>Evidence tags</h3>
+<table data-caption="Legend of the evidence tags used on every page">
+  <thead><tr><th style="width:24%">Tag</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td><span class="tag tag-v">Verified</span> <span class="src">(path)</span></td><td>Seen directly in code, configuration or data. The path after it is the file to open to check the statement.</td></tr>
+    <tr><td><span class="tag tag-i">Inferred</span> <span class="src">(basis)</span></td><td>A strong conclusion drawn from several files, from commit history, or from the project's own documents in <code>docs/</code>. The basis is named.</td></tr>
+    <tr><td><span class="tag tag-n">Not found</span></td><td>Searched for and not present in the repository. Nothing was invented to fill the gap. Every one of these is repeated in Appendix D, "Open Items for the Team".</td></tr>
+  </tbody>
+</table>
+<p>Tag count in this edition: <!--COUNTS-->.</p>
+
+<h3>What was read, and what was not</h3>
+<ul>
+  <li>Read: the Unity project's own code (<code>GlowUp/Assets/_Project/</code>: Scripts, Editor builders, tests, legal text), our Android Java files (<code>Assets/Plugins/Android/GlowUp*.java</code> by name), the admin website (<code>GlowUp-Admin_AI_Testing/</code>: pages, shared modules, <code>api/</code> functions, tests, tools, <code>firestore.rules</code>, <code>vercel.json</code>, <code>firebase.json</code>, schema and import documents), the Git history (103 commits), <code>CLEANUP_LOG.md</code>, and the documents already in <code>docs/</code>.</li>
+  <li>Not read, on purpose: <code>GlowUp/ProjectSettings/</code>, <code>GlowUp/Packages/</code>, <code>Library/</code>, <code>Plugins/</code> (except our Java file names), <code>StreamingAssets/</code> and vendor SDK folders. The project's own rule (<code>CLAUDE.md</code>, <code>.graphifyignore</code>) excludes them. Package versions that live only there are marked <span class="tag tag-i">Inferred</span> from the methodology chapter in <code>docs/</code>, and Appendix D asks the team to confirm them from <code>Packages/manifest.json</code>.</li>
+  <li>The capstone paper itself is <b>not</b> in the repository. <code>docs/GlowUp_Methodology_Replacement.pdf</code> (a methodology chapter, 21 pages) is, and Part I compares it with the code. Appendix D asks the team for the full paper.</li>
+  <li>The live Firebase project and the live website were not contacted while writing this. "Deployed" or "published" is only stated where a commit message or file says so.</li>
+</ul>
+
+<h3>How paths are written</h3>
+<p>To keep citations short: paths that start with <code>Scripts/</code>, <code>Editor/</code>, <code>Legal/</code>, <code>Shaders/</code>, <code>Materials/</code>, <code>Resources/</code> or <code>Scenes/</code> are under <code>GlowUp/Assets/_Project/</code>. Paths that start with <code>_Shared/</code>, <code>_Admin_</code>, <code>_Index/</code>, <code>_Database/</code>, <code>api/</code>, <code>tests/</code>, <code>tools/</code> or name <code>firestore.rules</code>, <code>vercel.json</code>, <code>FIRESTORE_SCHEMA.md</code>, <code>IMPORT_FORMAT.md</code> are under <code>GlowUp-Admin_AI_Testing/</code>. "Commit abc1234" means the Git commit with that id; "line N" refers to the file as of commit <code>87c6162</code> plus the working tree on 24 October 2026.</p>
+
+<h3>Words used for status</h3>
+<p><b>Built</b> = the code exists. <b>Checked</b> = automated tests or the developer's local test rig ran it. <b>Not proven on a phone</b> = no record in the repository of a run on a real Android device. Most phone-side features are in the third group; Part J and Appendix D list them.</p>
+
+<h1 data-notoc><span class="part">Contents</span>Table of contents</h1>
+<!--TOC-->
+<h3>List of figures</h3>
+<!--LOF-->

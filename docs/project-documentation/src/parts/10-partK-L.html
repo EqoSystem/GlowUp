@@ -1,0 +1,66 @@
+<h1><span class="part">Part K · Future problems</span>37. Foreseeable problems and mitigations</h1>
+<table data-caption="Foreseeable problems for users and admins" class="compact">
+<thead><tr><th style="width:4%">#</th><th style="width:9%">Who</th><th style="width:33%">Problem</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Admins</td><td><b>Data growth and Firestore read costs.</b> A first install downloads every catalogue document (about 700 now); thousands of products multiply that per new user. {V:Scripts/Data/CatalogSync.cs}</td><td>Ship a starter copy in the app; page by brand or kind; keep the daily full download optional; watch the read counter; move to the Blaze plan with a budget alert.</td></tr>
+<tr><td>2</td><td>Users</td><td><b>Stale or reformulated products:</b> the stored list differs from the pack.</td><td>Show the list's date (already for Open Beauty Facts); "report a different list" button that creates a <code>productIngredientSuggestions</code> entry; periodic admin review by <code>updatedAt</code>.</td></tr>
+<tr><td>3</td><td>Users</td><td><b>Regional shade availability:</b> shades on file may not be sold in the Philippines.</td><td>Add a market per shade; prefer FDA PH-notified variants.</td></tr>
+<tr><td>4</td><td>Users</td><td><b>Device fragmentation and AR performance</b> on low-end phones.</td><td>Keep the guided preview; collect fps from the debug overlay on several test phones; tune <code>PerformanceProfile</code>.</td></tr>
+<tr><td>5</td><td>Users</td><td><b>Lighting and OCR errors</b> on glossy, curved or worn packs.</td><td>Flashlight, focus lock, typed entry and photo snapshot exist; measure success rates in the planned 20-product alpha test and tune Scan Rules.</td></tr>
+<tr><td>6</td><td>Users</td><td><b>Wrong recommendation:</b> a product suggested though it irritates the user, because an ingredient entry has no risk level (counts as safe) or the list is wrong.</td><td>Treat empty <code>riskLevel</code> as "unknown" for users with a condition; require reviewed lists for all recommendations; keep the "not medical advice" wording.</td></tr>
+<tr><td>7</td><td>Users</td><td><b>Consent and privacy complaints</b> (product photos sent to an AI, health-related profile data).</td><td>Finish the privacy policy (support e-mail, RA 10173, retention); in-app consent before the first AI photo; data export on request.</td></tr>
+<tr><td>8</td><td>Admins</td><td><b>Admin mistakes</b> (wrong approval, wrong merge) with a shared login.</td><td>One account per admin; an audit log collection written by the site; keep the Recycle Bin and backups.</td></tr>
+<tr><td>9</td><td>Admins</td><td><b>Duplicate entries</b> created by many users' scans of the same product.</td><td>Keep the index-based check; run "Find duplicates" weekly; per-user creation limits in the rules.</td></tr>
+<tr><td>10</td><td>Both</td><td><b>Rule misconfiguration</b>: the published rules differ from the file.</td><td>Publish from the file with the Firebase CLI only; record the date; add an emulator test suite.</td></tr>
+<tr><td>11</td><td>Both</td><td><b>API / library deprecation:</b> Gemini models retire (already happened), Unity's camera internals used by the torch can change, ML Kit / MediaPipe updates. {V:Scripts/Scanning/Geminiapiclient.cs, Scripts/Common/Flashlight.cs}</td><td>Model chain in configuration; pin versions; test after each SDK update.</td></tr>
+<tr><td>12</td><td>Both</td><td><b>AI key abuse:</b> the key inside the APK can be extracted. {V:Scripts/Scan/ProductAiAdvisor.cs line 31}</td><td>Move all app AI calls behind a Vercel function with per-user quotas (as the snapshot already does); rotate the key.</td></tr>
+<tr><td>13</td><td>Admins</td><td><b>Counter inflation and spam</b> through open create/+1 rules (§30.3).</td><td>The rule fixes in §30.3; App Check.</td></tr>
+<tr><td>14</td><td>Both</td><td><b>Single Firebase project</b> for development and the demo: a test can damage demo data.</td><td>A second project for testing; backups before the defence.</td></tr>
+</tbody></table>
+
+<h1><span class="part">Part L · Panel preparation</span>38. Likely panel questions and honest answers</h1>
+<h3>Live demo</h3>
+<dl class="qa">
+<dt>1. The scan failed during the demo. Why?</dt><dd>The quality gate rejects dark, glared, moving or blurred frames, and only front-label text is used. Switch on the flashlight, hold 15-20 cm away, show the brand and name; otherwise use "Type it in" or "Look it up". Products not in the catalogue need internet and the AI. Bring products that are already in the catalogue for the main demo.</dd>
+<dt>2. What happens offline?</dt><dd>Known products are recognised by barcode or name from the phone's copy and analysed fully offline; history is queued and synced later. AI identification, web lists, FDA check, Open Beauty Facts and photo snapshots need internet; the app says so instead of waiting.</dd>
+<dt>3. It recognised the wrong product.</dt><dd>The app asks rather than guesses ("Is this ...?", the shortlist) and accepts an AI answer only at confidence 0.45 or more with a source page; "Start over" and "Scan a different product" reset. We have not measured the error rate on phones yet.</dd>
+<dt>4. AR lags or does not track.</dt><dd>On phones without ARCore face tracking, or weak phones, the app uses the guided preview or the Light pipeline. A debug overlay can show fps. We have no measured fps figures yet.</dd>
+</dl>
+<h3>Research paper</h3>
+<dl class="qa">
+<dt>5. What are your objectives and did you meet them?</dt><dd>Recognition, ingredient cross-check with a skin profile, recommendations, AR try-on and an admin portal. All are built; phone testing and the 20-product alpha test are still to be done (Part I).</dd>
+<dt>6. What is the significance?</dt><dd>Users with allergies or chronic skin conditions get a personal ingredient check in plain language, and can try shades without shared testers.</dd>
+<dt>7. How does this differ from related apps?</dt><dd>Make-up only, a personal profile check done on the phone, Philippine FDA notification check, AR in the same app, and an admin-curated database with sources. The paper's related-work chapter is not in the repository; use it for named comparisons.</dd>
+<dt>8. What was your methodology?</dt><dd>Agile phases (plan, design, develop, test, deploy, review); screens generated from code; pure logic covered by 231 Unity tests and 11 website test suites.</dd>
+<dt>9. How did you evaluate it?</dt><dd>Automated tests and Editor checks so far. Honest answer: user acceptance and accuracy evaluation on real products are not recorded yet; the plan is the 20-product alpha test under different lighting.</dd>
+<dt>10. What are the limitations?</dt><dd>Android only; catalogue size; ingredient knowledge limits; lighting; ARCore support; internet for unknown products; informational, not medical (§2.4).</dd>
+</dl>
+<h3>AI</h3>
+<dl class="qa">
+<dt>11. Which model do you use and why?</dt><dd>On the phone: Google ML Kit (text, barcode) and a MobileNet V3 small embedder through MediaPipe, because they run offline and fast. Online: Gemini flash models for identification and web look-ups, chosen for vision + web search in one call.</dd>
+<dt>12. How accurate is it?</dt><dd>We have one measured figure: the pack-look model found 94% of packs at the 0.55 limit with 1.6% wrong on a desktop test of 76 public photos. Phone accuracy of the whole scan has not been measured.</dd>
+<dt>13. What dataset did you train on?</dt><dd>We did not train a model. We use pre-trained models and compare embeddings with the user's own earlier scans; the knowledge is the curated database.</dd>
+<dt>14. Bias and failure handling?</dt><dd>Unknown ingredients are never treated as safe; unreviewed AI information can only add warnings; every AI list needs a source page; limits per scan protect the quota.</dd>
+</dl>
+<h3>AR</h3>
+<dl class="qa">
+<dt>15. Do you store users' faces?</dt><dd>No. Frames and the face mesh stay in memory; nothing from AR is saved or sent. Only product photos are sent, when the user asks for an AI look-up or snapshot.</dd>
+<dt>16. How do you handle lighting and shade accuracy?</dt><dd>The colour multiplies the camera picture, a light adapter adjusts skin tone and shine, and a white screen frame lights the face. Colour still depends on the screen and room; the app says the preview is a simulation.</dd>
+</dl>
+<h3>Data</h3>
+<dl class="qa">
+<dt>17. Where does your data come from and is it credible?</dt><dd>Admin-entered and imported records, FDA Philippines records, US FDA prohibited list, Open Beauty Facts and brand sites; each source is labelled by kind (regulator, medical, maker, database, retailer). Admins approve everything before the app uses it.</dd>
+<dt>18. Why Firestore and not SQL?</dt><dd>One managed database for an app and a static website, offline persistence on the phone, security rules instead of a custom server, and a free tier. Relations are kept by ids and light summaries; no verdict is stored, so nothing goes stale.</dd>
+<dt>19. How do you prevent duplicates?</dt><dd>Normalised names and aliases, duplicate checks on forms and imports, a local index that stops the app adding a product twice, re-scans that replace earlier scans, and a "Find duplicates" merge tool.</dd>
+</dl>
+<h3>Security</h3>
+<dl class="qa">
+<dt>20. Who can change the database?</dt><dd>Only accounts listed in <code>admins</code>; the app can add only Pending, unreviewed entries and +1 to scan counters. Admins cannot read users' profiles.</dd>
+<dt>21. How is the admin site protected?</dt><dd>Firebase sign-in, the admin list checked at log-in and on every page, and the database rules as the real lock; the site sends no-frame and no-index headers.</dd>
+<dt>22. Where is the AI key?</dt><dd>Honest answer: the website's keys are server-side in Vercel; the app's key is not in Git but is inside the APK, which is a known risk. The fix is to route app calls through a server function, as the photo snapshot already does.</dd>
+</dl>
+<h3>Scope and future work</h3>
+<dl class="qa">
+<dt>23. Why not skin care?</dt><dd>The scope is make-up; users with skin conditions must never be given skin-care advice by the app. The rule is enforced in the app, the website and the rules.</dd>
+<dt>24. What would you do next?</dt><dd>Phone testing and the 20-product alpha test, publishing and testing the newest rules, moving the app's AI calls server-side, App Check, iOS, a larger catalogue, and measured accuracy figures.</dd>
+</dl>

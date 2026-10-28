@@ -1,0 +1,23 @@
+flowchart TB
+  User(("User"))
+  Admin(("Admin"))
+  APP["<b>Android app</b> (Unity, C#)<br/>15 scenes · ML Kit text + barcode<br/>MediaPipe pack embedder + hand reader<br/>AR Foundation + ARCore face mesh<br/>analysis engine + recommender<br/>JSON cache + SyncQueue"]
+  WEB["<b>Admin website</b><br/>static HTML / CSS / JS<br/>hosted on Vercel"]
+  AUTH["<b>Firebase Authentication</b><br/>e-mail + password, Google"]
+  FS[("<b>Cloud Firestore</b><br/>one database + security rules<br/>project glowup-admin-portal")]
+  FN["<b>Vercel functions</b><br/>api/assist-ingredient.js (admins)<br/>api/scan-snapshot.js (signed-in users)"]
+  GEM["<b>Google Gemini API</b>"]
+  BK["Groq, Mistral<br/>(website backups)"]
+  EXT["FDA Philippines portal · Open Beauty Facts<br/>openFDA substance API · DNS over HTTPS"]
+  User --> APP
+  Admin --> WEB
+  APP -->|"sign-in"| AUTH
+  WEB -->|"sign-in"| AUTH
+  APP <-->|"catalogue changes in,<br/>profile, scans, Pending entries out"| FS
+  WEB <-->|"CRUD checked by rules"| FS
+  WEB -->|"text, ID token"| FN
+  APP -->|"one product photo, ID token"| FN
+  FN --> GEM
+  FN -.-> BK
+  APP -->|"direct call, key inside app"| GEM
+  APP --> EXT

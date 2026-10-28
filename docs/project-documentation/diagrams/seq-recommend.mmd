@@ -1,0 +1,24 @@
+sequenceDiagram
+  autonumber
+  participant D as UserDashboardScene<br/>DashboardFlowController
+  participant P as ProductRepository<br/>+ CatalogSync
+  participant F as Firestore products / brands
+  participant R as ProductRecommender
+  participant E as ProductAnalysisEngine
+  participant C as UserProfileRepository
+  D->>C: profile (cloud or phone copy)
+  D->>P: products the app may use
+  alt checked less than 10 min ago
+    P-->>D: phone copy (0 reads)
+  else
+    P->>F: entries changed since newest stamp + count
+    F-->>P: changes (full download once a day)
+    P-->>D: updated list
+  end
+  D->>R: For(profile, products, maximum)
+  loop each product
+    R->>E: Analyse(ingredients, profile)
+    E-->>R: status, findings
+  end
+  R-->>D: picks (order of the catalogue list)
+  Note over D,R: Nothing about the user leaves the phone

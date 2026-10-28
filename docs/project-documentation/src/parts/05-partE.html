@@ -1,0 +1,85 @@
+<h1><span class="part">Part E · AI and AR</span>21. How the AI works</h1>
+<div class="box pink">
+<p><b>In plain words.</b> When the user points the phone at a product, the phone itself reads the words on the front and any barcode, many times a second, and throws away blurry or dark pictures. It compares what it read with its own copy of the GlowUp catalogue. If the product is there, its stored ingredient list is used at once, even offline. If not, the app asks the database by brand and name, then (online, a limited number of times) asks Google's Gemini AI to recognise the product from one picture and find its official ingredient list on the web with a source page. If that also fails, the user can take one photo for an admin to approve, choose from a shortlist, or type the product in. The ingredient check against the user's skin profile is always done on the phone and is never sent to the AI. {V:Scripts/Scan/SmartScanFlowController.cs header and lines 749-826, 1060-1249; Scripts/Scan/ScanAnalysisPipeline.cs header}</p>
+</div>
+<figure data-diagram="ai-pipeline" class="tall"><figcaption>Recognition and analysis pipeline of the AI Smart Scan</figcaption></figure>
+<h2>21.1 The parts, exactly</h2>
+<table data-caption="Every AI / recognition component" class="compact">
+<thead><tr><th style="width:20%">Step</th><th style="width:28%">Component (where it runs)</th><th>Detail</th></tr></thead>
+<tbody>
+<tr><td>Capture</td><td>Unity <code>WebCamTexture</code> 1920 x 1080 (phone)</td><td>Focus lock (padlock / tap / automatic), flashlight through Unity's camera session, brightness boost. {V:Scripts/Scan/CameraFeedController.cs, Scripts/Scan/FocusKeeper.cs, Scripts/Common/Flashlight.cs, Plugins/Android/GlowUpTorch.java (name)}</td></tr>
+<tr><td>Pre-processing</td><td><code>FrameQuality</code> (phone)</td><td>Rejects dark (&lt;0.14), glare (0.97 brightness over 18% of the picture), moving (&gt;0.12), blurry (&lt;0.4) frames; numbers are Scan Rules defaults. Pictures are turned upright; the colour is sampled inside the scan frame only. {V:Scripts/Scan/ScanRules.cs lines 48-58, commit 25380d6}</td></tr>
+<tr><td>Text + barcode</td><td>Google ML Kit text-recognition 16.0.1 and barcode-scanning 17.2.0 (phone, no internet), Java bridge <code>GlowUpFrameReader.java</code></td><td>Lines with confidence and position; one picture at a time, always the newest. Lines below 0.3 confidence are not used; 0.55 counts as clear. Editor fallback: Tesseract. {V:Scripts/Scan/FrameReader.cs header, Scripts/Scan/ScanRules.cs lines 62-64}</td></tr>
+<tr><td>Primary label filter</td><td><code>ScanEvidence.PrimaryLabelOnly</code></td><td>Keeps front-label lines and the barcode; small print (ingredient list) does not influence matching. {V:Scripts/Scan/ScanEvidence.cs lines 112-133}</td></tr>
+<tr><td>Catalogue match</td><td><code>ProductIndex</code> (phone)</td><td>Look-up tables by barcode, brand + name key, alias and word. A name read in the text counts when it is the exact name with score ≥ 0.86 ("Sure"); 0.45 is "Possible" (shortlist). {V:Scripts/Data/ProductIndex.cs header, lines 35-37; Scripts/Scan/SmartScanFlowController.cs lines 1016-1021}</td></tr>
+<tr><td>Pack look</td><td>MediaPipe Image Embedder, MobileNet V3 small <code>pack_embedder.tflite</code> (phone)</td><td>About 1,000 numbers per picture, compared with up to six looks per product this phone saw before; ≥ 0.70 asks "Is this ...?" at once, ≥ 0.55 only together with a word of the name. Android 7+; otherwise a colour + pattern signature. {V:Scripts/Scan/PackEmbedder.cs, Scripts/Scan/PackagingMemory.cs, Scripts/Scan/ScanRules.cs lines 82-86}</td></tr>
+<tr><td>Database look-up</td><td>Firestore <code>products</code> by brand + name</td><td>Asked when the same brand and name were read twice, 0.5 s apart. {V:Scripts/Scan/SmartScanFlowController.cs lines 1060-1076, 147}</td></tr>
+<tr><td>AI identify + web confirm</td><td>Gemini REST API, called from the phone (model chain gemini-3.8-flash, gemini-3.6-flash, gemini-flash-latest)</td><td>One picture (JPEG) + the text read; answer accepted at confidence ≥ 0.45; the list is accepted only with a usable source page; "never invent a product, a page or an ingredient list" is in the prompt. Also an "early look" in the background while the user keeps scanning. {V:Scripts/Scan/ProductAiAdvisor.cs lines 141-379, Scripts/Scan/SmartScanFlowController.cs lines 126, 1127-1249, 1581-1600, Scripts/Scanning/GeminiApiConfig_Default.asset}</td></tr>
+<tr><td>Budget</td><td><code>AiBudget</code></td><td>Per visit of the scan screen: 2 recognitions, 2 list look-ups; web search skipped 30 min after a refusal. {V:Scripts/Scan/AiBudget.cs, Scripts/Scan/ScanRules.cs lines 40-44}</td></tr>
+<tr><td>Photo snapshot</td><td><code>api/scan-snapshot.js</code> on Vercel → Gemini with Google Search grounding</td><td>One JPEG ≤ 80 KB without EXIF; 30 s cool-down, 5 per account and 150 for everybody per day; result staged as PENDING APPROVAL. {V:api/scan-snapshot.js lines 1-60}</td></tr>
+<tr><td>Unknown ingredients</td><td><code>IngredientResearcher</code> → Gemini + openFDA</td><td>Names only; saved as <code>ai_</code> entries, unreviewed; can warn, never clear. {V:Scripts/Scan/IngredientResearcher.cs header}</td></tr>
+<tr><td>Ingredient reading of typed text</td><td><code>IngredientTextParser</code>, <code>IngredientStoplist</code>, <code>TypedEntry</code></td><td>Splits on commas, "and", "&amp;", "plus"; rejects "free of" claims; matches close spellings at 0.85. {V:Scripts/Scan/TypedEntry.cs, Scripts/Scan/IngredientStoplist.cs, Scripts/Scan/ScanRules.cs line 22}</td></tr>
+<tr><td>Confidence shown</td><td>Ring + checklist</td><td>Five segments: brand, product name, cosmetic type, barcode, ingredient list. {V:Scripts/Scan/ScanRingView.cs header}</td></tr>
+</tbody></table>
+
+<h2>21.2 Hold-to-scan and multi-angle capture</h2>
+<p>Hold-to-scan was built on 12 October 2026 (ring, quality gate, zones, text merging). {V:commits 95ebd9a, dbbd763, 845a476} In the current code the big button is <b>tap once to start, tap again to pause</b>; the class is still called <code>HoldToScanButton</code>, and a long pause (30 s) resets the scan. {V:Scripts/Scan/HoldToScanButton.cs header, Scripts/Scan/SmartScanFlowController.cs lines 17, 152-153, 190, 222-223} This differs from the team's description of a press-and-hold gesture; the team should decide which one they present (Appendix D).</p>
+<p>Several angles are merged by <code>ScanEvidence</code> and <code>ScanTextMerger</code>: every readable line is kept in its best reading across pictures; five zones fill (Front, Ingredients, Codes, Shade, Around); "Around" counts new views when fewer than 40% of clear lines were seen before; the best picture of each zone is kept for the AI; the scan finishes by itself when all zones are full or the ring completes. A different product seen twice restarts the scan. {V:Scripts/Scan/ScanEvidence.cs lines 96-110, 180-229; Scripts/Scan/SmartScanFlowController.cs lines 770-826}</p>
+<h2>21.3 Fallbacks for a worn, unpackaged or unreadable product</h2>
+<ul>
+<li>No packaging / scratched name: pack-look memory, "Look it up" shortlist, typed name (looked up in the catalogue, then on the web), or one photo. {V:Scripts/Scan/ScanShortlist.cs, Scripts/Scan/TypedEntry.cs, Scripts/Scan/ScanSnapshotController.cs}</li>
+<li>No ingredient list on the item: the catalogue's list, a web list with a source, Open Beauty Facts by barcode, or the photo snapshot. {V:Scripts/Scan/ListSources.cs header}</li>
+<li>Faded shade: the shade is never taken from pack memory; the AI may report a shade name/colour, otherwise the user picks it in AR. {I:Scripts/Scan/PackagingMemory.cs (no shade), Scripts/Scan/ProductAiAdvisor.cs (shadeName, shadeHex)}</li>
+<li>"Near-instant" recognition is only possible for products already in the phone's catalogue copy (barcode or exact name); no timing has been measured on a phone. {I:Scripts/Data/ProductIndex.cs is in-memory} {N:measured time to result on a phone}</li>
+</ul>
+
+<h1><span class="part">Part E · AI and AR</span>22. Recommendation logic</h1>
+<p><b>In plain words.</b> The app never sends the profile anywhere to get recommendations. It takes every make-up product in its catalogue copy and analyses its ingredients for this user, exactly like a scan. A product is suggested only if nothing is flagged. For a user who saved a chronic skin condition, the bar is higher: the ingredient list must come from a trusted source and every ingredient must be known. Skin-care products can never be suggested, because the catalogue and the rule are make-up only. {V:Scripts/Scan/ProductRecommender.cs lines 1-108}</p>
+<figure data-diagram="recommend" class="tall"><figcaption>Recommendation decision for one product and one user</figcaption></figure>
+<table data-caption="Inputs and rules of the analysis that feeds recommendations" class="compact">
+<thead><tr><th style="width:20%">Input</th><th>Rule</th></tr></thead>
+<tbody>
+<tr><td>Allergens</td><td>An ingredient matching a saved allergen (by allergen family keywords) becomes <b>harmful</b>. {V:Scripts/Scan/ProductAnalysisEngine.cs lines 76-83}</td></tr>
+<tr><td>Skin type</td><td>Listed in <code>avoidForSkinTypes</code> → caution; in <code>goodForSkinTypes</code> → positive note. {V:ProductAnalysisEngine.cs lines 85-92}</td></tr>
+<tr><td>Skin conditions</td><td>In <code>avoidForConditions</code> → caution ("May aggravate ..."); <code>goodForConditions</code> → "often used for". {V:ProductAnalysisEngine.cs lines 94-107}</td></tr>
+<tr><td>Age</td><td>Ingredient or product <code>minAge</code> above the user's age → caution / not suggested. {V:ProductAnalysisEngine.cs lines 109-115, ProductRecommender.cs line 53}</td></tr>
+<tr><td>Ingredient's own level</td><td><code>riskLevel</code> safe / caution / harmful; empty counts as safe. Unreviewed AI entries can never be "safe" (become "unknown"). {V:ProductAnalysisEngine.cs lines 72, 126}</td></tr>
+<tr><td>Skin tone</td><td>Used for shade suggestions only, not for the safety verdict. {V:ProductAnalysisEngine.cs line 210, Scripts/Scan/ShadeAdvisor.cs}</td></tr>
+<tr><td>Verdict</td><td>Any harmful → harmful; any caution → caution; fewer than 50% of names checkable → "incomplete" caution; else safe. Dermatologist advice when harmful, 2+ cautions, or a condition and not safe. {V:ProductAnalysisEngine.cs lines 143-209}</td></tr>
+</tbody></table>
+<p><b>Ranking and explanation.</b> Products are taken in the order of the catalogue list, up to a maximum; there is no scoring or ranking by preference, finish, price or popularity. {V:ProductRecommender.cs lines 70-84} {N:ranking or scoring of recommendations, user preferences (finish, price) as input} The result screen's alternatives are limited to the same kind of product (or another colour cosmetic of the same area). {V:Scripts/Result/ScanResultFlowController.cs lines 578-581} Each suggestion says "no ingredients flagged for your profile", never "safe" or "good for your condition". {V:ProductRecommender.cs header}</p>
+
+<h1><span class="part">Part E · AI and AR</span>23. AR try-on</h1>
+<figure data-diagram="ar-pipeline" class="tall"><figcaption>AR Try-On: live tracking or guided preview</figcaption></figure>
+<table data-caption="AR components" class="compact">
+<thead><tr><th style="width:22%">Topic</th><th>How it is done</th></tr></thead>
+<tbody>
+<tr><td>Libraries</td><td>Unity AR Foundation with the ARCore XR Plugin; URP with <code>ARBackgroundRendererFeature</code>. {V:Editor/ArFaceTrackingSetup.cs}</td></tr>
+<tr><td>Camera feed</td><td>ARCore front camera drawn into a RenderTexture shown in the camera box; in fallback, Unity <code>WebCamTexture</code>. The camera question is asked about 0.4 s after the screen is drawn. {V:Scripts/AR/ArFaceTrackingController.cs lines 100, 264, Scripts/Scan/CameraFeedController.cs}</td></tr>
+<tr><td>Face detection</td><td><code>ARFaceManager</code> gives ARCore's face mesh every frame. No separate landmark model. {V:Scripts/AR/ArFaceTrackingController.cs line 38}</td></tr>
+<tr><td>Regions</td><td>Materials <code>ArMakeup_1_Face</code>, <code>_2_Cheeks</code>, <code>_3_Eyes</code>, <code>_4_Lips</code>, <code>_5_Shine</code> with mask textures on the one face mesh. Brows: no layer. {V:Materials/ArMakeup_*.mat (file names), Scripts/AR/ArFaceMakeup.cs header} {N:a brow region in AR}</td></tr>
+<tr><td>Shade, finish</td><td>Shade from the product (<code>#RRGGBB</code>) or the skin-tone table; finishes matte, satin, glossy, shimmer, metallic change opacity, lightening, highlight and sparkle. {V:Scripts/AR/FallbackMakeupOverlay.cs header}</td></tr>
+<tr><td>Blending</td><td>Shader <code>GlowUp/FaceMakeupBlend</code> tints the skin so texture and shadow stay visible. {V:Shaders/FaceMakeupBlend.shader, Scripts/AR/ArFaceMakeup.cs}</td></tr>
+<tr><td>Lighting</td><td><code>ArLightAdapter</code> samples a 32 x 32 copy of the picture to adjust the assumed skin tone and highlight strength and to hint in low light; a white screen frame acts as front light. {V:Scripts/AR/ArLightAdapter.cs, Scripts/AR/ScreenLightFrame.cs}</td></tr>
+<tr><td>Mouth, lost face</td><td>Mouth mask keeps lipstick off teeth; a lost face is held, predicted, then faded. Hair and hands cannot be masked. {V:Scripts/AR/ArMouthMask.cs, Scripts/AR/ArFaceHold.cs}</td></tr>
+<tr><td>Performance</td><td>Full or Light pipeline from phone memory (≥ 5.5 GB Full, &lt; 3.8 GB Light) and a frame-rate check; Light caps the frame rate. A debug overlay shows fps and frame ms behind a flag. {V:Scripts/AR/ArAdaptiveQuality.cs, Scripts/Performance/PerformanceProfile.cs lines 63-65, Scripts/AR/ArDebugOverlay.cs}</td></tr>
+<tr><td>Crash safety</td><td>A mark is written before AR starts and cleared after 4 s of tracking; if the app died there, live AR is off on that phone until the next build. 32-bit builds on 64-bit phones are refused. {V:Scripts/Common/FeatureCrashGuard.cs, ArFaceTrackingController.cs lines 211-250, 643}</td></tr>
+<tr><td>Measured performance</td><td>None recorded in the repository. {N:AR fps / latency measured on a phone}</td></tr>
+</tbody></table>
+
+<h1><span class="part">Part E · AI and AR</span>24. AR data and face-data handling</h1>
+<table data-caption="What camera data exists, where it lives and whether it leaves the phone">
+<thead><tr><th style="width:22%">Data</th><th style="width:22%">Where</th><th style="width:14%">Leaves phone?</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td>AR camera frames, face mesh, light samples</td><td>Memory only, per frame</td><td class="ok">No</td><td>No image encoding or file writing in <code>Scripts/AR/</code>. {V:grep of EncodeToJPG/EncodeToPNG/WriteAllBytes: only in Scan files} {V:Legal/PrivacyPolicyAndTerms.txt §4 line 34}</td></tr>
+<tr><td>Finger-sign camera pictures (320 px), 21 hand points</td><td>Memory only</td><td class="ok">No</td><td>{V:Scripts/Common/HandLandmarkReader.cs header, Scripts/Common/FingerSignNavigator.cs line 36}</td></tr>
+<tr><td>Scan pictures of a PRODUCT</td><td>Memory; the best picture of a zone, shrunk to 900 px, JPEG quality 80</td><td class="part">Yes, when online and the app cannot name the product</td><td>Sent to Gemini (phone) or to the snapshot function. {V:Scripts/Scan/SmartScanFlowController.cs lines 122-124, 1957-1971, Scripts/Scan/ScanPhotoService.cs}</td></tr>
+<tr><td>Snapshot photo of a product</td><td><code>pending_product_images</code> (Firestore, admins only)</td><td class="part">Yes</td><td>Deleted on approve or reject. {V:firestore.rules lines 335-350, FIRESTORE_SCHEMA.md}</td></tr>
+<tr><td>Pack-look numbers</td><td>Phone (<code>PackagingMemory</code>)</td><td class="ok">No</td><td>Cannot be turned back into a picture. {V:Scripts/Scan/PackEmbedder.cs header}</td></tr>
+<tr><td>Biometric face data</td><td>Not stored anywhere</td><td class="ok">No</td><td>{V:Scripts/AR/*.cs (no storage calls)}</td></tr>
+</tbody></table>
+<ul>
+<li><b>Consent:</b> Android's camera permission, asked after the screen is drawn; if refused twice, a button opens the app's settings page. Finger signs are off until switched on. {V:Scripts/Common/CameraPermission.cs, Scripts/AR/CameraWaitCard.cs, Scripts/Common/FingerSignNavigator.cs header}</li>
+<li><b>Retention / deletion:</b> nothing face-related to retain. Product snapshot images are deleted at review. {V:FIRESTORE_SCHEMA.md}</li>
+<li><b>Unclear:</b> whether the Gemini API keeps the product pictures it receives depends on Google's terms for the key's tier; the repository does not state it. {N:a statement of the AI provider's data retention for the project's key}</li>
+</ul>

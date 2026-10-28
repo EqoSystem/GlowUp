@@ -1,0 +1,37 @@
+flowchart LR
+  AD(("Admin<br/>(website)"))
+  CON(("Project owner<br/>(Firebase console)"))
+  subgraph SITE["GlowUp admin website"]
+    B1(["Log in (account must be in admins)"])
+    B2(["Dashboard: counts, today's results, suggestions"])
+    B3(["Add / edit / approve brand"])
+    B4(["Add / edit / approve product"])
+    B5(["Add / edit / approve ingredient"])
+    B6(["Import PDF, Excel or Word file"])
+    B7(["Assist with AI: draft description or list"])
+    B8(["Review pending snapshots"])
+    B9(["Review web ingredient lists"])
+    B10(["Clean up / find duplicates (dry run first)"])
+    B11(["Folders, Recycle Bin: restore, delete forever"])
+    B12(["Export CSV, change layout and theme"])
+    B13(["Edit allergen / condition / highlight lists"])
+  end
+  subgraph CONSOLE["Firebase console"]
+    C1(["Add or remove an admins document"])
+    C2(["Publish firestore.rules"])
+  end
+  AD --- B1
+  AD --- B2
+  AD --- B3
+  AD --- B4
+  AD --- B5
+  AD --- B6
+  AD --- B7
+  AD --- B8
+  AD --- B9
+  AD --- B10
+  AD --- B11
+  AD --- B12
+  AD --- B13
+  CON --- C1
+  CON --- C2

@@ -1,0 +1,23 @@
+flowchart TB
+  ST["StartupScene"] --> LG["LogInScene"]
+  ST --> DB
+  LG --> O1["OnboardingStep1Scene"]
+  O1 --> O2["OnboardingStep2Scene"]
+  O2 --> O3["OnboardingStep3Scene"]
+  O3 --> O4["OnboardingStep4Scene"]
+  O4 --> O5["OnboardingStep5Scene"]
+  O5 --> TC["TermsAndConditionScene"]
+  TC --> DB
+  LG --> DB
+  subgraph ROW["Swipe row + bottom bar (pink pill)"]
+    RS["RecentScanActivitiesScene"] <-->|"swipe"| DB["UserDashboardScene"]
+    DB <-->|"swipe"| AR["ARTryOnScene"]
+  end
+  DB -->|"Start Scan"| SC["AiSmartAnalysisScene"]
+  SC --> LD["LoadingScene"]
+  LD --> RE["AiSmartAnalysisResultScene"]
+  RS -->|"Result"| RE
+  RE --> AR
+  DB -->|"gear"| SE["SettingsScene"]
+  SE -->|"retake quiz"| O2
+  FS["Finger signs 1-5<br/>(optional, Settings)"] -.-> DB

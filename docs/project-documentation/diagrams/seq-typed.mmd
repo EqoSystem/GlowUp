@@ -1,0 +1,23 @@
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant S as Scan screen<br/>Type it in pop-up
+  participant T as TypedEntry.Understand
+  participant P as IngredientTextParser
+  participant I as ProductIndex (phone)
+  participant G as Gemini API
+  U->>S: types a list or a product name
+  S->>T: Understand(text)
+  alt ingredients
+    T->>P: Read(text): split, stoplist, close names
+    P-->>S: known + unrecognised names
+  else product name
+    S->>I: InventoryProductFor(name, brand)
+    alt in catalogue
+      I-->>S: product + stored list
+    else not found, online
+      S->>G: FindTyped (one of 2 look-ups per visit)
+      G-->>S: brand, name, sourced list, or notMakeup / question
+    end
+  end
+  S-->>U: analysis through LoadingScene, or a message

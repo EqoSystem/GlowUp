@@ -1,0 +1,28 @@
+flowchart TB
+  s0(["Open app: start-up animation"]) --> s1{"Signed in?"}
+  s1 -->|"yes"| d0["User Dashboard"]
+  s1 -->|"no"| l0["Log-in page"]
+  l0 -->|"e-mail + password<br/>(offline: Argon2id check)"| d0
+  l0 -->|"Google"| g1{"Profile exists?"}
+  g1 -->|"yes"| d0
+  g1 -->|"no"| o2
+  l0 -->|"Sign up"| o1["Step 1: names, birthday, e-mail,<br/>password; account made;<br/>confirm e-mail link"]
+  o1 --> o2["Step 2: skin type +<br/>skin conditions"]
+  o2 --> o3["Step 3: skin tone"]
+  o3 --> o4["Step 4: allergens or<br/>No known allergens"]
+  o4 --> o5["Step 5: summary + edit"]
+  o5 --> t0["Terms and Conditions<br/>(read to the end)"]
+  t0 --> d0
+  d0 --> sc["AI Smart Scan"]
+  d0 --> rs["Recent Scans"]
+  d0 --> ar["AR Try-On"]
+  d0 --> st["Settings"]
+  sc -->|"tap to start / pause,<br/>or type it in"| rec{"Product + list found?"}
+  rec -->|"no"| sh["Shortlist, look it up,<br/>or one photo (snapshot)"]
+  sh --> rec
+  rec -->|"yes"| ld["Loading: analysis steps"]
+  ld --> re["Result: verdict, FDA badge,<br/>sources, alternatives"]
+  re -->|"saved to"| rs
+  re --> ar
+  re -->|"scan again"| sc
+  st -->|"log out / delete account"| l0

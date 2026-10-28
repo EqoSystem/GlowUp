@@ -1,0 +1,19 @@
+sequenceDiagram
+  autonumber
+  actor U as User
+  participant S as ScanSnapshotController<br/>ScanPhotoService
+  participant V as api/scan-snapshot.js<br/>(Vercel)
+  participant F as Firestore
+  participant G as Gemini (vision + search)
+  actor A as Admin (Pending Snapshot Reviews)
+  U->>S: Take one photo (catalogue miss)
+  S->>S: JPEG under 80 KB, no EXIF, button locked
+  S->>V: photo + Firebase ID token
+  V->>V: accounts:lookup (real, enabled user)
+  V->>F: snapshot_quota uid_day +1, all_day +1 (user's token)
+  V->>G: read brand, name, kind, shade, list
+  G-->>V: fields + source pages
+  V-->>S: reading, label Pending approval
+  S->>F: pending_products/snap_brand__name__uid + image doc
+  S-->>U: result with PENDING APPROVAL badge
+  A->>F: approve (brand, product, new ingredients ai_) or reject (delete)

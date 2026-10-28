@@ -27,6 +27,8 @@ namespace GlowUp.Data
             public bool brandAgrees;
             /// <summary>The name that was asked for is exactly this product's name (or one of its aliases).</summary>
             public bool exactName;
+            /// <summary>exactName is true although numbers or claims of the name ("SPF 16", "30H") were not read: they are small print, often missed.</summary>
+            public bool leftOutWeak;
             /// <summary>How much of what was read this product explains (the weight of the words they share): the tie-breaker between equal scores.</summary>
             public float evidence;
         }
@@ -40,6 +42,7 @@ namespace GlowUp.Data
         readonly Dictionary<string, ProductData> byId = new Dictionary<string, ProductData>();
         readonly Dictionary<string, ProductData> byBarcode = new Dictionary<string, ProductData>();
         readonly Dictionary<string, List<ProductData>> byName = new Dictionary<string, List<ProductData>>();     // name key or alias key
+        readonly Dictionary<string, List<ProductData>> byCompact = new Dictionary<string, List<ProductData>>();  // the same keys without spaces: "super stay" = "superstay"
         readonly Dictionary<string, List<ProductData>> byWord = new Dictionary<string, List<ProductData>>();
         readonly Dictionary<string, Words> wordsOf = new Dictionary<string, Words>();                            // product id -> the words of its name
         readonly Dictionary<string, Words> brandOf = new Dictionary<string, Words>();                            // product id -> the words of its brand
@@ -117,6 +120,18 @@ namespace GlowUp.Data
             if (key.Length == 0) return;
             if (!byName.TryGetValue(key, out List<ProductData> list)) byName[key] = list = new List<ProductData>();
             if (!list.Contains(p)) list.Add(p);
+            string compact = key.Replace(" ", "");
+            if (compact.Length < 4) return;
+            if (!byCompact.TryGetValue(compact, out List<ProductData> same)) byCompact[compact] = same = new List<ProductData>();
+            if (!same.Contains(p)) same.Add(p);
+        }
+
+        /// <summary>The products named like this key, also when the pack spaces the name differently ("Super Stay" for "Superstay").</summary>
+        bool NamedLike(string key, out List<ProductData> list)
+        {
+            if (byName.TryGetValue(key, out list)) return true;
+            string compact = key.Replace(" ", "");
+            return compact.Length >= 4 && byCompact.TryGetValue(compact, out list);
         }
 
         // ---------------------------------------------------------------------------------------
@@ -135,20 +150,45 @@ namespace GlowUp.Data
         /// The product with exactly this name (or alias), whatever the capitals, accents and punctuation. When a brand is
         /// given, a product of another brand is not it. Of several, the one with an ingredient list comes first.
         /// </summary>
-        public ProductData Exact(string brandName, string productName)
+        public ProductData Exact(string brandName, string productName, string kindHint = "")
         {
             string key = TextKey.Normalize(productName);
-            if (key.Length == 0 || !byName.TryGetValue(key, out List<ProductData> list)) return null;
+            if (key.Length == 0 || !NamedLike(key, out List<ProductData> list)) return null;
             // without a brand, a name only identifies a product when it is more than one word and only one product has it
             // ("Lip Tint" could be anybody's)
             if (TextKey.Normalize(brandName).Length == 0 && (list.Count != 1 || key.IndexOf(' ') < 0)) return null;
             ProductData best = null;
+            bool bestFits = false;
             foreach (ProductData p in list)
             {
                 if (!BrandsAgree(brandName, p.brandName)) continue;
-                if (best == null || (HasList(p) && !HasList(best))) best = p;
+                // of products that share the name, the one of the kind read on the pack comes first, then the one with an ingredient list
+                bool fits = !string.IsNullOrWhiteSpace(kindHint) && SameKind(p.cosmeticType, kindHint);
+                if (best == null || (fits && !bestFits) || (fits == bestFits && HasList(p) && !HasList(best))) { best = p; bestFits = fits; }
             }
             return best;
+        }
+
+        /// <summary>
+        /// The products of this brand that have exactly this name and DIFFERENT kinds of make-up, when the kind read on the pack does not
+        /// pick one of them: the user has to say which one it is. Empty when there is no such clash.
+        /// </summary>
+        public List<ProductData> SameNameDifferentKind(string brandName, string productName, string kindHint = "")
+        {
+            var same = new List<ProductData>();
+            string key = TextKey.Normalize(productName);
+            if (key.Length == 0 || !NamedLike(key, out List<ProductData> list)) return same;
+            var kinds = new HashSet<string>();
+            foreach (ProductData p in list)
+            {
+                if (!BrandsAgree(brandName, p.brandName)) continue;
+                same.Add(p);
+                string kind = TextKey.Normalize(p.cosmeticType);
+                if (kind.Length > 0) kinds.Add(kind);
+            }
+            if (kinds.Count < 2) return new List<ProductData>();
+            if (!string.IsNullOrWhiteSpace(kindHint) && same.FindAll(p => SameKind(p.cosmeticType, kindHint)).Count == 1) return new List<ProductData>();
+            return same;
         }
 
         // ---------------------------------------------------------------------------------------
@@ -157,8 +197,10 @@ namespace GlowUp.Data
         /// <summary>
         /// The products whose name is closest to a name that was recognised (by the AI, typed by the user ...), best
         /// first. A product of another brand than the one given is left out. Scores: 1 = the same name.
+        /// `kindHint` = the kind of make-up read on the pack ("Foundation"): it picks between products that have the same name and
+        /// a different kind (see ResolveKindClash).
         /// </summary>
-        public List<Candidate> Search(string brandName, string productName, int maximum = 3)
+        public List<Candidate> Search(string brandName, string productName, int maximum = 3, string kindHint = "")
         {
             var found = new List<Candidate>();
             string key = TextKey.Normalize(productName);
@@ -171,9 +213,10 @@ namespace GlowUp.Data
             {
                 if (!BrandsAgree(brandName, p.brandName)) continue;
                 Words its = wordsOf[p.id];
+                Words askedHere = JoinedLike(asked, its), itsHere = JoinedLike(its, asked);
                 float shared = 0f, askedTotal = 0f, itsTotal = 0f;
-                for (int i = 0; i < asked.Length; i++) { float w = Weight(asked.plain[i]); askedTotal += w; if (Has(its, asked.plain[i], asked.squashed[i])) shared += w; }
-                foreach (string word in its.plain) itsTotal += Weight(word);
+                for (int i = 0; i < askedHere.Length; i++) { float w = Weight(askedHere.plain[i]); askedTotal += w; if (Has(itsHere, askedHere.plain[i], askedHere.squashed[i])) shared += w; }
+                foreach (string word in itsHere.plain) itsTotal += Weight(word);
                 if (shared <= 0f || askedTotal <= 0f || itsTotal <= 0f) continue;
                 float ofAsked = shared / askedTotal, ofIts = Math.Min(1f, shared / itsTotal);
                 // one name may be the short form of the other ("Superstay Matte Ink" / "Superstay Matte Ink Liquid Lipstick"):
@@ -181,7 +224,7 @@ namespace GlowUp.Data
                 float score = 0.7f * Math.Max(ofAsked, ofIts) + 0.3f * Math.Min(ofAsked, ofIts);
                 if (!scores.TryGetValue(p.id, out float had) || score > had) { scores[p.id] = score; evidence[p.id] = shared; }
             }
-            if (byName.TryGetValue(key, out List<ProductData> exact))
+            if (NamedLike(key, out List<ProductData> exact))
                 foreach (ProductData p in exact) if (BrandsAgree(brandName, p.brandName)) scores[p.id] = 1f;
 
             foreach (KeyValuePair<string, float> entry in scores)
@@ -193,14 +236,15 @@ namespace GlowUp.Data
                     brandAgrees = !string.IsNullOrWhiteSpace(brandName) && !string.IsNullOrWhiteSpace(p.brandName) && BrandsAgree(brandName, p.brandName)
                 });
             }
-            return Best(found, maximum);
+            return Best(found, maximum, kindHint);
         }
 
         /// <summary>
         /// The products whose name can be read in a text the camera found on a pack (brand, product name, claims, in any
         /// order, with reading mistakes). Best first. Score 1 = every word of the product's name is in the text.
+        /// `kindHint` = the kind of make-up read on the pack, see Search.
         /// </summary>
-        public List<Candidate> InText(string labelText, int maximum = 3)
+        public List<Candidate> InText(string labelText, int maximum = 3, string kindHint = "")
         {
             var found = new List<Candidate>();
             string key = TextKey.Normalize(labelText);
@@ -209,13 +253,17 @@ namespace GlowUp.Data
 
             foreach (ProductData p in Holding(seen))
             {
-                Words its = wordsOf[p.id];
-                if (its.Length == 0) continue;
-                float shared = 0f, itsTotal = 0f; int sharedWords = 0;
+                Words ownWords = wordsOf[p.id];
+                if (ownWords.Length == 0) continue;
+                // the pack may space the name differently: "SUPER STAY" on the pack, "Superstay" in the list (or the other way round)
+                Words seenHere = JoinedLike(seen, ownWords), its = JoinedLike(ownWords, seen);
+                float shared = 0f, itsTotal = 0f; int sharedWords = 0, strongWords = 0, strongShared = 0;
                 for (int i = 0; i < its.Length; i++)
                 {
                     float w = Weight(its.plain[i]); itsTotal += w;
-                    if (Has(seen, its.plain[i], its.squashed[i])) { shared += w; sharedWords++; }
+                    bool strong = !Weak(its.plain[i]);
+                    if (strong) strongWords++;
+                    if (Has(seenHere, its.plain[i], its.squashed[i])) { shared += w; sharedWords++; if (strong) strongShared++; }
                 }
                 if (itsTotal <= 0f || sharedWords == 0) continue;
                 // the brand printed on the pack: its words are in the text, or it stands there written as one word
@@ -225,9 +273,32 @@ namespace GlowUp.Data
                 float score = shared / itsTotal;
                 if (sharedWords < 2 && !(brandSeen && its.Length == 1)) score *= 0.5f;       // one shared word proves little
                 if (!brandSeen) score *= 0.85f;
-                found.Add(new Candidate { product = p, score = score, brandAgrees = brandSeen, exactName = sharedWords == its.Length, evidence = shared });
+                // every word of the name is on the pack, or every word that matters (two at least): "SPF 16" printed small is often not read
+                bool wholeName = sharedWords == its.Length, allThatMatters = strongWords >= 2 && strongShared == strongWords;
+                found.Add(new Candidate { product = p, score = score, brandAgrees = brandSeen, exactName = wholeName || allThatMatters, leftOutWeak = !wholeName && allThatMatters, evidence = shared });
             }
-            return Best(found, maximum);
+            return Best(found, maximum, kindHint);
+        }
+
+        /// <summary>
+        /// "Super Stay" and "Superstay" are one name written two ways. Where two neighbouring words of `words` run together into a word
+        /// that `other` holds, they are joined, so both names compare word for word. `words` itself is left as it is.
+        /// </summary>
+        static Words JoinedLike(Words words, Words other)
+        {
+            if (words.Length < 2) return words;
+            var result = new List<string>(words.Length);
+            bool joined = false;
+            for (int i = 0; i < words.Length; i++)
+            {
+                if (i + 1 < words.Length)
+                {
+                    string run = words.plain[i] + words.plain[i + 1];
+                    if (run.Length >= 5 && Has(other, run, TextKey.Squash(run))) { result.Add(run); joined = true; i++; continue; }
+                }
+                result.Add(words.plain[i]);
+            }
+            return joined ? new Words(string.Join(" ", result)) : words;
         }
 
         /// <summary>Every product that holds at least one of these words (also with a small reading mistake).</summary>
@@ -237,6 +308,9 @@ namespace GlowUp.Data
             for (int i = 0; i < words.Length; i++)
             {
                 string word = words.plain[i];
+                // two words that run together into a word of a name ("super" "stay" -> "superstay")
+                if (i + 1 < words.Length && (word + words.plain[i + 1]).Length >= 5 && byWord.TryGetValue(word + words.plain[i + 1], out List<ProductData> glued))
+                    foreach (ProductData p in glued) if (once.Add(p.id)) yield return p;
                 if (word.Length < 2) continue;
                 if (byWord.TryGetValue(word, out List<ProductData> list))
                     foreach (ProductData p in list) if (once.Add(p.id)) yield return p;
@@ -255,7 +329,14 @@ namespace GlowUp.Data
             }
         }
 
-        float Weight(string word) => weight.TryGetValue(word, out float w) ? w : 1.5f;
+        /// <summary>How little a number or a claim counts: "SPF 16" or "30H" in a name is small print on the pack, so a pack read without it is not a different product.</summary>
+        const float WeakWeight = 0.25f;
+
+        float Weight(string word) => Weak(word) ? WeakWeight : weight.TryGetValue(word, out float w) ? w : 1.5f;
+
+        /// <summary>A number ("16", "30h") or a claim word ("spf", "uva", "pa", "ml"): weak evidence of which product it is.</summary>
+        static bool Weak(string word) =>
+            word.Length > 0 && (char.IsDigit(word[0]) || word == "spf" || word == "uva" || word == "uvb" || word == "pa" || word == "ml" || word == "oz");
 
         /// <summary>True when the name holds this word: letter for letter, with a camera's mix-up evened out, or (five letters and more) with one letter wrong.</summary>
         static bool Has(Words name, string word, string squashedWord)
@@ -293,7 +374,7 @@ namespace GlowUp.Data
         /// <summary>How far the best candidate must be ahead of the next one to be taken as "this is the product".</summary>
         public const float ClearLead = 0.1f;
 
-        static List<Candidate> Best(List<Candidate> found, int maximum)
+        static List<Candidate> Best(List<Candidate> found, int maximum, string kindHint = "")
         {
             found.Sort((x, y) =>
             {
@@ -302,9 +383,10 @@ namespace GlowUp.Data
                 int byList = HasList(y.product).CompareTo(HasList(x.product));          // one with an ingredient list first
                 return byList != 0 ? byList : string.CompareOrdinal(x.product.id, y.product.id);
             });
+            ResolveKindClash(found, kindHint);
             // A name that fits two different products about equally well ("Fit Me": the foundation or the concealer?) does not
             // say which one is meant: neither is "sure" then, and the user has to choose. (An exact name stays sure.)
-            if (found.Count >= 2 && !found[0].exactName && found[0].score >= Sure && found[0].score - found[1].score < ClearLead
+            if (found.Count >= 2 && (!found[0].exactName || found[0].leftOutWeak) && found[0].score >= Sure && found[0].score - found[1].score < ClearLead
                 && TextKey.Normalize(found[0].product.name) != TextKey.Normalize(found[1].product.name))
             {
                 float cap = Sure - 0.01f;
@@ -312,6 +394,41 @@ namespace GlowUp.Data
             }
             if (found.Count > maximum) found.RemoveRange(maximum, found.Count - maximum);
             return found;
+        }
+
+        /// <summary>
+        /// Products of one brand with the SAME name and a different kind of make-up ("Fit Me" as a foundation and as a concealer): the name
+        /// does not say which one is meant. When the kind read on the pack ("Foundation") fits exactly one of them, that one is taken and the
+        /// others drop out. Otherwise none of them is taken for granted: their scores are held below Sure and they are no exact name, so the
+        /// user is asked which one it is. `found` is sorted, best first.
+        /// </summary>
+        static void ResolveKindClash(List<Candidate> found, string kindHint)
+        {
+            if (found.Count < 2) return;
+            Candidate top = found[0];
+            string name = TextKey.Normalize(top.product.name);
+            var group = new List<Candidate>();
+            foreach (Candidate c in found)
+                if (top.score - c.score < ClearLead && TextKey.Normalize(c.product.name) == name && TextKey.Normalize(c.product.brandName) == TextKey.Normalize(top.product.brandName)) group.Add(c);
+            if (group.Count < 2) return;
+            var kinds = new HashSet<string>();
+            foreach (Candidate c in group) { string kind = TextKey.Normalize(c.product.cosmeticType); if (kind.Length > 0) kinds.Add(kind); }
+            if (kinds.Count < 2) return;                    // one kind (or none given): the same product listed twice, not a clash
+
+            if (!string.IsNullOrWhiteSpace(kindHint))
+            {
+                var fitting = group.FindAll(c => SameKind(c.product.cosmeticType, kindHint));
+                if (fitting.Count == 1) { foreach (Candidate c in group) if (c != fitting[0]) found.Remove(c); return; }
+            }
+            foreach (Candidate c in group) { c.exactName = false; c.score = Math.Min(c.score, Sure - 0.01f); }
+        }
+
+        /// <summary>"Foundation" fits "Liquid Foundation" and the other way round.</summary>
+        static bool SameKind(string a, string b)
+        {
+            string x = TextKey.Normalize(a), y = TextKey.Normalize(b);
+            if (x.Length == 0 || y.Length == 0) return false;
+            return x == y || (" " + x + " ").Contains(" " + y + " ") || (" " + y + " ").Contains(" " + x + " ");
         }
 
         static bool HasList(ProductData p) => p != null && p.ingredients != null && p.ingredients.Count >= 3;

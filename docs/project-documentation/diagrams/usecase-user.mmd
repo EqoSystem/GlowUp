@@ -1,0 +1,32 @@
+flowchart LR
+  U(("User<br/>(app)"))
+  subgraph APP["GlowUp mobile app"]
+    A1(["Sign up: Step 1 account + e-mail confirmation"])
+    A2(["Build skin profile: Steps 2-5 + Terms"])
+    A3(["Log in: e-mail/password, Google, offline unlock"])
+    A4(["Reset password"])
+    A5(["View dashboard + recommendations"])
+    A6(["AI Smart Scan a product"])
+    A7(["Type a product or ingredient list in"])
+    A8(["Take one photo when the product is not listed"])
+    A9(["Read result: verdict, FDA badge, sources, alternatives"])
+    A10(["Recent Scans: open, rename, remove, restore"])
+    A11(["AR Try-On: shades, finish, strength, before/after"])
+    A12(["Settings: theme, sounds, alerts, AR quality, finger signs"])
+    A13(["Retake skin quiz"])
+    A14(["Log out / delete account"])
+  end
+  U --- A1
+  U --- A2
+  U --- A3
+  U --- A4
+  U --- A5
+  U --- A6
+  U --- A7
+  U --- A8
+  U --- A9
+  U --- A10
+  U --- A11
+  U --- A12
+  U --- A13
+  U --- A14

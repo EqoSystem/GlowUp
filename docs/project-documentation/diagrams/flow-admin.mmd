@@ -1,0 +1,23 @@
+flowchart TB
+  a0(["Open site: /_Index/index.html"]) --> a1["Log in: e-mail + password<br/>(Firebase Auth)"]
+  a1 --> a2{"Document in admins/uid?"}
+  a2 -->|"no"| a3["Signed out again,<br/>refused at login"]
+  a2 -->|"yes"| a4["Dashboard"]
+  a4 --> b["Brand and Product Inventory"]
+  a4 --> c["Ingredient Curator"]
+  a4 --> r["Recycle Bin (header icon)"]
+  b --> b1["Add / edit brand or product"]
+  c --> c1["Add / edit ingredient"]
+  b1 --> v{"Form checks pass?"}
+  c1 --> v
+  v -->|"no"| e["Message on the form,<br/>field focused"]
+  v -->|"yes"| w["Write to Firestore<br/>(rules check admin + shape)"]
+  b --> i["Import file / Assist with AI"]
+  i --> p["Saved as Pending,<br/>reviewed false"]
+  p --> ap["Approve: Active,<br/>reviewed true"]
+  b --> sn["Pending snapshot reviews:<br/>approve / edit / reject"]
+  b --> cl["Clean up / Find duplicates:<br/>preview, confirm each step"]
+  w --> app["App picks the change up<br/>on its next sync"]
+  ap --> app
+  r --> rr["Restore, or delete forever<br/>after a JSON backup download"]
+  a4 --> so["Sign out: lists cleared<br/>from this browser"]

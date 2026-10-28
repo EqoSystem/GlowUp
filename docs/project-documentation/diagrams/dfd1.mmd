@@ -1,0 +1,42 @@
+flowchart TB
+  U["User"]
+  A["Admin"]
+  X["External sources"]
+  P1(("1.0<br/>Admin sign-in"))
+  P2(("2.0<br/>Manage catalogue"))
+  P3(("3.0<br/>Sync catalogue<br/>to phone"))
+  P4(("4.0<br/>Create account<br/>+ confirm e-mail"))
+  P5(("5.0<br/>Build skin<br/>profile"))
+  P6(("6.0<br/>Scan and<br/>recognise"))
+  P7(("7.0<br/>Analyse and<br/>recommend"))
+  P8(("8.0<br/>History"))
+  P9(("9.0<br/>AR try-on"))
+  D1[("D1 brands, products,<br/>ingredients, config/lists")]
+  D2[("D2 users/uid + scans")]
+  D3[("D3 scanActivity,<br/>suggestions")]
+  D4[("D4 pending_products,<br/>productIngredientSuggestions")]
+  D5[("D5 phone cache")]
+  A --> P1
+  P1 --> P2
+  P2 <--> D1
+  D4 -->|"review"| P2
+  D3 --> P2
+  D1 --> P3
+  P3 --> D5
+  U --> P4
+  P4 --> D2
+  U --> P5
+  P5 --> D2
+  P5 --> D5
+  U -->|"camera / typed"| P6
+  D5 --> P6
+  P6 <--> X
+  P6 --> D4
+  P6 --> P7
+  D5 --> P7
+  P7 --> U
+  P7 --> P8
+  P8 --> D2
+  P8 --> D3
+  P7 --> P9
+  P9 --> U

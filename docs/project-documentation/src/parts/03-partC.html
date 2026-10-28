@@ -1,0 +1,149 @@
+<h1><span class="part">Part C · Mobile application</span>10. Screen inventory</h1>
+<p>Each screen is a Unity scene. Scenes are not drawn by hand: an Editor "builder" script creates every object, so a screen can be rebuilt exactly from code (menu <code>GlowUp &gt; Build Scene</code>). The screen's logic lives in one "flow controller" script. {V:Editor/SceneBuilderCore.cs, Editor/AllScenesBuilder.cs, Editor/BuildSettingsSync.cs lines 24-30}</p>
+<p class="small">Paths in this part are relative to <code>GlowUp/Assets/_Project/</code>.</p>
+<table data-caption="The 15 scenes of the app, in build order" class="compact">
+<thead><tr><th style="width:4%">#</th><th style="width:23%">Scene (file)</th><th style="width:25%">Builder / controller</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><code>StartupScene</code></td><td>StartupSceneBuilder / StartupIntroController</td><td>Animated "GlowUp" word, then dashboard or log-in.</td></tr>
+<tr><td>2</td><td><code>LogInScene</code></td><td>LoginSceneBuilder / LoginFlowController</td><td>Log in, saved e-mails, Google, forgot password, sign up.</td></tr>
+<tr><td>3</td><td><code>OnboardingStep1Scene</code></td><td>OnboardingStep1Builder / OnboardingStep1FlowController</td><td>Account details, e-mail confirmation.</td></tr>
+<tr><td>4</td><td><code>OnboardingStep2Scene</code></td><td>OnboardingTileBuilders / OnboardingStep2FlowController</td><td>Skin type (required) and chronic skin conditions (optional).</td></tr>
+<tr><td>5</td><td><code>OnboardingStep3Scene</code></td><td>OnboardingTileBuilders / OnboardingStep3FlowController</td><td>Skin tone.</td></tr>
+<tr><td>6</td><td><code>OnboardingStep4Scene</code></td><td>OnboardingFinalBuilders / OnboardingStep4FlowController</td><td>Allergens and sensitivities (must answer).</td></tr>
+<tr><td>7</td><td><code>OnboardingStep5Scene</code></td><td>OnboardingFinalBuilders / OnboardingStep5FlowController</td><td>Summary with Edit, Generate Profile.</td></tr>
+<tr><td>8</td><td><code>TermsAndConditionScene</code></td><td>OnboardingFinalBuilders / TermsAcceptanceFlowController</td><td>Privacy Policy and Terms; read to the end, tick, save profile.</td></tr>
+<tr><td>9</td><td><code>UserDashboardScene</code></td><td>DashboardSceneBuilder / DashboardFlowController</td><td>Greeting, profile summary, recommendations, account pop-up.</td></tr>
+<tr><td>10</td><td><code>RecentScanActivitiesScene</code></td><td>RecentScansSceneBuilder / RecentScansFlowController</td><td>Saved scans as expanding rows; remove, rename, sort, restore.</td></tr>
+<tr><td>11</td><td><code>AiSmartAnalysisScene</code></td><td>SmartScanSceneBuilder / SmartScanFlowController</td><td>The scanner.</td></tr>
+<tr><td>12</td><td><code>LoadingScene</code></td><td>LoadingSceneBuilder / LoadingSceneController</td><td>Runs the analysis, ticks steps off.</td></tr>
+<tr><td>13</td><td><code>AiSmartAnalysisResultScene</code></td><td>ScanResultSceneBuilder / ScanResultFlowController</td><td>Verdict and everything behind it.</td></tr>
+<tr><td>14</td><td><code>ARTryOnScene</code></td><td>ArTryOnSceneBuilder / ArTryOnFlowController</td><td>Live AR or guided preview.</td></tr>
+<tr><td>15</td><td><code>SettingsScene</code></td><td>SettingsSceneBuilder / SettingsFlowController</td><td>Nine groups of settings, account actions.</td></tr>
+</tbody></table>
+<p>{V:Editor/BuildSettingsSync.cs FlowScenes, Scripts/Common/SceneNavigator.cs lines 15-29, Editor/*Builder*.cs}</p>
+
+<h1><span class="part">Part C · Mobile application</span>11. Screens in detail</h1>
+<p>For every screen: what is on it (blocks named as the builder names them), why it is there, what data it reads or writes, and its loading / empty / error states. Fetched values show a skeleton bar only while they are really being fetched; titles, labels, buttons and the bottom bar are never skeletons. {V:Scripts/Common/TextSkeleton.cs header, Scripts/Common/ScreenTransition.cs header}</p>
+
+<h2>11.1 Start-up (StartupScene)</h2>
+<ul>
+<li><b>Blocks:</b> <code>GlowWord</code>, <code>UpWord</code>. "Glow" comes down, "Up" comes up, they join with a burst of light, the word rises and dissolves. {V:Editor/StartupSceneBuilder.cs, Scripts/Common/StartupIntroController.cs header}</li>
+<li><b>Why:</b> brand moment while Firebase starts; replaces the Unity splash where the licence allows. {V:Scripts/Common/StartupIntroController.cs}</li>
+<li><b>Data:</b> reads whether a user is signed in; opens the dashboard or the log-in page. {V:Scripts/Common/StartupIntroController.cs step 4}</li>
+</ul>
+
+<h2>11.2 Log-in (LogInScene)</h2>
+<ul>
+<li><b>Blocks:</b> title "Glow Up", "Welcome!", <code>Email:</code> field with the list of saved e-mails (<code>SavedEmailText</code>, <code>RemoveButton</code>), <code>Password:</code> field with show/hide eye, "Forgot Password?", "Log-In", "Sign Up", "Or continue with" + Google button, a caption "Read the Privacy Policy and Terms before signing up", dark-mode button. {V:Editor/LoginSceneBuilder.cs, Scripts/Auth/PasswordFieldToggle.cs}</li>
+<li><b>Data:</b> Firebase Auth sign-in online; Argon2id check of a locally stored verifier offline; password-reset e-mail; the last five e-mails used on this phone (never passwords). {V:Scripts/Auth/LoginFlowController.cs header, Scripts/Auth/SavedAccounts.cs header}</li>
+<li><b>States:</b> every Firebase call has a time limit and returns a message instead of hanging; Android's own autofill pop-up is switched off on the e-mail field. {V:Scripts/Auth/LoginFlowController.cs (OrTimeout), Scripts/Common/SystemAutofill.cs}</li>
+</ul>
+
+<h2>11.3 Onboarding Step 1: account details</h2>
+<ul>
+<li><b>Blocks:</b> first, middle (optional), last name; birthday with a calendar pop-up (month and year can change without losing the day) and the age calculated at once; e-mail with a live domain check and a status line; password and retype with a checklist of conditions; "Use another email"; the "Confirm your email" pop-up with "Confirmed", "Send again", "Change email". {V:Editor/OnboardingStep1Builder.cs, Scripts/Onboarding/OnboardingStep1FlowController.cs, Scripts/Onboarding/DatePickerPopup.cs}</li>
+<li><b>Why each check:</b> a well-known mail provider is accepted at once; other domains are checked through DNS for a mail server; throw-away domains are refused from a list. {V:Scripts/Common/EmailFieldVerifier.cs, Scripts/Common/EmailDomainCheck.cs, Resources/EmailThrowAwayDomains.txt}</li>
+<li><b>Data:</b> when every field passes, the Firebase account is created and the verification e-mail sent; leaving sign-up later deletes that unfinished account. The password is kept in memory only. {V:Scripts/Auth/SignUpAccount.cs header, Scripts/Onboarding/OnboardingSession.cs header}</li>
+<li><b>States:</b> Continue is locked and dim until valid, then expands and glows; "Leave sign-up?" asks before leaving. {V:Scripts/Common/ContinueButtonGlowAnimator.cs, Scripts/Onboarding/OnboardingLeaveGuard.cs}</li>
+</ul>
+
+<h2>11.4 Onboarding Steps 2 to 5 and Terms</h2>
+<ul>
+<li><b>Step 2:</b> four skin-type tiles (<code>OilyCard</code>, <code>NormalCard</code>, <code>DryCard</code>, <code>MixCard</code>) and "Skin Condition Selection (Optional)" from the admin-editable list (<code>config/lists</code>, built-in list when offline), plus "add your own". {V:Editor/OnboardingTileBuilders.cs, Scripts/Onboarding/OnboardingStep2FlowController.cs lines 9-72}</li>
+<li><b>Step 3:</b> six skin-tone tiles: Fair, Light, Medium, Tan, Deep, Dark. They seed the AR shade suggestions. {V:Editor/OnboardingTileBuilders.cs, Scripts/Scan/ShadeAdvisor.cs}</li>
+<li><b>Step 4:</b> "Known Skin Allergens &amp; Sensitivities" checklist with apply-all and "Not listed? Add it here"; or "No known allergens". There is no way to skip. Typed items are queued as <code>allergenSuggestions</code> / <code>conditionSuggestions</code>. {V:Scripts/Onboarding/OnboardingStep4FlowController.cs lines 4-9, 107-119}</li>
+<li><b>Step 5:</b> "Label ... Value" lines for every answer, Edit / Done, Generate Profile. {V:Scripts/Onboarding/OnboardingStep5FlowController.cs}</li>
+<li><b>Terms:</b> the checkbox unlocks only after scrolling to the bottom; Continue saves the profile to Firestore and to the phone. {V:Scripts/Onboarding/TermsAcceptanceFlowController.cs header}</li>
+<li><b>Progress:</b> a progress bar and tile animations (lift, pixel sweep, glowing outline). {V:Scripts/Onboarding/OnboardingProgressBar.cs, Scripts/Common/PressSweepEffect.cs}</li>
+</ul>
+
+<h2>11.5 User Dashboard</h2>
+<ul>
+<li><b>Blocks:</b> <code>AvatarButton</code> (account pop-up: name, e-mail, note, Sign out with "Log out?" confirm), <code>GreetingText</code> (first name), <code>SettingsButton</code> (gear), Quick Summary (Age, Birthday, Skin type, Skin tone, Allergens), "Recommendation for you" list with a note on what it means, the bottom bar Recent | Start Scan | Try On with the pink pill, and a rule-update banner. {V:Editor/DashboardSceneBuilder.cs, Scripts/Dashboard/DashboardFlowController.cs, Scripts/Notifications/RuleUpdateBanner.cs}</li>
+<li><b>Data:</b> profile from <code>users/{uid}</code> or the phone copy; products and brands through the incremental catalogue sync; recommendations worked out on the phone. {V:Scripts/Data/UserProfileRepository.cs, Scripts/Data/CatalogSync.cs, Scripts/Dashboard/DashboardFlowController.cs lines 178-181}</li>
+<li><b>States:</b> <code>msgLoading</code>, <code>msgNone</code> and <code>RecommendationsEmptyText</code> when nothing passes the rules. {V:Editor/DashboardSceneBuilder.cs}</li>
+</ul>
+
+<h2>11.6 Recent Scans</h2>
+<ul>
+<li><b>Blocks:</b> count, Sort, Clear all, list of rows (kind icon, name, brand); a tapped row opens with Result, Try On and AI; press-and-hold makes tiles shake for drag-to-remove into a red zone; pencil to rename (phone only); selection mode (Select all, Delete); bottom restore bar and "Delete forever". {V:Editor/RecentScansSceneBuilder.cs, Scripts/Recent/RecentScansFlowController.cs header, Scripts/Views/HoldToRemoveTile.cs}</li>
+<li><b>Data:</b> phone copy of the history; new scans are also sent to <code>users/{uid}/scans</code>. Remove and Clear go to a restorable trash. {V:Scripts/Data/ScanHistoryRepository.cs header}</li>
+<li><b>States:</b> <code>EmptyTitleText</code> / <code>EmptyBodyText</code> for an empty list; a freezing sound while tiles shake and a drop sound when removed (switchable). {V:Editor/RecentScansSceneBuilder.cs, Scripts/Common/DeleteSoundPlayer.cs}</li>
+</ul>
+
+<h2>11.7 AI Smart Scan</h2>
+<ul>
+<li><b>Blocks:</b> camera box with an idle placeholder, scan frame, text outlines and a "text tracer" for small print; status and hint lines; the round <b>Start Scan</b> button ("Tap to scan" / "Tap to pause") inside a ring of five segments (brand, product name, cosmetic type, barcode, ingredient list) and a matching checklist; flashlight, brightness, focus-lock buttons; "Is this ...?" question; shortlist pop-up; "Look it up"; "Type the product in instead" pop-up; Start over, Finish; "Take one photo" fallback. {V:Editor/SmartScanSceneBuilder.cs, Scripts/Scan/ScanRingView.cs header, Scripts/Scan/ScanProductQuestion.cs, Scripts/Scan/ScanShortlistView.cs, Scripts/Scan/ScanSnapshotController.cs}</li>
+<li><b>Why:</b> each block answers one failure: dim light (flashlight, brightness), small print (focus lock, tracer), worn or missing pack (shortlist, typed entry, photo). {V:Scripts/Scan/SmartScanFlowController.cs header}</li>
+<li><b>Data:</b> see Part E §21 and the scan sequence diagram in §29. Reads the local product index, Firestore <code>products</code>, own <code>pending_products</code>; calls Gemini within the per-visit budget. {V:Scripts/Scan/SmartScanFlowController.cs lines 1060-1249}</li>
+<li><b>States:</b> messages for offline, AI unavailable, AI limit reached, catalogue miss, not make-up ("GlowUp only checks make-up products"); a paused scan resets after 30 s. {V:Scripts/Scan/SmartScanFlowController.cs lines 152-260, 1109-1113}</li>
+</ul>
+
+<h2>11.8 Loading</h2>
+<ul>
+<li><b>Blocks:</b> title, message, wait text, a list of steps ticked off one by one, a tip, Cancel. {V:Editor/LoadingSceneBuilder.cs, Scripts/Common/LoadingSceneController.cs}</li>
+<li><b>Data:</b> runs <code>ScanAnalysisPipeline</code>: split list, look up ingredients, cross-check with the profile, save. FDA and Open Beauty Facts answers wait only a limited time; a late FDA answer fills the badge afterwards. {V:Scripts/Scan/ScanAnalysisPipeline.cs header}</li>
+</ul>
+
+<h2>11.9 Scan Result</h2>
+<ul>
+<li><b>Blocks:</b> brand, name, type, date, rename; status pill and one-line summary; "See safer alternatives" when flagged; FDA Philippines badge and verification-portal button ("Is this record your product?" for a similar record); compatibility card (skin type, allergens, concerns, age); key-ingredient chips with icon and colour per level; "All ingredients"; "Sources" (each page labelled by its kind) and the list check ("Matched 2 sources" or what differs); "Why this result?"; shades that suit the user; dermatologist card; Scan another, Try On; alternatives list. {V:Editor/ScanResultSceneBuilder.cs, Scripts/Result/ScanResultFlowController.cs header, Scripts/Views/FdaBadgeView.cs}</li>
+<li><b>Safety alert pop-up:</b> opens by itself when a switched-on trigger is found (own allergens, harmful ingredients, a condition) and vibrates if allowed. {V:Scripts/Result/SafetyAlertPopup.cs}</li>
+<li><b>States:</b> <code>msgLoadingAlternatives</code>, <code>msgNoAlternatives</code>; "PENDING APPROVAL" label for a photo-snapshot product. {V:Editor/ScanResultSceneBuilder.cs, Scripts/Scan/ScanSnapshotController.cs}</li>
+</ul>
+
+<h2>11.10 AR Try-On</h2>
+<ul>
+<li><b>Blocks:</b> camera box with the camera card (Asking, Starting, Refused with "Allow camera", Problem), product name and "Change product", area tabs (only the area the product is made for), shade swatches (product shades and shades for the user's tone), finish tabs (matte, satin, glossy, shimmer, metallic), strength with − / +, compare (before/after split), face light, brightness; product picker with "Scan a product" when nothing is saved. {V:Editor/ArTryOnSceneBuilder.cs, Scripts/AR/ArTryOnFlowController.cs header, Scripts/AR/CameraWaitCard.cs}</li>
+<li><b>Data:</b> reads shades from the product (<code>shades</code> as #RRGGBB) and <code>ShadeAdvisor</code>; writes nothing. {V:Scripts/AR/ArTryOnFlowController.cs, FIRESTORE_SCHEMA.md products.shades}</li>
+</ul>
+
+<h2>11.11 Settings</h2>
+<ul>
+<li><b>Groups:</b> Appearance (dark mode, graphics, frame rate, AR quality); Sounds &amp; Motion (tap sounds, volume, delete sound, finger signs, edge light); Camera (bright screen while scanning, flashlight, try-on brightness, face light); Account (details, sync status and "Sync now", local cache); Skin Profile (retake quiz, reset); Ingredient Safety Alerts (instant alerts, vibrate); Notifications (daily reminder, time, rule updates); About &amp; Support (legal text, support form); Account Actions (Log out, Delete account). {V:Editor/SettingsSceneBuilder.cs section and row names, Scripts/Settings/*.cs}</li>
+<li><b>Delete account:</b> needs internet and the password again; deletes scan history, profile, the Firebase account, then the phone's data. {V:Scripts/Settings/AccountActions.cs header}</li>
+<li><b>Gap:</b> the support e-mail address in the legal text is still a placeholder. {V:Legal/PrivacyPolicyAndTerms.txt lines 69, 128}</li>
+</ul>
+
+<h1><span class="part">Part C · Mobile application</span>12. Animations and transitions</h1>
+<p>All animation is written by hand in C# (coroutines, Unity UI, two custom shaders). No animation library such as DOTween, Lottie or Rive is used. {N:third-party animation library in Assets/_Project or Assets/Scripts}</p>
+<table data-caption="Animations, where they are used and why" class="compact">
+<thead><tr><th style="width:26%">Script / asset</th><th style="width:22%">Where</th><th>What and why</th></tr></thead>
+<tbody>
+<tr><td>StartupIntroController</td><td>Start-up</td><td>Word comes together and ascends; covers Firebase start. {V:Scripts/Common/StartupIntroController.cs}</td></tr>
+<tr><td>ScreenTransition</td><td>Every scene change</td><td>Since 13 Oct nothing is drawn between screens; older "Skeleton Sheet" and "Sliding Sheet" looks remain selectable. {V:Scripts/Common/ScreenTransition.cs}</td></tr>
+<tr><td>SwipeSceneNavigator + LiquidTabBar</td><td>Recent / Dashboard / AR row</td><td>Page follows the finger; the pink pill stretches like liquid and snaps with a wobble. {V:Scripts/Common/SwipeSceneNavigator.cs, Scripts/Common/LiquidTabBar.cs}</td></tr>
+<tr><td>PressSweepEffect, PixelSweepTileAnimator, CardHoverEffect</td><td>Onboarding tiles, buttons</td><td>Lift, pixel sweep, glowing outline; in Performance Mode only lift + glow. {V:Scripts/Common/PressSweepEffect.cs}</td></tr>
+<tr><td>ContinueButtonGlowAnimator, ChecklistRowAnimator</td><td>Onboarding</td><td>Signals when a form is ready and which rule is met. {V:Scripts/Common/ContinueButtonGlowAnimator.cs, Scripts/Onboarding/ChecklistRowAnimator.cs}</td></tr>
+<tr><td>ScanRingView</td><td>Scanner</td><td>Five radial segments light gold with a pulse as each item is detected. {V:Scripts/Scan/ScanRingView.cs}</td></tr>
+<tr><td>TextSkeleton, SkeletonShimmer, shader SkeletonShine</td><td>Dashboard, lists</td><td>Rose-to-gold shine on placeholders while data is fetched. {V:Scripts/Common/TextSkeleton.cs, Shaders/SkeletonShine.shader}</td></tr>
+<tr><td>HoldToRemoveTile, DeleteSoundPlayer</td><td>Recent Scans</td><td>Shake, drag under the finger, pop with sound. {V:Scripts/Views/HoldToRemoveTile.cs}</td></tr>
+<tr><td>PerimeterLightStrip, SettingsIconAnimator</td><td>Panels, Settings</td><td>Light running round a panel's edge (switchable); icon motion. {V:Scripts/Common/PerimeterLightStrip.cs, Scripts/Settings/SettingsIconAnimator.cs}</td></tr>
+<tr><td>ArFaceHold, FaceMakeupBlend shader</td><td>AR Try-On</td><td>Hold, predict and fade make-up when the face is lost; colour tints the skin. {V:Scripts/AR/ArFaceHold.cs, Shaders/FaceMakeupBlend.shader}</td></tr>
+<tr><td>ScanSnapshotController spinner</td><td>Scanner photo fallback</td><td>"Analyzing Packaging..." with a spinning icon while the button is locked. {V:Scripts/Scan/ScanSnapshotController.cs header}</td></tr>
+</tbody></table>
+
+<h1><span class="part">Part C · Mobile application</span>13. Navigation structure</h1>
+<figure data-diagram="nav-app" class="tall"><figcaption>Navigation between the 15 scenes</figcaption></figure>
+<ul>
+<li><b>Linear stack:</b> sign-up Steps 1-5 and Terms; the phone's back key and an X on every page ask "Leave sign-up?". {V:Scripts/Onboarding/OnboardingLeaveGuard.cs}</li>
+<li><b>Swipe row:</b> Recent Scans | Dashboard | AR Try-On, matched by the bottom bar. On the dashboard, drag right = Recent Scans, drag left = AR Try-On. Scanner and Settings are outside the row. {V:Scripts/Common/SwipeSceneNavigator.cs header}</li>
+<li><b>Through Loading:</b> scan → Loading → Result. {V:Scripts/Common/SceneNavigator.cs header}</li>
+<li><b>Finger signs (optional):</b> hold up 1-5 fingers to the selfie camera: 1 Home, 2 Scan, 3 Recent, 4 AR, 5 Settings (re-assignable). {V:Scripts/Common/FingerSignNavigator.cs header}</li>
+<li><b>Deep links:</b> none. {N:Android deep links / intent filters for app screens in our code}</li>
+</ul>
+
+<h1><span class="part">Part C · Mobile application</span>14. Authentication for users</h1>
+<table data-caption="User authentication features">
+<thead><tr><th style="width:24%">Feature</th><th>How it works</th></tr></thead>
+<tbody>
+<tr><td>Sign-up</td><td>E-mail + password with Firebase Auth; account created on Step 1 so the verification e-mail can be sent; the sign-up waits until the link was tapped (checks every few seconds and on return from the mail app). {V:Scripts/Auth/SignUpAccount.cs, Scripts/Onboarding/OnboardingStep1FlowController.cs}</td></tr>
+<tr><td>Log-in</td><td>E-mail + password (Firebase Auth); Google through Firebase's browser flow (<code>SignInWithProviderAsync</code>, provider <code>google.com</code>). Facebook sign-in was removed on 22 Oct 2026. {V:Scripts/Auth/LoginFlowController.cs, Scripts/Auth/SocialSignIn.cs header, commit 62c3be0}</td></tr>
+<tr><td>Offline unlock</td><td>Argon2id hash of the password kept on the phone, used only when there is no internet. {V:Scripts/Auth/Argon2idHasher.cs}</td></tr>
+<tr><td>Session</td><td>Firebase Auth keeps the session; the start-up screen goes straight to the dashboard for a signed-in user; the profile copy is used only for the account it belongs to. {V:Scripts/Common/StartupIntroController.cs, Scripts/Data/UserProfileRepository.cs header}</td></tr>
+<tr><td>Guest mode</td><td>Not offered: the app works only for a signed-in user. The word "guest" appears only as a cache key fallback. {I:Scripts/Data/ScanHistoryRepository.cs line 20; no guest entry point in LoginFlowController}</td></tr>
+<tr><td>Password reset</td><td><code>SendPasswordResetEmailAsync</code> from "Forgot Password?". {V:Scripts/Auth/LoginFlowController.cs line 223}</td></tr>
+<tr><td>Logout</td><td>From the dashboard pop-up or Settings, after "Log out?". The profile copy stays on the phone for offline sign-in. {V:Scripts/Dashboard/DashboardFlowController.cs lines 236-254, Scripts/Settings/AccountActions.cs}</td></tr>
+<tr><td>Account deletion</td><td>Settings &gt; Account Actions; re-authentication with the password; deletes scans, profile, account, phone data. {V:Scripts/Settings/AccountActions.cs header}</td></tr>
+<tr><td>Google users without a profile</td><td>Go to Step 2; Back on Step 2 signs them out. {V:Scripts/Onboarding/OnboardingStep2FlowController.cs, Scripts/Onboarding/OnboardingSession.cs}</td></tr>
+</tbody></table>

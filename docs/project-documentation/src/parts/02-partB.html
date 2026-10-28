@@ -1,0 +1,94 @@
+<h1><span class="part">Part B · The system at a glance</span>4. System architecture</h1>
+<p><b>In plain words.</b> There is no server of the team's own between the phone and the database. The phone app and the admin website both talk directly to Google Firebase: Authentication for sign-in and Cloud Firestore for data. Firestore's security rules are the gatekeeper. The phone keeps a copy of what it needs (catalogue, profile, history) and works from that copy first. Two small Vercel functions exist only to call the AI with a key that never reaches a browser or a phone. {V:Scripts/Data/FirebaseBootstrap.cs, Scripts/Data/OfflineCache.cs, GlowUp-Admin_AI_Testing/_Database/firebase-console.js, GlowUp-Admin_AI_Testing/api/*.js}</p>
+<figure data-diagram="architecture"><figcaption>System architecture: phone, Firebase, Vercel and outside services</figcaption></figure>
+<table data-caption="Which Firebase and cloud services are actually used">
+<thead><tr><th style="width:26%">Service</th><th style="width:14%">Used?</th><th>How</th></tr></thead>
+<tbody>
+<tr><td>Firebase Authentication</td><td class="ok">Yes</td><td>E-mail + password, e-mail verification, password reset, Google (browser flow). {V:Scripts/Auth/LoginFlowController.cs, Scripts/Auth/SignUpAccount.cs, Scripts/Auth/SocialSignIn.cs}</td></tr>
+<tr><td>Cloud Firestore</td><td class="ok">Yes</td><td>All shared and personal data; offline persistence on in the app. {V:Scripts/Data/FirebaseBootstrap.cs}</td></tr>
+<tr><td>Cloud Storage</td><td class="miss">No</td><td>Pictures are stored as https addresses; snapshot photos as base64 in a Firestore document. Storage "needs the Blaze plan". {V:FIRESTORE_SCHEMA.md "Not built"}</td></tr>
+<tr><td>Cloud Functions</td><td class="miss">No</td><td>Server code runs as Vercel functions instead. {V:vercel.json "functions"} {N:Firebase Cloud Functions}</td></tr>
+<tr><td>Firebase Hosting</td><td class="miss">No</td><td><code>firebase.json</code> only points at the rules file; the site is hosted on Vercel. {V:GlowUp-Admin_AI_Testing/firebase.json, vercel.json}</td></tr>
+<tr><td>Firebase App Check, Cloud Messaging, Analytics</td><td class="miss">No</td><td>{N:App Check, FCM push, Analytics in app or site code} Notifications are local only (Unity Mobile Notifications). {V:Scripts/Notifications/LocalNotificationService.cs}</td></tr>
+<tr><td>Vercel</td><td class="ok">Yes</td><td>Static admin site + <code>api/assist-ingredient.js</code> and <code>api/scan-snapshot.js</code> (60 s limit each). {V:GlowUp-Admin_AI_Testing/vercel.json}</td></tr>
+<tr><td>Google Gemini API</td><td class="ok">Yes</td><td>From the phone directly (identify, web list look-up, ingredient research, typed product) and from both Vercel functions. {V:Scripts/Scan/ProductAiAdvisor.cs, Scripts/Scan/IngredientResearcher.cs, api/*.js}</td></tr>
+<tr><td>Groq, Mistral (OpenRouter optional)</td><td class="part">Website only</td><td>Backups for Assist with AI when Gemini's quota is used up, in a fixed order. {V:api/assist-ingredient.js lines 14-16, 572-575}</td></tr>
+<tr><td>FDA Philippines verification portal</td><td class="ok">Yes</td><td>Product notification look-up by name. {V:Scripts/Scan/PhFdaVerification.cs}</td></tr>
+<tr><td>Open Beauty Facts</td><td class="ok">Yes</td><td>Second opinion on an ingredient list, by barcode only. {V:Scripts/Scan/OpenBeautyFacts.cs}</td></tr>
+<tr><td>openFDA substance API</td><td class="ok">Yes</td><td>Confirms an ingredient name is a registered substance (UNII). {V:Scripts/Scan/FdaSubstanceRegistry.cs}</td></tr>
+<tr><td>Google / Cloudflare DNS over HTTPS</td><td class="ok">Yes</td><td>Checks that a sign-up e-mail domain receives mail; only the part after @ is sent. {V:Scripts/Common/EmailDomainCheck.cs}</td></tr>
+</tbody></table>
+
+<h1><span class="part">Part B · The system at a glance</span>5. User and admin diagrams (use cases)</h1>
+<figure data-diagram="usecase-user" class="tall"><figcaption>Use cases of the User (mobile app)</figcaption></figure>
+<figure data-diagram="usecase-admin" class="tall"><figcaption>Use cases of the Admin (website) and the project owner (Firebase console)</figcaption></figure>
+<p>Each use case maps to code: sign-up and profile to <code>Scripts/Onboarding/</code>, log-in to <code>Scripts/Auth/</code>, scan to <code>Scripts/Scan/</code>, history to <code>Scripts/Recent/</code>, AR to <code>Scripts/AR/</code>, settings to <code>Scripts/Settings/</code>; admin use cases to the page folders <code>_Admin_Dashboard</code>, <code>_Admin_Brand_Inventory</code>, <code>_Admin_Ingredient_Curator</code>, <code>_Admin_Recycle_Bin</code> and <code>_Shared/</code>. {V:folder structure} What each actor may write is enforced by <code>firestore.rules</code> (Part G). {V:GlowUp-Admin_AI_Testing/firestore.rules}</p>
+
+<h1><span class="part">Part B · The system at a glance</span>6. Data flow diagrams</h1>
+<h2>6.1 Level 0 (context)</h2>
+<figure data-diagram="dfd0"><figcaption>DFD Level 0: GlowUp and the people and services around it</figcaption></figure>
+<h2>6.2 Level 1 (main processes)</h2>
+<figure data-diagram="dfd1" class="tall"><figcaption>DFD Level 1: nine processes and five data stores</figcaption></figure>
+<p>D1 is public to read and admin-only to change; D2 is private to its owner; D3 is append-only from the app and admin-only to read; D4 is the review queue; D5 lives only on the phone. {V:firestore.rules, Scripts/Data/OfflineCache.cs}</p>
+<h2>6.3 Level 2: the scan</h2>
+<figure data-diagram="dfd2-scan" class="tall"><figcaption>DFD Level 2 for process 6.0 / 7.0 / 8.0: scanning, analysing, saving</figcaption></figure>
+<h2>6.4 Level 2: adding a product</h2>
+<figure data-diagram="dfd2-addproduct"><figcaption>DFD Level 2 for process 2.0: an admin adds a product, the phone receives it</figcaption></figure>
+
+<h1><span class="part">Part B · The system at a glance</span>7. Flowcharts</h1>
+<h2>7.1 Whole project</h2>
+<figure data-diagram="flow-project"><figcaption>Full project flow: how the admin side feeds the user side and back</figcaption></figure>
+<h2>7.2 User flow</h2>
+<figure data-diagram="flow-user" class="tall"><figcaption>User flow: open app, log in, profile, scan, result, AR, history</figcaption></figure>
+<p>Favourites are not part of the app: "save" means the automatic entry in Recent Scans. {N:a favourites / saved-products feature in Scripts/} Earlier favourites and profile screens were deleted. {I:BuildSettingsSync.cs lists 15 scenes and none for favourites}</p>
+<h2>7.3 Admin flow</h2>
+<figure data-diagram="flow-admin" class="tall"><figcaption>Admin flow: log in, dashboard, add / edit / approve, review, recycle</figcaption></figure>
+
+<h1><span class="part">Part B · The system at a glance</span>8. Technology and software used</h1>
+<table data-caption="Technology, version and why it was chosen" class="compact">
+<thead><tr><th style="width:17%">Component</th><th style="width:22%">Tool</th><th style="width:16%">Version</th><th>Why (and evidence)</th></tr></thead>
+<tbody>
+<tr><td>Mobile engine</td><td>Unity, C#, IL2CPP</td><td>2022.3.62f3 LTS</td><td>Camera, AR and UI in one engine. {I:docs/GlowUp_Methodology_Replacement.pdf p.2; ProjectSettings/ProjectVersion.txt not read} IL2CPP: {V:Editor/ArFaceTrackingSetup.cs line 140}</td></tr>
+<tr><td>Render pipeline</td><td>Universal Render Pipeline</td><td>14.0.12</td><td>Needed by the AR background renderer feature. {V:Editor/ArFaceTrackingSetup.cs (UnityEngine.Rendering.Universal)} {I:version from methodology chapter}</td></tr>
+<tr><td>UI</td><td>uGUI + TextMeshPro</td><td>3.0.7</td><td>Screens built by Editor scripts. {V:Editor/AppKit.cs (using TMPro)} {I:version from methodology chapter}</td></tr>
+<tr><td>AR</td><td>AR Foundation + ARCore XR Plugin</td><td>5.2.2 / 5.2.2</td><td>Face mesh on Android. {V:Editor/ArFaceTrackingSetup.cs, Editor/ArTryOnSceneBuilder.cs} {I:version from methodology chapter}</td></tr>
+<tr><td>Database SDK (app)</td><td>Firebase Unity SDK: App, Auth, Firestore</td><td>13.17.0</td><td>Same database as the website, offline persistence. {V:GlowUp/Assets/GeneratedLocalRepo/Firebase/m2repository/.../13.17.0 (tracked file names)}</td></tr>
+<tr><td>Text + barcode</td><td>Google ML Kit text-recognition, barcode-scanning</td><td>16.0.1 / 17.2.0</td><td>On-device, no internet, fast. {V:Editor/ArFaceTrackingSetup.cs lines 122-126}</td></tr>
+<tr><td>Vision models</td><td>MediaPipe tasks-vision (Image Embedder, Hand Landmarker)</td><td>0.10.11</td><td>Pack-look memory (MobileNet V3 small, 4 MB) and finger signs. {V:Editor/ArFaceTrackingSetup.cs line 132, Scripts/Scan/PackEmbedder.cs, Editor/FingerSignSetup.cs}</td></tr>
+<tr><td>Backup OCR</td><td>Tesseract (wrapper)</td><td>not stated</td><td>Editor only / fallback when ML Kit is missing. {V:Scripts/Scan/FrameReader.cs, Assets/Scripts/TesseractWrapper.cs}</td></tr>
+<tr><td>Offline password check</td><td>Isopoh Argon2id</td><td>DLL, version not stated</td><td>Unlock without internet; OWASP minimum cost (2 iterations, 19 MiB). {V:Scripts/Auth/Argon2idHasher.cs, Plugins/Argon2/*.dll (file names)}</td></tr>
+<tr><td>Notifications</td><td>Unity Mobile Notifications</td><td>not read</td><td>Local reminders and rule-change notes. {V:Editor/NotificationPackageDefine.cs} {N:package version (lives in Packages/manifest.json, not read)}</td></tr>
+<tr><td>Unit tests (app)</td><td>Unity Test Framework (NUnit)</td><td>1.1.33</td><td>231 EditMode tests of the pure logic. {V:Editor/Tests/*.cs} {I:version from methodology chapter}</td></tr>
+<tr><td>Admin website</td><td>Plain HTML, CSS, JavaScript modules</td><td>no framework</td><td>No build step; deployed as static files. {V:GlowUp-Admin_AI_Testing/_Admin_*/*.html}</td></tr>
+<tr><td>Website SDK</td><td>Firebase JS SDK (app, auth, firestore)</td><td>10.12.0</td><td>Loaded from gstatic.com. {V:_Database/firebase-console.js lines 1-3}</td></tr>
+<tr><td>Server functions</td><td>Vercel Node functions</td><td>runtime not pinned</td><td>Keeps AI keys server-side. {V:vercel.json, api/*.js}</td></tr>
+<tr><td>AI</td><td>Gemini (app: gemini-3.8-flash, 3.6-flash, flash-latest; site: flash-latest, 3.6, 3.5); Groq, Mistral backups</td><td>model names as configured</td><td>Product identification, web list look-up, drafts. {V:Scripts/Scanning/GeminiApiConfig_Default.asset lines 16-18, api/assist-ingredient.js line 584}</td></tr>
+<tr><td>Website tests and tools</td><td>Node.js scripts</td><td>run with <code>node</code></td><td>11 test suites; read-only backup and clean-up report. {V:tests/*.test.mjs, tools/*.mjs}</td></tr>
+<tr><td>Version control</td><td>Git</td><td>-</td><td>103 commits, branch <code>scan-miss-flow</code>. {V:git log}</td></tr>
+<tr><td>Editors / design</td><td>Visual Studio Code, Unity Editor, Figma</td><td>-</td><td>{V:GlowUp.code-workspace, GlowUp/.vsconfig} {I:Figma named only in the methodology chapter}</td></tr>
+<tr><td>Deployment CLIs</td><td>Vercel CLI, Firebase CLI</td><td>-</td><td>{V:.firebaserc, .vercelignore}</td></tr>
+</tbody></table>
+
+<h1><span class="part">Part B · The system at a glance</span>9. Hardware needed</h1>
+<h2>9.1 For development</h2>
+<table data-caption="Development hardware">
+<thead><tr><th style="width:22%">Device</th><th>Specification</th><th style="width:30%">Evidence</th></tr></thead>
+<tbody>
+<tr><td>Laptop</td><td>Lenovo IdeaPad Flex 5 14IAU7, Intel Core i7-1255U, 16 GB RAM, 512 GB SSD, Intel Iris Xe</td><td>{I:docs/GlowUp_Methodology_Replacement.pdf Table 1}</td></tr>
+<tr><td>Test phone</td><td>Samsung Galaxy A16, octa-core up to 2.2 GHz, 4 GB RAM, 128 GB</td><td>{I:docs/GlowUp_Methodology_Replacement.pdf Table 1}</td></tr>
+</tbody></table>
+<h2>9.2 Minimum user device</h2>
+<table data-caption="Minimum user device and where each number comes from">
+<thead><tr><th style="width:22%">Need</th><th>Minimum</th><th style="width:38%">Where it comes from</th></tr></thead>
+<tbody>
+<tr><td>Operating system</td><td>Android 6.0 (API 23) or newer</td><td>{V:Editor/ArFaceTrackingSetup.cs lines 109-111 (minSdkVersion 23)}</td></tr>
+<tr><td>Processor</td><td>ARMv7 or ARM64; live AR needs the 64-bit build on a 64-bit phone</td><td>{V:Editor/ArFaceTrackingSetup.cs line 139, Scripts/AR/ArFaceTrackingController.cs line 247}</td></tr>
+<tr><td>Graphics</td><td>OpenGL ES 3.0</td><td>{V:Editor/ArFaceTrackingSetup.cs lines 99-104}</td></tr>
+<tr><td>Camera</td><td>Rear camera with autofocus for scanning; front camera for AR and finger signs. Full HD (1920 x 1080) scan picture requested.</td><td>{V:Editor/SmartScanSceneBuilder.cs line 399, Scripts/Scan/CameraFeedController.cs line 160} The proposal's "12 MP" is not enforced in code. {I:methodology chapter p.5}</td></tr>
+<tr><td>Live AR</td><td>A phone on Google's ARCore supported list with front-camera face tracking; otherwise the guided preview</td><td>{V:Scripts/AR/ArFaceTrackingController.cs header}</td></tr>
+<tr><td>Finger signs, pack-look model</td><td>Android 7.0 (API 24)</td><td>{V:Editor/FingerSignSetup.cs header, Scripts/Scan/PackEmbedder.cs header}</td></tr>
+<tr><td>Memory (RAM)</td><td>No hard minimum. Below 3 GB (with other checks) the app chooses Performance Mode; for AR, 5.5 GB+ gets Full quality and under 3.8 GB gets Light</td><td>{V:Scripts/Performance/PerformanceProfile.cs lines 45-65 (code defaults)}</td></tr>
+<tr><td>Storage</td><td>APK size not recorded; on-device models about 4 MB (pack) + 7.8 MB (hand)</td><td>{V:Scripts/Scan/PackEmbedder.cs, Editor/FingerSignSetup.cs} {N:measured APK size}</td></tr>
+<tr><td>Internet</td><td>Optional for known products; needed for sign-up, AI, FDA, Open Beauty Facts, photo snapshot, sync</td><td>{V:Scripts/Scan/ScanAnalysisPipeline.cs header}</td></tr>
+<tr><td>Other</td><td>A vibration motor is optional (haptics stay quiet without one)</td><td>{V:Scripts/Common/Haptics.cs lines 8-9}</td></tr>
+</tbody></table>
