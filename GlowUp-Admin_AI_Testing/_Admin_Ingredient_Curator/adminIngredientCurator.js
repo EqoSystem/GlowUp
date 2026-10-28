@@ -97,6 +97,8 @@ const brokenText = (text) => /System\.Collections\./i.test(String(text || ""));
 
 /** Found by the app's AI lookup and not checked by an admin yet. */
 const needsReview = (item) => item.source === "ai" && !item.reviewed;
+/** The admin account that approves an entry is recorded on it (reviewedBy), so it is known who verified it. */
+const reviewer = () => (auth.currentUser ? auth.currentUser.uid : "");
 
 // the "show" box next to the search box
 const FILTERS = [
@@ -932,6 +934,7 @@ async function approveIngredientDrafts() {
                 webSearched: sources.length > 0,
                 aiAssistModel: entry.model || "",
                 reviewed: true,
+                reviewedBy: reviewer(),
                 reviewedAt: serverTimestamp(),
                 updatedAt: serverTimestamp()
             }
@@ -965,7 +968,7 @@ async function approveSelectedIngredients(keys) {
     try {
         await saveOrReload(selected.map((item) => ({
             ref: refOf(item),
-            data: { reviewed: true, reviewedAt: serverTimestamp(), updatedAt: serverTimestamp() }
+            data: { reviewed: true, reviewedBy: reviewer(), reviewedAt: serverTimestamp(), updatedAt: serverTimestamp() }
         })));
         notify(`${many(selected.length, "ingredient was", "ingredients were")} approved.`, "ok");
     } catch (error) {
@@ -1220,10 +1223,10 @@ async function saveIngredient(event) {
     // an admin who opens an entry that was not typed here and saves it has checked it
     const before = ingredients.find((i) => i.id === editingIngredientId);
     const nowReviewed = !!before && before.source !== "" && before.source !== "admin" && !before.reviewed;
-    if (nowReviewed) { data.reviewed = true; data.reviewedAt = serverTimestamp(); }
+    if (nowReviewed) { data.reviewed = true; data.reviewedBy = reviewer(); data.reviewedAt = serverTimestamp(); }
     // a draft the AI wrote and the admin has now read and saved: the pages it came from are kept with the entry
     if (assisted && !editingIngredientId)
-        Object.assign(data, { source: "aiassist", reviewed: true, reviewedAt: serverTimestamp(), webSearched: assisted.sources.length > 0, model: assisted.model,
+        Object.assign(data, { source: "aiassist", reviewed: true, reviewedBy: reviewer(), reviewedAt: serverTimestamp(), webSearched: assisted.sources.length > 0, model: assisted.model,
             sources: assisted.sources.map((p) => `${p.title || p.site || "web page"} | ${p.url}`) });
 
     // "Harmful" must be backed by a regulator's page (docs/DATA_SOURCE_POLICY.md). An entry that was already harmful can still be saved
@@ -1289,7 +1292,7 @@ async function approveIngredient(item, button) {
     if (unbacked) { notify(`"${titleOf(item)}" was not approved. ${unbacked} Use Edit to add the page or to change the rating.`, "error"); return; }
     button.disabled = true;
     try {
-        await updateDoc(doc(db, "ingredients", item.id), { reviewed: true, reviewedAt: serverTimestamp() });
+        await updateDoc(doc(db, "ingredients", item.id), { reviewed: true, reviewedBy: reviewer(), reviewedAt: serverTimestamp() });
         notify(`"${titleOf(item)}" approved. The app now trusts this entry.`, "ok");
         await loadIngredients();
     } catch (error) {

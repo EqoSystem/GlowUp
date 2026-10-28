@@ -170,6 +170,7 @@ A brand, product or ingredient that the app added by itself, or that came from a
 | `source` | text | Where the entry came from. See the table below. |
 | `reviewed` | yes/no | `false` until an admin approves the entry or opens it and saves it on the website. |
 | `reviewedAt` | time | Set by the website when it is approved. |
+| `reviewedBy` | text | The account (UID) of the admin who pressed Approve, or who opened and saved the entry. Not set by an automatic approval (`autoApproved` is yes then). Added 28 October 2026; older approvals have none. |
 | `addedBy` | text | The id of the app user whose scan added it. Only on entries the app added. |
 | `addedAtUnix` | number (seconds) | When it was added. |
 | `sources` | list of text | Web pages the information came from, each as `page title | address`. On ingredients and imported products. |

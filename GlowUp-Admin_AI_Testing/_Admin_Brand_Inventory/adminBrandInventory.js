@@ -2428,7 +2428,8 @@ async function saveProduct(event) {
 // ---------------------------------------------------------------------------------------------
 // Approving what the app added by itself (from a scan) or what came from a data import
 // ---------------------------------------------------------------------------------------------
-const approval = () => ({ status: "Active", reviewed: true, reviewedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+// reviewedBy = the admin account that pressed Approve (who verified it); an automatic approval has none
+const approval = () => ({ status: "Active", reviewed: true, reviewedBy: auth.currentUser ? auth.currentUser.uid : "", reviewedAt: serverTimestamp(), updatedAt: serverTimestamp() });
 
 async function approveBrand(brand, button) {
     const waiting = productsOf(brand.id).filter((p) => p.needsReview).length;
