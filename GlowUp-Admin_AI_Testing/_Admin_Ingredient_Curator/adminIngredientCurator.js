@@ -720,7 +720,7 @@ async function importIngredientFile(file) {
     dropbox.disabled = true;
     try {
         report(`Reading "${file.name}" in this browser...`, false);
-        const documentText = await readAdminDocument(file);
+        const documentText = await readAdminDocument(file, (message) => report(message, false));
         // a file in the GlowUp import format is read as it is, with no AI; any other document is read by the AI as before
         const keyed = parseImportText(documentText);
         if (keyed.kind === "inventory") { report("This file lists brands or products. Import it in Brand & Product Inventory.", true); return; }

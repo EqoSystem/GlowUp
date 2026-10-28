@@ -837,7 +837,7 @@ async function importInventoryFile(file) {
     showImportFlags(flagsBox, []);
     report(`Reading "${file.name}" in this browser...`, false);
     try {
-        const documentText = await readAdminDocument(file);
+        const documentText = await readAdminDocument(file, (message) => report(message, false));
         // a file in the GlowUp import format is read as it is, with no AI; any other document is read by the AI as before
         const keyed = parseImportText(documentText);
         if (keyed.kind === "ingredients") { report("This file lists ingredients. Import it in the Ingredient Curator.", true); return; }

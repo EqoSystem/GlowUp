@@ -35,8 +35,8 @@ Drop a file on the import box. No AI and no quota is used for:
 - a product sheet that labels each product with `Brand:`, `Product:` and `Ingredients:` lines (Word, PDF, text).
 
 Any other document is read by the AI (that uses the free AI quota). Everything an import creates arrives as **Pending / not reviewed**; nothing reaches
-the app until you approve it. Skin care and other non-make-up rows are flagged and not saved. Image-only (scanned) PDFs cannot be read: export the text,
-or type from the pack.
+the app until you approve it. Skin care and other non-make-up rows are flagged and not saved. A scanned PDF (pictures of pages) is read with text
+recognition in your browser, at most 10 pages; it takes a few seconds a page, and misread names are possible, so compare the result with the pack.
 
 ## Approving what others added
 
