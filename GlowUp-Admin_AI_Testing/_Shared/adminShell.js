@@ -1,7 +1,7 @@
 // The parts every admin page is built from (no database code in here; the Refresh data button only calls adminStore.js):
 //   icons            - one set of thin-line icons, drawn as SVG (no emoji, no picture files)
-//   theme            - dark / light, remembered on this computer; follows the computer's setting until chosen
-//   mountShell       - the sidebar (with its flowing highlight) and the top bar (title, layout name, theme button)
+//   theme            - light / dark / system, remembered on this computer; "system" follows the computer's setting
+//   mountShell       - the sidebar (with its flowing highlight and the settings menu behind the logo) and the top bar (title)
 //   guides           - the small "i" badges and the pop-up that explains a control
 //   tile animation   - the lift, pixel sweep and glowing outline of the mobile app's tiles, on every button and tile
 //   menus, dialogs   - one small pop-up menu and two dialogs (confirm, type a name) used by every page
@@ -11,6 +11,7 @@
 // the data panels (lists, grids, graphs) in adminWidgets.js.
 import { initLayouts, applyAppearance } from "./adminLayouts.js";
 import { refreshData, refreshWait } from "./adminStore.js";   // only for the "Refresh data" button
+import { mountSettingsMenu } from "./adminSettingsMenu.js";
 
 // ---------------------------------------------------------------------------------------------
 // Icons
@@ -72,24 +73,21 @@ const ICONS = {
     folderPlus: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M12 11v6M9 14h6"/>',
     sort: '<path d="M7 5v14M4 16l3 3 3-3"/><path d="M13 7h8M13 12h6M13 17h4"/>',
     sparkle: '<path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9z"/><path d="M18.5 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/>',
-    up: '<path d="M6 15l6-6 6 6"/>'
+    up: '<path d="M6 15l6-6 6 6"/>',
+    archive: '<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M10 13h4"/>',
+    monitor: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>',
+    minus: '<path d="M5 12h14"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'
 };
 /** The Recycle bin: its lid is drawn apart from its body so it can open when something is held over it. */
 export const BIN_ICON = '<svg class="ic bin-ic" viewBox="0 0 24 24" aria-hidden="true"><g class="bin-lid"><path d="M4 7h16"/><path d="M9 7V4h6v3"/></g><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg>';
 
 /**
- * Shows how many entries are in the Recycle bin on the header button. Only for a number the page already holds (no new read).
- * `what` names what the number counts ("products and brands"): a page holds only its own part of the bin.
+ * A page has (re)loaded part of the Recycle bin: the settings menu behind the logo counts the whole bin again, from the
+ * lists this browser keeps (adminSettingsMenu.js). The page's own number is not needed: it holds only its own part.
  */
-export function setBinCount(count, what) {
-    const badge = document.getElementById("binBadge"), link = document.getElementById("binLink");
-    if (!badge || !link) return;
-    const n = Math.max(0, Number(count) || 0);
-    badge.textContent = n > 99 ? "99+" : String(n);
-    badge.hidden = n === 0;
-    const text = n > 0 && what ? `Recycle Bin: ${n} ${what}` : "Recycle Bin";
-    link.setAttribute("data-tip", text);
-    link.setAttribute("aria-label", text);
+export function setBinCount() {
+    document.dispatchEvent(new CustomEvent("glowup:bin-count"));
 }
 
 /** The SVG of one icon, as text to put into HTML. */
@@ -116,6 +114,31 @@ const THEME_KEY = "glowup.theme";
 
 export function currentTheme() { return document.documentElement.dataset.theme === "light" ? "light" : "dark"; }
 
+const systemTheme = () => (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+
+/** What the person chose: "light", "dark", or "system" (nothing kept: the page follows the computer's setting). */
+export function themeChoice() {
+    let chosen = null;
+    try { chosen = localStorage.getItem(THEME_KEY); } catch (error) { /* private window */ }
+    return chosen === "light" || chosen === "dark" ? chosen : "system";
+}
+
+/** Light, Dark or System, for every page of this browser. */
+export function setThemeChoice(choice) {
+    if (choice === "light" || choice === "dark") { setTheme(choice); return; }
+    try { localStorage.removeItem(THEME_KEY); } catch (error) { /* private window */ }
+    setTheme(systemTheme(), false);
+}
+
+/** Until the person chooses Light or Dark, a change of the computer's own setting changes the page too. */
+let followingSystem = false;
+function followSystemTheme() {
+    if (followingSystem || !window.matchMedia) return;
+    followingSystem = true;
+    const system = window.matchMedia("(prefers-color-scheme: light)");
+    system.addEventListener("change", () => { if (themeChoice() === "system") setTheme(system.matches ? "light" : "dark", false); });
+}
+
 export function setTheme(theme, remember = true) {
     document.documentElement.dataset.theme = theme === "light" ? "light" : "dark";
     if (remember) { try { localStorage.setItem(THEME_KEY, document.documentElement.dataset.theme); } catch (error) { /* private window */ } }
@@ -141,8 +164,7 @@ export function mountThemeToggle(host) {
     button.addEventListener("click", () => setTheme(currentTheme() === "dark" ? "light" : "dark"));
     host.appendChild(button);
     // until the person chooses, the page follows the computer's own setting
-    const system = window.matchMedia("(prefers-color-scheme: light)");
-    system.addEventListener("change", () => { let chosen = null; try { chosen = localStorage.getItem(THEME_KEY); } catch (error) { /* ignore */ } if (!chosen) setTheme(system.matches ? "light" : "dark", false); });
+    followSystemTheme();
     return button;
 }
 
@@ -150,13 +172,14 @@ export function mountThemeToggle(host) {
 // The page frame
 // ---------------------------------------------------------------------------------------------
 /**
- * The "Refresh data" button of the top bar: an icon only. It downloads brands, products and ingredients again in full
+ * The "Refresh data" button: an icon only. It downloads brands, products and ingredients again in full
  * (about 700 reads), so adminStore.js limits it (a pause after each use, and a number of uses per hour). While it is
- * blocked its tooltip says how long to wait. Skipped without an error when the top bar has no tools area.
+ * blocked its tooltip says how long to wait. `host` = the element it goes into (first); skipped without an error when there is none.
+ * Since 29 October 2026 it is no longer in the top bar: only the Recycle Bin page shows it, in its search row.
  */
-function addRefreshDataButton(topbar) {
+export function addRefreshDataButton(host) {
     try {
-        const tools = topbar ? topbar.querySelector(".topbar-tools") : null;
+        const tools = host && host.classList.contains("topbar") ? host.querySelector(".topbar-tools") : host;
         if (!tools) return;
         const baseTip = "Refresh data, about 700 reads";
         const button = document.createElement("button");
@@ -225,13 +248,10 @@ export function mountShell(page) {
     const sidebar = document.querySelector("aside.sidebar");
     const topbar = main.querySelector("header.topbar");
     wireNavDrop(sidebar.querySelector(".nav-links"));
-    topbar.querySelector(".topbar-tools").innerHTML = `<button type="button" class="operator-chip" id="operatorChip" data-tip-title="Display layout" data-tip="Arrange and resize the panels, turn a panel into a list, a grid or a graph, pick a font and colours, and save it under your name." data-tip-preview="The contents never change, only how they are shown.">${icon("sliders")}<span id="operatorName">Default layout</span></button>`;
-    if (page !== "bin") {
-        // icon-only link to the Recycle Bin page; a page that already holds the bin's size can show it with setBinCount()
-        topbar.querySelector("#operatorChip").insertAdjacentHTML("afterend", `<a class="icon-btn bin-link" id="binLink" href="../_Admin_Recycle_Bin/adminRecycleBin.html" aria-label="Recycle Bin" data-tip="Recycle Bin">${BIN_ICON}<span class="bin-badge" id="binBadge" hidden></span></a>`);
-    }
-    mountThemeToggle(topbar.querySelector(".topbar-tools"));
-    addRefreshDataButton(topbar);
+    // the top bar keeps only the page's own tools (search, Add, More: placeInHeader). Layout and style, the Recycle bin,
+    // the Archive, light / dark / system and Sign Out are in the settings menu behind the GlowUp logo (adminSettingsMenu.js).
+    topbar.querySelector(".topbar-tools").innerHTML = "";
+    followSystemTheme();
 
     const bar =document.createElement("div");
     bar.className = "editing-bar";
@@ -242,6 +262,7 @@ export function mountShell(page) {
 
     hydrate(document);
     initLayouts(page);
+    mountSettingsMenu();
     watchForNewControls();
 }
 
@@ -628,7 +649,8 @@ let openMenuEl = null, closeOpenMenu = null;
 export function closeMenu() { if (closeOpenMenu) closeOpenMenu(); }
 
 /**
- * A small menu under `anchor`. items = [{ label, description, icon, danger, checked, disabled, run }, { heading }, { separator }].
+ * A small menu under `anchor`. items = [{ label, description, icon, danger, checked, disabled, badge, run }, { heading }, { note }, { separator }].
+ * `badge` = a short count shown in red at the end of the item; `note` = a line of plain text (not a button).
  * A second click on the anchor, a click elsewhere or Esc closes it.
  */
 export function openMenu(anchor, items) {
@@ -643,6 +665,7 @@ export function openMenu(anchor, items) {
     items.filter((item) => item).forEach((item) => {
         if (item.separator) { const line = document.createElement("div"); line.className = "menu-sep"; menu.appendChild(line); return; }
         if (item.heading) { const head = document.createElement("div"); head.className = "menu-heading"; head.textContent = item.heading; menu.appendChild(head); return; }
+        if (item.note) { const note = document.createElement("div"); note.className = "menu-note"; note.textContent = item.note; if (item.title) note.title = item.title; menu.appendChild(note); return; }
         const button = document.createElement("button");
         button.type = "button";
         button.className = "menu-item" + (item.danger ? " danger" : "") + (item.checked ? " checked" : "");
@@ -656,6 +679,7 @@ export function openMenu(anchor, items) {
         text.appendChild(label);
         if (item.description) { const more = document.createElement("small"); more.textContent = item.description; text.appendChild(more); }
         button.appendChild(text);
+        if (item.badge) { const badge = document.createElement("span"); badge.className = "menu-badge"; badge.textContent = item.badge; button.appendChild(badge); }
         if (item.checked) button.insertAdjacentHTML("beforeend", icon("check", "menu-check"));
         button.addEventListener("click", () => { closeMenu(); if (item.run) item.run(); });
         menu.appendChild(button);

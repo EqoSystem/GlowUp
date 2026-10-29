@@ -119,17 +119,21 @@ export function wireSignOut() {
     document.querySelectorAll(".sign-out").forEach((link) => {
         if (link.dataset.wired === "1") return;
         link.dataset.wired = "1";
-        link.addEventListener("click", async (event) => {
-            event.preventDefault();
-            const sure = await askConfirm({ title: "Sign out?", message: "You will need your e-mail and password to come back in.", confirmLabel: "Sign out", danger: true });
-            if (!sure) return;
-            remember(false);
-            clearStore();                    // the lists this tab kept belong to the signed-in admin
-            try { await signOut(auth); }
-            catch (error) { console.error("Sign out failed:", error); }
-            window.location.replace(LOGIN_PAGE);
-        });
+        link.addEventListener("click", (event) => { event.preventDefault(); confirmSignOut(); });
     });
+    // Sign Out in the settings menu behind the logo (adminSettingsMenu.js) asks through this event: the same question, the same steps
+    if (!signOutEventWired) { signOutEventWired = true; document.addEventListener("glowup:sign-out", confirmSignOut); }
+}
+let signOutEventWired = false;
+
+async function confirmSignOut() {
+    const sure = await askConfirm({ title: "Sign out?", message: "You will need your e-mail and password to come back in.", confirmLabel: "Sign out", danger: true });
+    if (!sure) return;
+    remember(false);
+    clearStore();                    // the lists this tab kept belong to the signed-in admin
+    try { await signOut(auth); }
+    catch (error) { console.error("Sign out failed:", error); }
+    window.location.replace(LOGIN_PAGE);
 }
 
 /** True while a dialog is open (a form, a question): the list behind it is not redrawn under the admin's hands. */

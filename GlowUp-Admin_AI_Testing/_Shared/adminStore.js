@@ -172,6 +172,19 @@ function touch(ref) {
     setDirty(name, ids);
 }
 
+/**
+ * How many entries of a kept list are in the Recycle bin (binned == true), counted in the kept copy: no read at all.
+ * Null when this browser keeps no copy of that list for the signed-in admin (the caller then asks for a count).
+ */
+export function keptBinnedCount(name) {
+    if (!LISTS.includes(name)) return null;
+    const kept = load(name);
+    if (!kept) return null;
+    let n = 0;
+    kept.docs.forEach((data) => { if (data && data.binned === true) n++; });
+    return n;
+}
+
 /** Forgets everything that is kept (sign-out, or another account). */
 export function clearStore() {
     LISTS.forEach((name) => { delete memory[name]; });

@@ -161,7 +161,8 @@ export function initLayouts(page) {
     loadStore();
     buildDrawer();
     applyLayout();
-    byId("operatorChip").addEventListener("click", () => openDrawer(true));
+    // opened from the settings menu behind the logo (openLayoutWindow); an older header button still works when present
+    if (byId("operatorChip")) byId("operatorChip").addEventListener("click", () => openDrawer(true));
     byId("addPanelBtn").addEventListener("click", () => openPanelDialog(null));
     byId("doneArrangingBtn").addEventListener("click", () => setEditing(false));
     wireBoard();
@@ -996,6 +997,11 @@ async function importProfile(event) {
     } catch (error) {
         toast("That file is not a GlowUp layout.", "error");
     }
+}
+
+/** Opens the Layout & Style window (the settings menu behind the logo calls it). */
+export function openLayoutWindow() {
+    if (byId("customiseDrawer")) openDrawer(true);
 }
 
 function openDrawer(open) {

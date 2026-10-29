@@ -18,7 +18,7 @@ import {
     statusBadge, statusGuide, normalizeStatus, STATUSES, wireSearch, dialogIsOpen
 } from "../_Shared/adminCommon.js";
 import { matchesSearch } from "../_Shared/glowupRules.js";
-import { mountShell, paginate, renderPager, icon, BIN_ICON, askConfirm, hydrate } from "../_Shared/adminShell.js";
+import { mountShell, paginate, renderPager, icon, BIN_ICON, askConfirm, hydrate, setBinCount } from "../_Shared/adminShell.js";
 
 const el = (id) => document.getElementById(id);
 const many = (n, one, more) => `${n} ${n === 1 ? one : more}`;
@@ -126,6 +126,7 @@ function render() {
     el("countIngredients").textContent = binned("ingredients").length || "";
     el("countBrands").textContent = binned("brands").length || "";
     el("countProducts").textContent = binned("products").length || "";
+    setBinCount();                         // the count on the logo's settings menu follows what this page shows
 
     const inBin = binned(), shown = shownEntries();
     Array.from(picked).forEach((id) => { if (!inBin.some((x) => x.id === id)) picked.delete(id); });

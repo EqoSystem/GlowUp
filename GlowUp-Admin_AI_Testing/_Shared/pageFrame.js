@@ -31,7 +31,7 @@
         bin: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/>',
         camera: '<path d="M4 8h3.2l1.8-2.5h6l1.8 2.5H20v11H4z"/><circle cx="12" cy="13.2" r="3.6"/>',
         chevron: '<path d="M15 6l-6 6 6 6"/>',
-        logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>'
+        down: '<path d="M6 9l6 6 6-6"/>'
     };
     var NAV = [
         { id: "dashboard", label: "Dashboard", icon: "dashboard", href: "../_Admin_Dashboard/adminDashboard.html" },
@@ -53,9 +53,12 @@
         document.body.classList.add("app");
         var sidebar = document.createElement("aside");
         sidebar.className = "sidebar";
+        // the logo and the name are ONE button: it opens the settings menu (adminSettingsMenu.js). Folded, the logo alone opens it.
+        // (no "Admin Portal" line, no e-mail and no Sign Out at the bottom since 29 October 2026: both are in that menu)
         sidebar.innerHTML =
-            '<div class="sidebar-brand"><div class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"></div>' +
-            '<div class="brand-text"><h1 class="brand-title">GlowUp</h1><p class="brand-subtitle">Admin Portal</p></div>' +
+            '<div class="sidebar-brand"><button type="button" class="brand-menu" id="brandMenuBtn" aria-haspopup="menu" aria-label="Settings" data-tip="Settings">' +
+            '<span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"><span class="brand-badge" id="brandBinBadge" hidden></span></span>' +
+            '<span class="brand-text"><span class="brand-title">GlowUp</span></span>' + svg("down").replace('class="ic"', 'class="ic brand-chevron"') + "</button>" +
             '<button type="button" class="sidebar-toggle" id="sidebarToggle" aria-controls="sidebarNav">' + svg("chevron") + '</button></div>' +
             '<ul class="nav-links" id="sidebarNav" aria-label="Pages"><li class="nav-drop" aria-hidden="true"></li>' +
             NAV.map(function (n) {
@@ -63,9 +66,7 @@
                 // the page you are on is marked on the link itself (and for screen readers), not by where the pointer is
                 return '<li><a href="' + n.href + '"' + (here ? ' class="active" aria-current="page"' : "") + ' title="' + esc(n.label) + '">' + svg(n.icon) + '<span class="label">' + esc(n.label) + "</span></a></li>";
             }).join("") +
-            "</ul>" +
-            '<div class="sidebar-footer"><p class="signed-in-as" aria-live="polite">&nbsp;</p>' +
-            '<a href="../_Index/index.html" class="sign-out" title="Sign out">' + svg("logout") + '<span class="label">Sign Out</span></a></div>';
+            "</ul>";
         document.body.insertBefore(sidebar, main);
         var toggle = sidebar.querySelector("#sidebarToggle");
         var paintToggle = function () {
