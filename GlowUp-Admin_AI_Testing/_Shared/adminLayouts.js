@@ -857,18 +857,124 @@ function wireBoard() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The Customise drawer
+// The Layout & Style window
 // ---------------------------------------------------------------------------------------------
+// A floating window (since 29 October 2026; it was a drawer over a dark cover): no cover, so the page stays in view
+// while it is changed. It is dragged by its title bar, resized from its lower right corner (never smaller than
+// WINDOW_MIN), kept inside the browser window, can be minimised to its title bar, and remembers where it was and how
+// big ("glowup.layoutWindow.v1" in this browser). "Reset to default" puts it back to its first place and size.
+const WINDOW_KEY = "glowup.layoutWindow.v1";
+const WINDOW_MIN = { w: 300, h: 260 };
+const WINDOW_GAP = 8;
+let colourTheme = "";                             // the theme whose colours the window edits ("" = the one on screen)
+
+function windowDefaults() {
+    const w = Math.min(360, window.innerWidth - 2 * WINDOW_GAP);
+    const h = Math.max(WINDOW_MIN.h, Math.min(680, window.innerHeight - 120));
+    return { left: window.innerWidth - w - 24, top: 76, width: w, height: h, minimized: false };
+}
+function readWindowState() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(WINDOW_KEY) || "null");
+        if (saved && [saved.left, saved.top, saved.width, saved.height].every((n) => Number.isFinite(Number(n))))
+            return { left: Number(saved.left), top: Number(saved.top), width: Number(saved.width), height: Number(saved.height), minimized: saved.minimized === true };
+    } catch (error) { /* a private window */ }
+    return windowDefaults();
+}
+function saveWindowState(state) { try { localStorage.setItem(WINDOW_KEY, JSON.stringify(state)); } catch (error) { /* not kept */ } }
+
+/** Puts the window where `state` says, inside the browser window, and never smaller than its minimum. */
+function placeWindow(state) {
+    const win = byId("customiseDrawer");
+    if (!win) return state;
+    const maxW = Math.max(WINDOW_MIN.w, window.innerWidth - 2 * WINDOW_GAP), maxH = Math.max(WINDOW_MIN.h, window.innerHeight - 2 * WINDOW_GAP);
+    const s = Object.assign({}, state);
+    s.width = Math.min(maxW, Math.max(WINDOW_MIN.w, s.width));
+    s.height = Math.min(maxH, Math.max(WINDOW_MIN.h, s.height));
+    const shownH = s.minimized ? (win.querySelector(".lw-head").offsetHeight || 52) : s.height;
+    s.left = Math.min(Math.max(WINDOW_GAP, s.left), Math.max(WINDOW_GAP, window.innerWidth - s.width - WINDOW_GAP));
+    s.top = Math.min(Math.max(WINDOW_GAP, s.top), Math.max(WINDOW_GAP, window.innerHeight - shownH - WINDOW_GAP));
+    win.style.left = s.left + "px"; win.style.top = s.top + "px"; win.style.width = s.width + "px";
+    win.style.height = s.minimized ? "" : s.height + "px";
+    win.classList.toggle("is-min", s.minimized);
+    const min = byId("drawerMin");
+    if (min) { min.innerHTML = icon(s.minimized ? "up" : "minus"); min.setAttribute("aria-label", s.minimized ? "Show the whole window" : "Minimise"); min.dataset.tip = s.minimized ? "Show the whole window" : "Minimise"; min.setAttribute("aria-expanded", String(!s.minimized)); }
+    return s;
+}
+
+/** Dragging the title bar moves the window; dragging the corner resizes it. Listens on window (no pointer capture), like the rest of the site. */
+function wireWindow(win) {
+    let state = readWindowState();
+    const follow = (event, onMove) => {
+        event.preventDefault();
+        win.classList.add("moving");
+        const move = (e) => { state = placeWindow(onMove(e)); };
+        const stop = () => {
+            win.classList.remove("moving");
+            window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", stop); window.removeEventListener("pointercancel", stop);
+            saveWindowState(state);
+        };
+        window.addEventListener("pointermove", move); window.addEventListener("pointerup", stop); window.addEventListener("pointercancel", stop);
+    };
+    const head = win.querySelector(".lw-head");
+    head.addEventListener("pointerdown", (event) => {
+        if (event.button !== 0 || event.target.closest("button")) return;
+        const box = win.getBoundingClientRect(), dx = event.clientX - box.left, dy = event.clientY - box.top;
+        follow(event, (e) => Object.assign({}, state, { left: e.clientX - dx, top: e.clientY - dy }));
+    });
+    head.addEventListener("keydown", (event) => {
+        const step = event.shiftKey ? 60 : 20;
+        const to = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[event.key];
+        if (!to || event.target !== head) return;
+        event.preventDefault();
+        state = placeWindow(Object.assign({}, state, { left: state.left + to[0], top: state.top + to[1] }));
+        saveWindowState(state);
+    });
+    win.querySelector(".lw-resize").addEventListener("pointerdown", (event) => {
+        if (event.button !== 0) return;
+        const start = { x: event.clientX, y: event.clientY, w: state.width, h: state.height };
+        follow(event, (e) => Object.assign({}, state, { width: start.w + e.clientX - start.x, height: start.h + e.clientY - start.y }));
+    });
+    byId("drawerMin").addEventListener("click", () => { state = placeWindow(Object.assign({}, state, { minimized: !state.minimized })); saveWindowState(state); });
+    byId("windowResetBtn").addEventListener("click", () => {
+        try { localStorage.removeItem(WINDOW_KEY); } catch (error) { /* nothing kept */ }
+        state = placeWindow(windowDefaults());
+        toast("The window is back in its first place and size.", "ok");
+    });
+    window.addEventListener("resize", () => { if (document.body.classList.contains("drawer-open")) state = placeWindow(state); });
+    win.placeNow = () => { state = placeWindow(readWindowState()); };
+}
+
+/** The value of a colour token for `theme`, read from the site's own style sheet (for the theme that is not on screen). */
+function themeToken(theme, name) {
+    try {
+        for (const sheet of Array.from(document.styleSheets)) {
+            let rules;
+            try { rules = sheet.cssRules; } catch (error) { continue; }      // a sheet from another address (fonts)
+            for (const rule of Array.from(rules || [])) {
+                if (rule.selectorText && rule.selectorText.includes(`[data-theme="${theme}"]`)) {
+                    const value = rule.style.getPropertyValue(name).trim();
+                    if (value) return value;
+                }
+            }
+        }
+    } catch (error) { /* no style sheet to read */ }
+    return "";
+}
+
 function buildDrawer() {
-    const overlay = document.createElement("div");
-    overlay.className = "drawer-overlay";
-    overlay.addEventListener("click", () => openDrawer(false));
     const drawer = document.createElement("aside");
-    drawer.className = "drawer";
+    drawer.className = "drawer layout-window";
     drawer.id = "customiseDrawer";
+    drawer.setAttribute("role", "dialog");
     drawer.setAttribute("aria-label", "Layout and style of the display");
     drawer.innerHTML = `
-        <h3>${icon("sliders")}<span style="flex:1">Layout &amp; Style</span><button type="button" class="icon-btn small" id="drawerClose" aria-label="Close">${icon("x")}</button></h3>
+        <div class="lw-head" tabindex="0" aria-label="Layout and Style window. Drag it, or move it with the arrow keys.">
+            <h3>${icon("sliders")}<span style="flex:1">Layout &amp; Style</span></h3>
+            <button type="button" class="icon-btn small" id="drawerMin" aria-label="Minimise" data-tip="Minimise">${icon("minus")}</button>
+            <button type="button" class="icon-btn small" id="drawerClose" aria-label="Close" data-tip="Close">${icon("x")}</button>
+        </div>
+        <div class="lw-body">
 
         <div class="drawer-section first">
             <h4>${icon("user")}Layout ${guideBadge("Layouts", "One sign-in, several people: pick your name to get your own arrangement, panels, font and colours. Up to " + MAX_PROFILES + " layouts are kept in this browser.", "Default layout is the fixed starting point. It cannot be changed.")}</h4>
@@ -900,16 +1006,33 @@ function buildDrawer() {
 
         <div class="drawer-section">
             <h4>${icon("palette")}Colours <span class="small muted" id="lookThemeNote"></span></h4>
+            <div class="segmented lw-theme-tabs" id="lookThemeTabs" role="tablist" aria-label="Colours of which mode">
+                <button type="button" class="seg" role="tab" data-theme-tab="light">${icon("sun")}Light mode</button>
+                <button type="button" class="seg" role="tab" data-theme-tab="dark">${icon("moon")}Dark mode</button>
+            </div>
             <div class="drawer-row"><span>Accent (buttons)</span><input type="color" id="lookAccent"></div>
             <div class="drawer-row"><span>Panels</span><input type="color" id="lookPanel"></div>
             <div class="drawer-row"><span>Page background</span><input type="color" id="lookBg"></div>
             <div class="drawer-row"><span>Round corners</span><input type="range" id="lookRadius" min="0" max="24" step="1"></div>
         </div>
+
+        <div class="drawer-section">
+            <button type="button" class="btn" id="windowResetBtn" data-tip-title="Reset to default" data-tip="Puts this window back in its first place and size." data-tip-preview="Your layouts, fonts and colours stay as they are.">${icon("reset")}Reset to default</button>
+        </div>
+        </div>
+        <span class="lw-resize" aria-hidden="true"></span>
         <input type="file" id="importFile" accept="application/json,.json" hidden>`;
-    document.body.append(overlay, drawer);
+    document.body.append(drawer);
     hydrate(drawer);
+    wireWindow(drawer);
 
     byId("drawerClose").addEventListener("click", () => openDrawer(false));
+    byId("lookThemeTabs").addEventListener("click", (event) => {
+        const tab = event.target.closest("[data-theme-tab]");
+        if (!tab) return;
+        colourTheme = tab.dataset.themeTab;
+        paintDrawer();
+    });
     byId("profileSelect").addEventListener("change", async (event) => {
         if (editing) await setEditing(false);
         store.active = event.target.value;
@@ -931,7 +1054,8 @@ function buildDrawer() {
         saveStore();
         applyAppearance();
     };
-    const colour = (key) => (event) => { const value = event.target.value; look((a) => { a.colors = a.colors || {}; a.colors[currentTheme()] = a.colors[currentTheme()] || {}; a.colors[currentTheme()][key] = value; }); };
+    // the colours of the mode chosen with the Light mode / Dark mode tabs (at first the one on screen)
+    const colour = (key) => (event) => { const value = event.target.value, theme = colourTheme || currentTheme(); look((a) => { a.colors = a.colors || {}; a.colors[theme] = a.colors[theme] || {}; a.colors[theme][key] = value; }); };
     byId("lookFont").addEventListener("change", (event) => { const value = event.target.value; look((a) => { a.font = value; }); });
     byId("lookScale").addEventListener("input", (event) => { const value = Number(event.target.value); look((a) => { a.scale = value; }); });
     byId("lookDensity").addEventListener("change", (event) => { const value = event.target.value; look((a) => { a.density = value; }); });
@@ -1005,8 +1129,15 @@ export function openLayoutWindow() {
 }
 
 function openDrawer(open) {
+    const wasOpen = document.body.classList.contains("drawer-open");
     document.body.classList.toggle("drawer-open", open);
-    if (open) { closeMenu(); paintDrawer(); }
+    if (open) {
+        closeMenu();
+        if (!wasOpen) colourTheme = currentTheme();
+        const win = byId("customiseDrawer");
+        if (win && win.placeNow) win.placeNow();
+        paintDrawer();
+    }
 }
 
 function paintDrawer() {
@@ -1024,8 +1155,17 @@ function paintDrawer() {
     byId("lookScale").value = look.scale || 1;
     byId("lookDensity").value = look.density || "";
     byId("lookRadius").value = look.radius !== undefined && look.radius !== "" ? look.radius : 14;
-    byId("lookAccent").value = toHex(css.getPropertyValue("--accent"));
-    byId("lookPanel").value = toHex(css.getPropertyValue("--surface"));
-    byId("lookBg").value = toHex(css.getPropertyValue("--bg"));
-    byId("lookThemeNote").textContent = "for " + currentTheme() + " mode";
+    // the colours of the tab that is chosen: the one on screen reads the page, the other one its kept choice or the site's own value
+    const theme = colourTheme || currentTheme();
+    const kept = (look.colors && look.colors[theme]) || {};
+    const valueOf = (key, token) => theme === currentTheme() ? toHex(css.getPropertyValue(token)) : toHex(kept[key] || themeToken(theme, token));
+    byId("lookAccent").value = valueOf("accent", "--accent");
+    byId("lookPanel").value = valueOf("panel", "--surface");
+    byId("lookBg").value = valueOf("bg", "--bg");
+    byId("lookThemeNote").textContent = "for " + theme + " mode";
+    document.querySelectorAll("#lookThemeTabs [data-theme-tab]").forEach((tab) => {
+        const on = tab.dataset.themeTab === theme;
+        tab.classList.toggle("on", on);
+        tab.setAttribute("aria-selected", String(on));
+    });
 }
