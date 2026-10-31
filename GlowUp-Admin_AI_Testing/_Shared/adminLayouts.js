@@ -186,7 +186,7 @@ function decorate(panel) {
         const after = head.querySelector(":scope > .guide-badge") || head.querySelector(":scope > .panel-title");
         if (after) after.insertAdjacentHTML("afterend", FOLD_PARTS); else head.insertAdjacentHTML("afterbegin", FOLD_PARTS);
         // the arrow and the "..." menu close the bar, except for a part that asks to stay at the very end (data-head-end: the bin)
-        const tail = head.querySelector(":scope > [data-head-end]");
+        const tail = head.querySelector("[data-head-end]");
         if (tail) tail.insertAdjacentHTML("beforebegin", foldButton() + menu); else head.insertAdjacentHTML("beforeend", foldButton() + menu);
     } else panel.querySelector(".panel-tools").insertAdjacentHTML("beforeend", menu);
     panel.querySelector(".tools-name").textContent = panel.dataset.label || panel.dataset.panel;
@@ -591,7 +591,7 @@ function openPanelMenu(panel, anchor) {
         const hidden = panel.classList.contains("is-hidden");
         items.push({ label: hidden ? "Show panel" : "Hide panel", icon: hidden ? "eye" : "eyeOff", run: () => hidePanel(id, !hidden) });
     }
-    if (!isMember && panel.querySelector(":scope > .panel-inner > .panel-head > .panel-fold-btn")) {
+    if (!isMember && panel.querySelector(":scope > .panel-inner > .panel-head .panel-fold-btn")) {
         const folded = foldedNow(id);
         items.push({ label: folded ? "Open panel" : "Fold panel", icon: folded ? "down" : "up", description: folded ? null : "Only its title stays. The arrow at its top right opens it again.", run: () => toggleFold(id) });
     }

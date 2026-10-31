@@ -162,8 +162,11 @@
                         <button type="button" class="seg" data-layout="rows" aria-pressed="true" data-tip-title="Rows" data-tip="One product per line, in a table."><i data-icon="list"></i>Rows</button>
                         <button type="button" class="seg" data-layout="cards" aria-pressed="false" data-tip-title="Cards" data-tip="Products as cards, several side by side. Brands stay as headings."><i data-icon="layers"></i>Cards</button>
                     </div>
-                    <div class="pager" id="inventoryPagerTop"></div>
-                    <span class="shelf" id="inventoryShelfEnd" data-head-end></span>
+                    <!-- the pager, the fold arrow and the bin stay together at the right end, also when the row wraps -->
+                    <div class="head-end">
+                        <div class="pager" id="inventoryPagerTop"></div>
+                        <span class="shelf" id="inventoryShelfEnd" data-head-end></span>
+                    </div>
                 </div>
                 <div class="table-container" id="inventoryHost">
                     <table class="admin-table inventory-table">

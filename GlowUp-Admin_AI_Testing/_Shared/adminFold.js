@@ -42,7 +42,7 @@ export function paintFold(panelId) {
     if (!panelId) { document.querySelectorAll(".board .panel[data-panel]").forEach((panel) => paintFold(panel.dataset.panel)); return; }
     const panel = panelOf(panelId);
     if (!panel) return;
-    const button = panel.querySelector(":scope > .panel-inner > .panel-head > .panel-fold-btn");
+    const button = panel.querySelector(":scope > .panel-inner > .panel-head .panel-fold-btn");
     // a panel without a title bar, and a panel inside a combined panel, never folds
     const can = !!button && !panel.classList.contains("member");
     const folded = can && foldedNow(panelId);

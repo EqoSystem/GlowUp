@@ -318,7 +318,7 @@ html.sb-collapsed .nav-links a, html.sb-collapsed .sign-out { justify-content: c
 @keyframes edge-light { to { --spin: 360deg; } }
 /* the "..." of a panel shows when the pointer is over the panel */
 .panel-menu-btn { opacity: 0; background: transparent; border-color: transparent; transition: opacity .2s, background-color .2s; }
-.panel:hover > .panel-inner > .panel-head > .panel-menu-btn, .panel-menu-btn:focus-visible, .panel-menu-btn[aria-expanded] { opacity: 1; }
+.panel:hover > .panel-inner > .panel-head > .panel-menu-btn, .panel:hover > .panel-inner > .panel-head > .head-end > .panel-menu-btn, .panel-menu-btn:focus-visible, .panel-menu-btn[aria-expanded] { opacity: 1; }
 @media (hover: none) { .panel-menu-btn { opacity: 1; } }
 /* ---- Auto resize: the panels are packed without gaps ----
    The board becomes a grid of very low rows; adminLayouts.js gives every panel the number of rows its own height needs
@@ -330,19 +330,20 @@ html.sb-collapsed .nav-links a, html.sb-collapsed .sign-out { justify-content: c
 .board.fit.measuring > .panel { grid-row: auto; }
 
 /* ---- a folded panel shows only its title line (adminFold.js) ---- */
-.panel-head > .panel-fold-btn { margin-left: auto; background: transparent; border-color: transparent; box-shadow: none; color: var(--muted); }
-.panel-head > .panel-fold-btn:hover, .panel-head > .panel-fold-btn:focus-visible { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); }
-.panel-head > .spacer ~ .panel-fold-btn { margin-left: 0; }
+.panel-head > .panel-fold-btn, .head-end > .panel-fold-btn { margin-left: auto; background: transparent; border-color: transparent; box-shadow: none; color: var(--muted); }
+.panel-head > .panel-fold-btn:hover, .panel-head > .panel-fold-btn:focus-visible, .head-end > .panel-fold-btn:hover, .head-end > .panel-fold-btn:focus-visible { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); }
+.panel-head > .spacer ~ .panel-fold-btn, .head-end > .panel-fold-btn { margin-left: 0; }
 .panel-fold-btn svg.ic { transition: transform .2s var(--ease); }
-.panel.folded > .panel-inner > .panel-head > .panel-fold-btn svg.ic { transform: rotate(-90deg); }
+.panel.folded > .panel-inner > .panel-head > .panel-fold-btn svg.ic, .panel.folded > .panel-inner > .panel-head > .head-end > .panel-fold-btn svg.ic { transform: rotate(-90deg); }
 .panel-summary { display: none; flex: 1; min-width: 0; font-size: var(--fs-xs); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .panel.folded { height: auto !important; }          /* a height set by hand does not hold a folded panel open */
 .panel.folded > .panel-inner { padding-block: calc(var(--pad) * .5); overflow: visible; }
 .panel.folded > .panel-inner > :not(.panel-head) { display: none !important; }
-.panel.folded > .panel-inner > .panel-head > :not(.panel-title):not(.guide-badge):not(.panel-summary):not(.panel-fold-btn):not(.panel-menu-btn) { display: none !important; }
+.panel.folded > .panel-inner > .panel-head > .head-end > :not(.panel-fold-btn):not(.panel-menu-btn) { display: none !important; }
+.panel.folded > .panel-inner > .panel-head > :not(.panel-title):not(.guide-badge):not(.panel-summary):not(.panel-fold-btn):not(.panel-menu-btn):not(.head-end) { display: none !important; }
 .panel.folded > .panel-inner > .panel-head > .panel-summary { display: block; }
 .panel.folded > .panel-inner > .panel-head > .panel-title { color: var(--text-2); }
-.panel.member > .panel-inner > .panel-head > .panel-fold-btn, .panel.member > .panel-inner > .panel-head > .panel-summary,
+.panel.member > .panel-inner > .panel-head > .panel-fold-btn, .panel.member > .panel-inner > .panel-head > .head-end > .panel-fold-btn, .panel.member > .panel-inner > .panel-head > .panel-summary,
 .panel.group > .panel-inner > .panel-head > .panel-fold-btn, .panel.preview .panel-fold-btn { display: none; }
 body.layout-editing .board > .panel .panel-fold-btn { pointer-events: auto; }
 
@@ -923,11 +924,12 @@ svg.chart { display: block; max-width: 100%; overflow: visible; }
 .panel-head.wraps { flex-wrap: wrap; row-gap: 8px; }
 .panel-head.wraps > :not(.spacer):not(.shelf) { flex: none; }
 .panel-head.wraps > .shelf > * { flex: none; }
-/* the pager, the fold arrow and the bin close the row at its right end, on whichever line they land (an auto margin, not a spacer) */
+/* the pager, the fold arrow and the bin are ONE group (.head-end) at the row's right end: they wrap together, never one by one */
 .panel-head.wraps > .spacer { display: none; }
-.panel-head.wraps > .segmented, .panel-head.wraps > .pager { margin-left: auto; }
 .panel-head.wraps > .segmented[hidden] { display: none; }
-.panel-head.wraps > .segmented:not([hidden]) ~ .pager { margin-left: 0; }
+.head-end { margin-left: auto; flex: none; display: flex; align-items: center; gap: 8px; }
+.head-end > .shelf { display: contents; }
+.head-end > .shelf .folder-chip { padding-block: 4px; }
 .folder-chip {
     display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border-radius: 999px; cursor: pointer; white-space: nowrap; max-width: 220px;
     font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); background: var(--surface-2); border: 1px solid var(--border);

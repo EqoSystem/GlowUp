@@ -161,7 +161,8 @@ export function mountWidget(panel, config) {
         inner.appendChild(body);
         const head = inner.querySelector(":scope > .panel-head");
         const pager = h("div", { class: "pager widget-pager" });
-        if (head) head.insertBefore(pager, head.querySelector(".panel-menu-btn"));
+        const menu = head ? head.querySelector(".panel-menu-btn") : null;        // it may sit in a .head-end group
+        if (menu) menu.parentNode.insertBefore(pager, menu); else if (head) head.appendChild(pager);
         w = { panel, body, pager, wanted: null, config: null, page: { page: 1, size: LIST_SIZE }, selected: new Set(), shaking: false, width: 0 };
         // a graph is drawn for the width it has: draw it again when the panel is resized
         w.watcher = new ResizeObserver(() => {
