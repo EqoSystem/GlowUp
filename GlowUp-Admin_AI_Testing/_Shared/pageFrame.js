@@ -53,12 +53,11 @@
         var sidebar = document.createElement("aside");
         sidebar.className = "sidebar";
         // the logo ("G" and the red Recycle bin count, no name and no caret) is ONE button: a tap opens the settings window, a
-        // second tap hides it (adminSettingsMenu.js). The collapse arrow sits beside it.
+        // second tap hides it (adminSettingsMenu.js).
         // (no "Admin Portal" line, no e-mail and no Sign Out at the bottom since 29 October 2026: all are in that window)
         sidebar.innerHTML =
             '<div class="sidebar-brand"><button type="button" class="brand-menu" id="brandMenuBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="settingsWindow" aria-label="Settings" data-tip="Settings">' +
-            '<span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"><span class="brand-badge" id="brandBinBadge" hidden></span></span></button>' +
-            '<button type="button" class="sidebar-toggle" id="sidebarToggle" aria-controls="sidebarNav">' + svg("chevron") + '</button></div>' +
+            '<span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"><span class="brand-badge" id="brandBinBadge" hidden></span></span></button></div>' +
             '<ul class="nav-links" id="sidebarNav" aria-label="Pages"><li class="nav-drop" aria-hidden="true"></li>' +
             NAV.map(function (n) {
                 var here = n.id === page;
@@ -67,20 +66,51 @@
             }).join("") +
             "</ul>";
         document.body.insertBefore(sidebar, main);
-        var toggle = sidebar.querySelector("#sidebarToggle");
+
+        // THE BUTTON THAT FOLDS THE MENU: an edge tab, half on the sidebar and half over its border line, below the last link. It is
+        // not inside the sidebar (the sidebar is a layer of its own, so the page would paint over the tab's outer half and the settings
+        // window would cover it) but right after it, so the keyboard reaches it after the links and before the page.
+        // Up to 1100 px wide the sidebar is always icons only: there the tab opens the whole menu over the page, and that is not kept.
+        var toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "sidebar-toggle";
+        toggle.id = "sidebarToggle";
+        toggle.setAttribute("aria-controls", "sidebarNav");
+        toggle.innerHTML = svg("chevron");
+        document.body.insertBefore(toggle, main);
+        var narrow = window.matchMedia("(max-width: 1100px)");
+        var links = sidebar.querySelectorAll(".nav-links a");
         var paintToggle = function () {
-            var folded = root.classList.contains("sb-collapsed");
-            var text = folded ? "Expand the menu" : "Collapse the menu";
-            toggle.setAttribute("aria-expanded", folded ? "false" : "true");
+            var open = narrow.matches ? root.classList.contains("sb-peek") : !root.classList.contains("sb-collapsed");
+            var text = open ? "Collapse sidebar" : "Expand sidebar";
+            toggle.setAttribute("aria-expanded", open ? "true" : "false");
             toggle.setAttribute("aria-label", text);
-            toggle.title = text;
+            toggle.setAttribute("data-tip", text);
+        };
+        // lower-middle of the window, but always below the last link and never off the bottom (on a very short window the bottom wins:
+        // the tab stays reachable, and it is too narrow to reach the links beside it)
+        var placeToggle = function () {
+            var height = toggle.offsetHeight, room = window.innerHeight;
+            var wanted = Math.max(links[links.length - 1].getBoundingClientRect().bottom + 12, room * 0.58 - height / 2);
+            toggle.style.top = Math.round(Math.max(0, Math.min(wanted, room - height - 12))) + "px";
         };
         paintToggle();
+        placeToggle();
         toggle.addEventListener("click", function () {
-            var folded = root.classList.toggle("sb-collapsed");
-            try { localStorage.setItem(FOLD_KEY, folded ? "1" : "0"); } catch (error) { /* not kept */ }
+            if (narrow.matches) root.classList.toggle("sb-peek");
+            else {
+                var folded = root.classList.toggle("sb-collapsed");
+                try { localStorage.setItem(FOLD_KEY, folded ? "1" : "0"); } catch (error) { /* not kept */ }
+            }
             paintToggle();
+            placeToggle();
         });
+        narrow.addEventListener("change", function () { root.classList.remove("sb-peek"); paintToggle(); placeToggle(); });
+        window.addEventListener("resize", placeToggle);
+        if (window.ResizeObserver) {
+            var watcher = new ResizeObserver(placeToggle);
+            Array.prototype.forEach.call(links, function (link) { watcher.observe(link); });
+        }
 
         var topbar = document.createElement("header");
         topbar.className = "topbar";

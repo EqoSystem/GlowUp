@@ -210,21 +210,25 @@ body.app { display: grid; grid-template-columns: 232px 1fr; overflow: hidden; }
     background: var(--surface); border-right: 1px solid var(--border);
     display: flex; flex-direction: column; padding: 20px 14px; gap: 22px; min-height: 0;
 }
-.sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 0 6px; }
+.sidebar-brand { position: relative; display: flex; align-items: center; gap: 10px; }
+/* a thin line between the logo and the menu, in the middle of the gap between them (nothing moves for it) */
+.sidebar-brand::after { content: ""; position: absolute; left: 0; right: 0; bottom: -11px; height: 1px; background: var(--border); }
 .brand-logo { width: 34px; height: 34px; border-radius: 10px; flex: none; overflow: hidden; display: block; }
 .brand-logo img { display: block; width: 100%; height: 100%; }
-/* the menu folded to its icons (the button is in the brand row; the choice is kept by pageFrame.js) */
-.sidebar-toggle {
-    margin-left: auto; flex: none; width: 28px; height: 28px; padding: 0; display: grid; place-items: center; cursor: pointer;
-    border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2);
+/* the menu folded to its icons: an edge tab centred on the sidebar's right edge, placed by pageFrame.js below the last link (the choice is
+   kept there too). 26 px wide: its 13 px on either side stay inside the sidebar's and the page's own padding, so it touches neither.
+   Above the settings window (901), under dialogs (1000). By id, because the tile animation's .fx would make it position: relative. */
+#sidebarToggle {
+    position: fixed; z-index: 902; top: 58vh; left: calc(232px - 13px); width: 26px; height: 44px; padding: 0; display: grid; place-items: center; cursor: pointer;
+    border-radius: 13px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); view-transition-name: glowup-sidebar-toggle;
 }
-.sidebar-toggle:hover { background: var(--surface-3); color: var(--text); }
-.sidebar-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#sidebarToggle:hover { background: var(--surface-3); color: var(--text); }
+#sidebarToggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+html.sb-collapsed #sidebarToggle { left: calc(72px - 13px); }
 .sidebar-toggle svg.ic { width: 16px; height: 16px; transition: transform .2s var(--ease); }
 html.sb-collapsed body.app { grid-template-columns: 72px 1fr; }
 html.sb-collapsed .sidebar .label, html.sb-collapsed .signed-in-as { display: none; }
 html.sb-collapsed .sidebar-brand { flex-direction: column; padding: 0; gap: 12px; }
-html.sb-collapsed .sidebar-toggle { margin-left: 0; }
 html.sb-collapsed .sidebar-toggle svg.ic { transform: rotate(180deg); }
 html.sb-collapsed .nav-links a, html.sb-collapsed .sign-out { justify-content: center; padding-left: 0; padding-right: 0; }
 .brand-title { font-size: var(--fs-md); font-weight: 700; line-height: 1.15; letter-spacing: .1px; }
@@ -345,7 +349,20 @@ body.layout-editing .board > .panel .panel-fold-btn { pointer-events: auto; }
 /* a built-in panel that is shown as a list, a row, a grid or a graph: its own content steps aside */
 .panel.alt-view > .panel-inner > :not(.panel-head):not(.widget-body):not(.assist) { display: none !important; }
 .panel.alt-view > .panel-inner > .panel-head .pager:not(.widget-pager) { display: none; }
-@media (max-width: 1100px) { .panel { grid-column: span 12 !important; } body.app { grid-template-columns: 72px 1fr; } .sidebar .label, .signed-in-as { display: none; } .sidebar-toggle { display: none; } }
+@media (max-width: 1100px) { .panel { grid-column: span 12 !important; } body.app { grid-template-columns: 72px 1fr; } .sidebar .label, .signed-in-as { display: none; } }
+/* up to 1100 px the sidebar is icons only; the edge tab opens the whole menu OVER the page (html.sb-peek, not kept) */
+@media (max-width: 1100px) {
+    html:not(.sb-peek) .sidebar-brand { justify-content: center; }
+    #sidebarToggle, html.sb-collapsed #sidebarToggle { left: calc(72px - 13px); }
+    .sidebar-toggle svg.ic { transform: rotate(180deg); }
+    html.sb-peek #sidebarToggle, html.sb-peek.sb-collapsed #sidebarToggle { left: calc(232px - 13px); }
+    html.sb-peek .sidebar-toggle svg.ic, html.sb-peek.sb-collapsed .sidebar-toggle svg.ic { transform: none; }
+    html.sb-peek .sidebar { position: fixed; top: 0; bottom: 0; left: 0; width: 232px; z-index: 900; box-shadow: var(--shadow); }
+    html.sb-peek .main-content { grid-column: 2; }
+    html.sb-peek .sidebar .label { display: inline; }
+    html.sb-peek.sb-collapsed .nav-links a { justify-content: flex-start; padding: 10px 12px; }
+    html.sb-peek.sb-collapsed .sidebar-brand { align-items: flex-start; }
+}
 
 /* ============================================================== 3. components */
 /* ---- buttons ---- */

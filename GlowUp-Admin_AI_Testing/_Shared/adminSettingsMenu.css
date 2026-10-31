@@ -1,8 +1,8 @@
 /* The settings window behind the GlowUp logo (adminSettingsMenu.js), on every admin page. */
 
-/* the logo button: only the "G" and the red Recycle bin count; the collapse arrow sits beside it */
+/* the logo button: only the "G" and the red Recycle bin count; the G lines up with the left edge of the menu's highlight */
 .brand-menu {
-    flex: none; display: grid; place-items: center; padding: 4px; margin: -4px 0 -4px -4px;
+    flex: none; display: grid; place-items: center; padding: 4px; margin: -4px 0 -4px -5px;
     border: 1px solid transparent; border-radius: 12px; background: transparent; color: var(--text);
     font: inherit; cursor: pointer; transition: background-color .15s, border-color .15s;
 }
