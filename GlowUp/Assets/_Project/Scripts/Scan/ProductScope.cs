@@ -47,7 +47,10 @@ namespace GlowUp.Scan
             "Highlighter", "Contour", "Eyeshadow", "Eyeliner", "Mascara", "Brow", "Setting Spray"
         };
 
-        /// <summary>Finds a supported make-up type when its label appears in OCR text; returns empty when it is unclear.</summary>
+        /// <summary>
+        /// Finds a supported make-up type when its label appears in OCR text; returns empty when it is unclear. Capitals never matter
+        /// ("Foundation", "FOUNDATION", "foundation"); see TypeFromMisread for what a camera does to the word on a real pack.
+        /// </summary>
         public static string TypeFromLabel(string text)
         {
             string key = " " + TextKey.Normalize(text) + " ";
@@ -60,7 +63,75 @@ namespace GlowUp.Scan
             if (key.Contains(" liquid lipstick ")) return "Lipstick";
             if (key.Contains(" cheek tint ") || key.Contains(" cheek stain ")) return "Blush";
             if (key.Contains(" loose powder ") || key.Contains(" pressed powder ") || key.Contains(" face powder ")) return "Powder";
+            return TypeFromMisread(key);
+        }
+
+        // the last rows of TypeWords ("gloss", "tint", "liner") are too common on a label to name a kind by themselves
+        const int LooseTypeWords = 3;
+        // shorter words ("brow", "kohl") are only taken as written: one misread letter makes them another word
+        const int ShortestMisreadWord = 5;
+        const int ShortestWordWithLostLetter = 8;
+
+        /// <summary>
+        /// The kind of make-up when the word is on the label but not as the app spells it, in this order: another spelling or a plural
+        /// ("EYE SHADOW", "BLUSHER", "FOUNDATIONS"); letters spaced apart for style ("F O U N D A T I O N"); a word cut in two
+        /// ("FOUN DATION", or at the end of a line); letters a camera confuses ("F0UNDATION", "FOUNDATlON", TextKey.Squash); one letter
+        /// lost from a long word ("FOUNDATON"). A wrong letter is NOT forgiven, so "CONCEALED" and "BROWN" stay what they are.
+        /// key = " " + TextKey.Normalize(text) + " ".
+        /// </summary>
+        static string TypeFromMisread(string key)
+        {
+            string joined = JoinLoneLetters(key);
+            int rows = TypeWords.Length - LooseTypeWords;
+            for (int row = 0; row < rows; row++)
+                for (int i = 1; i < TypeWords[row].Length; i++)
+                    if (Holds(joined, TypeWords[row][i])) return TypeWords[row][0];
+
+            string[] read = joined.Trim().Split(' ');
+            var squashed = new HashSet<string>();
+            for (int i = 0; i < read.Length; i++)
+            {
+                squashed.Add(TextKey.Squash(read[i]));
+                if (i + 1 < read.Length && read[i].Length > 1 && read[i + 1].Length > 1) squashed.Add(TextKey.Squash(read[i] + read[i + 1]));
+            }
+            for (int row = 0; row < rows; row++)
+                for (int i = 1; i < TypeWords[row].Length; i++)
+                {
+                    string word = TextKey.Squash(TypeWords[row][i]);
+                    if (word.Length >= ShortestMisreadWord && (squashed.Contains(word) || squashed.Contains(word + "s"))) return TypeWords[row][0];
+                }
+            for (int row = 0; row < rows; row++)
+                for (int i = 1; i < TypeWords[row].Length; i++)
+                {
+                    string word = TextKey.Squash(TypeWords[row][i]);
+                    if (word.Length < ShortestWordWithLostLetter) continue;
+                    foreach (string seen in squashed) if (LostOneLetter(seen, word)) return TypeWords[row][0];
+                }
             return "";
+        }
+
+        /// <summary>" f o u n d a t i o n " gives " foundation ": three or more single letters in a row are one word spaced apart.</summary>
+        static string JoinLoneLetters(string key)
+        {
+            string[] words = key.Trim().Split(' ');
+            var kept = new System.Text.StringBuilder(" ");
+            for (int i = 0; i < words.Length;)
+            {
+                int end = i;
+                while (end < words.Length && words[end].Length == 1) end++;
+                if (end - i >= 3) { for (int j = i; j < end; j++) kept.Append(words[j]); kept.Append(' '); i = end; }
+                else { kept.Append(words[i]).Append(' '); i++; }
+            }
+            return kept.ToString();
+        }
+
+        /// <summary>True when "seen" is "word" with exactly one letter missing.</summary>
+        static bool LostOneLetter(string seen, string word)
+        {
+            if (seen.Length != word.Length - 1) return false;
+            int at = 0;
+            while (at < seen.Length && seen[at] == word[at]) at++;
+            return string.CompareOrdinal(seen, at, word, at + 1, seen.Length - at) == 0;
         }
 
         // ---------------------------------------------------------------------------------------

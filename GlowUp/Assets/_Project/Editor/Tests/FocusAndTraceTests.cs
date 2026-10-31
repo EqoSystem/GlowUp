@@ -308,6 +308,21 @@ namespace GlowUp.Tests
             Assert.AreEqual("Lipstick", ProductScope.TypeFromLabel("GLOWUP VELVET MATTE LIPSTICK"));
             Assert.AreEqual("Powder", ProductScope.TypeFromLabel("Pressed Face Powder"));
             Assert.AreEqual("", ProductScope.TypeFromLabel("GLOWUP ROSE SHADE 03"));
+            // capitals never matter
+            foreach (string written in new[] { "Foundation", "FOUNDATION", "foundation", "FoUnDaTiOn" }) Assert.AreEqual("Foundation", ProductScope.TypeFromLabel(written), written);
+            // other spellings and plurals
+            Assert.AreEqual("Foundation", ProductScope.TypeFromLabel("FOUNDATIONS"));
+            Assert.AreEqual("Eyeshadow", ProductScope.TypeFromLabel("EYE SHADOW"));
+            Assert.AreEqual("Blush", ProductScope.TypeFromLabel("BLUSHER"));
+            Assert.AreEqual("Foundation", ProductScope.TypeFromLabel("BB CREAM"));
+            // what a camera does to the word
+            foreach (string read in new[] { "F0UNDATION", "FOUNDAT1ON", "FOUNDATlON", "F O U N D A T I O N", "FOUN DATION", "FOUN-\nDATION", "FOUNDATON" })
+                Assert.AreEqual("Foundation", ProductScope.TypeFromLabel(read), read);
+            Assert.AreEqual("Lipstick", ProductScope.TypeFromLabel("L1PSTICK"));
+            Assert.AreEqual("Primer", ProductScope.TypeFromLabel("Prirner"));
+            // near words that are something else stay what they are
+            foreach (string other in new[] { "BROWN SUGAR", "FOUNDER EDITION", "CONCEALED ZIP", "MASCARPONE", "BLUSHING ROSE", "HIGH GLOSS FINISH", "A B C D E" })
+                Assert.AreEqual("", ProductScope.TypeFromLabel(other), other);
         }
     }
 }

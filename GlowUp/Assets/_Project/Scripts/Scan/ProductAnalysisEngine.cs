@@ -367,6 +367,11 @@ namespace GlowUp.Scan
             string text = (rawLabelText ?? "").ToLowerInvariant();
             foreach (var (keyword, type) in TypeKeywords) if (text.Contains(keyword)) return type;
 
+            // the word was misread or spelled another way ("F0UNDATION", "BLUSHER"). "Powder" alone is left to the ingredient
+            // check below: an ingredient such as Rice Powder says nothing about the kind of product.
+            string read = ProductScope.TypeFromLabel(rawLabelText);
+            if (read.Length > 0 && read != "Powder") return read;
+
             string all = string.Join(" | ", ingredients ?? new List<string>()).ToLowerInvariant();
             bool pigment = all.Contains("iron oxide") || all.Contains("mica") || all.Contains("carmine") || all.Contains("ci 7") || all.Contains("ci 1");
             bool wax = all.Contains("wax") || all.Contains("castor oil") || all.Contains("polybutene");
