@@ -58,27 +58,22 @@
 
 
             <!-- find and add -->
-            <section class="panel" data-panel="tools" data-label="Filters" data-w="8">
-                <!-- ONE row. The search box and + Ingredient / More sit in the page header (they move there when the page opens); Sort sits in the table's bar. -->
+            <!-- hidden since 29 October 2026: the search, Add and More sit in the page header, "Any risk level" in the Ingredients bar.
+                 The origin dropdown ("All ingredients") is no longer shown, but stays here hidden: the count tiles still set it. -->
+            <section class="panel" data-panel="tools" data-label="Filters" data-w="8" hidden>
+                <!-- ONE row. The search box and Add / More sit in the page header (they move there when the page opens); Sort sits in the table's bar. -->
                 <div class="toolbar inv-tools cur-tools">
                     <div class="search-container">
                         <i data-icon="search"></i>
                         <input type="text" placeholder="Search ingredients" class="search-input" id="ingredientSearchInput" autocomplete="off" aria-label="Search ingredients">
                         <button type="button" class="search-clear" id="ingredientSearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
                     </div>
-                    <select id="ingredientSourceFilter" class="toolbar-select" aria-label="Show only the entries of one origin">
+                    <select id="ingredientSourceFilter" class="toolbar-select" aria-label="Show only the entries of one origin" hidden>
                         <option value="">All ingredients</option>
-                    </select>
-                    <select id="ingredientRiskFilter" class="toolbar-select" aria-label="Show one risk level">
-                        <option value="">Any risk level</option>
-                        <option value="harmful">Harmful</option>
-                        <option value="caution">Caution</option>
-                        <option value="safe">Safe</option>
-                        <option value="auto">App decides</option>
                     </select>
                     <div class="tool-group end" id="headerActions">
                         <button type="button" class="icon-btn" id="moreMenuBtn" aria-label="More" aria-haspopup="menu" data-tip-title="More" data-tip="Clean up entries that are not ingredients, and find duplicates."><i data-icon="more"></i></button>
-                        <button type="button" class="primary-btn" id="addIngredientBtn" data-guide="Add an ingredient with its plain-words definition." data-guide-preview="Opens a form. Only the first three boxes are required."><i data-icon="plus"></i>Ingredient</button>
+                        <button type="button" class="primary-btn" id="addIngredientBtn" data-guide="Add an ingredient with its plain-words definition." data-guide-title="Add an ingredient" data-guide-preview="Opens a form. Only the first three boxes are required."><i data-icon="plus"></i>Add</button>
                     </div>
                 </div>
             </section>
@@ -96,7 +91,7 @@
                     <span><strong>Drop a PDF, Excel, or Word file here</strong><small id="ingredientImportHint">Only ingredient data is accepted: name, INCI name, other names and description. Brand and product data in the file is ignored.</small></span>
                 </button>
                 <p class="import-types">Accepted: PDF (.pdf), Excel (.xlsx), Word (.docx), CSV (.csv), text (.txt). Up to 5 MB.</p>
-                <p class="field-hint import-status" id="ingredientImportStatus" role="status" aria-live="polite">The text is read in your browser; only the extracted text is sent to the AI. Entries are saved as Pending for your review.</p>
+                <p class="field-hint import-status" id="ingredientImportStatus" role="status" aria-live="polite">Entries are saved as Pending for your review.</p>
             </section>
 
             <!-- products app users sent as ONE photo: reviewed in a floating window over this page (photo left, the AI's reading right;
@@ -132,7 +127,14 @@
                     <h3 class="panel-title">Ingredients</h3>
                     <button type="button" class="guide-badge" data-tip-title="Ingredients" data-tip="A card shows the name and the INCI name. Click it for everything else; double-click to edit. An entry here takes priority over the app's own built-in wording." data-tip-preview="Drag cards onto a folder or the Recycle bin. The small box picks a card; Ctrl+click picks several.">i</button>
                     <span class="panel-count" hidden id="ingredientCountLine"></span>
-                    <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most harmful, waiting for review, most used, or newest." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button></span>
+                    <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most harmful, waiting for review, most used, or newest." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button>
+                        <select id="ingredientRiskFilter" class="toolbar-select head-select" aria-label="Show one risk level">
+                            <option value="">Any risk level</option>
+                            <option value="harmful">Harmful</option>
+                            <option value="caution">Caution</option>
+                            <option value="safe">Safe</option>
+                            <option value="auto">App decides</option>
+                        </select></span>
                     <span id="ingredientQuick"></span>
                     <span class="spacer"></span>
                     <div class="segmented" hidden id="listLayoutSwitch" role="group" aria-label="How the ingredients are listed">

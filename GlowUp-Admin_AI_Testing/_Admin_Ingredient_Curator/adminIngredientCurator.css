@@ -52,3 +52,5 @@
     .as-rows .ingredient-card:not(.open) .card-sub { flex: 1 1 100%; order: 3; }
     .as-rows .ingredient-card:not(.open) .row-actions { order: 2; }
 }
+/* the Recycle bin of the shelf sits a little higher, in line with the chips (29 October 2026) */
+#ingredientShelf .bin-chip { position: relative; top: -3px; }

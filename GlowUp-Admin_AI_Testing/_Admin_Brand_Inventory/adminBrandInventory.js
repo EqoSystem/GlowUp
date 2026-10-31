@@ -233,19 +233,27 @@ document.addEventListener("DOMContentLoaded", async () => {
     paintLayout();
     el("inventoryQuick").addEventListener("click", (event) => {
         const chip = event.target.closest("[data-clear]");
+        if (chip && chip.dataset.clear === "brand") { setBrandChoice(""); return; }
         if (chip && chip.dataset.clear === "facets") facets = { type: "", status: "", facts: [] }; else quick = "";
         fromFirstPage();
     });
     el("filterMenuBtn").addEventListener("click", (event) => {
         const types = Array.from(new Set(products.map((p) => p.cosmeticType).filter(Boolean))).sort((a, b) => a.localeCompare(b));
+        // "Show": the brand dropdown that sat above the table until 29 October 2026 (it stays in the page, hidden, and keeps the choice)
+        const shows = Array.from(el("brandFilterSelect").options).filter((o) => o.value !== "").map((o) => ({ value: o.value, label: o.textContent }));
         openFacets(event.currentTarget, {
             title: "Filters",
             fields: [
+                { id: "show", label: "Show", kind: "select", anyLabel: "All brands, grouped", options: shows, value: el("brandFilterSelect").value },
                 { id: "type", label: "Kind", kind: "select", options: types.map((t) => ({ value: t, label: t })), value: facets.type },
                 { id: "status", label: "Status", kind: "select", options: STATUSES.map((s) => ({ value: s, label: s })), value: facets.status },
                 { id: "facts", label: "Only products that", kind: "checks", options: FACTS, value: facets.facts }
             ],
-            onApply: (values) => { facets = { type: values.type || "", status: values.status || "", facts: values.facts || [] }; fromFirstPage(); }
+            onApply: (values) => {
+                facets = { type: values.type || "", status: values.status || "", facts: values.facts || [] };
+                if ((values.show || "") !== el("brandFilterSelect").value) setBrandChoice(values.show || "");
+                else fromFirstPage();
+            }
         });
     });
     el("productNameInput").addEventListener("input", showScopeHint);
@@ -594,6 +602,12 @@ function originText(entry) {
 const FLAT_LIST = "__all_products";
 /** The brand the list is narrowed to ("" = every brand). */
 const brandFilterValue = () => { const value = el("brandFilterSelect").value; return value === FLAT_LIST ? "" : value; };
+/** Chooses in the (hidden) brand dropdown as if the admin had picked it there: its own change handler does the rest. */
+function setBrandChoice(value) {
+    const select = el("brandFilterSelect");
+    select.value = value;
+    select.dispatchEvent(new Event("change"));
+}
 
 function fillBrandSelects() {
     const filter = el("brandFilterSelect");
@@ -1122,7 +1136,10 @@ function paintToolbar() {
     const select = el("brandFilterSelect");
     if (select.value === "" && view.mode === "all") select.value = FLAT_LIST;
     if (select.value === FLAT_LIST && view.mode !== "all") select.value = "";
-    el("inventoryQuick").innerHTML = (quick && !inBin ? `<button type="button" class="filter-chip" data-clear="quick" data-tip="Showing only these products. Click to show all again.">${escapeHtml(QUICK[quick].label)}${icon("x")}</button>` : "")
+    // the brand chosen in Filters ("Show") is said on a chip, because the dropdown that showed it is hidden now
+    const brandChosen = brandFilterValue() ? brands.find((b) => b.id === brandFilterValue()) : null;
+    el("inventoryQuick").innerHTML = (brandChosen && !inBin ? `<button type="button" class="filter-chip" data-clear="brand" data-tip="Showing one brand only. Click to show every brand again.">${escapeHtml(brandChosen.name || "Unnamed Brand")}${icon("x")}</button>` : "")
+        + (quick && !inBin ? `<button type="button" class="filter-chip" data-clear="quick" data-tip="Showing only these products. Click to show all again.">${escapeHtml(QUICK[quick].label)}${icon("x")}</button>` : "")
         + (facetCount() > 0 && !inBin ? `<button type="button" class="filter-chip" data-clear="facets" data-tip="Filters are on. Click to switch them off.">Filters (${facetCount()})${icon("x")}</button>` : "");
     el("filterNow").textContent = facetCount() > 0 ? " " + facetCount() : "";
     el("filterMenuBtn").classList.toggle("on", facetCount() > 0);

@@ -58,7 +58,9 @@
 
 
             <!-- find and add -->
-            <section class="panel" data-panel="tools" data-label="Brand filter" data-w="8">
+            <!-- hidden since 29 October 2026: everything in it lives elsewhere (search, Add and More in the page header; the brand
+                 choice in the Filters pop-up). The controls stay here, hidden, because the page's code keeps its choices in them. -->
+            <section class="panel" data-panel="tools" data-label="Brand filter" data-w="8" hidden>
                 <!-- ONE row. The search box and Add / More sit in the page header (they move there when the page opens); Sort and Filters sit in the table's bar. -->
                 <div class="toolbar inv-tools">
                     <div class="search-container">
@@ -66,8 +68,8 @@
                         <input type="text" placeholder="Search brands and products" class="search-input" id="inventorySearchInput" autocomplete="off" aria-label="Search brands and products">
                         <button type="button" class="search-clear" id="inventorySearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
                     </div>
-                    <!-- one brand, or every brand grouped, or every product in one list -->
-                    <select id="brandFilterSelect" class="toolbar-select" aria-label="Which brand, and how the list is drawn">
+                    <!-- one brand, or every brand grouped, or every product in one list: chosen in Filters ("Show"), kept here -->
+                    <select id="brandFilterSelect" class="toolbar-select" aria-label="Which brand, and how the list is drawn" hidden>
                         <option value="">All brands, grouped</option>
                     </select>
                     <!-- what to show is chosen with the count tiles below; this box only keeps the choice -->
@@ -93,7 +95,7 @@
                     <span><strong>Drop a PDF, Excel, or Word file here</strong><small id="inventoryImportHint">Reads brand, product, cosmetic type, ingredients, source links, and shade colors. Imported entries are saved as Pending for admin review.</small></span>
                 </button>
                 <p class="import-types">Accepted: PDF (.pdf), Excel (.xlsx, .xls), Word (.docx), CSV (.csv), text (.txt)</p>
-                <p class="field-hint import-status" id="inventoryImportStatus" role="status" aria-live="polite">Ready for readable PDFs, Excel workbooks, and Word documents. Text is extracted in your browser; only the extracted text is analyzed.</p>
+                <p class="field-hint import-status" id="inventoryImportStatus" role="status" aria-live="polite"></p>
                 <!-- what the last import FLAGGED: skin care and other non-make-up records (not saved), and make-up whose kind is unclear (saved, to check) -->
                 <div class="import-flags" id="inventoryImportFlags" hidden></div>
             </section>

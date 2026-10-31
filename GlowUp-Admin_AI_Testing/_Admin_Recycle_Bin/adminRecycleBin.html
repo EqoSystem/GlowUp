@@ -56,6 +56,10 @@
                         <button type="button" class="search-clear" id="binSearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
                     </div>
                     <span class="spacer"></span>
+                    <!-- Refresh data (the only one left on the site, since 29 October 2026) is put in front of the Archive button by the page -->
+                    <div class="tool-group bin-tools" id="binTools">
+                        <a class="btn" id="archiveLink" href="../_Admin_Archive/adminArchive.html" data-tip-title="Archive" data-tip="What left the Recycle bin. It is kept 30 days, then deleted for good."><i data-icon="archive"></i>Archive</a>
+                    </div>
                     <button type="button" class="guide-badge" data-tip-title="How the Recycle bin works" data-tip="Removing an entry puts it here: the app stops using it at once, and nothing is lost. Restore gives it back the status it had. Delete permanently takes it out of the database: that cannot be undone, so a copy is saved to your computer first.">i</button>
                 </div>
             </section>

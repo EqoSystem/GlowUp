@@ -18,7 +18,7 @@ import {
     statusBadge, statusGuide, normalizeStatus, STATUSES, wireSearch, dialogIsOpen
 } from "../_Shared/adminCommon.js";
 import { matchesSearch } from "../_Shared/glowupRules.js";
-import { mountShell, paginate, renderPager, icon, BIN_ICON, askConfirm, hydrate, setBinCount } from "../_Shared/adminShell.js";
+import { mountShell, paginate, renderPager, icon, BIN_ICON, askConfirm, hydrate, setBinCount, addRefreshDataButton } from "../_Shared/adminShell.js";
 
 const el = (id) => document.getElementById(id);
 const many = (n, one, more) => `${n} ${n === 1 ? one : more}`;
@@ -37,6 +37,7 @@ const pager = { page: 1, size: 10 };
 
 document.addEventListener("DOMContentLoaded", async () => {
     mountShell("bin");
+    addRefreshDataButton(el("binTools"));      // the one Refresh data button of the site, beside the Archive button
     wireSignOut();
     setupNavigationGuard();
     el("binStatusGuide").innerHTML = statusGuide();

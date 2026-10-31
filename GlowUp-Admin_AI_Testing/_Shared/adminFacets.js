@@ -4,7 +4,7 @@
 //   openFacets(anchor, {
 //       title: "Filters",
 //       fields: [
-//           { id: "type",   label: "Kind",  kind: "select", options: [{ value, label }], value: "" },
+//           { id: "type",   label: "Kind",  kind: "select", options: [{ value, label }], value: "", anyLabel: "Any" },
 //           { id: "facts",  label: "Only",  kind: "checks", options: [{ value, label }], value: ["has-shades"] }
 //       ],
 //       onApply(values)    // { type: "Lipstick", facts: ["has-shades"] }
@@ -46,7 +46,7 @@ export function openFacets(anchor, spec) {
             const select = make("select");
             select.id = "facet_" + field.id;
             label.htmlFor = select.id;
-            const any = make("option", "", "Any"); any.value = ""; select.appendChild(any);
+            const any = make("option", "", field.anyLabel || "Any"); any.value = ""; select.appendChild(any);
             field.options.forEach((o) => { const option = make("option", "", o.label); option.value = o.value; select.appendChild(option); });
             select.value = field.value || "";
             group.appendChild(select);
