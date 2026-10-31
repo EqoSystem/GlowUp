@@ -167,7 +167,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     org = createOrganizer({
         kind: "products", noun: "products", nounOne: "product", allLabel: "All",
-        panel: el("inventoryHost").closest(".panel"), host: el("inventoryHost"), shelf: el("inventoryShelf"), bar: el("inventoryBar"),
+        panel: el("inventoryHost").closest(".panel"), host: el("inventoryHost"), shelf: el("inventoryShelf"), shelfAdd: el("inventoryShelfAdd"), shelfEnd: el("inventoryShelfEnd"), bar: el("inventoryBar"),
         folderNames: () => everyProduct.map((p) => p.folder).filter((name) => name),
         folderOf: (key) => { const p = key.startsWith("p:") ? everyProduct.find((x) => x.id === key.slice(2)) : null; return p ? p.folder : ""; },
         titleOf: (key) => { const item = itemOf(key); return item ? item.name || "Unnamed" : ""; },

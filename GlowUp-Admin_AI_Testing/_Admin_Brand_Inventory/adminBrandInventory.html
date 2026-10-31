@@ -146,11 +146,15 @@
 
             <!-- the inventory -->
             <section class="panel" data-panel="table" data-label="Inventory table" data-w="8" data-source="products">
-                <div class="panel-head">
+                <!-- ONE row (31 October 2026): Inventory (i) | Sort | Filters | All | New folder | pager | fold arrow | Recycle bin.
+                     The shelf's parts (All, New folder, the bin) are drawn into the three marked places by adminOrganizer.js. -->
+                <div class="panel-head wraps">
                     <h3 class="panel-title">Inventory</h3>
                     <button type="button" class="guide-badge" data-tip-title="How to use this list" data-tip="Click a product to see everything about it; double-click to edit it. Click a brand to open or close it. The app only uses Active products of Active brands." data-tip-preview="Drag rows onto a folder or the Recycle bin. The small box in front of a name picks it; Ctrl+click picks several.">i</button>
                     <span class="panel-count" hidden id="inventoryCountLine"></span>
                     <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most scanned, newest, type, or what needs attention first." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button> <button type="button" class="btn" id="filterMenuBtn" aria-haspopup="dialog" aria-expanded="false" data-tip-title="Filters" data-tip="Narrow the list by kind, status and a few facts at once, then press Apply filters." data-tip-preview="Nothing is read from the database: it only looks through what is already loaded."><i data-icon="sliders"></i>Filters<span class="sort-now" id="filterNow"></span></button></span>
+                    <span class="shelf" id="inventoryShelf"></span>
+                    <span class="shelf" id="inventoryShelfAdd"></span>
                     <span id="inventoryQuick"></span>
                     <span class="spacer"></span>
                     <!-- the same line as the Ingredient Curator's list: how it is shown, how many, which page -->
@@ -159,9 +163,8 @@
                         <button type="button" class="seg" data-layout="cards" aria-pressed="false" data-tip-title="Cards" data-tip="Products as cards, several side by side. Brands stay as headings."><i data-icon="layers"></i>Cards</button>
                     </div>
                     <div class="pager" id="inventoryPagerTop"></div>
+                    <span class="shelf" id="inventoryShelfEnd" data-head-end></span>
                 </div>
-                <!-- the second line, as in the Ingredient Curator: everything, the folders, and the Recycle bin at the right end -->
-                <div class="shelf" id="inventoryShelf"></div>
                 <div class="table-container" id="inventoryHost">
                     <table class="admin-table inventory-table">
                         <thead id="inventoryTableHead">
