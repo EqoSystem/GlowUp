@@ -1,7 +1,7 @@
 // The parts every admin page is built from (no database code in here; the Refresh data button only calls adminStore.js):
 //   icons            - one set of thin-line icons, drawn as SVG (no emoji, no picture files)
 //   theme            - light / dark / system, remembered on this computer; "system" follows the computer's setting
-//   mountShell       - the sidebar (with its flowing highlight and the settings menu behind the logo) and the top bar (title)
+//   mountShell       - the sidebar (with its flowing highlight and the settings window behind the logo) and the top bar (title)
 //   guides           - the small "i" badges and the pop-up that explains a control
 //   tile animation   - the lift, pixel sweep and glowing outline of the mobile app's tiles, on every button and tile
 //   menus, dialogs   - one small pop-up menu and two dialogs (confirm, type a name) used by every page
@@ -261,8 +261,8 @@ export function mountShell(page) {
     topbar.insertAdjacentElement("afterend", bar);
 
     hydrate(document);
+    mountSettingsMenu();                        // the window first: initLayouts puts the Layout & Style controls into it
     initLayouts(page);
-    mountSettingsMenu();
     watchForNewControls();
 }
 
@@ -649,8 +649,7 @@ let openMenuEl = null, closeOpenMenu = null;
 export function closeMenu() { if (closeOpenMenu) closeOpenMenu(); }
 
 /**
- * A small menu under `anchor`. items = [{ label, description, icon, danger, checked, disabled, badge, run }, { heading }, { note }, { separator }].
- * `badge` = a short count shown in red at the end of the item; `note` = a line of plain text (not a button).
+ * A small menu under `anchor`. items = [{ label, description, icon, danger, checked, disabled, run }, { heading }, { separator }].
  * A second click on the anchor, a click elsewhere or Esc closes it.
  */
 export function openMenu(anchor, items) {
@@ -665,7 +664,6 @@ export function openMenu(anchor, items) {
     items.filter((item) => item).forEach((item) => {
         if (item.separator) { const line = document.createElement("div"); line.className = "menu-sep"; menu.appendChild(line); return; }
         if (item.heading) { const head = document.createElement("div"); head.className = "menu-heading"; head.textContent = item.heading; menu.appendChild(head); return; }
-        if (item.note) { const note = document.createElement("div"); note.className = "menu-note"; note.textContent = item.note; if (item.title) note.title = item.title; menu.appendChild(note); return; }
         const button = document.createElement("button");
         button.type = "button";
         button.className = "menu-item" + (item.danger ? " danger" : "") + (item.checked ? " checked" : "");
@@ -679,7 +677,6 @@ export function openMenu(anchor, items) {
         text.appendChild(label);
         if (item.description) { const more = document.createElement("small"); more.textContent = item.description; text.appendChild(more); }
         button.appendChild(text);
-        if (item.badge) { const badge = document.createElement("span"); badge.className = "menu-badge"; badge.textContent = item.badge; button.appendChild(badge); }
         if (item.checked) button.insertAdjacentHTML("beforeend", icon("check", "menu-check"));
         button.addEventListener("click", () => { closeMenu(); if (item.run) item.run(); });
         menu.appendChild(button);

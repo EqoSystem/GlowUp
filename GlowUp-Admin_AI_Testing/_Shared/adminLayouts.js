@@ -161,8 +161,6 @@ export function initLayouts(page) {
     loadStore();
     buildDrawer();
     applyLayout();
-    // opened from the settings menu behind the logo (openLayoutWindow); an older header button still works when present
-    if (byId("operatorChip")) byId("operatorChip").addEventListener("click", () => openDrawer(true));
     byId("addPanelBtn").addEventListener("click", () => openPanelDialog(null));
     byId("doneArrangingBtn").addEventListener("click", () => setEditing(false));
     wireBoard();
@@ -297,8 +295,6 @@ function applyLayout() {
 
     const profile = activeProfile();
     document.body.classList.toggle("own-layout", !!profile);          // with a layout of your own, panels move by their title bar
-    const name = byId("operatorName");
-    if (name) name.textContent = profile ? profile.name : "Default layout";
     applyAppearance();
     paintFold();
     paintDrawer();
@@ -435,7 +431,7 @@ async function setEditing(on) {
     editing = on;
     document.body.classList.toggle("layout-editing", on);
     closeMenu();
-    if (on) openDrawer(false);
+    if (on) closeWindow();
     else { capture(); toast(`Layout saved for ${activeProfile().name}.`, "ok"); }
     paintDrawer();
 }
@@ -857,93 +853,13 @@ function wireBoard() {
 }
 
 // ---------------------------------------------------------------------------------------------
-// The Layout & Style window
+// The Layout & Style view
 // ---------------------------------------------------------------------------------------------
-// A floating window (since 29 October 2026; it was a drawer over a dark cover): no cover, so the page stays in view
-// while it is changed. It is dragged by its title bar, resized from its lower right corner (never smaller than
-// WINDOW_MIN), kept inside the browser window, can be minimised to its title bar, and remembers where it was and how
-// big ("glowup.layoutWindow.v1" in this browser). "Reset to default" puts it back to its first place and size.
-const WINDOW_KEY = "glowup.layoutWindow.v1";
-const WINDOW_MIN = { w: 300, h: 260 };
-const WINDOW_GAP = 8;
-let colourTheme = "";                             // the theme whose colours the window edits ("" = the one on screen)
-
-function windowDefaults() {
-    const w = Math.min(360, window.innerWidth - 2 * WINDOW_GAP);
-    const h = Math.max(WINDOW_MIN.h, Math.min(680, window.innerHeight - 120));
-    return { left: window.innerWidth - w - 24, top: 76, width: w, height: h, minimized: false };
-}
-function readWindowState() {
-    try {
-        const saved = JSON.parse(localStorage.getItem(WINDOW_KEY) || "null");
-        if (saved && [saved.left, saved.top, saved.width, saved.height].every((n) => Number.isFinite(Number(n))))
-            return { left: Number(saved.left), top: Number(saved.top), width: Number(saved.width), height: Number(saved.height), minimized: saved.minimized === true };
-    } catch (error) { /* a private window */ }
-    return windowDefaults();
-}
-function saveWindowState(state) { try { localStorage.setItem(WINDOW_KEY, JSON.stringify(state)); } catch (error) { /* not kept */ } }
-
-/** Puts the window where `state` says, inside the browser window, and never smaller than its minimum. */
-function placeWindow(state) {
-    const win = byId("customiseDrawer");
-    if (!win) return state;
-    const maxW = Math.max(WINDOW_MIN.w, window.innerWidth - 2 * WINDOW_GAP), maxH = Math.max(WINDOW_MIN.h, window.innerHeight - 2 * WINDOW_GAP);
-    const s = Object.assign({}, state);
-    s.width = Math.min(maxW, Math.max(WINDOW_MIN.w, s.width));
-    s.height = Math.min(maxH, Math.max(WINDOW_MIN.h, s.height));
-    const shownH = s.minimized ? (win.querySelector(".lw-head").offsetHeight || 52) : s.height;
-    s.left = Math.min(Math.max(WINDOW_GAP, s.left), Math.max(WINDOW_GAP, window.innerWidth - s.width - WINDOW_GAP));
-    s.top = Math.min(Math.max(WINDOW_GAP, s.top), Math.max(WINDOW_GAP, window.innerHeight - shownH - WINDOW_GAP));
-    win.style.left = s.left + "px"; win.style.top = s.top + "px"; win.style.width = s.width + "px";
-    win.style.height = s.minimized ? "" : s.height + "px";
-    win.classList.toggle("is-min", s.minimized);
-    const min = byId("drawerMin");
-    if (min) { min.innerHTML = icon(s.minimized ? "up" : "minus"); min.setAttribute("aria-label", s.minimized ? "Show the whole window" : "Minimise"); min.dataset.tip = s.minimized ? "Show the whole window" : "Minimise"; min.setAttribute("aria-expanded", String(!s.minimized)); }
-    return s;
-}
-
-/** Dragging the title bar moves the window; dragging the corner resizes it. Listens on window (no pointer capture), like the rest of the site. */
-function wireWindow(win) {
-    let state = readWindowState();
-    const follow = (event, onMove) => {
-        event.preventDefault();
-        win.classList.add("moving");
-        const move = (e) => { state = placeWindow(onMove(e)); };
-        const stop = () => {
-            win.classList.remove("moving");
-            window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", stop); window.removeEventListener("pointercancel", stop);
-            saveWindowState(state);
-        };
-        window.addEventListener("pointermove", move); window.addEventListener("pointerup", stop); window.addEventListener("pointercancel", stop);
-    };
-    const head = win.querySelector(".lw-head");
-    head.addEventListener("pointerdown", (event) => {
-        if (event.button !== 0 || event.target.closest("button")) return;
-        const box = win.getBoundingClientRect(), dx = event.clientX - box.left, dy = event.clientY - box.top;
-        follow(event, (e) => Object.assign({}, state, { left: e.clientX - dx, top: e.clientY - dy }));
-    });
-    head.addEventListener("keydown", (event) => {
-        const step = event.shiftKey ? 60 : 20;
-        const to = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[event.key];
-        if (!to || event.target !== head) return;
-        event.preventDefault();
-        state = placeWindow(Object.assign({}, state, { left: state.left + to[0], top: state.top + to[1] }));
-        saveWindowState(state);
-    });
-    win.querySelector(".lw-resize").addEventListener("pointerdown", (event) => {
-        if (event.button !== 0) return;
-        const start = { x: event.clientX, y: event.clientY, w: state.width, h: state.height };
-        follow(event, (e) => Object.assign({}, state, { width: start.w + e.clientX - start.x, height: start.h + e.clientY - start.y }));
-    });
-    byId("drawerMin").addEventListener("click", () => { state = placeWindow(Object.assign({}, state, { minimized: !state.minimized })); saveWindowState(state); });
-    byId("windowResetBtn").addEventListener("click", () => {
-        try { localStorage.removeItem(WINDOW_KEY); } catch (error) { /* nothing kept */ }
-        state = placeWindow(windowDefaults());
-        toast("The window is back in its first place and size.", "ok");
-    });
-    window.addEventListener("resize", () => { if (document.body.classList.contains("drawer-open")) state = placeWindow(state); });
-    win.placeNow = () => { state = placeWindow(readWindowState()); };
-}
+// Since 31 October 2026 these controls are not a window of their own: adminSettingsMenu.js owns the ONE floating window (drag,
+// resize, place and size remembered) and shows this view in it when "Layout and style" is chosen, with a back arrow. Here only
+// the controls are built (into #layoutHost) and kept painted. Arranging, "Panel" and Esc hide the window with "glowup:settings-close".
+let colourTheme = "";                             // the theme whose colours the view edits ("" = the one on screen)
+const closeWindow = () => document.dispatchEvent(new CustomEvent("glowup:settings-close"));
 
 /** The value of a colour token for `theme`, read from the site's own style sheet (for the theme that is not on screen). */
 function themeToken(theme, name) {
@@ -963,19 +879,9 @@ function themeToken(theme, name) {
 }
 
 function buildDrawer() {
-    const drawer = document.createElement("aside");
-    drawer.className = "drawer layout-window";
-    drawer.id = "customiseDrawer";
-    drawer.setAttribute("role", "dialog");
-    drawer.setAttribute("aria-label", "Layout and style of the display");
-    drawer.innerHTML = `
-        <div class="lw-head" tabindex="0" aria-label="Layout and Style window. Drag it, or move it with the arrow keys.">
-            <h3>${icon("sliders")}<span style="flex:1">Layout &amp; Style</span></h3>
-            <button type="button" class="icon-btn small" id="drawerMin" aria-label="Minimise" data-tip="Minimise">${icon("minus")}</button>
-            <button type="button" class="icon-btn small" id="drawerClose" aria-label="Close" data-tip="Close">${icon("x")}</button>
-        </div>
-        <div class="lw-body">
-
+    const host = byId("layoutHost");
+    if (!host) return;
+    host.innerHTML = `
         <div class="drawer-section first">
             <h4>${icon("user")}Layout ${guideBadge("Layouts", "One sign-in, several people: pick your name to get your own arrangement, panels, font and colours. Up to " + MAX_PROFILES + " layouts are kept in this browser.", "Default layout is the fixed starting point. It cannot be changed.")}</h4>
             <div class="drawer-row">
@@ -1016,17 +922,11 @@ function buildDrawer() {
             <div class="drawer-row"><span>Round corners</span><input type="range" id="lookRadius" min="0" max="24" step="1"></div>
         </div>
 
-        <div class="drawer-section">
-            <button type="button" class="btn" id="windowResetBtn" data-tip-title="Reset to default" data-tip="Puts this window back in its first place and size." data-tip-preview="Your layouts, fonts and colours stay as they are.">${icon("reset")}Reset to default</button>
-        </div>
-        </div>
-        <span class="lw-resize" aria-hidden="true"></span>
         <input type="file" id="importFile" accept="application/json,.json" hidden>`;
-    document.body.append(drawer);
-    hydrate(drawer);
-    wireWindow(drawer);
+    hydrate(host);
+    // the window shows this view: paint it with the current look, starting on the colours of the mode on screen
+    document.addEventListener("glowup:layout-view", () => { colourTheme = currentTheme(); paintDrawer(); });
 
-    byId("drawerClose").addEventListener("click", () => openDrawer(false));
     byId("lookThemeTabs").addEventListener("click", (event) => {
         const tab = event.target.closest("[data-theme-tab]");
         if (!tab) return;
@@ -1041,7 +941,7 @@ function buildDrawer() {
     });
     byId("profileMenuBtn").addEventListener("click", (event) => openProfileMenu(event.currentTarget));
     byId("arrangeBtn").addEventListener("click", () => setEditing(!editing));
-    byId("drawerAddPanel").addEventListener("click", () => { openDrawer(false); openPanelDialog(null); });
+    byId("drawerAddPanel").addEventListener("click", () => { closeWindow(); openPanelDialog(null); });
     byId("autoResizeBtn").addEventListener("click", autoResize);
     byId("fitSwitch").addEventListener("click", () => setFit(!fitOn()));
     byId("openAllBtn").addEventListener("click", () => { forgetFoldChoices(); paintDrawer(); toast("Every panel shows when it has something to show, and folds when it has not.", "ok"); });
@@ -1066,8 +966,7 @@ function buildDrawer() {
     byId("importFile").addEventListener("change", importProfile);
     document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape" || event.defaultPrevented) return;
-        if (document.body.classList.contains("drawer-open")) openDrawer(false);
-        else if (editing && !document.querySelector(".modal-overlay[style*='flex'], .menu")) setEditing(false);
+        if (editing && !document.querySelector(".modal-overlay[style*='flex'], .menu")) setEditing(false);
     });
 }
 
@@ -1123,25 +1022,8 @@ async function importProfile(event) {
     }
 }
 
-/** Opens the Layout & Style window (the settings menu behind the logo calls it). */
-export function openLayoutWindow() {
-    if (byId("customiseDrawer")) openDrawer(true);
-}
-
-function openDrawer(open) {
-    const wasOpen = document.body.classList.contains("drawer-open");
-    document.body.classList.toggle("drawer-open", open);
-    if (open) {
-        closeMenu();
-        if (!wasOpen) colourTheme = currentTheme();
-        const win = byId("customiseDrawer");
-        if (win && win.placeNow) win.placeNow();
-        paintDrawer();
-    }
-}
-
 function paintDrawer() {
-    if (!byId("customiseDrawer")) return;
+    if (!byId("profileSelect")) return;
     const profile = activeProfile();
     byId("profileSelect").innerHTML = `<option value="default">Default layout (fixed)</option>` + store.profiles.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("");
     byId("profileSelect").value = store.active;

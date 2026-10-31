@@ -30,8 +30,7 @@
         flask: '<path d="M9 3h6"/><path d="M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/><path d="M7.5 15h9"/>',
         bin: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/>',
         camera: '<path d="M4 8h3.2l1.8-2.5h6l1.8 2.5H20v11H4z"/><circle cx="12" cy="13.2" r="3.6"/>',
-        chevron: '<path d="M15 6l-6 6 6 6"/>',
-        down: '<path d="M6 9l6 6 6-6"/>'
+        chevron: '<path d="M15 6l-6 6 6 6"/>'
     };
     var NAV = [
         { id: "dashboard", label: "Dashboard", icon: "dashboard", href: "../_Admin_Dashboard/adminDashboard.html" },
@@ -53,12 +52,12 @@
         document.body.classList.add("app");
         var sidebar = document.createElement("aside");
         sidebar.className = "sidebar";
-        // the logo and the name are ONE button: it opens the settings menu (adminSettingsMenu.js). Folded, the logo alone opens it.
-        // (no "Admin Portal" line, no e-mail and no Sign Out at the bottom since 29 October 2026: both are in that menu)
+        // the logo ("G" and the red Recycle bin count, no name and no caret) is ONE button: a tap opens the settings window, a
+        // second tap hides it (adminSettingsMenu.js). The collapse arrow sits beside it.
+        // (no "Admin Portal" line, no e-mail and no Sign Out at the bottom since 29 October 2026: all are in that window)
         sidebar.innerHTML =
-            '<div class="sidebar-brand"><button type="button" class="brand-menu" id="brandMenuBtn" aria-haspopup="menu" aria-label="Settings" data-tip="Settings">' +
-            '<span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"><span class="brand-badge" id="brandBinBadge" hidden></span></span>' +
-            '<span class="brand-text"><span class="brand-title">GlowUp</span></span>' + svg("down").replace('class="ic"', 'class="ic brand-chevron"') + "</button>" +
+            '<div class="sidebar-brand"><button type="button" class="brand-menu" id="brandMenuBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="settingsWindow" aria-label="Settings" data-tip="Settings">' +
+            '<span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"><span class="brand-badge" id="brandBinBadge" hidden></span></span></button>' +
             '<button type="button" class="sidebar-toggle" id="sidebarToggle" aria-controls="sidebarNav">' + svg("chevron") + '</button></div>' +
             '<ul class="nav-links" id="sidebarNav" aria-label="Pages"><li class="nav-drop" aria-hidden="true"></li>' +
             NAV.map(function (n) {
