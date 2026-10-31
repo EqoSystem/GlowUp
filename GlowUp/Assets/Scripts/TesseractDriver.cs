@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.Networking;
 using UnityEngine.Events;
 
 public class TesseractDriver
@@ -72,17 +73,18 @@ public class TesseractDriver
             if (!File.Exists(toPath + fileName))
             {
                 Debug.Log("Copying from " + fromPath + fileName + " to " + toPath);
-                WWW www = new WWW(fromPath + fileName);
-
-                while (!www.isDone)
+                using (UnityWebRequest request = UnityWebRequest.Get(fromPath + fileName))
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(Time.deltaTime));
-                }
+                    request.SendWebRequest();
 
-                File.WriteAllBytes(toPath + fileName, www.bytes);
-                Debug.Log("File copy done");
-                www.Dispose();
-                www = null;
+                    while (!request.isDone)
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(Time.deltaTime));
+                    }
+
+                    File.WriteAllBytes(toPath + fileName, request.downloadHandler.data);
+                    Debug.Log("File copy done");
+                }
             }
             else
             {
