@@ -185,7 +185,9 @@ function decorate(panel) {
         // the panel and the "..." menu close the bar
         const after = head.querySelector(":scope > .guide-badge") || head.querySelector(":scope > .panel-title");
         if (after) after.insertAdjacentHTML("afterend", FOLD_PARTS); else head.insertAdjacentHTML("afterbegin", FOLD_PARTS);
-        head.insertAdjacentHTML("beforeend", foldButton() + menu);
+        // the arrow and the "..." menu close the bar, except for a part that asks to stay at the very end (data-head-end: the bin)
+        const tail = head.querySelector(":scope > [data-head-end]");
+        if (tail) tail.insertAdjacentHTML("beforebegin", foldButton() + menu); else head.insertAdjacentHTML("beforeend", foldButton() + menu);
     } else panel.querySelector(".panel-tools").insertAdjacentHTML("beforeend", menu);
     panel.querySelector(".tools-name").textContent = panel.dataset.label || panel.dataset.panel;
 }

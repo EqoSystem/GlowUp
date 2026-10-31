@@ -122,19 +122,23 @@
 
             <!-- the ingredients -->
             <section class="panel" data-panel="list" data-label="Ingredient list" data-w="8" data-source="ingredients">
-                <div class="panel-head">
+                <!-- ONE row (31 October 2026): [box] Ingredients (i) | Sort | All | Any risk level | New folder | pager | fold arrow | Recycle bin.
+                     The shelf's parts (All, New folder, the bin) are drawn into the three marked places by adminOrganizer.js. -->
+                <div class="panel-head wraps">
                     <button type="button" class="pick" data-pick-all role="checkbox" aria-checked="false" aria-label="Select all shown" data-tip="Select every ingredient shown here."></button>
                     <h3 class="panel-title">Ingredients</h3>
                     <button type="button" class="guide-badge" data-tip-title="Ingredients" data-tip="A card shows the name and the INCI name. Click it for everything else; double-click to edit. An entry here takes priority over the app's own built-in wording." data-tip-preview="Drag cards onto a folder or the Recycle bin. The small box picks a card; Ctrl+click picks several.">i</button>
                     <span class="panel-count" hidden id="ingredientCountLine"></span>
-                    <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most harmful, waiting for review, most used, or newest." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button>
-                        <select id="ingredientRiskFilter" class="toolbar-select head-select" aria-label="Show one risk level">
-                            <option value="">Any risk level</option>
-                            <option value="harmful">Harmful</option>
-                            <option value="caution">Caution</option>
-                            <option value="safe">Safe</option>
-                            <option value="auto">App decides</option>
-                        </select></span>
+                    <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most harmful, waiting for review, most used, or newest." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button></span>
+                    <span class="shelf" id="ingredientShelf"></span>
+                    <select id="ingredientRiskFilter" class="toolbar-select head-select" aria-label="Show one risk level">
+                        <option value="">Any risk level</option>
+                        <option value="harmful">Harmful</option>
+                        <option value="caution">Caution</option>
+                        <option value="safe">Safe</option>
+                        <option value="auto">App decides</option>
+                    </select>
+                    <span class="shelf" id="ingredientShelfAdd"></span>
                     <span id="ingredientQuick"></span>
                     <span class="spacer"></span>
                     <div class="segmented" hidden id="listLayoutSwitch" role="group" aria-label="How the ingredients are listed">
@@ -142,9 +146,8 @@
                         <button type="button" class="seg" data-layout="cards" aria-pressed="false" data-tip-title="Cards" data-tip="Ingredients as cards, several side by side."><i data-icon="layers"></i>Cards</button>
                     </div>
                     <div class="pager" id="ingredientPagerTop"></div>
+                    <span class="shelf" id="ingredientShelfEnd" data-head-end></span>
                 </div>
-                <!-- everything, the folders and the Recycle bin -->
-                <div class="shelf" id="ingredientShelf"></div>
                 <div class="ingredients-list as-rows" id="ingredientsList">
                     <div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div>
                 </div>

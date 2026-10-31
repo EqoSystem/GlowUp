@@ -156,7 +156,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     org = createOrganizer({
         kind: "ingredients", noun: "ingredients", nounOne: "ingredient", allLabel: "All",
-        panel: el("ingredientsList").closest(".panel"), host: el("ingredientsList"), shelf: el("ingredientShelf"), bar: el("ingredientBar"),
+        panel: el("ingredientsList").closest(".panel"), host: el("ingredientsList"), shelf: el("ingredientShelf"), shelfAdd: el("ingredientShelfAdd"), shelfEnd: el("ingredientShelfEnd"), bar: el("ingredientBar"),
         folderNames: () => everyIngredient.map((item) => item.folder).filter((name) => name),
         folderOf: (key) => { const item = everyIngredient.find((x) => x.id === key); return item ? item.folder : ""; },
         titleOf: (key) => { const item = everyIngredient.find((x) => x.id === key); return item ? titleOf(item) : ""; },

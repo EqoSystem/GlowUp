@@ -20,6 +20,8 @@
 //       host,                     // the element that holds the entries: each one has data-key, a .pick box
 //                                 // when it can be picked, and data-drag when it can be dragged
 //       shelf, bar,               // where the folder chips and the "3 selected" bar are drawn
+//       shelfAdd, shelfEnd,       // optional: "New folder" (and Restore all / Empty bin) go into shelfAdd, the Recycle bin chip into
+//                                 // shelfEnd; the "All" and folder chips stay in `shelf`. Without them everything is drawn in `shelf`.
 //       folderNames: () => [...],                 // the folder names found in the data
 //       folderOf: (key) => "name" | "",
 //       titleOf: (key) => "name of the entry",
@@ -281,13 +283,15 @@ export function createOrganizer(spec) {
         const shelf = spec.shelf;
         if (!shelf) return;
         const now = currentView(), names = folders(), inBin = spec.count({ kind: "bin" });
-        const kids = [];
+        // a part goes to "lead" (All, the folders) unless put() says "add" (New folder, Restore all, Empty bin) or "end" (the bin)
+        const kids = [], slot = new Map();
+        const put = (node, where) => { kids.push(node); slot.set(node, where); return node; };
         kids.push(chip(now.kind === "all" ? "on" : "", { "data-view": "all", "data-drop": "all", "data-tip-title": spec.allLabel || "All", "data-tip": `Every ${spec.nounOne}, whatever folder it is in.`, "data-tip-preview": "Drop entries here to take them out of their folder." },
             icon("layers"), spec.allLabel || "All", spec.count({ kind: "all" })));
         names.forEach((name) => kids.push(chip(now.kind === "folder" && same(now.name, name) ? "on" : "", { "data-view": "folder", "data-name": name, "data-drop": "folder:" + name, "data-tip-title": name, "data-tip": "Show only what is in this folder.", "data-tip-preview": "Drop entries here to put them in it." },
             icon("folder"), name, spec.count({ kind: "folder", name }))));
-        if (names.length < MAX_FOLDERS) kids.push(chip("add", { "data-new": "1", "data-drop": "new", "aria-label": "New folder", "data-tip-title": "New folder", "data-tip": `Make a folder to arrange the ${spec.noun}.`, "data-tip-preview": "Drop entries here to make a folder for them." },
-            icon("folderPlus"), names.length === 0 ? "New folder" : "", null));
+        if (names.length < MAX_FOLDERS) put(chip("add", { "data-new": "1", "data-drop": "new", "aria-label": "New folder", "data-tip-title": "New folder", "data-tip": `Make a folder to arrange the ${spec.noun}.`, "data-tip-preview": "Drop entries here to make a folder for them." },
+            icon("folderPlus"), names.length === 0 ? "New folder" : "", null), "add");
         if (now.kind === "folder") {
             const more = document.createElement("button");
             more.type = "button"; more.className = "icon-btn small"; more.setAttribute("data-folder-menu", "1"); more.setAttribute("aria-label", "Folder options"); more.setAttribute("aria-haspopup", "menu");
@@ -297,19 +301,21 @@ export function createOrganizer(spec) {
         }
         const spacer = document.createElement("span");
         spacer.className = "spacer";
-        kids.push(spacer);
+        if (!spec.shelfAdd) put(spacer, "lead");                         // one row: the bin goes to the far end
         if (now.kind === "bin" && inBin > 0) {
             const act = (label, name, cls, tip) => { const button = document.createElement("button"); button.type = "button"; button.className = "row-btn " + cls; button.dataset.act = name; button.textContent = label; button.dataset.tip = tip; return button; };
-            kids.push(act("Restore all", "restoreAll", "", "Everything in the Recycle bin goes back to the list."), act("Empty bin", "empty", "danger", "Delete everything in the Recycle bin from the database. It asks first."));
+            put(act("Restore all", "restoreAll", "", "Everything in the Recycle bin goes back to the list."), "add");
+            put(act("Empty bin", "empty", "danger", "Delete everything in the Recycle bin from the database. It asks first."), "add");
         }
-        kids.push(chip("bin-chip" + (now.kind === "bin" ? " on" : ""), { "data-view": "bin", "data-drop": "bin", "data-tip-title": "Recycle bin", "data-tip": "What was removed. The app does not use it, and it can be restored.", "data-tip-preview": "Drop entries here to remove them. Only Delete forever is final." },
-            BIN_ICON, now.kind === "bin" ? "Recycle bin" : "", inBin > 0 ? inBin : null));
+        put(chip("bin-chip" + (now.kind === "bin" ? " on" : ""), { "data-view": "bin", "data-drop": "bin", "data-tip-title": "Recycle bin", "data-tip": "What was removed. The app does not use it, and it can be restored.", "data-tip-preview": "Drop entries here to remove them. Only Delete forever is final." },
+            BIN_ICON, now.kind === "bin" ? "Recycle bin" : "", inBin > 0 ? inBin : null), "end");
         // low-key on purpose: only the small bin (and a number when something is in it) until it is opened, pointed at, or something is dragged
         kids[kids.length - 1].setAttribute("aria-label", "Recycle bin" + (inBin > 0 ? ", " + inBin + " inside" : ", empty"));
-        shelf.replaceChildren(...kids);
+        const hosts = { lead: shelf, add: spec.shelfAdd || shelf, end: spec.shelfEnd || shelf };
+        new Set(Object.values(hosts)).forEach((host) => host.replaceChildren(...kids.filter((node) => hosts[slot.get(node) || "lead"] === host)));
     }
 
-    if (spec.shelf) spec.shelf.addEventListener("click", (event) => {
+    const onShelfClick = (event) => {
         const button = event.target.closest("button");
         if (!button) return;
         if (button.dataset.view) show({ kind: button.dataset.view, name: button.dataset.name || "" });
@@ -317,7 +323,8 @@ export function createOrganizer(spec) {
         else if (button.hasAttribute("data-folder-menu")) folderMenu(button, view.name);
         else if (button.dataset.act === "restoreAll") restore(spec.binKeys());
         else if (button.dataset.act === "empty") purge(spec.binKeys());
-    });
+    };
+    new Set([spec.shelf, spec.shelfAdd, spec.shelfEnd].filter(Boolean)).forEach((host) => host.addEventListener("click", onShelfClick));
 
     function paintBar() {
         const bar = spec.bar;
