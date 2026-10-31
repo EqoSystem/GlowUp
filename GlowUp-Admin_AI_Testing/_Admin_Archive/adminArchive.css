@@ -1,0 +1,9 @@
+/* Archive page: the table and its rows come from the Recycle Bin page (adminRecycleBin.css); only "X days left" is its own. */
+.days-left { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: var(--fs-sm); color: var(--text-2); }
+.days-left svg.ic { width: 15px; height: 15px; }
+.days-left.warn { color: var(--warn); font-weight: 650; }
+.days-left.bad { color: var(--bad); font-weight: 650; }
+.archive-table tr.left-warn td, .archive-table tr.left-bad td { background: color-mix(in srgb, var(--warn) 7%, transparent); }
+#archiveBar { display: flex; align-items: center; gap: 8px; }
+#archiveBar[hidden] { display: none; }
+@media (max-width: 900px) { .archive-table th:nth-child(4), .archive-table td:nth-child(4) { display: none; } }

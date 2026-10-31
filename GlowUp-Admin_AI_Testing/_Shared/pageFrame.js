@@ -20,7 +20,7 @@
     var main = script && script.parentElement && script.parentElement.tagName === "MAIN" ? script.parentElement : document.querySelector("main.main-content");
     var root = document.documentElement;
     var path = location.pathname;
-    var page = path.indexOf("Inventory") >= 0 ? "inventory" : path.indexOf("Curator") >= 0 ? "curator" : path.indexOf("Recycle") >= 0 ? "bin" : "dashboard";
+    var page = path.indexOf("Inventory") >= 0 ? "inventory" : path.indexOf("Curator") >= 0 ? "curator" : path.indexOf("Recycle") >= 0 ? "bin" : path.indexOf("_Admin_Archive") >= 0 ? "archive" : "dashboard";
 
     // the same drawings as in adminShell.js (ICONS): the frame cannot wait for that file
     var ICON = {

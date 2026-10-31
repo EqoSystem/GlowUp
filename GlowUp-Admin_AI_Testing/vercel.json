@@ -45,6 +45,15 @@
     },
     "api/scan-snapshot.js": {
       "maxDuration": 60
+    },
+    "api/archive-purge.js": {
+      "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/archive-purge",
+      "schedule": "0 3 * * *"
+    }
+  ]
 }

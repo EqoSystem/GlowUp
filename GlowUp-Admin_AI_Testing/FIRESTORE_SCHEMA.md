@@ -16,6 +16,8 @@ The admin website and the mobile app use the same Firebase project (`glowup-admi
 | `allergenSuggestions`, `conditionSuggestions` | App | Website (Dashboard) | Items users typed in that were not on the app's lists |
 | `users/{uid}` and `users/{uid}/scans` | App | App (that user only) | A user's profile and scan history |
 | `admins/{uid}` | You, by hand in the Firebase console | Rules, website | Which accounts are admins |
+| `archive` | Website (Recycle Bin: Move to Archive; Archive page) and the purge job (`api/archive-purge.js`) | Website (admins only) | Entries that left the Recycle bin, kept 30 days, then deleted. Added 2026-10-29, see `ARCHIVE_DESIGN.md` |
+| `archive_purge_log` | The purge job only | Website (admins only) | One record per run of the purge job (dry run or live) |
 
 ## Fields
 
@@ -232,6 +234,10 @@ The Brand & Product Inventory and the Ingredient Curator let an admin arrange en
 - Moving a brand or a product to the bin also sets its `status` to `Inactive` in the same write, so every build of the app stops using it at once.
 - An ingredient has no status. App builds from 2026-10-10 on leave a `binned` ingredient out; an older build keeps reading it until "Delete forever".
 - Only "Delete forever" (or "Empty bin") deletes a document. A folder that is still empty is remembered only in the browser that made it.
+
+### The Archive (website only, added 2026-10-29)
+
+From the Recycle bin an entry can be moved to the Archive: the document `archive/<collection>__<id>` is written and the original is deleted in one batch, so the app and the website lists no longer see it. Fields: `type` (ingredient, brand, product), `sourceCollection`, `sourceId`, `name`, `data` (the whole original document, still `binned`), `deleted_at`, `expires_at` (30 days later), `deleted_by` (uid), `deleted_by_email`, `archivedWith` (a product moved with its brand). The Archive page restores an entry to the Recycle bin, or deletes it now. A daily job (`api/archive-purge.js`, dry run unless `ARCHIVE_PURGE_LIVE=1`) deletes entries whose `expires_at` has passed. Full design, impact check and the rule block: `ARCHIVE_DESIGN.md`.
 
 ### Make-up only
 

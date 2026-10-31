@@ -10,7 +10,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
-import { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, writeBatch, serverTimestamp, increment, setLogLevel } from "firebase/firestore";
+import { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, writeBatch, serverTimestamp, increment, setLogLevel, Timestamp } from "firebase/firestore";
 
 setLogLevel("silent");                                   // a refused write is expected here; the client would log each one
 
@@ -234,6 +234,48 @@ await can("both counters in one commit", async () => {
     await batch.commit();
 });
 await cannot("listing the counters", () => getDocs(query(collection(user(), "snapshot_quota"))));
+
+// ---------------------------------------------------------------------------------------------
+// 8. The Archive (added 29 October 2026, ARCHIVE_DESIGN.md): admins only, created once, never changed
+// ---------------------------------------------------------------------------------------------
+const in30 = () => Timestamp.fromMillis(Date.now() + 30 * 86400000);
+const entry = (uid, more = {}) => Object.assign({ type: "product", sourceCollection: "products", sourceId: "p1", name: "Example Lipstick",
+    data: { name: "Example Lipstick", binned: true }, deleted_at: serverTimestamp(), expires_at: in30(), deleted_by: uid, deleted_by_email: "a@x.test", archivedWith: "" }, more);
+await can("an admin archives a product (archive entry + delete the original, one batch)", async () => {
+    const db = adminDoc(), batch = writeBatch(db);
+    batch.set(doc(db, "archive/products__p1"), entry("a1"));
+    batch.delete(doc(db, "products/p1"));
+    await batch.commit();
+});
+await can("an admin with the claim archives a brand", () => setDoc(doc(adminClaim(), "archive/brands__b1"), entry("c1", { type: "brand", sourceCollection: "brands", sourceId: "b1" })));
+await cannot("a plain user archives", () => setDoc(doc(user(), "archive/products__p1"), entry("u1")));
+await cannot("nobody signed in archives", () => setDoc(doc(anon(), "archive/products__p1"), entry("x")));
+await cannot("an id that does not match the entry", () => setDoc(doc(adminDoc(), "archive/products__other"), entry("a1")));
+await cannot("a type that does not match the collection", () => setDoc(doc(adminDoc(), "archive/products__p1"), entry("a1", { type: "brand" })));
+await cannot("another collection than the three", () => setDoc(doc(adminDoc(), "archive/users__u1"), entry("a1", { type: "user", sourceCollection: "users", sourceId: "u1" })));
+await cannot("deleted_by is somebody else", () => setDoc(doc(adminDoc(), "archive/products__p1"), entry("someone-else")));
+await cannot("expires in 5 days instead of 30", () => setDoc(doc(adminDoc(), "archive/products__p1"), entry("a1", { expires_at: Timestamp.fromMillis(Date.now() + 5 * 86400000) })));
+await cannot("expires in 90 days", () => setDoc(doc(adminDoc(), "archive/products__p1"), entry("a1", { expires_at: Timestamp.fromMillis(Date.now() + 90 * 86400000) })));
+await cannot("a client-chosen deleted_at", () => setDoc(doc(adminDoc(), "archive/products__p1"), entry("a1", { deleted_at: Timestamp.fromMillis(Date.now() - 86400000) })));
+await cannot("an extra field", () => setDoc(doc(adminDoc(), "archive/products__p1"), entry("a1", { note: "x" })));
+const putEntry = () => env.withSecurityRulesDisabled((context) => setDoc(doc(context.firestore(), "archive/products__p1"), entry("a1", { deleted_at: Timestamp.now() })));
+await can("an admin reads the Archive", async () => { await putEntry(); await getDocs(query(collection(adminDoc(), "archive"))); });
+await cannot("a plain user reads the Archive", async () => { await putEntry(); await getDoc(doc(user(), "archive/products__p1")); });
+await cannot("nobody signed in lists the Archive", () => getDocs(query(collection(anon(), "archive"))));
+await cannot("an admin changes an archive entry", async () => { await putEntry(); await updateDoc(doc(adminDoc(), "archive/products__p1"), { expires_at: in30() }); });
+await can("an admin deletes an archive entry (Delete now)", async () => { await putEntry(); await deleteDoc(doc(adminDoc(), "archive/products__p1")); });
+await cannot("a plain user deletes an archive entry", async () => { await putEntry(); await deleteDoc(doc(user(), "archive/products__p1")); });
+await can("an admin restores: the original back, the entry gone (one batch)", async () => {
+    await env.withSecurityRulesDisabled(async (context) => { await deleteDoc(doc(context.firestore(), "products/p1")); });
+    await putEntry();
+    const db = adminDoc(), batch = writeBatch(db);
+    batch.set(doc(db, "products/p1"), { name: "Example Lipstick", brandId: "b1", cosmeticType: "Lipstick", ingredients: ["Mica"], shades: [], status: "Inactive", scans: 5, binned: true });
+    batch.delete(doc(db, "archive/products__p1"));
+    await batch.commit();
+});
+await can("an admin reads the purge log", () => getDocs(query(collection(adminDoc(), "archive_purge_log"))));
+await cannot("an admin writes the purge log", () => setDoc(doc(adminDoc(), "archive_purge_log/x"), { mode: "live" }));
+await cannot("a plain user reads the purge log", () => getDocs(query(collection(user(), "archive_purge_log"))));
 
 await env.cleanup();
 console.log(`checks made: ${checks}`);

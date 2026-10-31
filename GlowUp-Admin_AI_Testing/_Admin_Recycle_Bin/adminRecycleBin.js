@@ -10,6 +10,8 @@
 //                         Before an ingredient is deleted the page says how many products still list it.
 // Several entries can be selected and restored or deleted together ("Delete selected permanently" asks as well).
 // Nothing here is new in the database: the page reads and writes the same fields the Inventory and the Curator use.
+// Since 29 October 2026 a third action, Move to Archive, hands entries to the Archive (adminArchive.js): kept 30 days,
+// then deleted by the server job. Restore and Delete permanently above work exactly as before.
 import { db } from "../_Database/firebase-console.js";
 import { collection, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getDocs, writeBatch, onListsRefreshed } from "../_Shared/adminStore.js";
@@ -18,6 +20,7 @@ import {
     statusBadge, statusGuide, normalizeStatus, STATUSES, wireSearch, dialogIsOpen
 } from "../_Shared/adminCommon.js";
 import { matchesSearch } from "../_Shared/glowupRules.js";
+import { moveToArchive, KEEP_DAYS } from "../_Shared/adminArchive.js";
 import { mountShell, paginate, renderPager, icon, BIN_ICON, askConfirm, hydrate, setBinCount, addRefreshDataButton } from "../_Shared/adminShell.js";
 
 const el = (id) => document.getElementById(id);
@@ -61,6 +64,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("binTableBody").addEventListener("click", onRowClick);
     el("restoreSelectedBtn").addEventListener("click", () => restore(binned().filter((x) => picked.has(x.id))));
     el("deleteSelectedBtn").addEventListener("click", () => purge(binned().filter((x) => picked.has(x.id))));
+    el("archiveSelectedBtn").addEventListener("click", () => archive(binned().filter((x) => picked.has(x.id))));
     el("clearSelectedBtn").addEventListener("click", () => { picked.clear(); render(); });
 
     onListsRefreshed(() => { if (!dialogIsOpen()) load(); });
@@ -173,6 +177,7 @@ function rowOf(x) {
             <td>${before}</td>
             <td><div class="row-actions">
                 <button type="button" class="row-btn main" data-act="restore" data-tip="Brings it back with the status it had.">${icon("undo")}Restore</button>
+                <button type="button" class="row-btn" data-act="archive" data-tip="Moves it to the Archive: kept ${KEEP_DAYS} days, then deleted. It can be restored until then.">${icon("archive")}Archive</button>
                 <button type="button" class="row-btn danger" data-act="delete" data-tip="Takes it out of the database for good. It asks first, and saves a copy to your computer.">${BIN_ICON}Delete permanently</button>
             </div></td>
         </tr>`;
@@ -186,6 +191,46 @@ function onRowClick(event) {
     if (button.dataset.act === "pick") { if (picked.has(entry.id)) picked.delete(entry.id); else picked.add(entry.id); render(); }
     else if (button.dataset.act === "restore") restore([entry]);
     else if (button.dataset.act === "delete") purge([entry]);
+    else if (button.dataset.act === "archive") archive([entry]);
+}
+
+/**
+ * MOVE TO ARCHIVE. Asks first. A brand takes the products that are in the bin under it (as Delete permanently does);
+ * each entry is checked again just before the move (adminArchive.js), and the move and the removal from here are one batch.
+ */
+async function archive(entries) {
+    if (entries.length === 0) return;
+    const moving = [], names = [], seen = new Set();
+    const add = (x, listName, withBrand) => {
+        const key = listName + "/" + x.id;
+        if (seen.has(key)) return;
+        seen.add(key);
+        moving.push({ collection: listName, id: x.id, name: nameOf(x, listName), with: withBrand || "" });
+    };
+    entries.forEach((x) => {
+        if (kind === "brands") {
+            const riders = all.products.filter((p) => p.binned && p.brandId === x.id);
+            riders.forEach((p) => add(p, "products", x.id));
+            names.push(nameOf(x) + (riders.length > 0 ? ` (with ${many(riders.length, "product", "products")})` : ""));
+        } else names.push((kind === "products" && x.brandName ? x.brandName + ": " : "") + nameOf(x));
+    });
+    entries.forEach((x) => add(x, kind));
+    const sure = await askConfirm({
+        title: `Move to the Archive: ${many(entries.length, KINDS[kind].one, KINDS[kind].more)}?`,
+        message: `They leave the Recycle bin and are kept in the Archive for ${KEEP_DAYS} days, then deleted for good. Until then the Archive can bring them back.`,
+        items: names, confirmLabel: "Move to Archive"
+    });
+    if (!sure) return;
+    try {
+        const done = await moveToArchive(moving);
+        const skipped = done.skipped.length > 0 ? ` ${many(done.skipped.length, "entry was", "entries were")} no longer in the Recycle bin and stayed where they are.` : "";
+        notify(`${many(done.moved, "entry", "entries")} moved to the Archive (kept ${KEEP_DAYS} days).${skipped}`, done.skipped.length > 0 ? "info" : "ok");
+    } catch (error) {
+        console.error("Error moving to the Archive: ", error);
+        notify("Nothing was moved to the Archive. " + describeError(error), "error");
+    }
+    picked.clear();
+    await load();
 }
 
 // ---------------------------------------------------------------------------------------------
