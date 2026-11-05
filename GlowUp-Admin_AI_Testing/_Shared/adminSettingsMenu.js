@@ -10,8 +10,8 @@
 //                      title bar returns to Settings.
 // Its left edge sits ON the sidebar's right edge (New7.pdf, 5 November 2026): the style sheet gives both the same value, --sidebar-w,
 // so when the sidebar folds the window goes with it, open, with no gap at any frame. While it is open the page's title slides out from
-// under it (html.settings-open). It cannot be dragged. It can be resized from its lower right corner (never smaller than WINDOW_MIN),
-// and remembers that size ("glowup.settingsWindow.v2" in this browser, in a try/catch).
+// under it (html.settings-open). Its layout is fixed (New8.pdf): one width on every page, as tall as its content up to the browser
+// window, then its list scrolls under the title bar. It cannot be dragged or resized.
 // The Archive is opened from the button on the Recycle Bin page, and Sign Out sits at the bottom of the sidebar (pageFrame.js).
 // adminLayouts.js talks to it with two events: "glowup:settings-close" (arranging hides the window) and "glowup:layout-view"
 // (the Layout and style view was shown: paint it).
@@ -32,9 +32,6 @@ export const BIN_PAGE = "../_Admin_Recycle_Bin/adminRecycleBin.html";
 const BIN_LISTS = ["ingredients", "brands", "products"];
 const COUNT_KEEP_MS = 5 * 60 * 1000;
 const COUNT_KEY = "glowup.binCount.";
-const WINDOW_KEY = "glowup.settingsWindow.v2";
-const WINDOW_MIN = { w: 300, h: 260 };
-const WINDOW_GAP = 8;
 
 let binCount = 0;
 let recountTimer = 0;
@@ -42,51 +39,9 @@ let win = null, button = null;
 let opener = null;                                // what opened the window: the focus goes back there
 let pageItems = null;                             // () => the page's own entries, in the form openMenu takes
 let view = "menu";                                // "menu" | "layout"
-let state = null;                                 // { width, height }; the place comes from the sidebar (adminSettingsMenu.css)
 
 const el = (id) => document.getElementById(id);
 const isOpen = () => !!win && win.classList.contains("is-open");
-
-// ---------------------------------------------------------------------------------------------
-// Place and size
-// ---------------------------------------------------------------------------------------------
-function windowDefaults() { return { width: 360, height: window.innerHeight - 2 * WINDOW_GAP }; }
-function readState() {
-    try {
-        const saved = JSON.parse(localStorage.getItem(WINDOW_KEY) || "null");
-        if (saved && Number.isFinite(Number(saved.width)) && Number.isFinite(Number(saved.height))) return { width: Number(saved.width), height: Number(saved.height) };
-    } catch (error) { /* a private window, or a value that cannot be read */ }
-    return windowDefaults();
-}
-function saveState() { try { localStorage.setItem(WINDOW_KEY, JSON.stringify(state)); } catch (error) { /* not kept */ } }
-
-/** Gives the window the size `next` says, never smaller than its minimum and inside the browser window. Returns what it used. */
-function place(next) {
-    const maxW = Math.max(WINDOW_MIN.w, window.innerWidth - 2 * WINDOW_GAP), maxH = Math.max(WINDOW_MIN.h, window.innerHeight - 2 * WINDOW_GAP);
-    const s = { width: Math.min(maxW, Math.max(WINDOW_MIN.w, next.width)), height: Math.min(maxH, Math.max(WINDOW_MIN.h, next.height)) };
-    win.style.width = s.width + "px";
-    win.style.height = s.height + "px";
-    document.documentElement.style.setProperty("--settings-w", win.offsetWidth + "px");
-    return s;
-}
-
-/** Dragging the corner resizes the window. Listens on window (no pointer capture), like the rest of the site. */
-function wireWindow() {
-    win.querySelector(".sw-resize").addEventListener("pointerdown", (event) => {
-        if (event.button !== 0) return;
-        event.preventDefault();
-        win.classList.add("moving");
-        const start = { x: event.clientX, y: event.clientY, w: win.offsetWidth, h: win.offsetHeight };
-        const move = (e) => { state = place({ width: start.w + e.clientX - start.x, height: start.h + e.clientY - start.y }); };
-        const stop = () => {
-            win.classList.remove("moving");
-            window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", stop); window.removeEventListener("pointercancel", stop);
-            saveState();
-        };
-        window.addEventListener("pointermove", move); window.addEventListener("pointerup", stop); window.addEventListener("pointercancel", stop);
-    });
-    window.addEventListener("resize", () => { if (isOpen()) state = place(state); });
-}
 
 // ---------------------------------------------------------------------------------------------
 // Open, close, views
@@ -102,7 +57,6 @@ function show(next) {
     win.setAttribute("aria-label", el("swTitle").textContent);
     if (view === "menu") renderMenu();
     else document.dispatchEvent(new CustomEvent("glowup:layout-view"));
-    state = place(state);
 }
 
 function openWindow(from) {
@@ -211,13 +165,10 @@ export function mountSettingsMenu() {
         <div class="sw-body">
             <div class="sw-view" id="swMenuView"></div>
             <div class="sw-view layout-view" id="layoutHost" hidden></div>
-        </div>
-        <span class="sw-resize" aria-hidden="true"></span>`;
+        </div>`;
     document.body.appendChild(win);
     win.querySelector("#swBack").innerHTML = icon("left");
     win.querySelector("#swClose").innerHTML = icon("x");
-    state = place(readState());
-    wireWindow();
 
     button.addEventListener("click", () => { if (isOpen()) closeSettingsWindow(); else openWindow(); });
     el("swClose").addEventListener("click", closeSettingsWindow);
