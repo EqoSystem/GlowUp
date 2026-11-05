@@ -30,7 +30,7 @@ namespace GlowUp.Common
 
         [Header("Room (canvas units: the canvas is 1080 wide)")]
         [Tooltip("Space between the keyboard's top edge and the lowest thing that must be seen")]
-        [Min(0f)] [SerializeField] private float gapAboveKeyboard = 28f;
+        [Min(0f)] [SerializeField] private float gapAboveKeyboard = 16f;
         [Tooltip("Room kept under a field that has no KeyboardKeepVisible list, for a small badge or check line under it")]
         [Min(0f)] [SerializeField] private float spaceBelowField = 64f;
         [Tooltip("The field's top never goes higher than this far under the screen's top (slide only; the header and back button stay usable)")]

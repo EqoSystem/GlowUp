@@ -34,6 +34,7 @@ namespace GlowUp.EditorTools
                 OnboardingKit.EnsureFocusBorder(f.gameObject);
             }
             foreach (var d in Object.FindObjectsOfType<TMP_Dropdown>(true)) OnboardingKit.EnsureFocusBorder(d.gameObject);
+            KeyboardKit.Ensure();                   // a scene with a text field gets the ONE keyboard avoider (the field and its badges stay above the keyboard)
             RoundShapes();
             UiEffectsKit.FinishScene();             // tap sounds, screen change, edge light, the tile animation on onboarding buttons
             AddPressFeedback();
