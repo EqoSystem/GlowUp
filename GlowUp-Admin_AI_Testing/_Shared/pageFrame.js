@@ -55,13 +55,12 @@
         document.body.classList.add("app");
         var sidebar = document.createElement("aside");
         sidebar.className = "sidebar";
-        // the logo ("G" and the red Recycle bin count) is ONE button: a tap opens the settings window, a second tap hides it
-        // (adminSettingsMenu.js). The name "Glow Up" stands beside it and folds away with the other labels (5 November 2026).
-        // The bottom holds the signed-in e-mail and Sign Out (back from that window since 5 November 2026). adminCommon.js fills the e-mail
+        // the logo is a plain badge (no click, no count): the Quick settings gear is in the top bar (adminShell.js, adminSettingsMenu.js).
+        // The name "Glow Up" stands beside it and folds away with the other labels.
+        // The bottom holds the signed-in e-mail and Sign Out. adminCommon.js fills the e-mail
         // in once the sign-in check has answered, and wires the button.
         sidebar.innerHTML =
-            '<div class="sidebar-brand"><button type="button" class="brand-menu" id="brandMenuBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="settingsWindow" aria-label="Settings">' +
-            '<span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"><span class="brand-badge" id="brandBinBadge" hidden></span></span></button><span class="brand-title label">Glow Up</span></div>' +
+            '<div class="sidebar-brand"><span class="brand-mark"><span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"></span></span><span class="brand-title label">Glow Up</span></div>' +
             '<ul class="nav-links" id="sidebarNav" aria-label="Pages"><li class="nav-drop" aria-hidden="true"></li>' +
             NAV.map(function (n) {
                 var here = n.id === page;

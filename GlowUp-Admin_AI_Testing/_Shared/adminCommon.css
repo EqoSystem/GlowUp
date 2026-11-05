@@ -1477,11 +1477,3 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 @media (max-width: 900px) { .topbar > .header-tabs .seg svg.ic, .topbar > .header-tabs .tab-count { display: none; } }
 /* a phone: the header slides sideways rather than cut anything off */
 @media (max-width: 720px) { .topbar.has-tabs { overflow-x: auto; } }
-/* the Settings window open beside the title: the search goes first, then the tabs' words */
-html.settings-open .topbar.has-tabs > .search-container { flex: 1 1 0; }
-html.settings-open .topbar.has-tabs { overflow-x: auto; }
-@media (max-width: 1345px) {
-    html.settings-open .topbar > .header-tabs .seg { font-size: 0; gap: 0; padding-inline: 10px; }
-    html.settings-open .topbar > .header-tabs .seg svg.ic { display: inline-block; }
-    html.settings-open .topbar > .header-tabs .tab-count { display: none; }
-}

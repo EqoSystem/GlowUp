@@ -1,7 +1,7 @@
 // The parts every admin page is built from (no database code in here; the Refresh data button only calls adminStore.js):
 //   icons            - one set of thin-line icons, drawn as SVG (no emoji, no picture files)
 //   theme            - light / dark / system, remembered on this computer; "system" follows the computer's setting
-//   mountShell       - the sidebar (with its flowing highlight and the settings window behind the logo) and the top bar (title)
+//   mountShell       - the sidebar (with its flowing highlight; the logo is a plain badge) and the top bar (title)
 //   guides           - the small "i" badges and the pop-up that explains a control
 //   tile animation   - the lift, pixel sweep and glowing outline of the mobile app's tiles, on every button and tile
 //   menus, dialogs   - one small pop-up menu and two dialogs (confirm, type a name) used by every page
@@ -24,6 +24,7 @@ const ICONS = {
     logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
     moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+    gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
     sliders: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
@@ -83,7 +84,7 @@ const ICONS = {
 export const BIN_ICON = '<svg class="ic bin-ic" viewBox="0 0 24 24" aria-hidden="true"><g class="bin-lid"><path d="M4 7h16"/><path d="M9 7V4h6v3"/></g><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg>';
 
 /**
- * A page has (re)loaded part of the Recycle bin: the settings menu behind the logo counts the whole bin again, from the
+ * A page has (re)loaded part of the Recycle bin: the Quick settings panel (when open) counts the whole bin again, from the
  * lists this browser keeps (adminSettingsMenu.js). The page's own number is not needed: it holds only its own part.
  */
 export function setBinCount() {
@@ -249,7 +250,10 @@ export function placeHeaderParts() {
     bar.classList.add("has-search", "has-tabs");
     holder.querySelectorAll(":scope > .header-tabs, :scope > .search-container").forEach((part) => bar.insertBefore(part, tools));
     const end = holder.querySelector(":scope > [data-header-end]");
-    if (end) tools.append(...end.childNodes);
+    if (end) {                                  // the page's buttons go before the Quick settings gear, which stays at the far right
+        const gear = tools.querySelector(".quick-gear");
+        if (gear) gear.before(...end.childNodes); else tools.append(...end.childNodes);
+    }
     holder.remove();
     return bar;
 }
@@ -265,9 +269,10 @@ export function mountShell(page) {
     const sidebar = document.querySelector("aside.sidebar");
     const topbar = main.querySelector("header.topbar");
     wireNavDrop(sidebar.querySelector(".nav-links"));
-    // the top bar keeps only the page's own tools (search, Add: placeInHeader). Layout and style, the Recycle bin and
-    // light / dark / system are in the settings window behind the GlowUp logo (adminSettingsMenu.js).
-    topbar.querySelector(".topbar-tools").innerHTML = "";
+    // the top bar keeps the page's own tools (search, Add: placeInHeader) and, at the far right, the Quick settings gear. Layout and
+    // style, the Recycle bin and light / dark / system are in the panel it opens (adminSettingsMenu.js).
+    const tools = topbar.querySelector(".topbar-tools");
+    tools.innerHTML = "";
     followSystemTheme();
 
     const bar =document.createElement("div");
@@ -278,7 +283,7 @@ export function mountShell(page) {
     topbar.insertAdjacentElement("afterend", bar);
 
     hydrate(document);
-    mountSettingsMenu();                        // the window first: initLayouts puts the Layout & Style controls into it
+    mountSettingsMenu(tools);                   // the gear first (the panel itself is built on its first open): initLayouts puts the Layout & Style controls into its holder
     initLayouts(page);
     watchForNewControls();
 }

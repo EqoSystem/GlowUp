@@ -1,40 +1,32 @@
-// THE SETTINGS WINDOW behind the GlowUp logo at the top of the sidebar, on every admin page.
+// QUICK SETTINGS: the gear at the far right of the header, on every admin page (like Gmail's quick settings).
 //
-// The logo button shows the "G" and the red Recycle bin count. One tap opens ONE floating window, a second tap on the logo hides
-// it again; Esc and the X in its title bar close it too. A click anywhere else does NOT close it and there is no dark cover, so
-// the page stays usable while it is open. It always starts closed on a new page.
+// A click on the gear opens ONE panel under it, its right edge on the gear's right edge; a second click, the X, Esc or a click
+// anywhere outside closes it. Focus moves into the panel on open and back to the gear on close. Under 600 px wide the panel is a
+// full-width sheet under the header. It always starts closed on a new page. The GlowUp logo is a plain badge (pageFrame.js): no
+// click, no count.
 //
-// Two views in the same window (never a second window), so both have the same place, size and opening animation:
-//   Settings         - Layout and style, Recycle bin (red count), Appearance (Light / Dark / System), the page's own tools.
+// The panel is built on its FIRST OPEN, not at page load. Only an empty, hidden holder for the Layout & Style controls exists
+// before that (adminLayouts.js builds them into #layoutHost at start; the first open moves them into the panel).
+//
+// Two views in the same panel (never a second one), so both have the same place, size and opening animation:
+//   Quick settings   - Layout and style, Recycle bin (red count), Appearance (Light / Dark / System), the page's own tools.
 //   Layout and style - the existing Layout & Style controls (adminLayouts.js builds them into #layoutHost); a back arrow in the
-//                      title bar returns to Settings.
-// Its left edge sits ON the sidebar's right edge (New7.pdf, 5 November 2026): the style sheet gives both the same value, --sidebar-w,
-// so when the sidebar folds the window goes with it, open, with no gap at any frame. While it is open the page's title slides out from
-// under it (html.settings-open). Its layout is fixed (New8.pdf): one width on every page, as tall as its content up to the browser
-// window, then its list scrolls under the title bar. It cannot be dragged or resized.
-// The Archive is opened from the button on the Recycle Bin page, and Sign Out sits at the bottom of the sidebar (pageFrame.js).
-// adminLayouts.js talks to it with two events: "glowup:settings-close" (arranging hides the window) and "glowup:layout-view"
+//                      title bar returns to Quick settings.
+// adminLayouts.js talks to it with two events: "glowup:settings-close" (arranging hides the panel) and "glowup:layout-view"
 // (the Layout and style view was shown: paint it).
 //
-// What used to be behind the "..." on Inventory and the Curator (Clean up, Find duplicates ...) is listed in the Settings view under
-// "This page" (setPageSettings); a page with nothing of its own has no such heading.
+// What used to be behind the "..." on Inventory and the Curator (Clean up, Find duplicates ...) is listed in the Quick settings view
+// under "This page" (setPageSettings); a page with nothing of its own has no such heading.
 //
-// THE RECYCLE BIN COUNT is read-only and uses the existing data code (adminStore.js): first the lists this browser keeps
-// (no read at all); only a list that is not kept is counted with one count query (binned == true, the same query the
-// Dashboard already makes), remembered for 5 minutes in this tab.
-import { auth, db } from "../_Database/firebase-console.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { collection, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { keptBinnedCount, getCountFromServer, onListsRefreshed } from "./adminStore.js";
-import { themeChoice, setThemeChoice, icon, toast, hydrate } from "./adminShell.js";
+// THE RECYCLE BIN COUNT is shown ONLY inside the open panel (never on the gear, the logo, a title, a tooltip, an aria-label or a data
+// attribute). It is added up from the lists adminStore.js keeps in this browser, when the panel is opened or while it is open and a
+// list changes. It makes NO Firestore read or query. A list that is not kept is not counted.
+import { keptBinnedCount, onListsRefreshed } from "./adminStore.js";
+import { themeChoice, setThemeChoice, icon, hydrate } from "./adminShell.js";
 
 export const BIN_PAGE = "../_Admin_Recycle_Bin/adminRecycleBin.html";
 const BIN_LISTS = ["ingredients", "brands", "products"];
-const COUNT_KEEP_MS = 5 * 60 * 1000;
-const COUNT_KEY = "glowup.binCount.";
 
-let binCount = 0;
-let recountTimer = 0;
 let win = null, button = null;
 let pageItems = null;                             // () => the page's own entries, in the form openMenu takes
 let view = "menu";                                // "menu" | "layout"
@@ -42,26 +34,82 @@ let view = "menu";                                // "menu" | "layout"
 const el = (id) => document.getElementById(id);
 const isOpen = () => !!win && win.classList.contains("is-open");
 
+/** The entries removed, added up from the kept lists only. { n, unknown } (unknown = some list is not kept in this browser). */
+function binCount() {
+    let n = 0, unknown = false;
+    BIN_LISTS.forEach((name) => { const kept = keptBinnedCount(name); if (kept === null) unknown = true; else n += kept; });
+    return { n, unknown };
+}
+
 // ---------------------------------------------------------------------------------------------
 // Open, close, views
 // ---------------------------------------------------------------------------------------------
 function show(next) {
     view = next;
-    const layout = view === "layout" && !!el("layoutHost") && el("layoutHost").childElementCount > 0;
+    const host = el("layoutHost");
+    const layout = view === "layout" && !!host && host.childElementCount > 0;
     if (view === "layout" && !layout) view = "menu";
     el("swMenuView").hidden = view !== "menu";
-    el("layoutHost").hidden = view !== "layout";
+    if (host) host.hidden = view !== "layout";
     el("swBack").hidden = view !== "layout";
-    el("swTitle").textContent = view === "layout" ? "Layout & Style" : "Settings";
+    el("swTitle").textContent = view === "layout" ? "Layout & Style" : "Quick settings";
     win.setAttribute("aria-label", el("swTitle").textContent);
     if (view === "menu") renderMenu();
     else document.dispatchEvent(new CustomEvent("glowup:layout-view"));
 }
 
+/** Puts the panel under the gear, right-aligned (a full-width sheet under the header on a narrow window). */
+function place() {
+    if (!win || !button) return;
+    const gear = button.getBoundingClientRect();
+    const bar = button.closest(".topbar");
+    if (window.innerWidth < 600) {
+        win.style.top = Math.round((bar ? bar.getBoundingClientRect().bottom : gear.bottom + 8)) + "px";
+        win.style.right = "";
+        win.style.maxHeight = "calc(100vh - " + win.style.top + " - 8px)";
+    } else {
+        win.style.top = Math.round(gear.bottom + 8) + "px";
+        win.style.right = Math.max(8, Math.round(window.innerWidth - gear.right)) + "px";
+        win.style.maxHeight = "calc(100vh - " + Math.round(gear.bottom + 16) + "px)";
+    }
+}
+
+/** Builds the panel (once, on the first open). */
+function build() {
+    win = document.createElement("aside");
+    win.className = "settings-window";
+    win.id = "settingsWindow";
+    win.setAttribute("role", "dialog");
+    win.setAttribute("aria-label", "Quick settings");
+    win.tabIndex = -1;
+    win.innerHTML = `
+        <div class="sw-head">
+            <button type="button" class="icon-btn small" id="swBack" aria-label="Back to quick settings" hidden></button>
+            <h3 id="swTitle">Quick settings</h3>
+            <button type="button" class="icon-btn small" id="swClose" aria-label="Close"></button>
+        </div>
+        <div class="sw-body">
+            <div class="sw-view" id="swMenuView"></div>
+        </div>`;
+    document.body.appendChild(win);
+    const body = win.querySelector(".sw-body");
+    const host = el("layoutHost");                // built by adminLayouts.js into the holder; it moves in here
+    if (host) { host.classList.add("sw-view", "layout-view"); host.hidden = true; body.appendChild(host); }
+    const stash = el("layoutStash");
+    if (stash) stash.remove();
+    win.querySelector("#swBack").innerHTML = icon("left");
+    win.querySelector("#swClose").innerHTML = icon("x");
+    el("swClose").addEventListener("click", closeSettingsWindow);
+    el("swBack").addEventListener("click", () => show("menu"));
+    button.setAttribute("aria-controls", "settingsWindow");
+    hydrate(win);
+}
+
 function openWindow() {
     if (isOpen()) return;
+    if (!win) build();
+    place();
     win.classList.add("is-open");
-    document.documentElement.classList.add("settings-open");
     button.setAttribute("aria-expanded", "true");
     show("menu");
     win.focus({ preventScroll: true });
@@ -69,21 +117,20 @@ function openWindow() {
 
 export function closeSettingsWindow() {
     if (!isOpen()) return;
-    const hadFocus = win.contains(document.activeElement);
+    const hadFocus = win.contains(document.activeElement) || document.activeElement === document.body;
     win.classList.remove("is-open");
-    document.documentElement.classList.remove("settings-open");
     button.setAttribute("aria-expanded", "false");
     if (hadFocus) button.focus({ preventScroll: true });
 }
 
-/** The page's own entries for the Settings view: a function that returns them as openMenu takes them, asked each time the view is drawn. */
+/** The page's own entries for the Quick settings view: a function that returns them as openMenu takes them, asked each time the view is drawn. */
 export function setPageSettings(items) {
     pageItems = items;
     if (isOpen() && view === "menu") renderMenu();
 }
 
 // ---------------------------------------------------------------------------------------------
-// The Settings view
+// The Quick settings view
 // ---------------------------------------------------------------------------------------------
 function item({ label, description, iconName, danger, checked, badge, disabled, run }) {
     const row = document.createElement("button");
@@ -106,7 +153,7 @@ function item({ label, description, iconName, danger, checked, badge, disabled, 
 const heading = (text) => { const h = document.createElement("div"); h.className = "menu-heading"; h.textContent = text; return h; };
 const separator = () => { const s = document.createElement("div"); s.className = "menu-sep"; return s; };
 
-/** "This page": the entries that moved here from the page's "..." menu. Choosing one closes the window, because a dialog or the list comes next. */
+/** "This page": the entries that moved here from the page's "..." menu. Choosing one closes the panel, because a dialog or the list comes next. */
 function pageEntries() {
     const items = (pageItems ? pageItems() : []).filter((entry) => !entry.separator);
     if (items.length === 0) return [];
@@ -122,9 +169,11 @@ function renderMenu() {
     const choice = themeChoice(), here = location.pathname;
     const go = (address) => () => { window.location.href = address; };
     const layoutHere = !!el("layoutHost") && el("layoutHost").childElementCount > 0;
+    const { n, unknown } = binCount();
+    const description = n > 0 ? `${n} ${n === 1 ? "entry" : "entries"} removed` : unknown ? "Open it to see what was removed." : "Nothing removed";
     host.replaceChildren(
         ...(layoutHere ? [item({ label: "Layout and style", iconName: "sliders", description: "Arrange the panels, fonts and colours.", run: () => show("layout") })] : []),
-        item({ label: "Recycle bin", iconName: "trash", checked: here.includes("Recycle_Bin"), badge: binCount > 0 ? (binCount > 99 ? "99+" : String(binCount)) : "", description: binCount > 0 ? `${binCount} ${binCount === 1 ? "entry" : "entries"} removed` : "Nothing removed", run: go(BIN_PAGE) }),
+        item({ label: "Recycle bin", iconName: "trash", checked: here.includes("Recycle_Bin"), badge: n > 0 ? (n > 99 ? "99+" : String(n)) : "", description, run: go(BIN_PAGE) }),
         separator(),
         heading("Appearance"),
         item({ label: "Light", iconName: "sun", checked: choice === "light", run: () => { setThemeChoice("light"); renderMenu(); } }),
@@ -137,35 +186,33 @@ function renderMenu() {
 // ---------------------------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------------------------
-/** Builds the window (closed) and wires the logo button (once). Called by adminShell.mountShell on every admin page, before adminLayouts fills #layoutHost. */
-export function mountSettingsMenu() {
-    button = el("brandMenuBtn");
-    if (!button || button.dataset.wired === "1") return;
-    button.dataset.wired = "1";
+/**
+ * Adds the gear to the header's tools (once) and wires it. Called by adminShell.mountShell on every admin page, before adminLayouts
+ * fills #layoutHost. `tools` = the header's .topbar-tools. Returns the gear. Nothing of the panel is built yet.
+ */
+export function mountSettingsMenu(tools) {
+    if (!tools) return null;
+    if (button && tools.contains(button)) return button;
+    button = document.createElement("button");
+    button.type = "button";
+    button.className = "icon-btn quick-gear";
+    button.id = "quickSettingsBtn";
+    button.setAttribute("aria-label", "Quick settings");
+    button.setAttribute("data-tip", "Quick settings");        // the site shows no hover label on controls (adminShell.js tipOf); the text is here for it
+    button.setAttribute("aria-haspopup", "dialog");
+    button.setAttribute("aria-expanded", "false");
+    button.innerHTML = icon("gear");
+    tools.append(button);
 
-    win = document.createElement("aside");
-    win.className = "settings-window";
-    win.id = "settingsWindow";
-    win.setAttribute("role", "dialog");
-    win.setAttribute("aria-label", "Settings");
-    win.tabIndex = -1;
-    win.innerHTML = `
-        <div class="sw-head">
-            <button type="button" class="icon-btn small" id="swBack" aria-label="Back to settings" data-tip="Back to settings" hidden></button>
-            <h3 id="swTitle">Settings</h3>
-            <button type="button" class="icon-btn small" id="swClose" aria-label="Close" data-tip="Close"></button>
-        </div>
-        <div class="sw-body">
-            <div class="sw-view" id="swMenuView"></div>
-            <div class="sw-view layout-view" id="layoutHost" hidden></div>
-        </div>`;
-    document.body.appendChild(win);
-    win.querySelector("#swBack").innerHTML = icon("left");
-    win.querySelector("#swClose").innerHTML = icon("x");
+    // the holder for the Layout & Style controls until the panel exists (adminLayouts.js finds #layoutHost)
+    if (!el("layoutHost")) {
+        const stash = document.createElement("div");
+        stash.id = "layoutStash";
+        stash.innerHTML = '<div id="layoutHost" hidden></div>';
+        document.body.appendChild(stash);
+    }
 
     button.addEventListener("click", () => { if (isOpen()) closeSettingsWindow(); else openWindow(); });
-    el("swClose").addEventListener("click", closeSettingsWindow);
-    el("swBack").addEventListener("click", () => show("menu"));
     document.addEventListener("glowup:settings-close", closeSettingsWindow);
     // Esc closes it, unless a dialog, pop-up or menu has taken that key already (they stop it before it gets here)
     document.addEventListener("keydown", (event) => {
@@ -173,53 +220,15 @@ export function mountSettingsMenu() {
         if (document.querySelector(".modal-overlay[style*='flex'], .menu.show, .facet-panel")) return;
         closeSettingsWindow();
     });
-
-    document.addEventListener("glowup:bin-count", queueRecount);
+    // a click outside closes it; a dialog, menu or message opened from inside the panel is part of it
+    document.addEventListener("pointerdown", (event) => {
+        if (!isOpen() || win.contains(event.target) || button.contains(event.target)) return;
+        if (event.target.closest && event.target.closest(".modal-overlay, .menu, .info-pop, .toast, .facet-panel")) return;
+        closeSettingsWindow();
+    }, true);
+    window.addEventListener("resize", () => { if (isOpen()) place(); });
     document.addEventListener("glowup:theme", () => { if (isOpen() && view === "menu") renderMenu(); });
-    onListsRefreshed(queueRecount);
-    onAuthStateChanged(auth, (user) => { if (user) { queueRecount(); if (isOpen() && view === "menu") renderMenu(); } });
-    hydrate(win);
-}
-
-// ---------------------------------------------------------------------------------------------
-// The Recycle bin count on the logo
-// ---------------------------------------------------------------------------------------------
-function queueRecount() {
-    clearTimeout(recountTimer);
-    recountTimer = setTimeout(recount, 250);
-}
-
-async function recount() {
-    if (!auth.currentUser) return;
-    const parts = await Promise.all(BIN_LISTS.map((name) => {
-        const kept = keptBinnedCount(name);
-        return kept !== null ? kept : countedBinned(name);
-    }));
-    binCount = parts.reduce((sum, n) => sum + (Number(n) || 0), 0);
-    paintBadge();
-    if (isOpen() && view === "menu") renderMenu();
-}
-
-/** One count query for a list this browser does not keep, remembered for 5 minutes in this tab. 0 when it fails. */
-async function countedBinned(name) {
-    try {
-        const saved = JSON.parse(sessionStorage.getItem(COUNT_KEY + name) || "null");
-        if (saved && Date.now() - saved.at < COUNT_KEEP_MS) return Number(saved.n) || 0;
-    } catch (error) { /* not kept: ask */ }
-    try {
-        const n = (await getCountFromServer(query(collection(db, name), where("binned", "==", true)))).data().count;
-        try { sessionStorage.setItem(COUNT_KEY + name, JSON.stringify({ n, at: Date.now() })); } catch (error) { /* not kept */ }
-        return n;
-    } catch (error) {
-        console.warn("The Recycle bin of " + name + " could not be counted:", error);
-        return 0;
-    }
-}
-
-function paintBadge() {
-    const badge = el("brandBinBadge");
-    if (!badge || !button) return;
-    badge.textContent = binCount > 99 ? "99+" : String(binCount);
-    badge.hidden = binCount === 0;
-    button.setAttribute("aria-label", binCount > 0 ? `Settings. Recycle bin: ${binCount}` : "Settings");      // the tooltip stays "Settings"
+    document.addEventListener("glowup:bin-count", () => { if (isOpen() && view === "menu") renderMenu(); });
+    onListsRefreshed(() => { if (isOpen() && view === "menu") renderMenu(); });
+    return button;
 }

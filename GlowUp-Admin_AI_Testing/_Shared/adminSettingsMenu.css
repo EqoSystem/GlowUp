@@ -1,39 +1,19 @@
-/* The settings window behind the GlowUp logo (adminSettingsMenu.js), on every admin page. */
+/* Quick settings (adminSettingsMenu.js), on every admin page: a gear at the far right of the header opens ONE panel under it. */
 
-/* the logo button: only the "G" and the red Recycle bin count; the G lines up with the left edge of the menu's highlight */
-.brand-menu {
-    flex: none; display: grid; place-items: center; padding: 4px; margin: -4px 0 -4px -5px;
-    border: 1px solid transparent; border-radius: 12px; background: transparent; color: var(--text);
-    font: inherit; cursor: pointer; transition: background-color .15s, border-color .15s;
-}
-.brand-menu:hover, .brand-menu[aria-expanded="true"] { background: var(--surface-2); border-color: var(--border); }
-.brand-menu:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.brand-menu .brand-logo { position: relative; overflow: visible; }
-.brand-menu .brand-logo img { border-radius: 10px; }
-/* a red count on the logo while something is in the Recycle bin */
-.brand-badge {
-    position: absolute; top: -6px; right: -7px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; display: grid; place-items: center;
-    font-size: 10px; font-weight: 700; line-height: 1; color: #fff; background: var(--bad); border: 2px solid var(--surface);
-}
-.brand-badge[hidden] { display: none; }
+/* the logo: a plain badge. No click, no count; the "G" lines up with the left edge of the menu's highlight */
+.brand-mark { flex: none; display: grid; place-items: center; padding: 4px; margin: -4px 0 -4px -5px; cursor: default; }
+.brand-mark .brand-logo img { border-radius: 10px; }
+html.sb-collapsed .brand-mark { margin: 0; }
 
-html.sb-collapsed .brand-menu { margin: 0; }
-
-/* the header keeps only the page's own tools, at its right end */
+/* the gear: the header's own icon button (.icon-btn, 36 px) at the far right of the tools */
 .topbar-tools { margin-left: auto; }
-/* the window starts where the page's title starts: while it is open the title slides out from under it .
-   The search gives way first; only when even that is not enough does the header take a second line. */
-.topbar { transition: padding-left .2s var(--ease); }
-html.settings-open .topbar { padding-left: calc(var(--settings-w) + 26px); }
-html.settings-open .topbar:not(.has-tabs) { flex-wrap: wrap; }
-html.settings-open .topbar > .search-container { flex-basis: 0; min-width: 0; overflow: hidden; }
-/* a phone has no room beside the window: the header stays as it is */
-@media (max-width: 700px) { html.settings-open .topbar { padding-left: 26px; } }
+.quick-gear[aria-expanded="true"] { background: var(--surface-3); border-color: var(--border); }
+.quick-gear:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* ---- the window: floating, no dark cover, its left edge ON the sidebar's right edge (New7.pdf), one fixed width (New8.pdf) ---- */
+/* ---- the panel: under the gear, right edge on the gear's right edge (set by adminSettingsMenu.js), one fixed width ---- */
 :root { --settings-w: 360px; }
 .settings-window {
-    position: fixed; top: 8px; left: var(--sidebar-w); width: var(--settings-w); max-width: calc(100vw - var(--sidebar-w)); max-height: calc(100vh - 16px); z-index: 901;
+    position: fixed; top: 56px; right: 12px; width: var(--settings-w); max-width: calc(100vw - 16px); max-height: calc(100vh - 72px); z-index: 901;
     display: none; flex-direction: column; overflow: hidden;
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
 }
@@ -46,6 +26,12 @@ html.settings-open .topbar > .search-container { flex-basis: 0; min-width: 0; ov
 .sw-view { padding: 8px; }
 .sw-view.layout-view { padding: 16px 20px 22px; display: flex; flex-direction: column; gap: 16px; }
 .sw-view[hidden] { display: none; }
+/* a phone: a full-width sheet under the header */
+@media (max-width: 599px) {
+    .settings-window { left: 0; right: 0; width: auto; max-width: none; border-left: 0; border-right: 0; border-radius: 0 0 var(--radius) var(--radius); }
+}
+/* before the panel is first opened, the Layout & Style controls wait here */
+#layoutStash { display: none; }
 
 /* the Settings view uses the menu look (.menu-item ... in adminCommon.css) */
 .menu-badge {
