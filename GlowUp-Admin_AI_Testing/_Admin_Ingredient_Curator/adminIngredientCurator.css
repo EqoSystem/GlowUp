@@ -61,3 +61,9 @@
 #ingredientPagerTop .icon-btn { width: 26px; height: 26px; }
 #ingredientPagerTop .page-now { min-width: 0; }
 #ingredientPagerTop .pager-range { display: none; }
+/* the row stays one line: the "..." appears over the free space beside the pager and takes no room of its own; the sort's word goes first */
+[data-panel="list"] > .panel-inner > .panel-head > .head-end { position: relative; }
+[data-panel="list"] > .panel-inner > .panel-head > .head-end > .panel-menu-btn { position: absolute; right: 100%; margin-right: 4px; z-index: 2; }
+@media (max-width: 1400px) { [data-panel="list"] #sortNow { display: none; } }
+/* the sidebar open beside a narrow panel: New folder keeps only its icon. Up to 1100 px the panel has the whole width again */
+@media (min-width: 1101px) and (max-width: 1279px) { html:not(.sb-collapsed) #ingredientShelfAdd .folder-chip { font-size: 0; gap: 0; } }
