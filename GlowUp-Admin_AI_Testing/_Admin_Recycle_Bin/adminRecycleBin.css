@@ -15,5 +15,24 @@
 #binBar { display: flex; align-items: center; gap: 8px; }
 #binBar[hidden] { display: none; }
 @media (max-width: 900px) { .bin-table th:nth-child(4), .bin-table td:nth-child(4) { display: none; } }
-/* the search row: Refresh data and Archive on the right (29 October 2026) */
+/* the Archive button on the right of its row */
 .bin-tools { display: flex; align-items: center; gap: 8px; }
+/* the row keeps the height it had with the tabs in it, so the Archive button stays exactly where it was */
+[data-panel="tools"] > .panel-inner > .toolbar:has(#binTools) { min-height: 42px; }
+/* the tabs and the search in the header (5 November 2026) */
+.topbar > #binTabs { flex: none; padding-block: 0; height: 36px; }
+.topbar > #binTabs .seg { padding-block: 0; height: 30px; align-self: center; }
+.topbar > #binTabs + .search-container { flex: 0 1 300px; min-width: 150px; margin: 0; }
+.topbar > #binTabs + .search-container .search-input { height: 36px; padding-block: 0; }
+/* narrow: the title and Refresh on the first line, the tabs and the search below */
+@media (max-width: 1000px) {
+    .topbar:has(> #binTabs) { flex-wrap: wrap; }
+    .topbar:has(> #binTabs) > .topbar-tools { margin-left: auto; }
+    .topbar:has(> #binTabs)::after { content: ""; order: 1; flex-basis: 100%; }
+    .topbar > #binTabs { order: 2; }
+    .topbar > #binTabs + .search-container { order: 3; flex: 1 1 200px; max-width: none; }
+}
+/* the "..." of the list: always there, in front of the pager, and the row wraps rather than cut it off */
+.panel-head:has(> #binPagerTop) { flex-wrap: wrap; }
+.panel-head:has(> #binPagerTop) > .panel-menu-btn { opacity: 1; flex: none; margin-left: auto; }
+.panel-head:has(> #binPagerTop) > .spacer { flex: 1 1 0; }

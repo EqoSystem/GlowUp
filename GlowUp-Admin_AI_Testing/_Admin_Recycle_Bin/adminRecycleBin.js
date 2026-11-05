@@ -21,7 +21,7 @@ import {
 } from "../_Shared/adminCommon.js";
 import { matchesSearch } from "../_Shared/glowupRules.js";
 import { moveToArchive, KEEP_DAYS } from "../_Shared/adminArchive.js";
-import { mountShell, paginate, renderPager, icon, BIN_ICON, askConfirm, hydrate, setBinCount, addRefreshDataButton } from "../_Shared/adminShell.js";
+import { mountShell, placeInHeader, paginate, renderPager, icon, BIN_ICON, askConfirm, hydrate, setBinCount, addRefreshDataButton } from "../_Shared/adminShell.js";
 
 const el = (id) => document.getElementById(id);
 const many = (n, one, more) => `${n} ${n === 1 ? one : more}`;
@@ -40,7 +40,11 @@ const pager = { page: 1, size: 10 };
 
 document.addEventListener("DOMContentLoaded", async () => {
     mountShell("bin");
-    addRefreshDataButton(el("binTools"));      // the one Refresh data button of the site, beside the Archive button
+    // the header holds the tabs, the search and the one Refresh data button of the site; the Archive button stays below (5 November 2026)
+    const header = document.querySelector("main.main-content > header.topbar");
+    placeInHeader(".search-container", "");
+    header.insertBefore(el("binTabs"), header.querySelector(":scope > .search-container"));
+    addRefreshDataButton(header);
     wireSignOut();
     setupNavigationGuard();
     el("binStatusGuide").innerHTML = statusGuide();

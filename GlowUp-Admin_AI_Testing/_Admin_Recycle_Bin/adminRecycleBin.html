@@ -42,8 +42,9 @@
         <script src="../_Shared/pageFrame.js"></script>
         <div class="board">
 
-            <!-- which kind of entry, and the search -->
-            <section class="panel" data-panel="tools" data-label="Kind and search" data-w="12">
+            <!-- which kind of entry, and the search: the page moves both into the header, beside the title (5 November 2026).
+                 The Archive button stays here, in its place. -->
+            <section class="panel" data-panel="tools" data-label="Archive" data-w="12">
                 <div class="toolbar">
                     <div class="segmented" id="binTabs" role="tablist" aria-label="What to show">
                         <button type="button" class="seg" role="tab" data-kind="ingredients"><i data-icon="flask"></i>Ingredients <span class="tab-count" id="countIngredients"></span></button>
@@ -56,8 +57,7 @@
                         <button type="button" class="search-clear" id="binSearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
                     </div>
                     <span class="spacer"></span>
-                    <!-- Refresh data (the only one left on the site, since 29 October 2026) is put in front of the Archive button by the page -->
-                    <div class="tool-group bin-tools" id="binTools">
+                                        <div class="tool-group bin-tools" id="binTools">
                         <a class="btn" id="archiveLink" href="../_Admin_Archive/adminArchive.html" data-tip-title="Archive" data-tip="What left the Recycle bin. It is kept 30 days, then deleted for good."><i data-icon="archive"></i>Archive</a>
                     </div>
                     <button type="button" class="guide-badge" data-tip-title="How the Recycle bin works" data-tip="Removing an entry puts it here: the app stops using it at once, and nothing is lost. Restore gives it back the status it had. Delete permanently takes it out of the database: that cannot be undone, so a copy is saved to your computer first.">i</button>
@@ -65,13 +65,14 @@
             </section>
 
             <!-- the removed entries -->
-            <section class="panel" data-panel="list" data-label="Removed entries" data-w="12">
+            <section class="panel" data-panel="list" data-label="Removed entries" data-w="12" data-no-fold>
                 <div class="panel-head">
                     <button type="button" class="pick" id="binPickAll" role="checkbox" aria-checked="false" aria-label="Select all shown" data-tip="Select every entry shown here."></button>
                     <h3 class="panel-title" id="binTitle">Removed ingredients</h3>
                     <span class="panel-count" id="binCountLine"></span>
                     <span class="spacer"></span>
-                    <div class="pager" id="binPagerTop"></div>
+                    <!-- data-head-end: the "..." of the panel goes in front of the pager -->
+                    <div class="pager" id="binPagerTop" data-head-end></div>
                 </div>
                 <!-- shows while entries are picked -->
                 <div class="w-bar sel-bar" id="binBar" hidden>
