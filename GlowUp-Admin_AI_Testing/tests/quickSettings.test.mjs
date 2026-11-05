@@ -53,8 +53,8 @@ check(!/getDocs|onSnapshot|getCountFromServer|getDoc\b|firebase-firestore|collec
 // ---- Esc, outside click, narrow sheet
 check(/event\.key !== "Escape"/.test(menu) && /pointerdown/.test(menu), "Esc and a click outside close the panel");
 check(/max-width: 599px/.test(css), "under 600 px the panel is a full-width sheet");
-check(/grid-template-columns: var\(--sidebar-w\) minmax\(0, 1fr\) var\(--qs-col, 0px\)/.test(css) && /html\.qs-open \{ --qs-col: var\(--settings-w\)/.test(css), "beside the page the panel is a grid column: the page gets narrower, nothing is covered");
-check(/@media \(max-width: 900px\)[\s\S]*position: fixed[\s\S]*translateX\(100%\)/.test(css), "on a window of 900 px or less the panel slides over the page");
+check(/main-content > \.board[^{]*\{ margin-right: var\(--qs-shift, 0px\)/.test(css) && /html\.qs-open \{ --qs-shift: var\(--settings-w\)/.test(css), "beside the page the panel is a column under the header: the page content gets narrower, nothing is covered");
+check(/\.settings-window \{\s*position: fixed; top: var\(--qs-top/.test(css) && /translateX\(calc\(100%/.test(css) && /max-width: 900px/.test(css), "the panel is fixed under the header and slides in from the right; on 900 px or less the margin shift is off, so it covers the page");
 check(/\.sw-body \{[^}]*overflow: auto/.test(css), "the panel scrolls by itself");
 check(/classList\.add\("qs-open"\)/.test(menu) && /classList\.remove\("qs-open"\)/.test(menu), "opening and closing set and clear qs-open (the page width follows)");
 

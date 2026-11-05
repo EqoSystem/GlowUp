@@ -1,10 +1,10 @@
 // QUICK SETTINGS: the gear at the far right of the header, on every admin page (like Gmail's quick settings).
 //
-// A click on the gear slides ONE panel in from the right edge of the screen, NEXT to the page (the page gets narrower, nothing is
-// covered); a second click, the X or Esc slides it out again and the page is full width again. Focus moves into the panel on open
-// and back to the gear on close. On a window of 900 px or less there is no room: the panel covers the page (a click outside closes
-// it there), and under 600 px it is full width. It always starts closed on a new page. The GlowUp logo is a plain badge (pageFrame.js): no
-// click, no count.
+// Like Gmail's quick settings: the header stays whole with the gear at its far right. A click on the gear slides ONE panel in from
+// the right edge, UNDER the header and NEXT to the page (the page content gets narrower, nothing is covered). A second click, the X
+// or Esc slides it out again and the page is full width again. Focus moves into the panel on open and back to the gear on close.
+// On a window of 900 px or less there is no room: the panel covers the page (a click outside closes it there), and under 600 px
+// it is full width. It always starts closed on a new page. The GlowUp logo is a plain badge (pageFrame.js): no click, no count.
 //
 // The panel is built on its FIRST OPEN, not at page load. Only an empty, hidden holder for the Layout & Style controls exists
 // before that (adminLayouts.js builds them into #layoutHost at start; the first open moves them into the panel).
@@ -93,10 +93,14 @@ function build() {
 const overlay = () => window.matchMedia("(max-width: 900px)").matches;     // no room beside the page: the panel covers it
 let hideTimer = 0;
 
-/** The panel starts under the page header: its height goes into --qs-top (the header can take two lines on a narrow window). */
+/**
+ * The panel starts under the page header and left of the page's scroll bar: --qs-top is the header's height, --qs-sb the width of
+ * the page's scroll bar (the header can take two lines on a narrow window).
+ */
 function placeBelowHeader() {
-    const bar = button && button.closest(".topbar");
-    if (bar) document.documentElement.style.setProperty("--qs-top", bar.offsetHeight + "px");
+    const bar = button && button.closest(".topbar"), page = document.querySelector("main.main-content"), root = document.documentElement.style;
+    if (bar) root.setProperty("--qs-top", bar.offsetHeight + "px");
+    if (page) root.setProperty("--qs-sb", Math.max(0, page.offsetWidth - page.clientWidth) + "px");
 }
 
 function openWindow() {

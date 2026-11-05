@@ -10,14 +10,19 @@ html.sb-collapsed .brand-mark { margin: 0; }
 .quick-gear[aria-expanded="true"] { background: var(--surface-3); border-color: var(--border); }
 .quick-gear:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* ---- the panel: a column at the right edge of the page. It slides in from the right and the page gets narrower to make room
-   (body.app is a grid: sidebar | page | panel). On a window of 900 px or less there is no room: it slides over the page instead. ---- */
+/* ---- the panel, as in Gmail: the header stays whole across the top (the gear stays at its far right); the panel is a column under it,
+   at the right edge. It slides in and the page content gets narrower to make room, so nothing is covered. On a window of 900 px or
+   less there is no room: it slides over the page instead. --qs-top (header height) and --qs-sb (the page's scroll bar) are set by
+   adminSettingsMenu.js, so the panel never covers the header or the page's scroll bar. ---- */
 :root { --settings-w: 360px; }
 .settings-window {
-    display: none; flex-direction: column; overflow: hidden; z-index: 901;
-    width: var(--settings-w); background: var(--surface); border-left: 1px solid var(--border);
+    position: fixed; top: var(--qs-top, 56px); right: var(--qs-sb, 0px); bottom: 0; z-index: 901;
+    display: none; flex-direction: column; overflow: hidden;
+    width: var(--settings-w); max-width: calc(100vw - var(--qs-sb, 0px)); background: var(--surface); border-left: 1px solid var(--border);
+    transform: translateX(calc(100% + var(--qs-sb, 0px) + 12px)); transition: transform .28s var(--ease);
 }
 .settings-window.is-shown { display: flex; }
+.settings-window.is-open { transform: none; }
 .settings-window:focus { outline: none; }
 .sw-head { display: flex; align-items: center; gap: 4px; padding: 10px 10px 10px 16px; border-bottom: 1px solid var(--border); flex: none; }
 .sw-head:has(#swBack:not([hidden])) { padding-left: 10px; }
@@ -28,27 +33,12 @@ html.sb-collapsed .brand-mark { margin: 0; }
 .sw-view[hidden] { display: none; }
 
 @media (min-width: 901px) {
-    body.app { grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--qs-col, 0px); transition: grid-template-columns .28s var(--ease); }
-    html.qs-open { --qs-col: var(--settings-w); }
-    .settings-window { grid-column: 3; grid-row: 1; min-height: 0; }
-    /* the panel starts BELOW the page header: the strip above it is the header's own band (same colour and line), so the header stays whole */
-    .settings-window::before {
-        content: ""; flex: none; height: var(--qs-top, 56px); box-sizing: border-box;
-        background: color-mix(in srgb, var(--bg) 86%, transparent); border-bottom: 1px solid var(--border);
-    }
+    .main-content > .board, .main-content > .editing-bar { margin-right: var(--qs-shift, 0px); transition: margin-right .28s var(--ease); }
+    html.qs-open { --qs-shift: var(--settings-w); }
 }
-@media (min-width: 901px) and (max-width: 1100px) {
-    body.app { grid-template-columns: 72px minmax(0, 1fr) var(--qs-col, 0px); }       /* the sidebar is icons only up to 1100 px */
-}
-@media (max-width: 900px) {
-    .settings-window {
-        position: fixed; top: var(--qs-top, 56px); right: 0; bottom: 0; max-width: 100vw; box-shadow: var(--shadow);
-        transform: translateX(100%); transition: transform .28s var(--ease);
-    }
-    .settings-window.is-open { transform: none; }
-}
+@media (max-width: 900px) { .settings-window { box-shadow: var(--shadow); } }
 @media (max-width: 599px) { .settings-window { width: 100vw; border-left: 0; } }
-@media (prefers-reduced-motion: reduce) { body.app, .settings-window { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .main-content > .board, .main-content > .editing-bar, .settings-window { transition: none !important; } }
 /* before the panel is first opened, the Layout & Style controls wait here */
 #layoutStash { display: none; }
 
