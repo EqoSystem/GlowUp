@@ -99,7 +99,9 @@ namespace GlowUp.Views
             if (nameText != null) nameText.text = string.IsNullOrWhiteSpace(common) || common == f.name ? Plain(f.name) : $"{Plain(f.name)}  <size=80%>({Plain(common)})</size>";
             if (classificationText != null) classificationText.text = Plain(d.classification);
             if (classificationBadge != null) classificationBadge.SetActive(!string.IsNullOrWhiteSpace(d.classification));
-            Line(purposeText, purposePrefix, d.purpose);
+            // the line under the status shows what is there: the purpose when it exists, else the plain-words definition. With both, the purpose is
+            // shown first and the definition waits behind "More about this ingredient"; with only one of them it is shown once, up here.
+            bool hasPurpose = !string.IsNullOrWhiteSpace(d.purpose);
             Line(reasonText, reasonPrefix, f.reason);
 
             Line(aliasesText, aliasesPrefix, d.aliases);
@@ -116,7 +118,15 @@ namespace GlowUp.Views
             Line(sourceText, "", d.source);
             // a scene built before the fold has no line of its own for the source: it stays at the end of the description, as it was
             string description = sourceText != null || string.IsNullOrWhiteSpace(d.source) ? f.description : (f.description + " " + d.source).Trim();      // (escaped by Line)
-            Line(descriptionText, fold != null ? descriptionPrefix : "", description);
+            bool hasDefinition = !string.IsNullOrWhiteSpace(description);
+            if (fold == null) Line(descriptionText, "", description);                    // a scene built before the fold shows it as it always did
+            else
+            {
+                if (hasPurpose) Line(purposeText, purposePrefix, d.purpose);
+                else Line(purposeText, descriptionPrefix, description);                   // no purpose: the definition takes its place
+                Line(descriptionText, descriptionPrefix, hasPurpose ? description : "");   // both exist: the definition is in the fold; else it is not said twice
+            }
+            if (fold == null) Line(purposeText, purposePrefix, d.purpose);
 
             linkAddress = d.sourceUrl ?? "";
             if (sourceLinkButton != null)
@@ -130,7 +140,7 @@ namespace GlowUp.Views
             }
 
             if (fold != null)
-                fold.SetActive(!string.IsNullOrWhiteSpace(description) || !string.IsNullOrWhiteSpace(d.aliases) || !string.IsNullOrWhiteSpace(d.chemical)
+                fold.SetActive((hasPurpose && hasDefinition) || !string.IsNullOrWhiteSpace(d.aliases) || !string.IsNullOrWhiteSpace(d.chemical)
                     || !string.IsNullOrWhiteSpace(f.commonUses) || !string.IsNullOrWhiteSpace(d.allergen) || !string.IsNullOrWhiteSpace(d.caution)
                     || d.highlights.Count > 0 || !string.IsNullOrWhiteSpace(d.source));
             Paint();
