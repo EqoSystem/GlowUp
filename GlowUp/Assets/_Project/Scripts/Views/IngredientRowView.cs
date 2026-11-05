@@ -76,11 +76,18 @@ namespace GlowUp.Views
             Paint();
         }
 
+        /// <summary>
+        /// Everything the database holds is plain text, never markup: the app's own AI look-up writes entries nobody has checked, and a
+        /// "&lt;" in them must not become a tag (a size, a link, a colour). The text is wrapped so TextMeshPro shows it as it is.
+        /// </summary>
+        public static string Plain(string value) =>
+            string.IsNullOrEmpty(value) ? "" : "<noparse>" + value.Replace("</noparse>", "").Replace("</NOPARSE>", "") + "</noparse>";
+
         static void Line(TextMeshProUGUI text, string prefix, string value)
         {
             if (text == null) return;
             bool has = !string.IsNullOrWhiteSpace(value);
-            if (has) text.text = prefix + value;
+            if (has) text.text = prefix + Plain(value);
             text.gameObject.SetActive(has);
         }
 
@@ -89,8 +96,8 @@ namespace GlowUp.Views
             d = d ?? new Details();
             level = string.IsNullOrEmpty(f.level) ? "unknown" : f.level;
             string common = !string.IsNullOrWhiteSpace(d.commonName) ? d.commonName : f.techName;
-            if (nameText != null) nameText.text = string.IsNullOrWhiteSpace(common) || common == f.name ? f.name : $"{f.name}  <size=80%>({common})</size>";
-            if (classificationText != null) classificationText.text = d.classification ?? "";
+            if (nameText != null) nameText.text = string.IsNullOrWhiteSpace(common) || common == f.name ? Plain(f.name) : $"{Plain(f.name)}  <size=80%>({Plain(common)})</size>";
+            if (classificationText != null) classificationText.text = Plain(d.classification);
             if (classificationBadge != null) classificationBadge.SetActive(!string.IsNullOrWhiteSpace(d.classification));
             Line(purposeText, purposePrefix, d.purpose);
             Line(reasonText, reasonPrefix, f.reason);
@@ -100,10 +107,15 @@ namespace GlowUp.Views
             Line(usesText, fold != null ? usesPrefix : "Used in: ", f.commonUses);
             Line(allergenText, allergenPrefix, d.allergen);
             Line(cautionText, cautionPrefix, d.caution);
-            Line(highlightsText, "", Tags(d.highlights));
+            if (highlightsText != null)                                          // the tags carry their own (escaped) markup, so they do not go through Line
+            {
+                string tags = Tags(d.highlights);
+                if (tags.Length > 0) highlightsText.text = tags;
+                highlightsText.gameObject.SetActive(tags.Length > 0);
+            }
             Line(sourceText, "", d.source);
             // a scene built before the fold has no line of its own for the source: it stays at the end of the description, as it was
-            string description = sourceText != null || string.IsNullOrWhiteSpace(d.source) ? f.description : (f.description + " " + d.source).Trim();
+            string description = sourceText != null || string.IsNullOrWhiteSpace(d.source) ? f.description : (f.description + " " + d.source).Trim();      // (escaped by Line)
             Line(descriptionText, fold != null ? descriptionPrefix : "", description);
 
             linkAddress = d.sourceUrl ?? "";
@@ -127,7 +139,7 @@ namespace GlowUp.Views
         string Tags(List<string> names)
         {
             var parts = new List<string>();
-            foreach (string name in names) if (!string.IsNullOrWhiteSpace(name)) parts.Add($"<mark={tagTint}> {name} </mark>");
+            foreach (string name in names) if (!string.IsNullOrWhiteSpace(name)) parts.Add($"<mark={tagTint}> {Plain(name)} </mark>");
             return string.Join("  ", parts);
         }
 

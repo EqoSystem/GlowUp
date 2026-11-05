@@ -252,6 +252,18 @@ service cloud.firestore {
       allow delete: if isAdmin() && classificationId != 'other';
     }
 
+    // The TEST copy of the list: a preview or a local copy of the website uses this one, so looking at them never touches the real list.
+    // Nothing reads it but the website's test pages. ADDED on 5 November 2026.
+    match /ingredientClassificationsTest/{classificationId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['name', 'createdAt', 'updatedAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 1
+        && request.resource.data.name.size() <= 40;
+      allow delete: if isAdmin() && classificationId != 'other';
+    }
+
     // ---- each app user's own data -----------------------------------------------------------
     match /users/{uid} {
       allow read, write: if isOwner(uid);

@@ -106,6 +106,11 @@ await cannot("a classification with no name", () => setDoc(doc(adminDoc(), "ingr
 await cannot("a classification name that is too long", () => setDoc(doc(adminDoc(), "ingredientClassifications/x"), { name: "x".repeat(41) }));
 await cannot("a classification with a field that is not allowed", () => setDoc(doc(adminDoc(), "ingredientClassifications/x"), { name: "X", extra: 1 }));
 await cannot("a user adds a classification", () => setDoc(doc(user(), "ingredientClassifications/x"), { name: "X" }));
+await cannot("the app (anyone not an admin) reads the TEST list", () => getDoc(doc(user(), "ingredientClassificationsTest/other")));
+await can("an admin writes the TEST list", () => setDoc(doc(adminDoc(), "ingredientClassificationsTest/other"), { name: "Other" }));
+await can("an admin reads the TEST list", () => getDoc(doc(adminDoc(), "ingredientClassificationsTest/other")));
+await cannot("even an admin deletes the TEST fallback", () => deleteDoc(doc(adminDoc(), "ingredientClassificationsTest/other")));
+await cannot("a user writes the TEST list", () => setDoc(doc(user(), "ingredientClassificationsTest/x"), { name: "X" }));
 await cannot("nobody signed in adds a classification", () => setDoc(doc(anon(), "ingredientClassifications/x"), { name: "X" }));
 await cannot("a user deletes a classification", () => deleteDoc(doc(user(), "ingredientClassifications/other")));
 

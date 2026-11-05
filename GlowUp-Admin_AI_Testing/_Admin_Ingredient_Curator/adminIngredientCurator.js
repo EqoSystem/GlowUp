@@ -45,9 +45,9 @@ import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
 import { setPageSettings } from "../_Shared/adminSettingsMenu.js";
-import { loadClassifications, classifications, classificationName, openClassificationManager, askNewClassification, openFieldMigration, addStartingClassifications } from "../_Shared/adminClassifications.js";
+import { loadClassifications, classifications, classificationName, openClassificationManager, askNewClassification, openFieldMigration, addStartingClassifications, TEST_MODE } from "../_Shared/adminClassifications.js";
 import { makeCombo } from "../_Shared/adminSelect.js";
-import { aliasesWithInci, firstAlias, needsClassification, MAX_PURPOSE } from "../_Shared/classificationRules.js";
+import { aliasesWithInci, firstAlias, needsClassification, MAX_PURPOSE, CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING } from "../_Shared/classificationRules.js";
 
 const pageState = { page: 1, size: 10 };          // the list shows ten ingredients at a time
 const BATCH_LIMIT = 400;                          // Firestore allows 500 writes in one batch
@@ -150,6 +150,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     setupNavigationGuard();
     await requireAdmin();
 
+    if (TEST_MODE) {                  // a preview or localhost: real ingredients, but a TEST copy of the classification list
+        const banner = document.createElement("div");
+        banner.className = "test-banner";
+        banner.setAttribute("role", "note");
+        banner.textContent = "TEST COPY: the classifications on this address are a separate test list. Saving an ingredient and the field change are switched off here, so nothing live is changed by them.";
+        document.querySelector("main.main-content > header.topbar").after(banner);
+    }
     await loadLists();                // allergen families, highlights and skin conditions: one document, built-in lists when it is missing
     await loadClassifications();      // their own collection: about 25 reads when the page opens
     // a database that has no classification at all gets the starting list once (an admin is signed in here); it is never added again by itself
@@ -1255,6 +1262,7 @@ async function saveIngredient(event) {
     const form = el("addIngredientForm");
     const saveButton = el("saveIngredientBtn");
     if (saveButton.disabled) return;
+    if (TEST_MODE) { setFormError(form, "This is the test copy of the site: saving is switched off here, so no live ingredient gets a test classification."); return; }
 
     const clean = (id) => el(id).value.replace(/\s+/g, " ").trim();
     const name = clean("ingredientNameInput");
@@ -1269,11 +1277,11 @@ async function saveIngredient(event) {
     const avoidTypes = types.avoid, goodTypes = types.good, avoidConditions = conditions.avoid, goodConditions = conditions.good;
 
     if (!name) { setFormError(form, "Type the INCI name."); el("ingredientNameInput").focus(); return; }
-    // a NEW ingredient needs a classification and a purpose. An existing one that has none yet can be saved without (it is "Needs classification"
-    // until an admin fills it in), so editing any other box is never blocked; one that has them cannot lose them.
+    // a NEW ingredient needs a classification and a purpose. Whether an EXISTING one that has none yet may be saved without is decided for each
+    // box on its own in classificationRules.js (CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING); one that has them cannot lose them.
     const existing = editingIngredientId ? everyIngredient.find((i) => i.id === editingIngredientId) : null;
-    if ((!classificationId || classificationId === ADD_CLASS) && !(existing && lacksClass(existing))) { setFormError(form, "Choose the ingredient classification."); el("ingredientClassInput").focus(); return; }
-    if (!purpose && !(existing && !existing.purpose)) { setFormError(form, "Write one line on what this ingredient does in a product."); el("ingredientPurposeInput").focus(); return; }
+    if ((!classificationId || classificationId === ADD_CLASS) && (!existing || CLASSIFICATION_REQUIRED_ON_EXISTING || !lacksClass(existing))) { setFormError(form, "Choose the ingredient classification."); el("ingredientClassInput").focus(); return; }
+    if (!purpose && (!existing || PURPOSE_REQUIRED_ON_EXISTING || existing.purpose)) { setFormError(form, "Write one line on what this ingredient does in a product."); el("ingredientPurposeInput").focus(); return; }
     if (!description) { setFormError(form, "Write a short user-friendly definition."); el("ingredientDescInput").focus(); return; }
     // reference links: one per line, "Title | https://..." or just the address; only https is kept
     const sourceLines = el("ingredientSourcesInput").value.split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);

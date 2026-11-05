@@ -74,3 +74,6 @@
 .lists-row.class-row { grid-template-columns: minmax(0, 1fr) auto; }
 .class-row-name { min-width: 0; overflow-wrap: anywhere; font-size: var(--fs-base); }
 .migration-lines { margin: 0 0 10px; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-base); }
+
+/* shown on any address that is not the live site */
+.test-banner { margin: 12px 26px 0; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--warn, #d9a441); background: color-mix(in srgb, var(--warn, #d9a441) 16%, var(--surface)); color: var(--text); font-size: var(--fs-sm); }

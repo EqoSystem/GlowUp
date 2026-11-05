@@ -100,6 +100,8 @@ The classification list, managed by admins in the Ingredient Curator. Everyone c
 | `name` | text | 1 to 40 characters; no two the same, ignoring capitals and extra spaces (the website checks this). |
 | `createdAt`, `updatedAt` | time | |
 
+`ingredientClassificationsTest/{id}` has the same shape. Only admins read and write it; the website uses it on any address that is not the live site (a preview, localhost), so a preview can never change the real list.
+
 ### `ingredients/{id}`
 
 | Field | Type | Notes |

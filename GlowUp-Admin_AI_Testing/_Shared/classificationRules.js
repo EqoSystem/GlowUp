@@ -5,6 +5,20 @@
 // "other" is the safe fallback: it can be renamed but never deleted.
 
 export const COLLECTION = "ingredientClassifications";
+
+// TEST COPY. Only the live site (and the Firebase hosts of the project) use the real collection. Any other address (a Vercel preview, localhost)
+// reads and writes "ingredientClassificationsTest" instead, so looking at a preview can never put anything into the live list.
+export const TEST_COLLECTION = "ingredientClassificationsTest";
+export const LIVE_HOSTS = ["glowup-admin-snowy.vercel.app", "glowup-admin-portal.firebaseapp.com", "glowup-admin-portal.web.app"];
+export const isTestHost = (hostname) => !LIVE_HOSTS.includes(String(hostname || "").toLowerCase());
+export const collectionFor = (hostname) => (isTestHost(hostname) ? TEST_COLLECTION : COLLECTION);
+
+// TWO SEPARATE DECISIONS about saving an ingredient that already exists and has nothing in these boxes yet (all 937 start that way):
+//   CLASSIFICATION_REQUIRED_ON_EXISTING (asked for 5 November 2026): false = such an ingredient can still be saved while another box is edited.
+//   PURPOSE_REQUIRED_ON_EXISTING (my decision, not asked for; same reason; change it here alone): false = the same for Purpose.
+// A NEW ingredient always needs both, and an existing one that has them cannot lose them.
+export const CLASSIFICATION_REQUIRED_ON_EXISTING = false;
+export const PURPOSE_REQUIRED_ON_EXISTING = false;
 export const FALLBACK_ID = "other";
 export const MAX_NAME = 40;
 export const MAX_PURPOSE = 120;

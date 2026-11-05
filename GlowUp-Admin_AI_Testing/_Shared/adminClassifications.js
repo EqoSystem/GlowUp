@@ -8,8 +8,11 @@ import { db } from "../_Database/firebase-console.js";
 import { collection, doc, serverTimestamp, deleteField, getDocs as readDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getDocs, setDoc, updateDoc, deleteDoc, writeBatch, noteReads } from "./adminStore.js";
 import { dialogFrame, askConfirm, askText, toast } from "./adminShell.js";
-import { COLLECTION, FALLBACK_ID, MAX_NAME, cleanName, checkName, usersOf, canRemove, missingStarting, migrationPlan } from "./classificationRules.js";
+import { collectionFor, isTestHost, FALLBACK_ID, MAX_NAME, cleanName, checkName, usersOf, canRemove, missingStarting, migrationPlan } from "./classificationRules.js";
 
+/** True on any address that is not the live site: the classifications are then a test copy, and nothing that changes ingredients may run. */
+export const TEST_MODE = isTestHost(typeof location !== "undefined" ? location.hostname : "");
+const COLLECTION = collectionFor(typeof location !== "undefined" ? location.hostname : "");
 const BATCH_LIMIT = 400;                              // Firestore allows 500 writes in one batch
 let current = [];                                     // [{ id, name }], "Other" last
 
@@ -222,6 +225,7 @@ function downloadBackup(documents) {
 
 /** Shows what the field change will do (it reads the list fresh, about 940 reads, and writes nothing), and does it when confirmed. */
 export async function openFieldMigration(onDone) {
+    if (TEST_MODE) { toast("This is the test copy of the site: the field change writes live ingredients, so it is switched off here.", "error"); return; }
     let documents;
     try {
         const snapshot = await readDocs(collection(db, "ingredients"));

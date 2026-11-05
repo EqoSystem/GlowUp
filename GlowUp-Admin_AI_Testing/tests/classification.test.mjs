@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { STARTING_NAMES, FALLBACK_ID, MAX_NAME, startingList, missingStarting, startingId, checkName, nameKey, canRemove, usersOf, needsClassification, aliasesWithInci, firstAlias, migrationPlan, migrationWaits } from "../_Shared/classificationRules.js";
+import { STARTING_NAMES, FALLBACK_ID, MAX_NAME, startingList, missingStarting, startingId, isTestHost, collectionFor, CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING, checkName, nameKey, canRemove, usersOf, needsClassification, aliasesWithInci, firstAlias, migrationPlan, migrationWaits } from "../_Shared/classificationRules.js";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const read = (file) => readFileSync(path.join(root, file), "utf8");
@@ -32,10 +32,11 @@ equal([startingId("pH adjuster"), startingId("Wax / Structuring agent"), startin
       ["ph-adjuster", "wax-structuring-agent", "filler-bulking-agent", "other", "preservative"], "the id is the name: lowercase, spaces and slashes become hyphens");
 check(list.every((c) => /^[a-z0-9]+(-[a-z0-9]+)*$/.test(c.id)), "every starting id is lowercase words joined by hyphens");
 equal(list.map((c) => c.id), STARTING_NAMES.map(startingId), "the ids are the same for everybody: two admins seeding at once write the same documents");
-const js2 = read("_Admin_Ingredient_Curator/adminIngredientCurator.js"), combo = read("_Shared/adminSelect.js");
+const shared = read("_Shared/adminClassifications.js"), js2 = read("_Admin_Ingredient_Curator/adminIngredientCurator.js"), combo = read("_Shared/adminSelect.js");
 check(/document\.body\.appendChild\(pop\)/.test(combo) && /box\.appendChild\(pop\)/.test(combo), "the open list is moved to the page body, out of the window's scroll area");
 check(/if \(down\) \{ pop\.style\.top/.test(combo) && /pop\.style\.bottom = window\.innerHeight/.test(combo), "the list opens upward when there is no room below");
-check(/!\(existing && lacksClass\(existing\)\)/.test(js2), "an existing ingredient without a classification can still be saved; a new one cannot");
+check(/CLASSIFICATION_REQUIRED_ON_EXISTING \|\| !lacksClass\(existing\)/.test(js2) && /PURPOSE_REQUIRED_ON_EXISTING \|\| existing\.purpose/.test(js2), "classification and purpose are two separate decisions about existing ingredients; a new one needs both");
+check(/if \(TEST_MODE\) \{ setFormError/.test(js2) && /if \(TEST_MODE\) \{ toast/.test(shared), "on a test address saving an ingredient and the field change are switched off");
 
 
 // ---- names
@@ -85,9 +86,17 @@ equal(migrationPlan([{ id: "x", name: "Y", techName: "Z", classificationId: "bin
 equal(migrationWaits(documents.slice(4), []), true, "without the list the change still waits");
 equal(migrationWaits(documents.slice(4), list), false, "with the list and nothing to move it is finished");
 
+// ---- the test copy: only the live site writes the real list
+equal(collectionFor("glowup-admin-snowy.vercel.app"), "ingredientClassifications", "the live site uses the real list");
+equal(collectionFor("glowup-admin-test.vercel.app"), "ingredientClassificationsTest", "a preview uses the test list");
+equal(collectionFor("localhost"), "ingredientClassificationsTest", "localhost uses the test list");
+equal(collectionFor(""), "ingredientClassificationsTest", "an unknown address uses the test list");
+equal(isTestHost("GLOWUP-ADMIN-SNOWY.vercel.app"), false, "capital letters in the address do not matter");
+equal([CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING], [false, false], "the two decisions are separate constants");
+
 // ---- the page
 const js = read("_Admin_Ingredient_Curator/adminIngredientCurator.js"), html = read("_Admin_Ingredient_Curator/adminIngredientCurator.html");
-const shared = read("_Shared/adminClassifications.js");
+// (shared is read above)
 check(/<label for="ingredientNameInput">INCI name/.test(html), 'the name box is called "INCI name"');
 check(!/ingredientTechInput/.test(html + js), "the old INCI box is gone");
 check(/<select id="ingredientClassInput">/.test(html), "the classification is a drop-down, not free text");
