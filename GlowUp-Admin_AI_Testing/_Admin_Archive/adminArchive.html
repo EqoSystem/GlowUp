@@ -38,12 +38,9 @@
     <main class="main-content" data-title="Archive" data-subtitle="What left the Recycle bin: kept 30 days, then deleted">
         <!-- draws the menu and the top bar with the first picture: see pageFrame.js -->
         <script src="../_Shared/pageFrame.js"></script>
-        <div class="board">
-
-            <!-- which kind of entry, and the search -->
-            <section class="panel" data-panel="tools" data-label="Kind and search" data-w="12">
-                <div class="toolbar">
-                    <div class="segmented" id="archiveTabs" role="tablist" aria-label="What to show">
+        <!-- what goes into the page header, beside the title: see placeHeaderParts in adminShell.js -->
+        <div data-header-parts hidden>
+                    <div class="segmented header-tabs" id="archiveTabs" role="tablist" aria-label="What to show">
                         <button type="button" class="seg" role="tab" data-kind="ingredients"><i data-icon="flask"></i>Ingredients <span class="tab-count" id="countIngredients"></span></button>
                         <button type="button" class="seg" role="tab" data-kind="brands"><i data-icon="tag"></i>Brands <span class="tab-count" id="countBrands"></span></button>
                         <button type="button" class="seg" role="tab" data-kind="products"><i data-icon="lipstick"></i>Products <span class="tab-count" id="countProducts"></span></button>
@@ -53,11 +50,12 @@
                         <input type="text" placeholder="Search the Archive" class="search-input" id="archiveSearchInput" autocomplete="off" aria-label="Search the Archive">
                         <button type="button" class="search-clear" id="archiveSearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
                     </div>
-                    <span class="spacer"></span>
-                    <a class="btn" href="../_Admin_Recycle_Bin/adminRecycleBin.html" data-tip="Back to the Recycle bin."><i data-icon="trash"></i>Recycle bin</a>
+                    <div data-header-end>
+                        <a class="btn" href="../_Admin_Recycle_Bin/adminRecycleBin.html" data-tip="Back to the Recycle bin."><i data-icon="trash"></i>Recycle bin</a>
                     <button type="button" class="guide-badge" data-tip-title="How the Archive works" data-tip="Entries moved here from the Recycle bin are kept 30 days, counted from the day they were archived, then a daily job on the server deletes them for good. Restore puts an entry back in the Recycle bin as it was. Delete now removes it at once, after a copy is saved to your computer.">i</button>
-                </div>
-            </section>
+                    </div>
+        </div>
+        <div class="board">
 
             <!-- the archived entries -->
             <section class="panel" data-panel="list" data-label="Archived entries" data-w="12">

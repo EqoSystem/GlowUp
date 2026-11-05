@@ -8,7 +8,7 @@ import {
     requireAdmin, wireSignOut, setupNavigationGuard, escapeHtml, asArray, timeAgo, formatWhen, notify, describeError, wireSearch, dialogIsOpen
 } from "../_Shared/adminCommon.js";
 import { matchesSearch } from "../_Shared/glowupRules.js";
-import { mountShell, paginate, renderPager, icon, BIN_ICON, askConfirm, hydrate } from "../_Shared/adminShell.js";
+import { mountShell, placeHeaderParts, paginate, renderPager, icon, BIN_ICON, askConfirm, hydrate } from "../_Shared/adminShell.js";
 import { listArchive, restoreFromArchive, deleteFromArchive, daysLeft, expired, KEEP_DAYS, WARN_DAYS } from "../_Shared/adminArchive.js";
 
 const el = (id) => document.getElementById(id);
@@ -28,6 +28,7 @@ const pager = { page: 1, size: 10 };
 
 document.addEventListener("DOMContentLoaded", async () => {
     mountShell("archive");
+    placeHeaderParts();                 // the same header as the Recycle Bin (New8.pdf)
     wireSignOut();
     setupNavigationGuard();
     try { const wanted = new URLSearchParams(location.search).get("show"); if (KINDS[wanted]) kind = wanted; } catch (error) { /* keep the first tab */ }
