@@ -859,8 +859,8 @@ function wireBoard() {
 // ---------------------------------------------------------------------------------------------
 // The Layout & Style view
 // ---------------------------------------------------------------------------------------------
-// Since 31 October 2026 these controls are not a window of their own: adminSettingsMenu.js owns the ONE floating window (drag,
-// resize, place and size remembered) and shows this view in it when "Layout and style" is chosen, with a back arrow. Here only
+// Since 31 October 2026 these controls are not a window of their own: adminSettingsMenu.js owns the ONE floating window (fixed
+// place, resized from its corner) and shows this view in it when "Layout and style" is chosen, with a back arrow. Here only
 // the controls are built (into #layoutHost) and kept painted. Arranging, "Panel" and Esc hide the window with "glowup:settings-close".
 let colourTheme = "";                             // the theme whose colours the view edits ("" = the one on screen)
 const closeWindow = () => document.dispatchEvent(new CustomEvent("glowup:settings-close"));

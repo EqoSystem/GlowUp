@@ -249,8 +249,8 @@ export function mountShell(page) {
     const sidebar = document.querySelector("aside.sidebar");
     const topbar = main.querySelector("header.topbar");
     wireNavDrop(sidebar.querySelector(".nav-links"));
-    // the top bar keeps only the page's own tools (search, Add, More: placeInHeader). Layout and style, the Recycle bin,
-    // the Archive, light / dark / system and Sign Out are in the settings menu behind the GlowUp logo (adminSettingsMenu.js).
+    // the top bar keeps only the page's own tools (search, Add, the gear: placeInHeader). Layout and style, the Recycle bin and
+    // light / dark / system are in the settings window behind the GlowUp logo (adminSettingsMenu.js).
     topbar.querySelector(".topbar-tools").innerHTML = "";
     followSystemTheme();
 

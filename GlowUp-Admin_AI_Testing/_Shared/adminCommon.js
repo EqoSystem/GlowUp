@@ -108,6 +108,9 @@ function showSignedInAs(user) {
     let line = footer.querySelector(".signed-in-as");
     if (!line) { line = document.createElement("p"); line.className = "signed-in-as"; footer.insertBefore(line, footer.firstChild); }
     line.textContent = user.email || "Signed in";
+    // the folded menu shows only the icon: pointing at it still says who is signed in
+    const button = footer.querySelector(".sign-out");
+    if (button) button.dataset.tip = "Sign Out" + (user.email ? " " + user.email : "");
     line.title = user.email || "";
 }
 
@@ -121,10 +124,7 @@ export function wireSignOut() {
         link.dataset.wired = "1";
         link.addEventListener("click", (event) => { event.preventDefault(); confirmSignOut(); });
     });
-    // Sign Out in the settings menu behind the logo (adminSettingsMenu.js) asks through this event: the same question, the same steps
-    if (!signOutEventWired) { signOutEventWired = true; document.addEventListener("glowup:sign-out", confirmSignOut); }
 }
-let signOutEventWired = false;
 
 async function confirmSignOut() {
     const sure = await askConfirm({ title: "Sign out?", message: "You will need your e-mail and password to come back in.", confirmLabel: "Sign out", danger: true });
