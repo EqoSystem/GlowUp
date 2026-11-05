@@ -25,7 +25,6 @@ document.addEventListener("DOMContentLoaded", () => {
         eye.classList.toggle("on", show);
         eye.setAttribute("aria-pressed", String(show));
         eye.setAttribute("aria-label", show ? "Hide the password" : "Show the password");
-        eye.title = show ? "Hide the password" : "Show the password";
     };
     if (eye) {
         eye.addEventListener("click", () => { showPassword(passwordInput.type === "password"); passwordInput.focus(); });

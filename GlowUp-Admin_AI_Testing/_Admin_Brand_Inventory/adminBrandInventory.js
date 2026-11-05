@@ -2381,21 +2381,21 @@ function renderShadeEditor() {
     const swatch = (shade) => `background:${escapeHtml(shade)}`;
     const items = formShades.map((shade, index) => `
         <span class="shade-item" data-index="${index}">
-            <label class="shade-swatch" style="${swatch(shade)}" title="Pick a colour"><input type="color" class="shade-picker" value="${escapeHtml(shade.toLowerCase())}" data-index="${index}" aria-label="Pick the colour of shade ${index + 1}"></label>
+            <label class="shade-swatch" style="${swatch(shade)}" ><input type="color" class="shade-picker" value="${escapeHtml(shade.toLowerCase())}" data-index="${index}" aria-label="Pick the colour of shade ${index + 1}"></label>
             <input type="text" class="shade-hex" value="${escapeHtml(shade)}" maxlength="22" spellcheck="false" autocomplete="off" data-index="${index}" aria-label="Hex code of shade ${index + 1}">
-            <input type="text" class="shade-code" value="${escapeHtml(formShadeCodes[index] || "")}" maxlength="16" spellcheck="false" autocomplete="off" placeholder="Code" data-index="${index}" title="The shade code printed on the pack, such as 119 or N20" aria-label="Shade code of shade ${index + 1}, as printed on the pack">
-            <button type="button" data-move="-1" data-index="${index}" title="Move earlier" aria-label="Move shade ${index + 1} earlier"${index === 0 ? " disabled" : ""}>‹</button>
-            <button type="button" data-move="1" data-index="${index}" title="Move later" aria-label="Move shade ${index + 1} later"${index === formShades.length - 1 ? " disabled" : ""}>›</button>
-            <button type="button" data-remove="${index}" title="Remove this shade" aria-label="Remove shade ${index + 1}">×</button>
+            <input type="text" class="shade-code" value="${escapeHtml(formShadeCodes[index] || "")}" maxlength="16" spellcheck="false" autocomplete="off" placeholder="Code" data-index="${index}" aria-label="Shade code of shade ${index + 1}, as printed on the pack">
+            <button type="button" data-move="-1" data-index="${index}" aria-label="Move shade ${index + 1} earlier"${index === 0 ? " disabled" : ""}>‹</button>
+            <button type="button" data-move="1" data-index="${index}" aria-label="Move shade ${index + 1} later"${index === formShades.length - 1 ? " disabled" : ""}>›</button>
+            <button type="button" data-remove="${index}" aria-label="Remove shade ${index + 1}">×</button>
         </span>`).join("");
     let tail;
     if (shadeAdding && formShades.length < MAX_SHADES) {
         tail = `<span class="shade-item shade-new">
-            <label class="shade-swatch" style="${swatch(shadeDraft)}" title="Pick a colour"><input type="color" class="shade-picker" id="newShadePicker" value="${escapeHtml(shadeDraft.toLowerCase())}" aria-label="Pick a colour for the new shade"></label>
+            <label class="shade-swatch" style="${swatch(shadeDraft)}" ><input type="color" class="shade-picker" id="newShadePicker" value="${escapeHtml(shadeDraft.toLowerCase())}" aria-label="Pick a colour for the new shade"></label>
             <input type="text" class="shade-hex" id="newShadeHex" value="${escapeHtml(shadeDraft)}" maxlength="22" spellcheck="false" autocomplete="off" placeholder="#C24B62" aria-label="Hex code of the new shade">
-            <input type="text" class="shade-code" id="newShadeCode" value="" maxlength="16" spellcheck="false" autocomplete="off" placeholder="Code" title="The shade code printed on the pack, such as 119 or N20" aria-label="Shade code of the new shade, as printed on the pack">
+            <input type="text" class="shade-code" id="newShadeCode" value="" maxlength="16" spellcheck="false" autocomplete="off" placeholder="Code" aria-label="Shade code of the new shade, as printed on the pack">
             <button type="button" class="row-btn" id="confirmShadeBtn">Add</button>
-            <button type="button" id="cancelShadeBtn" title="Cancel" aria-label="Cancel adding a shade">×</button>
+            <button type="button" id="cancelShadeBtn" aria-label="Cancel adding a shade">×</button>
         </span>`;
     } else if (formShades.length < MAX_SHADES) tail = `<button type="button" class="row-btn" id="addShadeBtn">${icon("plus")}Shade</button>`;
     else tail = `<span class="field-hint">A product can have up to ${MAX_SHADES} shades.</span>`;

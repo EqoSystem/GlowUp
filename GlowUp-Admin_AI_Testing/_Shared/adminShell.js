@@ -568,9 +568,15 @@ function showTip(target) {
     pop.style.top = Math.max(8, top) + "px";
 }
 export function hideTip() { if (pop) pop.classList.remove("show"); }
-document.addEventListener("mouseover", (event) => { const t = event.target.closest && event.target.closest("[data-tip]"); if (t) showTip(t); });
-document.addEventListener("mouseout", (event) => { const t = event.target.closest && event.target.closest("[data-tip]"); if (t && !t.contains(event.relatedTarget)) hideTip(); });
-document.addEventListener("focusin", (event) => { const t = event.target.closest && event.target.closest("[data-tip]"); if (t) showTip(t); });
+// A control with a label or an icon gets no hover label (5 November 2026): its aria-label is for screen readers. The "i" badges keep theirs: it is all they do.
+const CONTROL = "button, a, select, input, textarea, label, [role=button]";
+const tipOf = (node) => {
+    const t = node.closest && node.closest("[data-tip]");
+    return t && (t.classList.contains("guide-badge") || !t.closest(CONTROL)) ? t : null;
+};
+document.addEventListener("mouseover", (event) => { const t = tipOf(event.target); if (t) showTip(t); });
+document.addEventListener("mouseout", (event) => { const t = tipOf(event.target); if (t && !t.contains(event.relatedTarget)) hideTip(); });
+document.addEventListener("focusin", (event) => { const t = tipOf(event.target); if (t) showTip(t); });
 document.addEventListener("focusout", hideTip);
 document.addEventListener("scroll", hideTip, true);
 document.addEventListener("pointerdown", hideTip, true);

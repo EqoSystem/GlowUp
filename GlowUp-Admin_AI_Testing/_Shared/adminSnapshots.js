@@ -477,7 +477,6 @@ export function openSnapshotReview(options) {
         const edit = make("button", "btn", "Edit & Approve"); edit.type = "button";
         const approve = make("button", "save-btn snapx-approve", "Approve & Publish"); approve.type = "button";
         const toForm = make("button", "btn", "Open in Add Product form"); toForm.type = "button";
-        toForm.title = "Check and save it with the same form as a product you add by hand. The brand is added first when it is new.";
         if (typeof options.onOpenForm !== "function") toForm.hidden = true;
         actions.append(nav, make("span", "spacer"), reject, edit, toForm, approve);
 

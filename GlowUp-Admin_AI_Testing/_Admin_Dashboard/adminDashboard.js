@@ -94,7 +94,6 @@ function setMetric(id, value, title) {
     if (!box) return;
     box.classList.remove("skeleton");
     box.textContent = value;
-    box.title = title || "";
 }
 
 // ---------------------------------------------------------------------------------------------

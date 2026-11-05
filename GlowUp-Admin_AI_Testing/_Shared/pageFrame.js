@@ -60,16 +60,16 @@
         // The bottom holds the signed-in e-mail and Sign Out (back from that window since 5 November 2026). adminCommon.js fills the e-mail
         // in once the sign-in check has answered, and wires the button.
         sidebar.innerHTML =
-            '<div class="sidebar-brand"><button type="button" class="brand-menu" id="brandMenuBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="settingsWindow" aria-label="Settings" data-tip="Settings">' +
+            '<div class="sidebar-brand"><button type="button" class="brand-menu" id="brandMenuBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="settingsWindow" aria-label="Settings">' +
             '<span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"><span class="brand-badge" id="brandBinBadge" hidden></span></span></button><span class="brand-title label">Glow Up</span></div>' +
             '<ul class="nav-links" id="sidebarNav" aria-label="Pages"><li class="nav-drop" aria-hidden="true"></li>' +
             NAV.map(function (n) {
                 var here = n.id === page;
                 // the page you are on is marked on the link itself (and for screen readers), not by where the pointer is
-                return '<li><a href="' + n.href + '"' + (here ? ' class="active" aria-current="page"' : "") + ' title="' + esc(n.label) + '">' + svg(n.icon) + '<span class="label">' + esc(n.label) + "</span></a></li>";
+                return '<li><a href="' + n.href + '"' + (here ? ' class="active" aria-current="page"' : "") + ' aria-label="' + esc(n.label) + '">' + svg(n.icon) + '<span class="label">' + esc(n.label) + "</span></a></li>";
             }).join("") +
             "</ul>" +
-            '<div class="sidebar-footer"><p class="signed-in-as" title="Signed in as"></p><button type="button" class="sign-out" aria-label="Sign Out" data-tip="Sign Out">' + svg("logout") + '<span class="label">Sign Out</span></button></div>';
+            '<div class="sidebar-footer"><p class="signed-in-as"></p><button type="button" class="sign-out" aria-label="Sign Out">' + svg("logout") + '<span class="label">Sign Out</span></button></div>';
         document.body.insertBefore(sidebar, main);
 
         // THE BUTTON THAT FOLDS THE MENU: an edge tab, half on the sidebar and half over its border line, below the last link. It is
@@ -90,7 +90,6 @@
             var text = open ? "Collapse sidebar" : "Expand sidebar";
             toggle.setAttribute("aria-expanded", open ? "true" : "false");
             toggle.setAttribute("aria-label", text);
-            toggle.setAttribute("data-tip", text);
         };
         // lower-middle of the window, but always below the last link and never off the bottom (on a very short window the bottom wins:
         // the tab stays reachable, and it is too narrow to reach the links beside it)

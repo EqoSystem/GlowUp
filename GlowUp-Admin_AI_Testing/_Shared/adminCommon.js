@@ -108,10 +108,6 @@ function showSignedInAs(user) {
     let line = footer.querySelector(".signed-in-as");
     if (!line) { line = document.createElement("p"); line.className = "signed-in-as"; footer.insertBefore(line, footer.firstChild); }
     line.textContent = user.email || "Signed in";
-    // the folded menu shows only the icon: pointing at it still says who is signed in
-    const button = footer.querySelector(".sign-out");
-    if (button) button.dataset.tip = "Sign Out" + (user.email ? " " + user.email : "");
-    line.title = user.email || "";
 }
 
 /**

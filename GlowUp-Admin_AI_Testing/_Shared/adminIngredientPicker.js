@@ -86,7 +86,6 @@ export function mountIngredientPicker(options) {
             const pill = make("span", "ing-pill" + (linked ? " linked" : " unlinked"));
             const label = make(linked ? "span" : "button", "ing-pill-name", name);
             if (!linked) { label.type = "button"; label.addEventListener("click", () => openCreate(name)); }
-            pill.title = linked ? WORDS.linked : WORDS.unlinked;
             const x = make("button", "ing-pill-x");
             x.type = "button";
             x.setAttribute("aria-label", WORDS.remove(name));
@@ -97,7 +96,6 @@ export function mountIngredientPicker(options) {
             noteButton.type = "button";
             noteButton.textContent = "✎";
             noteButton.setAttribute("aria-label", own ? WORDS.noteSet(own.caution || (own.percent !== null ? own.percent + "%" : "")) : WORDS.note);
-            noteButton.title = own ? WORDS.noteSet(own.caution || (own.percent !== null ? own.percent + "%" : "")) : WORDS.note;
             noteButton.addEventListener("click", () => openNote(name));
             pill.append(label, noteButton, x);
             pills.appendChild(pill);

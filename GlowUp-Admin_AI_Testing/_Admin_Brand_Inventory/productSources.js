@@ -58,6 +58,7 @@ export function mountSourceEditor(opts) {
                 : row(index, "secondary", line, allowed))).join("")}
             ${adding ? `<div class="source-row"><input type="url" class="text-input" maxlength="300" inputmode="url" autocomplete="off" id="productSecondaryNew" placeholder="https://..." aria-label="New secondary source"></div>` : ""}
             ${list.length < MAX_SOURCES && !adding ? `<div><button type="button" class="row-btn" id="addSourceBtn">${icon("plus")}Add a source</button></div>` : ""}
+            ${brand && !allowed ? `<span class="field-hint">${escapeHtml(PILOT_NOTE)}</span>` : ""}
             <span class="field-hint">Web addresses only (https). Saving the form saves this product's sources. The buttons change other products, after you confirm.</span>`;
     }
 

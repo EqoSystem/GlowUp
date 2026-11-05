@@ -604,7 +604,7 @@ function toggleDetails(id) {
 function renderFit(container, group, options) {
     container.innerHTML = options.map((o, i) => {
         const name = `fit_${group}_${i}`;
-        const choice = (value, label, cls, tip) => `<label class="fit-choice ${cls}" title="${tip}"><input type="radio" name="${name}" value="${value}"${value === "" ? " checked" : ""}><span>${label}</span></label>`;
+        const choice = (value, label, cls, tip) => `<label class="fit-choice ${cls}"><input type="radio" aria-label="${tip}" name="${name}" value="${value}"${value === "" ? " checked" : ""}><span>${label}</span></label>`;
         return `<div class="fit-row" data-value="${escapeHtml(o.value)}"><span class="fit-name">${escapeHtml(o.label)}</span><span class="fit-choices">`
             + choice("avoid", "Avoid", "avoid", "The app warns users with this") + choice("", "&ndash;", "none", "No effect either way") + choice("good", "Good", "good", "The app counts it as a plus for users with this")
             + `</span></div>`;

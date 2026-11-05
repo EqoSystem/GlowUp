@@ -158,7 +158,7 @@ export function openListManager(kind, context) {
                     else if (verdict.warnings.length) note.textContent = "Saved as typed, but: " + verdict.warnings.join(" ");
                     else note.textContent = "";
                 });
-                if (builtIn(item)) { label.readOnly = true; label.title = "Built in: the name cannot change."; }
+                if (builtIn(item)) { label.readOnly = true; }
 
                 const middle = make("span", "lists-mid");
                 middle.appendChild(label);
@@ -176,11 +176,9 @@ export function openListManager(kind, context) {
                 const buttons = make("span", "lists-actions");
                 if (!builtIn(item)) {
                     const retire = make("button", "row-btn", item.retired ? "Restore" : "Retire"); retire.type = "button";
-                    retire.title = item.retired ? "Offer it in the pickers again." : "Hide it from the pickers. What is saved with it keeps working.";
                     retire.addEventListener("click", () => { item.retired = !item.retired; mark(); paint(); });
                     const del = make("button", "row-btn danger", "Delete"); del.type = "button";
                     del.disabled = count > 0;
-                    del.title = count > 0 ? `${count} ingredient${count === 1 ? "" : "s"} use it: retire it instead.` : "Remove it from the list for good.";
                     del.addEventListener("click", async () => {
                         if (!(await askConfirm({ title: `Delete "${item.label}"?`, message: "No ingredient uses it. Users who saved it keep their own text, but the app no longer knows it as a listed item.", confirmLabel: "Delete", danger: true }))) return;
                         work.splice(work.indexOf(item), 1); mark(); paint();
