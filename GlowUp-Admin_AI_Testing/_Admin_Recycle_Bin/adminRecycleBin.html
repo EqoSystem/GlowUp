@@ -40,13 +40,9 @@
     <main class="main-content" data-title="Recycle Bin" data-subtitle="What was removed: bring it back, or delete it for good">
         <!-- draws the menu and the top bar with the first picture: see pageFrame.js -->
         <script src="../_Shared/pageFrame.js"></script>
-        <div class="board">
-
-            <!-- which kind of entry, and the search: the page moves both into the header, beside the title (5 November 2026).
-                 The Archive button stays here, in its place. -->
-            <section class="panel" data-panel="tools" data-label="Archive" data-w="12">
-                <div class="toolbar">
-                    <div class="segmented" id="binTabs" role="tablist" aria-label="What to show">
+        <!-- what goes into the page header, beside the title: see placeHeaderParts in adminShell.js -->
+        <div data-header-parts hidden>
+                    <div class="segmented header-tabs" id="binTabs" role="tablist" aria-label="What to show">
                         <button type="button" class="seg" role="tab" data-kind="ingredients"><i data-icon="flask"></i>Ingredients <span class="tab-count" id="countIngredients"></span></button>
                         <button type="button" class="seg" role="tab" data-kind="brands"><i data-icon="tag"></i>Brands <span class="tab-count" id="countBrands"></span></button>
                         <button type="button" class="seg" role="tab" data-kind="products"><i data-icon="lipstick"></i>Products <span class="tab-count" id="countProducts"></span></button>
@@ -56,13 +52,11 @@
                         <input type="text" placeholder="Search the Recycle bin" class="search-input" id="binSearchInput" autocomplete="off" aria-label="Search the Recycle bin">
                         <button type="button" class="search-clear" id="binSearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
                     </div>
-                    <span class="spacer"></span>
-                                        <div class="tool-group bin-tools" id="binTools">
+                    <div data-header-end>
                         <a class="btn" id="archiveLink" href="../_Admin_Archive/adminArchive.html" data-tip-title="Archive" data-tip="What left the Recycle bin. It is kept 30 days, then deleted for good."><i data-icon="archive"></i>Archive</a>
                     </div>
-                    <button type="button" class="guide-badge" data-tip-title="How the Recycle bin works" data-tip="Removing an entry puts it here: the app stops using it at once, and nothing is lost. Restore gives it back the status it had. Delete permanently takes it out of the database: that cannot be undone, so a copy is saved to your computer first.">i</button>
-                </div>
-            </section>
+        </div>
+        <div class="board">
 
             <!-- the removed entries -->
             <section class="panel" data-panel="list" data-label="Removed entries" data-w="12" data-no-fold>

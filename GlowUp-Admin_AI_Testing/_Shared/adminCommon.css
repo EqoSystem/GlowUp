@@ -1463,3 +1463,25 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 .note-row[data-tone="ok"] .note-level { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok); }
 .note-row[data-tone=""] .note-text { color: var(--muted); }
 @media (max-width: 700px) { .note-row { flex-wrap: wrap; } .note-text { flex-basis: 100%; order: 3; } }
+
+/* ---- the header of the Recycle Bin and the Archive (placeHeaderParts in adminShell.js): one line, the search gives way first ---- */
+.topbar.has-tabs { flex-wrap: nowrap; flex: none; }
+.topbar.has-tabs .topbar-titles { flex: none; }
+.topbar.has-tabs > .topbar-tools { flex: none; margin-left: auto; }
+.topbar.has-tabs > .topbar-tools .btn { white-space: nowrap; }
+.topbar > .header-tabs { flex: none; padding-block: 0; height: 36px; }
+.topbar > .header-tabs .seg { padding-block: 0; height: 30px; align-self: center; }
+.topbar.has-tabs > .search-container { order: 0; flex: 0 1 300px; max-width: none; min-width: 0; margin: 0; overflow: hidden; }
+.topbar.has-tabs > .search-container .search-input { height: 36px; padding-block: 0; }
+/* less room: the tabs keep their words and lose their icons and counts */
+@media (max-width: 900px) { .topbar > .header-tabs .seg svg.ic, .topbar > .header-tabs .tab-count { display: none; } }
+/* a phone: the header slides sideways rather than cut anything off */
+@media (max-width: 720px) { .topbar.has-tabs { overflow-x: auto; } }
+/* the Settings window open beside the title: the search goes first, then the tabs' words */
+html.settings-open .topbar.has-tabs > .search-container { flex: 1 1 0; }
+html.settings-open .topbar.has-tabs { overflow-x: auto; }
+@media (max-width: 1345px) {
+    html.settings-open .topbar > .header-tabs .seg { font-size: 0; gap: 0; padding-inline: 10px; }
+    html.settings-open .topbar > .header-tabs .seg svg.ic { display: inline-block; }
+    html.settings-open .topbar > .header-tabs .tab-count { display: none; }
+}

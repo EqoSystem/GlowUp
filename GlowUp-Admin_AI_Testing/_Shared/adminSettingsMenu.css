@@ -24,7 +24,8 @@ html.sb-collapsed .brand-menu { margin: 0; }
 /* the window starts where the page's title starts: while it is open the title slides out from under it .
    The search gives way first; only when even that is not enough does the header take a second line. */
 .topbar { transition: padding-left .2s var(--ease); }
-html.settings-open .topbar { padding-left: calc(var(--settings-w) + 26px); flex-wrap: wrap; }
+html.settings-open .topbar { padding-left: calc(var(--settings-w) + 26px); }
+html.settings-open .topbar:not(.has-tabs) { flex-wrap: wrap; }
 html.settings-open .topbar > .search-container { flex-basis: 0; min-width: 0; overflow: hidden; }
 /* a phone has no room beside the window: the header stays as it is */
 @media (max-width: 700px) { html.settings-open .topbar { padding-left: 26px; } }

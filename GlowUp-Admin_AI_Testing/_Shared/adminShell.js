@@ -237,6 +237,23 @@ export function placeInHeader(searchSelector, actionsId) {
     if (actions && tools) tools.insertBefore(actions, tools.firstChild);
 }
 
+/**
+ * The header of the Recycle Bin and the Archive: the tabs and the search beside the title, and the page's buttons at the far right.
+ * The parts wait in the page's <div data-header-parts hidden>. Call it right after mountShell. Returns the header.
+ */
+export function placeHeaderParts() {
+    const bar = document.querySelector("main.main-content > header.topbar");
+    const holder = document.querySelector("[data-header-parts]");
+    if (!bar || !holder) return bar;
+    const tools = bar.querySelector(".topbar-tools");
+    bar.classList.add("has-search", "has-tabs");
+    holder.querySelectorAll(":scope > .header-tabs, :scope > .search-container").forEach((part) => bar.insertBefore(part, tools));
+    const end = holder.querySelector(":scope > [data-header-end]");
+    if (end) tools.append(...end.childNodes);
+    holder.remove();
+    return bar;
+}
+
 export function mountShell(page) {
     const main = document.querySelector("main.main-content");
     document.body.classList.add("app");
