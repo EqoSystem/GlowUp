@@ -28,7 +28,7 @@ namespace GlowUp.Onboarding
         {
             OnboardingSession.LoadDraft();
             if (skinToneGroup != null && !string.IsNullOrEmpty(OnboardingSession.SkinTone)) skinToneGroup.Select(OnboardingSession.SkinTone, false);
-            if (feedbackText != null) feedbackText.text = "";
+            if (feedbackText != null) feedbackText.text = OnboardingSession.Social ? OnboardingSession.SocialReminder : "";
             Refresh();
         }
 

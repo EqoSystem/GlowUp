@@ -41,6 +41,9 @@ namespace GlowUp.Onboarding
         /// </summary>
         public static bool Social;
 
+        /// <summary>Said on the sign-up steps after a Google sign-in: Google gives only a name and an email, so everything else is asked here.</summary>
+        public const string SocialReminder = "You signed in with Google. Please fill in every field in these steps. Google does not share your age or birthday, so you will be asked for it on the last step.";
+
         /// <summary>
         /// The account this sign-up already has, by its id ("" = none yet). Since 12 October 2026 the account is made on
         /// Step 1, so that the "confirm your email" message can be sent; it is also set when somebody logs in with an

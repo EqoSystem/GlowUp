@@ -57,6 +57,9 @@ namespace GlowUp.Onboarding
         [SerializeField] private int minimumAge = 13;
         [SerializeField] private int emailMax = 100;
         [SerializeField] private string msgNoEmail = "Enter your email address.";
+        [SerializeField] private string msgNoFirstName = "Enter your first name.";
+        [SerializeField] private string msgNoLastName = "Enter your last name.";
+        [SerializeField] private string msgNoBirthday = "Enter your birthday: tap Edit and pick it. Your age is worked out from it.";
 
         [Header("Scenes")]
         [SerializeField] private string termsScene = SceneNames.Terms;
@@ -99,9 +102,13 @@ namespace GlowUp.Onboarding
             Set(conditions, string.Join(", ", OnboardingSession.SkinConditions)); Set(allergens, string.Join(", ", OnboardingSession.Allergens));
             if (feedbackText != null) feedbackText.text = "";
             if (email != null) email.characterLimit = emailMax;
-            SetEditing(false);
+            // something required is empty (a Google account has no birthday, and often only one name): the fields are open at once
+            SetEditing(MissingRequired());
             Refresh();
         }
+
+        /// <summary>True when the first name, the last name or the birthday is empty. They are required for every sign-up, also after a Google sign-in.</summary>
+        bool MissingRequired() => T(firstName).Length == 0 || T(lastName).Length == 0 || birthday == null || !birthday.Value.HasValue;
 
         /// <summary>Plain text lines (false) or input fields (true).</summary>
         public void SetEditing(bool value)
@@ -137,8 +144,8 @@ namespace GlowUp.Onboarding
         bool Valid(out string reason)
         {
             reason = "";
-            // Signed in with Google / Facebook: Step 1 was skipped, so a birthday is welcome here but not needed, and the
-            // email is the account's own. What IS filled in still has to follow the rules.
+            // Signed in with Google: Step 1 was skipped and Google gives no birthday, so the names and the birthday are asked here and
+            // are required, like on Step 1. The email is the account's own.
             bool social = OnboardingSession.Social;
             bool hasAccount = OnboardingSession.HasAccount;        // its email was confirmed on Step 1 and is fixed
             // the email: a well-known provider, or a domain that was checked online (an answer Step 1 already has is used again)
@@ -147,8 +154,11 @@ namespace GlowUp.Onboarding
                 reason = emailCheck != null && emailCheck.Message.Length > 0 ? emailCheck.Message : msgNoEmail;
                 return false;
             }
+            if (T(firstName).Length == 0) { reason = msgNoFirstName; return false; }
+            if (T(lastName).Length == 0) { reason = msgNoLastName; return false; }
             bool hasBirthday = birthday != null && birthday.Value.HasValue;
-            if (hasBirthday ? InputRules.CalculateAge(birthday.Value.Value) < minimumAge : !social) { reason = $"You must be at least {minimumAge} years old."; return false; }
+            if (!hasBirthday) { reason = msgNoBirthday; return false; }
+            if (InputRules.CalculateAge(birthday.Value.Value) < minimumAge) { reason = $"You must be at least {minimumAge} years old."; return false; }
             return true;
         }
 
@@ -170,7 +180,6 @@ namespace GlowUp.Onboarding
                 var dob = birthday.Value.Value;
                 OnboardingSession.BirthdayIso = dob.ToString("yyyy-MM-dd"); OnboardingSession.Age = InputRules.CalculateAge(dob);
             }
-            else { OnboardingSession.BirthdayIso = ""; OnboardingSession.Age = 0; }      // no birthday given (Google / Facebook sign-up): the age stays "not set"
             if (skinType != null && skinTypeOptions.Length > 0) OnboardingSession.SkinType = skinTypeOptions[Mathf.Clamp(skinType.value, 0, skinTypeOptions.Length - 1)];
             if (skinTone != null && skinToneOptions.Length > 0) OnboardingSession.SkinTone = skinToneOptions[Mathf.Clamp(skinTone.value, 0, skinToneOptions.Length - 1)];
             OnboardingSession.SkinConditions = ParseList(T(conditions));

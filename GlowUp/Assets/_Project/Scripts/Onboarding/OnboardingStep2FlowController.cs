@@ -47,7 +47,7 @@ namespace GlowUp.Onboarding
             _ = ListsRepository.Refresh();
             if (skinTypeGroup != null && !string.IsNullOrEmpty(OnboardingSession.SkinType)) skinTypeGroup.Select(OnboardingSession.SkinType, false);
             if (conditions != null) conditions.SetSelected(OnboardingSession.SkinConditions);
-            if (feedbackText != null) feedbackText.text = "";
+            if (feedbackText != null) feedbackText.text = OnboardingSession.Social ? OnboardingSession.SocialReminder : "";
             Refresh();
         }
 

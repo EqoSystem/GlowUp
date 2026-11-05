@@ -34,8 +34,9 @@ namespace GlowUp.Common
         public static bool ShakeToNavigate => false;
 
         // ---- finger signs: hold 1 to 5 fingers up to the selfie camera to open a screen ----
-        /// <summary>Off until the user switches it on (it uses the selfie camera).</summary>
-        public static bool FingerSigns { get => Get("GlowUp.Ui.FingerSigns", false); set => Set("GlowUp.Ui.FingerSigns", value); }
+        /// <summary>REMOVED on 6 November 2026 (the Settings rows and the navigator are no longer built). Always off, so the selfie camera is never
+        /// started for it; the property stays only so the old scripts still compile. Whatever a phone saved earlier is ignored.</summary>
+        public static bool FingerSigns { get => false; set { } }
 
         /// <summary>How long a sign must be held before the screen changes, in seconds.</summary>
         public static float FingerSignHoldSeconds

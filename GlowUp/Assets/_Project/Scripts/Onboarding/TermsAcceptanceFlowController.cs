@@ -47,6 +47,7 @@ namespace GlowUp.Onboarding
         [Tooltip("How long to wait for the account to be created before asking the user to try again (seconds)")]
         [SerializeField] private float createWaitSeconds = 30f;
         [SerializeField] private string msgSessionLost = "Your sign-up details were lost. Please start again.";
+        [SerializeField] private string msgNoBirthday = "Your birthday is missing. Go back to the summary and fill in your name and birthday.";
         [SerializeField] private string msgConfirmFirst = "Your email is not confirmed yet. Go back to Step 1 and tap Continue there.";
 
         bool reachedBottom, busy, readOnly;
@@ -127,6 +128,9 @@ namespace GlowUp.Onboarding
         {
             if (busy) return;
             if (!reachedBottom) { Say(msgScrollFirst); return; }
+            // a profile is never made without the names and the birthday (a Google account does not bring them)
+            if (string.IsNullOrWhiteSpace(OnboardingSession.BirthdayIso) || OnboardingSession.Age <= 0
+                || string.IsNullOrWhiteSpace(OnboardingSession.FirstName) || string.IsNullOrWhiteSpace(OnboardingSession.LastName)) { Say(msgNoBirthday); return; }
             bool social = OnboardingSession.Social;        // signed in with Google / Facebook: the account exists, only the profile is saved
             bool hasAccount = OnboardingSession.HasAccount; // Step 1 made the account when the email was confirmed: the same
             if (!social && !hasAccount && (string.IsNullOrEmpty(OnboardingSession.Email) || string.IsNullOrEmpty(OnboardingSession.Password))) { Say(msgSessionLost); return; }
