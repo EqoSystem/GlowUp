@@ -32,6 +32,13 @@
     .topbar > #binTabs { order: 2; }
     .topbar > #binTabs + .search-container { order: 3; flex: 1 1 200px; max-width: none; }
 }
+/* the Settings window open: the header stays one line, so the Archive button below it does not move. The search gives way first, then the tabs' words */
+html.settings-open .topbar > #binTabs + .search-container { flex: 1 1 0; min-width: 0; }
+@media (min-width: 1001px) { html.settings-open .topbar:has(> #binTabs) { flex-wrap: nowrap; } }
+@media (max-width: 1240px) {
+    html.settings-open .topbar > #binTabs .seg { font-size: 0; gap: 0; padding-inline: 10px; }
+    html.settings-open .topbar > #binTabs .tab-count { display: none; }
+}
 /* the "..." of the list: always there, in front of the pager, and the row wraps rather than cut it off */
 .panel-head:has(> #binPagerTop) { flex-wrap: wrap; }
 .panel-head:has(> #binPagerTop) > .panel-menu-btn { opacity: 1; flex: none; margin-left: auto; }

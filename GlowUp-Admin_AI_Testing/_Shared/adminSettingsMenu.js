@@ -8,9 +8,10 @@
 //   Settings         - Layout and style, Recycle bin (red count), Appearance (Light / Dark / System), the page's own tools.
 //   Layout and style - the existing Layout & Style controls (adminLayouts.js builds them into #layoutHost); a back arrow in the
 //                      title bar returns to Settings.
-// Its place is FIXED (5 November 2026): just right of the unfolded sidebar, whether the sidebar is unfolded or not, so folding the
-// sidebar never moves it. It cannot be dragged. It can be resized from its lower right corner (never smaller than WINDOW_MIN), and
-// remembers that size ("glowup.settingsWindow.v2" in this browser, in a try/catch).
+// Its left edge sits ON the sidebar's right edge (New7.pdf, 5 November 2026): the style sheet gives both the same value, --sidebar-w,
+// so when the sidebar folds the window goes with it, open, with no gap at any frame. While it is open the page's title slides out from
+// under it (html.settings-open). It cannot be dragged. It can be resized from its lower right corner (never smaller than WINDOW_MIN),
+// and remembers that size ("glowup.settingsWindow.v2" in this browser, in a try/catch).
 // The Archive is opened from the button on the Recycle Bin page, and Sign Out sits at the bottom of the sidebar (pageFrame.js).
 // adminLayouts.js talks to it with two events: "glowup:settings-close" (arranging hides the window) and "glowup:layout-view"
 // (the Layout and style view was shown: paint it).
@@ -34,7 +35,6 @@ const COUNT_KEY = "glowup.binCount.";
 const WINDOW_KEY = "glowup.settingsWindow.v2";
 const WINDOW_MIN = { w: 300, h: 260 };
 const WINDOW_GAP = 8;
-const WINDOW_LEFT = 248;                          // the unfolded sidebar (232) and room for its edge tab: the same whether it is folded or not
 
 let binCount = 0;
 let recountTimer = 0;
@@ -42,7 +42,7 @@ let win = null, button = null;
 let opener = null;                                // what opened the window: the focus goes back there
 let pageItems = null;                             // () => the page's own entries, in the form openMenu takes
 let view = "menu";                                // "menu" | "layout"
-let state = null;                                 // { width, height }; the place never changes
+let state = null;                                 // { width, height }; the place comes from the sidebar (adminSettingsMenu.css)
 
 const el = (id) => document.getElementById(id);
 const isOpen = () => !!win && win.classList.contains("is-open");
@@ -66,9 +66,7 @@ function place(next) {
     const s = { width: Math.min(maxW, Math.max(WINDOW_MIN.w, next.width)), height: Math.min(maxH, Math.max(WINDOW_MIN.h, next.height)) };
     win.style.width = s.width + "px";
     win.style.height = s.height + "px";
-    // a browser too narrow for its place: it moves left only as far as it must, and that depends on the browser, never on the sidebar
-    win.style.left = Math.max(WINDOW_GAP, Math.min(WINDOW_LEFT, window.innerWidth - s.width - WINDOW_GAP)) + "px";
-    win.style.top = WINDOW_GAP + "px";
+    document.documentElement.style.setProperty("--settings-w", win.offsetWidth + "px");
     return s;
 }
 
@@ -111,6 +109,7 @@ function openWindow(from) {
     if (isOpen()) return;
     opener = from || button;
     win.classList.add("is-open");
+    document.documentElement.classList.add("settings-open");
     opener.setAttribute("aria-expanded", "true");
     show("menu");
     win.focus({ preventScroll: true });
@@ -120,6 +119,7 @@ export function closeSettingsWindow() {
     if (!isOpen()) return;
     const hadFocus = win.contains(document.activeElement);
     win.classList.remove("is-open");
+    document.documentElement.classList.remove("settings-open");
     opener.setAttribute("aria-expanded", "false");
     if (hadFocus) opener.focus({ preventScroll: true });
 }

@@ -44,6 +44,8 @@
     // the menu can be folded to its icons; the choice is kept in this browser (and applied before the menu is drawn)
     var FOLD_KEY = "glowup.sidebar.folded";
     try { if (localStorage.getItem(FOLD_KEY) === "1") root.classList.add("sb-collapsed"); } catch (error) { /* a private window */ }
+    // the width animates only from here on: a page that opens with the menu folded must not show it folding
+    requestAnimationFrame(function () { requestAnimationFrame(function () { root.classList.add("sb-ready"); }); });
     var esc = function (value) { return String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); };
     var svg = function (name) { return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + (ICON[name] || ICON.logo) + "</svg>"; };
 

@@ -21,10 +21,17 @@ html.sb-collapsed .brand-menu { margin: 0; }
 
 /* the header keeps only the page's own tools, at its right end */
 .topbar-tools { margin-left: auto; }
+/* the window starts where the page's title starts: while it is open the title slides out from under it (--settings-w: adminSettingsMenu.js).
+   The search gives way first; only when even that is not enough does the header take a second line. */
+.topbar { transition: padding-left .2s var(--ease); }
+html.settings-open .topbar { padding-left: calc(var(--settings-w, 360px) + 26px); flex-wrap: wrap; }
+html.settings-open .topbar > .search-container { flex-basis: 0; min-width: 0; overflow: hidden; }
+/* a phone has no room beside the window: the header stays as it is */
+@media (max-width: 700px) { html.settings-open .topbar { padding-left: 26px; } }
 
-/* ---- the window: floating, no dark cover, in ONE place beside the unfolded sidebar (see WINDOW_LEFT), resized from its corner ---- */
+/* ---- the window: floating, no dark cover, its left edge ON the sidebar's right edge (New7.pdf), resized from its corner ---- */
 .settings-window {
-    position: fixed; top: 8px; left: 248px; width: 360px; height: calc(100vh - 16px); max-height: calc(100vh - 16px); z-index: 901;
+    position: fixed; top: 8px; left: var(--sidebar-w); width: 360px; max-width: calc(100vw - var(--sidebar-w)); height: calc(100vh - 16px); max-height: calc(100vh - 16px); z-index: 901;
     display: none; flex-direction: column; overflow: hidden;
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
 }
