@@ -117,8 +117,8 @@
             <!-- the counts; a click on one filters the table -->
             <section class="panel bare" data-panel="counts" data-label="Counts" data-w="8">
                 <div class="stat-row">
-                    <button type="button" class="stat" data-show="" data-tip-title="Everything" data-tip="Show every brand and product."><span class="stat-icon"><i data-icon="tag"></i></span><span><span class="stat-value skeleton" id="statBrands">00</span><span class="stat-title">Brands</span></span></button>
-                    <button type="button" class="stat" data-show="" data-tip-title="Everything" data-tip="Show every brand and product."><span class="stat-icon"><i data-icon="lipstick"></i></span><span><span class="stat-value skeleton" id="statProducts">00</span><span class="stat-title">Products</span></span></button>
+                    <button type="button" class="stat" data-drill="brands" data-tip-title="Brands" data-tip="Show the list of brands only." data-tip-preview="Click a brand to see its products."><span class="stat-icon"><i data-icon="tag"></i></span><span><span class="stat-value skeleton" id="statBrands">00</span><span class="stat-title">Brands</span></span></button>
+                    <button type="button" class="stat" data-drill="types" data-tip-title="Products" data-tip="Show every product, grouped by cosmetic type, A to Z." data-tip-preview="All on one page."><span class="stat-icon"><i data-icon="lipstick"></i></span><span><span class="stat-value skeleton" id="statProducts">00</span><span class="stat-title">Products</span></span></button>
                     <button type="button" class="stat" data-show="review" data-tip-title="Waiting for review" data-tip="Entries the app added from a scan or that were imported, and products whose kind is not clear. The app does not use them until you have dealt with them." data-tip-preview="Click: the table shows only these."><span class="stat-icon"><i data-icon="inbox"></i></span><span><span class="stat-value skeleton" id="statReview">00</span><span class="stat-title">Waiting for review</span></span></button>
                     <button type="button" class="stat" data-show="out" data-tip-title="Not make-up" data-tip="Skin care, hair, body, nail and fragrance products. GlowUp is for make-up only." data-tip-preview="Click: the table shows only these, ready to go to the Recycle bin."><span class="stat-icon"><i data-icon="ban"></i></span><span><span class="stat-value skeleton" id="statOut">00</span><span class="stat-title">Not make-up</span></span></button>
                 </div>
@@ -164,6 +164,12 @@
                     </div>
                     <!-- the pager, the fold arrow and the bin stay together at the right end, also when the row wraps -->
                     <div class="head-end">
+                        <!-- one brand's products: how many on a page. Never changes what is selected or what a bulk action covers -->
+                        <select id="brandPageSize" class="toolbar-select head-select" aria-label="Products per page" data-tip="Products per page. What you selected stays selected." hidden>
+                            <option value="10">10 per page</option>
+                            <option value="25">25 per page</option>
+                            <option value="50">50 per page</option>
+                        </select>
                         <div class="pager" id="inventoryPagerTop"></div>
                         <span class="shelf" id="inventoryShelfEnd" data-head-end></span>
                     </div>
@@ -299,6 +305,9 @@
                         <span class="field-hint">The notification number shown on verification.fda.gov.ph for this product. Letters, digits and . , # ( ) _ - /.</span>
                     </div>
                 </div>
+
+                <!-- official website, primary and secondary sources: drawn by productSources.js -->
+                <div class="field sources-box" id="productSourcesBox"></div>
 
                 <div class="field">
                     <div class="field-heading">

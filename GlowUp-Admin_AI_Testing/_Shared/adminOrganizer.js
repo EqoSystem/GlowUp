@@ -206,6 +206,9 @@ export function createOrganizer(spec) {
     const pickable = (el) => !!el.querySelector(".pick");
     const pickAllBox = () => (spec.panel || spec.host).querySelector("[data-pick-all]");
 
+    /** Every key "select all" covers: what the page says (also rows on other pages), else the rows on screen. */
+    const allKeys = () => (spec.pickScope && spec.pickScope()) || entries().filter(pickable).map((el) => el.dataset.key);
+
     function decorate() {
         let seen = 0, picked = 0;
         entries().forEach((el) => {
@@ -218,6 +221,8 @@ export function createOrganizer(spec) {
         });
         spec.host.classList.toggle("picking", selected.size > 0);
         const all = pickAllBox();
+        const scope = spec.pickScope && spec.pickScope();
+        if (scope) { seen = scope.length; picked = scope.filter((key) => selected.has(key)).length; }
         if (all) { all.setAttribute("aria-checked", seen > 0 && picked === seen ? "true" : picked > 0 ? "mixed" : "false"); all.disabled = seen === 0; }
     }
 
@@ -236,7 +241,7 @@ export function createOrganizer(spec) {
         decorate(); paintBar();
     }
     function pickAll() {
-        const keys = entries().filter(pickable).map((el) => el.dataset.key);
+        const keys = allKeys();
         const every = keys.length > 0 && keys.every((key) => selected.has(key));
         keys.forEach((key) => { if (every) selected.delete(key); else selected.add(key); });
         decorate(); paintBar();

@@ -198,7 +198,7 @@ Open Beauty Facts is an open database of product labels typed in by volunteers, 
 
 ### What kind of page a source is (shown, never stored)
 
-Every `sources` entry stays `page title | https://address`. The kind of page is **worked out when it is shown**, the same way in the app, on the website and in the Assist with AI server, so older entries are labelled too and nothing new is written to the database. Do not put the label into the stored text.
+A product's line titled `Official website` comes first: the Edit Product form writes it, and can apply it to a brand's other products (`_Shared/sourceEdit.js`). Next comes the primary source, then secondary and retailer sources, by position. Every `sources` entry stays `page title | https://address`. The kind of page is **worked out when it is shown**, the same way in the app, on the website and in the Assist with AI server, so older entries are labelled too and nothing new is written to the database. Do not put the label into the stored text.
 
 | Kind | Label shown | Which pages |
 |---|---|---|

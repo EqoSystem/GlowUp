@@ -53,6 +53,8 @@ import { mountIngredientPicker } from "../_Shared/adminIngredientPicker.js";
 import { openFacets } from "../_Shared/adminFacets.js";
 import { EXPORT_MAX_ROWS, EXPORT_FILE_PREFIX, toCsv, downloadCsv, today } from "../_Shared/adminExport.js";
 import { wireSettingsButton, setPageSettings } from "../_Shared/adminSettingsMenu.js";
+import { mountSourceEditor, openApplyWindow } from "./productSources.js";
+import { applyRole, brandPageOf, groupByType, bulkAllowed } from "../_Shared/sourceEdit.js";
 import { countPending, openSnapshotReview, finishSnapshot, APPROVED_DESCRIPTION } from "../_Shared/adminSnapshots.js";
 import { gs1Hint, VERIFIED_BY_GS1 } from "../_Shared/gs1Hint.js";
 
@@ -81,6 +83,14 @@ const binPage = { page: 1, size: PRODUCTS_PER_PAGE };
 const closed = new Set();                   // brands whose products are folded away
 const moreShown = new Map();                // brand id -> how many of its products are shown
 let shownGroups = [];                       // the brands the table currently lists (all pages)
+// The two count tiles open their own view of the list (5 November 2026): null = the normal list, or
+//   { kind: "brands" }          only the brands; a click on one opens it
+//   { kind: "brand", id }       the products of one brand, A to Z, 10 per page
+//   { kind: "types" }           every product under its cosmetic type, A to Z, all on one page
+let drill = null;
+let keepDrill = false;                      // the organizer goes back to "All" because a tile asked for it
+const brandPage = { page: 1, size: PRODUCTS_PER_PAGE };
+let sourceEditor = null;                    // the sources box of the product form (productSources.js)
 
 let everyBrand = [];                        // every brand document, also the ones in the Recycle bin
 let everyProduct = [];
@@ -178,9 +188,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         renameFolder: (from, to) => refolder(from, to), deleteFolder: (name) => refolder(name, ""),
         selectionActions: () => [
             { label: "Assist with AI", className: "bar-main", tip: "Draft sourced ingredient lists and brand aliases for selected entries.", icon: icon("sparkle"), run: assistSelectedInventory },
-            { label: "Approve All", className: "bar-quiet", tip: "Approve only eligible selected entries after you confirm you have reviewed them.", run: approveSelectedInventory }
+            { label: "Approve All", className: "bar-quiet", tip: "Approve only eligible selected entries after you confirm you have reviewed them.", run: approveSelectedInventory },
+            { label: "Apply website or source", className: "bar-quiet", tip: "Give every selected product a web address, also those on other pages. You see how many change and confirm first.", icon: icon("layers"), run: applyToSelected }
         ],
-        onView: () => { fromFirstPage(); }
+        // one brand's view: "select all" means the whole brand, also the products on other pages
+        pickScope: () => (drill && drill.kind === "brand" && org.view.kind !== "bin" ? productsOf(drill.id).map((p) => "p:" + p.id) : null),
+        onView: () => { if (!keepDrill) drill = null; fromFirstPage(); }
     });
     setAssistPage("inventory");
     registerHelpers();
@@ -191,12 +204,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     // the brand dropdown also says how the list is drawn: "All brands, grouped" or "All products, one list" (it replaced the
     // Brands / All products pills, which did the same job twice)
     el("brandFilterSelect").addEventListener("change", () => {
+        drill = null;
         const value = el("brandFilterSelect").value;
         view.mode = value === FLAT_LIST ? "all" : "brands";
         saveView();
         if (org.view.kind === "bin") org.show({ kind: "all" }); else fromFirstPage();
     });
     el("reviewFilterSelect").addEventListener("change", fromFirstPage);
+    document.querySelectorAll(".stat[data-drill]").forEach((tile) => tile.addEventListener("click", () => openDrill({ kind: tile.dataset.drill })));
+    el("brandPageSize").addEventListener("change", () => { brandPage.size = Number(el("brandPageSize").value) || PRODUCTS_PER_PAGE; brandPage.page = 1; renderInventory(); });
     document.querySelectorAll(".stat[data-show]").forEach((tile) => tile.addEventListener("click", () => {
         if (!tile.dataset.show) resetAllFilters();
         else showOnly(tile.dataset.show);
@@ -236,6 +252,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     paintLayout();
     el("inventoryQuick").addEventListener("click", (event) => {
         const chip = event.target.closest("[data-clear]");
+        if (chip && chip.dataset.clear === "drill") { openDrill(drill && drill.kind === "brand" ? { kind: "brands" } : null); return; }
         if (chip && chip.dataset.clear === "brand") { setBrandChoice(""); return; }
         if (chip && chip.dataset.clear === "facets") facets = { type: "", status: "", facts: [] }; else quick = "";
         fromFirstPage();
@@ -259,6 +276,15 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
         });
     });
+    sourceEditor = mountSourceEditor({
+        host: el("productSourcesBox"),
+        sources: () => assistedProductSources,
+        setSources: (list) => { assistedProductSources = list; },
+        brand: () => brands.find((b) => b.id === el("productBrandInput").value) || null,
+        setError: (text) => setFormError(el("productForm"), text),
+        openApply: (ask) => openApply(ask)
+    });
+    el("productBrandInput").addEventListener("change", () => sourceEditor.paint());
     el("productNameInput").addEventListener("input", showScopeHint);
     el("productTypeOtherInput").addEventListener("input", showScopeHint);
     el("addBrandForm").addEventListener("submit", saveBrand);
@@ -312,12 +338,59 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) { /* private window */ } };
-function fromFirstPage() { pageState.page = 1; flatPage.page = 1; binPage.page = 1; renderInventory(); }
+function fromFirstPage() { pageState.page = 1; flatPage.page = 1; binPage.page = 1; brandPage.page = 1; renderInventory(); }
+
+/** A count tile (or the chip that goes back) chose a view of the list. Opening another brand starts on its page 1 with nothing selected. */
+function openDrill(next) {
+    const otherBrand = !!(drill && drill.kind === "brand" && !(next && next.kind === "brand" && next.id === drill.id));
+    drill = next;
+    el("reviewFilterSelect").value = "";
+    el("brandFilterSelect").value = "";
+    quick = "";
+    if (otherBrand) org.clear();
+    if (org.view.kind !== "all") { keepDrill = true; org.show({ kind: "all" }); keepDrill = false; }
+    else fromFirstPage();
+}
+
+/** The sources box or the selection bar asked to apply an address: the window, and what is kept on this page afterwards. */
+function openApply(ask) {
+    openApplyWindow({
+        ...ask,
+        brands: () => brands,
+        productsOf,
+        confirmWebsite: (url) => websiteFields(url, null),
+        onSaved: ({ role, url, written, brandId }) => {
+            written.forEach((change) => {
+                const product = everyProduct.find((p) => p.id === change.id);
+                if (product) product.sources = change.after;
+            });
+            // the form behind the window keeps what the admin typed, and gets what was just saved for this product
+            if (editingProductId && written.some((change) => change.id === editingProductId)) {
+                assistedProductSources = applyRole(assistedProductSources, role, url);
+                sourceEditor.paint();
+            }
+            const brand = brandId ? everyBrand.find((b) => b.id === brandId) : null;
+            if (brand) { brand.website = url; brand.websiteConfirmedAt = new Date(); sourceEditor.paint(); }
+            renderInventory();
+        }
+    });
+}
+
+/** "Apply website or source" in the bar: everything selected counts, also what is on other pages. */
+function applyToSelected(keys) {
+    const ids = keys.filter((key) => key.startsWith("p:")).map((key) => key.slice(2));
+    const first = products.find((p) => ids.includes(p.id));
+    if (!first) { notify("Select at least one product.", "error"); return; }
+    const brand = brands.find((b) => b.id === first.brandId);
+    if (!brand || !bulkAllowed(brand.name)) { notify("Applying to other products is not switched on for this brand yet.", "error"); return; }
+    openApply({ role: "primary", url: "", brandId: first.brandId, chosen: ids });
+}
 /** What a count tile (or a helper) narrows the list to: "" | "review" | "out". The same choice again shows everything. */
 function showOnly(value, keep) {
     const select = el("reviewFilterSelect");
     select.value = select.value === value && !keep ? "" : value;
     quick = "";
+    drill = null;
     if (org.view.kind === "bin") org.show({ kind: "all" }); else fromFirstPage();
 }
 /** A visible "Show all" action returns to the whole inventory, not just the current search or folder. */
@@ -833,6 +906,7 @@ async function assistProductIngredients() {
         if (body.draft.fdaVerifiedLink && /^https:\/\/([a-z0-9-]+\.)*fda\.gov\.ph\//i.test(body.draft.fdaVerifiedLink))
             sources.unshift(`FDA Philippines verification | ${body.draft.fdaVerifiedLink}`);
         assistedProductSources = Array.from(new Set(assistedProductSources.concat(sources))).slice(0, 10);
+        sourceEditor.paint();
         showIngredientSummary();
         note.innerHTML = `<b>AI draft only; nothing is saved yet.</b> Compare the list against the package before saving.`
             + (body.searched === false ? ` <b>${escapeHtml(body.model || "A backup AI")} answered without web search; it gave no source pages.</b>` : "")
@@ -1130,6 +1204,7 @@ function paintStats() {
     });
     const show = org.view.kind === "bin" ? "" : el("reviewFilterSelect").value;
     document.querySelectorAll(".stat[data-show]").forEach((tile) => tile.classList.toggle("on", show !== "" && tile.dataset.show === show));
+    document.querySelectorAll(".stat[data-drill]").forEach((tile) => tile.classList.toggle("on", !!drill && org.view.kind !== "bin" && (tile.dataset.drill === drill.kind || (tile.dataset.drill === "brands" && drill.kind === "brand"))));
 }
 
 function paintToolbar() {
@@ -1144,6 +1219,14 @@ function paintToolbar() {
     el("inventoryQuick").innerHTML = (brandChosen && !inBin ? `<button type="button" class="filter-chip" data-clear="brand" data-tip="Showing one brand only. Click to show every brand again.">${escapeHtml(brandChosen.name || "Unnamed Brand")}${icon("x")}</button>` : "")
         + (quick && !inBin ? `<button type="button" class="filter-chip" data-clear="quick" data-tip="Showing only these products. Click to show all again.">${escapeHtml(QUICK[quick].label)}${icon("x")}</button>` : "")
         + (facetCount() > 0 && !inBin ? `<button type="button" class="filter-chip" data-clear="facets" data-tip="Filters are on. Click to switch them off.">Filters (${facetCount()})${icon("x")}</button>` : "");
+    if (!inBin && drill) {
+        const brand = drill.kind === "brand" ? brands.find((b) => b.id === drill.id) : null;
+        const label = drill.kind === "brand" ? "All brands" : drill.kind === "brands" ? "Brands" : "By type";
+        el("inventoryQuick").insertAdjacentHTML("afterbegin", `<button type="button" class="filter-chip" data-clear="drill" data-tip="${drill.kind === "brand" ? "Back to the list of brands." : "Back to the whole inventory."}">${drill.kind === "brand" ? icon("left") : ""}${label}${drill.kind === "brand" ? "" : icon("x")}</button>`);
+        if (brand) el("inventoryQuick").insertAdjacentHTML("beforeend", `<span class="drill-name">${escapeHtml(brand.name || "Unnamed Brand")}</span>`);
+    }
+    // a view has its own order (A to Z), so the Sort button has nothing to say there
+    el("sortMenuBtn").hidden = !!drill && !inBin;
     el("filterNow").textContent = facetCount() > 0 ? " " + facetCount() : "";
     el("filterMenuBtn").classList.toggle("on", facetCount() > 0);
 }
@@ -1275,6 +1358,8 @@ function renderList(now) {
     // A product is also found by its other names, its kind, its barcode and its brand ("maybelline lipstick").
     const productMatches = (p) => matchesSearch(typed, [p.name, ...p.aliases, p.cosmeticType, p.description, p.barcode, (brandOf(p) || {}).name || p.brandName]);
     const brandMatches = (b) => !!b && matchesSearch(typed, [b.name, ...b.aliases, b.category, b.market]);
+    paintBrandPageSize();
+    if (drill && now.kind === "all") { renderDrill({ base, productMatches, brandMatches, term, typed }); return; }
     const order = sortNow().cmp;
     const html = [];
     let productsShown = 0;
@@ -1336,6 +1421,53 @@ function renderList(now) {
         : show === "out" ? "Every listed product is make-up."
         : "Nothing to show.";
     body.innerHTML = html.length > 0 ? html.join("") : `<tr><td colspan="${columns}" class="table-message">${nothing}</td></tr>`;
+}
+
+/** The size box beside the pager: only for one brand with more than 10 products. It keeps its value when it is hidden. */
+function paintBrandPageSize() {
+    const select = el("brandPageSize");
+    const count = drill && drill.kind === "brand" && org.view.kind !== "bin" ? productsOf(drill.id).filter((p) => !isOut(p)).length : 0;
+    select.hidden = !brandPageOf(new Array(count).fill({}), 1, brandPage.size).showSizes;
+    select.value = String(brandPage.size);
+}
+
+/** The views the two count tiles open. Search and Filters still narrow them; "base" is the same test as in the normal list. */
+function renderDrill({ base, productMatches, brandMatches, term, typed }) {
+    const body = el("inventoryTableBody"), head = el("inventoryTableHead");
+    shownGroups = [];
+    const nothing = (columns, text) => { body.innerHTML = `<tr><td colspan="${columns}" class="table-message">${text}</td></tr>`; };
+    if (drill.kind === "brands") {
+        head.innerHTML = `<tr><th colspan="6"><span class="th-line">${pickAllBox("brand")}Brand</span></th></tr>`;
+        const list = brands.filter((b) => !brandOut(b) && (!term || brandMatches(b))).sort(byName);
+        el("inventoryCountLine").textContent = many(list.length, "brand", "brands");
+        setPagers(pageState, list.length, "brands");
+        if (list.length === 0) { nothing(6, term ? `No brand matches "${escapeHtml(typed)}".` : "No brands yet."); return; }
+        body.innerHTML = paginate(list, pageState).map((b) => brandRow(b, productsOf(b.id).length, 6).replace('class="brand-row', 'class="brand-row closed')).join("");
+        return;
+    }
+    if (drill.kind === "brand") {
+        const brand = brands.find((b) => b.id === drill.id);
+        if (!brand) { openDrill({ kind: "brands" }); return; }
+        const whole = productsOf(brand.id).length;
+        head.innerHTML = `<tr><th><span class="th-line"><button type="button" class="pick" data-pick-all role="checkbox" aria-checked="false" aria-label="Select all ${whole} products in this brand" data-tip="Select all ${whole} products of this brand, also those on other pages."></button>Product <small class="muted">select all in brand: ${whole}</small></span></th><th>Type</th><th>Shades</th><th class="text-right">Scans</th><th>Status</th><th></th></tr>`;
+        const list = productsOf(brand.id).filter((p) => base(p) && (!term || productMatches(p)));
+        const page = brandPageOf(list, brandPage.page, brandPage.size);
+        brandPage.page = page.page;
+        el("inventoryCountLine").textContent = many(list.length, "product", "products");
+        setPagers(brandPage, page.total, "products");
+        const heading = brandRow(brand, whole, 6).replace('class="brand-row', 'class="brand-row drill-head');
+        const rows = page.rows.map((p) => productRow(p, brand, false));
+        body.innerHTML = heading + (rows.join("") || `<tr class="note-row"><td colspan="6" class="table-message">${term ? `Nothing in this brand matches "${escapeHtml(typed)}".` : "This brand has no products to show here."}</td></tr>`);
+        return;
+    }
+    head.innerHTML = `<tr><th><span class="th-line">${pickAllBox("product")}Product</span></th><th>Brand</th><th>Type</th><th>Shades</th><th class="text-right">Scans</th><th>Status</th><th></th></tr>`;
+    const groups = groupByType(products.filter((p) => base(p) && (!term || productMatches(p))));
+    const total = groups.reduce((sum, group) => sum + group.rows.length, 0);
+    el("inventoryCountLine").textContent = many(total, "product", "products");
+    setPagers(flatPage, 0, "products");                     // this view is one long list: no pager
+    if (total === 0) { nothing(7, term ? `Nothing here matches "${escapeHtml(typed)}".` : "Nothing to show."); return; }
+    body.innerHTML = groups.map((group) => `<tr class="type-row"><td colspan="7"><span class="type-name">${escapeHtml(group.label)}</span> <span class="muted small">${many(group.rows.length, "product", "products")}</span></td></tr>`
+        + group.rows.map((p) => productRow(p, brandOf(p), true)).join("")).join("");
 }
 
 /** The brands in the order the Sort button asks for (the orders that only fit products keep the brands A to Z). */
@@ -2106,6 +2238,8 @@ function openProductForm(product, brandId) {
     formShades = product ? product.shades.slice() : [];
     formShadeCodes = product ? formShades.map((_, at) => (product.shadeCodes || [])[at] || "") : [];
     shadeAdding = false; shadeMessage = "";
+    sourceEditor.reset();
+    sourceEditor.paint();
 
     showOtherTypeBox();
     showBrandHint();
@@ -2552,6 +2686,13 @@ function toggleBrand(id) {
 
 function onTableClick(event) {
     const button = event.target.closest("button");
+    // the list of brands: a click on a brand opens its products (its own buttons keep working)
+    if (drill && drill.kind === "brands" && org.view.kind !== "bin") {
+        const row = event.target.closest("tr.brand-row");
+        if (row && (!button || button.dataset.act === "toggle")) { openDrill({ kind: "brand", id: row.dataset.brand }); return; }
+    }
+    // one brand's view: its heading stays open
+    if (drill && drill.kind === "brand" && event.target.closest("tr.brand-row") && (!button || button.dataset.act === "toggle")) return;
     if (!button) {
         // a click on a row itself: a product shows (or hides) its details, a brand opens or closes
         if (event.target.closest("a, .detail-box")) return;
