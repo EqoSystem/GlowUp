@@ -93,9 +93,16 @@ function build() {
 const overlay = () => window.matchMedia("(max-width: 900px)").matches;     // no room beside the page: the panel covers it
 let hideTimer = 0;
 
+/** The panel starts under the page header: its height goes into --qs-top (the header can take two lines on a narrow window). */
+function placeBelowHeader() {
+    const bar = button && button.closest(".topbar");
+    if (bar) document.documentElement.style.setProperty("--qs-top", bar.offsetHeight + "px");
+}
+
 function openWindow() {
     if (isOpen()) return;
     if (!win) build();
+    placeBelowHeader();
     clearTimeout(hideTimer);
     win.classList.add("is-shown");
     void win.offsetWidth;                         // the panel is drawn at its start place first, then slides in
@@ -221,6 +228,7 @@ export function mountSettingsMenu(tools) {
         if (event.target.closest && event.target.closest(".modal-overlay, .menu, .info-pop, .toast, .facet-panel")) return;
         closeSettingsWindow();
     }, true);
+    window.addEventListener("resize", () => { if (isOpen()) placeBelowHeader(); });
     document.addEventListener("glowup:theme", () => { if (isOpen() && view === "menu") renderMenu(); });
     document.addEventListener("glowup:bin-count", () => { if (isOpen() && view === "menu") renderMenu(); });
     onListsRefreshed(() => { if (isOpen() && view === "menu") renderMenu(); });
