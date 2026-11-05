@@ -146,7 +146,8 @@ export function openClassificationManager(context) {
 
     /** The ingredients move first, in batches; the classification is deleted only after all of them have moved. */
     async function removeOne(item) {
-        const users = usersOf(context.ingredients(), item.id);
+        // on a test address no live ingredient is ever written: only the test list's own document goes
+        const users = TEST_MODE ? [] : usersOf(context.ingredients(), item.id);
         let target = "";
         if (users.length === 0) {
             if (!(await askConfirm({ title: "Remove classification?", message: `Remove '${item.name}'? No ingredient uses it.`, confirmLabel: "Remove", danger: true }))) return;

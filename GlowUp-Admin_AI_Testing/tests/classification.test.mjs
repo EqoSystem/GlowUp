@@ -94,6 +94,9 @@ equal(collectionFor(""), "ingredientClassificationsTest", "an unknown address us
 equal(isTestHost("GLOWUP-ADMIN-SNOWY.vercel.app"), false, "capital letters in the address do not matter");
 equal([CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING], [false, false], "the two decisions are separate constants");
 
+check(/const users = TEST_MODE \? \[\] : usersOf/.test(shared), "on a test address removing a classification writes no live ingredient");
+check(/AUTO_APPROVE_AI && !TEST_MODE/.test(js2), "on a test address the automatic approval writes no live ingredient");
+
 // ---- the page
 const js = read("_Admin_Ingredient_Curator/adminIngredientCurator.js"), html = read("_Admin_Ingredient_Curator/adminIngredientCurator.html");
 // (shared is read above)

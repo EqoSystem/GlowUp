@@ -336,7 +336,7 @@ async function loadIngredients() {
     }
 
     // what the app's AI lookup added since the last visit is approved by itself
-    if (AUTO_APPROVE_AI) {
+    if (AUTO_APPROVE_AI && !TEST_MODE) {                 // (a test address writes no live ingredient)
         const fresh = everyIngredient.filter((item) => needsReview(item) && !item.binned && hasCredibleSource(item));
         if (fresh.length > 0) {
             try {

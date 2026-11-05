@@ -123,9 +123,10 @@ namespace GlowUp.Views
                 int cut = first.LastIndexOf(" | ", System.StringComparison.Ordinal);
                 source = (cut > 0 ? first.Substring(0, cut) : first).Trim();
                 string address = (cut > 0 ? first.Substring(cut + 3) : first).Trim();
-                // a page is only offered as a LINK for an entry an admin typed or approved. An entry the app's own AI look-up wrote and nobody
-                // has checked can name any address, so it keeps the page's title as text and no button.
-                if (!entry.IsUnreviewedAi() && address.StartsWith("https://", System.StringComparison.OrdinalIgnoreCase))
+                // a page is only offered as a LINK for an entry an admin typed, copied from a regulator's list or wrote and saved themself. Any
+                // entry the app's own AI look-up wrote (source "ai"), checked or approved by itself or not, can name any address, so it keeps the
+                // page's title as text and no button.
+                if (!string.Equals(entry.source, "ai", System.StringComparison.OrdinalIgnoreCase) && address.StartsWith("https://", System.StringComparison.OrdinalIgnoreCase))
                 {
                     details.sourceUrl = address;
                     if (source == address) source = "";
