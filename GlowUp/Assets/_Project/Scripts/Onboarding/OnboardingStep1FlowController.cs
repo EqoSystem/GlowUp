@@ -61,6 +61,8 @@ namespace GlowUp.Onboarding
         [Tooltip("The line in the pop-up that says what is going on (sent again, not confirmed yet ...)")]
         [SerializeField] private TextMeshProUGUI confirmStatusText;
         [SerializeField] private Button confirmedButton;
+        [Tooltip("\"Open Gmail\": opens the Gmail app (or its Play Store page, or the phone's own email app). Only when tapped.")]
+        [SerializeField] private Button openGmailButton;
         [SerializeField] private Button sendAgainButton;
         [SerializeField] private TextMeshProUGUI sendAgainLabel;
         [Tooltip("In the pop-up: \"Use another email\"")]
@@ -101,6 +103,9 @@ namespace GlowUp.Onboarding
         [SerializeField] private string msgTooManyTries = "Too many tries. Wait a few minutes, then try again.";
         [SerializeField] private string msgCouldNot = "That did not work. Check the internet connection and try again.";
         [SerializeField] private string msgConfirmed = "Email confirmed.";
+        [SerializeField] private string msgGmailFromStore = "Gmail is not on this phone: its Play Store page opened so you can install it. You can also check your email another way.";
+        [SerializeField] private string msgOwnMailApp = "Gmail is not on this phone, so your email app opened.";
+        [SerializeField] private string msgNoMailApp = "No email app was found on this phone. Please check your email manually.";
         [SerializeField] private string msgWaiting = "Waiting for you to confirm this email.";
         [SerializeField] private string sendAgainText = "Send again";
         [Tooltip("{0} = seconds left")]
@@ -126,6 +131,7 @@ namespace GlowUp.Onboarding
             emailCheck = EmailFieldVerifier.On(gameObject, emailCheck);
             if (emailCheck != null) emailCheck.Changed += Validate;
             if (confirmedButton != null) confirmedButton.onClick.AddListener(() => { _ = LookWhetherConfirmed(true); });
+            if (openGmailButton != null) openGmailButton.onClick.AddListener(OpenGmail);
             if (sendAgainButton != null) sendAgainButton.onClick.AddListener(() => { _ = SendAgain(); });
             if (changeEmailButton != null) changeEmailButton.onClick.AddListener(AskUseAnotherEmail);
             if (useAnotherEmailButton != null) { useAnotherEmailButton.onClick.AddListener(AskUseAnotherEmail); useAnotherEmailButton.gameObject.SetActive(false); }
@@ -431,6 +437,16 @@ namespace GlowUp.Onboarding
         }
 
         // back from the mail app: look at once
+        /// <summary>The "Open Gmail" button. Says what happened when it was not Gmail itself that opened.</summary>
+        void OpenGmail()
+        {
+            MailApp.Result result = MailApp.OpenGmail();
+            if (confirmStatusText == null) return;
+            if (result == MailApp.Result.Store) confirmStatusText.text = msgGmailFromStore;
+            else if (result == MailApp.Result.MailApp) confirmStatusText.text = msgOwnMailApp;
+            else if (result == MailApp.Result.None) confirmStatusText.text = msgNoMailApp;
+        }
+
         void OnApplicationFocus(bool focused) { if (focused && confirmPanel != null && confirmPanel.IsOpen && !busy) _ = LookWhetherConfirmed(false); }
         void OnApplicationPause(bool paused) { if (!paused && confirmPanel != null && confirmPanel.IsOpen && !busy) _ = LookWhetherConfirmed(false); }
 
