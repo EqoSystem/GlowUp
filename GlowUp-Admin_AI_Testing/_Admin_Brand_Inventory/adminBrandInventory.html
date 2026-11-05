@@ -67,6 +67,7 @@
                         <i data-icon="search"></i>
                         <input type="text" placeholder="Search brands and products" class="search-input" id="inventorySearchInput" autocomplete="off" aria-label="Search brands and products">
                         <button type="button" class="search-clear" id="inventorySearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
+                        <div class="search-suggest" id="inventorySuggest" role="listbox" aria-label="Suggestions" hidden></div>
                     </div>
                     <!-- one brand, or every brand grouped, or every product in one list: chosen in Filters ("Show"), kept here -->
                     <select id="brandFilterSelect" class="toolbar-select" aria-label="Which brand, and how the list is drawn" hidden>
@@ -151,6 +152,7 @@
                     <h3 class="panel-title">Inventory</h3>
                     <button type="button" class="guide-badge" data-tip-title="How to use this list" data-tip="Click a product to see everything about it; double-click to edit it. Click a brand to open or close it. The app only uses Active products of Active brands." data-tip-preview="Drag rows onto a folder or the Recycle bin. The small box in front of a name picks it; Ctrl+click picks several.">i</button>
                     <span class="panel-count" hidden id="inventoryCountLine"></span>
+                    <span class="search-status" id="inventorySearchStatus" role="status" hidden><span id="inventorySearchStatusText"></span><button type="button" class="search-status-clear" id="inventorySearchStatusClear" aria-label="Clear the search"><i data-icon="x"></i></button></span>
                     <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most scanned, newest, type, or what needs attention first." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button> <button type="button" class="btn" id="filterMenuBtn" aria-haspopup="dialog" aria-expanded="false" data-tip-title="Filters" data-tip="Narrow the list by kind, status and a few facts at once, then press Apply filters." data-tip-preview="Nothing is read from the database: it only looks through what is already loaded."><i data-icon="sliders"></i>Filters<span class="sort-now" id="filterNow"></span></button></span>
                     <span class="shelf" id="inventoryShelf"></span>
                     <span class="shelf" id="inventoryShelfAdd"></span>

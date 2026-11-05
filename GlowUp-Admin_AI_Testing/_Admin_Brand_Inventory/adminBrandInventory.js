@@ -200,6 +200,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("inventoryAiDraftList").addEventListener("change", updateInventoryDraftApproval);
     el("inventoryApproveAllBtn").addEventListener("click", approveInventoryDrafts);
 
+    const askedFor = new URLSearchParams(window.location.search).get("q");
+    if (askedFor) el("inventorySearchInput").value = askedFor;                 // ?q=blush: the search comes back after a reload
+    wireSearchExtras();
     wireSearch(el("inventorySearchInput"), el("inventorySearchClear"), fromFirstPage);
     // the brand dropdown also says how the list is drawn: "All brands, grouped" or "All products, one list" (it replaced the
     // Brands / All products pills, which did the same job twice)
@@ -1235,6 +1238,8 @@ function renderInventory() {
     paintLayout();
     paintToolbar();
     if (org.view.kind === "bin") renderBin(); else renderList(org.view);
+    paintSearchStatus();
+    syncSearchUrl();
     org.refresh();
     refreshAssist();
     // the data panels (lists, grids, graphs) follow the same brand and folder
@@ -1332,7 +1337,203 @@ function setPagers(state, total, noun) {
     renderPager(el("inventoryPagerTop"), state, total, renderInventory, noun);
 }
 
+// ---------------------------------------------------------------------------------------------
+// Search (Gmail style). The box searches EVERY listed product, on every page of the list: name, other names, brand, type,
+// barcode, description and ingredients; any letter case, parts of words. While you type (2+ letters) a drop-down offers Brands,
+// Products and Ingredients (5 each). The words are kept in the address (?q=), so Back and a reload keep the search.
+// ---------------------------------------------------------------------------------------------
+const SUGGEST_MAX = 5;
+let suggestItems = [];                      // the options in the drop-down: { kind, group, text, note?, brand?, product? }
+let suggestAt = -1;                         // the highlighted option, -1 = none
+let searchCount = null;                     // products found by the last search of the list (null = no search, or a view without a count)
+let nextPush = false;                       // the next address change is a step Back can return to (Enter, a suggestion, clear)
+
+/** The texts of a product the search looks in (ingredients are added by productMatches). */
+const productTexts = (p) => [p.name, ...p.aliases, p.cosmeticType, p.description, p.barcode, (brandOf(p) || {}).name || p.brandName];
+
+/** The ingredient that made a product match: the whole search first, then each word of it. "" when none. */
+function ingredientFor(p, typed) {
+    const list = p.ingredients || [];
+    const whole = list.find((name) => matchesSearch(typed, name));
+    if (whole) return whole;
+    for (const word of typed.split(/\s+/).filter((w) => w.length > 1)) {
+        const hit = list.find((name) => matchesSearch(word, name));
+        if (hit) return hit;
+    }
+    return "";
+}
+
+/** "contains: niacinamide" on a row that was found only through its ingredients. */
+function containsNote(p) {
+    const typed = el("inventorySearchInput").value;
+    if (!sameKey(typed) || matchesSearch(typed, productTexts(p))) return "";
+    const found = ingredientFor(p, typed);
+    return found ? `<span class="contains-note">contains: ${escapeHtml(found)}</span>` : "";
+}
+
+/** Keeps ?q= equal to the box. Typing replaces the address; Enter, a suggestion and clearing add a step for Back. */
+function syncSearchUrl() {
+    const url = new URL(window.location.href), typed = el("inventorySearchInput").value.trim();
+    if (typed) url.searchParams.set("q", typed); else url.searchParams.delete("q");
+    const push = nextPush;
+    nextPush = false;
+    if (url.href === window.location.href) return;
+    try { window.history[push ? "pushState" : "replaceState"](null, "", url); } catch (error) { /* an address that cannot change: the search still works */ }
+}
+
+/** "12 results for "blush"" with an X that clears the search. Hidden when nothing is searched. */
+function paintSearchStatus() {
+    const status = el("inventorySearchStatus"), typed = el("inventorySearchInput").value.trim();
+    const show = !!typed && searchCount !== null && org.view.kind !== "bin";
+    status.hidden = !show;
+    if (!show) return;
+    el("inventorySearchStatusText").textContent = searchCount === 0 ? `No results for "${typed}"` : `${many(searchCount, "result", "results")} for "${typed}"`;
+}
+
+function closeSuggest() {
+    const input = el("inventorySearchInput");
+    el("inventorySuggest").hidden = true;
+    suggestAt = -1;
+    input.setAttribute("aria-expanded", "false");
+    input.removeAttribute("aria-activedescendant");
+}
+
+function paintSuggestActive() {
+    const input = el("inventorySearchInput");
+    el("inventorySuggest").querySelectorAll("[role=option]").forEach((row, at) => {
+        const on = at === suggestAt;
+        row.classList.toggle("active", on);
+        row.setAttribute("aria-selected", String(on));
+        if (on) { input.setAttribute("aria-activedescendant", row.id); row.scrollIntoView({ block: "nearest" }); }
+    });
+    if (suggestAt < 0) input.removeAttribute("aria-activedescendant");
+}
+
+/** The drop-down for what is typed: up to 5 brands, 5 products, 5 ingredients; "No results" when there are none. */
+function openSuggest() {
+    const input = el("inventorySearchInput"), box = el("inventorySuggest"), typed = input.value.trim();
+    if (sameKey(typed).length < 2) { closeSuggest(); return; }
+    const listed = products.filter((p) => !isOut(p));
+    const foundBrands = brands.filter((b) => matchesSearch(typed, [b.name, ...b.aliases])).slice(0, SUGGEST_MAX)
+        .map((b) => ({ kind: "brand", group: "Brands", text: b.name, brand: b }));
+    const foundProducts = listed.filter((p) => matchesSearch(typed, [p.name, ...p.aliases, p.cosmeticType, (brandOf(p) || {}).name || p.brandName])).slice(0, SUGGEST_MAX)
+        .map((p) => ({ kind: "product", group: "Products", text: p.name || "Unnamed Product", note: (brandOf(p) || {}).name || p.brandName || "", product: p }));
+    const byIngredient = new Map();         // key -> { text, count }
+    listed.forEach((p) => (p.ingredients || []).forEach((name) => {
+        if (!matchesSearch(typed, name)) return;
+        const key = sameKey(name), row = byIngredient.get(key) || { text: name, count: 0 };
+        row.count++;
+        byIngredient.set(key, row);
+    }));
+    const foundIngredients = Array.from(byIngredient.values()).sort((a, b) => b.count - a.count || a.text.localeCompare(b.text)).slice(0, SUGGEST_MAX)
+        .map((row) => ({ kind: "ingredient", group: "Ingredients", text: row.text, note: many(row.count, "product", "products") }));
+    suggestItems = [...foundBrands, ...foundProducts, ...foundIngredients];
+    suggestAt = -1;
+    box.replaceChildren();
+    if (suggestItems.length === 0) {
+        const none = document.createElement("div");
+        none.className = "sug-none";
+        none.textContent = `No results for "${typed}"`;
+        box.appendChild(none);
+    } else {
+        let group = "";
+        suggestItems.forEach((item, at) => {
+            if (item.group !== group) {
+                group = item.group;
+                const head = document.createElement("div");
+                head.className = "sug-head";
+                head.textContent = group;
+                box.appendChild(head);
+            }
+            const row = document.createElement("div");
+            row.className = "sug-item";
+            row.id = "invSug" + at;
+            row.setAttribute("role", "option");
+            row.setAttribute("aria-selected", "false");
+            const name = document.createElement("span");
+            name.className = "sug-text";
+            name.textContent = item.text;
+            row.appendChild(name);
+            if (item.note) { const note = document.createElement("span"); note.className = "sug-note"; note.textContent = item.note; row.appendChild(note); }
+            row.addEventListener("mousedown", (event) => event.preventDefault());       // the box keeps the focus
+            row.addEventListener("click", () => chooseSuggestion(at));
+            box.appendChild(row);
+        });
+    }
+    box.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+}
+
+/** A brand shows its products, an ingredient the products that contain it, a product opens (all by searching for it). */
+function chooseSuggestion(at) {
+    const item = suggestItems[at];
+    if (!item) return;
+    el("inventorySearchInput").value = item.text;
+    el("inventorySearchClear").hidden = false;
+    closeSuggest();
+    nextPush = true;
+    drill = null;
+    fromFirstPage();
+    if (item.kind === "product" && item.product && openId !== item.product.id) toggleDetails(item.product.id);
+}
+
+function wireSearchExtras() {
+    const input = el("inventorySearchInput"), box = el("inventorySuggest");
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-expanded", "false");
+    input.setAttribute("aria-controls", "inventorySuggest");
+    // these run BEFORE the box's own Enter / Esc handling (wireSearch), so they are added first
+    input.addEventListener("input", openSuggest);
+    input.addEventListener("keydown", (event) => {
+        const open = !box.hidden, count = suggestItems.length;
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            if (box.hidden) openSuggest();
+            if (suggestItems.length === 0) return;
+            suggestAt = event.key === "ArrowDown" ? (suggestAt + 1) % suggestItems.length : (suggestAt <= 0 ? suggestItems.length - 1 : suggestAt - 1);
+            paintSuggestActive();
+        } else if (event.key === "Enter") {
+            if (open && suggestAt >= 0 && suggestAt < count) { event.preventDefault(); event.stopImmediatePropagation(); chooseSuggestion(suggestAt); return; }
+            closeSuggest();
+            nextPush = true;
+        } else if (event.key === "Escape") {
+            if (open) { event.stopImmediatePropagation(); closeSuggest(); }          // the first Esc closes the drop-down, the next one clears the box
+            else if (input.value) nextPush = true;
+        }
+    });
+    input.addEventListener("blur", closeSuggest);
+    el("inventorySearchClear").addEventListener("click", () => { nextPush = true; closeSuggest(); });
+    el("inventorySearchStatusClear").addEventListener("click", () => {
+        input.value = "";
+        el("inventorySearchClear").hidden = true;
+        nextPush = true;
+        closeSuggest();
+        fromFirstPage();
+        input.focus();
+    });
+    // "/" anywhere on the page jumps to the box, unless you are already typing in a field or a dialog is open
+    document.addEventListener("keydown", (event) => {
+        if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
+        const target = event.target;
+        if (target && target.closest && target.closest("input, textarea, select, [contenteditable]:not([contenteditable=false])")) return;
+        if (dialogIsOpen()) return;
+        event.preventDefault();
+        input.focus();
+        input.select();
+    });
+    // Back / Forward: the box follows the address
+    window.addEventListener("popstate", () => {
+        input.value = new URLSearchParams(window.location.search).get("q") || "";
+        el("inventorySearchClear").hidden = input.value.length === 0;
+        closeSuggest();
+        drill = null;
+        fromFirstPage();
+    });
+}
+
 function renderList(now) {
+    searchCount = null;
     const body = el("inventoryTableBody");
     const typed = el("inventorySearchInput").value;
     const term = sameKey(typed);                            // "" when nothing is searched for
@@ -1354,8 +1555,8 @@ function renderList(now) {
     const base = (p) => (show === "out" ? isOut(p) : !isOut(p)) && (!folder || sameKey(p.folder) === sameKey(folder))
         && (show !== "review" || waits(p)) && (!quick || QUICK[quick].test(p)) && facetOk(p);
     // Search: any letter case, with or without accents and punctuation, parts of words, several words in any order.
-    // A product is also found by its other names, its kind, its barcode and its brand ("maybelline lipstick").
-    const productMatches = (p) => matchesSearch(typed, [p.name, ...p.aliases, p.cosmeticType, p.description, p.barcode, (brandOf(p) || {}).name || p.brandName]);
+    // A product is also found by its other names, its kind, its barcode, its brand ("maybelline lipstick") and its ingredients.
+    const productMatches = (p) => matchesSearch(typed, [...productTexts(p), ...(p.ingredients || [])]);
     const brandMatches = (b) => !!b && matchesSearch(typed, [b.name, ...b.aliases, b.category, b.market]);
     paintBrandPageSize();
     if (drill && now.kind === "all") { renderDrill({ base, productMatches, brandMatches, term, typed }); return; }
@@ -1367,6 +1568,7 @@ function renderList(now) {
         shownGroups = [];
         const list = products.filter((p) => base(p) && (!brandFilter || p.brandId === brandFilter) && (!term || productMatches(p))).sort(order);
         productsShown = list.length;
+        searchCount = term ? productsShown : null;
         paginate(list, flatPage).forEach((p) => html.push(productRow(p, brandOf(p), true)));
         el("inventoryCountLine").textContent = list.length === 0 ? "" : many(list.length, "product", "products") + (folder ? ` in "${folder}"` : "");
         setPagers(flatPage, list.length, "products");
@@ -1400,6 +1602,7 @@ function renderList(now) {
         }
 
         shownGroups = groups;
+        searchCount = term ? productsShown : null;
         paginate(groups, pageState).forEach((group) => {
             const folded = !term && closed.has(group.id);           // a search always shows what it found
             html.push(folded ? group.head.replace('class="brand-row', 'class="brand-row closed') : group.head);
@@ -1413,7 +1616,7 @@ function renderList(now) {
         setPagers(pageState, groups.length, "brands");
     }
 
-    const nothing = term ? `Nothing here matches "${escapeHtml(typed)}".`
+    const nothing = term ? `No results for "${escapeHtml(typed)}".`
         : quick ? "No product like that. Click the chip above to show all again."
         : folder ? `"${escapeHtml(folder)}" is empty. Drag products onto its chip above.`
         : show === "review" ? "Nothing is waiting for review."
@@ -1523,7 +1726,7 @@ function productRow(p, brand, flat) {
 
     return `
         <tr class="product-row${isOut(p) ? " out-row" : ""}${open ? " open" : ""}" data-product="${escapeHtml(p.id)}" data-key="p:${escapeHtml(p.id)}" data-drag tabindex="0" aria-expanded="${open}">
-            <td class="name-cell"><div class="name-line">${pickBox(p.name || "product")}${toneDot(attentionOf(p, brand, !flat))}<span class="product-name">${escapeHtml(p.name || "Unnamed Product")}</span>${p.ingredients.length === 0 ? (isOut(p)
+            <td class="name-cell"><div class="name-line">${pickBox(p.name || "product")}${toneDot(attentionOf(p, brand, !flat))}<span class="product-name">${escapeHtml(p.name || "Unnamed Product")}</span>${containsNote(p)}${p.ingredients.length === 0 ? (isOut(p)
                 ? `<span class="chip warn ingredient-missing">${icon("alert")}<span>No ingredient list</span></span>`
                 : `<button type="button" class="chip warn ingredient-missing" data-act="assist-product" data-id="${escapeHtml(p.id)}" aria-label="No ingredient list. Find ingredients for ${escapeHtml(p.name || "product")} with AI." data-tip="Search the web for a draft ingredient list, then check it against the product package.">${icon("alert")}<span>No ingredient list</span><span class="ingredient-missing-cta">Find with AI</span></button>`) : ""}</div></td>
             ${flat ? `<td class="brand-ref">${escapeHtml(brand ? brand.name : (p.brandName || "–"))}</td>` : ""}

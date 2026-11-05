@@ -10,26 +10,40 @@ html.sb-collapsed .brand-mark { margin: 0; }
 .quick-gear[aria-expanded="true"] { background: var(--surface-3); border-color: var(--border); }
 .quick-gear:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* ---- the panel: under the gear, right edge on the gear's right edge (set by adminSettingsMenu.js), one fixed width ---- */
+/* ---- the panel: a column at the right edge of the page. It slides in from the right and the page gets narrower to make room
+   (body.app is a grid: sidebar | page | panel). On a window of 900 px or less there is no room: it slides over the page instead. ---- */
 :root { --settings-w: 360px; }
 .settings-window {
-    position: fixed; top: 56px; right: 12px; width: var(--settings-w); max-width: calc(100vw - 16px); max-height: calc(100vh - 72px); z-index: 901;
-    display: none; flex-direction: column; overflow: hidden;
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+    display: none; flex-direction: column; overflow: hidden; z-index: 901;
+    width: var(--settings-w); background: var(--surface); border-left: 1px solid var(--border);
 }
-.settings-window.is-open { display: flex; animation: rise .2s var(--ease); }
+.settings-window.is-shown { display: flex; }
 .settings-window:focus { outline: none; }
 .sw-head { display: flex; align-items: center; gap: 4px; padding: 10px 10px 10px 16px; border-bottom: 1px solid var(--border); flex: none; }
 .sw-head:has(#swBack:not([hidden])) { padding-left: 10px; }
 .sw-head h3 { flex: 1; min-width: 0; font-size: var(--fs-md); }
-.sw-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.sw-body { flex: 1 1 auto; min-height: 0; overflow: auto; }          /* the panel scrolls by itself; the page keeps its own scroll */
 .sw-view { padding: 8px; }
 .sw-view.layout-view { padding: 16px 20px 22px; display: flex; flex-direction: column; gap: 16px; }
 .sw-view[hidden] { display: none; }
-/* a phone: a full-width sheet under the header */
-@media (max-width: 599px) {
-    .settings-window { left: 0; right: 0; width: auto; max-width: none; border-left: 0; border-right: 0; border-radius: 0 0 var(--radius) var(--radius); }
+
+@media (min-width: 901px) {
+    body.app { grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--qs-col, 0px); transition: grid-template-columns .28s var(--ease); }
+    html.qs-open { --qs-col: var(--settings-w); }
+    .settings-window { grid-column: 3; grid-row: 1; min-height: 0; }
 }
+@media (min-width: 901px) and (max-width: 1100px) {
+    body.app { grid-template-columns: 72px minmax(0, 1fr) var(--qs-col, 0px); }       /* the sidebar is icons only up to 1100 px */
+}
+@media (max-width: 900px) {
+    .settings-window {
+        position: fixed; top: 0; right: 0; bottom: 0; max-width: 100vw; box-shadow: var(--shadow);
+        transform: translateX(100%); transition: transform .28s var(--ease);
+    }
+    .settings-window.is-open { transform: none; }
+}
+@media (max-width: 599px) { .settings-window { width: 100vw; border-left: 0; } }
+@media (prefers-reduced-motion: reduce) { body.app, .settings-window { transition: none !important; } }
 /* before the panel is first opened, the Layout & Style controls wait here */
 #layoutStash { display: none; }
 

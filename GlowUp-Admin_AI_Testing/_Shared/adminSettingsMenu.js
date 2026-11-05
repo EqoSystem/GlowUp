@@ -1,8 +1,9 @@
 // QUICK SETTINGS: the gear at the far right of the header, on every admin page (like Gmail's quick settings).
 //
-// A click on the gear opens ONE panel under it, its right edge on the gear's right edge; a second click, the X, Esc or a click
-// anywhere outside closes it. Focus moves into the panel on open and back to the gear on close. Under 600 px wide the panel is a
-// full-width sheet under the header. It always starts closed on a new page. The GlowUp logo is a plain badge (pageFrame.js): no
+// A click on the gear slides ONE panel in from the right edge of the screen, NEXT to the page (the page gets narrower, nothing is
+// covered); a second click, the X or Esc slides it out again and the page is full width again. Focus moves into the panel on open
+// and back to the gear on close. On a window of 900 px or less there is no room: the panel covers the page (a click outside closes
+// it there), and under 600 px it is full width. It always starts closed on a new page. The GlowUp logo is a plain badge (pageFrame.js): no
 // click, no count.
 //
 // The panel is built on its FIRST OPEN, not at page load. Only an empty, hidden holder for the Layout & Style controls exists
@@ -58,22 +59,6 @@ function show(next) {
     else document.dispatchEvent(new CustomEvent("glowup:layout-view"));
 }
 
-/** Puts the panel under the gear, right-aligned (a full-width sheet under the header on a narrow window). */
-function place() {
-    if (!win || !button) return;
-    const gear = button.getBoundingClientRect();
-    const bar = button.closest(".topbar");
-    if (window.innerWidth < 600) {
-        win.style.top = Math.round((bar ? bar.getBoundingClientRect().bottom : gear.bottom + 8)) + "px";
-        win.style.right = "";
-        win.style.maxHeight = "calc(100vh - " + win.style.top + " - 8px)";
-    } else {
-        win.style.top = Math.round(gear.bottom + 8) + "px";
-        win.style.right = Math.max(8, Math.round(window.innerWidth - gear.right)) + "px";
-        win.style.maxHeight = "calc(100vh - " + Math.round(gear.bottom + 16) + "px)";
-    }
-}
-
 /** Builds the panel (once, on the first open). */
 function build() {
     win = document.createElement("aside");
@@ -105,11 +90,17 @@ function build() {
     hydrate(win);
 }
 
+const overlay = () => window.matchMedia("(max-width: 900px)").matches;     // no room beside the page: the panel covers it
+let hideTimer = 0;
+
 function openWindow() {
     if (isOpen()) return;
     if (!win) build();
-    place();
+    clearTimeout(hideTimer);
+    win.classList.add("is-shown");
+    void win.offsetWidth;                         // the panel is drawn at its start place first, then slides in
     win.classList.add("is-open");
+    document.documentElement.classList.add("qs-open");
     button.setAttribute("aria-expanded", "true");
     show("menu");
     win.focus({ preventScroll: true });
@@ -119,7 +110,10 @@ export function closeSettingsWindow() {
     if (!isOpen()) return;
     const hadFocus = win.contains(document.activeElement) || document.activeElement === document.body;
     win.classList.remove("is-open");
+    document.documentElement.classList.remove("qs-open");
     button.setAttribute("aria-expanded", "false");
+    // it slides out first, then leaves the layout
+    hideTimer = setTimeout(() => { if (!isOpen()) win.classList.remove("is-shown"); }, 320);
     if (hadFocus) button.focus({ preventScroll: true });
 }
 
@@ -220,13 +214,13 @@ export function mountSettingsMenu(tools) {
         if (document.querySelector(".modal-overlay[style*='flex'], .menu.show, .facet-panel")) return;
         closeSettingsWindow();
     });
-    // a click outside closes it; a dialog, menu or message opened from inside the panel is part of it
+    // Beside the page the panel stays open while the page is used. Over the page (a small window) a click outside closes it;
+    // a dialog, menu or message opened from inside the panel is part of it.
     document.addEventListener("pointerdown", (event) => {
-        if (!isOpen() || win.contains(event.target) || button.contains(event.target)) return;
+        if (!isOpen() || !overlay() || win.contains(event.target) || button.contains(event.target)) return;
         if (event.target.closest && event.target.closest(".modal-overlay, .menu, .info-pop, .toast, .facet-panel")) return;
         closeSettingsWindow();
     }, true);
-    window.addEventListener("resize", () => { if (isOpen()) place(); });
     document.addEventListener("glowup:theme", () => { if (isOpen() && view === "menu") renderMenu(); });
     document.addEventListener("glowup:bin-count", () => { if (isOpen() && view === "menu") renderMenu(); });
     onListsRefreshed(() => { if (isOpen() && view === "menu") renderMenu(); });
