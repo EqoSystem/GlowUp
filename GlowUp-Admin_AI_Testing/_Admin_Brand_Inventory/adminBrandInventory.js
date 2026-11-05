@@ -52,6 +52,7 @@ import { nearShade } from "../_Shared/listRules.js";
 import { mountIngredientPicker } from "../_Shared/adminIngredientPicker.js";
 import { openFacets } from "../_Shared/adminFacets.js";
 import { EXPORT_MAX_ROWS, EXPORT_FILE_PREFIX, toCsv, downloadCsv, today } from "../_Shared/adminExport.js";
+import { wireSettingsButton, setPageSettings } from "../_Shared/adminSettingsMenu.js";
 import { countPending, openSnapshotReview, finishSnapshot, APPROVED_DESCRIPTION } from "../_Shared/adminSnapshots.js";
 import { gs1Hint, VERIFIED_BY_GS1 } from "../_Shared/gs1Hint.js";
 
@@ -204,10 +205,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         { label: "Brand", icon: "tag", description: "A new brand: name, category, market, status.", run: () => openBrandForm(null) },
         { label: "Product", icon: "lipstick", description: "A make-up product of a listed brand.", disabled: brands.length === 0, run: () => openProductForm(null, brandFilterValue()) }
     ]));
-    el("moreMenuBtn").addEventListener("click", (event) => {
+    // the gear opens the settings window; what was behind "..." here is listed there under "This page" (5 November 2026)
+    wireSettingsButton(el("settingsGearBtn"));
+    setPageSettings(() => {
         const allClosed = shownGroups.length > 0 && shownGroups.every((g) => closed.has(g.id));
         const outside = outsideCount();
-        openMenu(event.currentTarget, [
+        return [
             { label: allClosed ? "Open all brands" : "Close all brands", icon: "down", disabled: view.mode !== "brands" || org.view.kind === "bin", description: allClosed ? "Show every brand's products." : "Show the brands only.", run: () => { if (allClosed) closed.clear(); else shownGroups.forEach((g) => closed.add(g.id)); renderInventory(); } },
             { separator: true },
             { label: "Clean up", icon: "sparkle", description: "What is not make-up, what is there twice, kinds and names to put right. You see every change and apply one step at a time.", run: openCleanUp },
@@ -218,7 +221,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             { label: "Add the FDA Philippines catalogue", icon: "download", description: "Make-up that is on the FDA Philippines list of notified cosmetics. You see how many and confirm first.", run: importFdaCatalogue },
             { label: "Trim the FDA Philippines catalogue", icon: "undo", description: "Moves FDA-list products that are no longer in the catalogue, have no ingredient list and were never scanned to the Recycle bin.", run: trimFdaCatalogue },
             { label: `Remove what is not make-up (${outside})`, icon: "ban", danger: true, disabled: outside === 0, description: "Skin care, hair, body, nail and fragrance entries go to the Recycle bin. You see the list and confirm first.", run: removeOutOfScope }
-        ]);
+        ];
     });
     el("sortMenuBtn").addEventListener("click", (event) => openMenu(event.currentTarget, [{ heading: "Order of the list" }].concat(
         SORTS.map((s) => ({ label: s.label, checked: s.id === view.sort, run: () => { view.sort = s.id; saveView(); fromFirstPage(); } })))));

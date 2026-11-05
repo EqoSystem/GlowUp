@@ -52,12 +52,12 @@
         document.body.classList.add("app");
         var sidebar = document.createElement("aside");
         sidebar.className = "sidebar";
-        // the logo ("G" and the red Recycle bin count, no name and no caret) is ONE button: a tap opens the settings window, a
-        // second tap hides it (adminSettingsMenu.js).
+        // the logo ("G" and the red Recycle bin count) is ONE button: a tap opens the settings window, a second tap hides it
+        // (adminSettingsMenu.js). The name "Glow Up" stands beside it and folds away with the other labels (5 November 2026).
         // (no "Admin Portal" line, no e-mail and no Sign Out at the bottom since 29 October 2026: all are in that window)
         sidebar.innerHTML =
             '<div class="sidebar-brand"><button type="button" class="brand-menu" id="brandMenuBtn" aria-haspopup="dialog" aria-expanded="false" aria-controls="settingsWindow" aria-label="Settings" data-tip="Settings">' +
-            '<span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"><span class="brand-badge" id="brandBinBadge" hidden></span></span></button></div>' +
+            '<span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"><span class="brand-badge" id="brandBinBadge" hidden></span></span></button><span class="brand-title label">Glow Up</span></div>' +
             '<ul class="nav-links" id="sidebarNav" aria-label="Pages"><li class="nav-drop" aria-hidden="true"></li>' +
             NAV.map(function (n) {
                 var here = n.id === page;

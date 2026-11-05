@@ -15,6 +15,9 @@
 // adminLayouts.js talks to it with two events: "glowup:settings-close" (arranging hides the window) and "glowup:layout-view"
 // (the Layout and style view was shown: paint it).
 //
+// THE GEAR beside Add on Inventory and the Curator opens the same window (wireSettingsButton). What used to be behind the "..."
+// there (Clean up, Find duplicates ...) is listed in the Settings view under "This page" (setPageSettings).
+//
 // THE RECYCLE BIN COUNT is read-only and uses the existing data code (adminStore.js): first the lists this browser keeps
 // (no read at all); only a list that is not kept is counted with one count query (binned == true, the same query the
 // Dashboard already makes), remembered for 5 minutes in this tab.
@@ -36,6 +39,8 @@ const WINDOW_GAP = 8;
 let binCount = 0;
 let recountTimer = 0;
 let win = null, button = null;
+let opener = null;                                // what opened the window: the focus goes back there
+let pageItems = null;                             // () => the page's own entries, in the form openMenu takes
 let view = "menu";                                // "menu" | "layout"
 let state = null;                                 // { left, top, width, height }; height 0 = as tall as the content (up to the window)
 
@@ -132,10 +137,11 @@ function show(next) {
     state = place(state);
 }
 
-function openWindow() {
+function openWindow(from) {
     if (isOpen()) return;
+    opener = from || button;
     win.classList.add("is-open");
-    button.setAttribute("aria-expanded", "true");
+    opener.setAttribute("aria-expanded", "true");
     show("menu");
     win.focus({ preventScroll: true });
 }
@@ -144,16 +150,28 @@ export function closeSettingsWindow() {
     if (!isOpen()) return;
     const hadFocus = win.contains(document.activeElement);
     win.classList.remove("is-open");
-    button.setAttribute("aria-expanded", "false");
-    if (hadFocus) button.focus({ preventScroll: true });
+    opener.setAttribute("aria-expanded", "false");
+    if (hadFocus) opener.focus({ preventScroll: true });
+}
+
+/** A second button that opens and closes the window (the gear of a page). */
+export function wireSettingsButton(gear) {
+    gear.addEventListener("click", () => { if (isOpen()) closeSettingsWindow(); else openWindow(gear); });
+}
+
+/** The page's own entries for the Settings view: a function that returns them as openMenu takes them, asked each time the view is drawn. */
+export function setPageSettings(items) {
+    pageItems = items;
+    if (isOpen() && view === "menu") renderMenu();
 }
 
 // ---------------------------------------------------------------------------------------------
 // The Settings view
 // ---------------------------------------------------------------------------------------------
-function item({ label, description, iconName, danger, checked, badge, run }) {
+function item({ label, description, iconName, danger, checked, badge, disabled, run }) {
     const row = document.createElement("button");
     row.type = "button";
+    row.disabled = !!disabled;
     row.className = "menu-item" + (danger ? " danger" : "") + (checked ? " checked" : "");
     row.innerHTML = iconName ? icon(iconName) : `<span class="menu-gap"></span>`;
     const text = document.createElement("span");
@@ -170,6 +188,16 @@ function item({ label, description, iconName, danger, checked, badge, run }) {
 }
 const heading = (text) => { const h = document.createElement("div"); h.className = "menu-heading"; h.textContent = text; return h; };
 const separator = () => { const s = document.createElement("div"); s.className = "menu-sep"; return s; };
+
+/** "This page": the entries that moved here from the page's "..." menu. Choosing one closes the window, because a dialog or the list comes next. */
+function pageEntries() {
+    const items = (pageItems ? pageItems() : []).filter((entry) => !entry.separator);
+    if (items.length === 0) return [];
+    return [separator(), heading("This page"), ...items.map((entry) => item({
+        label: entry.label, description: entry.description, iconName: entry.icon, danger: entry.danger, disabled: entry.disabled,
+        run: () => { closeSettingsWindow(); entry.run(); }
+    }))];
+}
 
 function renderMenu() {
     const host = el("swMenuView");
@@ -190,6 +218,7 @@ function renderMenu() {
         item({ label: "Light", iconName: "sun", checked: choice === "light", run: () => { setThemeChoice("light"); renderMenu(); } }),
         item({ label: "Dark", iconName: "moon", checked: choice === "dark", run: () => { setThemeChoice("dark"); renderMenu(); } }),
         item({ label: "System", iconName: "monitor", checked: choice === "system", description: "Follows this computer's setting.", run: () => { setThemeChoice("system"); renderMenu(); } }),
+        ...pageEntries(),
         separator(),
         note,
         item({ label: "Sign Out", iconName: "logout", danger: true, run: () => document.dispatchEvent(new CustomEvent("glowup:sign-out")) })
