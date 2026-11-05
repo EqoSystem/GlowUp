@@ -262,6 +262,8 @@ const putEntry = () => env.withSecurityRulesDisabled((context) => setDoc(doc(con
 await can("an admin reads the Archive", async () => { await putEntry(); await getDocs(query(collection(adminDoc(), "archive"))); });
 await cannot("a plain user reads the Archive", async () => { await putEntry(); await getDoc(doc(user(), "archive/products__p1")); });
 await cannot("nobody signed in lists the Archive", () => getDocs(query(collection(anon(), "archive"))));
+await cannot("a plain user lists the Archive", async () => { await putEntry(); await getDocs(query(collection(user(), "archive"))); });
+await cannot("nobody signed in reads an archive entry", async () => { await putEntry(); await getDoc(doc(anon(), "archive/products__p1")); });
 await cannot("an admin changes an archive entry", async () => { await putEntry(); await updateDoc(doc(adminDoc(), "archive/products__p1"), { expires_at: in30() }); });
 await can("an admin deletes an archive entry (Delete now)", async () => { await putEntry(); await deleteDoc(doc(adminDoc(), "archive/products__p1")); });
 await cannot("a plain user deletes an archive entry", async () => { await putEntry(); await deleteDoc(doc(user(), "archive/products__p1")); });
@@ -276,6 +278,16 @@ await can("an admin restores: the original back, the entry gone (one batch)", as
 await can("an admin reads the purge log", () => getDocs(query(collection(adminDoc(), "archive_purge_log"))));
 await cannot("an admin writes the purge log", () => setDoc(doc(adminDoc(), "archive_purge_log/x"), { mode: "live" }));
 await cannot("a plain user reads the purge log", () => getDocs(query(collection(user(), "archive_purge_log"))));
+
+// bulk apply on the Inventory page: one batch that changes only the sources of the chosen products
+await can("an admin applies a source to products in one batch", async () => {
+    const db = adminDoc(), batch = writeBatch(db);
+    batch.update(doc(db, "products/p1"), { sources: ["Official website | https://example.com"], updatedAt: serverTimestamp() });
+    await batch.commit();
+});
+await cannot("a plain user applies a source", () => updateDoc(doc(user(), "products/p1"), { sources: ["Official website | https://example.com"] }));
+await cannot("nobody signed in applies a source", () => updateDoc(doc(anon(), "products/p1"), { sources: ["Official website | https://example.com"] }));
+await cannot("an admin applies more sources than the rule takes", () => updateDoc(doc(adminDoc(), "products/p1"), { sources: Array.from({ length: 41 }, (_, i) => "x | https://example.com/" + i) }));
 
 await env.cleanup();
 console.log(`checks made: ${checks}`);

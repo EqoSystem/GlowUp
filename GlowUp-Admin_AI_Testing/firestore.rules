@@ -6,7 +6,7 @@ rules_version = '2';
 // (see FIRESTORE_SCHEMA.md, "Admin accounts"). Without that document the website can still
 // read, but every Save and Delete on the website will be refused.
 //
-// To publish: Firebase console > Firestore Database > Rules > paste this whole file > Publish.
+// To publish: firebase deploy --only firestore:rules (Vercel does not publish these).
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -380,7 +380,7 @@ service cloud.firestore {
 
     // ---- the Archive: entries that left the Recycle bin, kept 30 days, then deleted by the server job ----
     // Admins only. An entry is created once (id "<collection>__<id>"), never changed; the job deletes it after expires_at.
-    // ADDED on 29 October 2026 (ARCHIVE_DESIGN.md). Not published by the agent: the owner pastes it into the live rules.
+    // ADDED on 29 October 2026 (ARCHIVE_DESIGN.md), published on 5 November 2026.
     match /archive/{entryId} {
       allow read, delete: if isAdmin();
       allow update: if false;
