@@ -35,11 +35,14 @@ const make = (tag, className, text) => {
     return node;
 };
 
+/** What was typed under "Also known as": no empty names, not the name itself. */
+const toAliases = (typed, name) => String(typed || "").split(",").map((a) => a.replace(/\s+/g, " ").trim()).filter((a) => a && a.toLowerCase() !== String(name).toLowerCase());
+
 /**
  * options = {
  *   textarea, search, results, pills   - the elements (see the product form)
  *   library()                          - [{ id, name, techName, aliases }] of the ingredients that exist (not in the bin)
- *   create({ name, techName, description, riskLevel })  - saves a new ingredient; resolves to its library entry (or throws)
+ *   create({ name, aliases, description, riskLevel })  - saves a new ingredient; resolves to its library entry (or throws)
  *   onChange()                         - called after the list was changed here
  * }
  * Returns { refresh() }: draw the pills again after the text was set by code.
@@ -210,7 +213,7 @@ export function mountIngredientPicker(options) {
         const form = make("form", "modal-form");
         const field = (labelText, input) => { const wrap = make("div", "field"); const label = make("label", "", labelText); input.id = "newIng" + labelText.replace(/\W/g, ""); label.htmlFor = input.id; wrap.append(label, input); return wrap; };
         const nameInput = make("input"); nameInput.type = "text"; nameInput.maxLength = 80; nameInput.value = startName || ""; nameInput.autocomplete = "off";
-        const techInput = make("input"); techInput.type = "text"; techInput.maxLength = 120; techInput.autocomplete = "off"; techInput.placeholder = "As printed on labels (empty = the name above)";
+        const techInput = make("input"); techInput.type = "text"; techInput.maxLength = 120; techInput.autocomplete = "off"; techInput.placeholder = "Other spellings on labels, separated by commas (optional)";
         const descInput = make("textarea"); descInput.rows = 3; descInput.maxLength = 600; descInput.placeholder = "What it is and what it does, in plain words.";
         const riskInput = make("select");
         [["", "Let the app decide"], ["safe", "Safe"], ["caution", "Caution"], ["harmful", "Harmful"]].forEach(([value, text]) => { const o = make("option", "", text); o.value = value; riskInput.appendChild(o); });
@@ -219,7 +222,7 @@ export function mountIngredientPicker(options) {
         const cancel = make("button", "cancel-btn", "Cancel"); cancel.type = "button";
         const save = make("button", "save-btn", "Create and add"); save.type = "submit";
         actions.append(cancel, save);
-        form.append(field("Ingredient name", nameInput), field("INCI name (as printed on labels)", techInput), field("Plain-words definition", descInput), field("How the app judges it", riskInput), error, actions);
+        form.append(field("INCI name", nameInput), field("Also known as", techInput), field("Plain-words definition", descInput), field("How the app judges it", riskInput), error, actions);
         frame.box.append(note, form);
         cancel.addEventListener("click", () => frame.close());
         form.addEventListener("submit", async (event) => {
@@ -232,7 +235,7 @@ export function mountIngredientPicker(options) {
             if (existing) { frame.close(); add(existing.name); return; }              // it was there all along: just use it
             save.disabled = true; save.textContent = "Saving...";
             try {
-                const made = await options.create({ name, techName: techInput.value.replace(/\s+/g, " ").trim() || name, description, riskLevel: riskInput.value });
+                const made = await options.create({ name, aliases: toAliases(techInput.value, name), description, riskLevel: riskInput.value });
                 frame.close();
                 // a pill typed with another spelling than the new name now links to it
                 const list = names().filter((n) => sameKey(n) !== sameKey(startName || ""));

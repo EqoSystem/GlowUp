@@ -10,8 +10,9 @@ namespace GlowUp.Views
 {
     /// <summary>
     /// The ingredient list pop-up used by the Recent Scans and Result scenes. It lists every
-    /// ingredient of a product (flagged ones first) with its description, uses and the reason it
-    /// matters for this user, and ends with the advice to see a dermatologist.
+    /// ingredient of a product (flagged ones first) with its classification, purpose and the reason it
+    /// matters for this user, the rest behind a fold in each row, and ends with the advice to see a dermatologist.
+    /// The "Key ingredients" chips open this same list with the tapped ingredient first, so both show the same card.
     /// IngredientRowTemplate is the pattern row: the app makes one copy per ingredient.
     /// </summary>
     public class IngredientSheet : MonoBehaviour
@@ -80,10 +81,10 @@ namespace GlowUp.Views
                     var row = Instantiate(rowTemplate, listContent);
                     row.gameObject.name = "Ingredient_" + finding.name;
                     row.gameObject.SetActive(true);
-                    IngredientFinding shown = ForDisplay(finding);
+                    IngredientFinding shown = ForDisplay(finding, out IngredientRowView.Details details);
                     if (maybe.Contains(finding.name ?? "") && !string.IsNullOrWhiteSpace(mayContainNote))
                         shown.description = (mayContainNote + " " + (shown.description ?? "")).Trim();
-                    row.Bind(shown);
+                    row.Bind(shown, details);
                     rows.Add(row.gameObject);
                 }
 
@@ -95,35 +96,58 @@ namespace GlowUp.Views
         }
 
         /// <summary>
-        /// The line as it is shown: the description always ends with where the information comes from, and an
-        /// ingredient nothing is known about says why and what to do (the saved scan itself is not changed).
+        /// The finding as it is shown, and what the row shows beside it: an ingredient nothing is known about says why and what to do,
+        /// and the place the information comes from is on a line of its own (the saved scan itself is not changed).
         /// </summary>
-        IngredientFinding ForDisplay(IngredientFinding f)
+        IngredientFinding ForDisplay(IngredientFinding f, out IngredientRowView.Details details)
         {
+            details = new IngredientRowView.Details();
             var shown = new IngredientFinding
             {
                 name = f.name, techName = f.techName, level = f.level, description = f.description ?? "", commonUses = f.commonUses,
                 reason = f.reason, keyActive = f.keyActive, hidden = f.hidden, aiSourced = f.aiSourced
             };
+            GlowUp.Data.IngredientData entry = GlowUp.Data.IngredientRepository.Find(string.IsNullOrEmpty(f.techName) ? f.name : f.techName) ?? GlowUp.Data.IngredientRepository.Find(f.name);
+            if (entry != null) FillDetails(details, entry, f);
             if (f.level == "unknown" && string.IsNullOrWhiteSpace(shown.description))
             {
                 shown.description = GlowUp.Net.ConnectivityMonitor.Reachable ? unknownOnline : unknownOffline;
                 return shown;
             }
             if (string.IsNullOrWhiteSpace(shown.description)) return shown;
-            GlowUp.Data.IngredientData entry = GlowUp.Data.IngredientRepository.Find(string.IsNullOrEmpty(f.techName) ? f.name : f.techName) ?? GlowUp.Data.IngredientRepository.Find(f.name);
             string source = "";
             if (entry != null && entry.sources != null && entry.sources.Count > 0)
             {
-                // "Page title | https://address" -> the page title
+                // "Page title | https://address" -> the page title, and the address for the link
                 string first = entry.sources[0] ?? "";
                 int cut = first.LastIndexOf(" | ", System.StringComparison.Ordinal);
                 source = (cut > 0 ? first.Substring(0, cut) : first).Trim();
+                string address = (cut > 0 ? first.Substring(cut + 3) : first).Trim();
+                if (address.StartsWith("https://", System.StringComparison.OrdinalIgnoreCase))
+                {
+                    details.sourceUrl = address;
+                    if (source == address) source = "";
+                }
             }
             if (source.Length == 0 && entry != null) source = f.aiSourced ? sourceAi : sourceCurator;
             else if (source.Length > 0 && f.aiSourced) source += " (" + sourceAi + ")";
-            if (source.Length > 0) shown.description = shown.description.TrimEnd() + " " + string.Format(sourceFormat, source) + ".";
+            if (source.Length > 0) details.source = string.Format(sourceFormat, source) + ".";
             return shown;
+        }
+
+        /// <summary>What the website's entry says: the common name is its first alias. Empty fields stay empty, and the row then hides them.</summary>
+        static void FillDetails(IngredientRowView.Details d, GlowUp.Data.IngredientData entry, IngredientFinding f)
+        {
+            d.classification = GlowUp.Data.ClassificationRepository.NameOf(entry.classificationId);
+            d.purpose = entry.purpose;
+            d.chemical = entry.chemicalDescription;
+            if (!string.IsNullOrWhiteSpace(entry.cautionNote)) d.caution = "It " + entry.cautionNote.Trim().TrimEnd('.') + ".";
+            var others = (entry.aliases ?? new List<string>()).Where(a => !string.IsNullOrWhiteSpace(a) && !string.Equals(a, f.name, System.StringComparison.OrdinalIgnoreCase)).ToList();
+            if (others.Count > 0) { d.commonName = others[0]; d.aliases = string.Join(", ", others); }
+            if (entry.allergenTags != null && entry.allergenTags.Count > 0) d.allergen = string.Join(", ", entry.allergenTags.Select(GlowUp.Data.ListsRepository.AllergenLabel));
+            if (entry.keyActive) d.highlights.Add("Key active");
+            if (entry.umbrella) d.highlights.Add("Umbrella term");
+            if (entry.highlights != null) d.highlights.AddRange(entry.highlights.Select(GlowUp.Data.ListsRepository.HighlightLabel));
         }
     }
 }

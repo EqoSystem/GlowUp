@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -33,6 +34,8 @@ namespace GlowUp.Views
         [Tooltip("The arrow's turn in degrees while closed, and while open")]
         [SerializeField] private float arrowClosedAngle = 0f;
         [SerializeField] private float arrowOpenAngle = 180f;
+        [Tooltip("How long opening and closing takes, in seconds. 0 = at once. The block needs a RectMask2D so its text is cut while it moves.")]
+        [SerializeField] private float animateSeconds = 0f;
 
         public bool IsOpen { get; private set; }
         /// <summary>Raised after the block was opened (true) or closed (false).</summary>
@@ -49,8 +52,45 @@ namespace GlowUp.Views
         {
             if (IsOpen == open) return;
             IsOpen = open;
-            Apply();
+            if (animateSeconds > 0f && body != null && gameObject.activeInHierarchy)
+            {
+                if (running != null) StopCoroutine(running);
+                running = StartCoroutine(Slide(open));
+            }
+            else Apply();
             Changed?.Invoke(open);
+        }
+
+        Coroutine running;
+
+        /// <summary>The block's height moves between its height now and its full height (or 0); the screen around it follows on every frame.</summary>
+        IEnumerator Slide(bool open)
+        {
+            if (toggleLabel != null) toggleLabel.text = open ? openLabel : closedLabel;
+            var rect = (RectTransform)body.transform;
+            var parent = transform as RectTransform;
+            if (!body.TryGetComponent(out LayoutElement size)) size = body.AddComponent<LayoutElement>();
+            float from = body.activeSelf ? rect.rect.height : 0f;
+            // its full height: measured with the block free, in the width it really has
+            size.enabled = false;
+            body.SetActive(true);
+            if (parent != null) LayoutRebuilder.ForceRebuildLayoutImmediate(parent);
+            float full = rect.rect.height;
+            size.enabled = true;
+            float to = open ? full : 0f;
+            float fromAngle = arrow != null ? arrow.localEulerAngles.z : 0f, toAngle = open ? arrowOpenAngle : arrowClosedAngle;
+            for (float t = 0f; t < 1f; t += Time.unscaledDeltaTime / animateSeconds)
+            {
+                float eased = Mathf.SmoothStep(0f, 1f, t);
+                size.minHeight = size.preferredHeight = Mathf.Lerp(from, to, eased);
+                if (arrow != null) arrow.localEulerAngles = new Vector3(0f, 0f, Mathf.LerpAngle(fromAngle, toAngle, eased));
+                if (parent != null) LayoutRebuilder.MarkLayoutForRebuild(parent);
+                yield return null;
+            }
+            size.minHeight = size.preferredHeight = -1f;
+            size.enabled = false;
+            running = null;
+            Apply();
         }
 
         void Apply()

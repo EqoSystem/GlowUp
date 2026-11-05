@@ -1477,3 +1477,31 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 @media (max-width: 900px) { .topbar > .header-tabs .seg svg.ic, .topbar > .header-tabs .tab-count { display: none; } }
 /* a phone: the header slides sideways rather than cut anything off */
 @media (max-width: 720px) { .topbar.has-tabs { overflow-x: auto; } }
+
+/* ---- the site's own drop-down (adminSelect.js): dark panel, light text, pink hover and selected row ---- */
+.combo { position: relative; }
+.combo-native { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.combo-btn {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 40px; padding: 8px 12px; cursor: pointer;
+    background: var(--surface-2); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); font: inherit; text-align: left;
+}
+.combo-btn:hover { background: var(--surface-3); }
+.combo-btn:focus-visible, .combo-btn[aria-expanded="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
+.combo-btn.is-placeholder .combo-label { color: var(--muted); }
+.combo-caret { flex: none; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg) translateY(-2px); }
+.combo-pop {
+    position: fixed; z-index: 5000; display: flex; flex-direction: column; overflow: hidden; outline: none;
+    background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); box-shadow: var(--shadow);
+}
+.combo-pop[hidden] { display: none; }
+.combo-filter { flex: none; margin: 6px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font: inherit; }
+.combo-filter[hidden] { display: none; }
+.combo-filter:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+.combo-list { list-style: none; margin: 0; padding: 4px; overflow: auto; min-height: 0; }
+.combo-item { padding: 8px 10px; border-radius: 8px; cursor: pointer; }
+.combo-item.active, .combo-item:hover:not([aria-disabled="true"]) { background: color-mix(in srgb, var(--accent) 22%, var(--surface)); }
+.combo-item[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 34%, var(--surface)); font-weight: 600; }
+.combo-item[aria-disabled="true"] { color: var(--muted); opacity: .6; cursor: default; }
+.combo-item.is-add { color: var(--accent); font-weight: 600; }
+.combo-sep { height: 1px; margin: 4px 6px; background: var(--border); }
+.combo-none { padding: 10px; color: var(--muted); font-size: var(--fs-sm); }

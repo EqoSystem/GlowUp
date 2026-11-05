@@ -15,8 +15,9 @@ namespace GlowUp.Data
     /// used as it is, so changes made on the website reach the app without downloading the whole list each time.
     /// OFFLINE: the copy saved on the phone is used, so scanning keeps working without a connection.
     ///
-    /// Lookup matches techName / name / aliases, whatever the capital letters. The website writes name,
-    /// techName and description; every other field is optional.
+    /// Lookup matches techName / name / aliases, whatever the capital letters. The website writes name and
+    /// description; every other field is optional. (techName is the old INCI field: since the field change of
+    /// November 2026 its value is one of the aliases, so only entries from the app's AI look-up still have it.)
     ///
     /// Entries found by the app's own AI lookup (source "ai") that an admin has not reviewed yet are
     /// kept apart: an entry typed or approved by an admin always wins over them.
@@ -71,6 +72,7 @@ namespace GlowUp.Data
         static async Task Sync(bool everything)
         {
             if (!ConnectivityMonitor.Reachable || !await FirebaseBootstrap.Ready) return;
+            _ = ClassificationRepository.Refresh();          // on its own: a rename changes no ingredient, and it must not hold up a scan
             try
             {
                 bool haveCopy = holder != null && holder.items.Count > 0;
@@ -91,6 +93,7 @@ namespace GlowUp.Data
                     next.items.Add(new IngredientData
                     {
                         id = f.Id, name = f.Str("name"), techName = f.Str("techName"), description = f.Str("description"),
+                        classificationId = f.Str("classificationId"), purpose = f.Str("purpose"), chemicalDescription = f.Str("chemicalDescription"),
                         riskLevel = f.Str("riskLevel"), cautionNote = f.Str("cautionNote"), commonUses = f.Str("commonUses"),
                         minAge = f.Int("minAge"), keyActive = f.Bool("keyActive"), umbrella = f.Bool("umbrella"),
                         aliases = f.List("aliases"), allergenTags = f.List("allergenTags"), highlights = f.List("highlights"),

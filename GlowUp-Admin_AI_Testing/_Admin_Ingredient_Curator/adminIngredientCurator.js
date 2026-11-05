@@ -1,7 +1,11 @@
 // Ingredient Curator: the 'ingredients' collection the mobile app reads when it analyses a scan.
 // An ingredient document:
-//   name, techName, description                       - what app users read (always filled in here)
-//   aliases[]                                          - other spellings found on labels
+//   name (shown as "INCI name"), description            - what app users read (always filled in here)
+//   classificationId, purpose                          - the classification's document id (see adminClassifications.js) and one line on what it does in a product;
+//                                                        required in the form; empty = "Needs classification", and the app hides the badge and the line
+//   aliases[]                                          - other spellings found on labels; the first one is shown as the common name
+//   techName                                           - the old INCI field. Only entries from before the field change, or from the app's AI look-up, still have it:
+//                                                        it is shown as an alias, and saving the entry removes it
 //   riskLevel ("" | "safe" | "caution" | "harmful"), cautionNote, commonUses, minAge, keyActive, umbrella
 //   allergenTags[], avoidForSkinTypes[], goodForSkinTypes[], avoidForConditions[], goodForConditions[]
 //   source, reviewed, sources[], fdaUnii, webSearched  - only on entries that were NOT typed here:
@@ -19,7 +23,7 @@
 //
 // A card shows the ingredient's name and its scientific name only. A click on it shows everything else.
 import { db } from "../_Database/firebase-console.js";
-import { collection, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { collection, doc, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 // reading and writing go through the site's own copy of its lists: a list is downloaded once and kept between pages,
 // and after a change only the documents that were written are read again (see adminStore.js)
 import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed } from "../_Shared/adminStore.js";
@@ -41,6 +45,9 @@ import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
 import { setPageSettings } from "../_Shared/adminSettingsMenu.js";
+import { loadClassifications, classifications, classificationName, openClassificationManager, askNewClassification, openFieldMigration, addStartingClassifications } from "../_Shared/adminClassifications.js";
+import { makeCombo } from "../_Shared/adminSelect.js";
+import { aliasesWithInci, firstAlias, needsClassification, MAX_PURPOSE } from "../_Shared/classificationRules.js";
 
 const pageState = { page: 1, size: 10 };          // the list shows ten ingredients at a time
 const BATCH_LIMIT = 400;                          // Firestore allows 500 writes in one batch
@@ -108,6 +115,10 @@ const FILTERS = [
 ];
 /** The choice that shows what the inventory's products list and the Curator does not explain yet. */
 const FROM_PRODUCTS = "products";
+const NO_CLASS = "__none";            // the classification filter's choice "Needs classification"
+const ADD_CLASS = "__add";            // the form's choice "+ Add new classification"
+let classCombo = null;                // the form's classification drop-down (adminSelect.js)
+const lacksClass = (item) => needsClassification(item, classifications());
 
 // the orders the Sort button offers
 const RISK_ORDER = { harmful: 0, caution: 1, "": 2, safe: 3 };
@@ -126,7 +137,8 @@ const QUICK = {
     broken: { label: "Broken \"Used in\" text", test: (item) => item.usesBroken },
     noNote: { label: "Flagged without a caution note", test: (item) => (item.riskLevel === "harmful" || item.riskLevel === "caution") && !item.cautionNote },
     unused: { label: "Not in any listed product", test: (item) => productUseKnown && usedInProducts(item) === 0 },
-    noEvidence: { label: "Harmful without a regulator's page", test: (item) => item.riskLevel === "harmful" && evidenceProblem("harmful", item.sources) !== "" }
+    noEvidence: { label: "Harmful without a regulator's page", test: (item) => item.riskLevel === "harmful" && evidenceProblem("harmful", item.sources) !== "" },
+    noPurpose: { label: "No purpose yet", test: (item) => !item.purpose }
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -139,11 +151,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     await requireAdmin();
 
     await loadLists();                // allergen families, highlights and skin conditions: one document, built-in lists when it is missing
+    await loadClassifications();      // their own collection: about 25 reads when the page opens
+    // a database that has no classification at all gets the starting list once (an admin is signed in here); it is never added again by itself
+    if (classifications().length === 0) {
+        try { await addStartingClassifications(); } catch (error) { console.warn("The starting classifications could not be added:", error); }
+    }
     renderFit(el("skinTypesFit"), "skinType", SKIN_TYPES);
     renderPickers(null);
     el("addIngredientForm").addEventListener("click", (event) => {
         const button = event.target.closest("[data-list-edit]");
         if (!button) return;
+        if (button.dataset.listEdit === "classifications") { manageClassifications(); return; }
         openListManager(button.dataset.listEdit, {
             ingredients: () => everyIngredient,                 // also the ones in the Recycle bin: restoring one must not point at a deleted item
             onSaved: async () => { renderPickers(editingIngredientId ? everyIngredient.find((i) => i.id === editingIngredientId) || null : null); renderIngredients(); }
@@ -176,11 +194,16 @@ document.addEventListener("DOMContentLoaded", async () => {
     wireSearch(el("ingredientSearchInput"), el("ingredientSearchClear"), fromFirstPage);
     // what was behind "..." here is listed in the settings window under "This page" (5 November 2026)
     setPageSettings(() => [
+        { label: "Manage classifications", icon: "sliders", description: "Add, rename or remove the classifications ingredients can have.", run: manageClassifications },
+        ...(fieldChangeWaits() ? [{ label: "Change the ingredient fields", icon: "layers", description: "One time: back up, add the classification list, move old INCI values into Also Known As.", run: runFieldChange }] : []),
         { label: "Clean up", icon: "sparkle", description: "Entries that are notes, joined names or label text, and entries that are there twice. You see every change first.", run: openCleanUp },
         { label: "Find duplicates", icon: "layers", description: "Entries that explain the same ingredient, or have nearly the same name. You choose which one to keep.", run: openDuplicates }
     ]);
     el("ingredientSourceFilter").addEventListener("change", fromFirstPage);
     el("ingredientRiskFilter").addEventListener("change", fromFirstPage);
+    el("ingredientClassFilter").addEventListener("change", fromFirstPage);
+    el("manageClassBtn").addEventListener("click", manageClassifications);
+    wirePurposeAndClassification();
     el("curatorStats").addEventListener("click", (event) => {
         const tile = event.target.closest(".stat");
         if (!tile) return;
@@ -243,6 +266,7 @@ function narrow(source, risk) {
     el("ingredientSearchInput").value = "";
     el("ingredientSourceFilter").value = source;
     el("ingredientRiskFilter").value = risk;
+    el("ingredientClassFilter").value = "";
     quick = "";
     if (org.view.kind !== "all") org.show({ kind: "all" }); else fromFirstPage();
 }
@@ -263,8 +287,12 @@ async function loadIngredients() {
                 id: d.id,
                 name: data.name || "",
                 techName: data.techName || "",
+                rawTech: Object.prototype.hasOwnProperty.call(data, "techName"),
+                rawMarked: Object.prototype.hasOwnProperty.call(data, "classificationId"),
                 description: data.description || "",
-                aliases: asArray(data.aliases),
+                aliases: aliasesWithInci(data.name, data.techName, asArray(data.aliases)),
+                classificationId: String(data.classificationId || ""),
+                purpose: String(data.purpose || ""),
                 riskLevel: RISK_LEVELS.includes(risk) ? risk : "",
                 cautionNote: data.cautionNote || "",
                 commonUses: brokenText(uses) ? "" : uses,
@@ -358,6 +386,7 @@ function afterChange() {
     setBinCount(binIngredients.length, "ingredients");
     if (org) org.sync(everyIngredient.map((item) => item.id));
     fillSourceFilter();
+    fillClassFilter();
     renderIngredients();
     datasetChanged("ingredients");        // the data panels (lists, grids, graphs) draw the new data
 }
@@ -371,6 +400,56 @@ function fillSourceFilter() {
         + `<option value="${FROM_PRODUCTS}">From products, not explained yet (${fromProducts.length})</option>`;
     select.value = wanted === FROM_PRODUCTS || FILTERS.some((f) => f.value === wanted) ? wanted : "";
 }
+
+/** The classification filter, with how many ingredients each choice has. */
+function fillClassFilter() {
+    const select = el("ingredientClassFilter"), wanted = select.value;
+    const options = [make("", "Any classification"), make(NO_CLASS, `Needs classification (${ingredients.filter(lacksClass).length})`)];
+    classifications().forEach((c) => options.push(make(c.id, `${c.name} (${ingredients.filter((i) => i.classificationId === c.id).length})`)));
+    select.replaceChildren(...options);
+    select.value = options.some((o) => o.value === wanted) ? wanted : "";
+    function make(value, text) { const option = document.createElement("option"); option.value = value; option.textContent = text; return option; }
+}
+
+/** The form's classification box: the list, then "+ Add new classification". */
+function fillClassInput(selected) {
+    const select = el("ingredientClassInput");
+    const make = (value, text) => { const option = document.createElement("option"); option.value = value; option.textContent = text; return option; };
+    // the one list from the database: A to Z, "Other" last; the placeholder cannot be chosen; "+ Add" sits under a thin line
+    const placeholder = make("", "Choose a classification"), line = make("", "-"), add = make(ADD_CLASS, "+ Add new classification");
+    placeholder.disabled = true; line.disabled = true; line.setAttribute("data-sep", ""); add.setAttribute("data-add", "");
+    select.replaceChildren(placeholder, ...classifications().map((c) => make(c.id, c.name)), line, add);
+    select.value = classifications().some((c) => c.id === selected) ? selected : "";
+    select.dataset.last = select.value;
+    if (classCombo) classCombo.refresh();
+}
+
+function manageClassifications() {
+    openClassificationManager({
+        ingredients: () => everyIngredient,               // also the ones in the Recycle bin: restoring one must not point at a deleted classification
+        onChanged: async () => { fillClassInput(el("ingredientClassInput").value); fillClassFilter(); renderIngredients(); datasetChanged("ingredients"); }
+    });
+}
+
+function wirePurposeAndClassification() {
+    const purpose = el("ingredientPurposeInput"), select = el("ingredientClassInput");
+    purpose.maxLength = MAX_PURPOSE;
+    classCombo = makeCombo(select);
+    purpose.addEventListener("input", paintPurposeCount);
+    select.addEventListener("change", async () => {
+        if (select.value !== ADD_CLASS) { select.dataset.last = select.value; return; }
+        const before = select.dataset.last || "";
+        select.value = before;
+        const made = await askNewClassification();
+        fillClassInput(made ? made.id : before);
+        if (made) { fillClassFilter(); renderIngredients(); }
+    });
+}
+function paintPurposeCount() { el("ingredientPurposeCount").textContent = `${el("ingredientPurposeInput").value.length} / ${MAX_PURPOSE}`; }
+
+/** True while the one-time field change has something left to do. */
+const fieldChangeWaits = () => everyIngredient.length > 0 && (classifications().length === 0 || everyIngredient.some((item) => item.rawTech || !item.rawMarked));
+function runFieldChange() { return openFieldMigration(async () => { await loadIngredients(); }); }
 
 /** Every way this ingredient can be written on a label. */
 function keysOf(item) {
@@ -443,7 +522,7 @@ function renderIngredients() {
     const container = el("ingredientsList");
     const typed = el("ingredientSearchInput").value, term = sameKey(typed);
     const filter = FILTERS.find((f) => f.value === el("ingredientSourceFilter").value) || FILTERS[0];
-    const risk = el("ingredientRiskFilter").value;
+    const risk = el("ingredientRiskFilter").value, classFilter = el("ingredientClassFilter").value;
     const now = org.view, inBin = now.kind === "bin", folder = now.kind === "folder" ? now.name : "";
     paintStats();
     el("sortNow").textContent = sortNow().short;
@@ -459,6 +538,7 @@ function renderIngredients() {
         : pool.filter((item) => filter.test(item)
             && (!risk || (risk === "auto" ? !item.riskLevel : item.riskLevel === risk))
             && (!folder || sameKey(item.folder) === sameKey(folder))
+            && (!classFilter || (classFilter === NO_CLASS ? lacksClass(item) : item.classificationId === classFilter))
             && (!quick || QUICK[quick].test(item)) && matches(item)).sort(sortNow().cmp));
 
     el("ingredientCountLine").textContent = inBin ? (pool.length === 0 ? "" : `${many(shown.length, "entry", "entries")} · left out by the app`)
@@ -469,7 +549,7 @@ function renderIngredients() {
     if (shown.length === 0) {
         const message = everyIngredient.length === 0 ? "No ingredients yet."
             : inBin ? (term ? `Nothing in the Recycle bin matches "${escapeHtml(typed)}".` : "The Recycle bin is empty.")
-            : term ? `No ingredient matches "${escapeHtml(typed)}"${filter.value || risk || folder || quick ? " in this view" : ""}.`
+            : term ? `No ingredient matches "${escapeHtml(typed)}"${filter.value || risk || folder || quick || classFilter ? " in this view" : ""}.`
             : quick ? "No ingredient like that. Click the chip above to show all again."
             : folder ? `"${escapeHtml(folder)}" is empty.`
             : filter.value === "review" ? "Nothing is waiting for review."
@@ -539,10 +619,13 @@ function cardOf(item, inBin) {
                 <span class="spacer"></span>
                 <div class="btn-group row-actions">${buttons.join("")}</div>
             </header>
-            <div class="card-sub"><p class="ingredient-tech">${escapeHtml(item.techName || "No INCI name")}</p>${review ? statusBadge("Pending") : ""}${toneBadge(RISK_NAMES[item.riskLevel || "auto"], toneOfRisk(item.riskLevel), riskText)}</div>
+            <div class="card-sub"><p class="ingredient-tech">${escapeHtml(firstAlias(item))}</p><span class="class-cell">${classCell(item)}</span>${review ? statusBadge("Pending") : ""}${toneBadge(RISK_NAMES[item.riskLevel || "auto"], toneOfRisk(item.riskLevel), riskText)}</div>
             ${open ? detailOf(item, inBin) : ""}
         </article>`;
 }
+
+/** The classification column: one neutral chip, or "Needs classification". */
+const classCell = (item) => lacksClass(item) ? `<span class="chip warn">Needs classification</span>` : `<span class="chip">${escapeHtml(classificationName(item.classificationId))}</span>`;
 
 /** Everything else about an ingredient: shown inside its card when the card is clicked. */
 function detailOf(item, inBin) {
@@ -550,6 +633,7 @@ function detailOf(item, inBin) {
     const origin = originLabel(item.source);
     const facts = [];
     // the risk is on the card's own badge (with what it means in its tooltip): it is not said a second time here
+    if (item.purpose) facts.push(["Purpose", escapeHtml(item.purpose)]);
     facts.push(["Definition", escapeHtml(item.description || "No description provided.")]);
     if (item.chemicalDescription) facts.push(["What the chemical is", escapeHtml(item.chemicalDescription)]);
     if (item.aliases.length > 0) facts.push(["Also known as", escapeHtml(item.aliases.join(", "))]);
@@ -676,7 +760,7 @@ async function assistWithAi(name) {
         assistsToday(true);
         const body = await answer.json().catch(() => ({}));
         if (!answer.ok) throw new Error(body.error || "The AI could not be reached (error " + answer.status + ").");
-        if (!dialogIsOpen() || el("ingredientTechInput").value.trim() !== name.trim()) return;      // the form was closed or used for something else meanwhile
+        if (!dialogIsOpen() || el("ingredientNameInput").value.trim() !== name.trim()) return;      // the form was closed or used for something else meanwhile
         if (!body.found) { say(`<b>No description draft.</b> ${escapeHtml(body.message || "The AI found no source for this name.")}<br>${assistSources(body.sources)}`); return; }
 
         const d = body.draft;
@@ -771,9 +855,9 @@ async function saveImportedIngredients(records) {
     records.slice(0, IMPORT_MAX_ROWS).forEach((record) => {
         const name = String(record.name || "").replace(/\s+/g, " ").trim().slice(0, 80);
         if (name.length < 2) { skippedInvalid++; return; }
-        const techName = String(record.techName || "").replace(/\s+/g, " ").trim().slice(0, 120) || name;
-        const aliases = (Array.isArray(record.aliases) ? record.aliases : []).map((a) => String(a).replace(/\s+/g, " ").trim().slice(0, 80)).filter(Boolean).slice(0, 6);
-        const mine = [name, techName, ...aliases].map(sameKey).filter((k) => k.length > 0);
+        // the file's label name becomes an alias when it differs from the name: the same rule as the field change
+        const aliases = aliasesWithInci(name, String(record.techName || "").slice(0, 120), (Array.isArray(record.aliases) ? record.aliases : []).map((a) => String(a).replace(/\s+/g, " ").trim().slice(0, 80)).filter(Boolean).slice(0, 6));
+        const mine = [name, ...aliases].map(sameKey).filter((k) => k.length > 0);
         if (mine.some((k) => planned.has(k)) || everyIngredient.some((other) => keysOf(other).some((k) => mine.includes(k)))) { skippedDuplicates++; return; }
         mine.forEach((k) => planned.add(k));
         const risk = ["safe", "caution", "harmful"].includes(record.riskLevel) ? record.riskLevel : "";
@@ -784,7 +868,7 @@ async function saveImportedIngredients(records) {
         const sources = (Array.isArray(record.sources) ? record.sources : []).map((url) => String(url)).filter((url) => /^https:\/\//i.test(url))
             .map((url) => { try { return new URL(url).hostname.replace(/^www\./, "") + " | " + url; } catch (error) { return ""; } }).filter(Boolean).slice(0, 10);
         batch.set(doc(collection(db, "ingredients")), {
-            name, techName, aliases,
+            name, aliases, classificationId: "", purpose: "",
             description: String(record.description || "").replace(/\s+/g, " ").trim().slice(0, 300),
             chemicalDescription: String(record.chemicalDescription || "").replace(/\s+/g, " ").trim().slice(0, 400),
             riskLevel: risk,
@@ -1145,7 +1229,9 @@ function openIngredientForm(item) {
     }
 
     el("ingredientNameInput").value = item ? item.name : "";
-    el("ingredientTechInput").value = item ? item.techName : "";
+    fillClassInput(item ? item.classificationId : "");
+    el("ingredientPurposeInput").value = item ? item.purpose : "";
+    paintPurposeCount();
     el("ingredientDescInput").value = item ? item.description : "";
     el("ingredientAliasesInput").value = item ? item.aliases.join(", ") : "";
     el("ingredientChemInput").value = item ? item.chemicalDescription : "";
@@ -1172,17 +1258,22 @@ async function saveIngredient(event) {
 
     const clean = (id) => el(id).value.replace(/\s+/g, " ").trim();
     const name = clean("ingredientNameInput");
-    const techName = clean("ingredientTechInput");
+    const classificationId = el("ingredientClassInput").value;
+    const purpose = clean("ingredientPurposeInput");
     const description = el("ingredientDescInput").value.trim();
-    const aliases = toList(el("ingredientAliasesInput").value).filter((a) => sameKey(a) !== sameKey(name) && sameKey(a) !== sameKey(techName));
+    const aliases = toList(el("ingredientAliasesInput").value).filter((a) => sameKey(a) !== sameKey(name));
     const minAgeText = el("ingredientMinAgeInput").value.trim();
     const minAge = toWholeNumber(minAgeText);
     // one choice per skin type and per condition, so a name can never be both "avoid" and "good"
     const types = readFit(el("skinTypesFit")), conditions = readFit(el("conditionsFit"));
     const avoidTypes = types.avoid, goodTypes = types.good, avoidConditions = conditions.avoid, goodConditions = conditions.good;
 
-    if (!name) { setFormError(form, "Type the ingredient name."); el("ingredientNameInput").focus(); return; }
-    if (!techName) { setFormError(form, "Type the INCI name (the name printed on labels)."); el("ingredientTechInput").focus(); return; }
+    if (!name) { setFormError(form, "Type the INCI name."); el("ingredientNameInput").focus(); return; }
+    // a NEW ingredient needs a classification and a purpose. An existing one that has none yet can be saved without (it is "Needs classification"
+    // until an admin fills it in), so editing any other box is never blocked; one that has them cannot lose them.
+    const existing = editingIngredientId ? everyIngredient.find((i) => i.id === editingIngredientId) : null;
+    if ((!classificationId || classificationId === ADD_CLASS) && !(existing && lacksClass(existing))) { setFormError(form, "Choose the ingredient classification."); el("ingredientClassInput").focus(); return; }
+    if (!purpose && !(existing && !existing.purpose)) { setFormError(form, "Write one line on what this ingredient does in a product."); el("ingredientPurposeInput").focus(); return; }
     if (!description) { setFormError(form, "Write a short user-friendly definition."); el("ingredientDescInput").focus(); return; }
     // reference links: one per line, "Title | https://..." or just the address; only https is kept
     const sourceLines = el("ingredientSourcesInput").value.split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
@@ -1191,13 +1282,13 @@ async function saveIngredient(event) {
     if (minAgeText !== "" && (!/^\d+$/.test(minAgeText) || minAge > 99)) { setFormError(form, "Minimum age must be a whole number from 0 to 99."); el("ingredientMinAgeInput").focus(); return; }
 
     // the same ingredient must not be in the list twice (any of its names matching any name of another entry)
-    const myKeys = new Set([name, techName, ...aliases].map(sameKey));
+    const myKeys = new Set([name, ...aliases].map(sameKey));
     const clash = everyIngredient.find((other) => other.id !== editingIngredientId && keysOf(other).some((k) => myKeys.has(k)));
     if (clash) { setFormError(form, clash.binned ? `"${titleOf(clash)}" uses one of these names and is in the Recycle bin. Restore it from there instead.` : `"${titleOf(clash)}" already uses one of these names. Edit that entry instead.`); return; }
     setFormError(form, "");
 
     const data = {
-        name, techName, description, aliases,
+        name, description, aliases, classificationId: classificationId === ADD_CLASS ? "" : classificationId, purpose,
         riskLevel: el("ingredientRiskInput").value,
         cautionNote: clean("ingredientCautionInput").replace(/^it\s+/i, "").replace(/\.$/, ""),
         commonUses: clean("ingredientUsesInput"),
@@ -1231,7 +1322,7 @@ async function saveIngredient(event) {
     setBusy(saveButton, true, "Saving...");
     try {
         if (editingIngredientId) {
-            await updateDoc(doc(db, "ingredients", editingIngredientId), data);           // its folder is left as it is
+            await updateDoc(doc(db, "ingredients", editingIngredientId), { ...data, techName: deleteField() });           // its folder is left as it is; the old INCI field is now one of its aliases
             notify(nowReviewed ? "Ingredient saved and marked as reviewed." : "Ingredient saved.", "ok");
         } else {
             const folder = org.view.kind === "folder" ? org.view.name : "";               // added while a folder is open: it goes into that folder
@@ -1264,7 +1355,6 @@ function onListClick(event) {
     if (act === "write" || act === "assist") {
         openIngredientForm(null);
         el("ingredientNameInput").value = button.dataset.name || "";
-        el("ingredientTechInput").value = button.dataset.name || "";
         el("ingredientDescInput").focus();
         if (act === "assist") assistWithAi(button.dataset.name || "");
         return;
@@ -1335,6 +1425,8 @@ function registerHelpers() {
         const typed = el("ingredientSearchInput").value.trim(), source = FILTERS.find((f) => f.value === el("ingredientSourceFilter").value), risk = el("ingredientRiskFilter").value, now = org.view;
         if (typed) parts.push(`search "${typed}"`);
         if (source && source.value) parts.push(source.label.toLowerCase());
+        const classChoice = el("ingredientClassFilter");
+        if (classChoice.value) parts.push(classChoice.value === NO_CLASS ? "needs classification" : classificationName(classChoice.value));
         if (risk) parts.push(RISK_NAMES[risk].toLowerCase());
         if (now.kind === "folder") parts.push(`folder "${now.name}"`);
         if (now.kind === "bin") parts.push("the Recycle bin");
@@ -1353,6 +1445,10 @@ function registerHelpers() {
             : { tone: "ok", text: "The Recycle bin is empty." }];
         const lines = [];
         const count = (name) => ingredients.filter(QUICK[name].test).length;
+        if (fieldChangeWaits()) lines.push({ tone: "warn", text: "The ingredient fields have not been changed yet: the classification list and the move of old INCI values into Also Known As are waiting.", label: "Look at it", run: runFieldChange, tip: "You see what it will do and confirm first. A backup is saved on this computer." });
+        const unclassified = ingredients.filter(lacksClass).length, noPurpose = count("noPurpose");
+        if (unclassified > 0) lines.push({ tone: "warn", text: `${many(unclassified, "ingredient needs", "ingredients need")} a classification. Until then the app shows no badge for ${unclassified === 1 ? "it" : "them"}.`, label: el("ingredientClassFilter").value === NO_CLASS ? "Show all" : "Show", run: () => { const select = el("ingredientClassFilter"); select.value = select.value === NO_CLASS ? "" : NO_CLASS; if (org.view.kind !== "all") org.show({ kind: "all" }); else fromFirstPage(); } });
+        if (noPurpose > 0) lines.push({ tone: "warn", text: `${many(noPurpose, "ingredient has", "ingredients have")} no purpose yet. Until then the app shows no Purpose line for ${noPurpose === 1 ? "it" : "them"}.`, label: showLabel(quick === "noPurpose"), run: () => setQuick("noPurpose") });
         const broken = everyIngredient.filter((item) => item.usesBroken).length, review = ingredients.filter(needsReview).length, noNote = count("noNote"), unused = count("unused");
         if (broken > 0) lines.push({ tone: "warn", text: `${many(broken, "entry has", "entries have")} unreadable text in "Used in" (an older build of the app wrote it). It is hidden here.`, label: "Clear it", run: clearBrokenUses, tip: "You see the list and confirm first. Only that box is emptied." });
         const notReal = ingredientIssues(everyIngredient).length, twice = ingredientDuplicates(everyIngredient).length;
@@ -1365,7 +1461,7 @@ function registerHelpers() {
         if (binIngredients.length > 0) lines.push({ text: `${many(binIngredients.length, "ingredient is", "ingredients are")} in the Recycle bin.`, label: "Open the bin", run: () => org.show({ kind: "bin" }) });
         if (fromProducts.length > 0) lines.push({ tone: "info", text: `${many(fromProducts.length, "ingredient that products in the inventory list has", "ingredients that products in the inventory list have")} no entry here yet. Most used: ${fromProducts.slice(0, 4).map((x) => x.name).join(", ")}.`, label: "Show them", run: () => narrow(FROM_PRODUCTS, "") });
         if (fdaBrands.length > 0) lines.push({ tone: "ok", text: `Brands checked on the FDA Philippines list (${fdaBrands.length}): ${fdaBrands.slice(0, 10).join(", ")}${fdaBrands.length > 10 ? ` and ${fdaBrands.length - 10} more` : ""}. The FDA list names products, not ingredients, so their ingredients arrive here when the products are scanned.`, label: "Open the inventory", run: () => { window.location.href = "../_Admin_Brand_Inventory/adminBrandInventory.html"; } });
-        lines.push({ text: "A card shows the name and the INCI name. Click it for everything else; double-click to edit." });
+        lines.push({ text: "A card shows the INCI name, the first alias and the classification. Click it for everything else; double-click to edit." });
         return lines;
     }, { notes: "notesList" });
 }
@@ -1378,7 +1474,7 @@ function registerData() {
         label: "Ingredients", noun: "ingredients", nounOne: "ingredient",
         items: () => ingredients,
         map: (i) => ({
-            id: i.id, title: titleOf(i), subtitle: i.techName, meta: needsReview(i) ? "needs review" : RISK_NAMES[i.riskLevel || "auto"],
+            id: i.id, title: titleOf(i), subtitle: firstAlias(i), meta: needsReview(i) ? "needs review" : RISK_NAMES[i.riskLevel || "auto"],
             tone: needsReview(i) ? "info" : toneOfRisk(i.riskLevel), value: productUseKnown ? usedInProducts(i) : undefined, valueLabel: "products"
         }),
         dimensions: [

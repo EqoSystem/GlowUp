@@ -14,7 +14,8 @@ Make-up scanner app (Unity) plus an admin website. Both share one Firestore data
 ## Firestore data contract (full text: `GlowUp-Admin_AI_Testing/FIRESTORE_SCHEMA.md`)
 - `brands/{id}`: name, category (Makeup), aliases[], market, status (Active|Pending|Inactive), scans, source, reviewed.
 - `products/{id}`: name, brandId, brandName, cosmeticType, ingredients[], shades[], sources[], status, scans, source, reviewed, barcode. App-added ids start `scan_`.
-- `ingredients/{id}`: name, riskLevel (safe|caution|harmful), description, aliases[], sources[], source, reviewed. App-added ids start `ai_`.
+- `ingredients/{id}`: name (shown as INCI name), classificationId, purpose, riskLevel (safe|caution|harmful), description, aliases[], sources[], source, reviewed. App-added ids start `ai_`.
+- `ingredientClassifications/{id}`: name. Everyone reads, admins write; `other` is never deleted.
 - `productIngredientSuggestions`: app creates, admin reviews.
 - `scanActivity`: anonymous, no user id. status safe|caution|harmful, scannedAtUnix, counts.
 - `allergenSuggestions`, `conditionSuggestions`: app creates, admins read.

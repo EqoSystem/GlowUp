@@ -113,7 +113,7 @@
                 <div class="panel-head wraps">
                     <button type="button" class="pick" data-pick-all role="checkbox" aria-checked="false" aria-label="Select all shown" data-tip="Select every ingredient shown here."></button>
                     <h3 class="panel-title">Ingredients</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Ingredients" data-tip="A card shows the name and the INCI name. Click it for everything else; double-click to edit. An entry here takes priority over the app's own built-in wording." data-tip-preview="Drag cards onto a folder or the Recycle bin. The small box picks a card; Ctrl+click picks several.">i</button>
+                    <button type="button" class="guide-badge" data-tip-title="Ingredients" data-tip="A card shows the INCI name, the first alias and the classification. Click it for everything else; double-click to edit. An entry here takes priority over the app's own built-in wording." data-tip-preview="Drag cards onto a folder or the Recycle bin. The small box picks a card; Ctrl+click picks several.">i</button>
                     <span class="panel-count" hidden id="ingredientCountLine"></span>
                     <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most harmful, waiting for review, most used, or newest." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button></span>
                     <span class="shelf" id="ingredientShelf"></span>
@@ -125,12 +125,14 @@
                         <option value="safe">Safe</option>
                         <option value="auto">App decides</option>
                     </select>
+                    <select id="ingredientClassFilter" class="toolbar-select head-select" aria-label="Show one classification"><option value="">Any classification</option></select>
+                    <button type="button" class="icon-btn small" id="manageClassBtn" aria-label="Manage classifications"><i data-icon="sliders"></i></button>
                     <span class="shelf" id="ingredientShelfAdd"></span>
                     <span class="shelf" id="ingredientShelfEnd"></span>
                     <span id="ingredientQuick"></span>
                     <span class="spacer"></span>
                     <div class="segmented" hidden id="listLayoutSwitch" role="group" aria-label="How the ingredients are listed">
-                        <button type="button" class="seg" data-layout="rows" aria-pressed="true" data-tip-title="Rows" data-tip="One ingredient per line: name, INCI name and how the app judges it."><i data-icon="list"></i>Rows</button>
+                        <button type="button" class="seg" data-layout="rows" aria-pressed="true" data-tip-title="Rows" data-tip="One ingredient per line: INCI name, first alias, classification and how the app judges it."><i data-icon="list"></i>Rows</button>
                         <button type="button" class="seg" data-layout="cards" aria-pressed="false" data-tip-title="Cards" data-tip="Ingredients as cards, several side by side."><i data-icon="layers"></i>Cards</button>
                     </div>
                     <!-- the pager stays at the right end, also when the row wraps -->
@@ -162,19 +164,25 @@
     <div id="addIngredientModal" class="modal-overlay">
         <div class="modal-content wide">
             <h3 id="modalTitle">Add Ingredient</h3>
-            <p class="modal-intro">The first three boxes are what app users read. The rest tells the app how to judge the ingredient for each user; leave any of it empty and the app uses its own built-in knowledge.</p>
+            <p class="modal-intro">The first boxes are what app users read. The rest tells the app how to judge the ingredient for each user; leave any of it empty and the app uses its own built-in knowledge.</p>
             <p class="review-note" id="ingredientReviewNote" style="display: none;"></p>
             <form id="addIngredientForm" class="modal-form" novalidate>
                 <div class="form-row">
                     <div class="field">
-                        <label for="ingredientNameInput">Ingredient Name <span class="required">*</span></label>
-                        <input type="text" id="ingredientNameInput" maxlength="80" placeholder="e.g., Vitamin B3" autocomplete="off">
+                        <label for="ingredientNameInput">INCI name <span class="required">*</span></label>
+                        <input type="text" id="ingredientNameInput" maxlength="80" placeholder="e.g., Niacinamide" autocomplete="off">
+                        <span class="field-hint">As it is printed on labels. The app matches scanned text against this name and its aliases.</span>
                     </div>
                     <div class="field">
-                        <label for="ingredientTechInput">INCI Name (as printed on labels) <span class="required">*</span></label>
-                        <input type="text" id="ingredientTechInput" maxlength="120" placeholder="e.g., Niacinamide" autocomplete="off">
-                        <span class="field-hint">As it is printed on labels. The app matches scanned text against this name.</span>
+                        <span class="field-label"><label for="ingredientClassInput">Ingredient classification <span class="required">*</span></label><button type="button" class="icon-btn small list-edit" data-list-edit="classifications" aria-label="Manage classifications"><i data-icon="edit"></i></button></span>
+                        <select id="ingredientClassInput"></select>
                     </div>
+                </div>
+
+                <div class="field">
+                    <label for="ingredientPurposeInput">Purpose <span class="required">*</span></label>
+                    <input type="text" id="ingredientPurposeInput" autocomplete="off" placeholder="e.g., Helps prevent microbial growth and maintain product quality.">
+                    <span class="field-hint">One line on what this ingredient does in a product. <span id="ingredientPurposeCount"></span></span>
                 </div>
 
                 <div class="field">
@@ -190,7 +198,7 @@
                 <div class="field">
                     <label for="ingredientAliasesInput">Also Known As</label>
                     <input type="text" id="ingredientAliasesInput" maxlength="300" placeholder="e.g., Nicotinamide, Vitamin B3" autocomplete="off">
-                    <span class="field-hint">Other spellings found on labels, separated by commas. A scan of any of them finds this ingredient.</span>
+                    <span class="field-hint">Other spellings found on labels, separated by commas. A scan of any of them finds this ingredient. The first one is shown as the common name.</span>
                 </div>
 
                 <div class="field">

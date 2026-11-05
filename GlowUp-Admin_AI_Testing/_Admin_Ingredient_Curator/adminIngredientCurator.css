@@ -67,3 +67,10 @@
 @media (max-width: 1400px) { [data-panel="list"] #sortNow { display: none; } }
 /* the sidebar open beside a narrow panel: New folder keeps only its icon. Up to 1100 px the panel has the whole width again */
 @media (min-width: 1101px) and (max-width: 1279px) { html:not(.sb-collapsed) #ingredientShelfAdd .folder-chip { font-size: 0; gap: 0; } }
+
+/* the classification column of the list, and the rows of "Manage classifications" (the look of the Edit list window) */
+.class-cell { flex: none; display: inline-flex; }
+.as-rows .ingredient-card:not(.open) .class-cell { flex: 0 0 190px; }
+.lists-row.class-row { grid-template-columns: minmax(0, 1fr) auto; }
+.class-row-name { min-width: 0; overflow-wrap: anywhere; font-size: var(--fs-base); }
+.migration-lines { margin: 0 0 10px; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-base); }

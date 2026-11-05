@@ -91,14 +91,25 @@ The app recognises a scan as a product by comparing ingredient lists: at least 4
 
 The app offers a product to a user only when all of these are true: the product is Active, its brand is Active, it has ingredients, the user is at least `minAge`, and the app's analysis of the ingredients comes out safe for that user's profile.
 
+### `ingredientClassifications/{id}`
+
+The classification list, managed by admins in the Ingredient Curator. Everyone can read it; only admins write it. `other` is the fallback: it can be renamed but never deleted.
+
+| Field | Type | Notes |
+|---|---|---|
+| `name` | text | 1 to 40 characters; no two the same, ignoring capitals and extra spaces (the website checks this). |
+| `createdAt`, `updatedAt` | time | |
+
 ### `ingredients/{id}`
 
 | Field | Type | Notes |
 |---|---|---|
-| `name` | text | The friendly name users read. |
-| `techName` | text | The name printed on labels. Scans are matched against it. |
+| `name` | text | Shown as "INCI name". Scans are matched against it and against `aliases`. |
+| `classificationId` | text | Document id in `ingredientClassifications`. Empty = "Needs classification"; the app then shows no badge. |
+| `purpose` | text | One line, at most 120 characters, on what it does in a product. Empty: the app shows no Purpose line. |
+| `techName` | text | OLD INCI field, removed by the one-time field change (its value moves into `aliases` when it differs from `name`). Only entries from the app's AI look-up still arrive with it. |
 | `description` | text | The user-friendly definition. |
-| `aliases` | list of text | Other spellings found on labels. |
+| `aliases` | list of text | Other spellings found on labels. The first one is shown as the common name. |
 | `riskLevel` | text | `safe`, `caution`, `harmful`, or empty to let the app decide. |
 | `cautionNote` | text | Finishes the sentence "It ...", for example `can clog pores`. |
 | `commonUses` | text | For example `serums, moisturisers`. |

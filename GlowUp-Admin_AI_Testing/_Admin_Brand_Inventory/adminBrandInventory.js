@@ -2519,17 +2519,17 @@ function exportProductsCsv() {
 /** A new ingredient made from the product form: saved in the library at once, so the next product finds it too. */
 async function createIngredientFromPicker(fields) {
     const data = {
-        name: fields.name, techName: fields.techName, description: fields.description, aliases: [],
+        name: fields.name, description: fields.description, aliases: fields.aliases || [], classificationId: "", purpose: "",
         riskLevel: ["safe", "caution", "harmful"].includes(fields.riskLevel) ? fields.riskLevel : "",
         cautionNote: "", commonUses: "", minAge: 0, keyActive: false, umbrella: false, highlights: [],
         allergenTags: [], avoidForSkinTypes: [], goodForSkinTypes: [], avoidForConditions: [], goodForConditions: [],
         folder: "", createdAt: serverTimestamp(), updatedAt: serverTimestamp()
     };
     const made = await addDoc(collection(db, "ingredients"), data);
-    const entry = { id: made.id, name: data.name, techName: data.techName, aliases: [] };
+    const entry = { id: made.id, name: data.name, techName: "", aliases: data.aliases };
     curatedList.push(entry);
     curatedList.sort((a, b) => a.name.localeCompare(b.name));
-    [data.name, data.techName].forEach((n) => { const k = sameKey(n); if (k) curatedKeys.add(k); });
+    [data.name, ...data.aliases].forEach((n) => { const k = sameKey(n); if (k) curatedKeys.add(k); });
     curatorKnown = true;
     notify(`"${data.name}" is in the ingredient library now.`, "ok");
     return entry;

@@ -46,6 +46,8 @@ async function seed() {
         await setDoc(doc(db, "products/p1"), { name: "Example Lipstick", brandId: "b1", cosmeticType: "Lipstick", ingredients: ["Mica"], shades: ["#C24B62"], status: "Active", scans: 5 });
         await setDoc(doc(db, "ingredients/i1"), { name: "Mica", techName: "Mica", description: "A mineral", riskLevel: "safe" });
         await setDoc(doc(db, "config/lists"), { version: 1, allergens: [], conditions: [], highlights: [] });
+        await setDoc(doc(db, "ingredientClassifications/other"), { name: "Other" });
+        await setDoc(doc(db, "ingredientClassifications/binder"), { name: "Binder" });
         await setDoc(doc(db, "users/u1"), { firstName: "Test" });
         await setDoc(doc(db, "users/u1/scans/s1"), { productName: "x" });
         await setDoc(doc(db, "scanActivity/n1"), { productName: "x", status: "safe", scannedAtUnix: now });
@@ -92,6 +94,20 @@ await can("an admin sets a brand's website and records themselves as the one who
 await cannot("config/lists with a field that is not allowed", () => setDoc(doc(adminDoc(), "config/lists"), { version: 2, allergens: [], conditions: [], highlights: [], extra: 1 }));
 await cannot("another config document", () => setDoc(doc(adminDoc(), "config/other"), { version: 1, allergens: [], conditions: [], highlights: [] }));
 await cannot("even an admin deletes config/lists", () => deleteDoc(doc(adminDoc(), "config/lists")));
+
+// ---- ingredient classifications: everyone reads, only an admin writes, "other" is never deleted
+await can("nobody signed in reads a classification", () => getDoc(doc(anon(), "ingredientClassifications/other")));
+await can("an admin adds a classification", () => setDoc(doc(adminDoc(), "ingredientClassifications/other"), { name: "Other" }));
+await can("an admin adds another classification", () => setDoc(doc(adminDoc(), "ingredientClassifications/binder"), { name: "Binder" }));
+await can("an admin renames the fallback", () => updateDoc(doc(adminDoc(), "ingredientClassifications/other"), { name: "Everything else" }));
+await cannot("even an admin deletes the fallback", () => deleteDoc(doc(adminDoc(), "ingredientClassifications/other")));
+await can("an admin deletes another classification", () => deleteDoc(doc(adminDoc(), "ingredientClassifications/binder")));
+await cannot("a classification with no name", () => setDoc(doc(adminDoc(), "ingredientClassifications/x"), { name: "" }));
+await cannot("a classification name that is too long", () => setDoc(doc(adminDoc(), "ingredientClassifications/x"), { name: "x".repeat(41) }));
+await cannot("a classification with a field that is not allowed", () => setDoc(doc(adminDoc(), "ingredientClassifications/x"), { name: "X", extra: 1 }));
+await cannot("a user adds a classification", () => setDoc(doc(user(), "ingredientClassifications/x"), { name: "X" }));
+await cannot("nobody signed in adds a classification", () => setDoc(doc(anon(), "ingredientClassifications/x"), { name: "X" }));
+await cannot("a user deletes a classification", () => deleteDoc(doc(user(), "ingredientClassifications/other")));
 
 // ---------------------------------------------------------------------------------------------
 // 2. What the app itself may add: always Pending, always "not reviewed", always with the user's own id

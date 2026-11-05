@@ -135,7 +135,7 @@ function addMissingIngredients(batch, names, libraryIds, now) {
         if (added >= MAX_NEW_INGREDIENTS) return;
         const ref = doc(collection(db, "ingredients"));
         batch.set(ref, {
-            name: n, techName: n, description: "", aliases: [], riskLevel: "", cautionNote: "", commonUses: "", minAge: 0, keyActive: false, umbrella: false,
+            name: n, description: "", aliases: [], classificationId: "", purpose: "", riskLevel: "", cautionNote: "", commonUses: "", minAge: 0, keyActive: false, umbrella: false,
             highlights: [], allergenTags: [], avoidForSkinTypes: [], goodForSkinTypes: [], avoidForConditions: [], goodForConditions: [], folder: "",
             source: "ai", reviewed: false, via: "snapshot", createdAt: now, updatedAt: now
         });
