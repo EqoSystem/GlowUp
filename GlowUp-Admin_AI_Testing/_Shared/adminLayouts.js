@@ -186,8 +186,10 @@ function decorate(panel) {
         const after = head.querySelector(":scope > .guide-badge") || head.querySelector(":scope > .panel-title");
         if (after) after.insertAdjacentHTML("afterend", FOLD_PARTS); else head.insertAdjacentHTML("afterbegin", FOLD_PARTS);
         // the arrow and the "..." menu close the bar, except for a part that asks to stay at the very end (data-head-end: the bin)
+        // data-no-fold: the list a page is for has no arrow, and so can never be folded away
+        const closers = (panel.hasAttribute("data-no-fold") ? "" : foldButton()) + menu;
         const tail = head.querySelector("[data-head-end]");
-        if (tail) tail.insertAdjacentHTML("beforebegin", foldButton() + menu); else head.insertAdjacentHTML("beforeend", foldButton() + menu);
+        if (tail) tail.insertAdjacentHTML("beforebegin", closers); else head.insertAdjacentHTML("beforeend", closers);
     } else panel.querySelector(".panel-tools").insertAdjacentHTML("beforeend", menu);
     panel.querySelector(".tools-name").textContent = panel.dataset.label || panel.dataset.panel;
 }

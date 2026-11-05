@@ -52,3 +52,12 @@
     .as-rows .ingredient-card:not(.open) .card-sub { flex: 1 1 100%; order: 3; }
     .as-rows .ingredient-card:not(.open) .row-actions { order: 2; }
 }
+
+/* ---- the one toolbar row of the list (5 November 2026): a little tighter, so the pager fits beside New folder and the bin at the far right ---- */
+[data-panel="list"] > .panel-inner > .panel-head.wraps { column-gap: 6px; }
+#ingredientQuick:empty { display: none; }
+[data-panel="list"] .panel-head .table-tools .btn { padding-inline: 9px; }
+#ingredientPagerTop .btn-group { padding: 2px; }
+#ingredientPagerTop .icon-btn { width: 26px; height: 26px; }
+#ingredientPagerTop .page-now { min-width: 0; }
+#ingredientPagerTop .pager-range { display: none; }

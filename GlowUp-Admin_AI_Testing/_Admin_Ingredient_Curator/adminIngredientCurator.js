@@ -41,7 +41,6 @@ import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
 import { wireSettingsButton, setPageSettings } from "../_Shared/adminSettingsMenu.js";
-import { countPending, openSnapshotReview } from "../_Shared/adminSnapshots.js";
 
 const pageState = { page: 1, size: 10 };          // the list shows ten ingredients at a time
 const BATCH_LIMIT = 400;                          // Firestore allows 500 writes in one batch
@@ -72,8 +71,6 @@ let ingredients = [];                 // listed: [{ id, name, techName, descript
 let binIngredients = [];              // in the Recycle bin
 let productUse = new Map();           // ingredient key -> number of catalogue products that list it
 let productUseKnown = false;
-let snapshotsWaiting = null;          // the Pending Snapshot Reviews badge (null = not counted yet)
-let catalogProducts = [];             // the products, as the snapshot review window needs them: [{ id, brandId, name, aliases, ingredients, binned }]
 let editingIngredientId = null;
 let modal = null;
 let fromProducts = [];                // ingredient names the inventory's products list that the Curator has no entry for: [{ key, name, products[] }]
@@ -194,9 +191,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         SORTS.map((s) => ({ label: s.label, checked: s.id === view.sort, run: () => { view.sort = s.id; try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) { /* private window */ } fromFirstPage(); } })))));
     el("ingredientQuick").addEventListener("click", () => { quick = ""; fromFirstPage(); });
     el("addIngredientBtn").addEventListener("click", () => openIngredientForm(null));
-    // Pending Snapshot Reviews: the badge (one count read at most, shared with Inventory) and the review window
-    el("snapshotReviewBtn").addEventListener("click", openSnapshots);
-    countPending().then((n) => { snapshotsWaiting = n; paintSnapshotCount(); }).catch((error) => { console.warn("Could not count the snapshots: ", error); paintSnapshotCount(true); });
     Array.from(el("listLayoutSwitch").querySelectorAll(".seg")).forEach((button) => button.addEventListener("click", () => {
         view.layout = button.dataset.layout === "cards" ? "cards" : "rows";
         try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) { /* private window */ }
@@ -331,8 +325,6 @@ async function loadIngredients() {
         const productSnapshot = await getDocs(collection(db, "products"));
         const checkedBrands = new Set();
         const listedBy = new Map();
-        catalogProducts = productSnapshot.docs.map((d) => ({ id: d.id, brandId: String(d.data().brandId || ""), name: String(d.data().name || ""),
-            aliases: asArray(d.data().aliases), ingredients: asArray(d.data().ingredients), binned: d.data().binned === true }));
         productSnapshot.forEach((d) => {
             if (d.data().binned === true) return;
             if (d.data().source === "fdaph" || /FDA Philippines: notified as/i.test(String(d.data().description || ""))) checkedBrands.add(String(d.data().brandName || "").trim());
@@ -1403,43 +1395,5 @@ function registerData() {
         open: (i) => openIngredientForm(i),
         // a tile that is removed goes to the Recycle bin (it can be restored there)
         bin: (rows) => org.toBin(rows.map((i) => i.id))
-    });
-}
-
-// ---------------------------------------------------------------------------------------------
-// Pending Snapshot Reviews (the same window as in Brand & Product Inventory)
-// ---------------------------------------------------------------------------------------------
-/** The badge on the Pending Snapshot Reviews button. */
-function paintSnapshotCount(failed) {
-    const count = el("snapshotCount"), button = el("snapshotReviewBtn");
-    count.classList.remove("skeleton");
-    count.textContent = failed ? "–" : String(snapshotsWaiting || 0);
-    button.classList.toggle("has-waiting", (snapshotsWaiting || 0) > 0);
-    el("snapshotReviewHint").textContent = failed ? "The count could not be read. Open it to look anyway."
-        : snapshotsWaiting > 0 ? `${many(snapshotsWaiting, "snapshot waits", "snapshots wait")} for review.` : "Nothing is waiting.";
-}
-
-/**
- * Opens the review window. The brands come from the page's saved copy (only entries changed since the last visit are read);
- * the products and the ingredient library are what this page already holds.
- */
-async function openSnapshots() {
-    let brandList = [];
-    try {
-        const brandSnapshot = await getDocs(collection(db, "brands"));
-        brandList = brandSnapshot.docs.map((d) => ({ id: d.id, name: String(d.data().name || ""), aliases: asArray(d.data().aliases), binned: d.data().binned === true }));
-    } catch (error) {
-        notify("The brand list could not be read, so snapshots cannot be approved right now. " + describeError(error), "error");
-        return;
-    }
-    openSnapshotReview({
-        context: () => ({
-            brands: brandList,
-            products: catalogProducts,
-            library: everyIngredient.filter((i) => !i.binned).map((i) => ({ id: i.id, name: i.name, techName: i.techName, aliases: i.aliases, riskLevel: i.riskLevel }))
-        }),
-        onLoaded: (n) => { if (snapshotsWaiting === null || n > snapshotsWaiting) { snapshotsWaiting = n; paintSnapshotCount(); } },
-        onProcessed: () => { snapshotsWaiting = Math.max(0, (snapshotsWaiting || 1) - 1); paintSnapshotCount(); },
-        onClose: async (approved) => { if (approved > 0) await loadIngredients(); }
     });
 }

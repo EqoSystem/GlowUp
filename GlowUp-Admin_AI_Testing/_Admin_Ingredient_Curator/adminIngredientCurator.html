@@ -73,7 +73,7 @@
                     </select>
                     <div class="tool-group end" id="headerActions">
                         <button type="button" class="icon-btn" id="settingsGearBtn" aria-label="Settings" aria-haspopup="dialog" aria-expanded="false" aria-controls="settingsWindow" data-tip-title="Settings" data-tip="Layout and style, the Recycle bin, appearance, and this page's tools: clean up and find duplicates."><i data-icon="settings"></i></button>
-                        <button type="button" class="primary-btn" id="addIngredientBtn" data-guide="Add an ingredient with its plain-words definition." data-guide-title="Add an ingredient" data-guide-preview="Opens a form. Only the first three boxes are required."><i data-icon="plus"></i>Add</button>
+                        <button type="button" class="primary-btn" id="addIngredientBtn" data-tip="Add an ingredient with its plain-words definition." data-tip-title="Add an ingredient" data-tip-preview="Opens a form. Only the first three boxes are required."><i data-icon="plus"></i>Add</button>
                     </div>
                 </div>
             </section>
@@ -94,19 +94,6 @@
                 <p class="field-hint import-status" id="ingredientImportStatus" role="status" aria-live="polite">Entries are saved as Pending for your review.</p>
             </section>
 
-            <!-- products app users sent as ONE photo: reviewed in a floating window over this page (photo left, the AI's reading right;
-                 Approve & Publish, Edit, Reject). Only a count is read (remembered 10 minutes, shared by both pages). -->
-            <section class="panel snapshots-panel" data-panel="snapshots" data-label="Pending snapshot reviews" data-w="4" data-right>
-                <div class="panel-head">
-                    <h3 class="panel-title">Pending snapshots</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Pending snapshot reviews" data-tip="When a scanned product is not in the catalogue, the app offers to take one photo. The AI reads the brand, name, kind, shade and ingredient list. Users see that reading marked PENDING APPROVAL until you approve it here." data-tip-preview="Opens a review window over this page: one snapshot at a time, photo next to the reading.">i</button>
-                </div>
-                <button type="button" class="snapshots-open" id="snapshotReviewBtn" aria-haspopup="dialog">
-                    <span class="snapshots-icon"><i data-icon="camera"></i></span>
-                    <span class="snapshots-text"><strong>Pending Snapshot Reviews</strong><small id="snapshotReviewHint">One at a time: the photo next to what the AI read.</small></span>
-                    <span class="snapshots-count skeleton" id="snapshotCount" aria-label="Snapshots waiting">00</span>
-                </button>
-            </section>
 
             <!-- the counts; a click on one filters the list -->
             <section class="panel bare" data-panel="counts" data-label="Counts" data-w="8">
@@ -121,8 +108,8 @@
             </section>
 
             <!-- the ingredients -->
-            <section class="panel" data-panel="list" data-label="Ingredient list" data-w="8" data-source="ingredients">
-                <!-- ONE row (31 October 2026): [box] Ingredients (i) | Sort | All | Any risk level | New folder | pager | fold arrow | Recycle bin.
+            <section class="panel" data-panel="list" data-label="Ingredient list" data-w="8" data-source="ingredients" data-no-fold>
+                <!-- ONE row (5 November 2026): [box] Ingredients (i) | Sort | All | New folder | pager | ... | Recycle bin.
                      The shelf's parts (All, New folder, the bin) are drawn into the three marked places by adminOrganizer.js. -->
                 <div class="panel-head wraps">
                     <button type="button" class="pick" data-pick-all role="checkbox" aria-checked="false" aria-label="Select all shown" data-tip="Select every ingredient shown here."></button>
@@ -131,7 +118,8 @@
                     <span class="panel-count" hidden id="ingredientCountLine"></span>
                     <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most harmful, waiting for review, most used, or newest." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button></span>
                     <span class="shelf" id="ingredientShelf"></span>
-                    <select id="ingredientRiskFilter" class="toolbar-select head-select" aria-label="Show one risk level">
+                    <!-- no longer shown since 5 November 2026: it stays here hidden, because the count tiles and helpers still set it -->
+                    <select id="ingredientRiskFilter" class="toolbar-select head-select" aria-label="Show one risk level" hidden>
                         <option value="">Any risk level</option>
                         <option value="harmful">Harmful</option>
                         <option value="caution">Caution</option>
@@ -139,15 +127,15 @@
                         <option value="auto">App decides</option>
                     </select>
                     <span class="shelf" id="ingredientShelfAdd"></span>
+                    <div class="pager" id="ingredientPagerTop"></div>
                     <span id="ingredientQuick"></span>
                     <span class="spacer"></span>
                     <div class="segmented" hidden id="listLayoutSwitch" role="group" aria-label="How the ingredients are listed">
                         <button type="button" class="seg" data-layout="rows" aria-pressed="true" data-tip-title="Rows" data-tip="One ingredient per line: name, INCI name and how the app judges it."><i data-icon="list"></i>Rows</button>
                         <button type="button" class="seg" data-layout="cards" aria-pressed="false" data-tip-title="Cards" data-tip="Ingredients as cards, several side by side."><i data-icon="layers"></i>Cards</button>
                     </div>
-                    <!-- the pager, the fold arrow and the bin stay together at the right end, also when the row wraps -->
+                    <!-- the bin stays at the right end, also when the row wraps -->
                     <div class="head-end">
-                        <div class="pager" id="ingredientPagerTop"></div>
                         <span class="shelf" id="ingredientShelfEnd" data-head-end></span>
                     </div>
                 </div>
