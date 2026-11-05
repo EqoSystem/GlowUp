@@ -77,3 +77,9 @@
 
 /* shown on any address that is not the live site */
 .test-banner { margin: 12px 26px 0; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--warn, #d9a441); background: color-mix(in srgb, var(--warn, #d9a441) 16%, var(--surface)); color: var(--text); font-size: var(--fs-sm); }
+
+/* the scan window and the bar inside the duplicates window (Clean up, Find duplicates) */
+.scan-status { margin: 4px 0 10px; color: var(--text); }
+.scan-track { height: 8px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+.scan-fill { height: 100%; width: 0; border-radius: 999px; background: var(--accent); transition: width .12s linear; }
+.scan-inline { padding: 18px 8px; }

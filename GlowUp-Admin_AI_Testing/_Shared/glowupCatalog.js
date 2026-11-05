@@ -298,24 +298,82 @@ export function ingredientDuplicates(ingredients) {
  * Answers [{ reason, items[], keep, alike }].
  */
 export function ingredientLookalikes(ingredients, threshold) {
+    const scan = lookalikeScan(ingredients, threshold);
+    while (!scan.next().done) { /* the whole search at once (tests, tools); a page uses ingredientLookalikesAsync */ }
+    return scan.result();
+}
+
+/**
+ * The same answer as ingredientLookalikes, but the work is cut into slices of about 12 ms and the page is given back between them, so it
+ * stays alive (a spinner turns, a bar fills, the page scrolls). `onProgress(done, total)` is called after each slice; `cancelled()` returning
+ * true stops the search and resolves null. Resolves to the same list of groups.
+ */
+export async function ingredientLookalikesAsync(ingredients, threshold, options) {
+    const { onProgress, cancelled, sliceMs } = Object.assign({ sliceMs: 12 }, options || {});
+    const scan = lookalikeScan(ingredients, threshold);
+    for (;;) {
+        const started = Date.now();
+        let step;
+        do { step = scan.next(); } while (!step.done && Date.now() - started < sliceMs);
+        if (step.done) break;
+        if (onProgress) onProgress(step.value.done, step.value.total);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        if (cancelled && cancelled()) return null;
+    }
+    if (onProgress) onProgress(1, 1);
+    return scan.result();
+}
+
+/** How many entries a search of `ingredients` looks at (the Recycle bin is not searched). */
+export const lookalikeCount = (ingredients) => live(ingredients).length;
+
+/**
+ * Whether two names (already normalised, as namesOf gives them) are at least `limit` alike, and how alike. Exactly the rule of similarity():
+ * the better of "same letters" and "same words". Only the slow part, counting letter changes, is skipped when the lengths alone already make the
+ * letters too different, which is true for almost every pair. Returns 0 when the pair is below the limit.
+ */
+function alikeAtLeast(x, y, limit) {
+    if (x.k === y.k || x.c === y.c || x.sq === y.sq) return 1;
+    let best = 0;
+    const longest = Math.max(x.c.length, y.c.length);
+    if (1 - Math.abs(x.c.length - y.c.length) / longest >= limit) best = 1 - editDistance(x.c, y.c) / longest;      // the letters can only be alike when the lengths are
+    let shared = 0;
+    x.w.forEach((word) => { if (y.w.has(word)) shared++; });
+    best = Math.max(best, (2 * shared) / (x.w.size + y.w.size));
+    return best >= limit ? best : 0;
+}
+
+/** What alikeAtLeast needs of a normalised name, made once per name and not once per pair. */
+const prepared = (key) => ({ k: key, c: key.replace(/ /g, ""), sq: squashKey(key), w: new Set(key.split(" ")) });
+
+/** The search as a generator: it yields { done, total } after every entry it has compared with the later ones, and result() has the groups. */
+function lookalikeScan(ingredients, threshold) {
     const limit = typeof threshold === "number" ? threshold : 0.93;
     const items = live(ingredients);
     const same = new Map();                       // entries that are already one sure group are not listed again
     ingredientDuplicates(items).forEach((group, index) => group.items.forEach((ingredient) => same.set(ingredient, index)));
     const namesOf = (ingredient) => [ingredient.name, ingredient.techName].map(normalizeName).filter((key) => key.length >= 3 && !key.startsWith("hidden "));
+    const names = items.map((ingredient) => namesOf(ingredient).map(prepared));      // made once, not again for every pair
     const links = [], alikeOf = new Map();
-    for (let a = 0; a < items.length; a++)
-        for (let b = a + 1; b < items.length; b++) {
-            if (same.has(items[a]) && same.get(items[a]) === same.get(items[b])) continue;
-            let best = 0;
-            namesOf(items[a]).forEach((x) => namesOf(items[b]).forEach((y) => { best = Math.max(best, similarity(x, y)); }));
-            if (best < limit) continue;
-            links.push([items[a], items[b]]);
-            alikeOf.set(items[a], Math.max(alikeOf.get(items[a]) || 0, best)); alikeOf.set(items[b], Math.max(alikeOf.get(items[b]) || 0, best));
+    let finished = null;
+    function* run() {
+        for (let a = 0; a < items.length; a++) {
+            for (let b = a + 1; b < items.length; b++) {
+                if (same.has(items[a]) && same.get(items[a]) === same.get(items[b])) continue;
+                let best = 0;
+                names[a].forEach((x) => names[b].forEach((y) => { best = Math.max(best, alikeAtLeast(x, y, limit)); }));
+                if (best < limit) continue;
+                links.push([items[a], items[b]]);
+                alikeOf.set(items[a], Math.max(alikeOf.get(items[a]) || 0, best)); alikeOf.set(items[b], Math.max(alikeOf.get(items[b]) || 0, best));
+            }
+            yield { done: a + 1, total: items.length };
         }
-    return groupsOf(items, links).map((group) => ({
-        reason: "Names that are nearly the same", items: group, keep: pickKeeper(group), alike: Math.min(...group.map((ingredient) => alikeOf.get(ingredient) || 0))
-    }));
+        finished = groupsOf(items, links).map((group) => ({
+            reason: "Names that are nearly the same", items: group, keep: pickKeeper(group), alike: Math.min(...group.map((ingredient) => alikeOf.get(ingredient) || 0))
+        }));
+    }
+    const generator = run();
+    return { next: () => generator.next(), result: () => finished || [] };
 }
 
 // ---------------------------------------------------------------------------------------------

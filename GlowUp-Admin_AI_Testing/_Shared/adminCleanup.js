@@ -22,6 +22,42 @@ function make(tag, className, textContent) {
 }
 
 /** The frame of a big dialog. Esc, the X and a click on the dark area close it (not while something is being saved). */
+/**
+ * A small window that says a scan is running, with a bar and a Cancel button. Shown at once: the work behind it is cut into slices (see
+ * ingredientLookalikesAsync), so the bar really moves. update(done, total) moves it; close() removes it; `cancelled()` is true after Cancel.
+ */
+export function showScan(title, text, onCancel) {
+    const overlay = make("div", "modal-overlay");
+    overlay.style.display = "flex";
+    const box = make("div", "modal-content");
+    box.setAttribute("role", "alertdialog");
+    box.setAttribute("aria-modal", "true");
+    box.setAttribute("aria-busy", "true");
+    const status = make("p", "scan-status", text);
+    status.setAttribute("role", "status");
+    const track = make("div", "scan-track");
+    const fill = make("div", "scan-fill");
+    track.append(fill);
+    const actions = make("div", "modal-actions");
+    const cancel = make("button", "cancel-btn", "Cancel");
+    cancel.type = "button";
+    actions.append(cancel);
+    box.append(make("h3", "", title), status, track, actions);
+    overlay.append(box);
+    document.body.appendChild(overlay);
+    let stopped = false;
+    const stop = () => { stopped = true; cancel.disabled = true; cancel.textContent = "Cancelling..."; if (onCancel) onCancel(); };
+    cancel.addEventListener("click", stop);
+    const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); stop(); } };
+    document.addEventListener("keydown", onKey, true);
+    cancel.focus();
+    return {
+        update(done, total) { fill.style.width = Math.min(100, Math.round((done / Math.max(1, total)) * 100)) + "%"; status.textContent = text.replace("{done}", done).replace("{total}", total); },
+        close() { document.removeEventListener("keydown", onKey, true); overlay.remove(); },
+        cancelled: () => stopped
+    };
+}
+
 function bigDialog(title, intro, onClose) {
     const overlay = make("div", "modal-overlay");
     overlay.style.display = "flex";
@@ -270,7 +306,13 @@ export function openDuplicatesDialog(options) {
     const sliderLabel = make("label", "dup-slider");
     const sliderText = make("span", "");
     sliderLabel.append(sliderText, slider);
-    slider.addEventListener("input", () => { state.threshold = Number(slider.value) / 100; draw(); });
+    let sliderTimer = 0;
+    slider.addEventListener("input", () => {                       // the number follows the slider at once; the search starts when it rests
+        state.threshold = Number(slider.value) / 100;
+        sliderText.textContent = `Also list names at least ${Math.round(state.threshold * 100)}% alike`;
+        window.clearTimeout(sliderTimer);
+        sliderTimer = window.setTimeout(draw, 250);
+    });
     if (options.sections.length > 1) bar.append(tabs);
     bar.append(make("span", "spacer"), sliderLabel);
     const list = make("div", "dup-list");
@@ -282,13 +324,34 @@ export function openDuplicatesDialog(options) {
     closeButton.addEventListener("click", () => dialog.close());
     dialog.foot.append(summary, make("span", "spacer"), closeButton);
 
-    function draw() {
+    let drawing = 0;                                               // the number of the newest search; an older one that comes back late is dropped
+    async function draw() {
+        const mine = ++drawing;
         const section = options.sections.find((s) => s.id === state.section) || options.sections[0];
         tabs.querySelectorAll(".seg").forEach((tab) => tab.classList.toggle("on", tab.dataset.section === section.id));
         sliderText.textContent = `Also list names at least ${Math.round(state.threshold * 100)}% alike`;
         let found;
-        try { found = section.find(state.threshold); }
-        catch (error) { console.error("Looking for duplicates failed: ", error); list.replaceChildren(make("p", "table-message error", "The search for duplicates did not work. " + (error.message || ""))); return; }
+        // while the search runs: a bar in the list (real progress), and the controls that would start another one wait
+        const waiting = make("div", "scan-inline");
+        const waitText = make("p", "scan-status", "Checking the names...");
+        waitText.setAttribute("role", "status");
+        const track = make("div", "scan-track"), fill = make("div", "scan-fill");
+        track.append(fill); waiting.append(waitText, track);
+        list.replaceChildren(waiting);
+        list.setAttribute("aria-busy", "true");
+        tabs.querySelectorAll(".seg").forEach((tab) => { tab.disabled = true; });
+        const progress = (done, total) => { fill.style.width = Math.round((done / Math.max(1, total)) * 100) + "%"; waitText.textContent = `Checking the names: ${done} / ${total}`; };
+        try { found = await section.find(state.threshold, { onProgress: progress, cancelled: () => mine !== drawing || !document.body.contains(list) }); }
+        catch (error) {
+            console.error("Looking for duplicates failed: ", error);
+            if (mine !== drawing) return;
+            list.removeAttribute("aria-busy"); tabs.querySelectorAll(".seg").forEach((tab) => { tab.disabled = false; });
+            list.replaceChildren(make("p", "table-message error", "The search for duplicates did not work. Close this window and try again."));    // the real error is in the console
+            return;
+        }
+        if (mine !== drawing || found === null) return;             // a newer search took over (or the window closed): this one is dropped
+        list.removeAttribute("aria-busy");
+        tabs.querySelectorAll(".seg").forEach((tab) => { tab.disabled = false; });
         const groups = found.sure.map((group) => Object.assign({ sure: true }, group)).concat(found.possible.slice().sort((a, b) => (b.alike || 0) - (a.alike || 0)).map((group) => Object.assign({ sure: false }, group)))
             .filter((group) => !skipped.has(signature(group)));
         tally.found = Math.max(tally.found, found.sure.length + found.possible.length);

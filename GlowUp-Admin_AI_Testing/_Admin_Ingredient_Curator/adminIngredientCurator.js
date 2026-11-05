@@ -34,8 +34,8 @@ import {
 } from "../_Shared/adminCommon.js";
 import { matchesSearch, normalizeName, evidenceProblem } from "../_Shared/glowupRules.js";
 import { auth } from "../_Database/firebase-console.js";
-import { cleanupPlan, ingredientDuplicates, ingredientLookalikes, ingredientIssues, mergeIngredients } from "../_Shared/glowupCatalog.js";
-import { openPlanDialog, openDuplicatesDialog } from "../_Shared/adminCleanup.js";
+import { cleanupPlan, ingredientDuplicates, ingredientLookalikesAsync, lookalikeCount, ingredientIssues, mergeIngredients } from "../_Shared/glowupCatalog.js";
+import { openPlanDialog, openDuplicatesDialog, showScan } from "../_Shared/adminCleanup.js";
 import { mountShell, placeInHeader, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
 import { readAdminDocument, AI_TEXT_CHARACTERS } from "../_Shared/adminDocumentReader.js";
 import { parseImportText } from "../_Shared/importFormat.js";
@@ -1164,7 +1164,24 @@ async function applyChanges(changes) {
     return ops.length;
 }
 
-function openCleanUp() {
+// "Clean up" and "Find duplicates" compare every ingredient with every other one. That runs in THIS page (nothing is sent to a server), so it is
+// cut into slices (ingredientLookalikesAsync): a window with a bar shows at once, the page stays alive, and a second click while a scan runs is
+// refused. When the scan ends, or fails, or is cancelled, the guard is lifted again.
+let scanning = false;
+async function openCleanUp() {
+    if (scanning) { notify("A scan is running already.", "info"); return; }
+    scanning = true;
+    const scan = showScan("Clean up the ingredients", `Scanning ${lookalikeCount(everyIngredient)} ingredients: {done} / {total} checked`);
+    scan.update(0, lookalikeCount(everyIngredient));
+    let groups = null;
+    try { groups = await ingredientLookalikesAsync(everyIngredient, 0.93, { onProgress: scan.update, cancelled: scan.cancelled }); }
+    catch (error) { console.error("Clean up: the scan failed:", error); scan.close(); scanning = false; notify("The scan did not finish. Please try again.", "error"); return; }
+    scan.close();
+    scanning = false;
+    if (groups === null) return;                                  // cancelled
+    showCleanUp(groups);
+}
+function showCleanUp(lookalikes) {
     openPlanDialog({
         title: "Clean up the ingredients",
         intro: "Entries that are not ingredients (notes, two names joined into one, label text), and entries that explain an ingredient that has an entry already. Open the step to see every entry, take the tick off what should stay, and apply it. Nothing is deleted: what is removed goes to the Recycle bin.",
@@ -1172,13 +1189,14 @@ function openCleanUp() {
         apply: (changes) => applyChanges(changes),
         notes: () => [{
             title: "Ingredient names that are nearly the same", text: "Chemical names can differ by one letter and still be different ingredients (methylparaben, ethylparaben), so these are only listed.",
-            items: ingredientLookalikes(everyIngredient, 0.93).map((group) => group.items.map(titleOf).join("  /  ")),
+            items: lookalikes.map((group) => group.items.map(titleOf).join("  /  ")),
             action: { label: "Open Find duplicates", run: openDuplicates }
         }]
     });
 }
 
 function openDuplicates() {
+    if (scanning) { notify("A scan is running already.", "info"); return; }
     const origin = (item) => originLabel(item.source) || "Typed on this website";
     openDuplicatesDialog({
         title: "Find duplicate ingredients",
@@ -1186,7 +1204,14 @@ function openDuplicates() {
         threshold: 0.93,
         sections: [{
             id: "ingredients", label: "Ingredients",
-            find: (threshold) => ({ sure: ingredientDuplicates(everyIngredient), possible: ingredientLookalikes(everyIngredient, threshold) }),
+            // the slow part (names that are nearly the same) is awaited in slices; the dialog shows its own bar and drops an older search
+            find: async (threshold, progress) => {
+                scanning = true;
+                try {
+                    const possible = await ingredientLookalikesAsync(everyIngredient, threshold, progress);
+                    return possible === null ? null : { sure: ingredientDuplicates(everyIngredient), possible };
+                } finally { scanning = false; }
+            },
             describe: (item) => ({
                 title: titleOf(item),
                 badges: (item.riskLevel ? [{ text: RISK_NAMES[item.riskLevel], tone: item.riskLevel === "safe" ? "good" : item.riskLevel === "caution" ? "warn" : "bad" }] : [])
