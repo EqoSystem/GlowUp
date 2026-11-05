@@ -108,7 +108,7 @@
 
             <!-- the ingredients -->
             <section class="panel" data-panel="list" data-label="Ingredient list" data-w="8" data-source="ingredients" data-no-fold>
-                <!-- ONE row (5 November 2026): [box] Ingredients (i) | Sort | All | New folder | pager | ... | Recycle bin.
+                <!-- ONE row (5 November 2026): [box] Ingredients (i) | Sort | All | New folder | Recycle bin | ... | pager.
                      The shelf's parts (All, New folder, the bin) are drawn into the three marked places by adminOrganizer.js. -->
                 <div class="panel-head wraps">
                     <button type="button" class="pick" data-pick-all role="checkbox" aria-checked="false" aria-label="Select all shown" data-tip="Select every ingredient shown here."></button>
@@ -126,16 +126,16 @@
                         <option value="auto">App decides</option>
                     </select>
                     <span class="shelf" id="ingredientShelfAdd"></span>
-                    <div class="pager" id="ingredientPagerTop"></div>
+                    <span class="shelf" id="ingredientShelfEnd"></span>
                     <span id="ingredientQuick"></span>
                     <span class="spacer"></span>
                     <div class="segmented" hidden id="listLayoutSwitch" role="group" aria-label="How the ingredients are listed">
                         <button type="button" class="seg" data-layout="rows" aria-pressed="true" data-tip-title="Rows" data-tip="One ingredient per line: name, INCI name and how the app judges it."><i data-icon="list"></i>Rows</button>
                         <button type="button" class="seg" data-layout="cards" aria-pressed="false" data-tip-title="Cards" data-tip="Ingredients as cards, several side by side."><i data-icon="layers"></i>Cards</button>
                     </div>
-                    <!-- the bin stays at the right end, also when the row wraps -->
+                    <!-- the pager stays at the right end, also when the row wraps -->
                     <div class="head-end">
-                        <span class="shelf" id="ingredientShelfEnd" data-head-end></span>
+                        <div class="pager" id="ingredientPagerTop" data-head-end></div>
                     </div>
                 </div>
                 <div class="ingredients-list as-rows" id="ingredientsList">
