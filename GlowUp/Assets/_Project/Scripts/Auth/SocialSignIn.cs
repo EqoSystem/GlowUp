@@ -19,6 +19,10 @@ namespace GlowUp.Auth
     public static class SocialSignIn
     {
         public const string Google = "google.com", Password = "password";
+        /// <summary>What the user reads when Google sign-in did not finish. Never Firebase's own text.</summary>
+        public const string DidNotComplete = "Google sign-in didn't complete. Please try again.";
+        /// <summary>The same, when the browser's own privacy settings are what stopped it (Firebase: "missing initial state" / sessionStorage / storage-partitioned).</summary>
+        public const string BrowserBlocking = "Your browser may be blocking sign-in. Try disabling shields/privacy blocking for this site, or use a different browser.";
         const string Facebook = "facebook.com";          // only so that an account made that way in the past is still recognised
 
         /// <summary>How a sign-in ended. Exactly one of User / Cancelled / Problem says what happened.</summary>
@@ -80,11 +84,17 @@ namespace GlowUp.Auth
         }
 
         // ---------------------------------------------------------------------------------------
+        static bool BlockedByBrowser(string text) =>
+            text.IndexOf("missing initial state", StringComparison.OrdinalIgnoreCase) >= 0
+            || text.IndexOf("sessionStorage", StringComparison.OrdinalIgnoreCase) >= 0
+            || text.IndexOf("storage-partitioned", StringComparison.OrdinalIgnoreCase) >= 0;
+
         static Outcome Failed(Exception e, string name)
         {
             FirebaseException firebase = TaskLimits.FirebaseError(e);
             AuthError code = firebase != null ? (AuthError)firebase.ErrorCode : AuthError.None;
-            Debug.LogWarning("[GlowUp] " + name + " sign-in: " + (firebase != null ? code + " " + firebase.Message : e.ToString()));
+            Debug.LogWarning("[GlowUp] " + name + " sign-in: " + (firebase != null ? code + " " + firebase.Message : e.ToString())
+                + (e.InnerException != null ? " | inner: " + e.InnerException.Message : ""));
             switch (code)
             {
                 case AuthError.WebContextCancelled:
@@ -100,8 +110,10 @@ namespace GlowUp.Auth
                     return new Outcome { Problem = "This account has been disabled." };
             }
             if (e is OperationCanceledException) return new Outcome { Cancelled = true };
-            string detail = firebase != null ? firebase.Message : e.InnerException != null ? e.InnerException.Message : e.Message;
-            return new Outcome { Problem = name + " sign-in did not work: " + detail };
+            // The raw text is only logged (above), never shown. The sign-in page opens in the phone's browser; a browser that blocks or splits
+            // its storage (Brave with Shields, strict privacy modes, some in-app browsers) makes Firebase answer "missing initial state".
+            string detail = (firebase != null ? firebase.Message : "") + " " + e.Message + " " + (e.InnerException != null ? e.InnerException.Message : "");
+            return new Outcome { Problem = BlockedByBrowser(detail) ? BrowserBlocking : DidNotComplete };
         }
     }
 }

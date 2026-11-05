@@ -262,7 +262,7 @@ namespace GlowUp.Auth
                 if (HasSkinProfile(profile)) SceneNavigator.Go(dashboardScene);       // already has a skin profile: straight to the dashboard
                 else StartSocialSignUp(outcome.User);                                  // no skin profile yet: the skin quiz (Onboarding Step 2)
             }
-            catch (Exception e) { Debug.LogWarning(name + " sign-in failed: " + e); Fail(string.Format(msgSocialNotConfigured, name)); }
+            catch (Exception e) { Debug.LogWarning(name + " sign-in failed: " + e); Fail(SocialSignIn.DidNotComplete); }      // the Google button is the retry
             finally { socialBusy = false; }
         }
 
