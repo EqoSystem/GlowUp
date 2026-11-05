@@ -16,8 +16,8 @@
 // adminLayouts.js talks to it with two events: "glowup:settings-close" (arranging hides the window) and "glowup:layout-view"
 // (the Layout and style view was shown: paint it).
 //
-// THE GEAR beside Add on Inventory and the Curator opens the same window (wireSettingsButton). What used to be behind the "..."
-// there (Clean up, Find duplicates ...) is listed in the Settings view under "This page" (setPageSettings).
+// What used to be behind the "..." on Inventory and the Curator (Clean up, Find duplicates ...) is listed in the Settings view under
+// "This page" (setPageSettings); a page with nothing of its own has no such heading.
 //
 // THE RECYCLE BIN COUNT is read-only and uses the existing data code (adminStore.js): first the lists this browser keeps
 // (no read at all); only a list that is not kept is counted with one count query (binned == true, the same query the
@@ -36,7 +36,6 @@ const COUNT_KEY = "glowup.binCount.";
 let binCount = 0;
 let recountTimer = 0;
 let win = null, button = null;
-let opener = null;                                // what opened the window: the focus goes back there
 let pageItems = null;                             // () => the page's own entries, in the form openMenu takes
 let view = "menu";                                // "menu" | "layout"
 
@@ -59,12 +58,11 @@ function show(next) {
     else document.dispatchEvent(new CustomEvent("glowup:layout-view"));
 }
 
-function openWindow(from) {
+function openWindow() {
     if (isOpen()) return;
-    opener = from || button;
     win.classList.add("is-open");
     document.documentElement.classList.add("settings-open");
-    opener.setAttribute("aria-expanded", "true");
+    button.setAttribute("aria-expanded", "true");
     show("menu");
     win.focus({ preventScroll: true });
 }
@@ -74,13 +72,8 @@ export function closeSettingsWindow() {
     const hadFocus = win.contains(document.activeElement);
     win.classList.remove("is-open");
     document.documentElement.classList.remove("settings-open");
-    opener.setAttribute("aria-expanded", "false");
-    if (hadFocus) opener.focus({ preventScroll: true });
-}
-
-/** A second button that opens and closes the window (the gear of a page). */
-export function wireSettingsButton(gear) {
-    gear.addEventListener("click", () => { if (isOpen()) closeSettingsWindow(); else openWindow(gear); });
+    button.setAttribute("aria-expanded", "false");
+    if (hadFocus) button.focus({ preventScroll: true });
 }
 
 /** The page's own entries for the Settings view: a function that returns them as openMenu takes them, asked each time the view is drawn. */

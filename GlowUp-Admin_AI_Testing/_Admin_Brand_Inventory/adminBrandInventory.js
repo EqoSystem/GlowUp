@@ -52,7 +52,7 @@ import { nearShade } from "../_Shared/listRules.js";
 import { mountIngredientPicker } from "../_Shared/adminIngredientPicker.js";
 import { openFacets } from "../_Shared/adminFacets.js";
 import { EXPORT_MAX_ROWS, EXPORT_FILE_PREFIX, toCsv, downloadCsv, today } from "../_Shared/adminExport.js";
-import { wireSettingsButton, setPageSettings } from "../_Shared/adminSettingsMenu.js";
+import { setPageSettings } from "../_Shared/adminSettingsMenu.js";
 import { mountSourceEditor, openApplyWindow } from "./productSources.js";
 import { applyRole, brandPageOf, groupByType, bulkAllowed } from "../_Shared/sourceEdit.js";
 import { countPending, openSnapshotReview, finishSnapshot, APPROVED_DESCRIPTION } from "../_Shared/adminSnapshots.js";
@@ -221,8 +221,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         { label: "Brand", icon: "tag", description: "A new brand: name, category, market, status.", run: () => openBrandForm(null) },
         { label: "Product", icon: "lipstick", description: "A make-up product of a listed brand.", disabled: brands.length === 0, run: () => openProductForm(null, brandFilterValue()) }
     ]));
-    // the gear opens the settings window; what was behind "..." here is listed there under "This page" (5 November 2026)
-    wireSettingsButton(el("settingsGearBtn"));
+    // what was behind "..." here is listed in the settings window under "This page" (5 November 2026)
     setPageSettings(() => {
         const allClosed = shownGroups.length > 0 && shownGroups.every((g) => closed.has(g.id));
         const outside = outsideCount();

@@ -40,7 +40,7 @@ import { BUILT_IN_HIGHLIGHTS } from "../_Shared/listRules.js";
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
-import { wireSettingsButton, setPageSettings } from "../_Shared/adminSettingsMenu.js";
+import { setPageSettings } from "../_Shared/adminSettingsMenu.js";
 
 const pageState = { page: 1, size: 10 };          // the list shows ten ingredients at a time
 const BATCH_LIMIT = 400;                          // Firestore allows 500 writes in one batch
@@ -174,8 +174,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("ingredientApproveAllBtn").addEventListener("click", approveIngredientDrafts);
 
     wireSearch(el("ingredientSearchInput"), el("ingredientSearchClear"), fromFirstPage);
-    // the gear opens the settings window; what was behind "..." here is listed there under "This page" (5 November 2026)
-    wireSettingsButton(el("settingsGearBtn"));
+    // what was behind "..." here is listed in the settings window under "This page" (5 November 2026)
     setPageSettings(() => [
         { label: "Clean up", icon: "sparkle", description: "Entries that are notes, joined names or label text, and entries that are there twice. You see every change first.", run: openCleanUp },
         { label: "Find duplicates", icon: "layers", description: "Entries that explain the same ingredient, or have nearly the same name. You choose which one to keep.", run: openDuplicates }
