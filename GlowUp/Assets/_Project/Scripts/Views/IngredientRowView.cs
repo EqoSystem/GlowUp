@@ -78,10 +78,10 @@ namespace GlowUp.Views
 
         /// <summary>
         /// Everything the database holds is plain text, never markup: the app's own AI look-up writes entries nobody has checked, and a
-        /// "&lt;" in them must not become a tag (a size, a link, a colour). The text is wrapped so TextMeshPro shows it as it is.
+        /// "&lt;" in them must not become a tag (a size, a link, a colour). Every "&lt;" gets an invisible zero-width space behind it, so no
+        /// tag can form however the text is built (a wrapper like noparse can be closed from inside the text; this cannot).
         /// </summary>
-        public static string Plain(string value) =>
-            string.IsNullOrEmpty(value) ? "" : "<noparse>" + value.Replace("</noparse>", "").Replace("</NOPARSE>", "") + "</noparse>";
+        public static string Plain(string value) => string.IsNullOrEmpty(value) ? "" : value.Replace("<", "<​");
 
         static void Line(TextMeshProUGUI text, string prefix, string value)
         {
