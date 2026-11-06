@@ -387,6 +387,9 @@ body.layout-editing .board > .panel .panel-fold-btn { pointer-events: auto; }
    whole row); under 640 px every panel takes the whole row. */
 .board { container: board / inline-size; }
 @container board (max-width: 999px) { .board > .panel { grid-column: span calc(6 + 6 * clamp(0, var(--w, 12) - 6, 1)) !important; } }
+/* while Quick settings pushes the page, a panel with empty room at the right of its row fills it (adminLayouts.js sets
+   data-qs-grow and --qs-span; both go when Quick settings closes, so the saved width comes back) */
+html.qs-open .board > .panel[data-qs-grow] { grid-column: span var(--qs-span) !important; }
 @container board (max-width: 639px) {
     .board > .panel { grid-column: 1 / -1 !important; }
     .panel.group[data-group="side"] > .panel-inner > .group-body { grid-template-columns: minmax(0, 1fr); }

@@ -362,6 +362,65 @@ function watchForFit() {
     }
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(queueFit).catch(() => { });
     fitNow();
+    watchForSettingsGrow();
+}
+
+// ---------------------------------------------------------------------------------------------
+// While Quick settings pushes the page (7 November 2026): a panel left with empty room at the right of its row (Quick actions
+// beside nothing) widens into that room. When Quick settings closes, every panel has its own saved width again. The saved
+// layout (--w) is never touched: the extra width is only data-qs-grow + --qs-span, cleared on close.
+// ---------------------------------------------------------------------------------------------
+function clearSettingsGrow() {
+    document.querySelectorAll(".board > .panel[data-qs-grow]").forEach((panel) => { panel.removeAttribute("data-qs-grow"); panel.style.removeProperty("--qs-span"); });
+}
+
+function settingsGrowNow() {
+    clearSettingsGrow();
+    const b = board();
+    const pushing = document.documentElement.classList.contains("qs-open") && window.matchMedia("(min-width: 1024px)").matches;
+    if (!b || !pushing || document.body.classList.contains("layout-editing")) return;
+    const style = getComputedStyle(b);
+    const gap = parseFloat(style.columnGap) || 16;
+    const box = b.getBoundingClientRect();
+    const left = box.left + parseFloat(style.paddingLeft), right = box.right - parseFloat(style.paddingRight);
+    const column = (right - left + gap) / 12;
+    if (!(column > 0)) return;
+    const rects = topPanels().filter((panel) => panel.offsetParent !== null).map((panel) => ({ panel, r: panel.getBoundingClientRect() }));
+    const grows = [];
+    rects.forEach(({ panel, r }) => {
+        // the nearest panel to its right that shares any of its height; none means the room runs to the board's edge
+        let edge = right;
+        rects.forEach((other) => {
+            if (other.panel === panel || other.r.bottom <= r.top + 1 || other.r.top >= r.bottom - 1 || other.r.left < r.right - 1) return;
+            edge = Math.min(edge, other.r.left - gap);
+        });
+        const free = Math.round((edge - r.right) / column);
+        if (free < 1) return;
+        const span = Math.min(12, Math.round((r.width + gap) / column) + free);
+        grows.push([panel, span]);
+    });
+    grows.forEach(([panel, span]) => { panel.style.setProperty("--qs-span", String(span)); panel.setAttribute("data-qs-grow", ""); });
+}
+
+function watchForSettingsGrow() {
+    const b = board();
+    if (!b) return;
+    let timer = 0;
+    // after the push has finished sliding (.28 s), so the room is measured at the board's final width
+    const later = () => { clearTimeout(timer); timer = setTimeout(settingsGrowNow, 340); };
+    let wasOpen = document.documentElement.classList.contains("qs-open");
+    new MutationObserver(() => {
+        const open = document.documentElement.classList.contains("qs-open");
+        if (open === wasOpen) return;
+        wasOpen = open;
+        if (open) later(); else { clearTimeout(timer); clearSettingsGrow(); }
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    new MutationObserver(() => { if (document.body.classList.contains("layout-editing")) clearSettingsGrow(); else if (wasOpen) later(); })
+        .observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    if (window.ResizeObserver) {
+        let lastWidth = b.clientWidth;
+        new ResizeObserver(() => { if (b.clientWidth !== lastWidth) { lastWidth = b.clientWidth; if (wasOpen) later(); } }).observe(b);
+    }
 }
 
 /** The switch in Layout & Style: gaps closed, or every panel on its own line of the grid as before. */
