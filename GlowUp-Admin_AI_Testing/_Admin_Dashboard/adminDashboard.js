@@ -495,16 +495,8 @@ function registerHelpers() {
         return [{ tone: "info", text: `${parts.join(" and ")} suggested by app users.` + (Number.isFinite(oldest) ? ` Oldest: ${timeAgo(oldest)}.` : ""), label: "Curator", run: () => { window.location.href = "../_Admin_Ingredient_Curator/adminIngredientCurator.html"; }, tip: "Add what is useful to the Ingredient Curator, then mark the suggestion reviewed." }];
     });
 
-    registerAssist("brands", () => {
-        if (!brandsAnswered) return null;
-        if (allBrands.length === 0) return [];
-        const total = allBrands.reduce((sum, b) => sum + b.scans, 0);
-        const lines = [];
-        if (total > 0) lines.push({ text: `${allBrands[0].name} has ${percent(allBrands[0].scans, total)}% of all brand scans.` });
-        const never = allBrands.filter((b) => b.scans === 0).length;
-        if (never > 0) lines.push({ text: `${many(never, "brand was", "brands were")} never scanned yet.`, label: "Inventory", run: () => { window.location.href = INVENTORY_PAGE; } });
-        return lines;
-    });
+    // "Most scanned brands" has no helper line (removed 7 November 2026 at the owner's request): its list already shows
+    // each brand's scans, and brands never scanned show 0.
 }
 
 // ---------------------------------------------------------------------------------------------
