@@ -96,6 +96,7 @@ export function requireAdmin() {
             document.documentElement.classList.remove("auth-pending", "auth-stuck", "frame-first");
             document.querySelectorAll(".brand-loader, .auth-stuck-box").forEach((box) => box.remove());
             showSignedInAs(user);
+            watchIdle();
             if (!resolved) { resolved = true; resolve(user); }
         });
     });
@@ -117,6 +118,25 @@ export function wireSignOut() {
         link.dataset.wired = "1";
         link.addEventListener("click", (event) => { event.preventDefault(); confirmSignOut(); });
     });
+}
+
+// An admin page left open is signed out after IDLE_MINUTES without a click, key or scroll, so an unattended computer does not
+// leave the database open to whoever sits down at it. Every open tab counts its own quiet time.
+const IDLE_MINUTES = 30;
+let idleWatched = false;
+function watchIdle() {
+    if (idleWatched) return;
+    idleWatched = true;
+    let last = Date.now();
+    const awake = () => { last = Date.now(); };
+    ["pointerdown", "keydown", "wheel", "touchstart", "scroll"].forEach((name) => window.addEventListener(name, awake, { passive: true, capture: true }));
+    window.setInterval(async () => {
+        if (Date.now() - last < IDLE_MINUTES * 60 * 1000) return;
+        remember(false);
+        clearStore();
+        try { await signOut(auth); } catch (error) { console.error("Sign out failed:", error); }
+        window.location.replace(LOGIN_PAGE + "?idle=1");
+    }, 30 * 1000);
 }
 
 async function confirmSignOut() {

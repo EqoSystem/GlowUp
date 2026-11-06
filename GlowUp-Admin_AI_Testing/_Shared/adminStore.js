@@ -326,22 +326,53 @@ export async function getDocs(target) {
     if (name === null) { const result = await fb.getDocs(target); noteReads("queries", result.size); return result; }
     return snapshotOf(await list(name, target));
 }
-export function updateDoc(ref, ...rest) { touch(ref); return fb.updateDoc(ref, ...rest); }
-export function setDoc(ref, ...rest) { touch(ref); return fb.setDoc(ref, ...rest); }
-export function deleteDoc(ref) { touch(ref); return fb.deleteDoc(ref); }
-export async function addDoc(target, data) {
-    const made = await fb.addDoc(target, data);
-    const name = wholeList(target);
-    if (name && made && made.id) { const ids = dirtyOf(name); ids.add(made.id); setDirty(name, ids); }
-    return made;
+// ---------------------------------------------------------------------------------------------
+//  AUDIT TRAIL: every write this site makes is recorded in "auditLog", IN THE SAME BATCH as the change itself, so a change
+//  is never saved without its record. One record per save: who (uid and e-mail of the signed-in admin), when, from which
+//  page, and which documents were created, changed or deleted, with the names of the fields (not their values) and the
+//  entry's name. The rules let an admin ADD a record for themself only; nobody can change or delete one.
+// ---------------------------------------------------------------------------------------------
+export const AUDIT_COLLECTION = "auditLog";
+const AUDIT_MOST_ITEMS = 450;
+function auditItem(action, ref, rest) {
+    let fields = [];
+    if (typeof rest[0] === "string") fields = rest.filter((value, index) => index % 2 === 0 && typeof value === "string");   // update(ref, "a", 1, "b", 2)
+    else if (rest[0] && typeof rest[0] === "object") fields = Object.keys(rest[0]);
+    const data = rest[0] && typeof rest[0] === "object" ? rest[0] : {};
+    const item = { collection: String((ref.parent && ref.parent.id) || ""), docId: String(ref.id || ""), action, fields: fields.filter((f) => f !== "updatedAt").slice(0, 30) };
+    if (typeof data.name === "string" && data.name) item.name = data.name.slice(0, 120);
+    return item;
 }
+function auditRecord(items) {
+    const user = auth.currentUser;
+    return {
+        uid: user ? user.uid : "", email: user && user.email ? user.email : "",
+        at: fb.serverTimestamp(), atUnix: Math.floor(Date.now() / 1000),
+        page: String((typeof location !== "undefined" && location.pathname) || "").split("/").filter(Boolean).slice(-1)[0] || "",
+        count: items.length, items: items.slice(0, AUDIT_MOST_ITEMS)
+    };
+}
+const logged = (ref) => !(ref.parent && ref.parent.id === AUDIT_COLLECTION);
+
 export function writeBatch(database) {
-    const batch = fb.writeBatch(database);
+    const batch = fb.writeBatch(database || db);
+    const items = [];
     const api = {
-        set(ref, ...rest) { touch(ref); batch.set(ref, ...rest); return api; },
-        update(ref, ...rest) { touch(ref); batch.update(ref, ...rest); return api; },
-        delete(ref) { touch(ref); batch.delete(ref); return api; },
-        commit: () => batch.commit()
+        set(ref, ...rest) { touch(ref); batch.set(ref, ...rest); if (logged(ref)) items.push(auditItem("set", ref, rest)); return api; },
+        update(ref, ...rest) { touch(ref); batch.update(ref, ...rest); if (logged(ref)) items.push(auditItem("update", ref, rest)); return api; },
+        delete(ref) { touch(ref); batch.delete(ref); if (logged(ref)) items.push(auditItem("delete", ref, [])); return api; },
+        commit: () => {
+            if (items.length > 0) batch.set(fb.doc(fb.collection(db, AUDIT_COLLECTION)), auditRecord(items));
+            return batch.commit();
+        }
     };
     return api;
+}
+export function updateDoc(ref, ...rest) { return writeBatch(db).update(ref, ...rest).commit(); }
+export function setDoc(ref, ...rest) { return writeBatch(db).set(ref, ...rest).commit(); }
+export function deleteDoc(ref) { return writeBatch(db).delete(ref).commit(); }
+export async function addDoc(target, data) {
+    const made = fb.doc(target);                                   // a new id, made here so the record can name it
+    await writeBatch(db).set(made, data).commit();
+    return made;
 }

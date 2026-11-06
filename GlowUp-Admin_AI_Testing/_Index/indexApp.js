@@ -52,6 +52,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // sent back here by an admin page because the account is not in the admins list
     if (new URLSearchParams(window.location.search).get("denied")) say(NOT_ADMIN);
+    if (new URLSearchParams(window.location.search).get("idle")) say("You were signed out after 30 minutes without activity. Sign in again to continue.");
 
     // already signed in (for example the page was reopened): go straight to the dashboard
     onAuthStateChanged(auth, async (user) => {

@@ -22,6 +22,7 @@ import { mountShell, paginate, renderPager, icon } from "../_Shared/adminShell.j
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
 import { setPanelQuiet, setPanelSummary } from "../_Shared/adminFold.js";
+import { openAuditLog } from "../_Shared/adminAuditLog.js";
 
 const RECENT_ITEMS = 120;             // how many recent scans are fetched (the list, the grid and the graphs all use them)
 const PAGE_SIZE = 8;                  // how many rows a panel shows at a time
@@ -56,6 +57,8 @@ const INVENTORY_PAGE = "../_Admin_Brand_Inventory/adminBrandInventory.html";
 document.addEventListener("DOMContentLoaded", async () => {
     registerData();                   // before the page frame: a saved layout may hold panels that show this data
     mountShell("dashboard");
+    const auditTile = document.getElementById("auditLogTile");
+    if (auditTile) auditTile.addEventListener("click", openAuditLog);
     setAssistPage("dashboard");
     registerHelpers();
     wireSignOut();
