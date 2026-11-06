@@ -1,20 +1,23 @@
 /* Login page: only where things sit. Colours, inputs and buttons come from ../_Shared/adminCommon.css. */
 
-/* a top row (the GlowUp link at the left, light / dark at the right) and the card in the middle of the space under it.
-   Every width from a phone up: the card is never wider than the window, and nothing is fixed on top of it. */
+/* THE PAPER (7 November 2026): no gradient. A plain dirty-white old paper: one flat colour with a fine grain and faint mottling
+   drawn by an SVG noise filter (one small seamless tile, no colour fades). The dark theme keeps the same grain on a warm charcoal. */
 body.login-page {
+    --paper: #eee8db;
+    --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .32 0 0 0 0 .27 0 0 0 0 .2 0 0 0 .11 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
     min-height: 100vh; min-height: 100dvh; display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr);
-    padding: 14px var(--page-x) 24px;
-    background:
-        radial-gradient(60% 50% at 80% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
-        radial-gradient(50% 45% at 0% 100%, color-mix(in srgb, var(--gold) 12%, transparent), transparent 70%),
-        var(--bg);
+    padding: 0;
+    background-color: var(--paper);
+    background-image: var(--paper-grain);
+    background-size: 220px 220px;
 }
-.login-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; }
-.login-brand { padding: 2px 8px 2px 2px; }
-.login-brand .brand-title { font-size: var(--fs-md); }
-.login-tools { display: flex; gap: 8px; }
-.login-main { display: grid; place-items: center; padding-block: 16px; min-width: 0; }
+:root[data-theme="dark"] body.login-page { --paper: #1c1a19; }
+/* the header: the admin pages' own top bar, on the paper (its tint follows the paper instead of the page colour) */
+.topbar.login-top { justify-content: space-between; background: color-mix(in srgb, var(--paper) 86%, transparent); }
+.login-brand { padding: 0; }
+.login-brand .brand-title { font-size: var(--fs-md); font-weight: 700; line-height: 1.15; letter-spacing: .1px; }
+.login-tools { display: flex; gap: 8px; margin-left: auto; }
+.login-main { display: grid; place-items: center; padding: 16px var(--page-x) 24px; min-width: 0; }
 .login-card {
     width: min(380px, 100%); padding: clamp(22px, 6vw, 32px) clamp(18px, 5vw, 28px); border-radius: calc(var(--radius) + 4px); text-align: center;
     background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); animation: pop-in .4s var(--ease) both;
@@ -29,8 +32,7 @@ body.login-page {
 .subtitle { font-size: var(--fs-sm); color: var(--muted); margin: 2px 0 22px; }
 #login-form { display: flex; flex-direction: column; gap: 14px; text-align: left; }
 .login-message { margin: 0; }
-.login-action { display: flex; align-items: center; gap: 8px; }
-.login-btn { flex: 1; padding: 12px 16px; font-size: var(--fs-base); }
+.login-btn { width: 100%; padding: 12px 16px; font-size: var(--fs-base); }
 .footer-note { font-size: var(--fs-xs); color: var(--muted); margin-top: 18px; line-height: 1.6; }
 
 /* "Terms and Conditions": a button that looks like a link, in the accent colour, underlined on hover and keyboard focus */

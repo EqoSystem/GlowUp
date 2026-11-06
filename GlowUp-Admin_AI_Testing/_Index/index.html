@@ -22,12 +22,13 @@
 
     <!-- the logo and the name are one link, as on the admin pages. Signed out it can only lead back to this login page
          (never past the sign-in); a signed-in admin is sent on to the dashboard by indexApp.js as before. -->
-    <header class="login-top">
+    <!-- the same header as every admin page (.topbar in adminCommon.css): same height, padding, border and background -->
+    <header class="topbar login-top">
         <a class="brand-home login-brand" href="../_Index/index.html" aria-label="GlowUp – admin login page">
             <span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"></span>
             <span class="brand-title">Glow Up</span>
         </a>
-        <div class="login-tools" id="loginTools"></div>
+        <div class="topbar-tools login-tools" id="loginTools"></div>
     </header>
 
     <main class="login-main">
@@ -56,10 +57,8 @@
 
             <p id="loginMessage" class="login-message form-error" role="alert"></p>
 
-            <div class="login-action">
-                <button type="submit" id="loginBtn" class="login-btn" disabled>Log in</button>
-                <button type="button" class="guide-badge" data-tip-title="Log in" data-tip="Type the admin email and password. The button lights up when both boxes are filled." data-tip-preview="Opens the Operations Dashboard.">i</button>
-            </div>
+            <!-- the button is exactly as wide as the Email and Password boxes (the same column) -->
+            <button type="submit" id="loginBtn" class="login-btn" disabled>Log in</button>
         </form>
 
         <!-- the old note about recorded sign-ins that stood here is now section 7 (Monitoring) of the Terms -->

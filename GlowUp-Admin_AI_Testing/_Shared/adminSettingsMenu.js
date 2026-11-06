@@ -77,6 +77,12 @@ function build() {
             <div class="sw-view" id="swMenuView"></div>
         </div>`;
     document.body.appendChild(win);
+    // the dimmed backdrop of the narrow-window sheet (shown by CSS only under 1024 px); a press on it closes the panel
+    const backdrop = document.createElement("div");
+    backdrop.className = "sw-backdrop";
+    backdrop.setAttribute("aria-hidden", "true");
+    backdrop.addEventListener("click", closeSettingsWindow);
+    document.body.appendChild(backdrop);
     const body = win.querySelector(".sw-body");
     const host = el("layoutHost");                // built by adminLayouts.js into the holder; it moves in here
     if (host) { host.classList.add("sw-view", "layout-view"); host.hidden = true; body.appendChild(host); }
@@ -90,7 +96,7 @@ function build() {
     hydrate(win);
 }
 
-const overlay = () => window.matchMedia("(max-width: 900px)").matches;     // no room beside the page: the panel covers it
+const overlay = () => window.matchMedia("(max-width: 1023px)").matches;    // no room beside the page: a sheet over a dimmed backdrop
 let hideTimer = 0;
 
 /**

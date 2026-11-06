@@ -27,17 +27,32 @@ html.sb-collapsed .brand-mark { margin: 0; }
 .sw-head { display: flex; align-items: center; gap: 4px; padding: 10px 10px 10px 16px; border-bottom: 1px solid var(--border); flex: none; }
 .sw-head:has(#swBack:not([hidden])) { padding-left: 10px; }
 .sw-head h3 { flex: 1; min-width: 0; font-size: var(--fs-md); }
-.sw-body { flex: 1 1 auto; min-height: 0; overflow: auto; }          /* the panel scrolls by itself; the page keeps its own scroll */
-.sw-view { padding: 8px; }
+.sw-body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }          /* the panel scrolls by itself; the page keeps its own scroll */
+.sw-view { padding: 8px 14px 12px 8px; }                                 /* room on the right: a count badge never touches the scroll bar or the edge */
+/* every row: icon | title + description (wraps) | check or count (never pushed out) */
+.settings-window .menu-item { min-width: 0; align-items: center; }
+.settings-window .menu-text { min-width: 0; overflow-wrap: anywhere; }
+.settings-window .menu-item > svg.ic, .settings-window .menu-badge, .settings-window .menu-check { flex: none; }
 .sw-view.layout-view { padding: 16px 20px 22px; display: flex; flex-direction: column; gap: 16px; }
 .sw-view[hidden] { display: none; }
 
-@media (min-width: 901px) {
+/* 1024 px and wider (7 November 2026): a side panel that PUSHES the page; the board reflows into the width that is left
+   (its panels follow the board's own width: the container query in adminCommon.css). Nothing is hidden under it. */
+@media (min-width: 1024px) {
     .main-content > .board, .main-content > .editing-bar { margin-right: var(--qs-shift, 0px); transition: margin-right .28s var(--ease); }
     html.qs-open { --qs-shift: var(--settings-w); }
 }
-@media (max-width: 900px) { .settings-window { box-shadow: var(--shadow); } }
+/* Under 1024 px: a full-height sheet over a dimmed backdrop. The backdrop, Esc and the close button close it; the page behind
+   does not scroll while it is open. */
+.sw-backdrop { display: none; }
+@media (max-width: 1023px) {
+    .settings-window { top: 0; right: 0; z-index: 960; box-shadow: var(--shadow); width: min(var(--settings-w), 100vw); max-width: 100vw; }
+    html.qs-open .sw-backdrop { display: block; position: fixed; inset: 0; z-index: 950; background: var(--overlay); animation: fade-in .2s ease both; }
+    html.qs-open .main-content { overflow: hidden; }
+    html.qs-open body { overflow: hidden; }
+}
 @media (max-width: 599px) { .settings-window { width: 100vw; border-left: 0; } }
+@keyframes fade-in { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .main-content > .board, .main-content > .editing-bar, .settings-window { transition: none !important; } }
 /* before the panel is first opened, the Layout & Style controls wait here */
 #layoutStash { display: none; }

@@ -152,7 +152,7 @@ function renderTopBrands(brands) {
     list.innerHTML = ranked.map((b, i) => `
         <li class="rank-item can-open" data-brand="${escapeHtml(b.id)}">
             <span class="rank-number">${i + 1}</span>
-            <span class="rank-name">${escapeHtml(b.name)}</span>
+            <span class="rank-name" title="${escapeHtml(b.name)}">${escapeHtml(b.name)}</span>
             <span class="rank-value">${b.scans} ${b.scans === 1 ? "scan" : "scans"}</span>
         </li>`).join("");
 }
@@ -280,7 +280,7 @@ function renderResults(results) {
     el("resultBar").innerHTML = total === 0 ? "" : Object.keys(names).filter((k) => results[k] > 0)
         .map((k) => `<span class="${k}" data-status="${k}" style="flex-grow:${results[k]}" data-tip-title="${results[k]} scans" data-tip="${names[k]}"></span>`).join("");
     el("resultLegend").innerHTML = Object.keys(names).map((k) =>
-        `<li data-status="${k}" class="${activityFilter === k ? "on" : ""}"><span class="activity-dot ${k}"></span>${names[k]}<span class="num">${results[k]}${total > 0 ? ` <span class="muted small">${Math.round(results[k] * 100 / total)}%</span>` : ""}</span></li>`).join("");
+        `<li data-status="${k}" class="${activityFilter === k ? "on" : ""}"><span class="legend-name ${k}">${names[k]}</span><span class="num">${results[k]}${total > 0 ? ` <span class="muted small">${Math.round(results[k] * 100 / total)}%</span>` : ""}</span></li>`).join("");
 }
 
 /** Narrows the activity list to one result (or to scans with an allergen match). The same choice again shows everything. */

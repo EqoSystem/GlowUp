@@ -240,7 +240,7 @@ export function formatWhen(value) {
     return date.toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-/** "just now", "5 min ago", "3 h ago", otherwise the date. */
+/** Short: "just now", "5 min ago", "3 h ago", "2 d ago" (under a week), "Nov 5" (this year), "Nov 5, 2025". formatWhen gives the full one. */
 export function timeAgo(value) {
     const date = toDate(value);
     if (!date) return "";
@@ -248,7 +248,9 @@ export function timeAgo(value) {
     if (seconds < 60) return "just now";
     if (seconds < 3600) return Math.floor(seconds / 60) + " min ago";
     if (seconds < 86400) return Math.floor(seconds / 3600) + " h ago";
-    return formatWhen(date);
+    if (seconds < 7 * 86400) return Math.floor(seconds / 86400) + " d ago";
+    const sameYear = date.getFullYear() === new Date().getFullYear();
+    return date.toLocaleDateString("en-US", sameYear ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" });
 }
 
 /** Unix seconds of today's midnight on this computer. */

@@ -123,10 +123,10 @@ function build(panelId) {
     const strip = document.createElement("div");
     strip.className = "assist";
     strip.setAttribute("role", "status");
-    strip.innerHTML = `<span class="assist-icon">${icon("sparkle")}</span><span class="assist-text"></span>
-        <button type="button" class="row-btn assist-act"></button>
-        <button type="button" class="assist-next" aria-label="Next hint"><span class="assist-step"></span>${icon("right")}</button>
-        <button type="button" class="assist-x" aria-label="Hide this helper">${icon("x")}</button>`;
+    strip.innerHTML = `<span class="assist-main"><span class="assist-icon">${icon("sparkle")}</span><span class="assist-text"></span></span>
+        <span class="assist-controls"><button type="button" class="row-btn assist-act"></button>
+        <span class="assist-pager"><button type="button" class="assist-next" aria-label="Next hint"><span class="assist-step"></span>${icon("right")}</button>
+        <button type="button" class="assist-x" aria-label="Hide this helper">${icon("x")}</button></span></span>`;
     strip.querySelector(".assist-act").addEventListener("click", () => { const line = strip.line; if (line && line.run) line.run(); });
     strip.querySelector(".assist-next").addEventListener("click", () => { shown.set(panelId, (shown.get(panelId) || 0) + 1); paint(panelId, true); });
     strip.querySelector(".assist-x").addEventListener("click", () => {
