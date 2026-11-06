@@ -1,0 +1,23 @@
+flowchart TD
+  A[Open app] --> B[Startup and loading]
+  B --> C{Signed in or offline cached session?}
+  C -->|No| D[Login / sign-up]
+  D --> E[Onboarding, consent]
+  C -->|Yes| F[Dashboard]
+  E --> F
+  F --> G[AI Smart Scan]
+  F --> M[Recent scans]
+  F --> T[Try On]
+  G --> H[Camera frames: OCR / barcode]
+  H --> I[Match product, analyze ingredients]
+  I --> J[Result screen]
+  J --> T
+  M --> J
+  T --> U[Face guide / live tracking, shade preview]
+
+  noteC["IF the app already has a signed-in Firebase user or a valid offline cached session, skip straight to Dashboard"]
+  C -.- noteC
+  noteI["IF the camera frames do not match a known product, the app falls back to a shortlist, typed entry or AI recognition"]
+  I -.- noteI
+  class noteC,noteI note
+  classDef note fill:#fffbe6,stroke:#d4b106,stroke-width:1px,color:#5c4a00,font-size:11px

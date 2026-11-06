@@ -1,0 +1,28 @@
+flowchart TD
+  A[Open admin login] --> B[Firebase email/password]
+  B --> C{admins/uid exists?}
+  C -->|No| D[Sign out, access denied]
+  C -->|Yes| E[Operations Dashboard]
+  E --> F[Brand and Product Inventory]
+  E --> IC[Ingredient Curator]
+  F --> G[Choose / drop import file]
+  G --> H[Extract text, optional AI draft]
+  H --> I[Stage Pending records]
+  I --> J{Admin approves, edits or rejects}
+  J -->|Approve| K[Status set to Active]
+  J -->|Reject| L[Removed / sent to Recycle bin]
+  F --> N[Move to Recycle Bin]
+  N --> O{Restore or Archive?}
+  O -->|Restore| F
+  O -->|Archive| P[Archive, kept 30 days]
+  P --> Q{Restore to bin, or delete now}
+  Q --> R[Daily purge job deletes expired entries]
+
+  noteC["IF the signed-in Firebase UID has no admins/uid document, sign out and deny access"]
+  C -.- noteC
+  noteJ["IF a field import or AI draft needs review, the admin approves, edits, or rejects it before it goes live"]
+  J -.- noteJ
+  noteQ["IF 30 days pass with no restore, the daily purge job deletes the archived entry"]
+  Q -.- noteQ
+  class noteC,noteJ,noteQ note
+  classDef note fill:#fffbe6,stroke:#d4b106,stroke-width:1px,color:#5c4a00,font-size:11px

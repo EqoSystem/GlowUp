@@ -51,6 +51,8 @@ namespace GlowUp.AR
         [Header("Look")]
         [Tooltip("How quickly a new shade or strength blends in")]
         [SerializeField] private float blendSpeed = 10f;
+        [Tooltip("Time constant for exponential smoothing of _SkinBase before it is pushed to the layer shader (seconds). 0 = instant.")]
+        [Min(0f)] [SerializeField] private float skinBaseSmoothTime = 0.3f;
         [Tooltip("Live tracking sits exactly on the face, so it can be a little stronger or weaker than the guided preview. 1 = the same.")]
         [Range(0.3f, 1.5f)] [SerializeField] private float strengthScale = 1f;
         [Tooltip("The colour bare LIPS are assumed to have. Lip colour is worked out against it: lips of this colour become exactly the shade, and the lines and light of the real lips stay visible.")]
@@ -84,6 +86,8 @@ namespace GlowUp.AR
         int shownLayer = -1;                // the colour layer that is drawn now (0 face, 1 cheeks, 2 eyes, 3 lips, 4 brows), -1 = none
         bool browMaskReady;
         float sharpnessNow = 14f;
+        Color skinBaseNow;                  // exponentially smoothed _SkinBase value pushed to the face/cheeks/eyes layers
+        bool skinBaseInit;
 
         // ---- set by the other AR scripts (all of them optional) ----
         /// <summary>How present the make-up is: 1 = fully, 0 = gone. ArFaceHold lowers it while a lost face fades out.</summary>
@@ -207,7 +211,8 @@ namespace GlowUp.AR
 
         /// <summary>True when every colour layer has its material (the brow layer is optional).</summary>
         public bool Ready => faceMaterial != null && cheeksMaterial != null && eyesMaterial != null && lipsMaterial != null;
-
+        /// <summary>The smoothed _SkinBase value last pushed to the face/cheeks/eyes layer shaders (read by the debug overlay).</summary>
+        public Color SkinBaseNow => skinBaseNow;
         void Update()
         {
             if (!made || choices == null) return;
@@ -215,6 +220,13 @@ namespace GlowUp.AR
             Color shade = Color.Lerp(choices.Shade, Color.white, choices.FinishBrighten);
             bool has = choices.Shade.a > 0.01f;
             int active = -1; float activeShare = 0f;
+
+            // smooth _SkinBase once per frame (shared by all face/cheeks/eyes layers)
+            Color sbTarget = SkinAdapt > 0.001f ? Color.Lerp(skinUnderneath, SkinSample, Mathf.Clamp01(SkinAdapt)) : skinUnderneath;
+            if (!skinBaseInit) { skinBaseNow = sbTarget; skinBaseInit = true; }
+            float tSkin = skinBaseSmoothTime > 0.001f ? 1f - Mathf.Exp(-Time.unscaledDeltaTime / skinBaseSmoothTime) : 1f;
+            skinBaseNow = Color.Lerp(skinBaseNow, sbTarget, tSkin);
+
             for (int i = 0; i < Areas.Length; i++)
             {
                 Material layer = colour[i];
@@ -226,8 +238,8 @@ namespace GlowUp.AR
                 var target = on ? new Color(shade.r, shade.g, shade.b, alpha) : new Color(shown[i].r, shown[i].g, shown[i].b, 0f);
                 shown[i] = Color.Lerp(shown[i], target, t);
                 layer.SetColor(colourProperty, shown[i]);
-                // the skin tone moves towards the measured one (not for the lips and brows: they have their own)
-                if (i < 3 && layer.HasProperty("_SkinBase")) layer.SetColor("_SkinBase", SkinAdapt > 0.001f ? Color.Lerp(skinUnderneath, SkinSample, Mathf.Clamp01(SkinAdapt)) : skinUnderneath);
+                // push the smoothed skin base (not for lips or brows: they have their own)
+                if (i < 3 && layer.HasProperty("_SkinBase")) layer.SetColor("_SkinBase", skinBaseNow);
                 if (on) { active = i; activeShare = full > 0.001f ? Mathf.Clamp01(shown[i].a / full) : 0f; }
             }
 
@@ -280,7 +292,7 @@ namespace GlowUp.AR
         {
             if (!made) return;
             foreach (Material m in all) if (m != null) Destroy(m);
-            all = null; colour = null; shine = gloss = null; made = false;
+            all = null; colour = null; shine = gloss = null; made = false; skinBaseInit = false;
         }
     }
 }

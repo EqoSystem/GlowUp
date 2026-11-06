@@ -17,6 +17,7 @@ namespace GlowUp.Scan
         }
 
         public List<Line> lines = new List<Line>();
+        public bool isRotated;
         /// <summary>The digits under a barcode in the picture, or "".</summary>
         public string barcode = "";
         /// <summary>Where that barcode is in the picture (0 to 1, from the top-left corner). All 0 = not known.</summary>

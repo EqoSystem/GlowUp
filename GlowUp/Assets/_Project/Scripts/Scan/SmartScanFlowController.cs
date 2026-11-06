@@ -385,6 +385,22 @@ namespace GlowUp.Scan
         ProductAiAdvisor.IngredientLookup webList;        // a confirmed source-backed list, kept until the scan can use it
         readonly CapShadeWatch capWatch = new CapShadeWatch();
 
+        // Multi-frame candidate ranking & token pooling
+        readonly object tokenLock = new object();
+        readonly Dictionary<string, int> pooledTokens = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        bool poolDirty = false;
+        List<ProductData> cachedBrandProducts = null;
+        string brandLoadingFor = "";
+        bool brandLoading = false;
+        bool loggedMatchSummary = false;
+        int frameScanIndex = 0;
+        float scanStartTime = 0f;
+        float nextTimeoutCheck = 1.0f;
+        bool shortlistShownForTimeout = false;
+        bool lastFrameWasRotated = false;
+        float nextRankTime = 0f;
+        int[] rotatedPixels = null;
+
         bool ProductKnown => identity.productName.Length > 0 || (identity.brandName.Length > 0 && identity.cosmeticType.Length > 0);
 
         void Awake()
@@ -505,6 +521,7 @@ namespace GlowUp.Scan
             if (idlePlaceholder != null) idlePlaceholder.SetActive(false);
             if (guide != null) guide.SetState(ScanGuideOverlay.State.Searching);
             stage = Stage.Scanning;
+            ResetScanRankingState();
             if (!readCounterStarted) { readCounterStarted = true; ReadCounter.NewScan(); }
             nextLook = 0f; pausedFor = 0f; sinceProgress = 0f;
             PaintButtonState();
@@ -592,6 +609,7 @@ namespace GlowUp.Scan
             }
             pausedFor = 0f;
             sinceProgress += Time.unscaledDeltaTime;
+            UpdateRankingFlow();
             if (!stalledSaid && sinceProgress > stallSeconds)
             {
                 stalledSaid = true; stuckTipTimer = 0f; stuckTipIndex = 0; Say(msgStalled); ShowButtons();
@@ -667,8 +685,26 @@ namespace GlowUp.Scan
             }
             if (sentCloseLook) { closeLooksSent++; lastEnlarge = enlarge; }
             sentSharpness = measure.sharpness; sentAt = Time.unscaledTime;
-            readingOut = sentCloseLook ? reader.Read(closePixels, closeW, closeH, false, OnReaderAnswer)             // a block of text: no barcode is looked for
-                                       : reader.Read(pixels, pixelsW, pixelsH, wantBarcodeNow, OnReaderAnswer, OnEarlyBarcode);
+
+            frameScanIndex++;
+            bool rotateThisFrame = !sentCloseLook && (frameScanIndex % 3 == 0);
+            if (rotateThisFrame)
+            {
+                int rotDegrees = (frameScanIndex % 6 == 0) ? 90 : 270;
+                int[] sendPixels = (rotDegrees == 90)
+                    ? RotatePixels90(pixels, pixelsW, pixelsH, ref rotatedPixels)
+                    : RotatePixels270(pixels, pixelsW, pixelsH, ref rotatedPixels);
+                int sendW = pixelsH;
+                int sendH = pixelsW;
+                lastFrameWasRotated = true;
+                readingOut = reader.Read(sendPixels, sendW, sendH, false, OnReaderAnswerRotated);
+            }
+            else
+            {
+                lastFrameWasRotated = false;
+                readingOut = sentCloseLook ? reader.Read(closePixels, closeW, closeH, false, OnReaderAnswer)             // a block of text: no barcode is looked for
+                                           : reader.Read(pixels, pixelsW, pixelsH, wantBarcodeNow, OnReaderAnswer, OnEarlyBarcode);
+            }
         }
 
         /// <summary>Shows where the text tracer is, and tells the focus helper to focus there (on the text, not just the middle of the frame).</summary>
@@ -702,7 +738,24 @@ namespace GlowUp.Scan
         void OnReaderAnswer(FrameReading reading, string problem)
         {
             if (problem != null) Debug.LogWarning("[Scan] Could not read this picture: " + problem);
+            if (reading != null && reading.lines != null)
+            {
+                PoolTokensFromLines(reading.lines);
+            }
             lock (answerLock) { answerReading = reading ?? new FrameReading(); answerWaiting = true; }
+        }
+
+        void OnReaderAnswerRotated(FrameReading reading, string problem)
+        {
+            if (problem != null) Debug.LogWarning("[Scan] Could not read rotated picture: " + problem);
+            if (reading != null)
+            {
+                reading.isRotated = true;
+                if (reading.lines != null)
+                {
+                    PoolTokensFromLines(reading.lines);
+                }
+            }
         }
 
         // called on the barcode reader's thread as soon as a barcode/QR code is found (10-25ms)
@@ -760,6 +813,7 @@ namespace GlowUp.Scan
         /// <summary>A picture was read: what does it show, and what does it do for the ring?</summary>
         void OnReading(FrameReading reading)
         {
+            if (reading == null || reading.isRotated) return;
             // a close look showed one part of the frame: its places become places of the frame, like every other reading's
             bool closeLook = sentCloseLook;
             if (closeLook) TextTracer.ToFrame(reading, sentPart);
@@ -1038,10 +1092,30 @@ namespace GlowUp.Scan
         /// <summary>The product of the inventory whose whole name stands in this text (words in any order, small reading mistakes forgiven), or null.</summary>
         static ProductData ProductIn(string text)
         {
-            if (string.IsNullOrWhiteSpace(text)) return null;
+            string query = (text ?? "").Replace('\r', ' ').Replace('\n', '|');
+            ProductIndex index = ProductRepository.Index;
+            Debug.Log("[MATCH] local-query text=\"" + query + "\" candidates in catalogue=" + index.Count);
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                Debug.Log("[MATCH] local-final=reject reason=empty-query bestNearMiss=none");
+                return null;
+            }
             // the kind read on the pack ("Foundation") chooses between products that share a name and differ in kind
-            List<ProductIndex.Candidate> found = ProductRepository.Index.InText(text, 1, ProductScope.TypeFromLabel(text));
-            return found.Count > 0 && found[0].exactName && found[0].score >= ProductIndex.Sure ? found[0].product : null;
+            List<ProductIndex.Candidate> found = index.InText(text, index.Count, ProductScope.TypeFromLabel(text));
+            foreach (ProductIndex.Candidate candidate in found)
+                Debug.Log("[MATCH] local-candidate id=\"" + candidate.product.id + "\" name=\"" + candidate.product.name
+                    + "\" brand=\"" + candidate.product.brandName + "\" score=" + candidate.score.ToString("0.000")
+                    + " bestField=product.name brandVisible=" + candidate.brandAgrees + " exactName=" + candidate.exactName);
+
+            ProductIndex.Candidate best = found.Count > 0 ? found[0] : null;
+            bool accepted = best != null && best.exactName && best.score >= ProductIndex.Sure;
+            Debug.Log(accepted
+                ? "[MATCH] local-final=accept id=\"" + best.product.id + "\" name=\"" + best.product.name
+                    + "\" score=" + best.score.ToString("0.000") + " bestField=product.name"
+                : "[MATCH] local-final=reject bestNearMiss=" + (best != null
+                    ? "\"" + best.product.name + "\" score=" + best.score.ToString("0.000") + " bestField=product.name"
+                    : "none"));
+            return accepted ? best.product : null;
         }
 
         void ReadPrimaryIdentityFromOcr()
@@ -1105,10 +1179,28 @@ namespace GlowUp.Scan
         {
             try
             {
+                Debug.Log("[MATCH] firebase-query brand=\"" + brand + "\" name=\"" + name + "\" kind=\"" + identity.cosmeticType + "\"");
                 // the kind read on the pack ("Foundation") chooses between products that share this name
                 ProductData product = ProductRepository.Index.Exact(brand, name, identity.cosmeticType);
                 List<ProductData> sameName = ProductRepository.Index.SameNameDifferentKind(brand, name, identity.cosmeticType);
-                if (sameName.Count > 1) { AskWhichKind(sameName); return; }
+                if (product != null)
+                {
+                    string field = TextKey.Compact(name) == TextKey.Compact(product.name) ? "product.name" : "product.alias";
+                    Debug.Log("[MATCH] local-exact-candidate id=\"" + product.id + "\" name=\"" + product.name
+                        + "\" score=1.000 bestField=" + field + " brandAgrees=true");
+                }
+                foreach (ProductData candidate in sameName)
+                {
+                    string field = TextKey.Compact(name) == TextKey.Compact(candidate.name) ? "product.name" : "product.alias";
+                    Debug.Log("[MATCH] kind-candidate id=\"" + candidate.id + "\" name=\"" + candidate.name
+                        + "\" type=\"" + candidate.cosmeticType + "\" score=1.000 bestField=" + field);
+                }
+                if (sameName.Count > 1)
+                {
+                    Debug.Log("[MATCH] final=ambiguous-kind candidates=" + sameName.Count + " query=\"" + brand + " " + name + "\"");
+                    AskWhichKind(sameName);
+                    return;
+                }
                 if (product == null || product.ingredients == null || product.ingredients.Count == 0)
                 {
                     ProductData current = await ProductRepository.FindByBrandAndNameAsync(brand, name, identity.cosmeticType);
@@ -1121,6 +1213,7 @@ namespace GlowUp.Scan
                     ShowIdentity();
                     if (HasStoredList(product))
                     {
+                        Debug.Log("[MATCH] final=accept source=catalogue id=\"" + product.id + "\" name=\"" + product.name + "\"");
                         UseLookedUpList(product.ingredients, ListPagesOf(product), "inventory", false);
                         return;
                     }
@@ -1136,10 +1229,17 @@ namespace GlowUp.Scan
 
                 if (await SearchWebAfterCatalogueMiss(brand, name, scan)) return;
                 if (this != null && scan == scanNumber && stage == Stage.Scanning)
+                {
+                    if (product == null)
+                        Debug.Log("[MATCH] no-match branch=FirebaseProductLookup query=\"" + brand + " " + name
+                            + "\" bestNearMiss=see preceding [MATCH] local/server candidate logs");
+                    else
+                        Debug.Log("[MATCH] final=product-found-without-ingredients id=\"" + product.id + "\" name=\"" + product.name + "\"");
                     Say(!ConnectivityMonitor.Online ? msgFirebaseUnavailable
                         : AiCanLook ? msgWebNoMatch
                         : !ProductAiAdvisor.Available ? msgAiUnavailable
                         : product == null ? msgFirebaseMiss : msgFirebaseNoIngredients);
+                }
                 if (product == null && offerSnapshotOnCatalogMiss && this != null && scan == scanNumber && stage == Stage.Scanning) OfferSnapshot(null);
             }
             catch (Exception e)
@@ -1155,6 +1255,9 @@ namespace GlowUp.Scan
 
         async Task<bool> SearchWebAfterCatalogueMiss(string brand, string name, int scan)
         {
+            // Gemini photo upload disabled for product recognition: return false to prevent photo upload fallback
+            return false;
+#pragma warning disable CS0162
             if (!aiRecognisesProduct || !aiChecksTheWeb || !ConnectivityMonitor.Online || !ProductAiAdvisor.Available
                 || !AiBudget.CanLookUp || stage != Stage.Scanning || scan != scanNumber)
                 return false;
@@ -1458,6 +1561,584 @@ namespace GlowUp.Scan
             UseLookedUpList(knownProduct.ingredients, ListPagesOf(knownProduct), "inventory", false);
         }
 
+        // ---------------------------------------------------------------------------------------
+        // Candidate Ranking, Token Pooling & Smart Scan Multi-Frame Matching
+        // ---------------------------------------------------------------------------------------
+        struct ScoredCandidate
+        {
+            public ProductData product;
+            public float score;
+            public int distinctiveMatches;
+        }
+
+        static readonly HashSet<string> GenericTypeWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "foundation", "powder", "concealer", "lipstick", "mascara", "blush", "bronzer",
+            "primer", "highlighter", "contour", "eyeliner", "eyeshadow"
+        };
+
+        static bool IsGenericTypeWord(string w) => GenericTypeWords.Contains(w);
+
+        static readonly char[] TokenDelimiters = new char[] { ' ', '\t', '\r', '\n', '-', '/', '.', ',', ':', ';', '(', ')', '"' };
+
+        void PoolTokensFromLines(IEnumerable<FrameReading.Line> lines)
+        {
+            if (lines == null) return;
+            lock (tokenLock)
+            {
+                foreach (FrameReading.Line line in lines)
+                {
+                    if (line == null || string.IsNullOrWhiteSpace(line.text)) continue;
+                    string[] rawTokens = line.text.Split(TokenDelimiters, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (string raw in rawTokens)
+                    {
+                        string norm = TextKey.Normalize(raw);
+                        if (norm.Length < 2) continue;
+                        if (pooledTokens.TryGetValue(norm, out int count))
+                        {
+                            pooledTokens[norm] = count + 1;
+                        }
+                        else
+                        {
+                            pooledTokens[norm] = 1;
+                        }
+                        poolDirty = true;
+                    }
+                }
+            }
+        }
+
+        void ResetScanRankingState()
+        {
+            lock (tokenLock)
+            {
+                pooledTokens.Clear();
+                poolDirty = false;
+            }
+            cachedBrandProducts = null;
+            brandLoadingFor = "";
+            brandLoading = false;
+            loggedMatchSummary = false;
+            frameScanIndex = 0;
+            scanStartTime = Time.unscaledTime;
+            nextTimeoutCheck = 1.0f;
+            shortlistShownForTimeout = false;
+            lastFrameWasRotated = false;
+            nextRankTime = 0f;
+        }
+
+        static int[] RotatePixels90(int[] src, int w, int h, ref int[] dst)
+        {
+            int len = w * h;
+            if (dst == null || dst.Length < len) dst = new int[len];
+            int newW = h;
+            for (int y = 0; y < h; y++)
+            {
+                int srcRow = y * w;
+                int dstCol = h - 1 - y;
+                for (int x = 0; x < w; x++)
+                {
+                    dst[x * newW + dstCol] = src[srcRow + x];
+                }
+            }
+            return dst;
+        }
+
+        static int[] RotatePixels270(int[] src, int w, int h, ref int[] dst)
+        {
+            int len = w * h;
+            if (dst == null || dst.Length < len) dst = new int[len];
+            int newW = h;
+            for (int y = 0; y < h; y++)
+            {
+                int srcRow = y * w;
+                for (int x = 0; x < w; x++)
+                {
+                    int dstY = w - 1 - x;
+                    dst[dstY * newW + y] = src[srcRow + x];
+                }
+            }
+            return dst;
+        }
+
+        bool TokenMatchesWord(string targetWord, Dictionary<string, int> tokens)
+        {
+            if (string.IsNullOrEmpty(targetWord) || tokens == null || tokens.Count == 0) return false;
+            string normTarget = TextKey.Normalize(targetWord);
+            if (normTarget.Length < 2) return false;
+
+            if (tokens.TryGetValue(normTarget, out int exactCount) && exactCount >= 1) return true;
+
+            int maxDist = normTarget.Length >= 6 ? 2 : (normTarget.Length >= 4 ? 1 : 0);
+            if (maxDist == 0) return false;
+
+            foreach (var kvp in tokens)
+            {
+                if (kvp.Value < 2) continue; // fuzzy matches (edit distance > 0) need count >= 2
+                string token = kvp.Key;
+                if (Math.Abs(token.Length - normTarget.Length) > maxDist) continue;
+                int dist = ProductIndex.Levenshtein(token, normTarget);
+                if (dist > 0 && dist <= maxDist) return true;
+            }
+            return false;
+        }
+
+        List<string> FindCandidateBrandNames(Dictionary<string, int> tokens)
+        {
+            var candidates = new List<string>();
+            if (!string.IsNullOrWhiteSpace(identity.brandName))
+            {
+                candidates.Add(identity.brandName.Trim());
+            }
+
+            if (tokens == null || tokens.Count == 0 || brands == null) return candidates;
+
+            foreach (BrandData b in brands)
+            {
+                if (b == null || string.IsNullOrWhiteSpace(b.name)) continue;
+                string bName = b.name.Trim();
+                if (candidates.Count > 0 && string.Equals(bName, candidates[0], StringComparison.OrdinalIgnoreCase)) continue;
+
+                string[] words = TextKey.Normalize(bName).Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                bool brandMatched = false;
+                foreach (string w in words)
+                {
+                    if (w.Length < 3) continue;
+                    if (w == "cosmetics" || w == "beauty" || w == "paris" || w == "york" || w == "london") continue;
+
+                    if (TokenMatchesWord(w, tokens))
+                    {
+                        brandMatched = true;
+                        break;
+                    }
+                }
+
+                if (!brandMatched && b.aliases != null)
+                {
+                    foreach (string alias in b.aliases)
+                    {
+                        if (string.IsNullOrWhiteSpace(alias)) continue;
+                        string[] aWords = TextKey.Normalize(alias).Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (string aw in aWords)
+                        {
+                            if (aw.Length < 3) continue;
+                            if (aw == "cosmetics" || aw == "beauty" || aw == "paris" || aw == "york" || aw == "london") continue;
+                            if (TokenMatchesWord(aw, tokens))
+                            {
+                                brandMatched = true;
+                                break;
+                            }
+                        }
+                        if (brandMatched) break;
+                    }
+                }
+
+                if (brandMatched)
+                {
+                    candidates.Add(bName);
+                    if (candidates.Count >= 2) break; // max 2 candidate brands
+                }
+            }
+            return candidates;
+        }
+
+        async void CheckAndWarmBrandCandidates()
+        {
+            if (brandLoading || stage != Stage.Scanning) return;
+            Dictionary<string, int> snapshot;
+            lock (tokenLock)
+            {
+                if (pooledTokens.Count == 0 && string.IsNullOrWhiteSpace(identity.brandName)) return;
+                snapshot = new Dictionary<string, int>(pooledTokens);
+            }
+
+            List<string> candidateBrands = FindCandidateBrandNames(snapshot);
+            if (candidateBrands.Count == 0) return;
+            string brandKey = string.Join("|", candidateBrands);
+            if (brandKey == brandLoadingFor) return;
+
+            brandLoading = true;
+            brandLoadingFor = brandKey;
+            int forScan = scanNumber;
+            try
+            {
+                var allProducts = new List<ProductData>();
+                foreach (string bName in candidateBrands)
+                {
+                    List<ProductData> prods = await ProductRepository.ProductsOfBrand(bName);
+                    if (prods != null) allProducts.AddRange(prods);
+                }
+
+                if (forScan != scanNumber || brandLoadingFor != brandKey || stage != Stage.Scanning) return;
+
+                var deduped = new List<ProductData>();
+                var seenIds = new HashSet<string>();
+                var seenNames = new HashSet<string>();
+                foreach (ProductData p in allProducts)
+                {
+                    if (p == null) continue;
+                    if (!ProductScope.IsMakeup(p.cosmeticType, p.name)) continue;
+                    if (!string.IsNullOrEmpty(p.id))
+                    {
+                        if (seenIds.Add(p.id)) deduped.Add(p);
+                    }
+                    else
+                    {
+                        string norm = TextKey.Normalize(p.name);
+                        if (!string.IsNullOrEmpty(norm) && seenNames.Add(norm)) deduped.Add(p);
+                    }
+                }
+                cachedBrandProducts = deduped;
+                Debug.Log($"[SMART_SCAN_MATCH] Brands tried: [{string.Join(", ", candidateBrands)}] loaded {deduped.Count} candidates");
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[SMART_SCAN_MATCH] Error warming brand candidates: " + e.Message);
+            }
+            finally
+            {
+                brandLoading = false;
+            }
+        }
+
+        static Dictionary<string, int> ComputeShadeMatchCounts(List<ProductData> candidates, Dictionary<string, int> tokens)
+        {
+            var counts = new Dictionary<string, int>();
+            if (candidates == null || tokens == null) return counts;
+            foreach (ProductData p in candidates)
+            {
+                if (p == null || p.shadeCodes == null) continue;
+                var seenCodes = new HashSet<string>();
+                foreach (string rawCode in p.shadeCodes)
+                {
+                    if (string.IsNullOrWhiteSpace(rawCode)) continue;
+                    string norm = TextKey.Normalize(rawCode);
+                    if (norm.Length < 2 || !seenCodes.Add(norm)) continue;
+                    if (tokens.TryGetValue(norm, out int cnt) && cnt >= 1)
+                    {
+                        if (counts.TryGetValue(norm, out int c)) counts[norm] = c + 1;
+                        else counts[norm] = 1;
+                    }
+                }
+            }
+            return counts;
+        }
+
+        ScoredCandidate ScoreCandidate(ProductData p, Dictionary<string, int> tokens, Dictionary<string, int> shadeCounts)
+        {
+            if (p == null) return new ScoredCandidate { product = p, score = 0f, distinctiveMatches = 0 };
+
+            string[] nameWords = TextKey.Normalize(p.name).Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            int distMatches;
+            float bestWordScore = ScoreWordSet(nameWords, tokens, out distMatches);
+
+            if (p.aliases != null)
+            {
+                foreach (string alias in p.aliases)
+                {
+                    if (string.IsNullOrWhiteSpace(alias)) continue;
+                    string[] aliasWords = TextKey.Normalize(alias).Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    int aliasDist;
+                    float aliasScore = ScoreWordSet(aliasWords, tokens, out aliasDist);
+                    if (aliasScore > bestWordScore)
+                    {
+                        bestWordScore = aliasScore;
+                        distMatches = aliasDist;
+                    }
+                }
+            }
+
+            float shadeBonus = 0f;
+            if (p.shadeCodes != null)
+            {
+                foreach (string rawCode in p.shadeCodes)
+                {
+                    if (string.IsNullOrWhiteSpace(rawCode)) continue;
+                    string norm = TextKey.Normalize(rawCode);
+                    if (shadeCounts.TryGetValue(norm, out int sc) && sc == 1)
+                    {
+                        shadeBonus = 0.15f;
+                        break;
+                    }
+                }
+            }
+
+            float finalScore = Mathf.Clamp01(bestWordScore + shadeBonus);
+            return new ScoredCandidate { product = p, score = finalScore, distinctiveMatches = distMatches };
+        }
+
+        float ScoreWordSet(string[] words, Dictionary<string, int> tokens, out int distinctiveMatches)
+        {
+            distinctiveMatches = 0;
+            if (words == null || words.Length == 0) return 0f;
+            float totalWeight = 0f;
+            float matchedWeight = 0f;
+            foreach (string w in words)
+            {
+                if (w.Length < 2) continue;
+                bool isGeneric = IsGenericTypeWord(w);
+                float wWeight = isGeneric ? 0.4f : 1.0f;
+                totalWeight += wWeight;
+                if (TokenMatchesWord(w, tokens))
+                {
+                    matchedWeight += wWeight;
+                    if (!isGeneric) distinctiveMatches++;
+                }
+            }
+            return totalWeight > 0f ? (matchedWeight / totalWeight) : 0f;
+        }
+
+        bool SiblingConditionMet(ProductData topProduct, Dictionary<string, int> tokens, Dictionary<string, int> shadeCounts, List<ProductData> allCandidates)
+        {
+            if (topProduct == null) return false;
+
+            if (topProduct.shadeCodes != null)
+            {
+                foreach (string rawCode in topProduct.shadeCodes)
+                {
+                    if (string.IsNullOrWhiteSpace(rawCode)) continue;
+                    string norm = TextKey.Normalize(rawCode);
+                    if (shadeCounts.TryGetValue(norm, out int sc) && sc == 1)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            string[] topWords = TextKey.Normalize(topProduct.name).Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var topDistinctive = new HashSet<string>();
+            foreach (string w in topWords)
+            {
+                if (w.Length >= 2 && !IsGenericTypeWord(w)) topDistinctive.Add(w);
+            }
+
+            var sharedWords = new HashSet<string>();
+            bool hasSiblings = false;
+
+            if (allCandidates != null)
+            {
+                foreach (ProductData other in allCandidates)
+                {
+                    if (other == null || other == topProduct || (!string.IsNullOrEmpty(topProduct.id) && other.id == topProduct.id)) continue;
+                    string[] otherWords = TextKey.Normalize(other.name).Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    var common = new HashSet<string>();
+                    foreach (string w in otherWords)
+                    {
+                        if (topDistinctive.Contains(w)) common.Add(w);
+                    }
+                    if (common.Count >= 2)
+                    {
+                        hasSiblings = true;
+                        foreach (string w in common) sharedWords.Add(w);
+                    }
+                }
+            }
+
+            if (!hasSiblings) return true;
+
+            var candidateWords = new HashSet<string>(topDistinctive);
+            if (topProduct.aliases != null)
+            {
+                foreach (string alias in topProduct.aliases)
+                {
+                    if (string.IsNullOrWhiteSpace(alias)) continue;
+                    string[] aWords = TextKey.Normalize(alias).Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (string aw in aWords)
+                    {
+                        if (aw.Length >= 2 && !IsGenericTypeWord(aw)) candidateWords.Add(aw);
+                    }
+                }
+            }
+
+            foreach (string w in candidateWords)
+            {
+                if (!sharedWords.Contains(w))
+                {
+                    if (TokenMatchesWord(w, tokens))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        void RankAndMatchCandidates()
+        {
+            if (stage != Stage.Scanning || cachedBrandProducts == null || cachedBrandProducts.Count == 0) return;
+
+            Dictionary<string, int> tokenSnapshot;
+            lock (tokenLock)
+            {
+                tokenSnapshot = new Dictionary<string, int>(pooledTokens);
+            }
+
+            var shadeCounts = ComputeShadeMatchCounts(cachedBrandProducts, tokenSnapshot);
+            var scored = new List<ScoredCandidate>();
+
+            foreach (ProductData p in cachedBrandProducts)
+            {
+                if (!ProductScope.IsMakeup(p.cosmeticType, p.name)) continue;
+                scored.Add(ScoreCandidate(p, tokenSnapshot, shadeCounts));
+            }
+
+            scored.Sort((a, b) => b.score.CompareTo(a.score));
+            if (scored.Count == 0) return;
+
+            if (scored.Count == 1)
+            {
+                if (scored[0].score >= 0.75f && scored[0].distinctiveMatches >= 2)
+                {
+                    AutoAcceptCandidate(scored[0].product, scored, "ONE_CANDIDATE_HIGH_SCORE");
+                    return;
+                }
+            }
+            else
+            {
+                float topScore = scored[0].score;
+                float runnerUpScore = scored[1].score;
+                float margin = topScore - runnerUpScore;
+
+                if (topScore >= 0.60f && margin >= 0.10f && SiblingConditionMet(scored[0].product, tokenSnapshot, shadeCounts, cachedBrandProducts))
+                {
+                    AutoAcceptCandidate(scored[0].product, scored, "TOP_SCORE_WITH_MARGIN");
+                    return;
+                }
+            }
+        }
+
+        void AutoAcceptCandidate(ProductData candidate, List<ScoredCandidate> scored, string reason)
+        {
+            if (candidate == null || stage != Stage.Scanning) return;
+            LogMatchSummary(scored, "AUTO_ACCEPT_" + reason);
+            Adopt(candidate);
+            if (!string.IsNullOrWhiteSpace(candidate.cosmeticType))
+            {
+                identity.cosmeticType = candidate.cosmeticType.Trim();
+            }
+            bool[] filled = evidence.ProductKnown();
+            ShowProgress(filled);
+            ShowIdentity();
+            if (HasStoredList(candidate))
+            {
+                UseLookedUpList(candidate.ingredients, ListPagesOf(candidate), "inventory", false);
+            }
+            else
+            {
+                MaybeCheckTheWeb();
+            }
+        }
+
+        void UpdateRankingFlow()
+        {
+            if (stage != Stage.Scanning) return;
+
+            CheckAndWarmBrandCandidates();
+
+            if (poolDirty && Time.unscaledTime >= nextRankTime)
+            {
+                nextRankTime = Time.unscaledTime + 0.25f;
+                poolDirty = false;
+                RankAndMatchCandidates();
+            }
+
+            float elapsedScan = Time.unscaledTime - scanStartTime;
+            if (elapsedScan >= nextTimeoutCheck && elapsedScan <= 8.5f && !shortlistShownForTimeout)
+            {
+                nextTimeoutCheck += 1.0f;
+                if (elapsedScan >= 3.0f)
+                {
+                    bool shown = TryShowTimeoutShortlist();
+                    if (shown)
+                    {
+                        shortlistShownForTimeout = true;
+                    }
+                    else if (elapsedScan >= 8.0f)
+                    {
+                        Say(msgStalled);
+                        ShowButtons();
+                        shortlistShownForTimeout = true;
+                    }
+                }
+            }
+        }
+
+        bool TryShowTimeoutShortlist()
+        {
+            if (stage != Stage.Scanning || PopupOpen || cachedBrandProducts == null || cachedBrandProducts.Count == 0) return false;
+
+            Dictionary<string, int> tokenSnapshot;
+            lock (tokenLock)
+            {
+                tokenSnapshot = new Dictionary<string, int>(pooledTokens);
+            }
+
+            var shadeCounts = ComputeShadeMatchCounts(cachedBrandProducts, tokenSnapshot);
+            var scored = new List<ScoredCandidate>();
+
+            foreach (ProductData p in cachedBrandProducts)
+            {
+                if (!ProductScope.IsMakeup(p.cosmeticType, p.name)) continue;
+                scored.Add(ScoreCandidate(p, tokenSnapshot, shadeCounts));
+            }
+
+            scored.Sort((a, b) => b.score.CompareTo(a.score));
+            return ShowCandidateShortlist(scored);
+        }
+
+        bool ShowCandidateShortlist(List<ScoredCandidate> scored)
+        {
+            if (stage != Stage.Scanning || PopupOpen || shortlist == null) return false;
+            var entries = new List<ScanShortlist.Entry>();
+            foreach (var sc in scored)
+            {
+                if (sc.score < 0.25f || sc.product == null) continue;
+                ScanShortlist.Entry entry = ScanShortlist.Of(sc.product);
+                entry.score = sc.score;
+                entry.byText = true;
+                entries.Add(entry);
+                if (entries.Count >= 3) break;
+            }
+            if (entries.Count == 0) return false;
+
+            LogMatchSummary(scored, "TIMEOUT_SHORTLIST_PROMPT");
+            OpenShortlist("Is this ...?", "We found these potential matches. Confirm your product:", shortlistNoneLabel, ContinueScanning, () => { }, entries);
+            return true;
+        }
+
+        void LogMatchSummary(List<ScoredCandidate> scored, string outcome)
+        {
+            if (loggedMatchSummary) return;
+            loggedMatchSummary = true;
+
+            string brandStr = string.IsNullOrEmpty(identity.brandName) ? "(none)" : identity.brandName;
+            string tokensStr;
+            lock (tokenLock)
+            {
+                var topTokens = new List<string>();
+                foreach (var kvp in pooledTokens)
+                {
+                    topTokens.Add(kvp.Key + ":" + kvp.Value);
+                    if (topTokens.Count >= 30) break;
+                }
+                tokensStr = string.Join(", ", topTokens);
+            }
+
+            var candList = new List<string>();
+            if (scored != null)
+            {
+                for (int i = 0; i < Math.Min(scored.Count, 5); i++)
+                {
+                    var sc = scored[i];
+                    candList.Add((sc.product != null ? sc.product.name : "unknown") + "=" + sc.score.ToString("0.000"));
+                }
+            }
+            string candsStr = string.Join("; ", candList);
+
+            Debug.Log("[SMART_SCAN_MATCH] Outcome=" + outcome + " Brand=" + brandStr + " Tokens=[" + tokensStr + "] Candidates=[" + candsStr + "]");
+        }
+
         bool PopupOpen => (shortlist != null && shortlist.IsOpen) || (startOverPanel != null && startOverPanel.IsOpen) || (manualPanel != null && manualPanel.IsOpen)
                           || (snapshot != null && snapshot.IsOpen);
 
@@ -1598,6 +2279,7 @@ namespace GlowUp.Scan
             shadeCandidate = lockedShade = ""; shadeStableCount = 0; photoHintSaid = false;
             declined.Clear(); shortlistAnswered = false; detailsAnswered = false; frontChecked = "";
             scanNumber++;
+            ResetScanRankingState();
             ReadCounter.NewScan();
             fault = FrameQuality.Fault.None; blurrySkips = 0; differentSeen = 0; sinceProgress = 0f; stalledSaid = false; pausedFor = 0f;
             finishUnnamed = false; lookingUp = false; lookupRequested = false; shownStatus = null; messageOver = null; lastHint = "";

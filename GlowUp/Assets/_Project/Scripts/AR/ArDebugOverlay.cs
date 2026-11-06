@@ -42,6 +42,8 @@ namespace GlowUp.AR
         float since, sum, worst, fingersFor;
         int frames, testShade = -1;
         bool visible, toggledThisHold;
+        float lastLoggedPresence = -1f;
+        float nextPresenceLog;
 
         /// <summary>Starts counting. Called when live tracking starts.</summary>
         public void Begin(ArAdaptiveQuality qualityController, ArLightAdapter light, ArFaceTrackingController trackingController, ArFaceMakeup faceMakeup, bool startVisible)
@@ -49,7 +51,7 @@ namespace GlowUp.AR
             if (!Allowed) { enabled = false; return; }
             quality = qualityController; lightAdapter = light; tracker = trackingController; makeup = faceMakeup;
             since = sum = worst = 0f; frames = 0; shown = "";
-            visible = startVisible;
+            visible = startVisible; lastLoggedPresence = -1f; nextPresenceLog = 0f;
             enabled = true;
         }
 
@@ -59,8 +61,21 @@ namespace GlowUp.AR
         void Update()
         {
             WatchFingers();
-            if (!visible) return;
             float dt = Time.unscaledDeltaTime;
+            // log a line whenever Presence jumps (on or off the main display)
+            if (makeup != null && Time.unscaledTime >= nextPresenceLog)
+            {
+                float p = makeup.Presence;
+                if (lastLoggedPresence < 0f) lastLoggedPresence = p;
+                if (Mathf.Abs(p - lastLoggedPresence) > 0.2f)
+                {
+                    Debug.Log($"[AR_DEBUG] Presence jump {lastLoggedPresence:F2}→{p:F2}  yaw={tracker?.HeadYaw:F1}  state={(tracker != null ? tracker.TrackingStateText : "-")}");
+                    lastLoggedPresence = p;
+                }
+                nextPresenceLog = Time.unscaledTime + 0.05f;
+            }
+
+            if (!visible) return;
             since += dt; sum += dt; frames++;
             if (dt > worst) worst = dt;
             if (since < refreshSeconds) return;
@@ -74,9 +89,21 @@ namespace GlowUp.AR
                 text.Append("\n").Append(quality.Tier.ToString()).Append(" pipeline").Append(quality.InTrial ? " (trial)" : "")
                     .Append("  p95 ").Append(quality.LastWindow.p95Ms.ToString("0")).Append(" ms");
             }
-            if (tracker != null) text.Append("\nFace: ").Append(tracker.TrackingStateText);
+            if (tracker != null)
+            {
+                text.Append("\nFace: ").Append(tracker.TrackingStateText);
+                text.Append("  yaw ").Append(tracker.HeadYaw.ToString("F1"))
+                    .Append("  pitch ").Append(tracker.HeadPitch.ToString("F1"))
+                    .Append("  roll ").Append(tracker.HeadRoll.ToString("F1"));
+            }
             if (quality != null) text.Append("  smoothing ").Append(quality.MeshSmoothing ? "on" : "off").Append("  gloss ").Append(makeup != null && makeup.UseGloss ? "moving" : "fixed");
             if (lightAdapter != null && lightAdapter.isActiveAndEnabled) text.Append("  light ").Append(lightAdapter.Brightness.ToString("0.00"));
+            if (makeup != null)
+            {
+                text.Append("\nPresence ").Append(makeup.Presence.ToString("F2"));
+                Color sb = makeup.SkinBaseNow;
+                text.Append("  SkinBase (").Append(sb.r.ToString("F2")).Append(", ").Append(sb.g.ToString("F2")).Append(", ").Append(sb.b.ToString("F2")).Append(")");
+            }
             text.Append("\nShade: ").Append(string.IsNullOrEmpty(ShadeNote) ? "-" : ShadeNote);
             if (makeup != null && makeup.Choices != null) text.Append("  ").Append(makeup.Choices.Area).Append(", ").Append(makeup.Choices.FinishName);
             shown = text.ToString();
