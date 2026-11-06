@@ -846,7 +846,7 @@ export function renderPager(host, state, total, onChange, noun = "items") {
     host.innerHTML = `<span class="pager-range">${from}-${to} of ${total} ${esc(noun)}</span>
         <span class="btn-group">
             <button type="button" class="icon-btn" data-go="-1" aria-label="Previous page"${state.page <= 1 ? " disabled" : ""}>${icon("left")}</button>
-            <span class="page-now">Page ${state.page} of ${pages}</span>
+            <span class="page-now"><span class="page-long">Page ${state.page} of ${pages}</span><span class="page-short">${state.page}/${pages}</span></span>
             <button type="button" class="icon-btn" data-go="1" aria-label="Next page"${state.page >= pages ? " disabled" : ""}>${icon("right")}</button>
         </span>`;
     host.onclick = (event) => {

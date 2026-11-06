@@ -674,6 +674,18 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .pager .icon-btn { width: 28px; height: 28px; }
 .pager .page-now { min-width: 76px; text-align: center; color: var(--text-2); }
 .pager:empty { display: none; }
+/* "Page 1 of 3" in a list bar; the short "1/3" in a panel's title bar (7 November 2026): smaller buttons, so the title, the
+   fold arrow and the pager stay on one line in a narrow panel */
+.pager .page-short { display: none; }
+.panel-head .widget-pager { gap: 4px; }
+.panel-head .widget-pager .btn-group { padding: 2px; }
+.panel-head .widget-pager .icon-btn { width: 24px; height: 24px; }
+.panel-head .widget-pager .page-now { min-width: 0; padding-inline: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.panel-head .widget-pager .page-long { display: none; }
+.panel-head .widget-pager .page-short { display: inline; }
+/* with a pager in it the title bar stays one line: a long title breaks between its words instead of pushing the controls down */
+.panel-head:has(> .head-end > .widget-pager:not(:empty)) { flex-wrap: nowrap; }
+.panel-head:has(> .head-end > .widget-pager:not(:empty)) > .panel-title { flex: 0 1 auto; min-width: 0; }
 
 /* ---- loading skeletons ---- */
 .skeleton { min-height: 1em; }
