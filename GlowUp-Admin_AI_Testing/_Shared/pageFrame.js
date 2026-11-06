@@ -68,7 +68,7 @@
                 return '<li><a href="' + n.href + '"' + (here ? ' class="active" aria-current="page"' : "") + ' aria-label="' + esc(n.label) + '">' + svg(n.icon) + '<span class="label">' + esc(n.label) + "</span></a></li>";
             }).join("") +
             "</ul>" +
-            '<div class="sidebar-footer"><p class="signed-in-as"></p><button type="button" class="sign-out" aria-label="Sign Out">' + svg("logout") + '<span class="label">Sign Out</span></button></div>';
+            '<div class="sidebar-footer"><button type="button" class="sign-out" aria-label="Sign Out">' + svg("logout") + '<span class="label">Sign Out</span></button></div>';
         document.body.insertBefore(sidebar, main);
 
         // THE BUTTON THAT FOLDS THE MENU: an edge tab, half on the sidebar and half over its border line, below the last link. It is

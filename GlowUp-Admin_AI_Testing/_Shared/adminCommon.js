@@ -101,13 +101,10 @@ export function requireAdmin() {
     });
 }
 
-function showSignedInAs(user) {
-    const footer = document.querySelector(".sidebar-footer");
-    if (!footer) return;
-    // the line is in the frame already (empty), so the Sign Out link below it does not jump when the name arrives
-    let line = footer.querySelector(".signed-in-as");
-    if (!line) { line = document.createElement("p"); line.className = "signed-in-as"; footer.insertBefore(line, footer.firstChild); }
-    line.textContent = user.email || "Signed in";
+// The admin's e-mail address is never shown on the pages (someone looking at the screen, or a screenshot, must not see which account
+// runs the site). Any old line for it is taken away.
+function showSignedInAs() {
+    document.querySelectorAll(".signed-in-as").forEach((line) => line.remove());
 }
 
 /**
