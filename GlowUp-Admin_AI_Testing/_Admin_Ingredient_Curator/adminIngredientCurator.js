@@ -257,7 +257,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     onListsRefreshed(() => { if (!dialogIsOpen()) loadIngredients(); });
     el("ingredientsList").addEventListener("keydown", (event) => { if (event.key === "Enter" && event.target.matches(".ingredient-card")) { event.preventDefault(); toggleDetails(event.target.dataset.id); } });
 
-    loadIngredients();
+    // the Dashboard's shortcuts: ?add=1 opens the empty ingredient form, ?cleanup=1 the Clean up steps, once the ingredients are here
+    const askedFor = new URLSearchParams(window.location.search);
+    loadIngredients().then(() => {
+        if (askedFor.get("add") === "1") openIngredientForm(null);
+        else if (askedFor.get("cleanup") === "1") openCleanUp();
+        else if (askedFor.get("duplicates") === "1") openDuplicates();
+    });
 });
 
 function fromFirstPage() { pageState.page = 1; renderIngredients(); }

@@ -338,6 +338,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         .catch((error) => { console.warn("Could not count the pending snapshots:", error); snapshotsWaiting = null; paintSnapshotCount(true); });
     // the Dashboard's tile opens this page with ?snapshots=open: the window opens once the lists are here
     if (new URLSearchParams(location.search).get("snapshots") === "open") firstLoad.then(openSnapshots);
+    // the Dashboard's "Add product" opens this page with ?add=product: the empty product form opens once the brands are here
+    if (new URLSearchParams(location.search).get("add") === "product") firstLoad.then(() => openProductForm(null));
 });
 
 const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) { /* private window */ } };
