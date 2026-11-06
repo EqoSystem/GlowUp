@@ -147,11 +147,13 @@ function vettedLookup(hostname, options, callback) {
 }
 
 /** One GET with the vetted look-up; redirects are NOT followed here. Resolves { status, location, type, body }. */
-function getOnce(url) {
+function getOnce(url, msLeft) {
     return new Promise((resolve) => {
-        let done = false;
-        const finish = (value) => { if (!done) { done = true; resolve(value); } };
-        const request = https.get(url, {
+        let done = false, deadline = null, request = null;
+        const finish = (value) => { if (!done) { done = true; clearTimeout(deadline); resolve(value); } };
+        // a TOTAL limit (the socket's own timeout only notices silence, not a page that trickles in slowly)
+        deadline = setTimeout(() => { if (request) request.destroy(); finish({ status: 0 }); }, Math.max(1, msLeft));
+        request = https.get(url, {
             lookup: vettedLookup, timeout: PAGE_SECONDS * 1000,
             headers: { "User-Agent": "GlowUpCatalogue/1.0 (ingredient list check)", Accept: "text/html" }
         }, (response) => {
@@ -178,9 +180,10 @@ function getOnce(url) {
 /** The page's HTML, or null. Redirects are followed by hand (at most MAX_HOPS), every hop checked again. */
 async function safeGet(url) {
     let at = url;
+    const stop = Date.now() + PAGE_SECONDS * 1000;                    // one deadline for the page and all its redirects
     for (let hop = 0; hop <= MAX_HOPS; hop++) {
-        if (!fetchable(at)) return null;
-        const answer = await getOnce(at);
+        if (!fetchable(at) || Date.now() >= stop) return null;
+        const answer = await getOnce(at, stop - Date.now());
         if (answer.status === 200) return answer.body || null;
         if (!answer.location) return null;
         try { at = new URL(answer.location, at).href; } catch (error) { return null; }
