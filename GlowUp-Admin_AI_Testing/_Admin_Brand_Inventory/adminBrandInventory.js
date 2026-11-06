@@ -2078,7 +2078,7 @@ const brandNameOf = (product) => (everyBrand.find((b) => b.id === product.brandI
 
 function openDuplicates(startWith) {
     const when = (item) => (item.addedAt ? "added " + timeAgo(new Date(item.addedAt * 1000)) : "");
-    const origin = (item) => originLabel(item.source) || "Typed on this website";
+    const origin = (item) => originLabel(item.source) || "Origin not recorded";
     const sections = [
         {
             id: "products", label: "Products",

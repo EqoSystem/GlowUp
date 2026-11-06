@@ -111,7 +111,7 @@ const FILTERS = [
     { value: "review", label: "AI-found, waiting for review", test: needsReview },
     { value: "ai", label: "AI-found (all)", test: (item) => item.source === "ai" },
     { value: "starter", label: "Starter data", test: (item) => item.source === "starter" || item.source === "fda" },
-    { value: "admin", label: "Typed on this website", test: (item) => item.source === "" || item.source === "admin" }
+    { value: "admin", label: "Origin not recorded", test: (item) => item.source === "" || item.source === "admin" }
 ];
 /** The choice that shows what the inventory's products list and the Curator does not explain yet. */
 const FROM_PRODUCTS = "products";
@@ -1185,7 +1185,7 @@ function showCleanUp(lookalikes) {
     openPlanDialog({
         title: "Clean up the ingredients",
         intro: "Entries that are not ingredients (notes, two names joined into one, label text), and entries that explain an ingredient that has an entry already. Open the step to see every entry, take the tick off what should stay, and apply it. Nothing is deleted: what is removed goes to the Recycle bin.",
-        makePlan: () => cleanupPlan([], [], everyIngredient, { only: ["ingredients"] }),
+        makePlan: () => cleanupPlan([], [], everyIngredient, { only: ["ingredients", "markdown", "definitions", "safetyClaims"] }),
         apply: (changes) => applyChanges(changes),
         notes: () => [{
             title: "Ingredient names that are nearly the same", text: "Chemical names can differ by one letter and still be different ingredients (methylparaben, ethylparaben), so these are only listed.",
@@ -1197,7 +1197,7 @@ function showCleanUp(lookalikes) {
 
 function openDuplicates() {
     if (scanning) { notify("A scan is running already.", "info"); return; }
-    const origin = (item) => originLabel(item.source) || "Typed on this website";
+    const origin = (item) => originLabel(item.source) || "Origin not recorded";
     openDuplicatesDialog({
         title: "Find duplicate ingredients",
         intro: "Entries that explain the same ingredient, or have nearly the same name. Most often the app's AI lookup made a new entry although one was there already. Choose which entry to keep; merging gives it the other names, so every product list is still explained. Chemical names can differ by one letter and be different ingredients: look before you merge.",
@@ -1512,7 +1512,7 @@ function registerData() {
         }),
         dimensions: [
             { id: "risk", label: "Risk level", of: (i) => i.riskLevel || "auto", keys: ["harmful", "caution", "safe", "auto"], labelOf: (k) => RISK_NAMES[k] || k, tone: toneOfRisk, pick: (k) => narrow("", k) },
-            { id: "origin", label: "Where it came from", of: (i) => originLabel(i.source) || "Typed on this website" },
+            { id: "origin", label: "Where it came from", of: (i) => originLabel(i.source) || "Origin not recorded" },
             { id: "review", label: "Checked or not", of: (i) => (needsReview(i) ? "Waiting for review" : "Checked"), keys: ["Waiting for review", "Checked"], tone: (k) => (k === "Checked" ? "ok" : "info"), pick: (k) => narrow(k === "Checked" ? "" : "review", "") },
             { id: "allergen", label: "Allergen family", of: (i) => i.allergenTags.map((t) => labelOf(allOptions("allergens"), t)), none: "No allergen family" },
             { id: "avoid", label: "Skin condition to avoid it", of: (i) => i.avoidForConditions.map((t) => labelOf(allOptions("conditions"), t)), none: "None" },

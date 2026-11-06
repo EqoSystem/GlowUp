@@ -477,6 +477,73 @@ export function mergeIngredients(keep, others) {
 // ---------------------------------------------------------------------------------------------
 //  5. The clean-up: every change it would make, as a list (a dry run). Nothing is written here.
 // ---------------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------------
+//  Definitions that belong to another ingredient, and sentences that call an ingredient safe
+// ---------------------------------------------------------------------------------------------
+/**
+ * Entries found on 6 November 2026 whose definition is a copy of ANOTHER ingredient's. Each has the entry's name, a mark that is in the wrong
+ * text (so a definition that was corrected since is left alone, and running the step twice does nothing) and the new plain-words definition.
+ */
+export const DEFINITION_FIXES = [
+    { name: "D&C Red 21 Al Lake / CI 45380", wrong: /candelilla/i, marker: "it is the text of Candelilla Wax",
+      to: "A red colorant (an aluminium lake of the dye eosin, also called D&C Red 21) that gives products a bright pink to red colour." },
+    { name: "TRIETHANOLAMINE", wrong: /synthetic polymer used to thicken/i, marker: "it is the text of Acrylates/C10-30 Alkyl Acrylate Crosspolymer",
+      to: "A pH adjuster that balances the acidity of a formula and helps some thickening polymers work." },
+    { name: "TITANIUM DIOXIDE", wrong: /metallic element/i, marker: "it is the text of Aluminum",
+      to: "A white mineral pigment that makes products opaque and lightens colours. It is also used as a sunscreen filter." }
+];
+
+/** [{ ingredient, to, marker }] for the entries whose definition is still the wrong one. */
+export function definitionFixes(ingredients) {
+    const out = [];
+    list(ingredients).forEach((ingredient) => {
+        if (!ingredient) return;
+        const fix = DEFINITION_FIXES.find((entry) => normalizeName(entry.name) === normalizeName(ingredient.name) && entry.wrong.test(text(ingredient.description)));
+        if (fix) out.push({ ingredient, to: fix.to, marker: fix.marker });
+    });
+    return out;
+}
+
+// a sentence that is only a claim about the ingredient's own safety
+const SAFETY_SENTENCE = /\b(is|are)\s+(completely\s+|very\s+|generally\s+|considered\s+|widely\s+|fully\s+)?safe\b|\bsafe\s+(for|to)\s+(cosmetic|use|skin|all|most|everyday|daily|sensitive)|non-?toxic|\b(is|are|and|completely|totally)\s+harmless\b|\bnot harmful\b/i;
+// "A safe, mineral-based pigment" -> "A mineral-based pigment"
+const SAFETY_ADJECTIVE = /\b(a|an|the)\s+(safe|non-?toxic|harmless),?\s+/i;
+
+/**
+ * The definition without the claims that the ingredient is safe. Returns { to, removed[] }, or null when nothing was taken out or what is left would
+ * be too short to be a definition (such an entry is left for a person).
+ */
+export function withoutSafetyClaims(description) {
+    const original = text(description).trim();
+    const removed = [];
+    const kept = [];
+    original.split(/(?<=[.!?])\s+/).forEach((sentence) => {
+        // a claim about the PRODUCT stays ("keeps products fresh and safe to use", "turns UV into harmless heat"): only the ingredient's own safety is taken out
+        const aboutTheProduct = /\b(keeps?|keeping|helps?\s+keep|ensur\w*|remain\w*|stay\w*|protects?)\b[^.]{0,60}\bsafe\b|harmless\s+heat/i.test(sentence);
+        if (!aboutTheProduct && SAFETY_SENTENCE.test(sentence)) { removed.push(sentence.trim()); return; }
+        const adjective = sentence.match(SAFETY_ADJECTIVE);
+        if (adjective) {
+            removed.push(adjective[0].trim());
+            kept.push(sentence.replace(SAFETY_ADJECTIVE, (match, article) => article[0].toUpperCase() === article[0] ? article + " " : article + " "));
+            return;
+        }
+        kept.push(sentence);
+    });
+    const to = kept.join(" ").replace(/\s+/g, " ").trim();
+    if (removed.length === 0 || to.length < 40 || to === original) return null;
+    return { to, removed };
+}
+
+/** [{ ingredient, to, removed[] }] for every listed entry whose definition makes a safety claim. */
+export function safetyClaimFixes(ingredients) {
+    const out = [];
+    live(ingredients).forEach((ingredient) => {
+        const fix = withoutSafetyClaims(ingredient.description);
+        if (fix) out.push({ ingredient, to: fix.to, removed: fix.removed });
+    });
+    return out;
+}
+
 /**
  * The whole clean-up as a list of steps. Each step: { id, title, why, careful, changes[] } (careful = a person should
  * look at every row before it is applied), each change:
@@ -572,6 +639,22 @@ export function cleanupPlan(brands, products, ingredients, options) {
         "The brand is stored separately, so a name that repeats it is found less well and reads double in lists. The old name is kept as an alias, so a search for it still finds the product.",
         () => nameFixes(P, B).map((fix) => update("products", fix.product, { name: fix.to, aliases: uniqueNames(list(fix.product.aliases).concat([fix.from]), [fix.to]) },
             `"${fix.from}" becomes "${fix.to}".`)));
+
+    // --- 8a. a definition that belongs to ANOTHER ingredient (found by comparing the live data on 6 November 2026)
+    step("definitions", "Definitions that describe another ingredient",
+        "Each of these entries carries the description of a different ingredient (a copy that was never changed). The new text is a short plain-words definition written for the step; read it, correct it if you know better, and tick the rows you accept. Nothing is ticked at first.",
+        () => definitionFixes(I).map((fix) => update("ingredients", fix.ingredient, { description: fix.to }, `Its definition describes another ingredient (${fix.marker}). It becomes: "${fix.to}"`)), true);
+
+    // --- 8a2. markdown stars that were pasted into a definition
+    step("markdown", "Stray ** marks are taken out of definitions",
+        "Some definitions were pasted with ** around words (a way of writing bold text). The app and the website show text as it is, so the users see the stars. Only the stars are taken out.",
+        () => live(I).filter((ingredient) => /\*\*/.test(text(ingredient.description)))
+            .map((ingredient) => update("ingredients", ingredient, { description: text(ingredient.description).replace(/\*\*/g, "") }, "The ** marks around words are taken out.")));
+
+    // --- 8b. sentences that call an ingredient safe
+    step("safetyClaims", "Sentences that call an ingredient safe",
+        "GlowUp never counts an entry nobody has checked as proof that an ingredient is safe, so a definition must not say it is. Only the claim is taken out (\"It is safe for cosmetic use.\", \"A safe, mineral-based pigment\" becomes \"A mineral-based pigment\"). \"Helps keep products safe from bacteria\" is about the product and stays. Nothing is ticked at first.",
+        () => safetyClaimFixes(I).map((fix) => update("ingredients", fix.ingredient, { description: fix.to }, `Takes out: ${fix.removed.map((r) => `"${r}"`).join(", ")}`)), true);
 
     // --- 8. ingredient entries
     step("ingredients", "Ingredient entries that are not ingredients, or are there twice, go to the Recycle bin",
