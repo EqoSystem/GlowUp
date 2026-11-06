@@ -463,7 +463,7 @@ const SOURCE_KINDS = {
     reference: { label: "Ingredient database", advice: "Explains what an ingredient is. Not peer-reviewed, and never proof of what one product contains.", tone: "" },
     public: { label: "Public list (anyone can edit)", advice: "A public list anybody can edit. Use it as a second opinion only.", tone: "" },
     retailer: { label: "Retailer listing", advice: "A shop's copy of the pack's list. It can be out of date: compare it with your pack.", tone: "" },
-    other: { label: "Unverified site", advice: "Not recognised. Do not rely on it without checking elsewhere.", tone: "warn" }
+    other: { label: "Other website", advice: "Not on GlowUp's list of known sources. Compare it with the pack or another source before relying on it.", tone: "warn" }
 };
 // Which kinds of page the backup AI may be shown, per task. An ingredient's description rests on regulators, medical
 // bodies and ingredient references; ONE product's list rests on the maker, a retailer or a public list (an ingredient

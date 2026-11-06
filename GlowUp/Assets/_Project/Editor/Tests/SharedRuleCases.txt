@@ -201,4 +201,4 @@ sourcelabel | maker | Manufacturer's own site
 sourcelabel | reference | Ingredient database
 sourcelabel | public | Public list (anyone can edit)
 sourcelabel | retailer | Retailer listing
-sourcelabel | other | Unverified site
+sourcelabel | other | Other website

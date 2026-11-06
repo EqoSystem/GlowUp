@@ -526,7 +526,7 @@ export const SOURCE_RETAILERS = ["watsons.com.ph", "watsons.com.my", "watsons.co
 // `website`, which only an admin sets, after checking that the brand owns the address (Brand form, "Official website").
 const BACKSLASH = String.fromCharCode(92);
 // only a PLAIN address is labelled: http(s), a host of a-z 0-9 . - only (no user name, no other letters), an optional
-// port, and printable ASCII after it. Anything else (a backslash, "user@", look-alike letters) is an Unverified site.
+// port, and printable ASCII after it. Anything else (a backslash, "user@", look-alike letters) is an Other website.
 const STRICT_ADDRESS = /^https?:\/\/([a-z0-9.-]+)(?::[0-9]{1,5})?([/?#][!-~]*)?$/i;
 
 export const SOURCE_KINDS = {
@@ -536,7 +536,7 @@ export const SOURCE_KINDS = {
     reference: { label: "Ingredient database", advice: "Explains what an ingredient is. Not peer-reviewed, and never proof of what one product contains.", tone: "" },
     public: { label: "Public list (anyone can edit)", advice: "A public list anybody can edit. Use it as a second opinion only.", tone: "" },
     retailer: { label: "Retailer listing", advice: "A shop's copy of the pack's list. It can be out of date: compare it with your pack.", tone: "" },
-    other: { label: "Unverified site", advice: "Not recognised. Do not rely on it without checking elsewhere.", tone: "warn" }
+    other: { label: "Other website", advice: "Not on GlowUp's list of known sources. Compare it with the pack or another source before relying on it.", tone: "warn" }
 };
 
 /** The line under every list of source links, for people who are careful about links. */

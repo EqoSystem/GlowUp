@@ -109,6 +109,7 @@ namespace GlowUp.Views
             };
             GlowUp.Data.IngredientData entry = GlowUp.Data.IngredientRepository.Find(string.IsNullOrEmpty(f.techName) ? f.name : f.techName) ?? GlowUp.Data.IngredientRepository.Find(f.name);
             if (entry != null) FillDetails(details, entry, f);
+            CardName(f, entry, shown, details);
             if (f.level == "unknown" && string.IsNullOrWhiteSpace(shown.description))
             {
                 shown.description = GlowUp.Net.ConnectivityMonitor.Reachable ? unknownOnline : unknownOffline;
@@ -145,12 +146,52 @@ namespace GlowUp.Views
             d.purpose = entry.purpose;
             d.chemical = entry.chemicalDescription;
             if (!string.IsNullOrWhiteSpace(entry.cautionNote)) d.caution = "It " + entry.cautionNote.Trim().TrimEnd('.') + ".";
-            var others = (entry.aliases ?? new List<string>()).Where(a => !string.IsNullOrWhiteSpace(a) && !string.Equals(a, f.name, System.StringComparison.OrdinalIgnoreCase)).ToList();
-            if (others.Count > 0) { d.commonName = others[0]; d.aliases = string.Join(", ", others); }
             if (entry.allergenTags != null && entry.allergenTags.Count > 0) d.allergen = string.Join(", ", entry.allergenTags.Select(GlowUp.Data.ListsRepository.AllergenLabel));
             if (entry.keyActive) d.highlights.Add("Key active");
             if (entry.umbrella) d.highlights.Add("Umbrella term");
             if (entry.highlights != null) d.highlights.AddRange(entry.highlights.Select(GlowUp.Data.ListsRepository.HighlightLabel));
+        }
+
+        static readonly string[] NameCut = { " / ", "/ ", " /" };
+
+        static List<string> NameParts(string value) => string.IsNullOrWhiteSpace(value) ? new List<string>()
+            : value.Split(NameCut, System.StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+
+        /// <summary>
+        /// The card's title is the INCI name, with the first other name in brackets. Many entries hold two names in one ("Dimethicone /
+        /// Silicone Oil", "Solvent / Isododecane"): the INCI name is the first part of techName, the other parts become aliases, and a part
+        /// that is a classification's name ("Solvent") becomes the badge when the entry has no classification of its own. Without a
+        /// techName nothing is split, because which part is the INCI name is then unknown. Only what is shown changes, never the saved scan.
+        /// </summary>
+        static void CardName(IngredientFinding f, GlowUp.Data.IngredientData entry, IngredientFinding shown, IngredientRowView.Details d)
+        {
+            List<string> tech = NameParts(f.techName);
+            string inci = tech.Count > 0 ? tech[0] : (f.name ?? "").Trim();
+            var candidates = new List<string>();
+            candidates.AddRange(tech.Skip(1));                                   // "Butylene Glycol / 1,3-Dihydroxybutane": the techName's own other name first
+            if (tech.Count > 0) candidates.AddRange(NameParts(f.name));
+            if (entry != null && entry.aliases != null) candidates.AddRange(entry.aliases);
+
+            var aliases = new List<string>();
+            foreach (string raw in candidates)
+            {
+                string c = (raw ?? "").Trim();
+                if (c.Length == 0 || string.Equals(c, inci, System.StringComparison.OrdinalIgnoreCase)) continue;
+                string word = GlowUp.Data.ClassificationRepository.Matching(c);
+                if (word.Length > 0)                                             // "Solvent" is a kind of ingredient, not a name for it
+                {
+                    if (string.IsNullOrWhiteSpace(d.classification)) d.classification = word;
+                    continue;
+                }
+                // a cut-off piece of a name already listed ("3-Dihydroxybutane" beside "1,3-Dihydroxybutane") is left out, and so is a repeat
+                if (aliases.Any(a => a.IndexOf(c, System.StringComparison.OrdinalIgnoreCase) >= 0)) continue;
+                aliases.RemoveAll(a => c.IndexOf(a, System.StringComparison.OrdinalIgnoreCase) >= 0);
+                aliases.Add(c);
+            }
+            shown.name = inci;
+            shown.techName = inci;                                               // so the row does not put the same name in brackets
+            d.commonName = aliases.Count > 0 ? aliases[0] : "";
+            d.aliases = aliases.Count > 0 ? string.Join(", ", aliases) : "";
         }
     }
 }

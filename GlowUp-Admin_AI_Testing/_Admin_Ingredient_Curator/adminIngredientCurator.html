@@ -170,8 +170,9 @@
                 <div class="form-row">
                     <div class="field">
                         <label for="ingredientNameInput">INCI name <span class="required">*</span></label>
-                        <input type="text" id="ingredientNameInput" maxlength="80" placeholder="e.g., Niacinamide" autocomplete="off">
-                        <span class="field-hint">As it is printed on labels. The app matches scanned text against this name and its aliases.</span>
+                        <input type="text" id="ingredientNameInput" maxlength="80" placeholder="e.g., Aqua" autocomplete="off">
+                        <span class="field-hint">Only the one official name printed on labels, for example Aqua. Do not add other names here (not "Aqua / Water"): put Water, Eau under Also known as.</span>
+                        <div class="field-hint" id="ingredientNameClash" hidden></div>
                     </div>
                     <div class="field">
                         <span class="field-label"><label for="ingredientClassInput">Ingredient classification <span class="required">*</span></label><button type="button" class="icon-btn small list-edit" data-list-edit="classifications" aria-label="Manage classifications"><i data-icon="edit"></i></button></span>
@@ -197,8 +198,18 @@
 
                 <div class="field">
                     <label for="ingredientAliasesInput">Also Known As</label>
-                    <input type="text" id="ingredientAliasesInput" maxlength="300" placeholder="e.g., Nicotinamide, Vitamin B3" autocomplete="off">
+                    <input type="text" id="ingredientAliasesInput" maxlength="300" placeholder="e.g., Water, Eau" autocomplete="off">
                     <span class="field-hint">Other spellings found on labels, separated by commas. A scan of any of them finds this ingredient. The first one is shown as the common name.</span>
+                </div>
+
+                <div class="field" id="mergeIntoField" hidden>
+                    <label for="mergeIntoInput">Is this only another name of an ingredient?</label>
+                    <div class="inline-actions">
+                        <input type="text" id="mergeIntoInput" list="mergeIntoList" maxlength="80" placeholder="Type the INCI name it belongs to, e.g. Aqua" autocomplete="off">
+                        <datalist id="mergeIntoList"></datalist>
+                        <button type="button" class="btn" id="mergeIntoBtn">Use it as another name</button>
+                    </div>
+                    <span class="field-hint">For an entry like "Water", which is an everyday name and not an INCI name. Its names are added to Also known as of the ingredient you choose, and this entry goes to the Recycle bin.</span>
                 </div>
 
                 <div class="field">

@@ -83,9 +83,16 @@ namespace GlowUp.Views
         /// </summary>
         public static string Plain(string value) => string.IsNullOrEmpty(value) ? "" : value.Replace("<", "<​");
 
+        /// <summary>
+        /// Takes out Markdown bold marks ("**In high amounts**") that AI-written entries carry: the card shows plain sentences, and a caution
+        /// that matters belongs in the Caution field, not in bold in the middle of the definition.
+        /// </summary>
+        public static string NoMarkdown(string value) => string.IsNullOrEmpty(value) ? "" : value.Replace("**", "").Replace("__", "");
+
         static void Line(TextMeshProUGUI text, string prefix, string value)
         {
             if (text == null) return;
+            value = NoMarkdown(value);
             bool has = !string.IsNullOrWhiteSpace(value);
             if (has) text.text = prefix + Plain(value);
             text.gameObject.SetActive(has);
@@ -99,8 +106,9 @@ namespace GlowUp.Views
             if (nameText != null) nameText.text = string.IsNullOrWhiteSpace(common) || common == f.name ? Plain(f.name) : $"{Plain(f.name)}  <size=80%>({Plain(common)})</size>";
             if (classificationText != null) classificationText.text = Plain(d.classification);
             if (classificationBadge != null) classificationBadge.SetActive(!string.IsNullOrWhiteSpace(d.classification));
-            // the line under the status shows what is there: the purpose when it exists, else the plain-words definition. With both, the purpose is
-            // shown first and the definition waits behind "More about this ingredient"; with only one of them it is shown once, up here.
+            // the line under the status is the short Purpose only. The long definition is ALWAYS behind "More about this ingredient" (closed by
+            // default), even when there is no purpose: then the card shows name, badge and status, and nothing long. (Until 2026-11-06 the
+            // definition took the purpose's place, so every entry without a purpose showed its whole definition open.)
             bool hasPurpose = !string.IsNullOrWhiteSpace(d.purpose);
             Line(reasonText, reasonPrefix, f.reason);
 
@@ -122,9 +130,8 @@ namespace GlowUp.Views
             if (fold == null) Line(descriptionText, "", description);                    // a scene built before the fold shows it as it always did
             else
             {
-                if (hasPurpose) Line(purposeText, purposePrefix, d.purpose);
-                else Line(purposeText, descriptionPrefix, description);                   // no purpose: the definition takes its place
-                Line(descriptionText, descriptionPrefix, hasPurpose ? description : "");   // both exist: the definition is in the fold; else it is not said twice
+                Line(purposeText, purposePrefix, d.purpose);                              // hidden when the entry has no purpose
+                Line(descriptionText, descriptionPrefix, description);                    // in the fold, always
             }
             if (fold == null) Line(purposeText, purposePrefix, d.purpose);
 
@@ -140,7 +147,7 @@ namespace GlowUp.Views
             }
 
             if (fold != null)
-                fold.SetActive((hasPurpose && hasDefinition) || !string.IsNullOrWhiteSpace(d.aliases) || !string.IsNullOrWhiteSpace(d.chemical)
+                fold.SetActive(hasDefinition ||!string.IsNullOrWhiteSpace(d.aliases) || !string.IsNullOrWhiteSpace(d.chemical)
                     || !string.IsNullOrWhiteSpace(f.commonUses) || !string.IsNullOrWhiteSpace(d.allergen) || !string.IsNullOrWhiteSpace(d.caution)
                     || d.highlights.Count > 0 || !string.IsNullOrWhiteSpace(d.source));
             Paint();

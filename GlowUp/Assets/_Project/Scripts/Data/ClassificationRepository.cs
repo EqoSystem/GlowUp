@@ -52,6 +52,17 @@ namespace GlowUp.Data
             return "";
         }
 
+        /// <summary>The list's own words when `word` is a classification's name (any capitals); "" otherwise.</summary>
+        public static string Matching(string word)
+        {
+            if (string.IsNullOrWhiteSpace(word)) return "";
+            FromPhone();
+            if (holder == null) return "";
+            foreach (ClassificationItem item in holder.items)
+                if (string.Equals((item.name ?? "").Trim(), word.Trim(), StringComparison.OrdinalIgnoreCase)) return item.name;
+            return "";
+        }
+
         public static async Task Refresh(bool force = false)
         {
             FromPhone();

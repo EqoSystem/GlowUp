@@ -221,7 +221,7 @@ A product's line titled `Official website` comes first: the Edit Product form wr
 | `reference` | Ingredient database | Personal Care Products Council, INCI Beauty, INCIDecoder, Paula's Choice dictionary, EWG, CosmeticsInfo |
 | `public` | Public list (anyone can edit) | Open Beauty Facts |
 | `retailer` | Retailer listing | Large shops by their whole address (watsons.com.ph, shopee.ph, lazada.com.ph, sephora.com, mercurydrug.com ...): `SOURCE_RETAILERS` / `ListSources.RetailerSites` |
-| `other` | Unverified site | Everything else, and every address that is not plain: a user name in front of the site (`https://fda.gov@evil.com`), a backslash, or letters outside a-z 0-9 . - in the site's name. Such addresses are also never shown as links. |
+| `other` | Other website | Everything else, and every address that is not plain: a user name in front of the site (`https://fda.gov@evil.com`), a backslash, or letters outside a-z 0-9 . - in the site's name. Such addresses are also never shown as links. |
 
 A search engine's pass-through address (Google's grounding link, `google.com/url`, `bing.com/ck`) is recognised by its own site, never by words elsewhere in the address; it is then labelled by its page title, and only when that title is a plain site name.
 

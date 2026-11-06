@@ -243,6 +243,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (file) importIngredientFile(file);
     });
     el("addIngredientForm").addEventListener("submit", saveIngredient);
+    el("mergeIntoBtn").addEventListener("click", useAsAnotherName);
+    el("ingredientNameInput").addEventListener("input", showNameClash);
+    el("ingredientAliasesInput").addEventListener("input", showNameClash);
     el("ingredientsList").addEventListener("click", onListClick);
     el("ingredientsList").addEventListener("dblclick", (event) => {
         if (event.target.closest("button, a, .detail-box")) return;
@@ -310,6 +313,7 @@ async function loadIngredients() {
                 highlights: asArray(data.highlights),
                 chemicalDescription: String(data.chemicalDescription || ""),
                 allergenTags: asArray(data.allergenTags),
+                differentFrom: asArray(data.differentFrom),
                 avoidForSkinTypes: asArray(data.avoidForSkinTypes),
                 goodForSkinTypes: asArray(data.goodForSkinTypes),
                 avoidForConditions: asArray(data.avoidForConditions),
@@ -461,6 +465,79 @@ function runFieldChange() { return openFieldMigration(async () => { await loadIn
 /** Every way this ingredient can be written on a label. */
 function keysOf(item) {
     return [item.name, item.techName, ...item.aliases].map(sameKey).filter((k) => k.length > 0);
+}
+
+/** Listed entries (not this one, not already marked different) that use one of these names. */
+function nameClashes(name, aliases) {
+    const mine = new Set([name, ...(aliases || [])].map(sameKey).filter((k) => k.length > 0));
+    return everyIngredient.filter((other) => other.id !== editingIngredientId && !other.binned && !differentIds.has(other.id) && keysOf(other).some((k) => mine.has(k)));
+}
+
+/** The note under the INCI name box: the name is used already. A different ingredient is told to the system with one button. */
+function showNameClash() {
+    const box = el("ingredientNameClash");
+    if (!box) return;
+    box.replaceChildren();
+    const name = el("ingredientNameInput").value.replace(/\s+/g, " ").trim();
+    if (!name) { box.hidden = true; return; }
+    const found = nameClashes(name, toList(el("ingredientAliasesInput").value).filter((a) => sameKey(a) !== sameKey(name)));
+    if (found.length === 0) { box.hidden = true; return; }
+    box.hidden = false;
+    found.slice(0, 3).forEach((other) => {
+        const exact = sameKey(other.name) === sameKey(name);
+        const row = document.createElement("div");
+        row.className = "name-clash-row";
+        row.append(`Already in the library: "${titleOf(other)}"${exact ? "." : " (it uses this name as Also known as)."} `);
+        const open = document.createElement("button");
+        open.type = "button"; open.className = "btn"; open.textContent = "Open it";
+        open.addEventListener("click", () => { modal.close(); openIngredientForm(other); });
+        row.append(open);
+        if (!exact) {
+            const different = document.createElement("button");
+            different.type = "button"; different.className = "btn"; different.textContent = "It is a different ingredient";
+            different.addEventListener("click", () => { differentIds.add(other.id); showNameClash(); });
+            row.append(" ", different);
+        }
+        box.append(row);
+    });
+}
+
+/** "Is this only another name of an ingredient?": shown for an existing entry, with every other listed ingredient to choose from. */
+function fillMergeInto(item) {
+    const field = el("mergeIntoField");
+    if (!field) return;
+    el("mergeIntoInput").value = "";
+    field.hidden = !item || item.binned;
+    el("mergeIntoList").replaceChildren(...(item ? everyIngredient.filter((other) => other.id !== item.id && !other.binned && other.name).map((other) => {
+        const option = document.createElement("option");
+        option.value = other.name;
+        return option;
+    }) : []));
+}
+
+/** Makes the entry in the form another name of the ingredient typed in the box: its names go to that ingredient, the entry goes to the Recycle bin. */
+async function useAsAnotherName() {
+    const form = el("addIngredientForm");
+    if (TEST_MODE) { setFormError(form, "This is the test copy of the site: nothing is changed here."); return; }
+    const item = everyIngredient.find((x) => x.id === editingIngredientId);
+    const typed = el("mergeIntoInput").value.replace(/\s+/g, " ").trim();
+    if (!item || !typed) { setFormError(form, "Type the INCI name of the ingredient this is another name of."); el("mergeIntoInput").focus(); return; }
+    const target = everyIngredient.find((x) => x.id !== item.id && !x.binned && (sameKey(x.name) === sameKey(typed))) || everyIngredient.find((x) => x.id !== item.id && !x.binned && keysOf(x).includes(sameKey(typed)));
+    if (!target) { setFormError(form, `No ingredient in the library is called "${typed}". Add it first, or pick one from the list.`); return; }
+    const merged = mergeIngredients(target, [item]);
+    const learns = merged.keepChanges.aliases ? merged.keepChanges.aliases.filter((a) => !target.aliases.some((t) => sameKey(t) === sameKey(a))) : [];
+    const used = productUseKnown ? usedInProducts(item) : 0;
+    if (!(await askConfirm({
+        title: `Use "${titleOf(item)}" as another name of "${titleOf(target)}"?`,
+        message: `"${titleOf(target)}" is kept and now also answers to: ${learns.length > 0 ? learns.join(", ") : "its names already"}. "${titleOf(item)}" goes to the Recycle bin (it can be restored)${used > 0 ? `; ${many(used, "listed product uses", "listed products use")} it, and those lists are still explained by "${titleOf(target)}"` : ""}. What "${titleOf(item)}" says about itself is not copied over.`,
+        confirmLabel: "Use as another name"
+    }))) return;
+    try {
+        await applyChanges((Object.keys(merged.keepChanges).length > 0 ? [{ collection: "ingredients", docId: target.id, action: "update", fields: merged.keepChanges }] : [])
+            .concat([{ collection: "ingredients", docId: item.id, action: "bin", reason: `Another name of "${titleOf(target)}": merged into it.` }]));
+    } catch (error) { console.error("Use as another name failed:", error); setFormError(form, "It could not be saved. Nothing was changed. Please try again."); return; }
+    modal.close();
+    notify(`"${titleOf(item)}" is now another name of "${titleOf(target)}".`, "ok");
 }
 
 function usedInProducts(item) {
@@ -1168,6 +1245,8 @@ async function applyChanges(changes) {
 // cut into slices (ingredientLookalikesAsync): a window with a bar shows at once, the page stays alive, and a second click while a scan runs is
 // refused. When the scan ends, or fails, or is cancelled, the guard is lifted again.
 let scanning = false;
+// ids of entries the admin said are DIFFERENT ingredients from the one in the form (kept on the saved entry; the duplicate tools then leave the pair alone)
+let differentIds = new Set();
 async function openCleanUp() {
     if (scanning) { notify("A scan is running already.", "info"); return; }
     scanning = true;
@@ -1185,7 +1264,7 @@ function showCleanUp(lookalikes) {
     openPlanDialog({
         title: "Clean up the ingredients",
         intro: "Entries that are not ingredients (notes, two names joined into one, label text), and entries that explain an ingredient that has an entry already. Open the step to see every entry, take the tick off what should stay, and apply it. Nothing is deleted: what is removed goes to the Recycle bin.",
-        makePlan: () => cleanupPlan([], [], everyIngredient, { only: ["ingredients", "markdown", "definitions", "safetyClaims"] }),
+        makePlan: () => cleanupPlan([], [], everyIngredient, { only: ["joinedNames", "friendlyNames", "ingredients", "markdown", "definitions", "safetyClaims"], classifications: classifications() }),
         apply: (changes) => applyChanges(changes),
         notes: () => [{
             title: "Ingredient names that are nearly the same", text: "Chemical names can differ by one letter and still be different ingredients (methylparaben, ethylparaben), so these are only listed.",
@@ -1246,6 +1325,7 @@ function openIngredientForm(item) {
     form.reset();
     setFormError(form, "");
     editingIngredientId = item ? item.id : null;
+    differentIds = new Set(item ? item.differentFrom : []);
     assisted = null;
     el("modalTitle").textContent = item ? "Edit Ingredient" : "Add Ingredient";
 
@@ -1261,11 +1341,14 @@ function openIngredientForm(item) {
     }
 
     el("ingredientNameInput").value = item ? item.name : "";
+    showNameClash();
     fillClassInput(item ? item.classificationId : "");
     el("ingredientPurposeInput").value = item ? item.purpose : "";
     paintPurposeCount();
     el("ingredientDescInput").value = item ? item.description : "";
     el("ingredientAliasesInput").value = item ? item.aliases.join(", ") : "";
+    showNameClash();
+    fillMergeInto(item);
     el("ingredientChemInput").value = item ? item.chemicalDescription : "";
     el("ingredientSourcesInput").value = item ? item.sources.join("\n") : "";
     el("ingredientRiskInput").value = item ? item.riskLevel : "";
@@ -1302,6 +1385,18 @@ async function saveIngredient(event) {
     const avoidTypes = types.avoid, goodTypes = types.good, avoidConditions = conditions.avoid, goodConditions = conditions.good;
 
     if (!name) { setFormError(form, "Type the INCI name."); el("ingredientNameInput").focus(); return; }
+    // "Aqua / Water" in the one name box: the box holds ONLY the INCI name. Split it, show the result and ask for one more Save, so nothing is
+    // saved that the admin has not seen.
+    if (/\s\/\s/.test(name)) {
+        const parts = name.split(/\s+\/\s+/).map((p) => p.trim()).filter(Boolean);
+        el("ingredientNameInput").value = parts[0];
+        const others = toList(el("ingredientAliasesInput").value);
+        parts.slice(1).forEach((p) => { if (!others.some((o) => sameKey(o) === sameKey(p))) others.push(p); });
+        el("ingredientAliasesInput").value = others.join(", ");
+        setFormError(form, `The name box holds only the INCI name. "${name}" was split: "${parts[0]}" is the INCI name, and ${parts.slice(1).map((p) => `"${p}"`).join(", ")} moved to Also known as. Check it, then save again.`);
+        el("ingredientNameInput").focus();
+        return;
+    }
     // a NEW ingredient needs a classification and a purpose. Whether an EXISTING one that has none yet may be saved without is decided for each
     // box on its own in classificationRules.js (CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING); one that has them cannot lose them.
     const existing = editingIngredientId ? everyIngredient.find((i) => i.id === editingIngredientId) : null;
@@ -1316,8 +1411,13 @@ async function saveIngredient(event) {
 
     // the same ingredient must not be in the list twice (any of its names matching any name of another entry)
     const myKeys = new Set([name, ...aliases].map(sameKey));
-    const clash = everyIngredient.find((other) => other.id !== editingIngredientId && keysOf(other).some((k) => myKeys.has(k)));
+    // hard stop: the same INCI name, or an entry in the Recycle bin that uses a name. A name shared only through Also known as can be a different
+    // ingredient: the admin may say so (nameClashes / the button under the name box).
+    const clash = everyIngredient.find((other) => other.id !== editingIngredientId && !differentIds.has(other.id)
+        && (other.binned ? keysOf(other).some((k) => myKeys.has(k)) : sameKey(other.name) === sameKey(name)));
     if (clash) { setFormError(form, clash.binned ? `"${titleOf(clash)}" uses one of these names and is in the Recycle bin. Restore it from there instead.` : `"${titleOf(clash)}" already uses one of these names. Edit that entry instead.`); return; }
+    const unsure = nameClashes(name, aliases);
+    if (unsure.length > 0) { showNameClash(); setFormError(form, `"${titleOf(unsure[0])}" already uses one of these names. Open it, or tell the system this is a different ingredient (the button under the name box).`); el("ingredientNameInput").focus(); return; }
     setFormError(form, "");
 
     const data = {
@@ -1331,6 +1431,7 @@ async function saveIngredient(event) {
         chemicalDescription: el("ingredientChemInput").value.replace(/\s+/g, " ").trim().slice(0, 600),
         sources: sourceLines.slice(0, 10),
         umbrella: el("ingredientUmbrellaInput").checked,
+        differentFrom: Array.from(differentIds).slice(0, 50),
         allergenTags: readChecks(el("allergenTagsChecks")),
         avoidForSkinTypes: avoidTypes,
         goodForSkinTypes: goodTypes,

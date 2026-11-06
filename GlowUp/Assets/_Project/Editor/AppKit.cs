@@ -765,7 +765,7 @@ namespace GlowUp.EditorTools
             //  so the legend said the same thing a second time)
             var listArea = Node(p.box, "ListArea");
             Fill(listArea.transform, 32, 300, 32, 176);
-            ScrollRect scroll = Scroll(listArea.transform, "IngredientScrollView", out RectTransform content, 14, 0, 22, 4, 24);
+            ScrollRect scroll = Scroll(listArea.transform, "IngredientScrollView", out RectTransform content, 24, 0, 22, 4, 24);   // 24: closed cards read as separate items
 
             // ---- the pattern row ----
             var row = Node(content, "IngredientRowTemplate");
@@ -788,7 +788,7 @@ namespace GlowUp.EditorTools
             Size(dot, 22, 22);
             var levelText = RawLabel(levelLine.transform, "LevelText", "Not flagged", 28, new Color32(94, 127, 75, 255), FontRole.Label);
             var purpose = Label(row.transform, "PurposeText", "Purpose: Helps even out skin tone and supports the skin barrier.",
-                                29, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+                                28, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);   // same size as the status, never the loudest line
             var reason = RawLabel(row.transform, "ReasonText", "For you: this is where the reason shows when an ingredient is flagged for your skin.",
                                   28, new Color32(169, 116, 28, 255), FontRole.Label, TextAlignmentOptions.TopLeft, true);
 
