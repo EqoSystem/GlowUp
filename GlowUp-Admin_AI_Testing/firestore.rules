@@ -272,6 +272,12 @@ service cloud.firestore {
       allow create: if isAdmin()
         && request.resource.data.keys().hasOnly(['uid', 'email', 'at', 'atUnix', 'page', 'count', 'items'])
         && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == request.auth.token.get('email', '')
+        && request.resource.data.atUnix is int
+        && request.resource.data.atUnix > request.time.toMillis() / 1000 - 120
+        && request.resource.data.atUnix < request.time.toMillis() / 1000 + 120
+        && request.resource.data.page is string && request.resource.data.page.size() <= 120
+        && request.resource.data.count is int
         && request.resource.data.items is list
         && request.resource.data.items.size() >= 1
         && request.resource.data.items.size() <= 450

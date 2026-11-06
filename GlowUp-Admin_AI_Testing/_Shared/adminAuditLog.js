@@ -42,7 +42,7 @@ export async function openAuditLog() {
     foot.append(close);
     frame.box.append(intro, list, foot);
     try {
-        const snapshot = await getDocs(query(collection(db, AUDIT_COLLECTION), orderBy("atUnix", "desc"), limit(SHOW)));
+        const snapshot = await getDocs(query(collection(db, AUDIT_COLLECTION), orderBy("at", "desc"), limit(SHOW)));
         list.replaceChildren();
         if (snapshot.empty) { list.append(make("p", "muted small", "No changes recorded yet. Recording started on 6 November 2026.")); return; }
         snapshot.forEach((d) => {

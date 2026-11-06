@@ -330,7 +330,11 @@ export async function getDocs(target) {
 //  AUDIT TRAIL: every write this site makes is recorded in "auditLog", IN THE SAME BATCH as the change itself, so a change
 //  is never saved without its record. One record per save: who (uid and e-mail of the signed-in admin), when, from which
 //  page, and which documents were created, changed or deleted, with the names of the fields (not their values) and the
-//  entry's name. The rules let an admin ADD a record for themself only; nobody can change or delete one.
+//  entry's name. The rules let an admin ADD a record for themself only (uid, e-mail and time are checked against the sign-in
+//  and the server clock); nobody can change or delete one.
+//  LIMIT: the record is written by this website. A change made with an admin's sign-in OUTSIDE the website (straight through
+//  Firebase's own API) is not recorded, so the log is a record of work done on the site, not proof against a stolen account.
+//  Closing that gap needs a server-side trigger (a Cloud Function, which needs the paid Blaze plan) or two-step sign-in.
 // ---------------------------------------------------------------------------------------------
 export const AUDIT_COLLECTION = "auditLog";
 const AUDIT_MOST_ITEMS = 450;
