@@ -325,6 +325,7 @@ export function openDuplicatesDialog(options) {
     dialog.foot.append(summary, make("span", "spacer"), closeButton);
 
     let drawing = 0;                                               // the number of the newest search; an older one that comes back late is dropped
+    let lastFound = null, lastSection = null;                      // the newest search result: choosing which entry to keep, or "Not the same", only redraws it
     async function draw() {
         const mine = ++drawing;
         const section = options.sections.find((s) => s.id === state.section) || options.sections[0];
@@ -352,6 +353,16 @@ export function openDuplicatesDialog(options) {
         if (mine !== drawing || found === null) return;             // a newer search took over (or the window closed): this one is dropped
         list.removeAttribute("aria-busy");
         tabs.querySelectorAll(".seg").forEach((tab) => { tab.disabled = false; });
+        lastFound = found; lastSection = section;
+        render(false);
+    }
+
+    // shows the newest search result. `keepPlace` = the admin changed something in the list (a choice, "Not the same"): no new search, and
+    // the list stays where it was scrolled to
+    function render(keepPlace) {
+        const found = lastFound, section = lastSection;
+        if (!found || !section) return;
+        const scroller = list.closest(".xl-body") || dialog.body, top = scroller.scrollTop;
         const groups = found.sure.map((group) => Object.assign({ sure: true }, group)).concat(found.possible.slice().sort((a, b) => (b.alike || 0) - (a.alike || 0)).map((group) => Object.assign({ sure: false }, group)))
             .filter((group) => !skipped.has(signature(group)));
         tally.found = Math.max(tally.found, found.sure.length + found.possible.length);
@@ -372,7 +383,7 @@ export function openDuplicatesDialog(options) {
                 const row = make("label", "dup-item" + (item.id === keepId ? " keep" : ""));
                 const radio = make("input");
                 radio.type = "radio"; radio.name = "keep-" + id; radio.checked = item.id === keepId;
-                radio.addEventListener("change", () => { keepOf.set(id, item.id); draw(); });
+                radio.addEventListener("change", () => { keepOf.set(id, item.id); render(true); });
                 const textBox = make("div", "dup-text");
                 const titleLine = make("div", "dup-title");
                 titleLine.append(make("b", "", shown.title || "(no name)"));
@@ -416,11 +427,12 @@ export function openDuplicatesDialog(options) {
             const skipButton = make("button", "btn ghost", "Not the same");
             skipButton.type = "button";
             skipButton.dataset.tip = "Leaves both as they are and takes this group off the list until the dialog is opened again.";
-            skipButton.addEventListener("click", () => { skipped.add(id); tally.skipped++; draw(); });
+            skipButton.addEventListener("click", () => { skipped.add(id); tally.skipped++; render(true); });
             actions.append(skipButton);
             card.append(actions);
             list.append(card);
         });
+        if (keepPlace) scroller.scrollTop = top;
     }
 
     async function run(work, count, message) {
