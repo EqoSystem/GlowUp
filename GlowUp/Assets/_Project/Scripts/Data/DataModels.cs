@@ -14,6 +14,7 @@ namespace GlowUp.Data
         public List<string> skinConditions = new List<string>();
         public List<string> knownAllergens = new List<string>();
         public bool termsAccepted;
+        public long healthConsentAtUnix;        // when the user agreed (second box on the Terms page) that their skin and allergy details are kept; 0 = not given
         public string theme = "light";
         public long createdAtUnix;
 

@@ -236,7 +236,7 @@ namespace GlowUp.EditorTools
             var scene = SceneBuilderCore.Open("TermsAndConditionScene");
             var c = BuildChrome(5, "Privacy Policy & Terms", continueLabel: "Continue", subtitleExisting: "PrivacyPolicySubtitleText");
             var ct = c.canvas;
-            const float toggleY = FooterTop + 6, toggleH = 110;
+            const float toggleY = FooterTop + 6, toggleH = 110, healthY = toggleY + toggleH + 8;      // the health-information box sits above the policy box
 
             // ---- the scrollable policy text ----
             var scrollT = Loose(ct, "PrivacyPolicy_Scroll View");
@@ -244,7 +244,7 @@ namespace GlowUp.EditorTools
             if (scrollT != null)
             {
                 var panel = EnsurePanel(c.card, "PrivacyPolicy_Scroll View", ThemeRole.SurfaceAlt, PanelAlpha, scrollT);
-                TopBottom(panel, c.card, HeaderBottom, toggleY + toggleH + 14);
+                TopBottom(panel, c.card, HeaderBottom, healthY + toggleH + 14);
                 if (scroll != null)
                 {
                     scroll.vertical = true; scroll.horizontal = false; scroll.scrollSensitivity = 40;
@@ -335,8 +335,26 @@ namespace GlowUp.EditorTools
                 SceneBuilderCore.SetField(anim, "punchScale", 1.02f);
             }
 
+            // ---- second box: consent for health information (skin conditions and allergies), a copy of the first so it looks the same ----
+            Toggle healthToggle = null; TextMeshProUGUI healthLabel = null;
+            if (toggle != null)
+            {
+                Transform old = toggleT.parent.Find("HealthToggle");
+                if (old != null) Object.DestroyImmediate(old.gameObject);
+                var healthT = Object.Instantiate(toggleT.gameObject, toggleT.parent).transform;
+                healthT.name = "HealthToggle";
+                healthT.gameObject.SetActive(true);
+                BottomRow(healthT, c.card, healthY, toggleH);
+                healthToggle = healthT.GetComponent<Toggle>();
+                healthToggle.isOn = false;
+                Transform label = healthT.Find("ReadLabel");
+                if (label != null) healthLabel = label.GetComponent<TextMeshProUGUI>();
+                if (healthLabel != null) { healthLabel.text = "I agree that GlowUp keeps my skin type, skin tone, skin conditions and allergies, to personalise my results"; healthLabel.fontSize = 28; }
+            }
+
             var go = SceneBuilderCore.EnsureRoot("TermsAcceptanceFlowController");
             var ctl = SceneBuilderCore.Ensure<TermsAcceptanceFlowController>(go);
+            SceneBuilderCore.SetField(ctl, "healthToggle", healthToggle); SceneBuilderCore.SetField(ctl, "healthLabel", healthLabel);
             SceneBuilderCore.SetField(ctl, "policyScroll", scroll); SceneBuilderCore.SetField(ctl, "readToggle", toggle);
             SceneBuilderCore.SetField(ctl, "toggleLabel", toggleLabel);
             SceneBuilderCore.SetField(ctl, "continueButton", c.cont); SceneBuilderCore.SetField(ctl, "continueAnimator", c.anim);

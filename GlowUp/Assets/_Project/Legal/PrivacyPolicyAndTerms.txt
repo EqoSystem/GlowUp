@@ -61,7 +61,13 @@ A few things are kept apart from your profile and are not removed by Delete My A
 GlowUp is not intended for children under 13 years of age, and we do not knowingly collect personal data from them. If you believe a child under 13 has created an account, please contact us so that we can remove it.
 
 ## 10. Your Rights and Choices
-Depending on where you live, you may have the right to see the personal data we hold about you, to correct it, to ask for it to be deleted, and to withdraw your consent. You can update your profile in the app at any time, and you can contact us for any other request.
+GlowUp follows the Data Privacy Act of 2012 (Republic Act No. 10173) of the Philippines. Under that law you have the right to be informed about how your personal data is used, to see the data we hold about you, to correct it, to object to its use, to ask for it to be deleted or blocked, to receive a copy of it, to be compensated for damage caused by misuse of it, and to withdraw your consent at any time. You can update your profile in the app, delete your account in Settings, and contact us for anything else. If you think your data was handled wrongly, you may also complain to the National Privacy Commission (privacy.gov.ph).
+
+Your skin type, skin tone, skin conditions and allergens are information about your health. The law treats such information as sensitive personal information, so we use it only with your clear consent. You give that consent with the second box on the page where you accept this policy, and you can withdraw it by deleting your account. Without that consent the app cannot compare products with your profile.
+
+Your data is stored with Google Firebase (Google Cloud), whose servers are outside the Philippines. Google keeps it under its own security and data protection terms.
+
+If a security breach puts your personal data at risk of serious harm, we will tell you and the National Privacy Commission within 72 hours of knowing about it, and say what happened and what you can do.
 
 ## 11. Changes to This Policy
 We may update this Privacy Policy from time to time. When we do, we will change the "Last updated" date at the top and, where the change is significant, tell you inside the app.

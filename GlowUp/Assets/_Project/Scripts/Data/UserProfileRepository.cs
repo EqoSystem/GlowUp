@@ -157,7 +157,7 @@ namespace GlowUp.Data
             { "age", p.age }, { "skinType", p.skinType ?? "" }, { "skinTone", p.skinTone ?? "" },
             { "skinConditions", p.skinConditions ?? new List<string>() },
             { "knownAllergens", p.knownAllergens ?? new List<string>() },
-            { "termsAccepted", p.termsAccepted }, { "theme", p.theme ?? "light" },
+            { "termsAccepted", p.termsAccepted }, { "healthConsentAtUnix", p.healthConsentAtUnix }, { "theme", p.theme ?? "light" },
             { "createdAt", FieldValue.ServerTimestamp }
         };
 
@@ -188,7 +188,7 @@ namespace GlowUp.Data
                 age = f.Int("age"),
                 skinType = f.Str("skinType"), skinTone = f.Str("skinTone"),
                 skinConditions = f.List("skinConditions"), knownAllergens = f.List("knownAllergens"),
-                termsAccepted = f.Bool("termsAccepted"), theme = f.Str("theme", "light")
+                termsAccepted = f.Bool("termsAccepted"), healthConsentAtUnix = f.Long("healthConsentAtUnix"), theme = f.Str("theme", "light")
             };
         }
     }

@@ -20,6 +20,7 @@ namespace GlowUp.Onboarding
         public static string SkinType = "", SkinTone = "";
         public static List<string> SkinConditions = new List<string>();
         public static List<string> Allergens = new List<string>();
+        public static bool HealthConsent;             // the second box on the Terms page was ticked: set just before the profile is saved, never persisted
         public static string Password = "";           // never persisted
         // Items the user typed that were not in the lists. Sent to the database for review after the account exists.
         public static List<string> CustomConditions = new List<string>();
@@ -157,7 +158,8 @@ namespace GlowUp.Onboarding
             username = Username, email = Email, birthday = BirthdayIso, age = Age,
             skinType = SkinType, skinTone = SkinTone,
             skinConditions = new List<string>(SkinConditions), knownAllergens = new List<string>(Allergens),
-            termsAccepted = true, createdAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+            termsAccepted = true, createdAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            healthConsentAtUnix = HealthConsent ? DateTimeOffset.UtcNow.ToUnixTimeSeconds() : 0
         };
     }
 }

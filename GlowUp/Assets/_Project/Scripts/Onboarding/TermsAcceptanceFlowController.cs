@@ -29,12 +29,16 @@ namespace GlowUp.Onboarding
         [SerializeField] private ScrollRect policyScroll;
         [SerializeField] private Toggle readToggle;
         [SerializeField] private TextMeshProUGUI toggleLabel;
+        [Tooltip("The second box: consent to keep the skin and allergy details (health information). Both boxes must be ticked. A scene built before it has none.")]
+        [SerializeField] private Toggle healthToggle;
+        [SerializeField] private TextMeshProUGUI healthLabel;
         [SerializeField] private Button continueButton;
         [SerializeField] private ContinueButtonGlowAnimator continueAnimator;
         [SerializeField] private Button backButton;
         [SerializeField] private TextMeshProUGUI feedbackText;
 
         [Range(0f, 0.2f)] [SerializeField] private float bottomThreshold = 0.03f;
+        [SerializeField] private string healthText = "I agree that GlowUp keeps my skin type, skin tone, skin conditions and allergies, to personalise my results (sensitive personal information)";
         [SerializeField] private string readLabel = "I have read and agree to the Privacy Policy and Terms & Conditions";
         [SerializeField] private string dashboardScene = SceneNames.Dashboard;
         [SerializeField] private string previousScene = SceneNames.Onboarding5;
@@ -64,11 +68,14 @@ namespace GlowUp.Onboarding
                 previousScene = "LogInScene";
                 if (readToggle != null) readToggle.gameObject.SetActive(false);
                 if (toggleLabel != null) toggleLabel.gameObject.SetActive(false);
+                if (healthToggle != null) healthToggle.gameObject.SetActive(false);
                 if (continueButton != null) continueButton.gameObject.SetActive(false);
             }
             if (policyScroll != null) policyScroll.onValueChanged.AddListener(_ => CheckBottom());
             if (readToggle != null) { readToggle.isOn = false; readToggle.interactable = false; readToggle.onValueChanged.AddListener(_ => OnToggled()); }
             if (toggleLabel != null) toggleLabel.text = readLabel;
+            if (healthToggle != null) { healthToggle.isOn = false; healthToggle.interactable = false; healthToggle.onValueChanged.AddListener(_ => OnToggled()); }
+            if (healthLabel != null) healthLabel.text = healthText;
             if (continueButton != null) continueButton.onClick.AddListener(() => _ = Create());
             if (backButton != null) backButton.onClick.AddListener(() => SceneNavigator.Go(previousScene));
         }
@@ -99,6 +106,7 @@ namespace GlowUp.Onboarding
             {
                 reachedBottom = true;
                 if (readToggle != null) readToggle.interactable = true;
+                if (healthToggle != null) healthToggle.interactable = true;
                 Say(msgTickToContinue);
             }
         }
@@ -106,14 +114,19 @@ namespace GlowUp.Onboarding
         void OnToggled()
         {
             // the box cannot be ticked before the end has been reached (it is locked), but make sure of it
-            if (!reachedBottom && readToggle != null && readToggle.isOn) { readToggle.SetIsOnWithoutNotify(false); Say(msgScrollFirst); }
-            else if (reachedBottom && !busy) Say(readToggle != null && readToggle.isOn ? "" : msgTickToContinue);
+            if (!reachedBottom && ((readToggle != null && readToggle.isOn) || (healthToggle != null && healthToggle.isOn)))
+            {
+                if (readToggle != null) readToggle.SetIsOnWithoutNotify(false);
+                if (healthToggle != null) healthToggle.SetIsOnWithoutNotify(false);
+                Say(msgScrollFirst);
+            }
+            else if (reachedBottom && !busy) Say(AgreedToAll() ? "" : msgTickToContinue);
             Refresh();
         }
 
         void Refresh()
         {
-            bool ready = reachedBottom && readToggle != null && readToggle.isOn && !busy;
+            bool ready = reachedBottom && AgreedToAll() && !busy;
             if (continueAnimator != null) continueAnimator.SetReady(ready);
             else if (continueButton != null) continueButton.interactable = ready;
             // while the account is being created nobody may walk away from this page: going back or leaving in the middle
@@ -121,6 +134,9 @@ namespace GlowUp.Onboarding
             if (backButton != null) backButton.interactable = !busy;
             OnboardingLeaveGuard.Locked = busy;
         }
+
+        /// <summary>The policy box is ticked and, when the scene has it, so is the health-information box.</summary>
+        bool AgreedToAll() => readToggle != null && readToggle.isOn && (healthToggle == null || healthToggle.isOn);
 
         void OnDestroy() { OnboardingLeaveGuard.Locked = false; }
 
@@ -186,6 +202,7 @@ namespace GlowUp.Onboarding
 
             // The account exists from here on. Nothing below may leave the user stuck on this page: each step
             // that fails is only noted, and the profile is always kept on the phone and sent again later.
+            OnboardingSession.HealthConsent = healthToggle != null && healthToggle.isOn;
             try { await UserProfileRepository.Save(OnboardingSession.ToProfile(uid)); }
             catch (Exception e) { Debug.LogWarning("Sign-up: the profile will be sent later: " + e.Message); }
             try
