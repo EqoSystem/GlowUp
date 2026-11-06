@@ -1271,9 +1271,9 @@ button.tile.small { width: auto; }
 .shade-item button:disabled { opacity: .3; cursor: default; }
 .shade-item.shade-new { border-style: dashed; border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
 .shade-msg { flex-basis: 100%; color: var(--bad); }
-/* 11 shades or more: one row that scrolls sideways; each shade keeps its full size */
-.shade-strip { display: flex; flex-wrap: nowrap; gap: 8px; width: 100%; overflow-x: auto; overscroll-behavior-x: contain; padding: 2px 2px 8px; scroll-snap-type: x proximity; scrollbar-width: thin; }
-.shade-strip .shade-item { flex: none; scroll-snap-align: start; }
+/* 11 shades or more: the shades sit in a box of about ten rows that scrolls up and down; each shade keeps its full size */
+.shade-strip { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; max-height: 440px; overflow-y: auto; overscroll-behavior-y: contain; padding: 2px 6px 2px 2px; scrollbar-width: thin; }
+.shade-strip .shade-item { flex: none; }
 .shade-strip + .field-hint { flex-basis: 100%; }
 
 /* ---- the "Edit list" window for allergen families, highlights and skin conditions ---- */
