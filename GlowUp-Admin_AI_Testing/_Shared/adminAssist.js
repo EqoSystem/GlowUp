@@ -5,6 +5,7 @@
 // and calls refreshAssist() whenever its data changed. The helper shows the first line; the small
 // arrow steps to the next one. tone = "bad" | "warn" | "info" | "ok" | "" (a plain tip).
 // "label" + "run" add one button that does what the line suggests.
+// A provider that returns null says "my data is not here yet": the panel shows a loading shape where the line will be.
 // A helper can be hidden per panel (its small x); the panel's "..." menu and Customise bring it back.
 //
 // The text is always written with textContent, never as HTML.
@@ -152,15 +153,24 @@ function paint(panelId, stepped) {
     if (!panel) return;
     const inner = panel.querySelector(":scope > .panel-inner") || panel;
     let strip = inner.querySelector(":scope > .assist");
-    let lines = [];
-    try { const provider = providers.get(panelId); lines = (provider ? provider() || [] : []).filter((line) => line && line.text); }
+    const head = inner.querySelector(":scope > .panel-head");
+    const place = (node) => { if (head) head.insertAdjacentElement("afterend", node); else inner.appendChild(node); };
+    let lines = [], raw = [];
+    try { const provider = providers.get(panelId); raw = provider ? provider() : []; lines = (raw || []).filter((line) => line && line.text); }
     catch (error) { console.warn("A helper could not work out what to say: ", error); }
+    // A provider answers null while its panel's data is still on the way (7 November 2026): the line will come, so a loading
+    // shape of the same size holds its place and the panel does not jump when the words arrive. Any other answer ends it.
+    let waiting = inner.querySelector(":scope > .assist-sk");
+    if (raw === null && !assistHidden(panelId)) {
+        if (!strip && !waiting) { waiting = document.createElement("div"); waiting.className = "sk assist-sk"; waiting.setAttribute("aria-hidden", "true"); place(waiting); }
+        return;
+    }
+    if (waiting) waiting.remove();
     if (lines.length === 0 || assistHidden(panelId)) { if (strip) strip.remove(); return; }
 
     if (!strip) {
         strip = build(panelId);
-        const head = inner.querySelector(":scope > .panel-head");
-        if (head) head.insertAdjacentElement("afterend", strip); else inner.appendChild(strip);
+        place(strip);
     }
     const index = (shown.get(panelId) || 0) % lines.length;
     shown.set(panelId, index);

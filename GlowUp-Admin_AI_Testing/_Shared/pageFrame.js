@@ -31,6 +31,7 @@
         bin: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/>',
         camera: '<path d="M4 8h3.2l1.8-2.5h6l1.8 2.5H20v11H4z"/><circle cx="12" cy="13.2" r="3.6"/>',
         chevron: '<path d="M15 6l-6 6 6 6"/>',
+        menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
         logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>'
     };
     var NAV = [
@@ -55,12 +56,13 @@
         document.body.classList.add("app");
         var sidebar = document.createElement("aside");
         sidebar.className = "sidebar";
-        // the logo is a plain badge (no click, no count): the Quick settings gear is in the top bar (adminShell.js, adminSettingsMenu.js).
-        // The name "Glow Up" stands beside it and folds away with the other labels.
+        // the logo and the name "Glow Up" are ONE link to the dashboard (like a site's home logo, 7 November 2026): a real <a href>,
+        // so a middle click or "open in new tab" works. It only opens a page; the dashboard runs its own sign-in check as always.
+        // The Quick settings gear is in the top bar (adminShell.js, adminSettingsMenu.js). The name folds away with the other labels.
         // The bottom holds the signed-in e-mail and Sign Out. adminCommon.js fills the e-mail
         // in once the sign-in check has answered, and wires the button.
         sidebar.innerHTML =
-            '<div class="sidebar-brand"><span class="brand-mark"><span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"></span></span><span class="brand-title label">Glow Up</span></div>' +
+            '<div class="sidebar-brand"><a class="brand-home" href="' + NAV[0].href + '" aria-label="GlowUp – go to dashboard"><span class="brand-mark"><span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"></span></span><span class="brand-title label">Glow Up</span></a></div>' +
             '<ul class="nav-links" id="sidebarNav" aria-label="Pages"><li class="nav-drop" aria-hidden="true"></li>' +
             NAV.map(function (n) {
                 var here = n.id === page;
@@ -117,10 +119,41 @@
 
         var topbar = document.createElement("header");
         topbar.className = "topbar";
+        // the menu button only shows up to 600 px wide (adminCommon.css): there the sidebar is off the screen and this slides it in
         topbar.innerHTML =
+            '<button type="button" class="icon-btn menu-btn" id="menuBtn" aria-controls="sidebarNav" aria-expanded="false" aria-label="Open the menu">' + svg("menu") + "</button>" +
             '<div class="topbar-titles"><h2 class="header-title">' + esc(main.getAttribute("data-title") || "") + "</h2></div>" +
             '<div class="topbar-tools"></div>';
         main.insertBefore(topbar, main.firstChild);
+        var menuBtn = topbar.querySelector("#menuBtn");
+        var paintMenuBtn = function () {
+            var open = root.classList.contains("sb-peek");
+            menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+            menuBtn.setAttribute("aria-label", open ? "Close the menu" : "Open the menu");
+        };
+        var closePeek = function (focusBack) {
+            if (!root.classList.contains("sb-peek")) return;
+            root.classList.remove("sb-peek");
+            paintToggle(); paintMenuBtn(); placeToggle();
+            if (focusBack) focusBack.focus();
+        };
+        menuBtn.addEventListener("click", function () {
+            root.classList.toggle("sb-peek");
+            paintToggle(); paintMenuBtn();
+            if (root.classList.contains("sb-peek")) { var here = sidebar.querySelector(".nav-links a.active") || links[0]; if (here) here.focus({ preventScroll: true }); }
+        });
+        // the menu opened over the page (narrow windows) closes with Esc, or with a press anywhere outside it
+        document.addEventListener("keydown", function (event) {
+            if (event.key !== "Escape" || !root.classList.contains("sb-peek")) return;
+            closePeek(window.matchMedia("(max-width: 600px)").matches ? menuBtn : toggle);
+        });
+        document.addEventListener("pointerdown", function (event) {
+            if (!root.classList.contains("sb-peek")) return;
+            if (sidebar.contains(event.target) || toggle.contains(event.target) || menuBtn.contains(event.target)) return;
+            closePeek(null);
+        });
+        narrow.addEventListener("change", paintMenuBtn);
+        toggle.addEventListener("click", paintMenuBtn);
 
         // a page the pointer rests on is fetched ahead (its HTML and its script), so opening it does not wait for them
         var fetched = {};

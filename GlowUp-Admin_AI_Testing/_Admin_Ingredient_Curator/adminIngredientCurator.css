@@ -51,6 +51,8 @@
     .as-rows .ingredient-card:not(.open) .ingredient-name { flex: 1 1 60%; }
     .as-rows .ingredient-card:not(.open) .card-sub { flex: 1 1 100%; order: 3; }
     .as-rows .ingredient-card:not(.open) .row-actions { order: 2; }
+    /* the second line (scientific name, classification, badges) wraps instead of running past the card */
+    .as-rows .ingredient-card:not(.open) .card-sub { flex-wrap: wrap; row-gap: 4px; }
 }
 
 /* ---- the one toolbar row of the list (5 November 2026): a little tighter, so the pager fits beside New folder and the bin at the far right ---- */
@@ -76,10 +78,12 @@
 .migration-lines { margin: 0 0 10px; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-base); }
 
 /* shown on any address that is not the live site */
-.test-banner { margin: 12px 26px 0; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--warn, #d9a441); background: color-mix(in srgb, var(--warn, #d9a441) 16%, var(--surface)); color: var(--text); font-size: var(--fs-sm); }
+.test-banner { margin: 12px var(--page-x) 0; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--warn, #d9a441); background: color-mix(in srgb, var(--warn, #d9a441) 16%, var(--surface)); color: var(--text); font-size: var(--fs-sm); }
 
 /* the scan window and the bar inside the duplicates window (Clean up, Find duplicates) */
 .scan-status { margin: 4px 0 10px; color: var(--text); }
 .scan-track { height: 8px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
 .scan-fill { height: 100%; width: 0; border-radius: 999px; background: var(--accent); transition: width .12s linear; }
 .scan-inline { padding: 18px 8px; }
+/* on a phone the classification column gives up its fixed width, so the line can wrap (after its 190 px rule above) */
+@media (max-width: 620px) { .as-rows .ingredient-card:not(.open) .class-cell { flex: 0 1 auto; max-width: 100%; } }

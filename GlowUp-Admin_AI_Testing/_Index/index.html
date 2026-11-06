@@ -20,8 +20,17 @@
 <body class="login-page">
     <script src="../_Shared/pageSkeleton.js"></script>
 
-    <div class="login-tools" id="loginTools"></div>
+    <!-- the logo and the name are one link, as on the admin pages. Signed out it can only lead back to this login page
+         (never past the sign-in); a signed-in admin is sent on to the dashboard by indexApp.js as before. -->
+    <header class="login-top">
+        <a class="brand-home login-brand" href="../_Index/index.html" aria-label="GlowUp – admin login page">
+            <span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"></span>
+            <span class="brand-title">Glow Up</span>
+        </a>
+        <div class="login-tools" id="loginTools"></div>
+    </header>
 
+    <main class="login-main">
     <div class="login-card">
         <div class="icon-box"><i data-icon="lock"></i></div>
         <h1>GlowUp Admin</h1>
@@ -53,8 +62,67 @@
             </div>
         </form>
 
-        <p class="footer-note">Sign-in attempts are recorded.</p>
+        <!-- the old note about recorded sign-ins that stood here is now section 7 (Monitoring) of the Terms -->
+        <p class="footer-note">By logging in, you agree to the <button type="button" class="text-link" id="termsLink" aria-haspopup="dialog" aria-controls="termsDialog">Terms and Conditions</button>.</p>
     </div>
+    </main>
+
+    <!-- THE TERMS AND CONDITIONS, in a window over the page (termsDialog.js opens and closes it).
+         Esc, the Close button or a click outside closes it, and the keyboard goes back to the link. -->
+    <dialog id="termsDialog" class="terms-dialog" aria-labelledby="termsTitle">
+        <div class="terms-box">
+            <header class="terms-head">
+                <h2 id="termsTitle">Terms and Conditions for GlowUp Administrators</h2>
+                <p class="terms-meta">Draft of 7 November 2026</p>
+            </header>
+            <div class="terms-body" tabindex="0" aria-label="Terms and Conditions text">
+                <p class="terms-template" role="note"><b>Template, pending review.</b> This text is a template. The GlowUp project owner must review and approve it before it is treated as final.</p>
+
+                <h3>1. Purpose</h3>
+                <p>The GlowUp Admin Portal is for authorized GlowUp administrators only. It is used to look after the data behind the GlowUp app. If you have not been given an admin account by the project owner, do not use this portal.</p>
+
+                <h3>2. Authorized use</h3>
+                <p>Access and manage only the data you need for the duties you have been given. Examples are viewing analytics, managing brands and products, curating ingredients and moderating content sent in by app users. Do not open or change data that your duties do not need.</p>
+
+                <h3>3. Confidentiality</h3>
+                <p>Do not copy, export, screenshot, share, sell or disclose user data, analytics or any other content of this portal outside GlowUp unless you have written authorization from the project owner. This applies during your access and after it ends.</p>
+
+                <h3>4. Data privacy</h3>
+                <p>Handle all personal data in line with the Philippine Data Privacy Act of 2012 (Republic Act No. 10173). Access only the minimum data you need for the task in front of you, use it only for that task, and do not try to identify the people behind anonymous records.</p>
+
+                <h3>5. Account security</h3>
+                <ul>
+                    <li>Never share your login details. Your account is for you alone.</li>
+                    <li>Log out when you finish, and always on a shared or public device.</li>
+                    <li>If you think someone else has used your account, or you see access that should not happen, report it to the project owner immediately.</li>
+                </ul>
+
+                <h3>6. Prohibited actions</h3>
+                <ul>
+                    <li>Altering or deleting records without a valid reason.</li>
+                    <li>Impersonating app users or other administrators.</li>
+                    <li>Trying to get around the portal's security, sign-in or access rules.</li>
+                    <li>Using the portal or its data for personal purposes.</li>
+                </ul>
+
+                <h3>7. Monitoring</h3>
+                <p>Admin sign-ins and admin actions in the portal are logged for security and audit purposes. The logs record which account made a change and when, and they cannot be edited from the portal.</p>
+
+                <h3>8. Consequences</h3>
+                <p>Breaking these terms may lead to your admin access being removed, and to further action where the law or GlowUp's rules call for it.</p>
+
+                <h3>9. Changes</h3>
+                <p>These terms may be updated. The date at the top shows the latest version. If you keep using the portal after a change, you accept the updated terms.</p>
+
+                <h3>10. Contact</h3>
+                <p>Questions about these terms, or reports about account security: [admin contact email].</p>
+            </div>
+            <footer class="terms-foot">
+                <button type="button" class="btn primary" id="termsClose">Close</button>
+            </footer>
+        </div>
+    </dialog>
+    <script src="../_Index/termsDialog.js" defer></script>
 
     <script type="module" src="../_Index/indexApp.js"></script>
 </body>

@@ -47,6 +47,8 @@ let openScanId = "";                  // the scan whose details are open in the 
 let scansToday = null, flaggedToday = 0;
 let waitingInventory = null, waitingIngredients = null;
 let suggestionsLoaded = false;
+// which helper lines have their data (or know it failed): until then a helper answers null and shows a loading shape
+let todayAnswered = false, activityAnswered = false, brandsAnswered = false;
 const many = (n, one, more) => `${n} ${n === 1 ? one : more}`;
 
 const STATUS_NAMES = { safe: "Safe", caution: "Use with care", harmful: "Harmful" };
@@ -110,11 +112,14 @@ async function loadCatalogueCounts() {
         allBrands = snapshot.docs.filter((d) => d.data().binned !== true).map((d) => ({ id: d.id, name: d.data().name || "Unnamed Brand", category: d.data().category || "", status: String(d.data().status || "Active"), scans: toWholeNumber(d.data().scans) }));
         setMetric("totalBrandsCount", allBrands.length);
         allBrands.sort((a, b) => b.scans - a.scans || a.name.localeCompare(b.name));
+        brandsAnswered = true;
         renderTopBrands(allBrands);
         datasetChanged("topBrands");
         refreshAssist("brands");
     } catch (error) {
         console.error("Error counting brands: ", error);
+        brandsAnswered = true;
+        refreshAssist("brands");
         setMetric("totalBrandsCount", "–", describeError(error));
         showEmpty("topBrands", "Could not load the brands.", true);
     }
@@ -175,6 +180,8 @@ async function loadReviewQueue() {
         return Math.max(0, all.data().count - binned.data().count);
     };
 
+    // the loading shape at the top of Quick actions holds the place of the first tile; it goes when a tile shows or all counts answered
+    const shapeGone = () => { const shape = el("reviewTilesLoading"); if (shape) shape.remove(); };
     try {
         const [brandCount, productCount] = await Promise.all([waiting("brands"), waiting("products")]);
         waitingInventory = brandCount + productCount;
@@ -183,6 +190,7 @@ async function loadReviewQueue() {
             if (productCount > 0) parts.push(many(productCount, "product", "products"));
             if (brandCount > 0) parts.push(many(brandCount, "brand", "brands"));
             el("reviewInventoryTitle").textContent = parts.join(" and ") + " waiting for review";
+            shapeGone();
             el("reviewInventoryTile").style.display = "";
         }
     } catch (error) {
@@ -193,6 +201,7 @@ async function loadReviewQueue() {
         waitingIngredients = ingredientCount;
         if (ingredientCount > 0) {
             el("reviewIngredientsTitle").textContent = many(ingredientCount, "AI-found ingredient", "AI-found ingredients") + " waiting for review";
+            shapeGone();
             el("reviewIngredientsTile").style.display = "";
         }
     } catch (error) {
@@ -205,11 +214,13 @@ async function loadReviewQueue() {
         waitingSnapshots = snapshots.data().count;
         if (waitingSnapshots > 0) {
             el("reviewSnapshotsTitle").textContent = many(waitingSnapshots, "product photo", "product photos") + " waiting for review";
+            shapeGone();
             el("reviewSnapshotsTile").style.display = "";
         }
     } catch (error) {
         console.warn("Could not count the photos waiting for review: ", error);           // the tile simply stays hidden
     }
+    shapeGone();
     // with nothing waiting, only the two shortcuts are left (the menu on the left has them too): the panel folds to one line
     const waitingNow = (waitingInventory || 0) + (waitingIngredients || 0) + waitingSnapshots;
     setPanelQuiet("actions", waitingNow === 0, waitingNow === 0 ? "Nothing is waiting for review" : `${many(waitingNow, "entry waits", "entries wait")} for review`);
@@ -243,6 +254,7 @@ function watchScansToday() {
             results[status === "safe" || status === "harmful" ? status : "caution"]++;
         });
         todayResults = results;
+        todayAnswered = true;
         scansToday = capped && exactToday !== null ? exactToday : snapshot.size;
         flaggedToday = flagged;
         renderResults(results);
@@ -252,6 +264,8 @@ function watchScansToday() {
         setMetric("flaggedAllergensCount", flagged, "Scans today in which one of the user's own allergens was found" + (capped ? " (among the latest " + TODAY_LIMIT + ")" : ""));
     }, (error) => {
         console.error("Error watching today's scans: ", error);
+        todayAnswered = true;
+        refreshAssist("numbers");
         setMetric("totalScansCount", "–", describeError(error));
         setMetric("flaggedAllergensCount", "–", describeError(error));
     });
@@ -294,6 +308,7 @@ function watchRecentActivity() {
     const recent = query(collection(db, "scanActivity"), orderBy("scannedAtUnix", "desc"), limit(RECENT_ITEMS));
     onSnapshot(recent, (snapshot) => {
         recentScans = snapshot.docs.map((d) => Object.assign({ id: d.id }, d.data()));
+        activityAnswered = true;
         datasetChanged("activity");
         refreshAssist("activity");
         refreshAssist("numbers");
@@ -306,6 +321,8 @@ function watchRecentActivity() {
         renderActivity();
     }, (error) => {
         console.error("Error watching recent activity: ", error);
+        activityAnswered = true;
+        refreshAssist("activity");
         showEmpty("activity", "Could not load the activity.", true);
         el("activityEmptyHint").textContent = describeError(error);
     });
@@ -366,6 +383,8 @@ async function loadSuggestions() {
         }
     }
     if (failed && suggestions.length === 0) {
+        suggestionsLoaded = true;
+        refreshAssist("suggestions");
         showEmpty("suggestion", "Could not load the suggestions.", true);
         el("suggestionEmptyHint").textContent = describeError(failed);
         return;
@@ -425,6 +444,7 @@ function registerHelpers() {
     const hourName = (hour) => new Date(2000, 0, 1, hour).toLocaleTimeString(undefined, { hour: "numeric" });
 
     registerAssist("numbers", () => {
+        if (!todayAnswered) return null;
         if (scansToday === null) return [];
         // (a helper only speaks when it adds something: "no scans yet" beside a tile that says 0 was the same thing twice)
         const lines = [];
@@ -446,6 +466,7 @@ function registerHelpers() {
     });
 
     registerAssist("activity", () => {
+        if (!activityAnswered) return null;
         const total = recentScans.length;
         if (total === 0) return [];
         const lines = [];
@@ -464,7 +485,8 @@ function registerHelpers() {
     // (the sum of what waits, the share of each result). Their folded line carries the short version instead.
 
     registerAssist("suggestions", () => {
-        if (!suggestionsLoaded || suggestions.length === 0) return [];
+        if (!suggestionsLoaded) return null;
+        if (suggestions.length === 0) return [];
         const allergens = suggestions.filter((s) => s.kind === "Allergen").length, conditions = suggestions.length - allergens;
         const parts = [];
         if (allergens > 0) parts.push(many(allergens, "allergen", "allergens"));
@@ -474,6 +496,7 @@ function registerHelpers() {
     });
 
     registerAssist("brands", () => {
+        if (!brandsAnswered) return null;
         if (allBrands.length === 0) return [];
         const total = allBrands.reduce((sum, b) => sum + b.scans, 0);
         const lines = [];

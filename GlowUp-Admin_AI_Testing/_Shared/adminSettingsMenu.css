@@ -1,7 +1,7 @@
 /* Quick settings (adminSettingsMenu.js), on every admin page: a gear at the far right of the header opens ONE panel under it. */
 
-/* the logo: a plain badge. No click, no count; the "G" lines up with the left edge of the menu's highlight */
-.brand-mark { flex: none; display: grid; place-items: center; padding: 4px; margin: -4px 0 -4px -5px; cursor: default; }
+/* the logo (part of the link to the dashboard, pageFrame.js); the "G" lines up with the left edge of the menu's highlight */
+.brand-mark { flex: none; display: grid; place-items: center; padding: 4px; margin: -4px 0 -4px -5px; cursor: pointer; }
 .brand-mark .brand-logo img { border-radius: 10px; }
 html.sb-collapsed .brand-mark { margin: 0; }
 

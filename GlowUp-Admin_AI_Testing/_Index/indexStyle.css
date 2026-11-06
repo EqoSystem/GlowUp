@@ -1,15 +1,22 @@
 /* Login page: only where things sit. Colours, inputs and buttons come from ../_Shared/adminCommon.css. */
 
+/* a top row (the GlowUp link at the left, light / dark at the right) and the card in the middle of the space under it.
+   Every width from a phone up: the card is never wider than the window, and nothing is fixed on top of it. */
 body.login-page {
-    min-height: 100vh; display: grid; place-items: center; padding: 24px;
+    min-height: 100vh; min-height: 100dvh; display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr);
+    padding: 14px var(--page-x) 24px;
     background:
         radial-gradient(60% 50% at 80% 0%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%),
         radial-gradient(50% 45% at 0% 100%, color-mix(in srgb, var(--gold) 12%, transparent), transparent 70%),
         var(--bg);
 }
-.login-tools { position: fixed; top: 16px; right: 18px; display: flex; gap: 8px; }
+.login-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; }
+.login-brand { padding: 2px 8px 2px 2px; }
+.login-brand .brand-title { font-size: var(--fs-md); }
+.login-tools { display: flex; gap: 8px; }
+.login-main { display: grid; place-items: center; padding-block: 16px; min-width: 0; }
 .login-card {
-    width: 380px; max-width: 100%; padding: 32px 28px; border-radius: calc(var(--radius) + 4px); text-align: center;
+    width: min(380px, 100%); padding: clamp(22px, 6vw, 32px) clamp(18px, 5vw, 28px); border-radius: calc(var(--radius) + 4px); text-align: center;
     background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); animation: pop-in .4s var(--ease) both;
     transition: border-color .25s, box-shadow .25s;
 }
@@ -24,7 +31,39 @@ body.login-page {
 .login-message { margin: 0; }
 .login-action { display: flex; align-items: center; gap: 8px; }
 .login-btn { flex: 1; padding: 12px 16px; font-size: var(--fs-base); }
-.footer-note { font-size: var(--fs-xs); color: var(--muted); margin-top: 18px; }
+.footer-note { font-size: var(--fs-xs); color: var(--muted); margin-top: 18px; line-height: 1.6; }
+
+/* "Terms and Conditions": a button that looks like a link, in the accent colour, underlined on hover and keyboard focus */
+.text-link {
+    display: inline; padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: var(--accent-text); cursor: pointer;
+    text-decoration: none; text-underline-offset: 2px; border-radius: 3px;
+}
+.text-link:hover, .text-link:focus-visible { text-decoration: underline; }
+.text-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* the Terms window: title at the top, the text scrolls, Close at the bottom. It fits any window, in both themes. */
+.terms-dialog {
+    margin: auto; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); background: var(--surface);
+    width: min(640px, calc(100vw - 32px)); max-width: none; max-height: min(760px, calc(100vh - 32px)); max-height: min(760px, calc(100dvh - 32px));
+    box-shadow: var(--shadow); overflow: hidden;
+}
+.terms-dialog[open] { animation: pop-in .22s var(--ease); }
+.terms-dialog::backdrop { background: var(--overlay); backdrop-filter: blur(3px); }
+html:has(.terms-dialog[open]) { overflow: hidden; }
+.terms-box { display: flex; flex-direction: column; max-height: inherit; }
+.terms-head { padding: 20px clamp(16px, 4vw, 24px) 12px; border-bottom: 1px solid var(--border); }
+.terms-head h2 { font-size: var(--fs-md); font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.terms-meta { margin-top: 2px; font-size: var(--fs-xs); color: var(--muted); }
+.terms-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px clamp(16px, 4vw, 24px) 20px; font-size: var(--fs-sm); line-height: 1.6; color: var(--text-2); text-align: left; overflow-wrap: anywhere; }
+.terms-body:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.terms-body h3 { margin: 16px 0 4px; font-size: var(--fs-base); font-weight: 650; color: var(--text); }
+.terms-body ul { margin: 4px 0 0 20px; display: flex; flex-direction: column; gap: 3px; }
+.terms-template {
+    padding: 10px 12px; border-radius: var(--radius-sm); color: var(--text);
+    background: color-mix(in srgb, var(--warn) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent);
+}
+.terms-foot { display: flex; justify-content: flex-end; padding: 12px clamp(16px, 4vw, 24px) 16px; border-top: 1px solid var(--border); }
+@media (prefers-reduced-motion: reduce) { .terms-dialog[open] { animation: none; } }
 
 /* the password box with its eye: the eye sits inside the box at the right */
 .password-box { position: relative; display: flex; }

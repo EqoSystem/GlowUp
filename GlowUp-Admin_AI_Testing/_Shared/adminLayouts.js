@@ -189,7 +189,9 @@ function decorate(panel) {
         // data-no-fold: the list a page is for has no arrow, and so can never be folded away
         const closers = (panel.hasAttribute("data-no-fold") ? "" : foldButton()) + menu;
         const tail = head.querySelector("[data-head-end]");
-        if (tail) tail.insertAdjacentHTML("beforebegin", closers); else head.insertAdjacentHTML("beforeend", closers);
+        // without such a part they get a group of their own, so on a narrow panel they wrap together (the "..." is invisible until
+        // the pointer is over the panel: alone on a second line it would leave an empty band)
+        if (tail) tail.insertAdjacentHTML("beforebegin", closers); else head.insertAdjacentHTML("beforeend", `<span class="head-end">${closers}</span>`);
     } else panel.querySelector(".panel-tools").insertAdjacentHTML("beforeend", menu);
     panel.querySelector(".tools-name").textContent = panel.dataset.label || panel.dataset.panel;
 }
@@ -352,6 +354,12 @@ function watchForFit() {
     });
     fitWatcher.observe(b, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "style", "hidden"] });
     window.addEventListener("resize", queueFit);
+    // the board can get narrower or wider without the window changing (the sidebar folds, the settings panel opens): its text
+    // wraps onto more or fewer lines, so every panel is measured again or it would run over the panel under it
+    if (window.ResizeObserver) {
+        let lastWidth = b.clientWidth;
+        new ResizeObserver(() => { if (b.clientWidth !== lastWidth) { lastWidth = b.clientWidth; queueFit(); } }).observe(b);
+    }
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(queueFit).catch(() => { });
     fitNow();
 }
