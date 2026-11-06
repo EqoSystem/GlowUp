@@ -83,7 +83,8 @@ namespace GlowUp.Onboarding
         IEnumerator Start()
         {
             if (!readOnly) OnboardingSession.LoadDraft();
-            Say(readOnly ? "Viewing only. No sign-in or agreement is needed." : msgScrollFirst);
+            // reading only (from Settings or the log-in page): no status line at all (the old "Viewing only..." line read like a log, 7 November 2026)
+            Say(readOnly ? "" : msgScrollFirst);
             Refresh();
 
             // 1. let the document take its full height, 2. start at the very top, 3. only then watch for the bottom
@@ -233,7 +234,13 @@ namespace GlowUp.Onboarding
             SyncQueue.EnqueueSet($"{collection}/{Guid.NewGuid():N}", rec);
         }
 
-        void Say(string m) { if (feedbackText != null) feedbackText.text = m; }
+        void Say(string m)
+        {
+            if (feedbackText == null) return;
+            if (readOnly) m = "";                        // nothing to tick or continue while only reading
+            feedbackText.text = m;
+            feedbackText.gameObject.SetActive(!string.IsNullOrEmpty(m));
+        }
     }
 
     [Serializable]

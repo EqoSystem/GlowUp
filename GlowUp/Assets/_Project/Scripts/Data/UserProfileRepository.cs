@@ -148,6 +148,80 @@ namespace GlowUp.Data
 
         public static void Clear() { Current = null; OfflineCache.Delete(CacheKey); }
 
+        // ---------------------------------------------------------------------------------------
+        //  THE SKIN QUIZ ONLY (7 November 2026)
+        //  Retaking or resetting the skin quiz may change these four fields and nothing else: never the name, email, password,
+        //  way of signing in, birthday or the record of the Terms being accepted. The write is a merge of exactly these keys, so
+        //  the rest of the account document stays as it is even when the phone's copy of the profile is missing or old.
+        // ---------------------------------------------------------------------------------------
+        /// <summary>The only fields a quiz retake or reset writes.</summary>
+        public static readonly string[] SkinFields = { "skinType", "skinTone", "skinConditions", "knownAllergens" };
+
+        /// <summary>The four answers as a queued write (JsonUtility writes every public field: these four only).</summary>
+        [Serializable]
+        public class SkinProfilePatch
+        {
+            public string skinType = "", skinTone = "";
+            public List<string> skinConditions = new List<string>(), knownAllergens = new List<string>();
+        }
+
+        /// <summary>The write itself: the four skin fields and nothing else.</summary>
+        public static Dictionary<string, object> SkinPatch(string skinType, string skinTone, List<string> conditions, List<string> allergens) => new Dictionary<string, object>
+        {
+            { "skinType", skinType ?? "" }, { "skinTone", skinTone ?? "" },
+            { "skinConditions", new List<string>(conditions ?? new List<string>()) }, { "knownAllergens", new List<string>(allergens ?? new List<string>()) }
+        };
+
+        /// <summary>What a document looks like after a merge write of the patch (the database's own rule). Used by the tests.</summary>
+        public static Dictionary<string, object> MergedWith(IDictionary<string, object> document, IDictionary<string, object> patch)
+        {
+            var after = new Dictionary<string, object>(document ?? new Dictionary<string, object>());
+            foreach (var pair in patch ?? new Dictionary<string, object>()) after[pair.Key] = pair.Value;
+            return after;
+        }
+
+        /// <summary>Tests only: when set, a skin save is handed to this instead of the database (path, fields).</summary>
+        public static Func<string, Dictionary<string, object>, Task> SkinWriteForTests;
+        /// <summary>Tests only: the account id to use instead of asking Firebase.</summary>
+        public static string UidForTests;
+
+        /// <summary>Saves the skin quiz answers of the signed-in user: the four skin fields only (see SkinFields).</summary>
+        public static async Task SaveSkinProfile(string skinType, string skinTone, List<string> conditions, List<string> allergens)
+        {
+            string uid = UidForTests ?? ActiveUid;
+            if (string.IsNullOrEmpty(uid)) return;
+            // the phone's copy changes in the same four fields only
+            if (Current != null && Belongs(Current, uid))
+            {
+                Current.skinType = skinType ?? ""; Current.skinTone = skinTone ?? "";
+                Current.skinConditions = new List<string>(conditions ?? new List<string>());
+                Current.knownAllergens = new List<string>(allergens ?? new List<string>());
+                OfflineCache.Save(CacheKey, Current);
+            }
+            string path = "users/" + uid;
+            Dictionary<string, object> patch = SkinPatch(skinType, skinTone, conditions, allergens);
+            if (SkinWriteForTests != null) { await SkinWriteForTests(path, patch); return; }
+            var queued = new SkinProfilePatch
+            {
+                skinType = skinType ?? "", skinTone = skinTone ?? "",
+                skinConditions = new List<string>(conditions ?? new List<string>()), knownAllergens = new List<string>(allergens ?? new List<string>())
+            };
+            if (ConnectivityMonitor.Online && await FirebaseBootstrap.Ready)
+            {
+                try
+                {
+                    Task write = FirebaseFirestore.DefaultInstance.Document(path).SetAsync(patch, SetOptions.MergeAll);
+                    if (await write.Within(SaveWaitSeconds)) return;
+                    TaskScheduler main = SynchronizationContext.Current != null ? TaskScheduler.FromCurrentSynchronizationContext() : TaskScheduler.Default;
+                    _ = write.ContinueWith(t => { try { SyncQueue.EnqueueSet(path, queued); } catch (Exception late) { Debug.LogWarning("Skin save: " + late.Message); } },
+                        CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, main);
+                    return;
+                }
+                catch (Exception e) { Debug.LogWarning("Skin save queued: " + e.Message); }
+            }
+            SyncQueue.EnqueueSet(path, queued);
+        }
+
         static Dictionary<string, object> ToDict(UserProfileData p) => new Dictionary<string, object>
         {
             { "firstName", p.firstName ?? "" }, { "middleName", p.middleName ?? "" }, { "lastName", p.lastName ?? "" },

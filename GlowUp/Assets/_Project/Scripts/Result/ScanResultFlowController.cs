@@ -90,6 +90,11 @@ namespace GlowUp.Result
         [Tooltip("Under the badge: what it means")]
         [SerializeField] private TextMeshProUGUI pendingDetailText;
         [SerializeField] private string pendingDetailWords = "Read by the AI from a photo. Not checked by an admin yet, so treat it as unverified.";
+        [Header("Pending review (7 November 2026: the product was named from a photo; its list comes from a product page or the pack)")]
+        [SerializeField] private string pendingBadgeWordsV2 = "Unverified \u2014 pending review";
+        [SerializeField] private string pendingDetailWordsV2 = "Ingredient data from the web may be incomplete. GlowUp hasn't reviewed this product yet.";
+        [SerializeField] private string listFromPendingPage = "Ingredient list from a product page online (unverified), waiting for GlowUp's review. Check it against your pack.";
+        [SerializeField] private string listFromPendingPack = "Ingredient list read from your pack, waiting for GlowUp's review.";
         [SerializeField] private string listFromInventory = "Ingredient list from the GlowUp product list.";
         [SerializeField] private string listFromWeb = "Ingredient list looked up online. Check it against your pack when you can.";
         [Tooltip("Looked up by the AI without a live web search: the page is one the AI named, not one that was opened")]
@@ -394,8 +399,8 @@ namespace GlowUp.Result
             {
                 bool pending = has && record.pendingApproval;
                 pendingBadge.SetActive(pending);
-                if (pending && pendingBadgeText != null) pendingBadgeText.text = pendingBadgeWords;
-                if (pending && pendingDetailText != null) pendingDetailText.text = pendingDetailWords;
+                if (pending && pendingBadgeText != null) pendingBadgeText.text = pendingBadgeWordsV2;
+                if (pending && pendingDetailText != null) pendingDetailText.text = pendingDetailWordsV2;
             }
 
             string from = has ? ListFrom(record) : "";
@@ -404,7 +409,7 @@ namespace GlowUp.Result
                 listSourceText.gameObject.SetActive(has);
                 // a scan saved before "web-backed" was kept is not called "not web-backed": that is simply not known
                 bool backedOrUnknown = has && (record.listWebBacked || string.IsNullOrEmpty(record.listFrom));
-                string line = from == "pending" ? listFromPending : from == "typed" ? listTyped : from == "inventory" ? listFromInventory
+                string line = from == "pending" ? (record.listWebBacked ? listFromPendingPage : listFromPendingPack) : from == "typed" ? listTyped : from == "inventory" ? listFromInventory
                             : from == "web" ? (backedOrUnknown ? listFromWeb : listFromWebUnchecked) : listFromPack;
                 // a list that was not read from the user's own pack: when it was looked up, and that it may differ
                 bool fromOpenBeautyFacts = has && from == "web" && record.ingredientSources != null && record.ingredientSources.Count > 0
@@ -432,7 +437,7 @@ namespace GlowUp.Result
                 var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 // the pages the list came from (a looked-up or stored list), then the page of the second place it was checked against
                 var pages = new List<string>();
-                if (from == "web" || from == "inventory") pages.AddRange(record.ingredientSources ?? new List<string>());
+                if (from == "web" || from == "inventory" || from == "pending") pages.AddRange(record.ingredientSources ?? new List<string>());
                 if (!string.IsNullOrWhiteSpace(record.listCheckSource)) pages.Add(record.listCheckSource);
                 int most = Mathf.Max(1, maximumSourceLinks) + (string.IsNullOrWhiteSpace(record.listCheckSource) ? 0 : 1);
                 foreach (string source in pages)
@@ -445,6 +450,7 @@ namespace GlowUp.Result
                     link.gameObject.name = "SourceLink_" + SourceLinkButton.SiteName(address);
                     link.gameObject.SetActive(true);
                     link.Bind(source, makerSite);
+                    if (from == "pending") link.LabelUnverified();          // "Unverified source · maybelline.com"
                     if (!kindsShown.Contains(link.Kind)) kindsShown.Add(link.Kind);
                     sourceLinks.Add(link.gameObject);
                     shown++;

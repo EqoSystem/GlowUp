@@ -53,7 +53,7 @@ namespace GlowUp.Auth
         [SerializeField] private string msgOfflineNoRecord = "You are offline and this account hasn't been used on this device yet.";
         [SerializeField] private string msgResetSent = "Verification email sent. Check your inbox to change your password.";
         [SerializeField] private string msgResetNeedsOnline = "Connect to the internet to reset your password.";
-        [SerializeField] private string msgSocialNotConfigured = "{0} sign-in isn't set up yet. Enable it in the Firebase console and add the provider plugin.";
+        [SerializeField] private string msgSocialNotConfigured = "{0} sign-in isn't available right now. Try again later, or sign in with your email.";
         [SerializeField] private string msgSocialNeedsOnline = "Connect to the internet to sign in with {0}.";
         [SerializeField] private string msgSocialOpening = "Opening {0} sign-in...";
 
@@ -63,6 +63,9 @@ namespace GlowUp.Auth
 
         void Awake()
         {
+            // a scene saved earlier keeps the old wording, which named the Firebase console: plain words for users (7 November 2026)
+            if (string.IsNullOrWhiteSpace(msgSocialNotConfigured) || msgSocialNotConfigured.IndexOf("Firebase", StringComparison.OrdinalIgnoreCase) >= 0)
+                msgSocialNotConfigured = "{0} sign-in isn't available right now. Try again later, or sign in with your email.";
             // both boxes start EMPTY (the grey hint shows until the first letter); nothing has to be deleted before typing
             ClearField(emailInput); ClearField(passwordInput);
 
@@ -124,6 +127,11 @@ namespace GlowUp.Auth
                         catch (Exception e) { Debug.LogWarning("Session restore: " + e.Message); }
                         if (this == null) return;
                     }
+                    // a quiz retake that was going on when the app closed: back into the quiz only (Steps 2 to 4)
+                    OnboardingSession.LoadDraft();
+                    if (OnboardingSession.Retake && profile != null) { SceneNavigator.Go(quizScene); return; }
+                    // a Google account whose sign-up is finished but whose quiz was reset: the quiz only, never the account steps
+                    if (!HasSkinProfile(profile) && FinishedSignUp(profile)) { RetakeQuizOnly(); return; }
                     // a Google account that never finished the skin quiz carries on with it
                     if (!HasSkinProfile(profile) && SocialSignIn.ProviderOf(user) != SocialSignIn.Password) { StartSocialSignUp(user); return; }
                     // a sign-up that was begun on this phone and not finished (Step 1 made its account to confirm the email) carries on there
@@ -252,7 +260,7 @@ namespace GlowUp.Auth
                 SocialSignIn.Outcome outcome = await SocialSignIn.WithGoogle();
                 if (this == null) return;
                 if (outcome.Cancelled) { Show(""); return; }
-                if (!outcome.Ok) { Fail(outcome.Problem); return; }
+                if (!outcome.Ok) { FailWithRetry(outcome.Problem, name); return; }
 
                 UserProfileRepository.OfflineEmail = null;
                 UserProfileData profile = null;
@@ -260,14 +268,28 @@ namespace GlowUp.Auth
                 catch (Exception e) { Debug.LogWarning("Sign-in: the profile could not be loaded yet: " + e.Message); }
                 if (this == null) return;
                 if (HasSkinProfile(profile)) SceneNavigator.Go(dashboardScene);       // already has a skin profile: straight to the dashboard
+                else if (FinishedSignUp(profile)) RetakeQuizOnly();                   // a finished account whose quiz was reset: the quiz only
                 else StartSocialSignUp(outcome.User);                                  // no skin profile yet: the skin quiz (Onboarding Step 2)
             }
-            catch (Exception e) { Debug.LogWarning(name + " sign-in failed: " + e); Fail(SocialSignIn.DidNotComplete); }      // the Google button is the retry
+            catch (Exception e) { Debug.LogWarning(name + " sign-in failed: " + e); FailWithRetry(SocialSignIn.DidNotComplete, name); }
             finally { socialBusy = false; }
         }
 
         /// <summary>A skin profile record = a saved profile that has a skin type.</summary>
         static bool HasSkinProfile(UserProfileData profile) => profile != null && !string.IsNullOrWhiteSpace(profile.skinType);
+
+        /// <summary>The account went through the whole sign-up once (the Terms were accepted): its account steps never run again.</summary>
+        static bool FinishedSignUp(UserProfileData profile) => profile != null && profile.termsAccepted;
+
+        [Tooltip("The first page of the skin quiz (Onboarding Step 2): a finished account whose quiz was reset goes here, never to Step 5")]
+        [SerializeField] private string quizScene = SceneNames.Onboarding2;
+
+        /// <summary>The skin quiz (Steps 2 to 4) as a retake: it saves the four skin fields only and returns to the dashboard.</summary>
+        void RetakeQuizOnly()
+        {
+            OnboardingSession.BeginRetake(dashboardScene);
+            SceneNavigator.Go(quizScene);
+        }
 
         void StartSocialSignUp(FirebaseUser user)
         {
@@ -277,9 +299,35 @@ namespace GlowUp.Auth
         }
 
         void Fail(string m) { Show(m, errorColor); ContextualHintController.Instance?.ReportValidationError(); }
+
+        /// <summary>A sign-in with Google that did not finish: a friendly message with a "Try again" link (never a raw error page).</summary>
+        void FailWithRetry(string m, string name)
+        {
+            StatusMessage box = Status();
+            if (box == null) { Fail(m); return; }
+            box.Show(StatusMessage.Kind.Error, m, "Try again", () => Social(name));
+            ContextualHintController.Instance?.ReportValidationError();
+        }
+
+        StatusMessage status;
+        /// <summary>The page's message line as the app's one status message (made on first use; see StatusMessage).</summary>
+        StatusMessage Status()
+        {
+            if (status == null && feedbackText != null) status = StatusMessage.Wrap(feedbackText);
+            return status;
+        }
         void Show(string m, Color? c = null)
         {
             if (feedbackText == null) return;
+            StatusMessage box = Status();
+            if (box != null)
+            {
+                if (string.IsNullOrEmpty(m)) { box.Hide(); return; }
+                bool error = c.HasValue && c.Value == errorColor;
+                bool working = !error && m.EndsWith("...", StringComparison.Ordinal);
+                box.Show(error ? StatusMessage.Kind.Error : working ? StatusMessage.Kind.Progress : StatusMessage.Kind.Info, StatusMessage.Plain(m));
+                return;
+            }
             feedbackText.text = m;
             if (c.HasValue) feedbackText.color = c.Value;
         }

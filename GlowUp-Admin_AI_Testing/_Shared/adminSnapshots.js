@@ -69,7 +69,12 @@ export async function loadPending() {
             id: d.id, name: String(data.name || ""), brandName: String(data.brandName || ""), cosmeticType: String(data.cosmeticType || ""),
             shadeHex: cleanHex(data.shadeHex), ingredients: asArray(data.ingredients).map(String), hasImage: data.hasImage === true,
             model: String(data.model || ""), confidence: Number(data.confidence) || 0, createdAtUnix: Number(data.createdAtUnix) || 0, createdByUid: String(data.createdByUid || ""),
-            variant: String(data.variant || "").slice(0, 60), size: String(data.size || "").slice(0, 40), sourceUrls: httpsLinks(data.sourceUrls)
+            variant: String(data.variant || "").slice(0, 60), size: String(data.size || "").slice(0, 40), sourceUrls: httpsLinks(data.sourceUrls),
+            // what the phone's own reader found, and where the list came from (7 November 2026; older entries have none of these)
+            ocrText: String(data.ocrText || "").slice(0, 1500), ocrBrand: String(data.ocrBrand || "").slice(0, 60),
+            ingredientsFrom: ["page", "printed", "none"].includes(data.ingredientsFrom) ? data.ingredientsFrom : "",
+            ingredientSourceUrl: httpsLinks([data.ingredientSourceUrl])[0] || "",
+            ingredientSourceKind: ["official", "retailer", "other"].includes(data.ingredientSourceKind) ? data.ingredientSourceKind : ""
         };
     }).sort((a, b) => b.createdAtUnix - a.createdAtUnix);
 }
@@ -366,7 +371,14 @@ export function openSnapshotReview(options) {
         // ---- left: the photo the user took (read only now, when this card is on screen)
         const left = make("div", "snapx-left");
         const frame = make("div", "snapx-photo", entry.hasImage ? "Loading the photo..." : "No photo was kept for this snapshot.");
-        left.append(frame, make("p", "snapx-caption", `Sent ${entry.createdAtUnix ? new Date(entry.createdAtUnix * 1000).toLocaleString() : "at an unknown time"} · read by ${entry.model || "the AI"}`));
+        left.append(frame, make("p", "snapx-caption", `Sent ${entry.createdAtUnix ? new Date(entry.createdAtUnix * 1000).toLocaleString() : "at an unknown time"} by user ${entry.createdByUid || "unknown"} · identified by ${entry.model || "the AI"}`));
+        // the text the phone read on the photo (cleaned on the phone: only lines that read as real words)
+        if (entry.ocrText || entry.ocrBrand) {
+            const read = make("details", "snapx-ocr");
+            read.append(make("summary", "", "Text the phone read on the photo" + (entry.ocrBrand ? " · brand: " + entry.ocrBrand : "")));
+            read.append(make("pre", "snapx-ocr-text", entry.ocrText || "(only the brand was readable)"));
+            left.append(read);
+        }
         if (entry.hasImage) {
             const show = (src) => {
                 if (!src) { frame.textContent = "The photo could not be shown."; return; }
@@ -449,8 +461,18 @@ export function openSnapshotReview(options) {
         // what else the AI read, kept apart from the name; the pages it used (https only; text is set as text, never as markup)
         const extra = make("div", "snapx-extra");
         if (entry.variant || entry.size) extra.append(make("p", "snapx-details", [entry.variant && "Shade or variant: " + entry.variant, entry.size && "Size: " + entry.size].filter(Boolean).join("   ")));
+        // where the INGREDIENT LIST came from: a page this server opened, or the pack itself (never written by the AI)
+        const kindWord = { official: "official brand site", retailer: "retailer", other: "other site" };
+        if (entry.ingredientsFrom === "printed") extra.append(make("p", "snapx-sources", "Ingredient list: read from the pack in the photo by the phone."));
+        else if (entry.ingredientSourceUrl) {
+            const line = make("p", "snapx-sources", "Ingredient list from (" + (kindWord[entry.ingredientSourceKind] || "web page") + ", unverified): ");
+            const link = make("a", "", new URL(entry.ingredientSourceUrl).hostname.replace(/^www\./, ""));
+            link.href = entry.ingredientSourceUrl; link.target = "_blank"; link.rel = "noopener noreferrer nofollow";
+            line.append(link);
+            extra.append(line);
+        } else if (entry.ingredientsFrom === "none") extra.append(make("p", "snapx-sources", "No ingredient list was found on any page: add it from the pack or the brand's site."));
         if (entry.sourceUrls.length > 0) {
-            const links = make("p", "snapx-sources", "Pages the AI used: ");
+            const links = make("p", "snapx-sources", "Pages found for this product: ");
             entry.sourceUrls.forEach((url, index) => {
                 const link = make("a", "", new URL(url).hostname.replace(/^www\./, ""));
                 link.href = url; link.target = "_blank"; link.rel = "noopener noreferrer nofollow";
@@ -461,7 +483,7 @@ export function openSnapshotReview(options) {
         const alike = similarProducts({ brand: entry.brandName, name: entry.name }, ctx);
         if (alike.length > 0) extra.append(make("p", "snapx-similar", "Looks like a product already listed: " + alike.map((a) => `"${a.name}" (${Math.round(a.score * 100)}%)`).join(", ") + ". Compare before you approve."));
         if (closeIngredients.size > 0) extra.append(make("p", "snapx-similar", `${closeIngredients.size} ingredient${closeIngredients.size === 1 ? "" : "s"} nearly equal one in the library (hover the dashed pills). Add them as new only if they are different.`));
-        const badge = make("p", "snapx-badge", "Pending approval · unverified · AI-generated");
+        const badge = make("p", "snapx-badge", entry.ingredientsFrom ? "Pending review · unverified · product identified by AI, list from a page or the pack" : "Pending approval · unverified · AI-generated");
         const error = make("p", "snapx-error"); error.setAttribute("role", "alert");
         right.append(summary, badge, rows, extra, listField, error);
 

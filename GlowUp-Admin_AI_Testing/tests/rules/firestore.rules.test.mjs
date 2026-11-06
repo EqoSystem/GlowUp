@@ -53,6 +53,7 @@ async function seed() {
         await setDoc(doc(db, "scanActivity/n1"), { productName: "x", status: "safe", scannedAtUnix: now });
         await setDoc(doc(db, "allergenSuggestions/g1"), { text: "nickel", uid: "u1", status: "pending", createdAtUnix: now });
         await setDoc(doc(db, "pending_products/snap_examplebrand__thing__u1"), { createdByUid: "u1", name: "Thing", brandName: "Examplebrand", isApproved: false });
+        await setDoc(doc(db, "pending_product_images/snap_examplebrand__thing__u1"), { createdByUid: "u1", jpegBase64: "AAAA", bytes: 3, createdAtUnix: 1 });
         await setDoc(doc(db, "pending_products/snap_examplebrand__thing__u2"), { createdByUid: "u2", name: "Thing", brandName: "Examplebrand", isApproved: false });
     });
 }
@@ -236,7 +237,17 @@ await can("an admin lists the staged products", () => getDocs(query(collection(a
 await can("an admin approves a staged product", () => updateDoc(doc(adminDoc(), "pending_products/snap_examplebrand__thing__u1"), { isApproved: true }));
 await cannot("a user changes their staged product", () => updateDoc(doc(user(), "pending_products/snap_examplebrand__thing__u1"), { isApproved: true }));
 await cannot("a user deletes their staged product", () => deleteDoc(doc(user(), "pending_products/snap_examplebrand__thing__u1")));
-await cannot("a user reads a staged photo", () => getDoc(doc(user(), "pending_product_images/snap_examplebrand__thing__u1")));
+await can("a user reads their OWN staged photo", () => getDoc(doc(user(), "pending_product_images/snap_examplebrand__thing__u1")));
+await cannot("another user reads someone's staged photo", () => getDoc(doc(other(), "pending_product_images/snap_examplebrand__thing__u1")));
+await cannot("a user deletes their staged photo", () => deleteDoc(doc(user(), "pending_product_images/snap_examplebrand__thing__u1")));
+{
+    const withFields = staged("u1", "Ocrbrand", "Matte Ink");
+    const extra = { ocrText: "MAYBELLINE NEW YORK SUPERSTAY", ocrBrand: "Maybelline New York", ingredientsFrom: "page", ingredientSourceUrl: "https://www.maybelline.com/p", ingredientSourceKind: "official" };
+    await can("a staged product carries the reader's text and its list's page", () => setDoc(doc(user(), "pending_products/" + withFields.id), { ...withFields.data, ...extra }));
+    const bad = staged("u1", "Ocrbrand", "Matte Ink Two");
+    await cannot("a list page kind outside official / retailer / other", () => setDoc(doc(user(), "pending_products/" + bad.id), { ...bad.data, ...extra, ingredientSourceKind: "ai" }));
+    await cannot("a list page that is not https", () => setDoc(doc(user(), "pending_products/" + bad.id), { ...bad.data, ...extra, ingredientSourceUrl: "http://x.example/p" }));
+}
 await can("an admin reads a staged photo", () => getDoc(doc(adminDoc(), "pending_product_images/snap_examplebrand__thing__u1")));
 
 // ---------------------------------------------------------------------------------------------

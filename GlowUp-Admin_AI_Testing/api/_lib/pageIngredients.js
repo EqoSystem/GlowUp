@@ -1,0 +1,171 @@
+// INGREDIENT LISTS FROM FETCHED PAGES ONLY (7 November 2026).
+//
+// The scan-snapshot function asks the AI WHICH product the photo shows (brand, name, kind, shade). It never takes an
+// ingredient list from the AI. The list comes from here: product pages are fetched by this server and the printed
+// "Ingredients:" block is cut out of the page's own text by plain rules. No list on a page = no list.
+//
+//   Pages tried: the pages the AI's web search opened, then a plain web search for "<brand> <product> ingredients".
+//   Order: the brand's own website first ("official"), then known shops ("retailer"), then other sites ("other").
+//   Safety: https only, public host names only (no IP addresses, no local names), 6 seconds and 1.5 MB per page, HTML only,
+//   at most MAX_PAGES pages. A page's text is data, never an instruction: it is only cut and split here, never sent to an AI.
+"use strict";
+
+const MAX_PAGES = 6;
+const PAGE_SECONDS = 6;
+const SEARCH_SECONDS = 7;
+const MAX_PAGE_BYTES = 1500000;
+
+/** The page's text with one line per block (paragraph, list item, cell, heading, line break). */
+function pageText(html) {
+    let s = String(html || "");
+    s = s.replace(/<(script|style|noscript|svg|template)\b[\s\S]*?<\/\1>/gi, " ");
+    s = s.replace(/<br\s*\/?>/gi, "\n").replace(/<\/(p|li|div|h[1-6]|tr|td|th|dd|dt|section|article|ul|ol|table|span)>/gi, "\n");
+    s = s.replace(/<[^>]*>/g, " ");
+    s = s.replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&quot;/gi, '"').replace(/&#39;|&#x27;|&apos;/gi, "'")
+        .replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
+        .replace(/&#(\d+);/g, (_, n) => { try { return String.fromCodePoint(Number(n)); } catch (e) { return " "; } })
+        .replace(/&#x([0-9a-f]+);/gi, (_, n) => { try { return String.fromCodePoint(parseInt(n, 16)); } catch (e) { return " "; } });
+    return s.split(/\n/).map((line) => line.replace(/[ \t\r\f\v]+/g, " ").trim()).filter((line) => line.length > 0).join("\n");
+}
+
+// words that show a block really is an ingredient list (at least one item must hold one)
+const ANCHORS = /\b(aqua|water|eau|glycerin|dimethicone|cyclopentasiloxane|mica|titanium dioxide|ci ?\d{5}|iron oxides?|silica|talc|tocopher|phenoxyethanol|paraffin|cera|wax|oil|butylene glycol|nylon|kaolin|isododecane|trimethylsiloxysilicate|polyethylene|caprylyl|ethylhexyl|stearate|alcohol)\b/i;
+const ITEM = /^[\p{L}\p{N} ().,/+\-'&:%[\]*]+$/u;
+const LABEL = /\b(full ingredients?|ingredients?(?: list)?|inci|ingrédients|ingredientes|composition)\b\s*[:\-–]?\s*/i;
+
+/** One ingredient name, tidied: no "may contain" lead-in, no trailing full stop, no stars or footnote marks. */
+function tidyItem(raw) {
+    let s = String(raw || "").replace(/^[\s*•·\-]+/, "").replace(/[\s.*•·]+$/, "").trim();
+    s = s.replace(/^\[?\s*(\+\/-|±)?\s*(may contain|peut contenir)\s*[:\-]?\s*/i, "").replace(/^\(?\+\/-\)?\s*/, "").replace(/[\]]$/, "").trim();
+    return s;
+}
+
+/** Splits a block of text into names, or returns null when it does not look like an INCI list. */
+function listFrom(block) {
+    const parts = String(block || "").split(/\s*(?:,|;|•|·|\s\|\s)\s*/).map(tidyItem).filter((item) => item.length > 0);
+    const items = [];
+    for (const item of parts) {
+        if (items.length >= 120) break;
+        if (!items.some((known) => known.toLowerCase() === item.toLowerCase())) items.push(item);
+    }
+    if (items.length < 5) return null;
+    const good = items.filter((item) => item.length >= 2 && item.length <= 80 && ITEM.test(item) && item.split(/\s+/).length <= 7);
+    if (good.length / items.length < 0.8) return null;
+    if (!good.some((item) => ANCHORS.test(item))) return null;
+    const words = good.reduce((sum, item) => sum + item.split(/\s+/).length, 0) / good.length;
+    if (words > 4.5) return null;                                       // prose, not a list
+    return good;
+}
+
+/** The first block on the page that follows an "Ingredients" label and reads as an INCI list; null when there is none. */
+function extractIngredientList(html) {
+    const lines = pageText(html).split("\n");
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const label = LABEL.exec(line);
+        if (!label) continue;
+        // the list can follow the label on the same line, or start on the next line(s)
+        const after = line.slice(label.index + label[0].length).trim();
+        const candidates = [];
+        if (after.length > 0) candidates.push(after);
+        let joined = "";
+        for (let j = i + 1; j < Math.min(lines.length, i + 4); j++) {
+            joined = joined ? joined + ", " + lines[j] : lines[j];
+            candidates.push(lines[j], joined);
+        }
+        for (const block of candidates) {
+            if (block.length > 4000) continue;
+            const list = listFrom(block);
+            if (list) return list;
+        }
+    }
+    return null;
+}
+
+/** "www.shop.maybelline.com" gives "maybelline.com"-like checks: true when the brand's name is the site's own name. */
+function isOfficial(host, brand) {
+    const h = String(host || "").toLowerCase().replace(/^www\./, "");
+    const labels = h.split(".");
+    if (labels.length < 2) return false;
+    const site = labels.length >= 3 && /^(co|com|org|net)$/.test(labels[labels.length - 2]) ? labels[labels.length - 3] : labels[labels.length - 2];
+    const slug = String(brand || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]/g, "");
+    const first = String(brand || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").split(/[^a-z0-9]+/).filter((w) => w.length >= 4)[0] || "";
+    if (!site || site.length < 3 || slug.length < 3) return false;
+    return site === slug || (first.length >= 4 && site.includes(first)) || (site.length >= 5 && slug.includes(site));
+}
+
+/** True for an https address on a public host name (no IP address, no single-word or local name). */
+function fetchable(url) {
+    try {
+        const u = new URL(url);
+        if (u.protocol !== "https:" || u.username || u.password || u.port) return false;
+        const host = u.hostname.toLowerCase();
+        if (!host.includes(".") || /^[\d.]+$/.test(host) || host.includes(":") || /(^|\.)(localhost|local|internal|lan|home|corp)$/.test(host)) return false;
+        return true;
+    } catch (error) { return false; }
+}
+
+async function fetchPage(url, fetcher) {
+    if (!fetchable(url)) return null;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PAGE_SECONDS * 1000);
+    try {
+        const answer = await fetcher(url, { headers: { "User-Agent": "GlowUpCatalogue/1.0 (ingredient list check)", Accept: "text/html" }, redirect: "follow", signal: controller.signal });
+        if (!answer.ok) return null;
+        if (answer.url && !fetchable(answer.url)) return null;               // a redirect to a private address is not read
+        const type = String(answer.headers.get("content-type") || "");
+        if (!/text\/html|application\/xhtml/i.test(type)) return null;
+        const length = Number(answer.headers.get("content-length") || 0);
+        if (length > MAX_PAGE_BYTES) return null;
+        const html = await answer.text();
+        return html.length > MAX_PAGE_BYTES ? html.slice(0, MAX_PAGE_BYTES) : html;
+    } catch (error) { return null; }
+    finally { clearTimeout(timer); }
+}
+
+/** Plain web search (DuckDuckGo's HTML page): result addresses only. */
+async function searchPages(query, fetcher, resultUrl) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), SEARCH_SECONDS * 1000);
+    try {
+        const answer = await fetcher("https://html.duckduckgo.com/html/?q=" + encodeURIComponent(query), { headers: { "User-Agent": "GlowUpCatalogue/1.0 (ingredient list check)" }, signal: controller.signal });
+        if (!answer.ok) return [];
+        const html = await answer.text();
+        const urls = [];
+        for (const match of html.matchAll(/<a\b(?=[^>]*class="[^"]*\bresult__a\b")[^>]*\bhref="([^"]+)"/gi)) {
+            const url = resultUrl(match[1]);
+            if (url && !urls.includes(url)) urls.push(url);
+            if (urls.length >= 8) break;
+        }
+        return urls;
+    } catch (error) { return []; }
+    finally { clearTimeout(timer); }
+}
+
+/**
+ * Looks for the product's ingredient list on real pages. `pages` = addresses the AI's search opened. Returns
+ * { ingredients, url, site, kind, tried } (ingredients empty when no page had a list) and never throws.
+ * `kindOf(url)` = "retailer" for a known shop (from assist-ingredient.js), anything else otherwise.
+ */
+async function findPageIngredients({ brand, productName, pages, fetcher, resultUrl, kindOf, notes }) {
+    const result = { ingredients: [], url: "", site: "", kind: "", tried: 0 };
+    if (!brand || !productName) return result;
+    const doFetch = fetcher || fetch;
+    let urls = (pages || []).filter(fetchable);
+    if (resultUrl) urls = urls.concat(await searchPages(`${brand} ${productName} ingredients`, doFetch, resultUrl));
+    const seen = new Set();
+    const ranked = urls.filter((url) => !seen.has(url) && seen.add(url)).map((url) => {
+        const site = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+        const kind = isOfficial(site, brand) ? "official" : (kindOf && kindOf(url) === "retailer") ? "retailer" : "other";
+        return { url, site, kind, rank: kind === "official" ? 0 : kind === "retailer" ? 1 : 2 };
+    }).sort((a, b) => a.rank - b.rank).slice(0, MAX_PAGES);
+    // fetched side by side; the best-ranked page that has a list wins
+    const found = await Promise.all(ranked.map(async (page) => ({ page, list: extractIngredientList(await fetchPage(page.url, doFetch)) })));
+    result.tried = ranked.length;
+    const best = found.find((f) => f.list && f.list.length > 0);
+    if (best) Object.assign(result, { ingredients: best.list.slice(0, 80).map((item) => item.slice(0, 100)), url: best.page.url, site: best.page.site, kind: best.page.kind });
+    if (notes) notes.push(best ? `ingredient list from ${best.page.kind} page ${best.page.site}` : `no ingredient list on ${ranked.length} page(s)`);
+    return result;
+}
+
+module.exports = { pageText, listFrom, extractIngredientList, isOfficial, fetchable, findPageIngredients, MAX_PAGES };

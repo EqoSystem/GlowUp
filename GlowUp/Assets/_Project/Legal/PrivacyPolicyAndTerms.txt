@@ -1,5 +1,5 @@
 # Privacy Policy
-Last updated: 6 November 2026
+Last updated: 7 November 2026
 
 ## 1. Introduction
 GlowUp ("we", "our", or "us") respects your privacy and is committed to protecting your personal data. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application. Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the application.
@@ -28,12 +28,22 @@ Having accurate information permits us to provide you with a smooth, efficient, 
 ## 4. Camera, Scans, and AR Try-On
 GlowUp asks for permission to use your camera for two features: scanning a product and its ingredient list, and previewing shades on your face with AR Try-On.
 
-- The text on a product is read on your device. We do not record or store the live camera feed, and we keep no photos.
+- The text on a product is read on your device. We do not record or store the live camera feed. We keep a photo only when you choose to send one for a product that is not in our catalog yet (see "Product Photo Submissions" below).
 - For a scan, only the text that was read, the product's name and the result are kept and analysed. When you are online and the app cannot name the product by itself, a few still pictures of the PRODUCT you are holding (its front, back or bottom; four at most, once per scan) may be sent to our AI service provider so that the product can be recognised (see section 5). Those pictures are not saved by us.
 - So that the app knows a product again the next time you scan it, it keeps what its pack looks like as a set of numbers (not a picture; the picture cannot be rebuilt from them), together with any other name you typed for the product. These stay on your device only and are removed when you clear the app's data or uninstall the app.
 - For AR Try-On, the picture of your face is used only while the preview is on screen. It is not saved and it is never sent to us or to anyone else.
 
 You can withdraw camera permission at any time in your device settings. The scanning and try-on features will stop working until permission is given again, but you can still type ingredients in by hand.
+
+## Product Photo Submissions
+When a product you scan is not in our catalog yet, you can choose to take one photo of it and send it to us. Nothing is sent unless you tap "Use photo", and the app tells you before your first photo is sent that GlowUp will review it.
+
+- What is stored: the photo, cut on your device to the part that shows the product (the rest of the picture is discarded before anything is sent); the text the app read on the product; the product's brand, name, type and shade; the ingredient list and the web address of the page it came from, or the list printed on the pack; the time you sent it; and your account id.
+- Who sees it: GlowUp administrators, who review it in our admin portal. You can see your own photo; other app users cannot.
+- Why: to identify the product, to find its published ingredient list, and to add the product to our catalog after an administrator has checked it. Until then it is shown to you as "Unverified — pending review".
+- How it is processed: the cut photo and the text read on it are sent to our AI service provider only to recognise which product it is. The ingredient list is never written by the AI: it is taken from product pages our server opens (the brand's own website first, then retailers) or from the list printed on your pack. Ingredient data from the web may be incomplete.
+- How long it is kept: the photo is deleted when an administrator approves or rejects the entry. The product details stay in our catalog once approved; they carry no information about you. If you want your photo or entry removed earlier, contact us (section 12).
+- Where it is kept: in our Google Firebase database, protected by security rules that let only you and GlowUp administrators read the photo.
 
 ## 5. AI-Assisted Analysis
 Part of each analysis is produced automatically. When you are online, the following may be sent to our AI service provider: up to four still pictures of the product, the text read from it, the product's name, and ingredient names. This is used to recognise the product, to find its published ingredient list, and to describe ingredients that are not yet in our database. The product's name may also be sent to the FDA Philippines verification site to check whether the product is registered. When the camera read the product's barcode, that barcode (and nothing else) may be sent to Open Beauty Facts, a public list of cosmetics, to compare its ingredient list with the one the app has.

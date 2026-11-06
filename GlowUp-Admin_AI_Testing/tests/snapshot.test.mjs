@@ -26,7 +26,7 @@ const draft = tidySnapshot({ found: true, brand: "Maybelline", productName: "May
     shadeHex: "c24b62", ingredients: ["Aqua", "aqua", "<b>x</b>", "see https://evil.example/", "Talc", 5], confidence: "high" });
 equal([draft.brand, draft.productName, draft.variant, draft.size, draft.cosmeticType, draft.shadeHex], ["Maybelline", "Fit Me Matte", "128 Warm Nude", "30 ml", "foundation", "#C24B62"],
     "brand, name, variant, size and kind stay separate; the brand is taken out of the name");
-equal(draft.ingredients, ["Aqua", "Talc"], "ingredients: no repeats, no markup, no links, no non-text");
+equal(draft.ingredients, [], "ingredients are NEVER taken from the AI (only from fetched pages)");
 equal(draft.confidence, 0.85, "a word for confidence becomes a number");
 equal(tidySnapshot({ found: false }), { found: false }, "found:false stays false");
 equal(tidySnapshot({ found: true, confidence: 7 }).found, false, "no brand and no name is not found");
@@ -80,7 +80,7 @@ check(commit.writes.length === 2 && commit.writes[0].update.name.endsWith("/snap
 const ask = JSON.parse(calls(r, "generativelanguage")[0].options.body);
 check(calls(r, "generativelanguage").length === 1 && ask.tools && ask.contents[0].parts[1].inline_data.mime_type === "image/jpeg", "ONE call to the AI, with the photo and web search");
 check(calls(r, "generativelanguage")[0].options.headers["x-goog-api-key"] === "test-key" && !calls(r, "generativelanguage")[0].url.includes("test-key"), "the key goes in a header, never in the address");
-check(JSON.stringify(r.body).indexOf("test-key") < 0 && /unverified/i.test(r.body.label) && /AI-generated/.test(r.body.label), "no key in the answer; the answer is labelled pending, unverified, AI-generated");
+check(JSON.stringify(r.body).indexOf("test-key") < 0 && /unverified/i.test(r.body.label) && /pending review/.test(r.body.label), "no key in the answer; the answer is labelled unverified, pending review");
 
 r = await call({ gemini: () => reply(200, { candidates: [{ content: { parts: [{ text: GOOD }] }, groundingMetadata: { groundingChunks: [
     { web: { uri: "https://vertexaisearch.cloud.google.com/grounding-api-redirect/ok", title: "maybelline.com" } },

@@ -346,7 +346,8 @@ service cloud.firestore {
         && request.resource.data.key is string && request.resource.data.name is string && request.resource.data.brandName is string
         && idFitsNames(pendingId, request.resource.data, request.auth.uid)
         && request.resource.data.keys().hasOnly(['name', 'brandName', 'cosmeticType', 'shadeHex', 'ingredients', 'key', 'status', 'source',
-             'isApproved', 'hasImage', 'confidence', 'model', 'createdByUid', 'createdAtUnix', 'variant', 'size', 'sourceUrls'])
+             'isApproved', 'hasImage', 'confidence', 'model', 'createdByUid', 'createdAtUnix', 'variant', 'size', 'sourceUrls',
+             'ocrText', 'ocrBrand', 'ingredientsFrom', 'ingredientSourceUrl', 'ingredientSourceKind'])
         && request.resource.data.createdByUid == request.auth.uid
         && request.resource.data.isApproved == false
         && request.resource.data.status == 'pending'
@@ -361,6 +362,13 @@ service cloud.firestore {
         && (!('sourceUrls' in request.resource.data) || (request.resource.data.sourceUrls is list && request.resource.data.sourceUrls.size() <= 5
              && httpsLink(request.resource.data.sourceUrls, 0) && httpsLink(request.resource.data.sourceUrls, 1) && httpsLink(request.resource.data.sourceUrls, 2)
              && httpsLink(request.resource.data.sourceUrls, 3) && httpsLink(request.resource.data.sourceUrls, 4)))
+        // what the phone's own text reader found (cleaned, confident lines only), and where the ingredient list came from (7 November 2026)
+        && (!('ocrText' in request.resource.data) || (request.resource.data.ocrText is string && request.resource.data.ocrText.size() <= 1500))
+        && (!('ocrBrand' in request.resource.data) || (request.resource.data.ocrBrand is string && request.resource.data.ocrBrand.size() <= 60))
+        && (!('ingredientsFrom' in request.resource.data) || request.resource.data.ingredientsFrom in ['page', 'printed', 'none'])
+        && (!('ingredientSourceUrl' in request.resource.data) || (request.resource.data.ingredientSourceUrl is string
+             && (request.resource.data.ingredientSourceUrl == '' || (request.resource.data.ingredientSourceUrl.matches('https://.+') && request.resource.data.ingredientSourceUrl.size() <= 300))))
+        && (!('ingredientSourceKind' in request.resource.data) || request.resource.data.ingredientSourceKind in ['', 'official', 'retailer', 'other'])
         && request.resource.data.createdAtUnix is number;
       allow update, delete: if isAdmin();
     }
@@ -390,11 +398,13 @@ service cloud.firestore {
           && getAfter(/databases/$(database)/documents/snapshot_quota/$(request.auth.uid + '_' + dayStamp(request.time))).data.lastAt == request.time));
     }
 
-    // The photo of a snapshot, in its own document so phones never download it: admins read it next to the AI's reading.
+    // The photo of a snapshot, in its own document so phones never download it: admins read it next to the AI's reading, and the
+    // person who sent it may read their own photo (7 November 2026). Only the crop around the product is ever sent (the app cuts it).
     // It can only be created for an entry that exists (or is written in the same batch) and is the caller's own, with hasImage = true.
     // About 80 KB as a JPG, at most 120,000 characters of base64. Deleted when the entry is approved or rejected.
     match /pending_product_images/{pendingId} {
-      allow read, delete: if isAdmin();
+      allow read: if isAdmin() || (signedIn() && resource.data.createdByUid == request.auth.uid);
+      allow delete: if isAdmin();
       allow create: if signedIn()
         && pendingId.matches('snap_.+') && pendingId.size() <= 110
         && request.resource.data.keys().hasOnly(['jpegBase64', 'bytes', 'createdByUid', 'createdAtUnix'])

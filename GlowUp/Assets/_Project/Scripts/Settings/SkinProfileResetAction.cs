@@ -79,7 +79,8 @@ namespace GlowUp.AppSettings
             {
                 profile.skinType = ""; profile.skinTone = "";
                 profile.skinConditions = new List<string>(); profile.knownAllergens = new List<string>();
-                try { await UserProfileRepository.Save(profile); }
+                // the four skin fields only: the account itself is never written from here (7 November 2026)
+                try { await UserProfileRepository.SaveSkinProfile("", "", new List<string>(), new List<string>()); }
                 catch (Exception e) { Debug.LogWarning("Retake: could not clear the saved profile: " + e.Message); }
             }
             OnboardingSession.BeginRetake(returnScene);

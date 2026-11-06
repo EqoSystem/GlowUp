@@ -244,7 +244,7 @@ namespace GlowUp.Data
                 queries.Add(AllPages(products.WhereEqualTo("brandName", name), "products of brand \"" + name + "\" (brandName)"));
                 queries.Add(AllPages(products.WhereEqualTo("product_identification.brand", name), "products of brand \"" + name + "\" (product_identification.brand)"));
             }
-            List<DocumentSnapshot>[] answers = await Task.WhenAll(queries).OrTimeout(12f, "Looking up this product in Firebase");
+            List<DocumentSnapshot>[] answers = await Task.WhenAll(queries).OrTimeout(12f, "Looking up this product in our catalog");
 
             var matches = new Dictionary<string, ProductData>(StringComparer.Ordinal);
             foreach (List<DocumentSnapshot> documents in answers)

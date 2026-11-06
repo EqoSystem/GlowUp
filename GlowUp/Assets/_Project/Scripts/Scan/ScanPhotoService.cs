@@ -28,13 +28,19 @@ namespace GlowUp.Scan
             public List<string> ingredients = new List<string>();
             public List<string> sourceUrls = new List<string>();
             public bool webSources;
+            /// <summary>The page the ingredient list was cut from by the server ("" = no page had a list), and its kind: official / retailer / other.</summary>
+            public string ingredientSourceUrl = "", ingredientSourceKind = "";
         }
 
         /// <summary>The address of the function, set by ScanSnapshotController (https only).</summary>
         public static string FunctionUrl = "";
-        public static float TimeoutSeconds = 45f;
+        public static float TimeoutSeconds = 58f;
 
-        public static async Task<Reading> Read(byte[] jpeg, string brandHint = "", string productHint = "")
+        /// <summary>
+        /// `ocrText` = the text the phone read on the photo, ONLY the lines that read as real words (PhotoTextQuality.cleanText):
+        /// the server gives it to the AI as data to name the product. The ingredient list never comes from the AI.
+        /// </summary>
+        public static async Task<Reading> Read(byte[] jpeg, string brandHint = "", string productHint = "", string ocrText = "")
         {
             var result = new Reading();
             if (string.IsNullOrEmpty(FunctionUrl) || !FunctionUrl.StartsWith("https://", StringComparison.Ordinal)) { result.outcome = Outcome.NotSetUp; return result; }
@@ -48,7 +54,7 @@ namespace GlowUp.Scan
                 string token = await user.TokenAsync(false).OrTimeout(8f, "Getting the sign-in token");
 
                 // the live scan's own reading (if any) goes along as a head start for the web search; the server cleans it and the photo wins
-                string body = "{\"image\":\"" + Convert.ToBase64String(jpeg) + "\",\"brandHint\":\"" + JsonText(brandHint) + "\",\"productHint\":\"" + JsonText(productHint) + "\"}";
+                string body = "{\"image\":\"" + Convert.ToBase64String(jpeg) + "\",\"brandHint\":\"" + JsonText(brandHint) + "\",\"productHint\":\"" + JsonText(productHint) + "\",\"ocrText\":\"" + JsonLong(ocrText, 3000) + "\"}";
                 using (var request = new UnityWebRequest(FunctionUrl, "POST"))
                 {
                     request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(body));
@@ -79,6 +85,13 @@ namespace GlowUp.Scan
                     result.ingredients = Strings(draft, "ingredients", 80, 120);
                     // only https links go on (the server already cleaned them; the phone does not trust that)
                     foreach (string url in Strings(json, "sourceUrls", 5, 300)) if (url.StartsWith("https://", StringComparison.Ordinal)) result.sourceUrls.Add(url);
+                    if (json.TryGetValue("ingredientSource", out object src) && src is Dictionary<string, object> page)
+                    {
+                        string url = Str(page, "url"), kind = Str(page, "kind");
+                        if (url.StartsWith("https://", StringComparison.Ordinal) && url.Length <= 300) result.ingredientSourceUrl = url;
+                        result.ingredientSourceKind = kind == "official" || kind == "retailer" || kind == "other" ? kind : "";
+                    }
+                    if (result.ingredientSourceUrl.Length == 0) result.ingredients.Clear();      // a list must name the page it came from
                     result.outcome = Outcome.Ok;
                     return result;
                 }
@@ -98,6 +111,22 @@ namespace GlowUp.Scan
             var sb = new StringBuilder();
             foreach (char c in text) { if (char.IsLetterOrDigit(c) || c == ' ' || c == '.' || c == ',' || c == '\'' || c == '&' || c == '+' || c == '-' || c == '!' || c == ':' || c == '(' || c == ')') sb.Append(c); if (sb.Length >= 100) break; }
             return sb.ToString().Trim();
+        }
+
+        /// <summary>Longer text (the photo's reading) made safe for a JSON string: quotes, backslashes and control characters escaped.</summary>
+        static string JsonLong(string text, int most)
+        {
+            if (string.IsNullOrEmpty(text)) return "";
+            var sb = new StringBuilder();
+            foreach (char c in text)
+            {
+                if (sb.Length >= most) break;
+                if (c == '"' || c == (char)92) sb.Append((char)92).Append(c);
+                else if (c == (char)10) sb.Append((char)92).Append('n');
+                else if (c < ' ' || c == '<' || c == '>') sb.Append(' ');
+                else sb.Append(c);
+            }
+            return sb.ToString();
         }
 
         static string Str(Dictionary<string, object> json, string key) =>

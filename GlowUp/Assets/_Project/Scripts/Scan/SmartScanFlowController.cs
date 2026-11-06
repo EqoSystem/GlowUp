@@ -135,7 +135,7 @@ namespace GlowUp.Scan
         [Tooltip("On = a product the AI named that is NOT in the app's lists is then checked on the web: a web search looks for it by its words and by what the pack looks like, says how its brand and its name are really written, and brings its published ingredient list in the same answer.")]
         [SerializeField] private bool aiChecksTheWeb = true;
         [SerializeField] private string msgWebChecking = "Found it. Checking it on the web...";
-        [SerializeField] private string msgAiUnavailable = "The Firebase catalogue had no match, and GlowUp's AI web lookup is not configured on this device. Type the product in or try again later.";
+        [SerializeField] private string msgAiUnavailable = "Not in our catalog yet, and product pages can't be checked right now. Type the product in, or try again later.";
         [SerializeField] private string msgWebNoMatch = "The web search could not verify this exact product and ingredient list. Check the label or type the product in.";
         [Tooltip("Said once when the AI sees that the cap is on and no shade can be seen")]
         [SerializeField] private string msgCapOn = "The cap is on, so the shade cannot be seen. Take it off if you can, or show the shade label.";
@@ -233,7 +233,7 @@ namespace GlowUp.Scan
         [SerializeField] private string hintGlare = "Tilt slightly, there is glare";
         [SerializeField] private string hintBlurry = "Move a little back so the text is sharp";
         [SerializeField] private string hintFront = "Show the front: the brand and the product's name";
-        [SerializeField] private string hintIngredients = "Checking GlowUp's Firebase catalogue for the ingredient list.";
+        [SerializeField] private string hintIngredients = "Checking our catalog for the ingredient list.";
         [SerializeField] private string hintIngredientsMore = "Tap Look it up to retry the catalogue search.";
         [SerializeField] private string hintCodes = "Show the barcode (on the bottom or the back)";
         [SerializeField] private string hintShade = "Show the shade's name or number";
@@ -275,14 +275,21 @@ namespace GlowUp.Scan
         [Tooltip("Nothing was typed that names a product or an ingredient")]
         [SerializeField] private string msgManualNothing = "Type the product's name (its brand helps), or its ingredient list.";
         [Tooltip("{0} = the product as typed")]
-        [SerializeField] private string msgManualLooking = "Looking for {0}...";
+        [SerializeField] private string msgManualLooking = "Searching for {0}\u2026";
         [Tooltip("{0} = the product as it is sold")]
-        [SerializeField] private string msgManualNoList = "Found {0}, but no trustworthy page shows its ingredient list. Type the list from the pack.";
+        [SerializeField] private string msgManualNoList = "Couldn't find an ingredient list \u2014 you can type it in below.";
         [SerializeField] private string msgLookUpNeedsName = "Show the front of the product first, so we know which product to look up.";
         [SerializeField] private string msgLookingUp = "Looking up this product's ingredient list...";
-        [SerializeField] private string msgFirebaseMiss = "No matching product was found in GlowUp's Firebase catalogue. Re-align the brand and product name, or type the product in.";
-        [SerializeField] private string msgFirebaseNoIngredients = "GlowUp found this product, but its ingredient list is not saved in the catalogue yet.";
-        [SerializeField] private string msgFirebaseUnavailable = "GlowUp's product catalogue could not be reached. Check your connection and try again.";
+        [SerializeField] private string msgFirebaseMiss = "Not in our catalog yet. Check the brand and product name, or type the product in.";
+        [SerializeField] private string msgFirebaseNoIngredients = "We know this product, but its ingredient list isn't saved yet \u2014 you can type it in below.";
+        [SerializeField] private string msgFirebaseUnavailable = "Our catalog couldn't be reached. Check your connection and try again.";
+        [Tooltip("The typed product is not in the catalogue: said while product pages are checked")]
+        [SerializeField] private string msgCheckingOnline = "Not in our catalog yet. Checking product pages online\u2026";
+        [Tooltip("A list was found on a product page for the typed product")]
+        [SerializeField] private string msgFoundOnline = "Found ingredient list \u00B7 Unverified source";
+        [SerializeField] private string msgNeedBrand = "Add the brand too, so we can find the right product.";
+        [Tooltip("The Analyse button of the type-it-in sheet while it looks the product up (shorter words when they do not fit)")]
+        [SerializeField] private string analyseBusyLabel = "Searching\u2026";
         [SerializeField] private string msgNoListFound = "No trustworthy ingredient list was found for this product. Scan the list or type it in.";
         [Tooltip("No list was found: the FDA Philippines list is asked, so the user at least learns whether the product is registered")]
         [SerializeField] private string msgNoListCheckingFda = "No ingredient list found yet. Checking the FDA Philippines list...";
@@ -405,6 +412,7 @@ namespace GlowUp.Scan
 
         void Awake()
         {
+            PlainWording();
             if (holdButton != null) { holdButton.ScanStarted += OnScanStarted; holdButton.ScanPaused += OnScanPaused; }
             if (finishButton != null) finishButton.onClick.AddListener(OnFinishTapped);
             if (startOverButton != null) startOverButton.onClick.AddListener(OnStartOverTapped);
@@ -412,7 +420,7 @@ namespace GlowUp.Scan
             if (differentProductButton != null) differentProductButton.onClick.AddListener(() => { ClosePanel(startOverPanel); StartOver(false, msgStartedOver); });
             if (manualEntryButton != null) manualEntryButton.onClick.AddListener(OpenManual);
             if (photoButton != null) { photoButton.onClick.AddListener(OnPhotoButton); photoButton.gameObject.SetActive(false); }
-            if (snapshot != null) { snapshot.Analysed += OnSnapshotAnalysed; snapshot.NameOnly += OnSnapshotNameOnly; }
+            if (snapshot != null) { snapshot.Analysed += OnSnapshotAnalysed; snapshot.NameOnly += OnSnapshotNameOnly; snapshot.TypeItIn += OpenManual; }
             if (manualAnalyseButton != null) manualAnalyseButton.onClick.AddListener(AnalyseManual);
             if (lookUpButton != null) lookUpButton.onClick.AddListener(LookUp);
             if (backButton != null) backButton.onClick.AddListener(() => { StopCamera(); SceneNavigator.Go(backScene); });
@@ -481,7 +489,7 @@ namespace GlowUp.Scan
 
         void OnDestroy()
         {
-            if (snapshot != null) { snapshot.Analysed -= OnSnapshotAnalysed; snapshot.NameOnly -= OnSnapshotNameOnly; }
+            if (snapshot != null) { snapshot.Analysed -= OnSnapshotAnalysed; snapshot.NameOnly -= OnSnapshotNameOnly; snapshot.TypeItIn -= OpenManual; }
             if (cameraFeed != null) cameraFeed.Started -= OnCameraStarted;
             if (holdButton != null) { holdButton.ScanStarted -= OnScanStarted; holdButton.ScanPaused -= OnScanPaused; }
         }
@@ -1415,6 +1423,7 @@ namespace GlowUp.Scan
                 if (match.list == null || !match.list.found || match.list.sources == null || match.list.sources.Count == 0)
                     return false;
 
+                if (showInManualPanel) ManualStatus(StatusMessage.Kind.Success, msgFoundOnline);
                 identity.productName = match.productName.Trim();
                 identity.brandName = match.brandName.Trim();
                 if (!string.IsNullOrWhiteSpace(match.cosmeticType)) identity.cosmeticType = match.cosmeticType.Trim();
@@ -2957,7 +2966,7 @@ namespace GlowUp.Scan
             if (!string.IsNullOrEmpty(staged.cosmeticType)) identity.cosmeticType = staged.cosmeticType;
             if (identity.shadeHex.Length == 0 && !string.IsNullOrEmpty(staged.shadeHex)) identity.shadeHex = staged.shadeHex;
             ShowIdentity();
-            UseLookedUpList(staged.ingredients, new List<string>(), "pending", false);
+            UseLookedUpList(staged.ingredients, new List<string>(staged.sourceUrls ?? new List<string>()), "pending", staged.ingredientsFrom == "page");
         }
 
         void UseLookedUpList(List<string> ingredients, List<string> from, string kind, bool webBacked)
@@ -2981,7 +2990,7 @@ namespace GlowUp.Scan
         {
             if (stage == Stage.Leaving || stage == Stage.Recognising || manualPanel == null) return;
             if (holdButton != null) holdButton.LetGo();
-            if (manualFeedbackText != null) manualFeedbackText.text = "";
+            ManualStatus(StatusMessage.Kind.Info, "");
             // what the scan already found is filled in, so the user only types what is missing
             if (manualProductInput != null && string.IsNullOrWhiteSpace(manualProductInput.text)) manualProductInput.text = identity.productName;
             if (manualBrandInput != null && string.IsNullOrWhiteSpace(manualBrandInput.text)) manualBrandInput.text = identity.brandName;
@@ -3007,7 +3016,66 @@ namespace GlowUp.Scan
 
         bool manualBusy;
 
-        void ManualSay(string message) { if (manualFeedbackText != null) manualFeedbackText.text = message ?? ""; }
+        List<string> knownBrandNames;
+        List<string> KnownBrandNames()
+        {
+            if (knownBrandNames != null) return knownBrandNames;
+            knownBrandNames = new List<string>();
+            try
+            {
+                foreach (BrandData b in BrandRepository.All()) if (!string.IsNullOrWhiteSpace(b.name) && !knownBrandNames.Contains(b.name)) knownBrandNames.Add(b.name);
+                foreach (ProductData p in ProductRepository.Every.Products) if (!string.IsNullOrWhiteSpace(p.brandName) && !knownBrandNames.Contains(p.brandName)) knownBrandNames.Add(p.brandName);
+            }
+            catch (Exception e) { Debug.LogWarning("Scan: the brand list is not available: " + e.Message); }
+            return knownBrandNames;
+        }
+
+        void ManualSay(string message) => ManualStatus(StatusMessage.Kind.Info, StatusMessage.Plain(message));
+
+        StatusMessage manualStatus;
+        /// <summary>The sheet's line as the app's status message: Info, Progress (spinner), Error or Success (7 November 2026).</summary>
+        void ManualStatus(StatusMessage.Kind kind, string message)
+        {
+            if (manualFeedbackText == null) return;
+            if (manualStatus == null) manualStatus = StatusMessage.Wrap(manualFeedbackText);
+            if (string.IsNullOrEmpty(message)) manualStatus.Hide(); else manualStatus.Show(kind, message);
+        }
+
+        string analyseIdleWords;
+        /// <summary>The Analyse button: the spinner inside it and not pressable while the product is looked up.</summary>
+        void ManualBusy(bool on)
+        {
+            if (manualAnalyseButton == null) return;
+            TMP_Text label = manualAnalyseButton.GetComponentInChildren<TMP_Text>(true);
+            if (analyseIdleWords == null) analyseIdleWords = label != null ? label.text : "";
+            ButtonBusy.Set(manualAnalyseButton, label, on, on ? analyseBusyLabel : analyseIdleWords);
+        }
+
+        /// <summary>
+        /// Words a scene saved in an older build may still name the database, the text reader or the AI service: users never read
+        /// those (7 November 2026). A saved sentence with such a word is replaced by today's plain one; any other wording is kept.
+        /// </summary>
+        void PlainWording()
+        {
+            string Plain(string current, string replacement)
+            {
+                if (string.IsNullOrWhiteSpace(current)) return replacement;
+                foreach (string word in new[] { "Firebase", "Firestore", "OCR", "API", "Gemini" })
+                    if (current.IndexOf(word, StringComparison.Ordinal) >= 0) return replacement;
+                return current;
+            }
+            msgAiUnavailable = Plain(msgAiUnavailable, "Not in our catalog yet, and product pages can't be checked right now. Type the product in, or try again later.");
+            hintIngredients = Plain(hintIngredients, "Checking our catalog for the ingredient list.");
+            msgFirebaseMiss = Plain(msgFirebaseMiss, "Not in our catalog yet. Check the brand and product name, or type the product in.");
+            msgFirebaseNoIngredients = Plain(msgFirebaseNoIngredients, "We know this product, but its ingredient list isn't saved yet \u2014 you can type it in below.");
+            msgFirebaseUnavailable = Plain(msgFirebaseUnavailable, "Our catalog couldn't be reached. Check your connection and try again.");
+            if (msgManualLooking == "Looking for {0}...") msgManualLooking = "Searching for {0}\u2026";
+            if (msgManualNoList == "Found {0}, but no trustworthy page shows its ingredient list. Type the list from the pack.") msgManualNoList = "Couldn't find an ingredient list \u2014 you can type it in below.";
+            if (msgFirebaseNoIngredients == "GlowUp found this product, but its ingredient list is not saved in the catalogue yet.")
+                msgFirebaseNoIngredients = "We know this product, but its ingredient list isn't saved yet \u2014 you can type it in below.";
+            if (msgFirebaseUnavailable == "GlowUp's product catalogue could not be reached. Check your connection and try again.")
+                msgFirebaseUnavailable = "Our catalog couldn't be reached. Check your connection and try again.";
+        }
 
         /// <summary>
         /// "Analyse" on the type-it-in pop-up. The app works out WHAT was typed (TypedEntry): an ingredient list is analysed
@@ -3039,29 +3107,36 @@ namespace GlowUp.Scan
         async void ManualLookUp(string product, string brand, string kind)
         {
             manualBusy = true;
-            if (manualAnalyseButton != null) manualAnalyseButton.interactable = false;
-            string shown = ((brand.Length > 0 && product.IndexOf(brand, StringComparison.OrdinalIgnoreCase) < 0 ? brand + " " : "") + product).Trim();
-            ManualSay(string.Format(msgManualLooking, shown));
+            ManualBusy(true);
+            // the brand as the catalogue spells it ("Maybelline Newyork" = "Maybelline New York"), the product name in medium weight
+            string niceBrand = BrandNameNormalizer.Normalize(brand, KnownBrandNames());
+            string shown = ((niceBrand.Length > 0 && product.IndexOf(niceBrand, StringComparison.OrdinalIgnoreCase) < 0 ? niceBrand + " " : "") + product).Trim();
+            ManualStatus(StatusMessage.Kind.Progress, string.Format(msgManualLooking, "<b>" + StatusMessage.Plain(shown) + "</b>"));
             try
             {
                 ProductData listed = InventoryProductFor(product, brand);          // the app's own product list (also offline)
                 if (!HasStoredList(listed)) listed = ProductIn(shown) ?? listed;      // brand and name typed in one go
                 if (HasStoredList(listed)) { UseTypedProduct(listed, kind); return; }
 
-                if (brand.Length < 2) { ManualSay("Enter both the product name and brand to search GlowUp's Firebase catalogue."); return; }
+                if (brand.Length < 2) { ManualStatus(StatusMessage.Kind.Info, msgNeedBrand); return; }
                 ProductData fromFirebase = await ProductRepository.FindByBrandAndNameAsync(brand, product);
                 if (this == null || stage == Stage.Leaving) return;
                 if (manualPanel != null && !manualPanel.IsOpen) return;
                 if (fromFirebase == null)
                 {
+                    ManualStatus(StatusMessage.Kind.Progress, msgCheckingOnline);
                     if (await SearchTypedProductOnWeb(product, brand, kind, true)) return;
-                    ManualSay(string.Format(msgManualNoList, shown));
+                    if (this == null) return;
+                    if (manualStatus == null || !manualStatus.Visible || manualStatus.Text.text.IndexOf("Checking", StringComparison.Ordinal) >= 0)
+                        ManualStatus(StatusMessage.Kind.Error, string.Format(msgManualNoList, StatusMessage.Plain(shown)));
                     return;
                 }
                 if (fromFirebase.ingredients == null || fromFirebase.ingredients.Count == 0)
                 {
+                    ManualStatus(StatusMessage.Kind.Progress, msgCheckingOnline);
                     if (await SearchTypedProductOnWeb(product, brand, kind, true)) return;
-                    ManualSay(msgFirebaseNoIngredients);
+                    if (this == null) return;
+                    ManualStatus(StatusMessage.Kind.Error, msgFirebaseNoIngredients);
                     return;
                 }
                 if (kind.Length > 0 && ProductScope.Judge(kind, product).IsNotMakeup)
@@ -3077,12 +3152,12 @@ namespace GlowUp.Scan
             catch (Exception e)
             {
                 Debug.LogWarning("Scan: looking a typed product up failed: " + e.Message);
-                if (this != null) ManualSay(msgFirebaseUnavailable);
+                if (this != null) ManualStatus(StatusMessage.Kind.Error, msgFirebaseUnavailable);
             }
             finally
             {
                 manualBusy = false;
-                if (this != null && manualAnalyseButton != null) manualAnalyseButton.interactable = true;
+                if (this != null) ManualBusy(false);
             }
         }
 

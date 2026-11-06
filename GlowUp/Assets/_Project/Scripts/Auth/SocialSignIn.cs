@@ -11,10 +11,12 @@ namespace GlowUp.Auth
     /// <summary>
     /// Signing in with a Google account (the round button on the login page). Facebook sign-in was removed on request.
     ///
-    /// GOOGLE needs nothing extra in the project: Firebase opens Google's own sign-in page in the phone's
-    /// browser and returns to the app. In the Firebase console the Google provider must be switched on and
-    /// the app's SHA-1 fingerprint added (Project settings > Your apps), then the new google-services.json
-    /// put in Assets. It only works on a phone, not in the Editor.
+    /// GOOGLE, since 7 November 2026: the phone's own Google account sheet (Android Credential Manager, NativeGoogleSignIn) gives an
+    /// ID token and Firebase signs in with it. No browser is opened, so browsers that block or split storage (Brave, strict privacy
+    /// modes) can no longer break it with "missing initial state" on firebaseapp.com. Only when that is not possible (an older build,
+    /// no Google account on the phone) does the old way run: Firebase opens Google's page in the phone's browser.
+    /// In the Firebase console the Google provider must be switched on and the app's SHA-1 fingerprint added (Project settings >
+    /// Your apps), then the new google-services.json put in Assets. It only works on a phone, not in the Editor.
     /// </summary>
     public static class SocialSignIn
     {
@@ -51,6 +53,25 @@ namespace GlowUp.Auth
         // ---------------------------------------------------------------------------------------
         public static async Task<Outcome> WithGoogle()
         {
+            // 1. inside the app (no browser)
+            NativeGoogleSignIn.Answer native = await NativeGoogleSignIn.RequestToken();
+            if (native.result == NativeGoogleSignIn.Result.Cancelled) return new Outcome { Cancelled = true };
+            if (native.result == NativeGoogleSignIn.Result.Token)
+            {
+                try
+                {
+                    Credential credential = GoogleAuthProvider.GetCredential(native.idToken, null);
+                    AuthResult signedIn = await FirebaseAuth.DefaultInstance.SignInAndRetrieveDataWithCredentialAsync(credential);
+                    return new Outcome { User = signedIn != null ? signedIn.User : FirebaseAuth.DefaultInstance.CurrentUser };
+                }
+                catch (Exception e) { return Failed(e, "Google"); }
+            }
+            if (native.result == NativeGoogleSignIn.Result.Failed)
+            {
+                Debug.LogWarning("[GlowUp] Google sign-in on the phone failed: " + native.detail);
+                return new Outcome { Problem = DidNotComplete };
+            }
+            // 2. no account on the phone, or an older build: Google's page in the browser, as before
             try
             {
                 AuthResult result = await FirebaseAuth.DefaultInstance.SignInWithProviderAsync(GoogleProvider());
@@ -79,7 +100,14 @@ namespace GlowUp.Auth
         public static async Task Reauthenticate(FirebaseUser user)
         {
             string provider = ProviderOf(user);
-            if (provider == Google) { await user.ReauthenticateWithProviderAsync(GoogleProvider()); return; }
+            if (provider == Google)
+            {
+                NativeGoogleSignIn.Answer native = await NativeGoogleSignIn.RequestToken();
+                if (native.result == NativeGoogleSignIn.Result.Cancelled) throw new OperationCanceledException();
+                if (native.result == NativeGoogleSignIn.Result.Token) { await user.ReauthenticateAsync(GoogleAuthProvider.GetCredential(native.idToken, null)); return; }
+                await user.ReauthenticateWithProviderAsync(GoogleProvider());
+                return;
+            }
             throw new InvalidOperationException("This account cannot be checked again on this phone.");
         }
 
@@ -105,7 +133,7 @@ namespace GlowUp.Auth
                 case AuthError.EmailAlreadyInUse:
                     return new Outcome { Problem = "This email already has a Glow Up account. Sign in the way you did the first time." };
                 case AuthError.OperationNotAllowed:
-                    return new Outcome { Problem = name + " sign-in is not switched on for this app yet (Firebase console > Authentication > Sign-in method)." };
+                    return new Outcome { Problem = name + " sign-in isn't available right now. Try again later, or sign in with your email." };   // (the Google provider is switched off in the project settings)
                 case AuthError.UserDisabled:
                     return new Outcome { Problem = "This account has been disabled." };
             }

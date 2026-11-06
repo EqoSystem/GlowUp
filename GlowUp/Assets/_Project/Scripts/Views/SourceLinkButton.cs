@@ -48,6 +48,16 @@ namespace GlowUp.Views
 
         void Open() { if (Url.Length > 0) Application.OpenURL(Url); }
 
+        /// <summary>A page nobody at GlowUp has checked yet: "Unverified source · site" (the whole words, never cut; 7 November 2026).</summary>
+        public void LabelUnverified()
+        {
+            if (label == null || Url.Length == 0) return;
+            label.text = "Unverified source \u00B7 " + SiteName(Url);
+            label.enableAutoSizing = true;
+            label.fontSizeMax = label.fontSize; label.fontSizeMin = Mathf.Min(label.fontSize, 26f);
+            label.overflowMode = TMPro.TextOverflowModes.Overflow;
+        }
+
         // ---------------------------------------------------------------------------------------
         //  Reading a source line (no Unity objects involved, so these can be tested on their own)
         // ---------------------------------------------------------------------------------------

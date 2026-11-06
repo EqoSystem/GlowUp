@@ -101,12 +101,10 @@ namespace GlowUp.Onboarding
             string returnScene = string.IsNullOrEmpty(OnboardingSession.RetakeReturnScene) ? SceneNames.Dashboard : OnboardingSession.RetakeReturnScene;
             try
             {
-                UserProfileData profile = await UserProfileRepository.Load() ?? new UserProfileData { uid = UserProfileRepository.ActiveUid };
-                profile.skinType = OnboardingSession.SkinType;
-                profile.skinTone = OnboardingSession.SkinTone;
-                profile.skinConditions = new List<string>(OnboardingSession.SkinConditions);
-                profile.knownAllergens = new List<string>(OnboardingSession.Allergens);
-                await UserProfileRepository.Save(profile);
+                // ONLY the four skin fields are written (7 November 2026). The old way saved the whole profile: when the profile could not
+                // be loaded it saved an empty one, which wiped the name, the email and the record of the Terms being accepted.
+                await UserProfileRepository.SaveSkinProfile(OnboardingSession.SkinType, OnboardingSession.SkinTone,
+                    new List<string>(OnboardingSession.SkinConditions), new List<string>(OnboardingSession.Allergens));
 
                 // items the user typed that were not on the lists go to the admin website for review, as at sign-up
                 string uid = UserProfileRepository.ActiveUid;

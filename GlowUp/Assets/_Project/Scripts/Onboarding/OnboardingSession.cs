@@ -114,6 +114,9 @@ namespace GlowUp.Onboarding
             PlayerPrefs.SetString(Prefix + "Allergens", string.Join("|", Allergens));
             PlayerPrefs.SetString(Prefix + "Account", AccountUid ?? "");
             PlayerPrefs.SetInt(Prefix + "AccountMadeHere", AccountMadeHere ? 1 : 0);
+            // a quiz retake is remembered too: after a restart it is still ONLY the quiz (Steps 2 to 4), never the account steps
+            PlayerPrefs.SetInt(Prefix + "Retake", Retake ? 1 : 0);
+            PlayerPrefs.SetString(Prefix + "RetakeReturn", RetakeReturnScene ?? "");
             PlayerPrefs.Save();
         }
 
@@ -132,6 +135,8 @@ namespace GlowUp.Onboarding
             Allergens = Split(PlayerPrefs.GetString(Prefix + "Allergens", ""));
             AccountUid = PlayerPrefs.GetString(Prefix + "Account", AccountUid ?? "");
             AccountMadeHere = PlayerPrefs.GetInt(Prefix + "AccountMadeHere", AccountMadeHere ? 1 : 0) == 1;
+            Retake = PlayerPrefs.GetInt(Prefix + "Retake", Retake ? 1 : 0) == 1;
+            RetakeReturnScene = PlayerPrefs.GetString(Prefix + "RetakeReturn", RetakeReturnScene ?? "");
         }
 
         public static void Clear()
@@ -140,7 +145,7 @@ namespace GlowUp.Onboarding
             FirstName = MiddleName = LastName = Username = Email = BirthdayIso = SkinType = SkinTone = Password = "";
             Age = 0; SkinConditions = new List<string>(); Allergens = new List<string>();
             CustomConditions = new List<string>(); CustomAllergens = new List<string>();
-            foreach (var k in new[] { "First", "Middle", "Last", "User", "Email", "Birthday", "Age", "Type", "Tone", "Cond", "Allergens", "Account", "AccountMadeHere" })
+            foreach (var k in new[] { "First", "Middle", "Last", "User", "Email", "Birthday", "Age", "Type", "Tone", "Cond", "Allergens", "Account", "AccountMadeHere", "Retake", "RetakeReturn" })
                 PlayerPrefs.DeleteKey(Prefix + k);
             PlayerPrefs.Save();
         }
