@@ -282,7 +282,9 @@ namespace GlowUp.AR
             }
             // a face powder is always shown in white, also one that was saved before with the colour of its box
             if (record != null && ShadeAdvisor.IsFacePowder(record.cosmeticType)) { own.Clear(); own.Add(ShadeAdvisor.PowderShade); }
+            GrowProductButtons(own.Count);
             Fill(productShadeButtons, own);
+            ScrollToStart(productShadeButtons);
             if (productShadesGroup != null) productShadesGroup.SetActive(own.Count > 0);
 
             ShowRecommended(area);
@@ -298,6 +300,33 @@ namespace GlowUp.AR
             string tone = profile != null ? profile.skinTone : "";
             Fill(recommendedShadeButtons, ShadeAdvisor.Recommend(tone, area));
             if (recommendedLabel != null) recommendedLabel.text = string.IsNullOrWhiteSpace(tone) ? recommendedNoTone : string.Format(recommendedFormat, tone);
+        }
+
+        /// <summary>
+        /// A product can have any number of shades (the website allows 100). The scene holds a few swatches; for every shade beyond them a copy
+        /// of the first swatch is added to the same row, which scrolls sideways (SideScrollRect).
+        /// </summary>
+        void GrowProductButtons(int count)
+        {
+            if (productShadeButtons == null || productShadeButtons.Length == 0 || productShadeButtons[0] == null || count <= productShadeButtons.Length) return;
+            ShadeButton pattern = productShadeButtons[0];
+            var grown = new List<ShadeButton>(productShadeButtons);
+            while (grown.Count < count)
+            {
+                ShadeButton copy = Instantiate(pattern, pattern.transform.parent);
+                copy.name = "Shade" + (grown.Count + 1);
+                copy.Clicked += Select;
+                grown.Add(copy);
+            }
+            productShadeButtons = grown.ToArray();
+        }
+
+        /// <summary>A new product starts its row of shades at the first one.</summary>
+        static void ScrollToStart(ShadeButton[] buttons)
+        {
+            if (buttons == null || buttons.Length == 0 || buttons[0] == null) return;
+            ScrollRect row = buttons[0].GetComponentInParent<ScrollRect>();
+            if (row != null && row.horizontal) { row.StopMovement(); row.horizontalNormalizedPosition = 0f; }
         }
 
         static void Fill(ShadeButton[] buttons, List<string> shades)

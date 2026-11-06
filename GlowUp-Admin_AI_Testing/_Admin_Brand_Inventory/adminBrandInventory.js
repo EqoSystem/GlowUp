@@ -60,7 +60,8 @@ import { gs1Hint, VERIFIED_BY_GS1 } from "../_Shared/gs1Hint.js";
 
 const OTHER_TYPE = "__other__";
 const NO_BRAND = "__none__";                // the group for products whose brand no longer exists
-const MAX_SHADES = 12;
+const MAX_SHADES = 100;               // no practical limit for a real range (foundations run to 40+); the database rule allows 100
+const SHADE_STRIP_FROM = 11;         // from 11 shades on, the shades sit in one row that scrolls sideways
 const MAX_TAGS = 10;                        // filter words kept on a product (tags), so a filter needs one cheap query and no join
 const BATCH_LIMIT = 400;                    // Firestore allows 500 writes in one batch
 const BRANDS_PER_PAGE = 10;                 // "Brands": this many brands at a time
@@ -2602,7 +2603,10 @@ function renderShadeEditor() {
     } else if (formShades.length < MAX_SHADES) tail = `<button type="button" class="row-btn" id="addShadeBtn">${icon("plus")}Shade</button>`;
     else tail = `<span class="field-hint">A product can have up to ${MAX_SHADES} shades.</span>`;
     const note = shadeMessage ? `<span class="field-hint shade-msg" role="alert">${escapeHtml(shadeMessage)}</span>` : "";
-    el("productShadeEditor").innerHTML = items + tail + note;
+    // many shades: one row that scrolls sideways (wheel, trackpad, drag of the bar), so the form stays short; the add box stays below it
+    const strip = formShades.length >= SHADE_STRIP_FROM;
+    el("productShadeEditor").innerHTML = (strip ? `<div class="shade-strip" role="group" aria-label="${formShades.length} shades, scroll sideways to see them all">${items}</div><span class="field-hint">${formShades.length} shades. Scroll the row sideways to see them all.</span>` : items) + tail + note;
+    if (strip && shadeAdding) { const row = el("productShadeEditor").querySelector(".shade-strip"); if (row) row.scrollLeft = row.scrollWidth; }
 }
 
 function addShadeFromDraft() {

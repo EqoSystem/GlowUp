@@ -468,7 +468,7 @@ export function mergeProducts(keep, others) {
         if (donor) { changes.ingredients = list(donor.ingredients).slice(); if (list(donor.sources).length > 0) changes.sources = uniqueNames(list(keep.sources).concat(list(donor.sources)), []); }
     }
     if (!barcodeKey(keep.barcode)) { const donor = others.find((other) => barcodeKey(other.barcode)); if (donor) changes.barcode = text(donor.barcode); }
-    const shades = Array.from(new Set(list(keep.shades).concat(...others.map((other) => list(other.shades))))).slice(0, 12);
+    const shades = Array.from(new Set(list(keep.shades).concat(...others.map((other) => list(other.shades))))).slice(0, 100);
     if (shades.length !== list(keep.shades).length) changes.shades = shades;
     return { keepChanges: changes, bin: others.map((other) => ({ item: other, reason: `The same product as "${text(keep.name)}": merged into it.` })) };
 }

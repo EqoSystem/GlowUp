@@ -164,7 +164,7 @@ function product(f) {
         cosmeticType: MAKEUP_TYPES.find((t) => t.toLowerCase() === kind.toLowerCase()) || kind,
         description: value(f.DESCRIPTION, 400),
         ingredients: listOf(f.INGREDIENTS, 100, 80),
-        shades: listOf(f.SHADES, 40, 24).map(hexOf).filter((s, i, all) => s && all.indexOf(s) === i).slice(0, 12),
+        shades: listOf(f.SHADES, 40, 100).map(hexOf).filter((s, i, all) => s && all.indexOf(s) === i).slice(0, 100),
         fdaVerifiedLink: fda,
         fdaNumber: fdaNumberOf(f.FDA_REGISTRATION_NUMBER),
         sources: Array.from(new Set(sources.concat(fda ? [fda] : []))).slice(0, 10),

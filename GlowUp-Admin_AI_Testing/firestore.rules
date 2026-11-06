@@ -114,7 +114,7 @@ service cloud.firestore {
       return isAdmin()
         && request.resource.data.get('name', '') is string
         && request.resource.data.get('name', '').size() <= 200
-        && sizedList('ingredients', 300) && sizedList('shades', 24) && sizedList('sources', 40) && sizedList('aliases', 60)
+        && sizedList('ingredients', 300) && sizedList('shades', 100) && sizedList('sources', 40) && sizedList('aliases', 60)
         && sizedList('tags', 20) && sizedList('ingredientIds', 300) && sizedList('ingredientNotes', 100)
         && httpsOrEmpty('imageUrl') && httpsOrEmpty('logoUrl') && httpsOrEmpty('website') && httpsOrEmpty('websiteSuggested');
     }
