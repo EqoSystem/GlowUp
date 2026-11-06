@@ -1,17 +1,14 @@
 /* Login page: only where things sit. Colours, inputs and buttons come from ../_Shared/adminCommon.css. */
 
-/* THE PAPER (7 November 2026): no gradient. A plain dirty-white old paper: one flat colour with a fine grain and faint mottling
-   drawn by an SVG noise filter (one small seamless tile, no colour fades). The dark theme keeps the same grain on a warm charcoal. */
+/* THE MARBLE (7 November 2026): white and blush-pink marble with thin gold veins, drawn as an SVG of our own (marble-light.svg,
+   marble-dark.svg: noise filters, no photo, so no licence and sharp at any size). It covers the window and stays still. */
 body.login-page {
-    --paper: #eee8db;
-    --paper-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .32 0 0 0 0 .27 0 0 0 0 .2 0 0 0 .11 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+    --paper: #fbf6f5;
     min-height: 100vh; min-height: 100dvh; display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr);
     padding: 0;
-    background-color: var(--paper);
-    background-image: var(--paper-grain);
-    background-size: 220px 220px;
+    background: var(--paper) url("marble-light.svg") center / cover no-repeat fixed;
 }
-:root[data-theme="dark"] body.login-page { --paper: #1c1a19; }
+:root[data-theme="dark"] body.login-page { --paper: #1e1719; background-image: url("marble-dark.svg"); }
 /* the header: the admin pages' own top bar, on the paper (its tint follows the paper instead of the page colour) */
 .topbar.login-top { justify-content: space-between; background: color-mix(in srgb, var(--paper) 86%, transparent); }
 .login-brand { padding: 0; }
