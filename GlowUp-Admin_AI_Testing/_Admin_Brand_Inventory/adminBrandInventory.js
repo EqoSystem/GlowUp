@@ -253,6 +253,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         paintLayout();
     });
     paintLayout();
+    // a narrow list (a snapped or small window, Quick settings open) draws products as cards by itself, so the table never
+    // needs a sideways scroll; it goes back to the chosen look when there is room again (two limits, so it cannot flicker)
+    if (window.ResizeObserver) new ResizeObserver(() => {
+        const width = el("inventoryHost").clientWidth;
+        if (width === 0) return;
+        const narrow = width < NARROW_LIST_PX ? true : width > NARROW_LIST_PX + 40 ? false : listIsNarrow;
+        if (narrow !== listIsNarrow) { listIsNarrow = narrow; paintLayout(); }
+    }).observe(el("inventoryHost"));
     el("inventoryQuick").addEventListener("click", (event) => {
         const chip = event.target.closest("[data-clear]");
         if (chip && chip.dataset.clear === "drill") { openDrill(drill && drill.kind === "brand" ? { kind: "brands" } : null); return; }
@@ -1324,10 +1332,14 @@ async function openSnapshotInForm(entry, v) {
     snapshotInForm = { entry };
 }
 
+/** Under this width the list is drawn as cards whatever the switch says (the table needs about 640 px). */
+const NARROW_LIST_PX = 600;
+let listIsNarrow = false;
+
 /** Rows or Cards on the inventory list (the switch in its title line). */
 function paintLayout() {
     // the Recycle bin keeps its table: cards are for products
-    el("inventoryHost").classList.toggle("as-cards", view.layout === "cards" && !(org && org.view.kind === "bin"));
+    el("inventoryHost").classList.toggle("as-cards", (view.layout === "cards" || listIsNarrow) && !(org && org.view.kind === "bin"));
     el("inventoryLayoutSwitch").querySelectorAll("[data-layout]").forEach((button) => {
         const on = button.dataset.layout === view.layout;
         button.classList.toggle("on", on);
