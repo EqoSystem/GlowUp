@@ -3,6 +3,7 @@
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const handler = require("../api/scan-snapshot.js");
+require("../api/_lib/pageIngredients.js").setPageGetterForTests(async () => null);     // no real page is ever opened by the tests
 const { photoOf, tidySnapshot, cleanLinks, dayStamp } = handler.helpers;
 
 let checks = 0, failed = 0;

@@ -10,6 +10,11 @@
 //   at most MAX_PAGES pages. A page's text is data, never an instruction: it is only cut and split here, never sent to an AI.
 "use strict";
 
+const https = require("https");
+const dns = require("dns");
+const net = require("net");
+const MAX_HOPS = 3;
+
 const MAX_PAGES = 6;
 const PAGE_SECONDS = 6;
 const SEARCH_SECONDS = 7;
@@ -105,22 +110,101 @@ function fetchable(url) {
     } catch (error) { return false; }
 }
 
+/** True for an address on the public internet. Loopback, private (RFC 1918), CGNAT, link-local, ULA, multicast, reserved and
+ *  IPv4-mapped forms of these are refused. */
+function publicAddress(address, family) {
+    let a = String(address || "").toLowerCase();
+    if (family === 6 || a.includes(":")) {
+        const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(a);
+        if (mapped) return publicAddress(mapped[1], 4);
+        if (a === "::" || a === "::1") return false;
+        if (/^(fc|fd)/.test(a) || /^fe[89ab]/.test(a) || /^ff/.test(a) || a.startsWith("64:ff9b:") || a.startsWith("2001:db8") || a.startsWith("100:")) return false;
+        return true;
+    }
+    const n = a.split(".").map(Number);
+    if (n.length !== 4 || n.some((x) => !Number.isInteger(x) || x < 0 || x > 255)) return false;
+    const [b0, b1] = n;
+    if (b0 === 0 || b0 === 10 || b0 === 127 || b0 >= 224) return false;
+    if (b0 === 100 && b1 >= 64 && b1 <= 127) return false;              // CGNAT
+    if (b0 === 169 && b1 === 254) return false;                         // link-local (cloud metadata)
+    if (b0 === 172 && b1 >= 16 && b1 <= 31) return false;
+    if (b0 === 192 && (b1 === 168 || (b1 === 0 && (n[2] === 0 || n[2] === 2)))) return false;
+    if (b0 === 198 && (b1 === 18 || b1 === 19 || (b1 === 51 && n[2] === 100))) return false;
+    if (b0 === 203 && b1 === 0 && n[2] === 113) return false;
+    return true;
+}
+
+/** DNS look-up used AT CONNECT TIME: every answer must be public, so the address checked is the address connected to
+ *  (no window for DNS rebinding between a check and the connection). */
+function vettedLookup(hostname, options, callback) {
+    dns.lookup(hostname, { all: true, verbatim: true }, (error, addresses) => {
+        if (error) return callback(error);
+        if (!addresses.length || !addresses.every((x) => publicAddress(x.address, x.family))) return callback(new Error("refused: not a public address"));
+        const first = addresses[0];
+        if (options && options.all) return callback(null, addresses);
+        callback(null, first.address, first.family);
+    });
+}
+
+/** One GET with the vetted look-up; redirects are NOT followed here. Resolves { status, location, type, body }. */
+function getOnce(url) {
+    return new Promise((resolve) => {
+        let done = false;
+        const finish = (value) => { if (!done) { done = true; resolve(value); } };
+        const request = https.get(url, {
+            lookup: vettedLookup, timeout: PAGE_SECONDS * 1000,
+            headers: { "User-Agent": "GlowUpCatalogue/1.0 (ingredient list check)", Accept: "text/html" }
+        }, (response) => {
+            const status = response.statusCode || 0;
+            const type = String(response.headers["content-type"] || "");
+            if (status >= 300 && status < 400) { response.resume(); return finish({ status, location: String(response.headers.location || "") }); }
+            if (status !== 200 || !/text\/html|application\/xhtml/i.test(type) || Number(response.headers["content-length"] || 0) > MAX_PAGE_BYTES) {
+                response.resume(); return finish({ status: 0 });
+            }
+            const chunks = []; let size = 0;
+            response.on("data", (chunk) => {
+                size += chunk.length;
+                if (size > MAX_PAGE_BYTES) { request.destroy(); return finish({ status: 200, type, body: Buffer.concat(chunks).toString("utf8") }); }
+                chunks.push(chunk);
+            });
+            response.on("end", () => finish({ status: 200, type, body: Buffer.concat(chunks).toString("utf8") }));
+            response.on("error", () => finish({ status: 0 }));
+        });
+        request.on("timeout", () => { request.destroy(); finish({ status: 0 }); });
+        request.on("error", () => finish({ status: 0 }));
+    });
+}
+
+/** The page's HTML, or null. Redirects are followed by hand (at most MAX_HOPS), every hop checked again. */
+async function safeGet(url) {
+    let at = url;
+    for (let hop = 0; hop <= MAX_HOPS; hop++) {
+        if (!fetchable(at)) return null;
+        const answer = await getOnce(at);
+        if (answer.status === 200) return answer.body || null;
+        if (!answer.location) return null;
+        try { at = new URL(answer.location, at).href; } catch (error) { return null; }
+    }
+    return null;
+}
+
+let pageGetter = safeGet;
+/** Tests only: the pretend web. Production always uses safeGet. */
+function setPageGetterForTests(getter) { pageGetter = getter || safeGet; }
+
 async function fetchPage(url, fetcher) {
     if (!fetchable(url)) return null;
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), PAGE_SECONDS * 1000);
     try {
-        const answer = await fetcher(url, { headers: { "User-Agent": "GlowUpCatalogue/1.0 (ingredient list check)", Accept: "text/html" }, redirect: "follow", signal: controller.signal });
-        if (!answer.ok) return null;
-        if (answer.url && !fetchable(answer.url)) return null;               // a redirect to a private address is not read
-        const type = String(answer.headers.get("content-type") || "");
-        if (!/text\/html|application\/xhtml/i.test(type)) return null;
-        const length = Number(answer.headers.get("content-length") || 0);
-        if (length > MAX_PAGE_BYTES) return null;
-        const html = await answer.text();
-        return html.length > MAX_PAGE_BYTES ? html.slice(0, MAX_PAGE_BYTES) : html;
+        if (fetcher) {
+            // only the tests pass a fetcher (a pretend web); it is never given a live address in production
+            const answer = await fetcher(url, { redirect: "manual" });
+            if (!answer || !answer.ok || (answer.url && !fetchable(answer.url))) return null;
+            if (!/text\/html|application\/xhtml/i.test(String(answer.headers.get("content-type") || ""))) return null;
+            const html = await answer.text();
+            return html.length > MAX_PAGE_BYTES ? html.slice(0, MAX_PAGE_BYTES) : html;
+        }
+        return await pageGetter(url);
     } catch (error) { return null; }
-    finally { clearTimeout(timer); }
 }
 
 /** Plain web search (DuckDuckGo's HTML page): result addresses only. */
@@ -147,12 +231,13 @@ async function searchPages(query, fetcher, resultUrl) {
  * { ingredients, url, site, kind, tried } (ingredients empty when no page had a list) and never throws.
  * `kindOf(url)` = "retailer" for a known shop (from assist-ingredient.js), anything else otherwise.
  */
-async function findPageIngredients({ brand, productName, pages, fetcher, resultUrl, kindOf, notes }) {
+async function findPageIngredients({ brand, productName, pages, fetcher, searchFetcher, resultUrl, kindOf, notes }) {
     const result = { ingredients: [], url: "", site: "", kind: "", tried: 0 };
     if (!brand || !productName) return result;
-    const doFetch = fetcher || fetch;
+    // the search goes to one fixed public address (DuckDuckGo); product pages go through the vetted fetch (fetchPage)
+    const doSearch = searchFetcher || fetcher || fetch;
     let urls = (pages || []).filter(fetchable);
-    if (resultUrl) urls = urls.concat(await searchPages(`${brand} ${productName} ingredients`, doFetch, resultUrl));
+    if (resultUrl) urls = urls.concat(await searchPages(`${brand} ${productName} ingredients`, doSearch, resultUrl));
     const seen = new Set();
     const ranked = urls.filter((url) => !seen.has(url) && seen.add(url)).map((url) => {
         const site = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
@@ -160,7 +245,7 @@ async function findPageIngredients({ brand, productName, pages, fetcher, resultU
         return { url, site, kind, rank: kind === "official" ? 0 : kind === "retailer" ? 1 : 2 };
     }).sort((a, b) => a.rank - b.rank).slice(0, MAX_PAGES);
     // fetched side by side; the best-ranked page that has a list wins
-    const found = await Promise.all(ranked.map(async (page) => ({ page, list: extractIngredientList(await fetchPage(page.url, doFetch)) })));
+    const found = await Promise.all(ranked.map(async (page) => ({ page, list: extractIngredientList(await fetchPage(page.url, fetcher)) })));
     result.tried = ranked.length;
     const best = found.find((f) => f.list && f.list.length > 0);
     if (best) Object.assign(result, { ingredients: best.list.slice(0, 80).map((item) => item.slice(0, 100)), url: best.page.url, site: best.page.site, kind: best.page.kind });
@@ -168,4 +253,4 @@ async function findPageIngredients({ brand, productName, pages, fetcher, resultU
     return result;
 }
 
-module.exports = { pageText, listFrom, extractIngredientList, isOfficial, fetchable, findPageIngredients, MAX_PAGES };
+module.exports = { pageText, listFrom, extractIngredientList, isOfficial, fetchable, publicAddress, safeGet, findPageIngredients, setPageGetterForTests, MAX_PAGES };

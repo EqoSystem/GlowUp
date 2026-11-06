@@ -463,9 +463,10 @@ export function openSnapshotReview(options) {
         if (entry.variant || entry.size) extra.append(make("p", "snapx-details", [entry.variant && "Shade or variant: " + entry.variant, entry.size && "Size: " + entry.size].filter(Boolean).join("   ")));
         // where the INGREDIENT LIST came from: a page this server opened, or the pack itself (never written by the AI)
         const kindWord = { official: "official brand site", retailer: "retailer", other: "other site" };
-        if (entry.ingredientsFrom === "printed") extra.append(make("p", "snapx-sources", "Ingredient list: read from the pack in the photo by the phone."));
+        // these fields are SENT BY THE APP (any signed-in phone can write them): they are claims to check, never proof
+        if (entry.ingredientsFrom === "printed") extra.append(make("p", "snapx-sources", "Ingredient list: the app says it was read from the pack. Compare it with the photo."));
         else if (entry.ingredientSourceUrl) {
-            const line = make("p", "snapx-sources", "Ingredient list from (" + (kindWord[entry.ingredientSourceKind] || "web page") + ", unverified): ");
+            const line = make("p", "snapx-sources", "Ingredient list page sent by the app (it says: " + (kindWord[entry.ingredientSourceKind] || "web page") + "; not checked). Open it and compare before approving: ");
             const link = make("a", "", new URL(entry.ingredientSourceUrl).hostname.replace(/^www\./, ""));
             link.href = entry.ingredientSourceUrl; link.target = "_blank"; link.rel = "noopener noreferrer nofollow";
             line.append(link);
@@ -483,7 +484,7 @@ export function openSnapshotReview(options) {
         const alike = similarProducts({ brand: entry.brandName, name: entry.name }, ctx);
         if (alike.length > 0) extra.append(make("p", "snapx-similar", "Looks like a product already listed: " + alike.map((a) => `"${a.name}" (${Math.round(a.score * 100)}%)`).join(", ") + ". Compare before you approve."));
         if (closeIngredients.size > 0) extra.append(make("p", "snapx-similar", `${closeIngredients.size} ingredient${closeIngredients.size === 1 ? "" : "s"} nearly equal one in the library (hover the dashed pills). Add them as new only if they are different.`));
-        const badge = make("p", "snapx-badge", entry.ingredientsFrom ? "Pending review · unverified · product identified by AI, list from a page or the pack" : "Pending approval · unverified · AI-generated");
+        const badge = make("p", "snapx-badge", entry.ingredientsFrom ? "Pending review · unverified · everything here was sent by the app: check it against the photo and the page" : "Pending approval · unverified · AI-generated");
         const error = make("p", "snapx-error"); error.setAttribute("role", "alert");
         right.append(summary, badge, rows, extra, listField, error);
 

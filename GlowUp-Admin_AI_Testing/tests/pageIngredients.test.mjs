@@ -35,6 +35,13 @@ check(fetchable("https://www.maybelline.com/lip-makeup/x"), "a normal https page
 for (const bad of ["http://maybelline.com/x", "https://127.0.0.1/x", "https://localhost/x", "https://user:pw@shop.example/x", "https://intranet/x", "https://shop.example:8443/x", "https://printer.local/x", "javascript:alert(1)", "file:///etc/passwd"])
     check(!fetchable(bad), "never fetched: " + bad);
 
+// ---- addresses a page may never be fetched from (checked at connect time, for every DNS answer and every redirect)
+const { publicAddress } = require("../api/_lib/pageIngredients.js");
+for (const [address, family] of [["127.0.0.1", 4], ["10.1.2.3", 4], ["172.20.0.1", 4], ["192.168.1.1", 4], ["169.254.169.254", 4], ["100.64.0.1", 4], ["0.0.0.0", 4],
+    ["::1", 6], ["fd00::1", 6], ["fe80::1", 6], ["::ffff:127.0.0.1", 6], ["::ffff:10.0.0.1", 6]])
+    check(!publicAddress(address, family), "refused: " + address);
+check(publicAddress("142.250.66.78", 4) && publicAddress("2606:4700::6810:84e5", 6), "a public address is allowed");
+
 // ---- the whole search with a pretend web
 const shopPage = "<p>Ingredients: Aqua, Glycerin, Mica, Talc, Silica, Dimethicone</p>";
 const brandPage = "<h2>Ingredients</h2><p>Isododecane, Dimethicone, Mica, Silica, Phenoxyethanol, Tocopherol</p>";

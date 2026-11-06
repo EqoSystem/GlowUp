@@ -214,7 +214,7 @@ module.exports = async (req, res) => {
         if (draft.found && draft.brand && draft.productName) {
             listPage = await findPageIngredients({
                 brand: draft.brand, productName: draft.productName, pages: (got.sources || []).map((page) => page && page.url).filter(Boolean),
-                fetcher: fetch, resultUrl: searchResultUrl, kindOf: (url) => sourceKind("page | " + url, ""), notes
+                searchFetcher: fetch, resultUrl: searchResultUrl, kindOf: (url) => sourceKind("page | " + url, ""), notes
             }).catch(() => listPage);
         }
         draft.ingredients = listPage.ingredients;
