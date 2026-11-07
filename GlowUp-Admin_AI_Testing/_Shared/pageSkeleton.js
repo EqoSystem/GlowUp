@@ -3,6 +3,18 @@
 // and soft blush shapes where that page's numbers, tools and lists will be, with a rose-to-gold shine moving across.
 // adminCommon.css shows it while the page is checking the sign-in (html.auth-pending) and from the moment a link to
 // another page is pressed (body.leaving); otherwise it is not displayed.
+// html.resizing while the window edge moves (until 150 ms after the last resize event): adminCommon.css stops every transition
+// and animation then, so the page follows the edge at once. pageFrame.js does the same on admin pages; the flag keeps it single.
+(function () {
+    if (window.__glowupResizing) return;
+    window.__glowupResizing = true;
+    var root = document.documentElement, timer = 0;
+    window.addEventListener("resize", function () {
+        if (!timer) root.classList.add("resizing");
+        clearTimeout(timer);
+        timer = setTimeout(function () { root.classList.remove("resizing"); timer = 0; }, 150);
+    }, { passive: true });
+})();
 (function () {
     var path = location.pathname;
     var kind = path.indexOf("_Index") >= 0 ? "login" : path.indexOf("Inventory") >= 0 ? "inventory" : path.indexOf("Curator") >= 0 ? "curator" : "dashboard";

@@ -19,10 +19,12 @@ html.sb-collapsed .brand-mark { margin: 0; }
     position: fixed; top: var(--qs-top, 56px); right: var(--qs-sb, 0px); bottom: 0; z-index: 901;
     display: none; flex-direction: column; overflow: hidden;
     width: var(--settings-w); max-width: calc(100vw - var(--qs-sb, 0px)); background: var(--surface); border-left: 1px solid var(--border);
-    transform: translateX(calc(100% + var(--qs-sb, 0px) + 12px)); transition: transform .28s var(--ease);
+    transform: translateX(calc(100% + var(--qs-sb, 0px) + 12px)); transition: transform .18s ease-in;
 }
 .settings-window.is-shown { display: flex; }
-.settings-window.is-open { transform: none; }
+.settings-window.is-open { transform: none; transition: transform .22s ease-out; }
+/* the frame it appears in, it starts off to the right and slides in (no script reflow needed to start the transition) */
+@starting-style { .settings-window.is-open { transform: translateX(calc(100% + var(--qs-sb, 0px) + 12px)); } }
 .settings-window:focus { outline: none; }
 .sw-head { display: flex; align-items: center; gap: 4px; padding: 10px 10px 10px 16px; border-bottom: 1px solid var(--border); flex: none; }
 .sw-head:has(#swBack:not([hidden])) { padding-left: 10px; }
@@ -39,7 +41,7 @@ html.sb-collapsed .brand-mark { margin: 0; }
 /* 1024 px and wider (7 November 2026): a side panel that PUSHES the page; the board reflows into the width that is left
    (its panels follow the board's own width: the container query in adminCommon.css). Nothing is hidden under it. */
 @media (min-width: 1024px) {
-    .main-content > .board, .main-content > .editing-bar { margin-right: var(--qs-shift, 0px); transition: margin-right .28s var(--ease); }
+    .main-content > .board, .main-content > .editing-bar { margin-right: var(--qs-shift, 0px); }   /* snaps: a margin is layout, never animated */
     html.qs-open { --qs-shift: var(--settings-w); }
 }
 /* Under 1024 px: a full-height sheet over a dimmed backdrop. The backdrop, Esc and the close button close it; the page behind
@@ -53,12 +55,12 @@ html.sb-collapsed .brand-mark { margin: 0; }
 }
 @media (max-width: 599px) { .settings-window { width: 100vw; border-left: 0; } }
 @keyframes fade-in { from { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .main-content > .board, .main-content > .editing-bar, .settings-window { transition: none !important; } }
+@media (prefers-reduced-motion: reduce) { .settings-window, .settings-window.is-open { transition: opacity .15s !important; } }
 /* before the panel is first opened, the Layout & Style controls wait here */
 #layoutStash { display: none; }
 
 /* the Settings view uses the menu look (.menu-item ... in adminCommon.css) */
 .menu-badge {
     flex: none; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center;
-    font-size: 11px; font-weight: 700; line-height: 1; color: #fff; background: var(--bad);
+    font-size: 12px; font-weight: 700; line-height: 1; color: #fff; background: var(--bad);
 }

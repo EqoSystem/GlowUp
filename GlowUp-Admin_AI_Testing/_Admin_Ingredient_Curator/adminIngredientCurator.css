@@ -27,7 +27,7 @@
 .panel-head > .pick { margin-right: 2px; }
 .table-foot { display: flex; align-items: center; gap: 12px; }
 .table-foot .spacer { flex: 1; }
-@media (max-width: 620px) { .ingredients-list { grid-template-columns: 1fr; } }
+@container panel (max-width: 620px) { .ingredients-list { grid-template-columns: 1fr; } }
 .ingredient-card.from-product { border-style: dashed; }
 .ingredient-card.from-product .ingredient-tech { font-style: normal; padding-left: 18px; }
 .suggestion-list { display: grid; gap: 12px; }
@@ -38,6 +38,9 @@
 
 /* ---- the list as rows (the default): name | scientific name and badges | actions, one ingredient per line ---- */
 .ingredients-list.as-rows { grid-template-columns: 1fr; gap: 6px; }
+/* the rows follow the LIST's width (container query, 7 November 2026), not the window's: Quick settings or a snapped window can
+   leave a wide window with a narrow list */
+.ingredients-list { container: inglist / inline-size; }
 .as-rows .ingredient-card:not(.open) { flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 14px; padding: 7px 14px; }
 .as-rows .ingredient-card:not(.open) > .card-head { display: contents; }
 .as-rows .ingredient-card:not(.open) .pick { order: 0; flex: none; }
@@ -46,7 +49,7 @@
 .as-rows .ingredient-card:not(.open) .card-sub { order: 2; flex: 1 1 46%; min-width: 0; }
 .as-rows .ingredient-card:not(.open) .row-actions { order: 3; flex: none; }
 .as-rows .ingredient-card:not(.open) .ingredient-tech { padding-left: 0; }
-@media (max-width: 620px) {
+@container inglist (max-width: 620px) {
     .as-rows .ingredient-card:not(.open) { flex-wrap: wrap; row-gap: 2px; }
     .as-rows .ingredient-card:not(.open) .ingredient-name { flex: 1 1 60%; }
     .as-rows .ingredient-card:not(.open) .card-sub { flex: 1 1 100%; order: 3; }
@@ -68,7 +71,7 @@
 [data-panel="list"] > .panel-inner > .panel-head > .head-end > .panel-menu-btn { position: absolute; right: 100%; margin-right: 4px; z-index: 2; }
 @media (max-width: 1400px) { [data-panel="list"] #sortNow { display: none; } }
 /* the sidebar open beside a narrow panel: New folder keeps only its icon. Up to 1100 px the panel has the whole width again */
-@media (min-width: 1101px) and (max-width: 1279px) { html:not(.sb-collapsed) #ingredientShelfAdd .folder-chip { font-size: 0; gap: 0; } }
+@media (min-width: 1024px) and (max-width: 1279px) { html:not(.sb-collapsed) #ingredientShelfAdd .folder-chip { font-size: 0; gap: 0; } }
 
 /* the classification column of the list, and the rows of "Manage classifications" (the look of the Edit list window) */
 .class-cell { flex: none; display: inline-flex; }
@@ -83,7 +86,7 @@
 /* the scan window and the bar inside the duplicates window (Clean up, Find duplicates) */
 .scan-status { margin: 4px 0 10px; color: var(--text); }
 .scan-track { height: 8px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
-.scan-fill { height: 100%; width: 0; border-radius: 999px; background: var(--accent); transition: width .12s linear; }
+.scan-fill { height: 100%; width: 100%; border-radius: 999px; background: var(--accent); transform: scaleX(0); transform-origin: left center; transition: transform .12s linear; }
 .scan-inline { padding: 18px 8px; }
 /* on a phone the classification column gives up its fixed width, so the line can wrap (after its 190 px rule above) */
-@media (max-width: 620px) { .as-rows .ingredient-card:not(.open) .class-cell { flex: 0 1 auto; max-width: 100%; } }
+@container inglist (max-width: 620px) { .as-rows .ingredient-card:not(.open) .class-cell { flex: 0 1 auto; max-width: 100%; } }

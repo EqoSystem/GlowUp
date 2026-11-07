@@ -318,7 +318,7 @@ export function openSnapshotReview(options) {
         // counts UP as the queue is worked through: 1 of 5, then 2 of 5 ... (a skipped card keeps its place)
         progress.textContent = left === 0 ? (approved > 0 ? `All done: ${approved} approved` : "Nothing is waiting")
             : `Reviewing snapshot ${done + at + 1} of ${total}`;
-        fill.style.width = total > 0 ? Math.round(((done + (left > 0 ? at : 0)) / total) * 100) + "%" : "100%";
+        fill.style.transform = `scaleX(${total > 0 ? Math.min(1, (done + (left > 0 ? at : 0)) / total) : 1})`;
     }
 
     function paintEmpty() {

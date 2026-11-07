@@ -1,2 +1,6 @@
 .vercel
 .env*
+
+# responsive test rig: its packages and its pictures
+tests/responsive/node_modules/
+tests/screenshots/

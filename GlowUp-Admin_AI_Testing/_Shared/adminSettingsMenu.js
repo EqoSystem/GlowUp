@@ -114,9 +114,13 @@ function openWindow() {
     if (!win) build();
     placeBelowHeader();
     clearTimeout(hideTimer);
-    win.classList.add("is-shown");
-    void win.offsetWidth;                         // the panel is drawn at its start place first, then slides in
+    win.classList.add("is-shown");                // its start place (off to the right) is @starting-style in adminSettingsMenu.css: no forced reflow
     win.classList.add("is-open");
+    // one layer over the page at a time: the menu opened over the page (narrow windows) closes first
+    if (document.documentElement.classList.contains("sb-peek")) {
+        document.documentElement.classList.remove("sb-peek");
+        document.querySelectorAll("#sidebarToggle, #menuBtn").forEach((b) => b.setAttribute("aria-expanded", "false"));
+    }
     document.documentElement.classList.add("qs-open");
     button.setAttribute("aria-expanded", "true");
     show("menu");
@@ -224,6 +228,10 @@ export function mountSettingsMenu(tools) {
     }
 
     button.addEventListener("click", () => { if (isOpen()) closeSettingsWindow(); else openWindow(); });
+    // the panel is built while the browser has nothing else to do, so the first press only slides it in (building it inside the
+    // press made that one frame long)
+    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1200));
+    idle(() => { if (!win) build(); }, { timeout: 3000 });
     document.addEventListener("glowup:settings-close", closeSettingsWindow);
     // Esc closes it, unless a dialog, pop-up or menu has taken that key already (they stop it before it gets here)
     document.addEventListener("keydown", (event) => {
@@ -238,7 +246,9 @@ export function mountSettingsMenu(tools) {
         if (event.target.closest && event.target.closest(".modal-overlay, .menu, .info-pop, .toast, .facet-panel")) return;
         closeSettingsWindow();
     }, true);
-    window.addEventListener("resize", () => { if (isOpen()) placeBelowHeader(); });
+    // once per frame at most, after the resize has been laid out (never a size read inside the resize event itself)
+    let placeQueued = 0;
+    window.addEventListener("resize", () => { if (isOpen() && !placeQueued) placeQueued = requestAnimationFrame(() => { placeQueued = 0; placeBelowHeader(); }); }, { passive: true });
     document.addEventListener("glowup:theme", () => { if (isOpen() && view === "menu") renderMenu(); });
     document.addEventListener("glowup:bin-count", () => { if (isOpen() && view === "menu") renderMenu(); });
     onListsRefreshed(() => { if (isOpen() && view === "menu") renderMenu(); });

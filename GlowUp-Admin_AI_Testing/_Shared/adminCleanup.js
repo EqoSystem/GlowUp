@@ -52,7 +52,7 @@ export function showScan(title, text, onCancel) {
     document.addEventListener("keydown", onKey, true);
     cancel.focus();
     return {
-        update(done, total) { fill.style.width = Math.min(100, Math.round((done / Math.max(1, total)) * 100)) + "%"; status.textContent = text.replace("{done}", done).replace("{total}", total); },
+        update(done, total) { fill.style.transform = `scaleX(${Math.min(1, done / Math.max(1, total))})`; status.textContent = text.replace("{done}", done).replace("{total}", total); },
         close() { document.removeEventListener("keydown", onKey, true); overlay.remove(); },
         cancelled: () => stopped
     };
@@ -341,7 +341,7 @@ export function openDuplicatesDialog(options) {
         list.replaceChildren(waiting);
         list.setAttribute("aria-busy", "true");
         tabs.querySelectorAll(".seg").forEach((tab) => { tab.disabled = true; });
-        const progress = (done, total) => { fill.style.width = Math.round((done / Math.max(1, total)) * 100) + "%"; waitText.textContent = `Checking the names: ${done} / ${total}`; };
+        const progress = (done, total) => { fill.style.transform = `scaleX(${Math.min(1, done / Math.max(1, total))})`; waitText.textContent = `Checking the names: ${done} / ${total}`; };
         try { found = await section.find(state.threshold, { onProgress: progress, cancelled: () => mine !== drawing || !document.body.contains(list) }); }
         catch (error) {
             console.error("Looking for duplicates failed: ", error);

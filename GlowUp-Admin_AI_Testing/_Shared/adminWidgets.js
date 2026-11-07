@@ -165,11 +165,11 @@ export function mountWidget(panel, config) {
         if (menu) menu.parentNode.insertBefore(pager, menu); else if (head) head.appendChild(pager);
         w = { panel, body, pager, wanted: null, config: null, page: { page: 1, size: LIST_SIZE }, selected: new Set(), shaking: false, width: 0 };
         // a graph is drawn for the width it has: draw it again when the panel is resized
-        w.watcher = new ResizeObserver(() => {
-            const width = Math.round(body.clientWidth);
+        w.watcher = new ResizeObserver((entries) => {
+            const width = Math.round(entries[entries.length - 1].contentRect.width);
             if (!w.config || Math.abs(width - w.width) < 12 || w.config.view !== "graph") { w.width = width; return; }
-            w.width = width;
-            render(w, true);                       // only its size changed: draw it again without the entrance animation
+            clearTimeout(w.redraw);                // 100 ms after the last change: a drag of the window draws it once, not per pixel
+            w.redraw = setTimeout(() => { w.width = Math.round(body.clientWidth); render(w, true); }, 100);
         });
         w.watcher.observe(body);
         mounted.set(panel, w);

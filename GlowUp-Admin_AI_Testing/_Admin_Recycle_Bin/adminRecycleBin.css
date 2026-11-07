@@ -14,7 +14,7 @@
 .bin-table .row-btn { white-space: nowrap; }
 #binBar { display: flex; align-items: center; gap: 8px; }
 #binBar[hidden] { display: none; }
-@media (max-width: 900px) { .bin-table th:nth-child(4), .bin-table td:nth-child(4) { display: none; } }
+@container panel (max-width: 700px) { .bin-table th:nth-child(4), .bin-table td:nth-child(4) { display: none; } }
 /* the "..." of the list: always there, in front of the pager, and the row wraps rather than cut it off */
 .panel-head:has(> #binPagerTop) { flex-wrap: wrap; }
 .panel-head:has(> #binPagerTop) > .panel-menu-btn { opacity: 1; flex: none; margin-left: auto; }

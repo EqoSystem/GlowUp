@@ -318,7 +318,8 @@ function wireNavDrop(list) {
     });
     list.addEventListener("mouseleave", () => place(home));
     list.addEventListener("focusout", () => { if (!list.contains(document.activeElement)) place(home); });
-    window.addEventListener("resize", () => place(home, true));
+    let placeQueued = 0;
+    window.addEventListener("resize", () => { if (!placeQueued) placeQueued = requestAnimationFrame(() => { placeQueued = 0; place(home, true); }); }, { passive: true });
 }
 
 /** Icons, guide badges and the tile animation for everything inside `root` (call it after filling a list). */
@@ -599,7 +600,7 @@ document.addEventListener("mouseover", (event) => { const t = tipOf(event.target
 document.addEventListener("mouseout", (event) => { const t = tipOf(event.target); if (t && !t.contains(event.relatedTarget)) hideTip(); });
 document.addEventListener("focusin", (event) => { const t = tipOf(event.target); if (t) showTip(t); });
 document.addEventListener("focusout", hideTip);
-document.addEventListener("scroll", hideTip, true);
+document.addEventListener("scroll", hideTip, { capture: true, passive: true });
 document.addEventListener("pointerdown", hideTip, true);
 
 // ---------------------------------------------------------------------------------------------

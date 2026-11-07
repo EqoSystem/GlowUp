@@ -76,7 +76,18 @@
         // THE BUTTON THAT FOLDS THE MENU: an edge tab, half on the sidebar and half over its border line, below the last link. It is
         // not inside the sidebar (the sidebar is a layer of its own, so the page would paint over the tab's outer half and the settings
         // window would cover it) but right after it, so the keyboard reaches it after the links and before the page.
-        // Up to 1100 px wide the sidebar is always icons only: there the tab opens the whole menu over the page, and that is not kept.
+        // Up to 1023 px wide the sidebar is always icons only: there the tab opens the whole menu over the page, and that is not kept.
+        (function watchResizing() {
+            if (window.__glowupResizing) return;
+            window.__glowupResizing = true;
+            var resizeTimer = 0;
+            window.addEventListener("resize", function () {
+                if (!resizeTimer) root.classList.add("resizing");
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(function () { root.classList.remove("resizing"); resizeTimer = 0; }, 150);
+            }, { passive: true });
+        })();
+
         var toggle = document.createElement("button");
         toggle.type = "button";
         toggle.className = "sidebar-toggle";
@@ -84,7 +95,7 @@
         toggle.setAttribute("aria-controls", "sidebarNav");
         toggle.innerHTML = svg("chevron");
         document.body.insertBefore(toggle, main);
-        var narrow = window.matchMedia("(max-width: 1100px)");
+        var narrow = window.matchMedia("(max-width: 1023px)");
         var links = sidebar.querySelectorAll(".nav-links a");
         var paintToggle = function () {
             var open = narrow.matches ? root.classList.contains("sb-peek") : !root.classList.contains("sb-collapsed");
@@ -101,21 +112,42 @@
         };
         paintToggle();
         placeToggle();
+        // folding and unfolding: the column width snaps (never animated: it is layout); the page slides from where it was with a
+        // transform (FLIP: --sb-shift = its old left minus its new left) and the labels fade in. Composited, 200 ms.
+        var slideTimer = 0;
+        // The distance is the change of the sidebar column (--sidebar-w), read from styles only: no layout is forced in the click.
+        var sidebarWidth = function () { return parseFloat(getComputedStyle(root).getPropertyValue("--sidebar-w")) || 0; };
+        var slidePage = function (change) {
+            var before = narrow.matches ? 0 : sidebarWidth();
+            change();
+            var shift = narrow.matches ? 0 : before - sidebarWidth();   // under 1024 px the menu opens over the page: it does not move
+            root.style.setProperty("--sb-shift", Math.round(shift) + "px");
+            root.classList.remove("sb-moving");
+            clearTimeout(slideTimer);
+            requestAnimationFrame(function () {       // a second click starts the animation again, one frame later, without a reflow
+                root.classList.add("sb-moving");
+                slideTimer = setTimeout(function () { root.classList.remove("sb-moving"); }, 240);
+            });
+        };
         toggle.addEventListener("click", function () {
-            if (narrow.matches) root.classList.toggle("sb-peek");
-            else {
-                var folded = root.classList.toggle("sb-collapsed");
-                try { localStorage.setItem(FOLD_KEY, folded ? "1" : "0"); } catch (error) { /* not kept */ }
-            }
+            slidePage(function () {
+                if (narrow.matches) root.classList.toggle("sb-peek");
+                else {
+                    var folded = root.classList.toggle("sb-collapsed");
+                    try { localStorage.setItem(FOLD_KEY, folded ? "1" : "0"); } catch (error) { /* not kept */ }
+                }
+            });
             paintToggle();
             placeToggle();
         });
-        narrow.addEventListener("change", function () { root.classList.remove("sb-peek"); paintToggle(); placeToggle(); });
-        window.addEventListener("resize", placeToggle);
+        narrow.addEventListener("change", function () { root.classList.remove("sb-peek"); paintToggle(); });
+        // the tab's place is worked out after the browser has laid the page out (a ResizeObserver: the sidebar is as tall as the
+        // window), never inside a resize event, where reading sizes would force an extra layout at every step of a drag
         if (window.ResizeObserver) {
             var watcher = new ResizeObserver(placeToggle);
+            watcher.observe(sidebar);
             Array.prototype.forEach.call(links, function (link) { watcher.observe(link); });
-        }
+        } else window.addEventListener("resize", placeToggle);
 
         var topbar = document.createElement("header");
         topbar.className = "topbar";
@@ -145,7 +177,7 @@
         // the menu opened over the page (narrow windows) closes with Esc, or with a press anywhere outside it
         document.addEventListener("keydown", function (event) {
             if (event.key !== "Escape" || !root.classList.contains("sb-peek")) return;
-            closePeek(window.matchMedia("(max-width: 600px)").matches ? menuBtn : toggle);
+            closePeek(window.matchMedia("(max-width: 767px)").matches ? menuBtn : toggle);
         });
         document.addEventListener("pointerdown", function (event) {
             if (!root.classList.contains("sb-peek")) return;

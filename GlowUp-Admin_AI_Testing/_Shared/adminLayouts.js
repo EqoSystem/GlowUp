@@ -353,7 +353,7 @@ function watchForFit() {
         queueFit();
     });
     fitWatcher.observe(b, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "style", "hidden"] });
-    window.addEventListener("resize", queueFit);
+    window.addEventListener("resize", queueFit, { passive: true });
     // the board can get narrower or wider without the window changing (the sidebar folds, the settings panel opens): its text
     // wraps onto more or fewer lines, so every panel is measured again or it would run over the panel under it
     if (window.ResizeObserver) {
@@ -405,15 +405,16 @@ function settingsGrowNow() {
 function watchForSettingsGrow() {
     const b = board();
     if (!b) return;
-    let timer = 0;
-    // after the push has finished sliding (.28 s), so the room is measured at the board's final width
-    const later = () => { clearTimeout(timer); timer = setTimeout(settingsGrowNow, 340); };
+    // at once: the page width snaps when Quick settings opens (no animated margin), so the room is already final. A
+    // MutationObserver and a ResizeObserver both answer before the next picture is drawn: the panel is never seen at its old width.
+    const later = settingsGrowNow;
     let wasOpen = document.documentElement.classList.contains("qs-open");
     new MutationObserver(() => {
         const open = document.documentElement.classList.contains("qs-open");
         if (open === wasOpen) return;
         wasOpen = open;
-        if (open) later(); else { clearTimeout(timer); clearSettingsGrow(); }
+        // opening: the board gets narrower, and its ResizeObserver below does the work after layout. Under 1024 px nothing is pushed.
+        if (!open) clearSettingsGrow();
     }).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
     new MutationObserver(() => { if (document.body.classList.contains("layout-editing")) clearSettingsGrow(); else if (wasOpen) later(); })
         .observe(document.body, { attributes: true, attributeFilter: ["class"] });

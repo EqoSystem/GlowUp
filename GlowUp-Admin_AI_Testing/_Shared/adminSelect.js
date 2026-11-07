@@ -157,8 +157,10 @@ export function makeCombo(select) {
         else if (event.key === "Tab") close(false);
     });
     document.addEventListener("pointerdown", (event) => { if (isOpen() && !box.contains(event.target) && !pop.contains(event.target)) close(false); }, true);
-    window.addEventListener("resize", () => { if (isOpen()) place(); });
-    document.addEventListener("scroll", () => { if (isOpen()) place(); }, true);
+    let placeQueued = 0;
+    const placeSoon = () => { if (isOpen() && !placeQueued) placeQueued = requestAnimationFrame(() => { placeQueued = 0; if (isOpen()) place(); }); };
+    window.addEventListener("resize", placeSoon, { passive: true });
+    document.addEventListener("scroll", placeSoon, { capture: true, passive: true });
 
     paintButton();
     return { refresh() { paintButton(); if (isOpen()) { paintList(); place(); } }, close };
