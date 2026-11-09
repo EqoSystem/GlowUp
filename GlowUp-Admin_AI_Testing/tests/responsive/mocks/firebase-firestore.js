@@ -130,7 +130,7 @@ export function writeBatch() {
             ops.push(() => applyWrite(ref.path, data, true)); return b;
         },
         delete(ref) { ops.push(() => store.delete(ref.path)); return b; },
-        async commit() { await wait(LAT()); ops.forEach((f) => f()); }
+        async commit() { await wait(LAT()); if (window.__FAIL_WRITES) throw Object.assign(new Error("pretend failure"), { code: window.__FAIL_WRITES }); ops.forEach((f) => f()); }
     };
     return b;
 }

@@ -22,6 +22,7 @@ import {
 import { matchesSearch } from "../_Shared/glowupRules.js";
 import { moveToArchive, KEEP_DAYS } from "../_Shared/adminArchive.js";
 import { mountShell, placeHeaderParts, paginate, renderPager, icon, BIN_ICON, askConfirm, hydrate, setBinCount, addRefreshDataButton } from "../_Shared/adminShell.js";
+import { bindButtons } from "../_Shared/shortcuts.js";
 
 const el = (id) => document.getElementById(id);
 const many = (n, one, more) => `${n} ${n === 1 ? one : more}`;
@@ -40,6 +41,7 @@ const pager = { page: 1, size: 10 };
 
 document.addEventListener("DOMContentLoaded", async () => {
     mountShell("bin");
+    bindButtons({ "bin.restore": "#restoreSelectedBtn", "bin.archive": "#archiveSelectedBtn", "bin.delete": "#deleteSelectedBtn" });      // keyboard shortcuts (shortcuts.js)
     // the one Refresh data button of the site goes in front of the Archive button, in the header (New8.pdf)
     addRefreshDataButton(placeHeaderParts());
     wireSignOut();

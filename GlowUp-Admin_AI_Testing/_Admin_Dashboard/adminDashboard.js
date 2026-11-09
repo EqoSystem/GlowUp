@@ -19,6 +19,7 @@ import {
     notify, describeError, toneBadge
 } from "../_Shared/adminCommon.js";
 import { mountShell, paginate, renderPager, icon } from "../_Shared/adminShell.js";
+import { bindButtons } from "../_Shared/shortcuts.js";
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
 import { setPanelQuiet, setPanelSummary } from "../_Shared/adminFold.js";
@@ -59,6 +60,7 @@ const INVENTORY_PAGE = "../_Admin_Brand_Inventory/adminBrandInventory.html";
 document.addEventListener("DOMContentLoaded", async () => {
     registerData();                   // before the page frame: a saved layout may hold panels that show this data
     mountShell("dashboard");
+    bindButtons({ "dashboard.activityLog": "#auditLogTile", "dashboard.addProduct": 'a.tile[href*="add=product"]' });      // keyboard shortcuts (shortcuts.js)
     const auditTile = document.getElementById("auditLogTile");
     if (auditTile) auditTile.addEventListener("click", openAuditLog);
     setAssistPage("dashboard");

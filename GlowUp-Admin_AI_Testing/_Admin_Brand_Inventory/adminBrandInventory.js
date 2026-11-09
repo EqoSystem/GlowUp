@@ -52,6 +52,7 @@ import { parseLabeledProducts } from "../_Shared/ingredientBlock.js";
 import { nearShade } from "../_Shared/listRules.js";
 import { mountIngredientPicker } from "../_Shared/adminIngredientPicker.js";
 import { openFacets } from "../_Shared/adminFacets.js";
+import { bindActions, bindButtons, comboFor } from "../_Shared/shortcuts.js";
 import { EXPORT_MAX_ROWS, EXPORT_FILE_PREFIX, toCsv, downloadCsv, today } from "../_Shared/adminExport.js";
 import { setPageSettings } from "../_Shared/adminSettingsMenu.js";
 import { mountSourceEditor, openApplyWindow } from "./productSources.js";
@@ -223,9 +224,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         else showOnly(tile.dataset.show);
     }));
     el("addMenuBtn").addEventListener("click", (event) => openMenu(event.currentTarget, [
-        { label: "Brand", icon: "tag", description: "A new brand: name, category, market, status.", run: () => openBrandForm(null) },
-        { label: "Product", icon: "lipstick", description: "A make-up product of a listed brand.", disabled: brands.length === 0, run: () => openProductForm(null, brandFilterValue()) }
+        { label: "Brand", icon: "tag", description: "A new brand: name, category, market, status.", keys: comboFor("inventory.addBrand"), run: () => openBrandForm(null) },
+        { label: "Product", icon: "lipstick", description: "A make-up product of a listed brand.", keys: comboFor("inventory.addProduct"), disabled: brands.length === 0, run: () => openProductForm(null, brandFilterValue()) }
     ]));
+    // keyboard shortcuts (shortcuts.js): the same handlers and the same conditions as the buttons and the Add menu
+    bindButtons({ "inventory.new": "#addMenuBtn", "inventory.import": "#chooseInventoryFileBtn", "inventory.filters": "#filterMenuBtn",
+        "inventory.snapshots": "#snapshotReviewBtn", "inventory.approveDrafts": "#inventoryApproveAllBtn", "inventory.sort": "#sortMenuBtn" });
+    bindActions({
+        "inventory.addBrand": { run: () => openBrandForm(null) },
+        "inventory.addProduct": { run: () => openProductForm(null, brandFilterValue()), isAvailable: () => (brands.length === 0 ? "Add product: add a brand first. A product needs a listed brand." : true) }
+    });
     // what was behind "..." here is listed in the settings window under "This page" (5 November 2026)
     setPageSettings(() => {
         const allClosed = shownGroups.length > 0 && shownGroups.every((g) => closed.has(g.id));

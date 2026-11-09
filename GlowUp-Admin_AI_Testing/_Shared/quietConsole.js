@@ -29,6 +29,8 @@ export function catchFailures(show) {
     window.addEventListener("unhandledrejection", (event) => { if (!LOCAL) event.preventDefault(); say(whyItFailed(event.reason)); });
     window.addEventListener("error", (event) => {
         if (!event.error && !event.message) return;                  // a picture or script that did not load: not an action of the admin
+        // the browser's harmless note that a resize took two frames (zoom, a panel opening): nothing failed, nothing to tell the admin
+        if (/ResizeObserver loop/.test(String(event.message || ""))) { event.stopImmediatePropagation(); return; }
         if (!LOCAL) event.preventDefault();
         say(whyItFailed(event.error || { message: event.message }));
     });

@@ -36,6 +36,7 @@ html.sb-collapsed .brand-mark { margin: 0; }
 .settings-window .menu-text { min-width: 0; overflow-wrap: anywhere; }
 .settings-window .menu-item > svg.ic, .settings-window .menu-badge, .settings-window .menu-check { flex: none; }
 .sw-view.layout-view { padding: 16px 20px 22px; display: flex; flex-direction: column; gap: 16px; }
+.sw-view.keys-view { padding: 16px 20px 22px; }                            /* Keyboard shortcuts: the same margins as Layout and style */
 .sw-view[hidden] { display: none; }
 
 /* 1024 px and wider (7 November 2026): a side panel that PUSHES the page; the board reflows into the width that is left

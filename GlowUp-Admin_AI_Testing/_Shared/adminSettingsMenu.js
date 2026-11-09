@@ -24,13 +24,14 @@
 // list changes. It makes NO Firestore read or query. A list that is not kept is not counted.
 import { keptBinnedCount, onListsRefreshed } from "./adminStore.js";
 import { themeChoice, setThemeChoice, icon, hydrate } from "./adminShell.js";
+import { paintShortcutsView } from "./shortcutsPanel.js";
 
 export const BIN_PAGE = "../_Admin_Recycle_Bin/adminRecycleBin.html";
 const BIN_LISTS = ["ingredients", "brands", "products"];
 
 let win = null, button = null;
 let pageItems = null;                             // () => the page's own entries, in the form openMenu takes
-let view = "menu";                                // "menu" | "layout"
+let view = "menu";                                // "menu" | "layout" | "shortcuts"
 
 const el = (id) => document.getElementById(id);
 const isOpen = () => !!win && win.classList.contains("is-open");
@@ -52,10 +53,12 @@ function show(next) {
     if (view === "layout" && !layout) view = "menu";
     el("swMenuView").hidden = view !== "menu";
     if (host) host.hidden = view !== "layout";
-    el("swBack").hidden = view !== "layout";
-    el("swTitle").textContent = view === "layout" ? "Layout & Style" : "Quick settings";
+    el("swKeysView").hidden = view !== "shortcuts";
+    el("swBack").hidden = view === "menu";
+    el("swTitle").textContent = view === "layout" ? "Layout & Style" : view === "shortcuts" ? "Keyboard shortcuts" : "Quick settings";
     win.setAttribute("aria-label", el("swTitle").textContent);
     if (view === "menu") renderMenu();
+    else if (view === "shortcuts") paintShortcutsView(el("swKeysView"));
     else document.dispatchEvent(new CustomEvent("glowup:layout-view"));
 }
 
@@ -75,6 +78,7 @@ function build() {
         </div>
         <div class="sw-body">
             <div class="sw-view" id="swMenuView"></div>
+            <div class="sw-view keys-view" id="swKeysView" hidden></div>
         </div>`;
     document.body.appendChild(win);
     // the dimmed backdrop of the narrow-window sheet (shown by CSS only under 1024 px); a press on it closes the panel
@@ -188,6 +192,7 @@ function renderMenu() {
     const description = n > 0 ? `${n} ${n === 1 ? "entry" : "entries"} removed` : unknown ? "Open it to see what was removed." : "Nothing removed";
     host.replaceChildren(
         ...(layoutHere ? [item({ label: "Layout and style", iconName: "sliders", description: "Arrange the panels, fonts and colours.", run: () => show("layout") })] : []),
+        item({ label: "Keyboard shortcuts", iconName: "keyboard", description: "Keys for this page's actions. Press ? on a page to see them.", run: () => show("shortcuts") }),
         item({ label: "Recycle bin", iconName: "trash", checked: here.includes("Recycle_Bin"), badge: n > 0 ? (n > 99 ? "99+" : String(n)) : "", description, run: go(BIN_PAGE) }),
         separator(),
         heading("Appearance"),

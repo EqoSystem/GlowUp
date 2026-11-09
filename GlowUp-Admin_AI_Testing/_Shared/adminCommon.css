@@ -1774,3 +1774,101 @@ body:has(> .modal-overlay[style*="flex"]) .toast-host { bottom: 96px; }
     .panel-head .pager .page-now { min-width: 0; padding-inline: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .panel-head .sort-now { display: none; }
 }
+
+/* ============================================================== 10. Keyboard shortcuts (shortcuts.js, shortcutsPanel.js; 9 November 2026)
+   Key chips, the list in Quick settings, the Add / Edit dialog, the "?" help and the command palette. Only the site's tokens. */
+:root { --z-layer: 1000; --z-layer-top: 1100; }
+.kb-layer { z-index: var(--z-layer); }
+.kb-layer.kb-top { align-items: flex-start; padding-top: min(12vh, 96px); }
+/* a key chip: never broken inside, the combo never wraps between its chips */
+.kb-combo { display: inline-flex; align-items: center; gap: 3px; flex: none; white-space: nowrap; vertical-align: middle; }
+.kb-key { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border: 1px solid var(--border); border-bottom-width: 2px;
+    border-radius: 6px; background: var(--surface-2); color: var(--text); font: 600 var(--fs-xs)/1 var(--font); font-variant-numeric: tabular-nums; }
+.kb-combo.is-partial .kb-key { border-style: dashed; }
+.kb-dots { color: var(--muted); font-size: var(--fs-xs); padding-left: 2px; }
+/* combo hints are for a keyboard: on a touch-only device they are not shown (the settings stay reachable) */
+@media (hover: none) and (pointer: coarse) { .kb-hint, .menu-item .kb-combo { display: none; } }
+
+/* the list in Quick settings */
+.keys-view { display: flex; flex-direction: column; gap: 12px; }
+.keys-view[hidden] { display: none; }
+.kb-actions .btn { flex: 1 1 0; min-width: 0; white-space: nowrap; justify-content: center; }
+.kb-group { display: flex; flex-direction: column; gap: 6px; }
+.kb-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface); }
+.kb-row.is-off { opacity: .62; }
+.kb-row.is-loading .kb-row-main { gap: 8px; }
+.kb-row-main { flex: 1 1 auto; min-width: min(10ch, 100%); display: flex; flex-direction: column; gap: 4px; }
+.kb-row-head { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.kb-action { font-size: var(--fs-sm); font-weight: 600; max-width: 100%; overflow-wrap: break-word; }
+.kb-desc { margin: 0; font-size: var(--fs-xs); color: var(--muted); line-height: 1.4; overflow-wrap: break-word;
+    display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.kb-flag { margin: 0; display: flex; gap: 6px; align-items: flex-start; font-size: var(--fs-xs); color: var(--warn); line-height: 1.4; }
+.kb-flag svg.ic, .kb-note svg.ic, .kb-msg > svg.ic { width: 15px; height: 15px; flex: none; margin-top: 1px; }
+.kb-row-tools { display: flex; align-items: center; gap: 4px; flex: none; }
+.kb-row-tools .switch { margin-right: 4px; }
+.kb-empty-group { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 1px dashed var(--border); border-radius: var(--radius-sm); }
+.kb-note { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: var(--radius-sm); font-size: var(--fs-sm); line-height: 1.45; }
+.kb-note > span { flex: 1; min-width: 0; }
+.kb-note.warn { color: var(--text); background: color-mix(in srgb, var(--warn) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); }
+.kb-note.bad { color: var(--text); background: color-mix(in srgb, var(--bad) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--bad) 40%, transparent); }
+.kb-note.warn svg.ic { color: var(--warn); } .kb-note.bad svg.ic { color: var(--bad); }
+
+/* the dialogs: the body scrolls, the head and the footer (Cancel / Save) stay in view at any zoom */
+.kb-modal { width: min(620px, 100%); max-height: 100%; }
+.kb-modal .xl-body { min-height: 0; }
+.kb-help { width: min(560px, 100%); }
+.kb-palette { width: min(600px, 100%); max-height: min(560px, 100%); }
+.kb-form.modal-form { margin-top: 0; }
+.kb-record { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 44px; padding: 8px 12px; text-align: left; cursor: pointer;
+    border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font: inherit; }
+.kb-record:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.kb-record.is-recording { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.kb-placeholder { color: var(--muted); font-size: var(--fs-sm); }
+/* the messages under the key field open and close their height smoothly: nothing below jumps */
+.kb-collapse { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .2s var(--ease); }
+.kb-collapse.open { grid-template-rows: 1fr; }
+.kb-collapse > .kb-msgs { overflow: hidden; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.kb-msg { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: var(--radius-sm); font-size: var(--fs-sm); line-height: 1.45; color: var(--text); }
+.kb-msg p { margin: 0; overflow-wrap: break-word; }
+.kb-msg-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.kb-msg-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.kb-msg.block { background: color-mix(in srgb, var(--bad) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--bad) 40%, transparent); }
+.kb-msg.block > svg.ic { color: var(--bad); }
+.kb-msg.warn { background: color-mix(in srgb, var(--warn) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); }
+.kb-msg.warn > svg.ic { color: var(--warn); }
+.kb-msg.info { background: color-mix(in srgb, var(--info) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--info) 35%, transparent); }
+.kb-msg.info > svg.ic { color: var(--info); }
+.kb-answer { color: var(--text-2); font-size: var(--fs-xs); }
+.btn.small { padding: 5px 10px; font-size: var(--fs-xs); }
+.kb-test { min-height: 44px; display: flex; flex-direction: column; justify-content: center; gap: 6px; font-size: var(--fs-sm); }
+.kb-test p { margin: 0; }
+.kb-test.ok { color: var(--ok); font-weight: 600; }
+.kb-test .kb-bar { display: block; height: 3px; border-radius: 999px; background: var(--accent); transform-origin: left; animation: kb-count 5s linear forwards; }
+@keyframes kb-count { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+.kb-save-error { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--bad); min-width: 0; }
+.kb-save-error[hidden] { display: none; }
+
+/* "?" help */
+.kb-help-list { display: grid; grid-template-columns: max-content 1fr; gap: 8px 14px; margin: 4px 0 8px; align-items: baseline; }
+.kb-help-list dt { margin: 0; }
+.kb-help-list dd { margin: 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: var(--fs-sm); }
+.kb-help-list dd span { color: var(--muted); font-size: var(--fs-xs); overflow-wrap: break-word; }
+@media (max-width: 480px) { .kb-help-list { grid-template-columns: 1fr; } }
+
+/* command palette */
+.kb-search { width: 100%; }
+.kb-results { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
+.kb-result { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: var(--fs-sm); }
+.kb-result > svg.ic { flex: none; color: var(--muted); }
+.kb-result .menu-text { flex: 1; min-width: min(12ch, 100%); }
+.kb-result .menu-text > span { overflow-wrap: break-word; }
+.kb-result.is-at { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.kb-result.is-off { color: var(--muted); cursor: default; }
+.kb-result.is-off .kb-combo { opacity: .6; }
+.menu-item .kb-combo { margin-left: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+    .kb-collapse { transition: none; }
+    .kb-modal { animation: none; }
+    .kb-test .kb-bar { animation: none; }
+}

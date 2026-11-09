@@ -332,6 +332,18 @@ await cannot("an admin writes it in someone else's name", () => setDoc(doc(admin
 await cannot("a shared default with an extra field", () => setDoc(doc(adminDoc(), "siteLayouts/dashboard"), Object.assign(shared("a1"), { script: "x" })));
 await cannot("a shared default whose layout is not a map", () => setDoc(doc(adminDoc(), "siteLayouts/dashboard"), Object.assign(shared("a1"), { layout: "x" })));
 
+// ---- adminShortcuts: an admin's own keyboard shortcuts (9 November 2026) ----
+const keys = () => ({ items: { "inventory.addBrand": { keys: "Ctrl+Alt+KeyB", description: "Opens the Add brand form.", enabled: true } }, seeded: ["inventory.addBrand"], updatedAt: serverTimestamp() });
+await can("an admin saves their own shortcuts", () => setDoc(doc(adminDoc(), "adminShortcuts/a1"), keys()));
+await can("an admin reads their own shortcuts", () => getDoc(doc(adminDoc(), "adminShortcuts/a1")));
+await cannot("an admin reads another admin's shortcuts", () => getDoc(doc(adminDoc(), "adminShortcuts/a2")));
+await cannot("an admin writes another admin's shortcuts", () => setDoc(doc(adminDoc(), "adminShortcuts/a2"), keys()));
+await cannot("a plain user saves shortcuts (the 403 of the endpoint)", () => setDoc(doc(user(), "adminShortcuts/u1"), keys()));
+await cannot("a plain user reads shortcuts", () => getDoc(doc(user(), "adminShortcuts/u1")));
+await cannot("nobody signed in reads shortcuts", () => getDoc(doc(anon(), "adminShortcuts/a1")));
+await cannot("shortcuts with an extra field", () => setDoc(doc(adminDoc(), "adminShortcuts/a1"), Object.assign(keys(), { script: "x" })));
+await cannot("shortcuts whose items are not a map", () => setDoc(doc(adminDoc(), "adminShortcuts/a1"), Object.assign(keys(), { items: "x" })));
+
 await env.cleanup();
 console.log(`checks made: ${checks}`);
 if (failures.length > 0) {

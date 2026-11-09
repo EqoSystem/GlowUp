@@ -446,6 +446,20 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
     }
 
+    // ---- keyboard shortcuts: one document per admin, only that admin reads or writes it ----
+    // ADDED on 9 November 2026 (Quick settings > Keyboard shortcuts, shortcutStore.js). Any other account, admin or not, is refused.
+    // The website cleans what it reads (shortcutKeys.js mergeWithCatalog), so the rule checks the owner, the shape and the size.
+    match /adminShortcuts/{uid} {
+      allow read, delete: if isAdmin() && request.auth.uid == uid;
+      allow create, update: if isAdmin() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['items', 'seeded', 'updatedAt'])
+        && request.resource.data.items is map
+        && request.resource.data.items.size() <= 80
+        && request.resource.data.seeded is list
+        && request.resource.data.seeded.size() <= 120
+        && request.resource.data.updatedAt == request.time;
+    }
+
     // ---- the Archive: entries that left the Recycle bin, kept 30 days, then deleted by the server job ----
     // Admins only. An entry is created once (id "<collection>__<id>"), never changed; the job deletes it after expires_at.
     // ADDED on 29 October 2026 (ARCHIVE_DESIGN.md), published on 5 November 2026.

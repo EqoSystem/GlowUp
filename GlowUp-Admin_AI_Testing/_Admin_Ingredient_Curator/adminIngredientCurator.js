@@ -37,6 +37,7 @@ import { auth } from "../_Database/firebase-console.js";
 import { cleanupPlan, ingredientDuplicates, ingredientLookalikesAsync, lookalikeCount, ingredientIssues, mergeIngredients } from "../_Shared/glowupCatalog.js";
 import { openPlanDialog, openDuplicatesDialog, showScan } from "../_Shared/adminCleanup.js";
 import { mountShell, placeInHeader, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
+import { bindButtons } from "../_Shared/shortcuts.js";
 import { readAdminDocument, splitForAi } from "../_Shared/adminDocumentReader.js";
 import { startImport } from "../_Shared/importReview.js";
 import { parseImportText, inventoryNotHere } from "../_Shared/importFormat.js";
@@ -147,6 +148,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     try { const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || "{}"); if (SORTS.some((s) => s.id === saved.sort)) view.sort = saved.sort; } catch (error) { /* first visit */ }
     registerData();                   // before the page frame: a saved layout may hold panels that show this data
     mountShell("curator");
+    // keyboard shortcuts (shortcuts.js): they press the same buttons, only when the buttons could be pressed
+    bindButtons({ "curator.addIngredient": "#addIngredientBtn", "curator.import": "#chooseIngredientFileBtn", "curator.classifications": "#manageClassBtn",
+        "curator.approveDrafts": "#ingredientApproveAllBtn", "curator.sort": "#sortMenuBtn" });
     placeInHeader(".search-container", "headerActions");      // search beside the title, + Ingredient and More beside the layout button
     wireSignOut();
     setupNavigationGuard();

@@ -13,6 +13,8 @@ import { catchFailures } from "./quietConsole.js";      // first: no debug outpu
 import { initLayouts, applyAppearance } from "./adminLayouts.js";
 import { refreshData, refreshWait } from "./adminStore.js";   // only for the "Refresh data" button
 import { mountSettingsMenu } from "./adminSettingsMenu.js";
+import { startShortcuts, keyChips } from "./shortcuts.js";
+import { ariaKeys } from "./shortcutKeys.js";
 
 catchFailures((text) => toast(text, "error"));
 
@@ -78,6 +80,7 @@ const ICONS = {
     folderPlus: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M12 11v6M9 14h6"/>',
     sort: '<path d="M7 5v14M4 16l3 3 3-3"/><path d="M13 7h8M13 12h6M13 17h4"/>',
     play: '<path d="M8 5.5v13l11-6.5z"/>',
+    keyboard: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M6.5 14h.01M17 14h.01M9.5 14h5"/>',
     sparkle: '<path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9z"/><path d="M18.5 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/>',
     up: '<path d="M6 15l6-6 6 6"/>',
     archive: '<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M10 13h4"/>',
@@ -291,6 +294,7 @@ export function mountShell(page) {
     mountSettingsMenu(tools);                   // the gear first (the panel itself is built on its first open): initLayouts puts the Layout & Style controls into its holder
     initLayouts(page);
     watchForNewControls();
+    startShortcuts(page);                       // keyboard shortcuts of this page (shortcuts.js)
 }
 
 /**
@@ -666,7 +670,11 @@ export function flip(elements, change, duration = 280) {
 export function toast(message, kind = "info", action) {
     let host = document.getElementById("toastHost");
     if (!host) { host = document.createElement("div"); host.id = "toastHost"; host.className = "toast-host"; host.setAttribute("aria-live", "polite"); document.body.appendChild(host); }
+    // the same message already on screen is not shown twice: it stays a little longer instead (no pile of equal toasts)
+    const same = Array.from(host.children).find((t) => t.dataset.text === message && t.dataset.kind === kind && !action);
+    if (same) { clearTimeout(Number(same.dataset.timer)); same.dataset.timer = String(window.setTimeout(() => same.remove(), kind === "error" ? 8000 : 3500)); return; }
     const box = document.createElement("div");
+    box.dataset.text = message; box.dataset.kind = kind;
     box.className = "toast " + kind;
     const text = document.createElement("span");
     text.textContent = message;
@@ -678,7 +686,7 @@ export function toast(message, kind = "info", action) {
         box.appendChild(button);
     }
     host.appendChild(box);
-    window.setTimeout(() => box.remove(), kind === "error" ? 8000 : action ? 7000 : 3500);
+    box.dataset.timer = String(window.setTimeout(() => box.remove(), kind === "error" ? 8000 : action ? 7000 : 3500));
 }
 
 let openMenuEl = null, closeOpenMenu = null;
@@ -713,6 +721,7 @@ export function openMenu(anchor, items) {
         text.appendChild(label);
         if (item.description) { const more = document.createElement("small"); more.textContent = item.description; text.appendChild(more); }
         button.appendChild(text);
+        if (item.keys) { button.appendChild(keyChips(item.keys, "kb-hint")); button.setAttribute("aria-keyshortcuts", ariaKeys(item.keys)); }   // its keyboard shortcut, as chips (no hover label)
         if (item.checked) button.insertAdjacentHTML("beforeend", icon("check", "menu-check"));
         button.addEventListener("click", () => { closeMenu(); if (item.run) item.run(); });
         menu.appendChild(button);
