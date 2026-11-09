@@ -619,7 +619,9 @@ export function playSweep(control) {
     void control.offsetWidth;                    // lets the animation start again on a quick second press
     control.classList.add("fx-run");
 }
-document.addEventListener("pointerdown", (event) => { playSweep(event.target.closest && event.target.closest(".fx")); });
+/** Only what answers a click gets the pixel sweep (9 November 2026): a control, or a card the page made clickable (its pointer is a hand). */
+const answersClick = (control) => !!control && (control.matches("button, a[href], [role=button], input, select, summary, label") || getComputedStyle(control).cursor === "pointer");
+document.addEventListener("pointerdown", (event) => { const control = event.target.closest && event.target.closest(".fx"); if (answersClick(control)) playSweep(control); });
 document.addEventListener("animationend", (event) => { if (event.animationName === "fx-glow") event.target.classList.remove("fx-run"); });
 
 // Moving to another page: this page stays as it is until the next one is there (no loading cover in between). The

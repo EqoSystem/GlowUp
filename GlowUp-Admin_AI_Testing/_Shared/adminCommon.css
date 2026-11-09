@@ -50,7 +50,7 @@
     --warn: #f0b545;
     --bad: #f27272;
     --info: #86b7f7;
-    --shadow: 0 10px 30px rgba(0, 0, 0, .45);
+    --shadow: 0 4px 14px rgba(0, 0, 0, .28);     /* 9 November 2026: lighter shadows on every container */
     --overlay: rgba(0, 0, 0, .62);
     /* graph colours: fixed order (the order is what keeps neighbours apart for colour-blind readers); never cycled */
     --zone: rgba(150, 44, 58, .78);             /* the "drag here to remove" shadow: a red glow on the dark theme ... */
@@ -75,7 +75,7 @@
     --warn: #9a6a08;
     --bad: #c23a3a;
     --info: #2f6fbe;
-    --shadow: 0 10px 30px rgba(80, 40, 50, .14);
+    --shadow: 0 3px 10px rgba(80, 40, 50, .08);
     --overlay: rgba(40, 25, 30, .42);
     --zone: rgba(38, 26, 31, .9);               /* ... the app's dark shadow on the light one */
     --viz-1: #e87ba4; --viz-2: #008300; --viz-3: #2a78d6; --viz-4: #eda100; --viz-5: #1baf7a; --viz-6: #eb6834;
@@ -346,7 +346,7 @@ html.sb-collapsed .nav-links a, html.sb-collapsed .sign-out { justify-content: c
 /* a panel's content sits in its inner box, so a fixed height scrolls the content and never cuts the panel's own frame */
 .panel-inner { display: flex; flex-direction: column; gap: 12px; padding: var(--pad); height: 100%; min-height: 0; border-radius: inherit; }
 .panel[data-fixed-h] > .panel-inner { overflow: auto; }
-.panel:not(.bare):hover { border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); box-shadow: 0 8px 26px rgba(0, 0, 0, .14); }
+/* a panel is not clickable: it does not lift or cast a shadow under the pointer (9 November 2026); only its edge light below shows */
 .panel.bare { background: none; border: none; }
 .panel.bare > .panel-inner { padding: 0; }
 .panel-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; min-height: 30px; user-select: none; }
@@ -720,8 +720,9 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
    Hovering lifts the control and lights its outline; pressing sends a band of small squares across it,
    from the bottom-left corner to the top-right one, with a pulse of the glowing outline. */
 .fx { position: relative; isolation: isolate; }
-.fx:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent), 0 6px 18px color-mix(in srgb, var(--accent) 16%, transparent); }
-.fx:active:not(:disabled) { transform: translateY(0) scale(.985); }
+/* only what answers a click lifts; the number tiles (.kpi, .stat) stay still and keep their outline (9 November 2026) */
+.fx:is(button, a[href], [role=button], .can-open, .can-pick, .w-tile, .ingredient-card, .tile):not(.kpi):not(.stat):hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent), 0 3px 8px color-mix(in srgb, var(--accent) 10%, transparent); }
+.fx:not(.kpi):not(.stat):active:not(:disabled) { transform: translateY(0) scale(.985); }
 .fx::after {
     content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; z-index: 1;
     background: color-mix(in srgb, var(--fx, var(--accent)) 55%, #fff 10%);
@@ -966,12 +967,12 @@ tr:hover .row-actions, tr:focus-within .row-actions, .ingredient-card:hover .row
 .chart-note { font-size: var(--fs-xs); color: var(--muted); }
 .chart.bars { display: flex; flex-direction: column; gap: 5px; }
 .bar-row { display: grid; grid-template-columns: minmax(70px, 30%) 1fr; align-items: center; gap: 10px; padding: 4px 6px; border-radius: 8px; transition: background-color .15s; }
-.bar-row:hover, .bar-row:focus-visible { background: color-mix(in srgb, var(--text) 6%, transparent); outline: none; }
+.bar-row.can-pick:hover, .bar-row:focus-visible { background: color-mix(in srgb, var(--text) 6%, transparent); outline: none; }
 .bar-row.can-pick { cursor: pointer; }
 .bar-label { font-size: var(--fs-sm); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
 .bar-line { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .bar-fill { height: 14px; min-width: 2px; border-radius: 0 4px 4px 0; transform-origin: left; animation: grow-x .5s var(--ease) both; transition: filter .15s; }
-.bar-row:hover .bar-fill, .bar-row:focus-visible .bar-fill { filter: brightness(1.14); }
+.bar-row.can-pick:hover .bar-fill, .bar-row:focus-visible .bar-fill { filter: brightness(1.14); }
 .bar-value { font-size: var(--fs-sm); font-weight: 650; color: var(--text); font-variant-numeric: tabular-nums; }
 @keyframes grow-x { from { transform: scaleX(0); } }
 .widget-body.calm .bar-fill, .widget-body.calm .slice { animation: none; }
@@ -1464,7 +1465,7 @@ body.snapx-open { overflow: hidden; }
     background: color-mix(in srgb, #140c0e 68%, transparent); opacity: 0; transition: opacity .2s; }
 .snapx-overlay.show { opacity: 1; }
 .snapx-window { width: min(1040px, 100%); max-height: calc(100vh - 40px); display: flex; flex-direction: column; overflow: hidden;
-    background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 24px 60px rgba(0, 0, 0, .35);
+    background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0, 0, 0, .22);
     transform: translateY(10px) scale(.985); transition: transform .22s var(--ease); }
 .snapx-overlay.show .snapx-window { transform: none; }
 .snapx-top { display: flex; align-items: center; gap: 12px; padding: 14px 18px 10px; }
