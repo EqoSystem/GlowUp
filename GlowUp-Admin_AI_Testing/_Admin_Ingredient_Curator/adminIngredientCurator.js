@@ -82,6 +82,7 @@ let editingIngredientId = null;
 let modal = null;
 let fromProducts = [];                // ingredient names the inventory's products list that the Curator has no entry for: [{ key, name, products[] }]
 let fdaBrands = [];                   // the brands whose products were checked on the FDA Philippines list (for the helper line)
+let fieldFound = {};                 // pages Assist found for each box of the form: { purpose: [page], description: [page], ... }
 let assisted = null;                  // description draft evidence: { sources, model } (null = the description was written by hand)
 let ingredientAiDrafts = [];
 let org = null;                       // folders, the Recycle bin, picking and dragging
@@ -245,6 +246,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("addIngredientForm").addEventListener("submit", saveIngredient);
     el("mergeIntoBtn").addEventListener("click", useAsAnotherName);
     el("ingredientNameInput").addEventListener("input", showNameClash);
+    el("ingredientNameInput").addEventListener("input", paintFieldSources);
     el("ingredientAliasesInput").addEventListener("input", showNameClash);
     el("ingredientsList").addEventListener("click", onListClick);
     el("ingredientsList").addEventListener("dblclick", (event) => {
@@ -672,7 +674,7 @@ function renderFromProducts(term, typed) {
                     <dt>In the app</dt><dd>No entry here yet: the app uses its own built-in knowledge for it, or looks it up when it is scanned.</dd>
                 </dl>
                 <div class="detail-actions"><button type="button" class="row-btn main" data-act="write" data-name="${escapeHtml(x.name)}" data-tip="Opens the form with the name filled in. You write what it is and how the app should judge it.">${icon("plus")}Write its entry</button>`
-                    + `<button type="button" class="row-btn" data-act="assist" data-name="${escapeHtml(x.name)}" data-tip-title="Assist with AI" data-tip="The AI is asked to use regulators, medical bodies and ingredient databases, and drafts only the ingredient description. Every page it used is listed with its kind. Nothing is saved until you have read it and pressed Save.">${icon("sparkle")}Assist with AI</button></div>
+                    + `<button type="button" class="row-btn" data-act="assist" data-name="${escapeHtml(x.name)}" data-tip-title="Assist with AI" data-tip="The AI is given the COSMILE Europe record (when it has one) and is asked to use regulators, medical bodies and ingredient databases. It drafts the description, purpose, uses and other names; risk, allergen and skin boxes stay yours. Every page it used is listed with its kind. Nothing is saved until you have read it and pressed Save.">${icon("sparkle")}Assist with AI</button></div>
             </div>`;
         return `
             <article class="ingredient-card from-product${open ? " open" : ""}" data-id="new:${escapeHtml(x.key)}" tabindex="0" aria-expanded="${open}">
@@ -826,6 +828,32 @@ function assistSources(pages) {
     return assistSourceLinks(pages, "<b>The AI named no web page.</b> Treat every box as unchecked.");
 }
 
+/**
+ * Under each box of the form that has a credible home: the page Assist took it from (when it did), and search pages of
+ * credible sites the admin can open to find the same thing by hand and paste it. Nothing is fetched here.
+ */
+function paintFieldSources() {
+    const name = el("ingredientNameInput").value.trim();
+    const q = encodeURIComponent(name);
+    const site = (host, extra) => `https://www.google.com/search?q=${encodeURIComponent("site:" + host + " " + name + (extra || ""))}`;
+    const cosmile = ["COSMILE Europe", `https://cosmileeurope.eu/inci/results/?q=${q}`];
+    const pubchem = ["PubChem (NIH)", `https://pubchem.ncbi.nlm.nih.gov/#query=${q}`];
+    const cosing = ["EU CosIng", site("ec.europa.eu", " cosing")];
+    const cir = ["Cosmetic Ingredient Review", site("cir-safety.org")];
+    const manual = { purpose: [cosmile, cosing], description: [cosmile, cir], chemicalDescription: [pubchem], aliases: [pubchem, cosmile], commonUses: [cosmile] };
+    document.querySelectorAll("[data-field-sources]").forEach((box) => {
+        const field = box.dataset.fieldSources;
+        if (name.length < 2 || !manual[field]) { box.hidden = true; box.innerHTML = ""; return; }
+        const found = (fieldFound[field] || []).filter((page) => page && /^https:\/\//i.test(page.url || "")).map((page) =>
+            `<a class="source-link" href="${escapeHtml(page.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(page.title || page.site || page.url)}</a> `
+            + `<span class="chip source-kind${page.tone ? " " + page.tone : ""}">${escapeHtml(page.label || "Source")}</span>`);
+        const links = manual[field].map(([label, url]) => `<a class="source-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`);
+        box.innerHTML = `<span class="field-hint">` + (found.length ? `<b>Where this box's text came from:</b> ${found.join(" · ")}<br>` : "")
+            + `Find it yourself: ${links.join(" · ")}</span>`;
+        box.hidden = false;
+    });
+}
+
 /** Asks the server for a description draft of `name`; other ingredient fields stay under the admin's control. */
 async function assistWithAi(name) {
     const note = el("ingredientReviewNote"), form = el("addIngredientForm"), saveButton = el("saveIngredientBtn");
@@ -844,7 +872,7 @@ async function assistWithAi(name) {
             answer = await fetch("/api/assist-ingredient", {
                 method: "POST", signal: stop.signal,
                 headers: { "Content-Type": "application/json", Authorization: "Bearer " + (await user.getIdToken()) },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({ mode: "description", name })
             });
         } finally { clearTimeout(timer); }
         assistsToday(true);
@@ -855,9 +883,27 @@ async function assistWithAi(name) {
 
         const d = body.draft;
         el("ingredientDescInput").value = d.description;
+        // the other boxes are filled only when they are EMPTY: what the admin already wrote is never replaced
+        const filled = ["Definition"];
+        const fillEmpty = (id, value, label) => { const box = el(id); if (value && !box.value.trim()) { box.value = value; filled.push(label); box.dispatchEvent(new Event("input", { bubbles: true })); } };
+        fillEmpty("ingredientPurposeInput", String(d.purpose || "").slice(0, MAX_PURPOSE), "Purpose");
+        fillEmpty("ingredientUsesInput", d.commonUses, "Commonly used in");
+        fillEmpty("ingredientChemInput", String(d.chemicalDescription || "").slice(0, 600), "What the chemical is");
+        const names = toList(el("ingredientAliasesInput").value);
+        const newNames = (d.aliases || []).filter((a) => sameKey(a) !== sameKey(name) && !names.some((n) => sameKey(n) === sameKey(a)));
+        if (newNames.length) { el("ingredientAliasesInput").value = names.concat(newNames).join(", "); filled.push("Also known as"); el("ingredientAliasesInput").dispatchEvent(new Event("input", { bubbles: true })); }
+        const links = el("ingredientSourcesInput");
+        const newLinks = (d.links || []).filter((l) => !links.value.includes(l.url)).map((l) => `${l.title} | ${l.url}`);
+        if (newLinks.length) { links.value = links.value.trim().split(/\r?\n/).concat(newLinks).filter(Boolean).join("\n"); filled.push("Reference links"); }
         assisted = { sources: body.sources || [], model: body.model || "" };
+        fieldFound = body.fieldSources || {};
+        paintFieldSources();
+        const cosmile = body.cosmile && body.cosmile.found
+            ? `<br><b>COSMILE Europe record used:</b> <a class="source-link" href="${escapeHtml(body.cosmile.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(body.cosmile.inci)}</a>`
+            : `<br><span class="field-hint">COSMILE Europe has no record with exactly this name, so it was not used.</span>`;
         const backupNote = body.notes && body.notes.length > 0 ? `<br><span class="field-hint">Before it answered: ${escapeHtml(body.notes.join("; "))}.</span>` : "";
-        say(`<b>This is a description-only draft. Nothing is saved yet.</b> Read it against the sources, correct what is wrong, then press Save.`
+        say(`<b>This is a draft. Nothing is saved yet.</b> Filled: ${escapeHtml(filled.join(", "))}. Risk level, allergens and skin boxes are left to you. Read it against the sources, correct what is wrong, then press Save.`
+            + cosmile
             + (body.searched === false ? `<br><b>This draft was written WITHOUT a web search (by ${escapeHtml(body.model || "a backup AI")}), from the AI's memory. It names no sources, so every box is unchecked: check it with the links below.</b>` : "")
             + `<br><b>Sources:</b><br>${assistSources(body.sources)}`
             + `<br><b>Check it yourself:</b> ` + (body.lookups || []).map((l) => `<a class="source-link" href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.title)}</a>`).join(" · ")
@@ -1016,7 +1062,7 @@ async function askCuratorApi(payload) {
             method: "POST",
             signal: controller.signal,
             headers: { "Content-Type": "application/json", Authorization: "Bearer " + (await user.getIdToken()) },
-            body: JSON.stringify({ mode: "description", name })
+            body: JSON.stringify(payload)
         });
     } finally {
         clearTimeout(timeout);
@@ -1333,6 +1379,7 @@ function openIngredientForm(item) {
     editingIngredientId = item ? item.id : null;
     differentIds = new Set(item ? item.differentFrom : []);
     assisted = null;
+    fieldFound = {};
     el("modalTitle").textContent = item ? "Edit Ingredient" : "Add Ingredient";
 
     const note = el("ingredientReviewNote");
@@ -1347,6 +1394,7 @@ function openIngredientForm(item) {
     }
 
     el("ingredientNameInput").value = item ? item.name : "";
+    paintFieldSources();
     showNameClash();
     fillClassInput(item ? item.classificationId : "");
     el("ingredientPurposeInput").value = item ? item.purpose : "";
@@ -1452,7 +1500,7 @@ async function saveIngredient(event) {
     // a draft the AI wrote and the admin has now read and saved: the pages it came from are kept with the entry
     if (assisted && !editingIngredientId)
         Object.assign(data, { source: "aiassist", reviewed: true, reviewedBy: reviewer(), reviewedAt: serverTimestamp(), webSearched: assisted.sources.length > 0, model: assisted.model,
-            sources: assisted.sources.map((p) => `${p.title || p.site || "web page"} | ${p.url}`) });
+            sources: Array.from(new Set(assisted.sources.map((p) => `${p.title || p.site || "web page"} | ${p.url}`).concat(sourceLines))).slice(0, 10) });
 
     // "Harmful" must be backed by a regulator's page (docs/DATA_SOURCE_POLICY.md). An entry that was already harmful can still be saved
     // (its other fields); it is listed under "Harmful without a regulator's page" until a page is added.

@@ -184,22 +184,26 @@
                     <label for="ingredientPurposeInput">Purpose <span class="required">*</span></label>
                     <input type="text" id="ingredientPurposeInput" autocomplete="off" placeholder="e.g., Helps prevent microbial growth and maintain product quality.">
                     <span class="field-hint">One line on what this ingredient does in a product. <span id="ingredientPurposeCount"></span></span>
+                    <div class="field-sources" data-field-sources="purpose" hidden></div>
                 </div>
 
                 <div class="field">
                     <label for="ingredientDescInput">User-Friendly Definition <span class="required">*</span></label>
                     <textarea id="ingredientDescInput" rows="3" maxlength="600" placeholder="What it is and what it does, in plain words."></textarea>
+                    <div class="field-sources" data-field-sources="description" hidden></div>
                 </div>
 
                 <div class="field">
                     <label for="ingredientChemInput">What the chemical is <span class="optional">(optional)</span></label>
                     <textarea id="ingredientChemInput" rows="2" maxlength="600" placeholder="The technical description: what the substance is, for example a salt of hyaluronic acid."></textarea>
+                    <div class="field-sources" data-field-sources="chemicalDescription" hidden></div>
                 </div>
 
                 <div class="field">
                     <label for="ingredientAliasesInput">Also Known As</label>
                     <input type="text" id="ingredientAliasesInput" maxlength="300" placeholder="e.g., Water, Eau" autocomplete="off">
                     <span class="field-hint">Other spellings found on labels, separated by commas. A scan of any of them finds this ingredient. The first one is shown as the common name.</span>
+                    <div class="field-sources" data-field-sources="aliases" hidden></div>
                 </div>
 
                 <div class="field" id="mergeIntoField" hidden>
@@ -246,6 +250,7 @@
                     <div class="field">
                         <label for="ingredientUsesInput">Commonly Used In</label>
                         <input type="text" id="ingredientUsesInput" maxlength="160" placeholder="e.g., serums, moisturisers, toners" autocomplete="off">
+                    <div class="field-sources" data-field-sources="commonUses" hidden></div>
                     </div>
 
                     <div class="field">

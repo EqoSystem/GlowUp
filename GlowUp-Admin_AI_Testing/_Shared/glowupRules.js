@@ -509,7 +509,7 @@ export function wrongIngredientShape(piece) {
 export const SOURCE_REGULATORS = ["europa.eu", "fda.gov", "fda.gov.ph", "nih.gov", "who.int", "aseancosmetics.org", "asean.org", "health.gov.au", "tga.gov.au", "canada.ca", "gov.uk", "echa.europa.eu"];
 export const SOURCE_MEDICAL = ["cir-safety.org", "cir-reports.cir-safety.org", "aad.org", "dermnetnz.org", "contactderm.org", "sciencedirect.com", "wiley.com", "springer.com",
     "nature.com", "jamanetwork.com", "bmj.com", "mayoclinic.org", "clevelandclinic.org"];
-export const SOURCE_REFERENCES = ["personalcarecouncil.org", "incibeauty.com", "incidecoder.com", "paulaschoice.com", "ewg.org", "cosmeticsinfo.org"];
+export const SOURCE_REFERENCES = ["personalcarecouncil.org", "incibeauty.com", "incidecoder.com", "paulaschoice.com", "ewg.org", "cosmeticsinfo.org", "cosmileeurope.eu"];
 export const SOURCE_PUBLIC_LISTS = ["openbeautyfacts.org"];
 // large shops whose product pages copy the list printed on the pack: their WHOLE web addresses (matched like the lists
 // above, never as a piece of a name, so "watsons-deals.xyz" is not Watsons)

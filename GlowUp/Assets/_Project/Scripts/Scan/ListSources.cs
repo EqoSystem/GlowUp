@@ -192,7 +192,7 @@ namespace GlowUp.Scan
         /// <summary>Ingredient databases and consumer references: they explain an ingredient, they are not peer-reviewed.</summary>
         public static readonly string[] References =
         {
-            "personalcarecouncil.org", "incibeauty.com", "incidecoder.com", "paulaschoice.com", "ewg.org", "cosmeticsinfo.org"
+            "personalcarecouncil.org", "incibeauty.com", "incidecoder.com", "paulaschoice.com", "ewg.org", "cosmeticsinfo.org", "cosmileeurope.eu"
         };
 
         /// <summary>Public lists that anybody can edit.</summary>
