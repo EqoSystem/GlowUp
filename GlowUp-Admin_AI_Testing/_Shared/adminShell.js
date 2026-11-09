@@ -789,7 +789,7 @@ export function askConfirm(options) {
         actions.className = "modal-actions";
         actions.style.marginTop = "18px";
         const cancel = document.createElement("button");
-        cancel.type = "button"; cancel.className = "cancel-btn"; cancel.textContent = "Cancel";
+        cancel.type = "button"; cancel.className = "cancel-btn"; cancel.textContent = options.cancelLabel || "Cancel";
         const ok = document.createElement("button");
         ok.type = "button"; ok.className = options.danger ? "btn danger solid" : "save-btn"; ok.textContent = options.confirmLabel || "Confirm";
         cancel.addEventListener("click", () => done(false));

@@ -29,6 +29,8 @@ Make-up scanner app (Unity) plus an admin website. Both share one Firestore data
 - Do not move or delete anything under `GlowUp/Assets/` outside the Unity Editor (`.meta` files).
 - After large changes, run `/graphify . --update`.
 - Commit a checkpoint before edits.
+- Routes, screens, modals, sheets, drawers, transitions: follow `docs/NAVIGATION_RULES.md`, and end each such change with
+  which of its rules were touched and how each was satisfied.
 
 ## graphify
 Knowledge graph in `graphify-out/` (GRAPH_REPORT.md, graph.json, graph.html).

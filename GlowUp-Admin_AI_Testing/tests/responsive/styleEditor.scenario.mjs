@@ -61,6 +61,13 @@ try {
     await page.locator(".menu .menu-item", { hasText: "Style and text" }).click();
     await page.fill("#sdTitleText", "Will be cancelled");
     await page.click(".style-dialog [data-close]");
+    // unsaved changes: "Discard changes?"; Escape there means Keep editing, never Discard
+    ok(await page.locator(".modal-content", { hasText: "Discard changes?" }).count() === 1, "Cancel with unsaved changes asks Discard changes?");
+    await page.keyboard.press("Escape");
+    ok(await page.locator(".style-dialog").count() === 1 && await page.inputValue("#sdTitleText") === "Will be cancelled", "Escape on that question keeps editing");
+    await page.click(".style-dialog [data-close]");
+    await page.locator(".modal-content button", { hasText: "Discard" }).click();
+    await page.waitForSelector(".style-dialog", { state: "detached" });
     ok(await page.evaluate(() => document.querySelector('.panel[data-panel="activity"] .panel-title').textContent) === own, "Cancel leaves the panel as it was");
 
     // the Numbers tiles one under the other, and the sizes of the window: no overlap, no sideways scroll

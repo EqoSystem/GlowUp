@@ -1098,8 +1098,25 @@ async function openStyleDialog(id) {
         note.textContent = weak.length ? `Hard to read: the text on ${weak.map(([where, r]) => `${where} has a contrast of ${r} to 1`).join(" and ")}. Aim for at least 4.5 to 1.` : "The text is easy to read on these colours.";
     };
 
-    let saved = false;
+    let saved = false, dirty = false, asking = false;
+    // unsaved changes: leaving the page asks the browser's own question; Escape, the backdrop and Cancel ask "Discard changes?"
+    // (Escape, the backdrop or "Keep editing" in that question all mean: keep editing)
+    const onLeave = (event) => { if (dirty && !saved) { event.preventDefault(); event.returnValue = ""; } };
+    window.addEventListener("beforeunload", onLeave);
+    overlay.addEventListener("input", () => { dirty = true; });
+    overlay.addEventListener("change", () => { dirty = true; });
+    const tryClose = async () => {
+        if (asking) return;
+        if (dirty) {
+            asking = true;
+            const discard = await askConfirm({ title: "Discard changes?", message: "What you changed on this panel is not saved yet.", confirmLabel: "Discard", cancelLabel: "Keep editing", danger: true });
+            asking = false;
+            if (!discard) return;
+        }
+        close();
+    };
     const close = () => {
+        window.removeEventListener("beforeunload", onLeave);
         document.removeEventListener("keydown", onKey, true);
         panel.classList.remove("style-target");
         overlay.remove();
@@ -1113,10 +1130,10 @@ async function openStyleDialog(id) {
         paintPanelStyles();
         queueFit();
     };
-    const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
+    const onKey = (event) => { if (event.key === "Escape" && !asking) { event.stopPropagation(); tryClose(); } };
     document.addEventListener("keydown", onKey, true);
-    overlay.addEventListener("mousedown", (event) => { if (event.target === overlay) close(); });
-    q("[data-close]").addEventListener("click", close);
+    overlay.addEventListener("mousedown", (event) => { if (event.target === overlay) tryClose(); });
+    q("[data-close]").addEventListener("click", tryClose);
 
     const setStyle = (key, value) => { if (value === "" || value === undefined || value === null) delete style[key]; else style[key] = value; show(); };
     q("#sdWidth").addEventListener("change", sizeNow);
@@ -1158,6 +1175,7 @@ async function openStyleDialog(id) {
     q("#sdNotePlace").addEventListener("change", textInput);
     overlay.querySelectorAll("[data-label-index]").forEach((input) => input.addEventListener("input", textInput));
     q("#sdReset").addEventListener("click", () => {
+        dirty = true;
         style = {}; texts = {};
         overlay.querySelectorAll("#sdSubtitle, #sdNote, [data-label-index]").forEach((input) => { input.value = ""; });
         if (!named) q("#sdTitleText").value = "";
@@ -1214,11 +1232,12 @@ async function openSharedDialog(clear) {
         </div>`;
     document.body.appendChild(overlay);
     const q = (selector) => overlay.querySelector(selector);
+    let saving = false;                           // while the database is written, Escape and the backdrop do nothing
     const close = () => { document.removeEventListener("keydown", onKey, true); overlay.remove(); };
-    const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
+    const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); if (!saving) close(); } };
     document.addEventListener("keydown", onKey, true);
-    overlay.addEventListener("mousedown", (event) => { if (event.target === overlay) close(); });
-    q("[data-close]").addEventListener("click", close);
+    overlay.addEventListener("mousedown", (event) => { if (event.target === overlay && !saving) close(); });
+    q("[data-close]").addEventListener("click", () => { if (!saving) close(); });
     q("form").addEventListener("submit", async (event) => {
         event.preventDefault();
         const pages = Array.from(overlay.querySelectorAll("#shPages input:checked")).map((input) => input.value).filter((id) => SHARED_PAGES.some((p) => p.id === id));
@@ -1226,6 +1245,7 @@ async function openSharedDialog(clear) {
         if (pages.length === 0) { error.textContent = "Tick at least one page."; error.hidden = false; return; }
         const button = q(".save-btn");
         button.disabled = true;
+        saving = true; q("[data-close]").disabled = true;
         try {
             if (clear) await clearShared(pages);
             else {
@@ -1239,6 +1259,7 @@ async function openSharedDialog(clear) {
             applyLayout();
             toast(clear ? `Built-in default again on ${pages.length} page(s).` : `"${profile.name}" is now the default on ${pages.length} page(s), for every admin.`, "ok");
         } catch (failure) {
+            saving = false; q("[data-close]").disabled = false;
             button.disabled = false;
             error.textContent = failure && failure.code === "permission-denied"
                 ? "The database refused it. The rule for shared layouts (siteLayouts in firestore.rules) must be published in the Firebase console first."
