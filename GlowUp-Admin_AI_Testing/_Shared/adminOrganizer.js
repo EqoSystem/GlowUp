@@ -88,14 +88,28 @@ export function createOrganizer(spec) {
         if (view.kind === "folder" && !folders().some((name) => same(name, view.name))) view = { kind: "all", name: "" };
         return view;
     };
-    const show = (next) => {
+    /**
+     * Shows a view. The Recycle bin and a folder are places of their own (docs/NAVIGATION_RULES.md, 9 November 2026): going
+     * there from the whole list adds a step to the browser's history, so the browser's Back (and the Back button the shelf
+     * shows there) returns to the whole list. `fromHistory` = it is the browser's Back itself: nothing is added.
+     */
+    const show = (next, fromHistory) => {
+        const was = view.kind;
         view = next && next.kind === "bin" ? { kind: "bin", name: "" }
             : next && next.kind === "folder" && cleanFolder(next.name) ? { kind: "folder", name: folders().find((name) => same(name, next.name)) || cleanFolder(next.name) }
             : { kind: "all", name: "" };
+        if (!fromHistory) {
+            const ours = history.state && history.state.glowupView === spec.kind;
+            try {
+                if (was === "all" && view.kind !== "all") history.pushState({ glowupView: spec.kind }, "");
+                else if (was !== "all" && view.kind === "all" && ours) history.back();
+            } catch (error) { /* history not available: the Back button still works */ }
+        }
         selected.clear();
         anchor = null;
         spec.onView();
     };
+    window.addEventListener("popstate", () => { if (view.kind !== "all") show({ kind: "all" }, true); });
 
     // ---------------------------------------------------------------------------------------------
     // What happens to entries (the page saves; this says what happened and offers Undo)
@@ -307,6 +321,15 @@ export function createOrganizer(spec) {
         // a part goes to "lead" (All, the folders) unless put() says "add" (New folder, Restore all, Empty bin) or "end" (the bin)
         const kids = [], slot = new Map();
         const put = (node, where) => { kids.push(node); slot.set(node, where); return node; };
+        // inside the Recycle bin or a folder: a Back button first, so the way out is plain (the browser's Back does the same)
+        if (now.kind !== "all") {
+            const back = document.createElement("button");
+            back.type = "button"; back.className = "btn shelf-back"; back.dataset.view = "all";
+            back.setAttribute("aria-label", `Back to all ${spec.noun}`);
+            back.innerHTML = icon("left");
+            back.append("Back");
+            kids.push(back);
+        }
         kids.push(chip(now.kind === "all" ? "on" : "", { "data-view": "all", "data-drop": "all", "data-tip-title": spec.allLabel || "All", "data-tip": `Every ${spec.nounOne}, whatever folder it is in.`, "data-tip-preview": "Drop entries here to take them out of their folder." },
             icon("layers"), spec.allLabel || "All", spec.count({ kind: "all" })));
         names.forEach((name) => kids.push(chip(now.kind === "folder" && same(now.name, name) ? "on" : "", { "data-view": "folder", "data-name": name, "data-drop": "folder:" + name, "data-tip-title": name, "data-tip": "Show only what is in this folder.", "data-tip-preview": "Drop entries here to put them in it." },

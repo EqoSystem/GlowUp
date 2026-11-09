@@ -406,7 +406,12 @@ body.layout-editing .board > .panel .panel-fold-btn { pointer-events: auto; }
    under 1000 px a panel of half the width or less takes half (so three narrow panels become two per row and a wide one the
    whole row); under 640 px every panel takes the whole row. */
 .board { container: board / inline-size; }
-@container board (max-width: 999px) { .board > .panel { grid-column: span calc(6 + 6 * clamp(0, var(--w, 12) - 6, 1)) !important; } }
+@container board (max-width: 999px) { html:not(.qs-open) .board > .panel { grid-column: span calc(6 + 6 * clamp(0, var(--w, 12) - 6, 1)) !important; } }
+/* Opening Quick settings only narrows the page (9 November 2026, the user's wish: "it just has to move left"): the panels keep
+   their places and widths and are squeezed, down to a board of 720 px. Only a board narrower than that is rearranged. */
+@media (min-width: 1024px) { @container board (max-width: 719px) { html.qs-open .board > .panel { grid-column: span calc(6 + 6 * clamp(0, var(--w, 12) - 6, 1)) !important; } } }
+/* under 1024 px Quick settings lies OVER the page and does not narrow it: the board then behaves as with it closed */
+@media (max-width: 1023px) { @container board (max-width: 999px) { html.qs-open .board > .panel { grid-column: span calc(6 + 6 * clamp(0, var(--w, 12) - 6, 1)) !important; } } }
 /* while Quick settings pushes the page, a panel with empty room at the right of its row fills it (adminLayouts.js sets
    data-qs-grow and --qs-span; both go when Quick settings closes, so the saved width comes back) */
 html.qs-open .board > .panel[data-qs-grow] { grid-column: span var(--qs-span) !important; }
@@ -571,6 +576,11 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .panel-inner { container: panel / inline-size; }
 .stat-row, .kpi-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap); }
 .stat-row > :last-child:nth-child(odd), .kpi-row > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+/* a row of at most 4 tiles stays one row down to a 520 px panel (Quick settings squeezes the page; it must not restack it) */
+@container panel (min-width: 520px) {
+    .stat-row:not(:has(> :nth-child(5))) { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+    .stat-row:not(:has(> :nth-child(5))) > :last-child:nth-child(odd) { grid-column: auto; }
+}
 @container panel (min-width: 640px) {
     .stat-row, .kpi-row { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
     .stat-row > :last-child:nth-child(odd), .kpi-row > :last-child:nth-child(odd) { grid-column: auto; }
@@ -1736,3 +1746,14 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 @media (max-width: 480px) { .toast-host { left: 12px; right: 12px; bottom: 12px; max-width: none; } }
 /* while a window is open, messages sit above its bottom bar, so they never cover its Save or Cancel */
 body:has(> .modal-overlay[style*="flex"]) .toast-host { bottom: 96px; }
+/* a list's pager in a title bar takes the short "1/16" when the panel is not wide, so the bar stays ONE line (9 November 2026:
+   Inventory's pager dropped to a second line with Quick settings closed) */
+@container panel (max-width: 1150px) {
+    .panel-head .pager .page-long { display: none; }
+    .panel-head .pager .page-short { display: inline; }
+    .panel-head .pager { gap: 4px; }
+    .panel-head .pager .btn-group { padding: 2px; }
+    .panel-head .pager .icon-btn { width: 24px; height: 24px; }
+    .panel-head .pager .page-now { min-width: 0; padding-inline: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .panel-head .sort-now { display: none; }
+}

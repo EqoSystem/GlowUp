@@ -1194,9 +1194,14 @@ async function openStyleDialog(id) {
             const target = widgetOf(page, id) || groupOf(page, id), name = cleanName(q("#sdTitleText").value, 40);
             if (target && name) target.title = name;
         }
+        // only THIS panel's size is kept: the order of the panels is not touched. (capture() would write the order too, and a
+        // page without a saved order keeps its default right-hand column; with one, that column falls into the flow.)
+        if (!isMember) {
+            const h = Number(q("#sdHeight").value);
+            page.size[id] = { w: Math.min(12, Math.max(2, Number(q("#sdWidth").value) || 12)), h: h >= 120 && h <= 1400 ? Math.round(h) : 0 };
+        }
         saved = true;
         close();
-        capture();
         commit("Saved. Undo (Layout & Style, or Ctrl+Z) takes it back.");
     });
     hydrate(overlay);
