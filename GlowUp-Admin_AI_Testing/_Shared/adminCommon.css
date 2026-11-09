@@ -1697,3 +1697,42 @@ body.snapx-open .modal-overlay { z-index: 3000; }
     .modal-overlay.style-overlay { align-items: flex-end; }
     .style-overlay .style-dialog { width: 100%; height: 62vh; border-radius: var(--radius) var(--radius) 0 0; border-width: 1px 0 0; }
 }
+
+/* ============================================================== 9. the import drop box: reading cover and check window (importReview.js) */
+.import-drop-holder { position: relative; }
+.import-drop-holder > .import-dropbox { width: 100%; }
+/* the cover lies over the drop box only, the same size: nothing on the page moves or is covered */
+.import-cover { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 14px;
+    border-radius: var(--radius); background: var(--surface); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+    text-align: center; animation: p-fade .2s var(--ease); }
+.import-cover-text { font-weight: 650; font-size: var(--fs-base); color: var(--text); overflow-wrap: anywhere; }
+.import-cover-sub { font-size: var(--fs-sm); color: var(--text-2); line-height: 1.45; min-height: 1.45em; max-width: 46ch; overflow-wrap: anywhere; }
+.import-cover-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 4px; }
+.import-spinner { width: 26px; height: 26px; border-radius: 50%; border: 3px solid color-mix(in srgb, var(--accent) 22%, transparent); border-top-color: var(--accent); animation: spin .9s linear infinite; }
+.import-cover.ready .import-spinner { animation: none; border-color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .import-spinner { animation-duration: 2.5s !important; } }
+/* the check window */
+.import-check { height: min(860px, 100%); }
+.import-check .xl-head .icon-btn { margin-left: auto; }
+.ic-head-text { min-width: 0; }
+.ic-head-text h3 { overflow-wrap: anywhere; }
+.ic-tabs { margin: 10px 24px 0; flex-wrap: wrap; align-self: flex-start; }
+.ic-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; position: sticky; top: -16px; z-index: 1; margin: -16px -24px 0; padding: 10px 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.ic-pager { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: var(--fs-sm); color: var(--text-2); }
+.ic-row { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; background: var(--surface-2); container: icrow / inline-size; }
+.ic-row.off { opacity: .55; }
+.ic-row.off .ic-fields { display: none; }
+.ic-row-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; cursor: pointer; }
+.ic-row-head b { overflow-wrap: anywhere; }
+.ic-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px 12px; margin-top: 8px; }
+.ic-fields .field.wide { grid-column: 1 / -1; }
+.ic-fields textarea, .ic-fields input, .ic-fields select { width: 100%; min-width: 0; }
+.ic-text { width: 100%; min-height: 50vh; font-family: Consolas, "Courier New", monospace; font-size: var(--fs-sm); line-height: 1.5; }
+.import-check .xl-foot { flex-wrap: wrap; }
+.ic-notes { flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 720px) { .ic-tabs { margin-left: 14px; margin-right: 14px; } .ic-bar { margin-left: -14px; margin-right: -14px; padding-left: 14px; padding-right: 14px; } }
+/* toasts on a phone: the whole width minus the page's gutter, never past the edge */
+@media (max-width: 480px) { .toast-host { left: 12px; right: 12px; bottom: 12px; max-width: none; } }
+/* while a window is open, messages sit above its bottom bar, so they never cover its Save or Cancel */
+body:has(> .modal-overlay[style*="flex"]) .toast-host { bottom: 96px; }

@@ -1,4 +1,5 @@
 // Admin login. Signs in with Firebase Authentication, then opens the dashboard.
+import "../_Shared/quietConsole.js";                 // first: no debug output on the live site
 import { auth } from "../_Database/firebase-console.js";
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { DASHBOARD_PAGE, REQUIRE_ADMIN_RECORD, isAdmin } from "../_Shared/adminCommon.js";

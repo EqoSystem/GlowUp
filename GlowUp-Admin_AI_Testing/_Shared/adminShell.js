@@ -9,9 +9,12 @@
 //
 // The display layouts (arranging panels, panel kinds, fonts and colours) live in adminLayouts.js;
 // the data panels (lists, grids, graphs) in adminWidgets.js.
+import { catchFailures } from "./quietConsole.js";      // first: no debug output on the live site, failures become a toast
 import { initLayouts, applyAppearance } from "./adminLayouts.js";
 import { refreshData, refreshWait } from "./adminStore.js";   // only for the "Refresh data" button
 import { mountSettingsMenu } from "./adminSettingsMenu.js";
+
+catchFailures((text) => toast(text, "error"));
 
 // ---------------------------------------------------------------------------------------------
 // Icons

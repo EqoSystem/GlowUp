@@ -38,6 +38,7 @@ import { cleanupPlan, ingredientDuplicates, ingredientLookalikesAsync, lookalike
 import { openPlanDialog, openDuplicatesDialog, showScan } from "../_Shared/adminCleanup.js";
 import { mountShell, placeInHeader, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
 import { readAdminDocument, splitForAi } from "../_Shared/adminDocumentReader.js";
+import { startImport } from "../_Shared/importReview.js";
 import { parseImportText, inventoryNotHere } from "../_Shared/importFormat.js";
 import { loadLists, optionsOf, allOptions, openListManager, listsNow } from "../_Shared/adminLists.js";
 import { BUILT_IN_HIGHLIGHTS } from "../_Shared/listRules.js";
@@ -923,76 +924,96 @@ async function assistWithAi(name) {
 // No size limit (9 November 2026): any PDF, Excel, Word, CSV or text file, of any length (adminDocumentReader.js says which types it reads).
 const IMPORT_MAX_ROWS = 60;                   // ingredients saved per database batch (an import itself has no limit)
 
-async function importIngredientFile(file) {
-    const status = el("ingredientImportStatus"), choose = el("chooseIngredientFileBtn"), dropbox = el("ingredientDropBox");
-    const report = (message, failed) => { status.textContent = message; status.classList.toggle("error", !!failed); };
-    setBusy(choose, true, "Analyzing...");
-    dropbox.disabled = true;
-    try {
-        report(`Reading "${file.name}" in this browser...`, false);
-        const documentText = await readAdminDocument(file, (message) => report(message, false));
-        // a file in the GlowUp import format is read as it is, with no AI; any other document is read by the AI as before
-        const keyed = parseImportText(documentText);
-        if (keyed.kind === "inventory") { report("This file lists only brands or products. " + inventoryNotHere(keyed.draft.products.length + keyed.draft.brands.length), true); return; }
-        if (keyed.kind === "mixed") { report(`This file mixes ${many(keyed.counts.ingredients, "ingredient record", "ingredient records")} with brands or products, so nothing was imported. ` + inventoryNotHere(keyed.counts.inventory), true); return; }
-        let body;
-        if (keyed.kind === "ingredients") {
-            report("Reading the file's own fields. No AI is used.", false);
-            body = { found: keyed.draft.ingredients.length > 0, draft: keyed.draft, plain: true, notes: keyed.notes, message: keyed.notes.join(" ") };
-        } else {
-            if (assistsToday(false) >= ASSIST_PER_DAY) { report(`The AI was used ${ASSIST_PER_DAY} times today in this browser. Try again tomorrow.`, true); return; }
-            // no size limit: the AI reads the file in parts, one after the other (the whole file counts once in the day's limit)
-            const parts = splitForAi(documentText);
-            const found = [], failedParts = [];
-            let model = "", inventoryRecords = 0;
-            for (let i = 0; i < parts.length; i++) {
-                report(parts.length > 1 ? `Asking the AI about part ${i + 1} of ${parts.length}. Only the extracted text is sent, not the file.` : "Asking the AI to pick out the ingredients. Only the extracted text is sent, not the file.", false);
-                try {
-                    const answer = await askCuratorApi({ mode: "ingredientImport", documentText: parts[i] });
-                    found.push(...((answer.draft && answer.draft.ingredients) || []));
-                    inventoryRecords += Number(answer.inventoryRecords) || 0;
-                    model = model || answer.model || "";
-                } catch (error) {
-                    if (i === 0) throw error;
-                    failedParts.push(`part ${i + 1} (${error && error.name === "AbortError" ? "the AI took too long" : (error && error.message) || "it failed"})`);
-                }
-            }
-            assistsToday(true);
-            const notes = (failedParts.length ? [`Not read: ${failedParts.join("; ")}. Import the file again later for those parts; what was saved is skipped as a duplicate.`] : [])
-                .concat(inventoryRecords > 0 ? [inventoryNotHere(inventoryRecords)] : []);
-            body = { found: found.length > 0, draft: { ingredients: found }, model, notes, message: notes.join(" ") || "" };
+/**
+ * The import drop box (importReview.js): read, then check every ingredient in a window, then save. Nothing reaches the
+ * database before the admin has checked it and pressed Save.
+ */
+function importIngredientFile(file) {
+    startImport({
+        dropbox: el("ingredientDropBox"), choose: el("chooseIngredientFileBtn"), status: el("ingredientImportStatus"), file,
+        read: (f, say) => readAdminDocument(f, say),
+        extract: extractIngredients,
+        review: INGREDIENT_REVIEW,
+        save: (draft, say) => saveIngredientDraft(draft, say)
+    });
+}
+
+const INGREDIENT_REVIEW = {
+    title: "Check before saving",
+    lists: [{
+        key: "ingredients", label: "Ingredients", nounOne: "ingredient", noun: "ingredients",
+        titleOf: (r) => r.name,
+        noteOf: (r) => {
+            const mine = [r.name, r.techName, ...(Array.isArray(r.aliases) ? r.aliases : [])].map(sameKey).filter((k) => k.length > 0);
+            const other = everyIngredient.find((item) => keysOf(item).some((k) => mine.includes(k)));
+            return other ? (other.binned ? "In the Recycle bin: will be skipped" : "Already listed: will be skipped") : "";
+        },
+        fields: [
+            { key: "name", label: "Name" }, { key: "techName", label: "INCI name" },
+            { key: "riskLevel", label: "Risk level", kind: "select", options: [["", "Let the app decide"], ["safe", "Safe"], ["caution", "Caution"], ["harmful", "Harmful"]] },
+            { key: "description", label: "User-friendly definition", kind: "area", wide: true },
+            { key: "aliases", label: "Also known as (one per line)", kind: "lines" },
+            { key: "cautionNote", label: "Caution note (It ...)" }, { key: "commonUses", label: "Commonly used in" },
+            { key: "chemicalDescription", label: "What the chemical is", kind: "area", wide: true }
+        ]
+    }]
+};
+
+/** What a file's text holds, for the check window: { draft: { ingredients }, notes, model, refused }. Nothing is saved here. */
+async function extractIngredients(documentText, say, signal) {
+    // a file in the GlowUp import format is read as it is, with no AI; any other document is read by the AI
+    const keyed = parseImportText(documentText);
+    if (keyed.kind === "inventory") return { refused: "This file lists only brands or products. " + inventoryNotHere(keyed.draft.products.length + keyed.draft.brands.length) };
+    if (keyed.kind === "mixed") return { refused: `This file mixes ${many(keyed.counts.ingredients, "ingredient record", "ingredient records")} with brands or products, so nothing was imported. ` + inventoryNotHere(keyed.counts.inventory) };
+    if (keyed.kind === "ingredients") { say("Reading the file's own fields. No AI is used."); return { draft: keyed.draft, notes: keyed.notes.slice(0, 6), model: "" }; }
+    if (assistsToday(false) >= ASSIST_PER_DAY) throw new Error(`The AI was used ${ASSIST_PER_DAY} times today in this browser. Try again tomorrow.`);
+    // no size limit: the AI reads the file in parts, one after the other (the whole file counts once in the day's limit)
+    const parts = splitForAi(documentText);
+    const found = [], failedParts = [];
+    let model = "", inventoryRecords = 0;
+    for (let i = 0; i < parts.length; i++) {
+        if (signal && signal.aborted) break;
+        say(parts.length > 1 ? `Asking the AI about part ${i + 1} of ${parts.length}. Only the extracted text is sent, not the file.` : "Asking the AI to pick out the ingredients. Only the extracted text is sent, not the file.");
+        try {
+            const answer = await askCuratorApi({ mode: "ingredientImport", documentText: parts[i] }, signal);
+            found.push(...((answer.draft && answer.draft.ingredients) || []));
+            inventoryRecords += Number(answer.inventoryRecords) || 0;
+            model = model || answer.model || "";
+        } catch (error) {
+            if (i === 0 || (signal && signal.aborted)) throw error;
+            failedParts.push(`part ${i + 1} (${error && error.name === "AbortError" ? "the AI took too long" : (error && error.message) || "it failed"})`);
         }
-        if (!body.found || !body.draft || !Array.isArray(body.draft.ingredients) || body.draft.ingredients.length === 0) {
-            report(body.message || "No ingredient records were found. Nothing was saved.", true);
-            return;
-        }
-        // saved in groups of IMPORT_MAX_ROWS (one batch each)
-        const result = { saved: 0, skippedDuplicates: 0, skippedInvalid: 0, unmatched: [] };
-        for (let from = 0; from < body.draft.ingredients.length; from += IMPORT_MAX_ROWS) {
-            const part = await saveImportedIngredients(body.draft.ingredients.slice(from, from + IMPORT_MAX_ROWS));
-            result.saved += part.saved; result.skippedDuplicates += part.skippedDuplicates; result.skippedInvalid += part.skippedInvalid;
-            part.unmatched.forEach((name) => { if (!result.unmatched.includes(name)) result.unmatched.push(name); });
-        }
-        if (result.saved === 0) {
-            report(`Nothing new was saved. ${result.skippedDuplicates} already in the list or the Recycle bin, ${result.skippedInvalid} incomplete.`, true);
-            return;
-        }
-        const skipped = result.skippedDuplicates + result.skippedInvalid;
-        const summary = `Saved ${many(result.saved, "ingredient", "ingredients")} as Pending for review` + (skipped ? `; skipped ${skipped} duplicate or incomplete.` : ".")
-            + (result.unmatched.length ? ` Not in your lists, so left out: ${result.unmatched.slice(0, 6).join(", ")}${result.unmatched.length > 6 ? " ..." : ""} (add them with Manage lists, then edit the ingredient).` : "")
-            + (body.plain ? " Read straight from the file's fields, no AI." + (body.notes.length ? " " + body.notes.slice(0, 3).join(" ") : "") : (body.model ? ` Read by ${body.model}.` : "") + (body.notes && body.notes.length ? " " + body.notes.join(" ") : ""));
-        report(summary, false);
-        notify(summary, "ok");
-        await loadIngredients();
-    } catch (error) {
-        console.error("Importing the ingredient file failed: ", error);
-        const reason = error && error.name === "AbortError" ? "The AI took too long." : (error && error.message) || "Something went wrong.";
-        report(`Import failed. ${reason}`, true);
-        notify(`The file was not imported. ${reason}`, "error");
-    } finally {
-        setBusy(choose, false);
-        dropbox.disabled = false;
     }
+    assistsToday(true);
+    const notes = (failedParts.length ? [`Not read: ${failedParts.join("; ")}. Import the file again later for those parts; what is saved now is then skipped as a duplicate.`] : [])
+        .concat(inventoryRecords > 0 ? [inventoryNotHere(inventoryRecords)] : []);
+    return { draft: { ingredients: found }, notes, model: model || "the AI" };
+}
+
+/** Writes the checked ingredients (NEW entries only, Pending) in groups; answers what was saved. */
+async function saveIngredientDraft(draft, say) {
+    const records = Array.isArray(draft.ingredients) ? draft.ingredients : [];
+    const result = { saved: 0, skippedDuplicates: 0, skippedInvalid: 0, unmatched: [] };
+    const groups = Math.max(1, Math.ceil(records.length / IMPORT_MAX_ROWS));
+    for (let g = 0; g < groups; g++) {
+        if (groups > 1) say(`Saving group ${g + 1} of ${groups}...`);
+        const part = await saveImportedIngredients(records.slice(g * IMPORT_MAX_ROWS, (g + 1) * IMPORT_MAX_ROWS));
+        result.saved += part.saved; result.skippedDuplicates += part.skippedDuplicates; result.skippedInvalid += part.skippedInvalid;
+        part.unmatched.forEach((name) => { if (!result.unmatched.includes(name)) result.unmatched.push(name); });
+        // the next group must see what this one added (duplicates inside one file)
+        if (part.saved && g < groups - 1) await loadIngredients();
+    }
+    if (result.saved === 0) {
+        const nothing = `Nothing new was saved: ${result.skippedDuplicates} already in the list or the Recycle bin, ${result.skippedInvalid} incomplete.`;
+        notify(nothing, "warn");
+        return nothing;
+    }
+    const skipped = result.skippedDuplicates + result.skippedInvalid;
+    const summary = `Saved ${many(result.saved, "ingredient", "ingredients")} as Pending for review` + (skipped ? `; skipped ${skipped} already listed or incomplete.` : ".")
+        + (result.unmatched.length ? ` Not in your lists, so left out: ${result.unmatched.slice(0, 6).join(", ")}${result.unmatched.length > 6 ? " ..." : ""} (add them with Manage lists, then edit the ingredient).` : "");
+    notify(summary, "ok");
+    await loadIngredients();
+    return summary;
 }
 
 /** Writes new ingredient entries only (never changes one that exists). Only ingredient fields are copied from a record. */
@@ -1064,11 +1085,13 @@ async function askCuratorAi(name) {
     return askCuratorApi({ mode: "description", name });
 }
 
-async function askCuratorApi(payload) {
+async function askCuratorApi(payload, signal = null) {
     const user = auth.currentUser;
     if (!user) throw new Error("You are signed out. Sign in again.");
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 75000);
+    const onCancel = () => controller.abort();            // Cancel on the drop box stops the question at once
+    if (signal) signal.addEventListener("abort", onCancel);
     let response;
     try {
         response = await fetch("/api/assist-ingredient", {
@@ -1079,6 +1102,7 @@ async function askCuratorApi(payload) {
         });
     } finally {
         clearTimeout(timeout);
+        if (signal) signal.removeEventListener("abort", onCancel);
     }
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || `The AI could not be reached (error ${response.status}).`);

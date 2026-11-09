@@ -46,6 +46,7 @@ import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
 import { readAdminDocument, splitForAi } from "../_Shared/adminDocumentReader.js";
+import { startImport } from "../_Shared/importReview.js";
 import { parseImportText, pairShades, shadeCodeOf, ingredientsNotHere } from "../_Shared/importFormat.js";
 import { parseLabeledProducts } from "../_Shared/ingredientBlock.js";
 import { nearShade } from "../_Shared/listRules.js";
@@ -723,12 +724,14 @@ function inventoryAiCalls(add) {
 }
 
 /** countIt = false: a later part of one imported file (a whole file counts as ONE use of the day's limit). */
-async function askInventoryAi(payload, countIt = true) {
+async function askInventoryAi(payload, countIt = true, signal = null) {
     if (countIt && inventoryAiCalls(false) >= INVENTORY_AI_DAILY_LIMIT) throw new Error(`Assist with AI was used ${INVENTORY_AI_DAILY_LIMIT} times today in this browser. Try again tomorrow.`);
     const user = auth.currentUser;
     if (!user) throw new Error("You are signed out. Sign in again.");
     const stop = new AbortController();
     const timer = setTimeout(() => stop.abort(), 75000);
+    const onCancel = () => stop.abort();                  // Cancel on the drop box stops the question at once
+    if (signal) signal.addEventListener("abort", onCancel);
     let answer;
     try {
         answer = await fetch("/api/assist-ingredient", {
@@ -736,7 +739,7 @@ async function askInventoryAi(payload, countIt = true) {
             headers: { "Content-Type": "application/json", Authorization: "Bearer " + (await user.getIdToken()) },
             body: JSON.stringify(payload)
         });
-    } finally { clearTimeout(timer); }
+    } finally { clearTimeout(timer); if (signal) signal.removeEventListener("abort", onCancel); }
     const body = await answer.json().catch(() => ({}));
     if (!answer.ok) throw new Error(body.error || `The AI could not be reached (error ${answer.status}).`);
     if (countIt) inventoryAiCalls(true);
@@ -935,102 +938,117 @@ async function assistProductIngredients() {
     }
 }
 
-async function importInventoryFile(file) {
-    const status = el("inventoryImportStatus"), choose = el("chooseInventoryFileBtn"), dropbox = el("inventoryDropBox"), flagsBox = el("inventoryImportFlags");
-    const report = (message, failed) => { status.textContent = message; status.classList.toggle("error", !!failed); };
-    setBusy(choose, true, "Analyzing...");
-    dropbox.disabled = true;
-    showImportFlags(flagsBox, []);
-    report(`Reading "${file.name}" in this browser...`, false);
-    try {
-        const documentText = await readAdminDocument(file, (message) => report(message, false));
-        // a file in the GlowUp import format is read as it is, with no AI; any other document is read by the AI as before
-        const keyed = parseImportText(documentText);
-        if (keyed.kind === "ingredients") { report("This file lists only ingredients. " + ingredientsNotHere(keyed.draft.ingredients.length), true); return; }
-        if (keyed.kind === "mixed") {
-            // the GlowUp format says exactly which record is which: nothing is guessed, the admin splits the file
-            report(`This file mixes ${many(keyed.counts.inventory, "brand or product record", "brand or product records")} with ingredient records, so nothing was imported. ` + ingredientsNotHere(keyed.counts.ingredients), true);
-            return;
+/**
+ * The import drop box (importReview.js): read, then check every record in a window, then save. Nothing reaches the
+ * database before the admin has checked it and pressed Save.
+ */
+function importInventoryFile(file) {
+    showImportFlags(el("inventoryImportFlags"), []);
+    startImport({
+        dropbox: el("inventoryDropBox"), choose: el("chooseInventoryFileBtn"), status: el("inventoryImportStatus"), file,
+        read: (f, say) => readAdminDocument(f, say),
+        extract: extractInventory,
+        review: INVENTORY_REVIEW,
+        save: (draft, say) => saveInventoryDraft(draft, file.name, say)
+    });
+}
+
+const INVENTORY_REVIEW = {
+    title: "Check before saving",
+    lists: [
+        {
+            key: "products", label: "Products", nounOne: "product", noun: "products",
+            titleOf: (r) => [r.brandName, r.productName].filter(Boolean).join(": "),
+            noteOf: (r) => {
+                const scope = productScope(r.cosmeticType || "", r.productName || "");
+                if (scope === "out" || scope === "skincare") return "Not make-up: will not be saved";
+                const brand = everyBrand.find((b) => [b.name, ...b.aliases].some((n) => sameKey(n) === sameKey(r.brandName || "")));
+                if (brand && everyProduct.some((p) => p.brandId === brand.id && [p.name, ...p.aliases].some((n) => compactName(n) === compactName(r.productName || "")))) return "Already listed";
+                return "";
+            },
+            fields: [
+                { key: "brandName", label: "Brand" }, { key: "productName", label: "Product" }, { key: "cosmeticType", label: "Cosmetic type" },
+                { key: "ingredients", label: "Ingredients (one per line, in printed order)", kind: "lines", wide: true },
+                { key: "shades", label: "Shade colours (#RRGGBB, one per line)", kind: "lines" },
+                { key: "description", label: "Description", kind: "area" }
+            ]
+        },
+        {
+            key: "brands", label: "Brands", nounOne: "brand", noun: "brands",
+            titleOf: (r) => r.name,
+            noteOf: (r) => (everyBrand.some((b) => [b.name, ...b.aliases].some((n) => sameKey(n) === sameKey(r.name || ""))) ? "Already listed" : ""),
+            fields: [
+                { key: "name", label: "Brand" },
+                { key: "market", label: "Market", kind: "select", options: [["", "Not given"], ["Global", "Global"], ["Local", "Local"], ["Asia", "Asia"], ["Europe", "Europe"], ["North America", "North America"]] },
+                { key: "aliases", label: "Other names (one per line)", kind: "lines" }
+            ]
         }
-        let body;
-        let ingredientRecords = 0;                     // ingredient details the AI found and did not extract
-        if (keyed.kind === "inventory") {
-            report("Reading the file's own fields. No AI is used.", false);
-            body = { draft: keyed.draft, plain: true, notes: keyed.notes, message: keyed.notes.join(" ") };
-        } else {
-            // a document that labels each product ("Brand:", "Product:", "Ingredients:") is read here too, with no AI and no quota; only a document
-            // this cannot read goes to the AI
-            const labeled = parseLabeledProducts(documentText);
-            if (labeled.kind === "inventory") {
-                report("Reading the labelled Brand / Product / Ingredients lines. No AI is used.", false);
-                body = { draft: labeled.draft, plain: true, notes: labeled.notes, message: labeled.notes.join(" ") };
-            } else {
-                // no size limit: the AI reads the file in parts, one after the other; a part that fails is named, the others still count
-                const parts = splitForAi(documentText);
-                const found = { products: [], brands: [] }, failedParts = [];
-                let model = "";
-                for (let i = 0; i < parts.length; i++) {
-                    report(parts.length > 1 ? `Asking the AI about part ${i + 1} of ${parts.length} of the file. The file itself is not uploaded.` : "Asking the configured AI to extract brand and product fields. The file itself is not uploaded.", false);
-                    try {
-                        const answer = await askInventoryAi({ mode: "import", documentText: parts[i] }, i === 0);
-                        found.products.push(...((answer.draft && answer.draft.products) || []));
-                        found.brands.push(...((answer.draft && answer.draft.brands) || []));
-                        ingredientRecords += Number(answer.ingredientRecords) || 0;
-                        model = model || answer.model || "";
-                    } catch (error) {
-                        if (i === 0) throw error;          // the first part failing: nothing was read, the whole import fails as before
-                        failedParts.push(`part ${i + 1} (${error && error.name === "AbortError" ? "the AI took too long" : (error && error.message) || "it failed"})`);
-                    }
-                }
-                const notes = failedParts.length ? [`Not read: ${failedParts.join("; ")}. Import the file again later for those parts; what was saved is skipped as a duplicate.`] : [];
-                body = { draft: found, model, notes, message: notes.join(" ") };
-            }
+    ]
+};
+
+/** What a file's text holds, for the check window: { draft: { products, brands }, notes, model, refused }. Nothing is saved here. */
+async function extractInventory(documentText, say, signal) {
+    // a file in the GlowUp import format is read as it is, with no AI; any other document is read by the AI
+    const keyed = parseImportText(documentText);
+    if (keyed.kind === "ingredients") return { refused: "This file lists only ingredients. " + ingredientsNotHere(keyed.draft.ingredients.length) };
+    if (keyed.kind === "mixed") return { refused: `This file mixes ${many(keyed.counts.inventory, "brand or product record", "brand or product records")} with ingredient records, so nothing was imported. ` + ingredientsNotHere(keyed.counts.ingredients) };
+    if (keyed.kind === "inventory") { say("Reading the file's own fields. No AI is used."); return { draft: keyed.draft, notes: keyed.notes.slice(0, 6), model: "" }; }
+    // a document that labels each product ("Brand:", "Product:", "Ingredients:") is read here too, with no AI and no quota
+    const labeled = parseLabeledProducts(documentText);
+    if (labeled.kind === "inventory") { say("Reading the labelled Brand / Product / Ingredients lines. No AI is used."); return { draft: labeled.draft, notes: labeled.notes.slice(0, 6), model: "" }; }
+    // no size limit: the AI reads the file in parts, one after the other; a part that fails is named, the others still count
+    const parts = splitForAi(documentText);
+    const found = { products: [], brands: [] }, failedParts = [];
+    let model = "", ingredientRecords = 0;
+    for (let i = 0; i < parts.length; i++) {
+        if (signal && signal.aborted) break;
+        say(parts.length > 1 ? `Asking the AI about part ${i + 1} of ${parts.length}. The file itself is not uploaded.` : "Asking the AI to pick out brands and products. The file itself is not uploaded.");
+        try {
+            const answer = await askInventoryAi({ mode: "import", documentText: parts[i] }, i === 0, signal);
+            found.products.push(...((answer.draft && answer.draft.products) || []));
+            found.brands.push(...((answer.draft && answer.draft.brands) || []));
+            ingredientRecords += Number(answer.ingredientRecords) || 0;
+            model = model || answer.model || "";
+        } catch (error) {
+            if (i === 0 || (signal && signal.aborted)) throw error;
+            failedParts.push(`part ${i + 1} (${error && error.name === "AbortError" ? "the AI took too long" : (error && error.message) || "it failed"})`);
         }
-        const records = body.draft && Array.isArray(body.draft.products) ? body.draft.products : [];
-        const brandRecords = body.draft && Array.isArray(body.draft.brands) ? body.draft.brands : [];
-        const ingredientNote = ingredientRecords > 0 ? " " + ingredientsNotHere(ingredientRecords) : "";
-        if (records.length === 0 && brandRecords.length === 0) {
-            report((body.message || "No product or brand records were found. Nothing was saved.") + ingredientNote, true);
-            return;
-        }
-        // no limit on records either: saved in groups of IMPORT_GROUP, one database batch each, remembering what earlier groups added
-        const memory = { newBrands: new Map(), plannedProducts: new Set() };
-        const result = { savedProducts: 0, savedBrands: 0, suggestedLists: 0, skippedDuplicates: 0, skippedInvalid: 0, withFdaLink: 0, flagged: [] };
-        const groups = Math.max(Math.ceil(records.length / IMPORT_GROUP), Math.ceil(brandRecords.length / IMPORT_GROUP), 1);
-        for (let g = 0; g < groups; g++) {
-            if (groups > 1) report(`Saving group ${g + 1} of ${groups}...`, false);
-            const part = await saveImportedProducts(records.slice(g * IMPORT_GROUP, (g + 1) * IMPORT_GROUP), brandRecords.slice(g * IMPORT_GROUP, (g + 1) * IMPORT_GROUP), file.name, memory);
-            ["savedProducts", "savedBrands", "suggestedLists", "skippedDuplicates", "skippedInvalid", "withFdaLink"].forEach((k) => { result[k] += part[k]; });
-            result.flagged.push(...part.flagged);
-        }
-        showImportFlags(flagsBox, result.flagged);
-        const flaggedOut = result.flagged.filter((f) => !f.saved).length;
-        if (result.savedProducts === 0 && result.savedBrands === 0 && result.suggestedLists === 0) {
-            report(`Nothing new was saved. ${result.skippedDuplicates} duplicate(s), ${flaggedOut} flagged as not make-up (see below), and ${result.skippedInvalid} incomplete record(s) were skipped.` + ingredientNote, true);
-            if (flaggedOut) notify(`${many(flaggedOut, "record was", "records were")} flagged as skin care or not make-up and not saved.`, "warn");
-            return;
-        }
-        const provider = body.plain ? " Read straight from the file's fields, no AI." + (body.notes.length ? " " + body.notes.slice(0, 3).join(" ") + (body.notes.length > 3 ? ` (and ${body.notes.length - 3} more)` : "") : "")
-            : body.model ? ` Analyzed by ${body.model}.` : "";
-        const skipped = result.skippedDuplicates + result.skippedInvalid;
-        const summary = `Saved ${many(result.savedProducts, "product", "products")} as Pending for review`
-            + (result.savedBrands ? ` and ${many(result.savedBrands, "new brand", "new brands")}` : "")
-            + (result.suggestedLists ? `; ${many(result.suggestedLists, "ingredient list was", "ingredient lists were")} sent to the review queue for products that had none` : "")
-            + (flaggedOut ? `; ${flaggedOut} flagged as skin care or not make-up and NOT saved (see below)` : "")
-            + (skipped ? `; skipped ${skipped} duplicate or incomplete record(s)` : "")
-            + `. ${result.withFdaLink} product(s) included an FDA Philippines source link.${provider}`;
-        report(summary + (body.plain ? "" : (body.notes || []).map((n) => " " + n).join("")) + ingredientNote, false);
-        notify(summary, flaggedOut || ingredientNote ? "warn" : "ok");
-        await loadInventory();
-    } catch (error) {
-        console.error("Importing the inventory file failed: ", error);
-        const reason = error && error.name === "AbortError" ? "The AI took too long." : (error && error.message) || "Something went wrong.";
-        report(`Import failed. ${reason} Nothing was saved unless a Firestore save completed.`, true);
-        notify(`The file was not imported. ${reason}`, "error");
-    } finally {
-        setBusy(choose, false);
-        dropbox.disabled = false;
     }
+    const notes = (failedParts.length ? [`Not read: ${failedParts.join("; ")}. Import the file again later for those parts; what is saved now is then skipped as a duplicate.`] : [])
+        .concat(ingredientRecords > 0 ? [ingredientsNotHere(ingredientRecords)] : []);
+    return { draft: found, notes, model: model || "the AI" };
+}
+
+/** Writes the checked records (NEW entries only, all Pending) in groups; answers what was saved. */
+async function saveInventoryDraft(draft, fileName, say) {
+    const records = Array.isArray(draft.products) ? draft.products : [], brandRecords = Array.isArray(draft.brands) ? draft.brands : [];
+    // no limit on records: saved in groups of IMPORT_GROUP, one database batch each, remembering what earlier groups added
+    const memory = { newBrands: new Map(), plannedProducts: new Set() };
+    const result = { savedProducts: 0, savedBrands: 0, suggestedLists: 0, skippedDuplicates: 0, skippedInvalid: 0, withFdaLink: 0, flagged: [] };
+    const groups = Math.max(Math.ceil(records.length / IMPORT_GROUP), Math.ceil(brandRecords.length / IMPORT_GROUP), 1);
+    for (let g = 0; g < groups; g++) {
+        if (groups > 1) say(`Saving group ${g + 1} of ${groups}...`);
+        const part = await saveImportedProducts(records.slice(g * IMPORT_GROUP, (g + 1) * IMPORT_GROUP), brandRecords.slice(g * IMPORT_GROUP, (g + 1) * IMPORT_GROUP), fileName, memory);
+        ["savedProducts", "savedBrands", "suggestedLists", "skippedDuplicates", "skippedInvalid", "withFdaLink"].forEach((k) => { result[k] += part[k]; });
+        result.flagged.push(...part.flagged);
+    }
+    showImportFlags(el("inventoryImportFlags"), result.flagged);
+    const flaggedOut = result.flagged.filter((f) => !f.saved).length;
+    const skipped = result.skippedDuplicates + result.skippedInvalid;
+    if (result.savedProducts === 0 && result.savedBrands === 0 && result.suggestedLists === 0) {
+        const nothing = `Nothing new was saved: ${result.skippedDuplicates} already listed, ${flaggedOut} not make-up (see below), ${result.skippedInvalid} incomplete.`;
+        notify(nothing, "warn");
+        return nothing;
+    }
+    const summary = `Saved ${many(result.savedProducts, "product", "products")} as Pending for review`
+        + (result.savedBrands ? ` and ${many(result.savedBrands, "new brand", "new brands")}` : "")
+        + (result.suggestedLists ? `; ${many(result.suggestedLists, "ingredient list was", "ingredient lists were")} sent to the review queue for products that had none` : "")
+        + (flaggedOut ? `; ${flaggedOut} not make-up and NOT saved (see below)` : "")
+        + (skipped ? `; skipped ${skipped} already listed or incomplete` : "")
+        + `. ${result.withFdaLink} with an FDA Philippines source link.`;
+    notify(summary, flaggedOut ? "warn" : "ok");
+    await loadInventory();
+    return summary;
 }
 
 /**

@@ -26,7 +26,7 @@ try {
 
     const inv = await openPage(browser, "inv");
     await inv.settle(800);
-    const MIXED = "=== BRAND ===\nNAME: Glow\n=== PRODUCT ===\nBRAND: Glow\nNAME: Tint\nTYPE: Lipstick\n=== INGREDIENT ===\nNAME: Aqua\nDESCRIPTION: Water.";
+    const MIXED = "=== BRAND ===\nBRAND_NAME: Glow\n=== PRODUCT ===\nBRAND_NAME: Glow\nPRODUCT_NAME: Tint\nCOSMETIC_TYPE: Lipstick\n=== INGREDIENT ===\nNAME: Aqua\nDESCRIPTION: Water.";
     await inv.page.setInputFiles("#inventoryFileInput", { name: "mixed.txt", mimeType: "text/plain", buffer: Buffer.from(MIXED) });
     await inv.page.waitForFunction(() => /cannot be extracted here/.test(document.getElementById("inventoryImportStatus").textContent), null, { timeout: 8000 }).catch(() => {});
     const text = await inv.page.textContent("#inventoryImportStatus");
