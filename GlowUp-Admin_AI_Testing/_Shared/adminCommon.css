@@ -1697,9 +1697,7 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 .style-dialog .colour-row .row-btn { padding: 2px 8px; }
 .undo-row { display: flex; gap: 8px; flex-wrap: nowrap; }
 .undo-row .btn { flex: 1 1 0; min-width: 0; padding-inline: 8px; white-space: nowrap; justify-content: center; }
-.style-dialog .inline-actions, .style-overlay .inline-actions { display: flex; align-items: center; gap: 8px; }
-.inline-actions > select { flex: 1 1 0; min-width: 0; }
-#sdPlay { flex: 0 0 auto; }
+.sd-play { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin: 4px 0 12px; }
 @media (prefers-reduced-motion: reduce) { .panel[data-edge="always"]::before { animation: none; } }
 /* the "Style and text" form sits at the side (at the bottom on a phone), so the panel it changes stays in view */
 .modal-overlay.style-overlay { justify-content: flex-end; align-items: stretch; padding: 0; background: color-mix(in srgb, #000 10%, transparent); }

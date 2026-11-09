@@ -177,7 +177,7 @@ async function saveCheckpoint() {
     if (!name) return;
     list.unshift({ id: "c" + Date.now().toString(36), name: cleanName(name, 40), at: Date.now(), store: JSON.parse(JSON.stringify(store)) });
     if (list.length > CHECKPOINTS_MOST) toast(`Only the newest ${CHECKPOINTS_MOST} checkpoints are kept: the oldest one goes.`, "info");
-    if (keepCheckpoints(list)) toast(`Checkpoint "${cleanName(name, 40)}" saved. Layout & Style > Checkpoints brings it back.`, "ok");
+    if (keepCheckpoints(list)) toast(`Checkpoint "${cleanName(name, 40)}" saved. Layout & Style > Saves brings it back.`, "ok");
 }
 function openCheckpointMenu(anchor) {
     const list = checkpoints();
@@ -1034,9 +1034,10 @@ async function openStyleDialog(id) {
                 <div class="form-section">
                     <span class="form-section-title">Motion</span>
                     <div class="form-row">
-                        <div class="field"><label for="sdAnim">When the page opens</label><div class="inline-actions"><select id="sdAnim">${opt(ANIMATIONS, style.anim)}</select><button type="button" class="icon-btn small" id="sdPlay" aria-label="Play the animation">${icon("play")}</button></div></div>
+                        <div class="field"><label for="sdAnim">When the page opens</label><select id="sdAnim">${opt(ANIMATIONS, style.anim)}</select></div>
                         <div class="field"><label for="sdTrans">Transition of things inside</label><select id="sdTrans">${opt(TRANSITIONS, style.trans)}</select></div>
                     </div>
+                    <button type="button" class="btn sd-play" id="sdPlay" aria-label="Play the animation">${icon("play")}Play the animation</button>
                     <div class="field"><label for="sdEdge">Edge light</label><select id="sdEdge">${opt(EDGES, style.edge)}</select></div>
                     <span class="field-hint" id="sdMotionHint"></span>
                 </div>
@@ -1465,9 +1466,9 @@ function buildDrawer() {
             <div class="undo-row">
                 <button type="button" class="btn" id="undoLayoutBtn" disabled>${icon("undo")}Undo</button>
                 <button type="button" class="btn" id="redoLayoutBtn" disabled>${icon("redo")}Redo</button>
-                <button type="button" class="btn" id="checkpointBtn" aria-haspopup="menu">${icon("save")}Checkpoints</button>
+                <button type="button" class="btn" id="checkpointBtn" aria-haspopup="menu">${icon("save")}Saves</button>
             </div>
-            <p class="drawer-note">Undo and Redo (also Ctrl+Z and Ctrl+Y) take back any change of a layout. A <b>checkpoint</b> keeps every layout as it is now, to come back to later.</p>
+            <p class="drawer-note">Undo and Redo (also Ctrl+Z and Ctrl+Y) take back any change of a layout. <b>Saves</b> keeps every layout as it is now (a checkpoint), to come back to later.</p>
             <p class="drawer-note">Every panel has an <b>arrow</b> at its top right that folds it to its title, and a <b>...</b> menu: show it as a list, grid or graph, combine it with another panel, or hide it. A panel with nothing to show folds by itself.</p>
         </div>
 
