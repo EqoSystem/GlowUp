@@ -496,17 +496,21 @@ function showNameClash() {
         const exact = sameKey(other.name) === sameKey(name);
         const row = document.createElement("div");
         row.className = "name-clash-row";
-        row.append(`Already in the library: "${titleOf(other)}"${exact ? "." : " (it uses this name as Also known as)."} `);
+        const words = document.createElement("span");
+        words.textContent = `Already in the library: "${titleOf(other)}"${exact ? "." : " (it uses this name as Also known as)."}`;
+        const actions = document.createElement("span");
+        actions.className = "name-clash-actions";
         const open = document.createElement("button");
         open.type = "button"; open.className = "btn"; open.textContent = "Open it";
         open.addEventListener("click", () => { modal.close(); openIngredientForm(other); });
-        row.append(open);
+        actions.append(open);
         if (!exact) {
             const different = document.createElement("button");
             different.type = "button"; different.className = "btn"; different.textContent = "It is a different ingredient";
             different.addEventListener("click", () => { differentIds.add(other.id); showNameClash(); });
-            row.append(" ", different);
+            actions.append(different);
         }
+        row.append(words, actions);
         box.append(row);
     });
 }

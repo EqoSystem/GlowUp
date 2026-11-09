@@ -627,6 +627,21 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .field-hint.warn { color: var(--warn); }
 .form-section { border-top: 1px solid var(--border); padding-top: 14px; display: flex; flex-direction: column; gap: 14px; }
 .form-section-title { font-size: var(--fs-sm); font-weight: 650; color: var(--accent-text); text-transform: uppercase; letter-spacing: .5px; }
+/* two boxes side by side start on the same line, read left to right; one column on a narrow window */
+.form-row { align-items: start; }
+.form-row > .field > label, .form-row > .field > .field-label { min-height: 24px; }
+@media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
+.inline-actions { display: flex; align-items: center; gap: 8px; }
+.inline-actions > input, .inline-actions > select { flex: 1 1 0; min-width: 0; }
+.inline-actions > .btn { flex: none; white-space: nowrap; }
+.merge-tool { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
+/* "Already in the library": a note across the form with its two buttons at the right of the words */
+.name-clash { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); font-size: var(--fs-sm); color: var(--text-2); }
+.name-clash[hidden] { display: none; }
+.name-clash-row { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; justify-content: space-between; }
+.name-clash-row > span { flex: 1 1 260px; min-width: 0; }
+.name-clash-row .btn { flex: none; }
+.name-clash-actions { display: inline-flex; gap: 8px; flex-wrap: wrap; }
 .checks { display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); cursor: pointer; }
 .check input { accent-color: var(--accent); width: 15px; height: 15px; }
