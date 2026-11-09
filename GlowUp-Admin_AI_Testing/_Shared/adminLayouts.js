@@ -1034,7 +1034,7 @@ async function openStyleDialog(id) {
                 <div class="form-section">
                     <span class="form-section-title">Motion</span>
                     <div class="form-row">
-                        <div class="field"><label for="sdAnim">When the page opens</label><div class="inline-actions"><select id="sdAnim">${opt(ANIMATIONS, style.anim)}</select><button type="button" class="btn" id="sdPlay">${icon("sparkle")}Play</button></div></div>
+                        <div class="field"><label for="sdAnim">When the page opens</label><div class="inline-actions"><select id="sdAnim">${opt(ANIMATIONS, style.anim)}</select><button type="button" class="icon-btn small" id="sdPlay" aria-label="Play the animation">${icon("play")}</button></div></div>
                         <div class="field"><label for="sdTrans">Transition of things inside</label><select id="sdTrans">${opt(TRANSITIONS, style.trans)}</select></div>
                     </div>
                     <div class="field"><label for="sdEdge">Edge light</label><select id="sdEdge">${opt(EDGES, style.edge)}</select></div>
