@@ -262,11 +262,13 @@ document.addEventListener("DOMContentLoaded", async () => {
         paintLayout();
     });
     paintLayout();
-    // a narrow list (a snapped or small window, Quick settings open) draws products as cards by itself, so the table never
-    // needs a sideways scroll; it goes back to the chosen look when there is room again (two limits, so it cannot flicker)
+    // a narrow list (a snapped or small window) draws products as cards by itself, so the table never needs a sideways scroll;
+    // it goes back to the chosen look when there is room again (two limits, so it cannot flicker).
+    // Opening Quick settings beside the page only makes the list narrower: the look stays as it was (9 November 2026).
     if (window.ResizeObserver) new ResizeObserver(() => {
         const width = el("inventoryHost").clientWidth;
         if (width === 0) return;
+        if (document.documentElement.classList.contains("qs-open") && window.innerWidth >= 1024) return;
         const narrow = width < NARROW_LIST_PX ? true : width > NARROW_LIST_PX + 40 ? false : listIsNarrow;
         if (narrow !== listIsNarrow) { listIsNarrow = narrow; paintLayout(); }
     }).observe(el("inventoryHost"));
@@ -1611,7 +1613,7 @@ function renderList(now) {
     const folder = now.kind === "folder" ? now.name : "";
     const flat = view.mode === "all";
     const columns = flat ? 7 : 6;
-    el("inventoryTableHead").innerHTML = `<tr><th><span class="th-line">${pickAllBox("product")}Product</span></th>${flat ? "<th>Brand</th>" : ""}<th>Type</th><th>Shades</th><th class="text-right" data-tip="Scans the app recognised as this product.">Scans</th><th><span class="th-line">Status${statusGuide()}</span></th><th></th></tr>`;
+    el("inventoryTableHead").innerHTML = `<tr><th><span class="th-line">${pickAllBox("product")}Product</span></th>${flat ? "<th>Brand</th>" : ""}<th>Type</th><th class="shade-col">Shades</th><th class="text-right scan-col" data-tip="Scans the app recognised as this product.">Scans</th><th><span class="th-line">Status${statusGuide()}</span></th><th></th></tr>`;
 
     if (everyBrand.length === 0 && everyProduct.length === 0) {
         shownGroups = [];
@@ -1720,7 +1722,7 @@ function renderDrill({ base, productMatches, brandMatches, term, typed }) {
         const brand = brands.find((b) => b.id === drill.id);
         if (!brand) { openDrill({ kind: "brands" }); return; }
         const whole = productsOf(brand.id).length;
-        head.innerHTML = `<tr><th><span class="th-line"><button type="button" class="pick" data-pick-all role="checkbox" aria-checked="false" aria-label="Select all ${whole} products in this brand" data-tip="Select all ${whole} products of this brand, also those on other pages."></button>Product <small class="muted">select all in brand: ${whole}</small></span></th><th>Type</th><th>Shades</th><th class="text-right">Scans</th><th>Status</th><th></th></tr>`;
+        head.innerHTML = `<tr><th><span class="th-line"><button type="button" class="pick" data-pick-all role="checkbox" aria-checked="false" aria-label="Select all ${whole} products in this brand" data-tip="Select all ${whole} products of this brand, also those on other pages."></button>Product <small class="muted">select all in brand: ${whole}</small></span></th><th>Type</th><th class="shade-col">Shades</th><th class="text-right scan-col">Scans</th><th>Status</th><th></th></tr>`;
         const list = productsOf(brand.id).filter((p) => base(p) && (!term || productMatches(p)));
         const page = brandPageOf(list, brandPage.page, brandPage.size);
         brandPage.page = page.page;
@@ -1731,7 +1733,7 @@ function renderDrill({ base, productMatches, brandMatches, term, typed }) {
         body.innerHTML = heading + (rows.join("") || `<tr class="note-row"><td colspan="6" class="table-message">${term ? `Nothing in this brand matches "${escapeHtml(typed)}".` : "This brand has no products to show here."}</td></tr>`);
         return;
     }
-    head.innerHTML = `<tr><th><span class="th-line">${pickAllBox("product")}Product</span></th><th>Brand</th><th>Type</th><th>Shades</th><th class="text-right">Scans</th><th>Status</th><th></th></tr>`;
+    head.innerHTML = `<tr><th><span class="th-line">${pickAllBox("product")}Product</span></th><th>Brand</th><th>Type</th><th class="shade-col">Shades</th><th class="text-right scan-col">Scans</th><th>Status</th><th></th></tr>`;
     const groups = groupByType(products.filter((p) => base(p) && (!term || productMatches(p))));
     const total = groups.reduce((sum, group) => sum + group.rows.length, 0);
     el("inventoryCountLine").textContent = many(total, "product", "products");

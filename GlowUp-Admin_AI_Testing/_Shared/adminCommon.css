@@ -1774,6 +1774,14 @@ body:has(> .modal-overlay[style*="flex"]) .toast-host { bottom: 96px; }
     .panel-head .pager .page-now { min-width: 0; padding-inline: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .panel-head .sort-now { display: none; }
 }
+/* a narrower list (Quick settings open, a half-width panel): Sort, Filters and New folder show only their icons, so the title bar
+   still keeps ONE line; the words stay for screen readers (9 November 2026) */
+@container panel (max-width: 900px) {
+    .panel-head .table-tools .btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .panel-head .table-tools .btn { padding-inline: 9px; gap: 0; }
+    .panel-head .folder-chip.add .chip-name { display: none; }
+    .panel-head .folder-chip.add { padding-inline: 8px; }
+}
 
 /* ============================================================== 10. Keyboard shortcuts (shortcuts.js, shortcutsPanel.js; 9 November 2026)
    Key chips, the list in Quick settings, the Add / Edit dialog, the "?" help and the command palette. Only the site's tokens. */
