@@ -432,6 +432,20 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ---- shared default layouts of the admin website: ONE document per page, siteLayouts/{page} ----
+    // ADDED on 9 November 2026 (Layout & Style > "Make this the default for everyone"). Admins only. The website cleans what it
+    // reads (componentStyle.js / adminLayouts.js), so the rule checks the shape and the size only.
+    match /siteLayouts/{pageKey} {
+      allow read, delete: if isAdmin();
+      allow create, update: if isAdmin()
+        && pageKey in ['dashboard', 'inventory', 'curator', 'bin', 'archive']
+        && request.resource.data.keys().hasOnly(['layout', 'appearance', 'updatedAt', 'updatedBy'])
+        && request.resource.data.layout is map
+        && request.resource.data.appearance is map
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+    }
+
     // ---- the Archive: entries that left the Recycle bin, kept 30 days, then deleted by the server job ----
     // Admins only. An entry is created once (id "<collection>__<id>"), never changed; the job deletes it after expires_at.
     // ADDED on 29 October 2026 (ARCHIVE_DESIGN.md), published on 5 November 2026.

@@ -1627,3 +1627,73 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 .combo-item.is-add { color: var(--accent); font-weight: 600; }
 .combo-sep { height: 1px; margin: 4px 6px; background: var(--border); }
 .combo-none { padding: 10px; color: var(--muted); font-size: var(--fs-sm); }
+
+/* ============================================================== 8. "Style and text" of one panel (componentStyle.js, 9 November 2026)
+   Set by an admin per panel. Everything here keeps the board's grid: no panel is turned or moved out of its place. */
+.panel[data-panel-bg] { background: var(--panel-bg); }
+.panel[data-card-bg] > .panel-inner { --surface: var(--card-bg); --surface-2: var(--card-bg); }
+.panel[data-pscale] {
+    --fs-xs: max(12px, calc(12px * var(--scale) * var(--pscale)));
+    --fs-sm: max(12px, calc(var(--t-sm) * var(--scale) * var(--pscale)));
+    --fs-base: max(12px, calc(var(--t-base) * var(--scale) * var(--pscale)));
+    --fs-md: max(12px, calc(var(--t-md) * var(--scale) * var(--pscale)));
+    --fs-kpi: calc(clamp(24px, 1.6vw + 14px, 30px) * var(--scale) * var(--pscale));
+}
+.panel-subtitle-text { margin: -6px 0 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.4; overflow-wrap: anywhere; }
+.panel-note { margin: 0; padding: 8px 12px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--accent) 7%, transparent);
+    border-left: 3px solid color-mix(in srgb, var(--accent) 55%, transparent); font-size: var(--fs-sm); color: var(--text-2); line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
+/* entrance: once, when the page opens */
+.board:not(.settled) > .panel[data-anim="none"] { animation: none; }
+.board:not(.settled) > .panel[data-anim="fade"] { animation-name: p-fade; }
+.board:not(.settled) > .panel[data-anim="zoom"] { animation-name: p-zoom; }
+.board:not(.settled) > .panel[data-anim="pop"] { animation-name: p-pop; animation-duration: .45s; }
+.board:not(.settled) > .panel[data-anim="left"] { animation-name: p-left; }
+.board:not(.settled) > .panel[data-anim="right"] { animation-name: p-right; }
+.board:not(.settled) > .panel[data-anim="drop"] { animation-name: p-drop; }
+.board:not(.settled) > .panel[data-anim="flip"] { animation-name: p-flip; }
+.board:not(.settled) > .panel[data-anim="blur"] { animation-name: p-blur; }
+@keyframes p-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes p-zoom { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
+@keyframes p-pop { 0% { opacity: 0; transform: scale(.9); } 70% { opacity: 1; transform: scale(1.03); } 100% { opacity: 1; transform: none; } }
+@keyframes p-left { from { opacity: 0; transform: translateX(-26px); } to { opacity: 1; transform: none; } }
+@keyframes p-right { from { opacity: 0; transform: translateX(26px); } to { opacity: 1; transform: none; } }
+@keyframes p-drop { from { opacity: 0; transform: translateY(-18px); } to { opacity: 1; transform: none; } }
+@keyframes p-flip { from { opacity: 0; transform: perspective(900px) rotateX(-14deg); } to { opacity: 1; transform: none; } }
+@keyframes p-blur { from { opacity: 0; filter: blur(6px); } to { opacity: 1; filter: none; } }
+/* the edge light: under the pointer (default), always and moving, or off */
+.panel[data-edge="off"]::before { display: none; }
+.panel[data-edge="always"]::before { opacity: .85; background: conic-gradient(from var(--spin), transparent 0 68%, var(--gold) 84%, var(--accent) 93%, transparent 100%); animation: edge-light 5s linear infinite; }
+/* how quickly things inside answer hover and press */
+.panel[data-trans] :is(button, a, .fx, .kpi, .stat, .w-tile, .w-card, .w-item, .rank-item, .activity-item, .bar-row, .bar-fill, .row-btn, .chip) { transition-timing-function: var(--p-ease, var(--ease)); }
+.panel[data-trans="quick"] :is(button, a, .fx, .kpi, .stat, .w-tile, .w-card, .w-item, .rank-item, .activity-item, .bar-row, .bar-fill, .row-btn, .chip) { transition-duration: .08s !important; }
+.panel[data-trans="slow"] :is(button, a, .fx, .kpi, .stat, .w-tile, .w-card, .w-item, .rank-item, .activity-item, .bar-row, .bar-fill, .row-btn, .chip) { transition-duration: .5s !important; }
+.panel[data-trans="springy"] { --p-ease: cubic-bezier(.34, 1.56, .64, 1); }
+.panel[data-trans="none"] :is(button, a, .fx, .kpi, .stat, .w-tile, .w-card, .w-item, .rank-item, .activity-item, .bar-row, .bar-fill, .row-btn, .chip) { transition: none !important; }
+/* orientation of the cards inside (never a turned panel: that would cover its neighbours) */
+.panel[data-orient="row"] :is(.kpi-row, .stat-row) { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.panel[data-orient="row"] :is(.kpi-row, .stat-row) > :last-child:nth-child(odd) { grid-column: auto; }
+.panel[data-orient="column"] :is(.kpi-row, .stat-row) { grid-template-columns: minmax(0, 1fr); grid-auto-flow: row; }
+.panel[data-orient="column"] :is(.kpi-row, .stat-row) > :last-child:nth-child(odd) { grid-column: auto; }
+@container panel (max-width: 520px) {
+    .panel[data-orient="row"] :is(.kpi-row, .stat-row) { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+/* the "Style and text" form */
+.style-dialog .form-section + .form-section { margin-top: 4px; }
+.style-dialog .contrast-note { min-height: 1.4em; }
+.style-dialog .contrast-note.warn { color: var(--warn); }
+.style-dialog input[type=color] { width: 44px; height: 30px; padding: 2px; border: 1px solid var(--border); border-radius: 8px; background: none; cursor: pointer; }
+.style-dialog .colour-row { display: flex; flex-wrap: wrap; gap: 10px 16px; }
+.style-dialog .colour-row label { display: inline-flex; align-items: center; gap: 8px; font-size: var(--fs-sm); }
+.style-dialog .colour-row .row-btn { padding: 2px 8px; }
+.undo-row { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (prefers-reduced-motion: reduce) { .panel[data-edge="always"]::before { animation: none; } }
+/* the "Style and text" form sits at the side (at the bottom on a phone), so the panel it changes stays in view */
+.modal-overlay.style-overlay { justify-content: flex-end; align-items: stretch; padding: 0; background: color-mix(in srgb, #000 10%, transparent); }
+.style-overlay .style-dialog { width: min(460px, 100%); height: 100%; max-height: none; border-radius: 0; border-width: 0 0 0 1px; animation: slide-in .22s var(--ease); }
+.style-dialog .modal-actions { position: sticky; bottom: -24px; z-index: 2; margin: 16px -24px -24px; padding: 12px 24px; background: var(--surface); border-top: 1px solid var(--border); flex-wrap: wrap; }
+.style-dialog .modal-actions .spacer { flex: 1; }
+.panel.style-target { outline: 2px solid var(--gold); outline-offset: 3px; }
+@media (max-width: 767px) {
+    .modal-overlay.style-overlay { align-items: flex-end; }
+    .style-overlay .style-dialog { width: 100%; height: 62vh; border-radius: var(--radius) var(--radius) 0 0; border-width: 1px 0 0; }
+}

@@ -23,6 +23,8 @@ import { datasetList, datasetSpec, measuresOf, mountWidget, unmountWidget, norma
 import { hasAssist, assistHidden, setAssistHidden, anyAssistHidden, showAllAssists } from "./adminAssist.js";
 import { rowsFor, ROW_UNIT } from "./layoutRules.js";
 import { setFoldPage, foldButton, FOLD_PARTS, paintFold, toggleFold, foldedNow, anyFoldChoice, forgetFoldChoices } from "./adminFold.js";
+import { ANIMATIONS, ANIMATION_FRAMES, TRANSITIONS, EDGES, ORIENTS, NOTE_PLACES, LIMITS, cleanStyle, cleanTexts, cleanPanelMap, contrast, applyPanelStyle, applyPanelTexts, ownTexts } from "./componentStyle.js";
+import { SHARED_PAGES, cachedShared, readShared, writeShared, clearShared } from "./sharedLayouts.js";
 
 const LAYOUT_KEY = "glowup.layouts.v1";
 // Version of the DEFAULT panel positions. A saved page older than this loses its saved order and sizes (names, fonts,
@@ -38,6 +40,7 @@ const FONTS = [
     { id: "verdana", label: "Verdana (wide)", stack: "Verdana, Geneva, sans-serif" },
     { id: "mono", label: "Consolas (fixed width)", stack: 'Consolas, "Courier New", monospace' }
 ];
+const FONT_IDS = () => FONTS.map((f) => f.id);
 const GROUP_MODES = [
     { id: "tabs", label: "Tabs", icon: "tabs", hint: "One at a time; a tab for each." },
     { id: "stack", label: "Stacked", icon: "list", hint: "All of them, one under the other." },
@@ -75,7 +78,10 @@ function cleanPage(raw) {
         widgets: (Array.isArray(page.widgets) ? page.widgets : []).slice(0, MAX_ADDED).filter((w) => w && ID.test(String(w.id)))
             .map((w) => Object.assign({ id: String(w.id), title: cleanName(w.title, 40) }, cleanView(w))),
         groups: (Array.isArray(page.groups) ? page.groups : []).slice(0, MAX_ADDED).filter((g) => g && ID.test(String(g.id)))
-            .map((g) => ({ id: String(g.id), title: cleanName(g.title, 40), mode: GROUP_MODES.some((m) => m.id === g.mode) ? g.mode : "tabs", members: idList(g.members, 8), active: Math.max(0, Math.min(7, Number(g.active) || 0)) }))
+            .map((g) => ({ id: String(g.id), title: cleanName(g.title, 40), mode: GROUP_MODES.some((m) => m.id === g.mode) ? g.mode : "tabs", members: idList(g.members, 8), active: Math.max(0, Math.min(7, Number(g.active) || 0)) })),
+        // "Style and text" of single panels (componentStyle.js)
+        styles: cleanPanelMap(page.styles, (raw) => cleanStyle(raw, FONT_IDS())),
+        texts: cleanPanelMap(page.texts, cleanTexts)
     };
 }
 function cleanProfile(raw, id) {
@@ -92,21 +98,124 @@ function cleanProfile(raw, id) {
     return profile;
 }
 
+/** A whole store (saved, from a checkpoint or from Undo) with only known settings. */
+function cleanStore(saved) {
+    const clean = { active: "default", profiles: [] };
+    if (saved && Array.isArray(saved.profiles))
+        Object.assign(clean, { active: String(saved.active || "default"), profiles: saved.profiles.slice(0, MAX_PROFILES).filter((p) => p && ID.test(String(p.id))).map((p) => cleanProfile(p, String(p.id))) });
+    if (!clean.profiles.some((p) => p.id === clean.active)) clean.active = "default";
+    return clean;
+}
 function loadStore() {
-    try {
-        const saved = JSON.parse(localStorage.getItem(LAYOUT_KEY) || "null");
-        if (saved && Array.isArray(saved.profiles))
-            store = { active: String(saved.active || "default"), profiles: saved.profiles.slice(0, MAX_PROFILES).filter((p) => p && ID.test(String(p.id))).map((p) => cleanProfile(p, String(p.id))) };
-    } catch (error) { console.warn("Saved layouts could not be read: ", error); }
-    if (!store.profiles.some((p) => p.id === store.active)) store.active = "default";
+    try { store = cleanStore(JSON.parse(localStorage.getItem(LAYOUT_KEY) || "null")); } catch (error) { console.warn("Saved layouts could not be read: ", error); }
     let moved = false;
     store.profiles.forEach((profile) => Object.keys(profile.pages).forEach((key) => {
         const saved = profile.pages[key];
         if (saved.ver < POSITIONS_VERSION) { saved.order = []; saved.size = {}; saved.ver = POSITIONS_VERSION; moved = true; }
     }));
     if (moved) saveStore();
+    lastSaved = JSON.stringify(store);
 }
-function saveStore() { try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(store)); } catch (error) { console.warn("The layout could not be saved: ", error); } }
+
+// ---------------------------------------------------------------------------------------------
+// Undo, Redo and checkpoints (9 November 2026): every change of a layout can be taken back
+// ---------------------------------------------------------------------------------------------
+// Each save remembers the layouts as they were before it. Changes that follow each other within UNDO_MERGE_MS (a slider
+// being dragged, a panel being resized) are ONE step. Undo is kept for this visit of the page; checkpoints are kept in this browser.
+const UNDO_MOST = 50, UNDO_MERGE_MS = 700;
+const CHECKPOINT_KEY = "glowup.layouts.checkpoints.v1", CHECKPOINTS_MOST = 10;
+const undoStack = [], redoStack = [];
+let lastSaved = null, lastStep = 0;
+function saveStore() {
+    const now = JSON.stringify(store);
+    if (lastSaved !== null && now !== lastSaved) {
+        if (undoStack.length === 0 || Date.now() - lastStep > UNDO_MERGE_MS) { undoStack.push(lastSaved); if (undoStack.length > UNDO_MOST) undoStack.shift(); }
+        lastStep = Date.now();
+        redoStack.length = 0;
+    }
+    lastSaved = now;
+    try { localStorage.setItem(LAYOUT_KEY, now); } catch (error) { console.warn("The layout could not be saved: ", error); }
+    paintUndo();
+}
+/** Puts `json` (a whole store) on the page as the layouts now. */
+function restoreStore(json, message) {
+    if (editing) { editing = false; document.body.classList.remove("layout-editing"); }
+    store = cleanStore(JSON.parse(json));
+    lastSaved = JSON.stringify(store);
+    lastStep = 0;
+    try { localStorage.setItem(LAYOUT_KEY, lastSaved); } catch (error) { /* full or blocked */ }
+    applyLayout();
+    paintUndo();
+    if (message) toast(message, "ok");
+}
+export function undoLayout() {
+    if (undoStack.length === 0) { toast("Nothing to undo.", "info"); return; }
+    redoStack.push(JSON.stringify(store));
+    restoreStore(undoStack.pop(), "Undone. Redo puts it back.");
+}
+export function redoLayout() {
+    if (redoStack.length === 0) { toast("Nothing to redo.", "info"); return; }
+    undoStack.push(JSON.stringify(store));
+    restoreStore(redoStack.pop(), "Done again.");
+}
+function paintUndo() {
+    const undo = byId("undoLayoutBtn"), redo = byId("redoLayoutBtn");
+    if (undo) undo.disabled = undoStack.length === 0;
+    if (redo) redo.disabled = redoStack.length === 0;
+}
+function checkpoints() {
+    try { const list = JSON.parse(localStorage.getItem(CHECKPOINT_KEY) || "[]"); return Array.isArray(list) ? list.filter((c) => c && c.id && c.store).slice(0, CHECKPOINTS_MOST) : []; } catch (error) { return []; }
+}
+function keepCheckpoints(list) {
+    try { localStorage.setItem(CHECKPOINT_KEY, JSON.stringify(list.slice(0, CHECKPOINTS_MOST))); return true; }
+    catch (error) { toast("The checkpoint could not be kept: this browser's storage is full.", "error"); return false; }
+}
+async function saveCheckpoint() {
+    const list = checkpoints();
+    const stamp = new Date().toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    const name = await askText({ title: "Save a checkpoint", label: "Name (what the layouts look like now)", value: "Before changes, " + stamp, maxLength: 40, confirmLabel: "Save checkpoint" });
+    if (!name) return;
+    list.unshift({ id: "c" + Date.now().toString(36), name: cleanName(name, 40), at: Date.now(), store: JSON.parse(JSON.stringify(store)) });
+    if (list.length > CHECKPOINTS_MOST) toast(`Only the newest ${CHECKPOINTS_MOST} checkpoints are kept: the oldest one goes.`, "info");
+    if (keepCheckpoints(list)) toast(`Checkpoint "${cleanName(name, 40)}" saved. Layout & Style > Checkpoints brings it back.`, "ok");
+}
+function openCheckpointMenu(anchor) {
+    const list = checkpoints();
+    const items = [{ label: "Save a checkpoint now", icon: "save", description: "Keeps every layout as it is now, in this browser.", run: saveCheckpoint }];
+    if (list.length) items.push({ heading: "Go back to" });
+    list.forEach((c) => items.push({
+        label: c.name, icon: "reset", description: new Date(c.at).toLocaleString(),
+        run: async () => {
+            if (!(await askConfirm({ title: `Go back to "${c.name}"?`, message: "Every layout becomes what it was then. Undo brings back what you have now.", confirmLabel: "Go back" }))) return;
+            undoStack.push(JSON.stringify(store)); redoStack.length = 0;
+            restoreStore(JSON.stringify(c.store), `Back to "${c.name}".`);
+        }
+    }));
+    if (list.length) items.push({ separator: true }, {
+        label: "Delete all checkpoints", icon: "trash", danger: true, run: async () => {
+            if (await askConfirm({ title: "Delete every checkpoint?", message: "The layouts themselves stay as they are.", confirmLabel: "Delete checkpoints", danger: true })) { keepCheckpoints([]); toast("Checkpoints deleted.", "ok"); }
+        }
+    });
+    openMenu(anchor, items);
+}
+// Ctrl+Z / Ctrl+Y (Ctrl+Shift+Z): not while typing and not while a form is open (the form has its own Cancel)
+document.addEventListener("keydown", (event) => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey || !board() || !defaults) return;
+    const key = String(event.key || "").toLowerCase();
+    if (key !== "z" && key !== "y") return;
+    const target = event.target;
+    if ((target && target.closest && target.closest("input, textarea, select, [contenteditable]")) || document.querySelector(".modal-overlay[style*='flex']")) return;
+    event.preventDefault();
+    if (key === "y" || event.shiftKey) redoLayout(); else undoLayout();
+});
+
+// ---------------------------------------------------------------------------------------------
+// The shared default (sharedLayouts.js): what "Default layout" shows for every admin
+// ---------------------------------------------------------------------------------------------
+let shared = null;                                // { appearance, page } of this page, cleaned; null = the page's built-in arrangement
+function setShared(data) {
+    shared = data ? { appearance: cleanProfile({ appearance: data.appearance }, "shared").appearance, page: cleanPage(Object.assign({}, data.layout, { ver: POSITIONS_VERSION })) } : null;
+}
 
 const activeProfile = () => store.profiles.find((p) => p.id === store.active) || null;
 const board = () => document.querySelector(".board");
@@ -115,10 +224,10 @@ const panelOf = (id) => document.querySelector(`.board .panel[data-panel="${CSS.
 const labelOf = (id) => { const panel = panelOf(id); return panel ? panel.dataset.label || id : id; };
 const byId = (id) => document.getElementById(id);
 
-/** This page's part of the active layout (made when `create` is on). Null on the default layout. */
+/** This page's part of the active layout (made when `create` is on). On the default layout: the shared default's page, or null. */
 function pageData(create) {
     const profile = activeProfile();
-    if (!profile) return null;
+    if (!profile) return create ? null : (shared ? shared.page : null);
     profile.pages = profile.pages || {};
     if (!profile.pages[pageId]) { if (!create) return null; profile.pages[pageId] = cleanPage({ ver: POSITIONS_VERSION }); }
     return profile.pages[pageId];
@@ -134,8 +243,9 @@ async function newProfile() {
     if (store.profiles.length >= MAX_PROFILES) { toast(`${MAX_PROFILES} layouts are saved already. Delete one to make room.`, "error"); return false; }
     const name = await askText({ title: "Your own layout", label: "Your name (the layout is saved under it)", placeholder: "For example Maria", confirmLabel: "Create" });
     if (!name) return false;
-    const from = activeProfile();
-    const profile = cleanProfile({ name, appearance: from ? from.appearance : {}, pages: from ? from.pages : {} }, "p" + Date.now().toString(36));
+    // a copy of what is on screen: the active layout, or the shared default of this page
+    const from = activeProfile() || (shared ? { appearance: shared.appearance, pages: { [pageId]: shared.page } } : null);
+    const profile = cleanProfile(JSON.parse(JSON.stringify({ name, appearance: from ? from.appearance : {}, pages: from ? from.pages : {} })), "p" + Date.now().toString(36));
     store.profiles.push(profile);
     store.active = profile.id;
     saveStore();
@@ -159,8 +269,15 @@ export function initLayouts(page) {
         decorate(panel);
     });
     loadStore();
+    const kept = cachedShared(pageId);
+    setShared(kept.data);
     buildDrawer();
     applyLayout();
+    if (!kept.fresh) readShared(pageId).then((data) => {
+        const before = JSON.stringify(shared);
+        setShared(data);
+        if (JSON.stringify(shared) !== before && !activeProfile()) applyLayout(); else paintDrawer();
+    }).catch((error) => console.warn("The shared default layout could not be read: ", error));
     byId("addPanelBtn").addEventListener("click", () => openPanelDialog(null));
     byId("doneArrangingBtn").addEventListener("click", () => setEditing(false));
     wireBoard();
@@ -461,7 +578,7 @@ function labelSize(panel) {
 export function applyAppearance() {
     const root = document.documentElement, style = root.style;
     const profile = activeProfile();
-    const look = profile && profile.appearance ? profile.appearance : {};
+    const look = profile && profile.appearance ? profile.appearance : !profile && shared ? shared.appearance : {};
     const font = FONTS.find((f) => f.id === (look.font || "")) || FONTS[0];
     if (font.web && !document.getElementById("font-" + font.id)) {
         const link = document.createElement("link");
@@ -479,6 +596,39 @@ export function applyAppearance() {
     set("--accent", colours.accent); set("--accent-text", colours.accent);
     set("--surface", colours.panel);
     set("--bg", colours.bg);
+    paintPanelStyles();
+}
+
+/** The font list of a font id, loading a web font the first time it is used ("" for none). */
+function fontStackOf(id) {
+    const font = FONTS.find((f) => f.id === (id || ""));
+    if (!font || !font.id) return "";
+    if (font.web && !document.getElementById("font-" + font.id)) {
+        const link = document.createElement("link");
+        link.id = "font-" + font.id; link.rel = "stylesheet"; link.href = "https://fonts.googleapis.com/css2?family=" + font.web + "&display=swap";
+        document.head.appendChild(link);
+    }
+    return font.stack;
+}
+
+/** "Style and text" of every panel on the page (again after a change of light / dark mode: colours are kept per mode). */
+function paintPanelStyles() {
+    const b = board();
+    if (!b || !defaults) return;
+    const page = pageData(false), theme = currentTheme();
+    b.querySelectorAll(".panel[data-panel]").forEach((panel) => {
+        const id = panel.dataset.panel;
+        const style = (page && page.styles && page.styles[id]) || {};
+        applyPanelStyle(panel, style, theme, fontStackOf(style.font));
+        let texts = (page && page.texts && page.texts[id]) || {};
+        // an added or combined panel has its own name (Rename): its title is not one of the fixed texts
+        if (panel.dataset.custom || panel.classList.contains("group")) {
+            const heading = panel.querySelector(":scope > .panel-inner > .panel-head .panel-title");
+            if (heading) heading.dataset.ownText = heading.textContent = panel.dataset.label || heading.textContent;
+            texts = Object.assign({}, texts, { title: "" });
+        }
+        applyPanelTexts(panel, texts);
+    });
 }
 
 /** Writes where the panels are and how big they are into the active layout. */
@@ -569,6 +719,7 @@ async function removePanel(id) {
 }
 
 async function renamePanel(id) {
+    if (!(await ensureProfile())) return;
     const page = pageData(false);
     const target = widgetOf(page, id) || groupOf(page, id);
     if (!target) return;
@@ -655,6 +806,7 @@ function openPanelMenu(panel, anchor) {
         }
     }
     items.push({ separator: true });
+    items.push({ label: "Style and text...", icon: "palette", description: "Size, cards, text, font, colours and motion of this panel.", run: () => openStyleDialog(id) });
     if (isCustom || isGroup) items.push({ label: "Rename", icon: "edit", run: () => renamePanel(id) });
     if (isCustom) items.push({ label: "Remove panel", icon: "trash", danger: true, run: () => removePanel(id) });
     else if (!isGroup && !isMember) {
@@ -786,6 +938,315 @@ async function openPanelDialog(editId) {
     });
     hydrate(overlay);
     paint();
+}
+
+// ---------------------------------------------------------------------------------------------
+// "Style and text" of ONE panel (9 November 2026): size, the cards inside, the fixed texts, font, colours, corners, motion.
+// Every change shows at once on the real panel (the form sits at the side, so the panel stays in view). Cancel puts back
+// what was there; Save keeps it in the layout, and Undo (Layout & Style, or Ctrl+Z) takes it back again.
+// ---------------------------------------------------------------------------------------------
+const COLOUR_FIELDS = [
+    { key: "bg", label: "Panel", token: "--surface" },
+    { key: "card", label: "Cards inside", token: "--surface-2" },
+    { key: "text", label: "Text", token: "--text" },
+    { key: "accent", label: "Accent", token: "--accent" },
+    { key: "border", label: "Outline", token: "--border" }
+];
+const WIDTHS = [[12, "Whole width"], [9, "Three quarters"], [8, "Two thirds"], [6, "Half"], [4, "One third"], [3, "One quarter"]];
+
+async function openStyleDialog(id) {
+    if (!(await ensureProfile())) return;
+    const panel = panelOf(id);
+    if (!panel) return;
+    if (editing) await setEditing(false);
+    const page = pageData(true);
+    page.styles = page.styles || {}; page.texts = page.texts || {};
+    const theme = currentTheme();
+    const before = { style: JSON.parse(JSON.stringify(page.styles[id] || {})), texts: JSON.parse(JSON.stringify(page.texts[id] || {})), w: getComputedStyle(panel).getPropertyValue("--w").trim(), h: panel.style.height };
+    let style = JSON.parse(JSON.stringify(before.style)), texts = JSON.parse(JSON.stringify(before.texts));
+    const named = !!panel.dataset.custom || panel.classList.contains("group");          // its title is its own name (Rename)
+    const own = ownTexts(panel);
+    const hasCards = !!panel.querySelector(".kpi-row, .stat-row");
+    const isMember = panel.classList.contains("member");
+    const opt = (list, value) => list.map((o) => `<option value="${esc(o.id)}"${o.id === (value || "") ? " selected" : ""}>${esc(o.label)}</option>`).join("");
+    const width = Number(before.w) || 12;
+    const widthOptions = WIDTHS.some(([w]) => w === width) ? WIDTHS : WIDTHS.concat([[width, `${width} of 12 columns`]]);
+
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay style-overlay";
+    overlay.style.display = "flex";
+    overlay.innerHTML = `
+        <div class="modal-content style-dialog" role="dialog" aria-modal="true" aria-labelledby="sdTitle">
+            <h3 id="sdTitle">Style and text: ${esc(labelOf(id))}</h3>
+            <p class="modal-intro">Changes show on the panel at once. Nothing here moves a panel out of the page's grid, so panels never overlap or leave holes, on any screen.</p>
+            <form class="modal-form" novalidate>
+                <div class="form-section"${isMember ? " hidden" : ""}>
+                    <span class="form-section-title">Size</span>
+                    <div class="form-row">
+                        <div class="field"><label for="sdWidth">Width</label><select id="sdWidth">${widthOptions.map(([w, l]) => `<option value="${w}"${w === width ? " selected" : ""}>${esc(l)} (${w}/12)</option>`).join("")}</select></div>
+                        <div class="field"><label for="sdHeight">Height (pixels)</label><input type="number" id="sdHeight" min="120" max="1400" step="10" placeholder="Automatic" value="${before.h ? parseInt(before.h, 10) : ""}"></div>
+                    </div>
+                    <span class="field-hint">Empty height = as tall as its content. On a tablet a narrow panel takes half the width, on a phone every panel takes the whole width: this setting is for wide screens.</span>
+                </div>
+
+                <div class="form-section">
+                    <span class="form-section-title">Cards inside</span>
+                    <div class="field"><label for="sdOrient">Orientation</label><select id="sdOrient"${hasCards ? "" : " disabled"}>${opt(ORIENTS, style.orient)}</select>
+                    <span class="field-hint">${hasCards ? "Side by side or one under the other. A panel is never turned at an angle: a turned panel would cover the ones next to it." : "This panel has no row of cards. To show its list as a row, grid or graph, use its ... menu > Show as."}</span></div>
+                </div>
+
+                <div class="form-section">
+                    <span class="form-section-title">Text</span>
+                    <p class="field-hint">Text goes only into these fixed places, so it always lines up and moves with the panel. Names and numbers from the database are never changed here.</p>
+                    <div class="field"${own.title === null ? " hidden" : ""}><label for="sdTitleText">Title</label><input type="text" id="sdTitleText" maxlength="${LIMITS.title}" autocomplete="off" placeholder="${esc(own.title || "")}" value="${esc(named ? labelOf(id) : texts.title || "")}">
+                        <span class="field-hint">${named ? "This panel's own name." : "Empty = the page's own title."}</span></div>
+                    <div class="field"><label for="sdSubtitle">Subtitle</label><input type="text" id="sdSubtitle" maxlength="${LIMITS.subtitle}" autocomplete="off" placeholder="One short line under the title" value="${esc(texts.subtitle || "")}">
+                        <span class="field-hint">Shown right under the title. At most ${LIMITS.subtitle} characters.</span></div>
+                    <div class="field"><label for="sdNote">Note</label><textarea id="sdNote" rows="3" maxlength="${LIMITS.note}" placeholder="For example: Check these every morning before 10.">${esc(texts.note || "")}</textarea>
+                        <div class="form-row"><div class="field"><label for="sdNotePlace">Where the note goes</label><select id="sdNotePlace">${opt(NOTE_PLACES, texts.notePlace || "top")}</select></div></div>
+                        <span class="field-hint">Plain text in a framed box, at the top or the bottom of the panel only. At most ${LIMITS.note} characters and 5 lines.</span></div>
+                    <div class="field" id="sdLabelsField"${own.labels.length ? "" : " hidden"}><span class="field-label">Card labels</span>
+                        <div class="form-row" id="sdLabels">${own.labels.slice(0, LIMITS.labels).map((label, i) => `<div class="field"><label for="sdLabel${i}">Card ${i + 1}</label><input type="text" id="sdLabel${i}" data-label-index="${i}" maxlength="${LIMITS.label}" autocomplete="off" placeholder="${esc(label)}" value="${esc((texts.labels && texts.labels[i]) || "")}"></div>`).join("")}</div>
+                        <span class="field-hint">Empty = the page's own label (shown greyed).</span></div>
+                </div>
+
+                <div class="form-section">
+                    <span class="form-section-title">Font</span>
+                    <div class="form-row">
+                        <div class="field"><label for="sdFont">Font</label><select id="sdFont"><option value="">Same as the page</option>${FONTS.filter((f) => f.id).map((f) => `<option value="${esc(f.id)}"${f.id === style.font ? " selected" : ""}>${esc(f.label)}</option>`).join("")}</select></div>
+                        <div class="field"><label for="sdScale">Text size: <span id="sdScaleText"></span></label><input type="range" id="sdScale" min="${LIMITS.scaleMin}" max="${LIMITS.scaleMax}" step="0.05" value="${style.scale || 1}"></div>
+                    </div>
+                    <span class="field-hint">Text never gets smaller than 12 pixels, so it stays readable on phones.</span>
+                </div>
+
+                <div class="form-section">
+                    <span class="form-section-title">Colours for ${esc(theme)} mode</span>
+                    <div class="colour-row" id="sdColours"></div>
+                    <span class="field-hint contrast-note" id="sdContrast"></span>
+                    <span class="field-hint">Colours are kept for each mode on its own: switch to the other mode to set its colours.</span>
+                </div>
+
+                <div class="form-section">
+                    <span class="form-section-title">Corners</span>
+                    <div class="drawer-row"><label class="check"><input type="checkbox" id="sdRadiusOwn"${style.radius !== undefined ? " checked" : ""}> <span>Own roundness</span></label><input type="range" id="sdRadius" min="0" max="${LIMITS.radiusMax}" step="1" value="${style.radius !== undefined ? style.radius : 14}"></div>
+                </div>
+
+                <div class="form-section">
+                    <span class="form-section-title">Motion</span>
+                    <div class="form-row">
+                        <div class="field"><label for="sdAnim">When the page opens</label><div class="inline-actions"><select id="sdAnim">${opt(ANIMATIONS, style.anim)}</select><button type="button" class="btn" id="sdPlay">${icon("sparkle")}Play</button></div></div>
+                        <div class="field"><label for="sdTrans">Transition of things inside</label><select id="sdTrans">${opt(TRANSITIONS, style.trans)}</select></div>
+                    </div>
+                    <div class="field"><label for="sdEdge">Edge light</label><select id="sdEdge">${opt(EDGES, style.edge)}</select></div>
+                    <span class="field-hint" id="sdMotionHint"></span>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn danger" id="sdReset">${icon("reset")}Reset this panel</button>
+                    <span class="spacer"></span>
+                    <button type="button" class="cancel-btn" data-close>Cancel</button>
+                    <button type="submit" class="save-btn">Save</button>
+                </div>
+            </form>
+        </div>`;
+    document.body.appendChild(overlay);
+    panel.classList.add("style-target");
+    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    const q = (selector) => overlay.querySelector(selector);
+
+    const sizeNow = () => {
+        if (isMember) return;
+        panel.style.setProperty("--w", q("#sdWidth").value);
+        const h = Number(q("#sdHeight").value);
+        if (h >= 120 && h <= 1400) { panel.style.height = Math.round(h) + "px"; panel.setAttribute("data-fixed-h", "1"); }
+        else { panel.style.height = ""; panel.removeAttribute("data-fixed-h"); }
+        labelSize(panel);
+        queueFit();
+    };
+    const show = () => {
+        const clean = cleanStyle(style, FONT_IDS());
+        applyPanelStyle(panel, clean, theme, fontStackOf(clean.font));
+        applyPanelTexts(panel, named ? Object.assign(cleanTexts(texts), { title: "" }) : cleanTexts(texts));
+        if (named) { const heading = panel.querySelector(":scope > .panel-inner > .panel-head .panel-title"); if (heading) heading.textContent = q("#sdTitleText").value.trim() || labelOf(id); }
+        q("#sdScaleText").textContent = Math.round((Number(q("#sdScale").value) || 1) * 100) + " %";
+        q("#sdRadius").disabled = !q("#sdRadiusOwn").checked;
+        const pick = (list, value) => (list.find((o) => o.id === (value || "")) || list[0]).hint;
+        q("#sdMotionHint").textContent = `${pick(ANIMATIONS, style.anim)} ${pick(TRANSITIONS, style.trans)} ${pick(EDGES, style.edge)}`;
+        paintColours();
+        queueFit();
+    };
+    // colours: an empty one follows the page; the swatch shows what is on screen now
+    const paintColours = () => {
+        const mine = (style.colors && style.colors[theme]) || {};
+        const css = getComputedStyle(panel);
+        const toHex = (value) => { const v = String(value || "").trim(); return /^#[0-9a-f]{6}$/i.test(v) ? v : "#888888"; };
+        const host = q("#sdColours");
+        if (!host.childElementCount) {
+            host.innerHTML = COLOUR_FIELDS.map((f) => `<label>${esc(f.label)} <input type="color" data-colour="${f.key}"> <button type="button" class="row-btn" data-colour-clear="${f.key}">Page colour</button></label>`).join("");
+        }
+        COLOUR_FIELDS.forEach((f) => {
+            const input = host.querySelector(`[data-colour="${f.key}"]`);
+            if (document.activeElement !== input) input.value = mine[f.key] || toHex(css.getPropertyValue(f.token));
+            host.querySelector(`[data-colour-clear="${f.key}"]`).disabled = !mine[f.key];
+        });
+        const read = (key, token) => mine[key] || toHex(css.getPropertyValue(token));
+        const textColour = read("text", "--text");
+        const pairs = [["the panel", contrast(textColour, read("bg", "--surface"))], ["the cards", contrast(textColour, read("card", "--surface-2"))]];
+        const weak = pairs.filter(([, ratio]) => ratio > 0 && ratio < 4.5);
+        const note = q("#sdContrast");
+        note.classList.toggle("warn", weak.length > 0);
+        note.textContent = weak.length ? `Hard to read: the text on ${weak.map(([where, r]) => `${where} has a contrast of ${r} to 1`).join(" and ")}. Aim for at least 4.5 to 1.` : "The text is easy to read on these colours.";
+    };
+
+    let saved = false;
+    const close = () => {
+        document.removeEventListener("keydown", onKey, true);
+        panel.classList.remove("style-target");
+        overlay.remove();
+        if (saved) return;
+        // Cancel: what was there before comes back
+        if (!isMember) {
+            panel.style.setProperty("--w", before.w || "12");
+            if (before.h) { panel.style.height = before.h; panel.setAttribute("data-fixed-h", "1"); } else { panel.style.height = ""; panel.removeAttribute("data-fixed-h"); }
+            labelSize(panel);
+        }
+        paintPanelStyles();
+        queueFit();
+    };
+    const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
+    document.addEventListener("keydown", onKey, true);
+    overlay.addEventListener("mousedown", (event) => { if (event.target === overlay) close(); });
+    q("[data-close]").addEventListener("click", close);
+
+    const setStyle = (key, value) => { if (value === "" || value === undefined || value === null) delete style[key]; else style[key] = value; show(); };
+    q("#sdWidth").addEventListener("change", sizeNow);
+    q("#sdHeight").addEventListener("change", sizeNow);
+    q("#sdOrient").addEventListener("change", (event) => setStyle("orient", event.target.value));
+    q("#sdFont").addEventListener("change", (event) => setStyle("font", event.target.value));
+    q("#sdScale").addEventListener("input", (event) => setStyle("scale", Number(event.target.value) === 1 ? "" : Number(event.target.value)));
+    q("#sdRadiusOwn").addEventListener("change", (event) => setStyle("radius", event.target.checked ? Number(q("#sdRadius").value) : ""));
+    q("#sdRadius").addEventListener("input", (event) => setStyle("radius", Number(event.target.value)));
+    q("#sdAnim").addEventListener("change", (event) => { setStyle("anim", event.target.value); play(); });
+    q("#sdTrans").addEventListener("change", (event) => setStyle("trans", event.target.value));
+    q("#sdEdge").addEventListener("change", (event) => setStyle("edge", event.target.value));
+    const play = () => {
+        const frames = ANIMATION_FRAMES[style.anim || ""];
+        if (!frames || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+        panel.animate(frames, { duration: style.anim === "pop" ? 450 : 380, easing: "cubic-bezier(.2, .8, .2, 1)" });
+    };
+    q("#sdPlay").addEventListener("click", play);
+    q("#sdColours").addEventListener("input", (event) => {
+        const key = event.target.dataset && event.target.dataset.colour;
+        if (!key) return;
+        style.colors = style.colors || {}; style.colors[theme] = style.colors[theme] || {};
+        style.colors[theme][key] = event.target.value;
+        show();
+    });
+    q("#sdColours").addEventListener("click", (event) => {
+        const key = event.target.dataset && event.target.dataset.colourClear;
+        if (!key || !style.colors || !style.colors[theme]) return;
+        delete style.colors[theme][key];
+        show();
+    });
+    const textInput = () => {
+        texts = { subtitle: q("#sdSubtitle").value, note: q("#sdNote").value, notePlace: q("#sdNotePlace").value, labels: {} };
+        if (!named) texts.title = q("#sdTitleText").value;
+        overlay.querySelectorAll("[data-label-index]").forEach((input) => { if (input.value.trim()) texts.labels[input.dataset.labelIndex] = input.value; });
+        show();
+    };
+    ["#sdTitleText", "#sdSubtitle", "#sdNote"].forEach((selector) => q(selector).addEventListener("input", textInput));
+    q("#sdNotePlace").addEventListener("change", textInput);
+    overlay.querySelectorAll("[data-label-index]").forEach((input) => input.addEventListener("input", textInput));
+    q("#sdReset").addEventListener("click", () => {
+        style = {}; texts = {};
+        overlay.querySelectorAll("#sdSubtitle, #sdNote, [data-label-index]").forEach((input) => { input.value = ""; });
+        if (!named) q("#sdTitleText").value = "";
+        ["#sdOrient", "#sdFont", "#sdAnim", "#sdTrans", "#sdEdge"].forEach((selector) => { q(selector).value = ""; });
+        q("#sdScale").value = 1; q("#sdRadiusOwn").checked = false;
+        show();
+        toast("This panel has its page look again. Save keeps it; Cancel brings your settings back.", "info");
+    });
+
+    q("form").addEventListener("submit", (event) => {
+        event.preventDefault();
+        const cleanS = cleanStyle(style, FONT_IDS()), cleanT = cleanTexts(texts);
+        if (Object.keys(cleanS).length) page.styles[id] = cleanS; else delete page.styles[id];
+        if (Object.keys(cleanT).length) page.texts[id] = cleanT; else delete page.texts[id];
+        if (named) {
+            const target = widgetOf(page, id) || groupOf(page, id), name = cleanName(q("#sdTitleText").value, 40);
+            if (target && name) target.title = name;
+        }
+        saved = true;
+        close();
+        capture();
+        commit("Saved. Undo (Layout & Style, or Ctrl+Z) takes it back.");
+    });
+    hydrate(overlay);
+    show();
+    q("#sdTitleText").focus();
+}
+
+// ---------------------------------------------------------------------------------------------
+// The shared default: "Make this the default for everyone" and "Back to the built-in default"
+// ---------------------------------------------------------------------------------------------
+/** clear = false: the active layout becomes the default of the chosen pages; true: those pages get their built-in default back. */
+async function openSharedDialog(clear) {
+    const profile = activeProfile();
+    if (!clear && !profile) { toast("Choose or make your own layout first: the default is made from it.", "info"); return; }
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.style.display = "flex";
+    overlay.innerHTML = `
+        <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="shTitle">
+            <h3 id="shTitle">${clear ? "Back to the built-in default" : "Make this the default for everyone"}</h3>
+            <p class="modal-intro">${clear
+                ? "On the pages you tick, Default layout shows the page's own arrangement again, for every admin."
+                : `Every admin who uses <b>Default layout</b> on the pages you tick sees "${esc(profile.name)}": its arrangement, panel styles and texts, font and colours. Their own layouts stay as they are.`}</p>
+            <form class="modal-form" novalidate>
+                <div class="checks" id="shPages">${SHARED_PAGES.map((p) => `<label class="check"><input type="checkbox" value="${esc(p.id)}"${p.id === pageId ? " checked" : ""}> <span>${esc(p.label)}</span></label>`).join("")}</div>
+                <span class="field-hint">${clear ? "" : "A page you have not changed in this layout gets its built-in arrangement, with this layout's font and colours."}</span>
+                <p class="form-error" id="shError" hidden></p>
+                <div class="modal-actions">
+                    <button type="button" class="cancel-btn" data-close>Cancel</button>
+                    <button type="submit" class="save-btn${clear ? " danger" : ""}">${clear ? "Use the built-in default" : "Make it the default"}</button>
+                </div>
+            </form>
+        </div>`;
+    document.body.appendChild(overlay);
+    const q = (selector) => overlay.querySelector(selector);
+    const close = () => { document.removeEventListener("keydown", onKey, true); overlay.remove(); };
+    const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } };
+    document.addEventListener("keydown", onKey, true);
+    overlay.addEventListener("mousedown", (event) => { if (event.target === overlay) close(); });
+    q("[data-close]").addEventListener("click", close);
+    q("form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const pages = Array.from(overlay.querySelectorAll("#shPages input:checked")).map((input) => input.value).filter((id) => SHARED_PAGES.some((p) => p.id === id));
+        const error = q("#shError");
+        if (pages.length === 0) { error.textContent = "Tick at least one page."; error.hidden = false; return; }
+        const button = q(".save-btn");
+        button.disabled = true;
+        try {
+            if (clear) await clearShared(pages);
+            else {
+                if (editing) capture();
+                // through JSON: the database takes no "undefined" (a colour that was never set)
+                const layoutOf = (p) => JSON.parse(JSON.stringify(cleanPage(Object.assign({}, profile.pages[p] || {}, { ver: POSITIONS_VERSION }))));
+                await writeShared(pages, layoutOf, JSON.parse(JSON.stringify(profile.appearance || {})));
+            }
+            if (pages.includes(pageId)) setShared(clear ? null : { layout: cleanPage(Object.assign({}, profile ? profile.pages[pageId] || {} : {}, { ver: POSITIONS_VERSION })), appearance: profile ? profile.appearance : {} });
+            close();
+            applyLayout();
+            toast(clear ? `Built-in default again on ${pages.length} page(s).` : `"${profile.name}" is now the default on ${pages.length} page(s), for every admin.`, "ok");
+        } catch (failure) {
+            button.disabled = false;
+            error.textContent = failure && failure.code === "permission-denied"
+                ? "The database refused it. The rule for shared layouts (siteLayouts in firestore.rules) must be published in the Firebase console first."
+                : "It was not saved: " + ((failure && failure.message) || "something went wrong") + ".";
+            error.hidden = false;
+        }
+    });
+    hydrate(overlay);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -955,7 +1416,7 @@ function buildDrawer() {
     if (!host) return;
     host.innerHTML = `
         <div class="drawer-section first">
-            <h4>${icon("user")}Layout ${guideBadge("Layouts", "One sign-in, several people: pick your name to get your own arrangement, panels, font and colours. Up to " + MAX_PROFILES + " layouts are kept in this browser.", "Default layout is the fixed starting point. It cannot be changed.")}</h4>
+            <h4>${icon("user")}Layout ${guideBadge("Layouts", "One sign-in, several people: pick your name to get your own arrangement, panels, font and colours. Up to " + MAX_PROFILES + " layouts are kept in this browser.", "Default layout is what every admin starts from: the page's own arrangement, or the one an admin made the default for everyone (... > Make this the default for everyone).")}</h4>
             <div class="drawer-row">
                 <select id="profileSelect" aria-label="Layout"></select>
                 <button type="button" class="icon-btn small" id="profileMenuBtn" aria-label="Layout options" aria-haspopup="menu">${icon("more")}</button>
@@ -972,6 +1433,15 @@ function buildDrawer() {
                 <span>Keep the gaps closed ${guideBadge("Keep the gaps closed", "On: when a panel grows or shrinks, the others move up or make room, so no hole is left between panels.", "Off: every panel keeps its own row, as before.")}</span>
                 <button type="button" class="switch" id="fitSwitch" role="switch" aria-checked="true" aria-label="Keep the gaps closed"><i></i></button>
             </div>
+            <div class="drawer-actions">
+                <button type="button" class="btn" id="stylePanelBtn" aria-haspopup="menu">${icon("palette")}Style a panel</button>
+            </div>
+            <div class="undo-row">
+                <button type="button" class="btn" id="undoLayoutBtn" disabled>${icon("undo")}Undo</button>
+                <button type="button" class="btn" id="redoLayoutBtn" disabled>${icon("redo")}Redo</button>
+                <button type="button" class="btn" id="checkpointBtn" aria-haspopup="menu">${icon("save")}Checkpoints</button>
+            </div>
+            <p class="drawer-note">Undo and Redo (also Ctrl+Z and Ctrl+Y) take back any change of a layout. A <b>checkpoint</b> keeps every layout as it is now, to come back to later.</p>
             <p class="drawer-note">Every panel has an <b>arrow</b> at its top right that folds it to its title, and a <b>...</b> menu: show it as a list, grid or graph, combine it with another panel, or hide it. A panel with nothing to show folds by itself.</p>
         </div>
 
@@ -1013,6 +1483,12 @@ function buildDrawer() {
     });
     byId("profileMenuBtn").addEventListener("click", (event) => openProfileMenu(event.currentTarget));
     byId("arrangeBtn").addEventListener("click", () => setEditing(!editing));
+    byId("undoLayoutBtn").addEventListener("click", undoLayout);
+    byId("stylePanelBtn").addEventListener("click", (event) => openMenu(event.currentTarget, [{ heading: "Size, cards, text, font, colours, motion of" }].concat(
+        Array.from(document.querySelectorAll(".board .panel[data-panel]")).filter((panel) => !panel.classList.contains("is-hidden"))
+            .map((panel) => ({ label: panel.dataset.label || panel.dataset.panel, icon: "palette", run: () => { closeWindow(); openStyleDialog(panel.dataset.panel); } })))));
+    byId("redoLayoutBtn").addEventListener("click", redoLayout);
+    byId("checkpointBtn").addEventListener("click", (event) => openCheckpointMenu(event.currentTarget));
     byId("drawerAddPanel").addEventListener("click", () => { closeWindow(); openPanelDialog(null); });
     byId("autoResizeBtn").addEventListener("click", autoResize);
     byId("fitSwitch").addEventListener("click", () => setFit(!fitOn()));
@@ -1059,6 +1535,8 @@ function openProfileMenu(anchor) {
         { separator: true },
         { label: "Reset this page", icon: "reset", description: "Panels back to the default places. Font and colours stay.", disabled: !profile, run: () => { if (profile.pages) delete profile.pages[pageId]; commit(); } },
         { label: "Reset font and colours", icon: "reset", disabled: !profile, run: () => { profile.appearance = {}; commit(); } },
+        { label: "Make this the default for everyone", icon: "monitor", description: "Every admin's Default layout on the pages you choose becomes this layout.", disabled: !profile, run: () => openSharedDialog(false) },
+        { label: "Back to the built-in default", icon: "reset", description: "Default layout shows the page's own arrangement again.", disabled: !shared, run: () => openSharedDialog(true) },
         { label: "Show every helper", icon: "sparkle", description: "The helper lines that were hidden on this page come back.", disabled: !anyAssistHidden(), run: () => { showAllAssists(); toast("The helpers are back.", "ok"); } },
         { separator: true },
         { label: "Export", icon: "download", description: "Save this layout as a small file.", disabled: !profile, run: exportProfile },
@@ -1097,11 +1575,12 @@ async function importProfile(event) {
 function paintDrawer() {
     if (!byId("profileSelect")) return;
     const profile = activeProfile();
-    byId("profileSelect").innerHTML = `<option value="default">Default layout (fixed)</option>` + store.profiles.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("");
+    byId("profileSelect").innerHTML = `<option value="default">${shared ? "Default layout (set for everyone)" : "Default layout (fixed)"}</option>` + store.profiles.map((p) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("");
     byId("profileSelect").value = store.active;
     byId("arrangeBtn").querySelector("span").textContent = editing ? "Done arranging" : "Arrange";
     byId("fitSwitch").setAttribute("aria-checked", String(fitOn()));
     byId("openAllBtn").disabled = !anyFoldChoice();
+    paintUndo();
     const look = (profile && profile.appearance) || {};
     const css = getComputedStyle(document.documentElement);
     const toHex = (value) => { const v = value.trim(); return /^#[0-9a-f]{6}$/i.test(v) ? v : "#888888"; };

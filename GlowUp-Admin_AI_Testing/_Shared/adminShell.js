@@ -60,6 +60,7 @@ const ICONS = {
     split: '<rect x="3" y="5" width="7" height="14" rx="1.5"/><rect x="14" y="5" width="7" height="14" rx="1.5"/>',
     tabs: '<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M3 8V6a2 2 0 0 1 2-2h5v4"/>',
     undo: '<path d="M4 9h10a6 6 0 0 1 0 12H8"/><path d="M8 5L4 9l4 4"/>',
+    redo: '<path d="M20 9H10a6 6 0 0 0 0 12h6"/><path d="M16 5l4 4-4 4"/>',
     bulb: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .8 1.6V16h5.4v-.5c0-.6.3-1.2.8-1.6A6 6 0 0 0 12 3z"/>',
     ban: '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
     save: '<path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h7V3M8 21v-7h8v7"/>',

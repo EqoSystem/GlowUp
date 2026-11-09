@@ -321,6 +321,17 @@ await cannot("a plain user applies a source", () => updateDoc(doc(user(), "produ
 await cannot("nobody signed in applies a source", () => updateDoc(doc(anon(), "products/p1"), { sources: ["Official website | https://example.com"] }));
 await cannot("an admin applies more sources than the rule takes", () => updateDoc(doc(adminDoc(), "products/p1"), { sources: Array.from({ length: 41 }, (_, i) => "x | https://example.com/" + i) }));
 
+// ---- siteLayouts: the shared default layout of a page (9 November 2026) ----
+const shared = (uid) => ({ layout: { order: ["kpis"], styles: { kpis: { anim: "fade" } } }, appearance: { font: "inter" }, updatedAt: serverTimestamp(), updatedBy: uid });
+await can("an admin makes the dashboard's shared default", () => setDoc(doc(adminDoc(), "siteLayouts/dashboard"), shared("a1")));
+await can("an admin reads a shared default", () => getDoc(doc(adminDoc(), "siteLayouts/dashboard")));
+await cannot("a plain user reads a shared default", () => getDoc(doc(user(), "siteLayouts/dashboard")));
+await cannot("a plain user writes a shared default", () => setDoc(doc(user(), "siteLayouts/dashboard"), shared("u1")));
+await cannot("an admin writes one for a page that does not exist", () => setDoc(doc(adminDoc(), "siteLayouts/elsewhere"), shared("a1")));
+await cannot("an admin writes it in someone else's name", () => setDoc(doc(adminDoc(), "siteLayouts/dashboard"), shared("u1")));
+await cannot("a shared default with an extra field", () => setDoc(doc(adminDoc(), "siteLayouts/dashboard"), Object.assign(shared("a1"), { script: "x" })));
+await cannot("a shared default whose layout is not a map", () => setDoc(doc(adminDoc(), "siteLayouts/dashboard"), Object.assign(shared("a1"), { layout: "x" })));
+
 await env.cleanup();
 console.log(`checks made: ${checks}`);
 if (failures.length > 0) {
