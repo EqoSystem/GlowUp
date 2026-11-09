@@ -24,12 +24,12 @@ export async function launch() {
 }
 
 /** A fresh tab on one page of the site, in one theme, at one size. Returns { page, ctx, errors, settle }. */
-export async function openPage(browser, key, { theme = "light", width = 1440, height = 900 } = {}) {
+export async function openPage(browser, key, { theme = "light", width = 1440, height = 900, lat = { auth: 0, read: 0 }, go = true } = {}) {
     const ctx = await browser.newContext({ viewport: { width, height }, colorScheme: theme });
-    await ctx.addInitScript(({ seed, signedIn, theme }) => {
-        window.__SEED = seed; window.__LAT = { auth: 0, read: 0 }; window.__SIGNED_IN = signedIn;
+    await ctx.addInitScript(({ seed, signedIn, theme, lat }) => {
+        window.__SEED = seed; window.__LAT = lat; window.__SIGNED_IN = signedIn;
         try { localStorage.setItem("glowup.theme", theme); } catch (e) { }
-    }, { seed: makeSeed(), signedIn: key !== "login", theme });
+    }, { seed: makeSeed(), signedIn: key !== "login", theme, lat });
     await ctx.addInitScript(auditSrc);
     await ctx.route("**/*", async (route) => {
         const url = new URL(route.request().url());
@@ -55,6 +55,7 @@ export async function openPage(browser, key, { theme = "light", width = 1440, he
         await page.evaluate(() => { document.getAnimations().forEach((a) => { try { a.finish(); } catch (e) { } }); });
         await page.waitForTimeout(80);
     };
+    if (!go) return { page, ctx, errors, settle, url: BASE + PAGES[key] };       // the caller opens it (to watch the loading)
     await page.goto(BASE + PAGES[key], { waitUntil: "load" });
     await page.waitForTimeout(900);
     await settle(400);

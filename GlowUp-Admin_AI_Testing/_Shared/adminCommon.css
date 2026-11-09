@@ -105,6 +105,9 @@ svg.ic { width: 1.15em; height: 1.15em; flex: none; stroke: currentColor; fill: 
    controls (fold arrows, pagers, the (i) guides, links) answer during the check too: only the data waits, not the controls.
    Anybody else sees GlowUp's own loading mark and nothing of the page. */
 html.auth-pending:not(.frame-first) body > :not(.brand-loader):not(.auth-stuck-box):not(.page-skeleton) { visibility: hidden; }
+/* the panels show only in their final arrangement: until adminLayouts.js has arranged the board (html.board-ready) the page area
+   stays empty under the real menu and title bar, so nothing is drawn in a plain order first and then jumps (9 November 2026) */
+html:not(.board-ready) main .board { visibility: hidden; }
 .topbar-tools { min-height: 36px; }                       /* its buttons arrive a moment after the frame: the bar keeps its height */
 .signed-in-as { min-height: 1.3em; }
 .brand-loader { display: none; }

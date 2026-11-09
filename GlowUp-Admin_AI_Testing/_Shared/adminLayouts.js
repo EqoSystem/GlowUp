@@ -273,11 +273,17 @@ export function initLayouts(page) {
     setShared(kept.data);
     buildDrawer();
     applyLayout();
+    // the board is shown only once it stands in its final arrangement (html.board-ready, adminCommon.css): before that the page's
+    // panels would sit in their plain order, full width and without their inner spacing, and then jump (9 November 2026).
+    // When the shared default must still be read, the board waits for it, at most 1.5 seconds.
+    const ready = () => document.documentElement.classList.add("board-ready");
+    const waitsForShared = !kept.fresh && !activeProfile();
+    if (!waitsForShared) ready(); else window.setTimeout(ready, 1500);
     if (!kept.fresh) readShared(pageId).then((data) => {
         const before = JSON.stringify(shared);
         setShared(data);
         if (JSON.stringify(shared) !== before && !activeProfile()) applyLayout(); else paintDrawer();
-    }).catch((error) => console.warn("The shared default layout could not be read: ", error));
+    }).catch((error) => console.warn("The shared default layout could not be read: ", error)).finally(ready);
     byId("addPanelBtn").addEventListener("click", () => openPanelDialog(null));
     byId("doneArrangingBtn").addEventListener("click", () => setEditing(false));
     wireBoard();

@@ -233,6 +233,8 @@
     // the static shell is drawn at once on every visit; only a page without a <main> (none today) falls back to the loading mark
     if (main) { root.classList.add("frame-first"); build(); }
     else brandLoader();
+    // never a page that stays empty: if the board was not arranged in 8 seconds (a script failed), it is shown as it is
+    setTimeout(function () { root.classList.add("board-ready"); }, 8000);
     setTimeout(stuck, 10000);
 
     window.GlowUpFrame = { page: page, NAV: NAV, build: build };
