@@ -321,15 +321,6 @@ export function createOrganizer(spec) {
         // a part goes to "lead" (All, the folders) unless put() says "add" (New folder, Restore all, Empty bin) or "end" (the bin)
         const kids = [], slot = new Map();
         const put = (node, where) => { kids.push(node); slot.set(node, where); return node; };
-        // inside the Recycle bin or a folder: a Back button first, so the way out is plain (the browser's Back does the same)
-        if (now.kind !== "all") {
-            const back = document.createElement("button");
-            back.type = "button"; back.className = "btn shelf-back"; back.dataset.view = "all";
-            back.setAttribute("aria-label", `Back to all ${spec.noun}`);
-            back.innerHTML = icon("left");
-            back.append("Back");
-            kids.push(back);
-        }
         kids.push(chip(now.kind === "all" ? "on" : "", { "data-view": "all", "data-drop": "all", "data-tip-title": spec.allLabel || "All", "data-tip": `Every ${spec.nounOne}, whatever folder it is in.`, "data-tip-preview": "Drop entries here to take them out of their folder." },
             icon("layers"), spec.allLabel || "All", spec.count({ kind: "all" })));
         names.forEach((name) => kids.push(chip(now.kind === "folder" && same(now.name, name) ? "on" : "", { "data-view": "folder", "data-name": name, "data-drop": "folder:" + name, "data-tip-title": name, "data-tip": "Show only what is in this folder.", "data-tip-preview": "Drop entries here to put them in it." },
@@ -355,6 +346,14 @@ export function createOrganizer(spec) {
             BIN_ICON, now.kind === "bin" ? "Recycle bin" : "", inBin > 0 ? inBin : null), "end");
         // low-key on purpose: only the small bin (and a number when something is in it) until it is opened, pointed at, or something is dragged
         kids[kids.length - 1].setAttribute("aria-label", "Recycle bin" + (inBin > 0 ? ", " + inBin + " inside" : ", empty"));
+        // inside the Recycle bin or a folder: a Back icon right after the bin, so the way out is plain (the browser's Back does the same)
+        if (now.kind !== "all") {
+            const back = document.createElement("button");
+            back.type = "button"; back.className = "icon-btn shelf-back"; back.dataset.view = "all";
+            back.setAttribute("aria-label", `Back to all ${spec.noun}`);
+            back.innerHTML = icon("left");
+            put(back, "end");
+        }
         const hosts = { lead: shelf, add: spec.shelfAdd || shelf, end: spec.shelfEnd || shelf };
         new Set(Object.values(hosts)).forEach((host) => host.replaceChildren(...kids.filter((node) => hosts[slot.get(node) || "lead"] === host)));
     }
