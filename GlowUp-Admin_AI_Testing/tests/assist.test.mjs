@@ -156,7 +156,7 @@ r = await call({ body: { mode: "description", name: "2-Hexanediol" }, cosmile: c
     gemini: (reply) => reply(200, { candidates: [{ content: { parts: [{ text: '{"description":"A solvent."}' }] } }] }) });
 check(r.status === 200 && r.body.cosmile.found === false && r.sent.filter((s) => s.url.includes("/inci/detail/")).length === 0, "a name that is only close to a record is not used, and no record page is fetched");
 r = await call({ body: { mode: "description", name: "Phenoxyethanol" }, cosmile: cosmilePages, gemini: (reply) => reply(429, {}) });
-check(r.status === 200 && r.body.found && /no AI answered/.test(r.body.model) && /^Used in cosmetics for: antimicrobial/.test(r.body.draft.description), "when no AI answers, the record alone fills the description");
+check(r.status === 200 && r.body.found && /no AI answered/.test(r.body.model) && /^An? .*ingredient that .*\(.*antimicrobial/.test(r.body.draft.description) && r.body.basis && r.body.basis.source === "COSMILE Europe", "when no AI answers, the record alone fills the description");
 r = await call({ body: { mode: "description", name: "Mica" }, cosmile: (url, reply) => reply(500, {}), gemini: (reply) => reply(429, {}) });
 check(r.status === 502, "no record and no AI is still an error");
 
@@ -382,6 +382,26 @@ check(describeSource({ url: "https://absidy.com/x", site: "absidy.com" }, "").ki
 }
 check(!SEARCH_KINDS.product.includes("reference") && SEARCH_KINDS.product.includes("retailer") && SEARCH_KINDS.product.includes("maker"), "a product's list never rests on an ingredient database; makers and retailers count");
 check(SEARCH_KINDS.ingredient.includes("reference") && !SEARCH_KINDS.ingredient.includes("retailer"), "an ingredient's description rests on references, not shops");
+
+// ---- the User-Friendly Definition rests on its source (9 November 2026) ----
+{
+    const { unsupportedClaims, recordDefinition, definitionBasis } = handler.helpers;
+    // the COSMILE record of 1-Methylhydantoin-2-Imide (as read on 9 November 2026): ONE function, skin conditioning
+    const rec = { url: "https://cosmileeurope.eu/inci/detail/18/1-methylhydantoin-2-imide/", inci: "1-METHYLHYDANTOIN-2-IMIDE", names: ["2-Amino-1,5-dihydro-1-methyl-4H-imidazol-4-one"],
+        functions: [{ name: "skin conditioning", what: "Maintains the skin in good condition" }], origin: "synthetic", occurrence: "", background: "", safeUse: "", safeLinks: [], groups: ["Ingredients for skincare"] };
+    const wrong = "A synthetic compound used in carefully balanced preservation systems. It helps keep products safe, stable, and free from harmful bacteria and mold without altering the product's feel or scent.";
+    check(unsupportedClaims(wrong, rec, null).length >= 1, "an AI definition that claims preservation for a skin-conditioning ingredient is caught");
+    equal(unsupportedClaims("A synthetic ingredient that keeps the skin in good condition.", rec, null), [], "a definition that says what the record says passes");
+    equal(recordDefinition(rec), "A synthetic ingredient that maintains the skin in good condition (skin conditioning).", "the plain definition made from the record");
+    const basis = definitionBasis(rec, null, ["preserv"], []);
+    check(basis.source === "COSMILE Europe" && basis.url === rec.url && /skin conditioning: Maintains the skin in good condition/.test(basis.quote) && basis.how === "made from the record", "the basis names COSMILE, its address and its words");
+    const preservative = Object.assign({}, rec, { functions: [{ name: "preservative", what: "Inhibits primarily the development of micro-organisms in cosmetic products" }] });
+    equal(unsupportedClaims("It helps keep products free from bacteria and mold.", preservative, null), [], "a preservative may be called one");
+    equal(unsupportedClaims("A pigment that gives colour.", rec, { description: "Iron oxide is a pigment used as a colorant." }), [], "PubChem's description also counts as support");
+    const pub = definitionBasis(null, { cid: 1, url: "https://pubchem.ncbi.nlm.nih.gov/compound/1", description: "A text." }, [], []);
+    check(pub.source === "PubChem (NIH)" && pub.how === "checked against PubChem", "without a COSMILE record the basis is PubChem");
+    equal(definitionBasis(null, null, [], [{ url: "https://shop.example", credible: false }]), null, "no credible source: no basis is claimed");
+}
 
 console.log("checks made: " + checks);
 console.log(failed === 0 ? "ALL PASSED" : failed + " FAILED");

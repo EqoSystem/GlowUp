@@ -85,6 +85,7 @@ let modal = null;
 let fromProducts = [];                // ingredient names the inventory's products list that the Curator has no entry for: [{ key, name, products[] }]
 let fdaBrands = [];                   // the brands whose products were checked on the FDA Philippines list (for the helper line)
 let fieldFound = {};                 // pages Assist found for each box of the form: { purpose: [page], description: [page], ... }
+let definitionBasis = null;          // what the User-Friendly Definition rests on: { source, title, url, quote, how, replaced } (Assist, 9 November 2026)
 let assisted = null;                  // description draft evidence: { sources, model } (null = the description was written by hand)
 let ingredientAiDrafts = [];
 let org = null;                       // folders, the Recycle bin, picking and dragging
@@ -849,7 +850,7 @@ function paintFieldSources() {
     const pubchem = ["PubChem (NIH)", `https://pubchem.ncbi.nlm.nih.gov/#query=${q}`];
     const cosing = ["EU CosIng", site("ec.europa.eu", " cosing")];
     const cir = ["Cosmetic Ingredient Review", site("cir-safety.org")];
-    const manual = { purpose: [cosmile, cosing], description: [cosmile, cir], chemicalDescription: [pubchem], aliases: [pubchem, cosmile], commonUses: [cosmile] };
+    const manual = { purpose: [cosmile, cosing], description: [cosmile, cosing, cir], chemicalDescription: [pubchem], aliases: [pubchem, cosmile], commonUses: [cosmile] };
     document.querySelectorAll("[data-field-sources]").forEach((box) => {
         const field = box.dataset.fieldSources;
         if (name.length < 2 || !manual[field]) { box.hidden = true; box.innerHTML = ""; return; }
@@ -857,7 +858,13 @@ function paintFieldSources() {
             `<a class="source-link" href="${escapeHtml(page.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(page.title || page.site || page.url)}</a> `
             + `<span class="chip source-kind${page.tone ? " " + page.tone : ""}">${escapeHtml(page.label || "Source")}</span>`);
         const links = manual[field].map(([label, url]) => `<a class="source-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`);
-        box.innerHTML = `<span class="field-hint">` + (found.length ? `<b>Where this box's text came from:</b> ${found.join(" · ")}<br>` : "")
+        // the definition says which source it rests on, with that source's own words, so the admin can check it in one look
+        const basis = field === "description" && definitionBasis && /^https:\/\//i.test(definitionBasis.url || "")
+            ? `<span class="definition-basis"><b>Based on:</b> <a class="source-link" href="${escapeHtml(definitionBasis.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(definitionBasis.title)}</a>`
+                + (definitionBasis.quote ? ` <q>${escapeHtml(definitionBasis.quote)}</q>` : "")
+                + (definitionBasis.replaced && definitionBasis.replaced.length ? `<br><span class="warn-text">The AI's text named a use this source does not give (${escapeHtml(definitionBasis.replaced.join(", "))}), so the definition was written from the source instead.</span>` : "")
+                + `</span><br>` : "";
+        box.innerHTML = `<span class="field-hint">` + basis + (found.length && !basis ? `<b>Where this box's text came from:</b> ${found.join(" · ")}<br>` : "")
             + `Find it yourself: ${links.join(" · ")}</span>`;
         box.hidden = false;
     });
@@ -881,7 +888,7 @@ async function assistWithAi(name) {
             answer = await fetch("/api/assist-ingredient", {
                 method: "POST", signal: stop.signal,
                 headers: { "Content-Type": "application/json", Authorization: "Bearer " + (await user.getIdToken()) },
-                body: JSON.stringify({ mode: "description", name })
+                body: JSON.stringify({ mode: "description", name, aliases: toList(el("ingredientAliasesInput").value).slice(0, 3) })
             });
         } finally { clearTimeout(timer); }
         assistsToday(true);
@@ -906,6 +913,7 @@ async function assistWithAi(name) {
         if (newLinks.length) { links.value = links.value.trim().split(/\r?\n/).concat(newLinks).filter(Boolean).join("\n"); filled.push("Reference links"); }
         assisted = { sources: body.sources || [], model: body.model || "" };
         fieldFound = body.fieldSources || {};
+        definitionBasis = body.basis && typeof body.basis === "object" ? body.basis : null;
         paintFieldSources();
         const cosmile = body.cosmile && body.cosmile.found
             ? `<br><b>COSMILE Europe record used:</b> <a class="source-link" href="${escapeHtml(body.cosmile.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(body.cosmile.inci)}</a>`
@@ -1425,6 +1433,7 @@ function openIngredientForm(item) {
     differentIds = new Set(item ? item.differentFrom : []);
     assisted = null;
     fieldFound = {};
+    definitionBasis = null;
     el("modalTitle").textContent = item ? "Edit Ingredient" : "Add Ingredient";
 
     const note = el("ingredientReviewNote");

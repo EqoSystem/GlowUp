@@ -195,6 +195,62 @@ function cosmileDraft(record) {
     };
 }
 
+// ---------------------------------------------------------------------------------------------
+// THE USER-FRIENDLY DEFINITION IS GROUNDED (9 November 2026). COSMILE Europe (Cosmetics Europe; it covers the INCI names of the EU's
+// CosIng list) is the ONE source every ingredient is looked up in first. When it has a record, the definition may only say what that
+// record (or PubChem's description) supports: an AI text that names a use the sources do not give (for example "preservation" for an
+// ingredient whose only function is skin conditioning) is replaced by a plain sentence made from the record itself. The answer
+// says which source the definition rests on, with its address and the words it was based on (the "basis").
+// ---------------------------------------------------------------------------------------------
+/** Uses a text may claim, and the record functions (or words of the sources) that support each. */
+const CLAIMS = [
+    { label: "preservation", said: /preserv|antimicrob|anti-microb|bacteri|microb|mou?ld|fung/i, by: /preserv|antimicrob|antibacter|antifung|deodorant/i },
+    { label: "fragrance", said: /fragran|scent|perfum|odou?r/i, by: /perfum|fragran|mask|deodorant|odou?r/i },
+    { label: "emulsifying", said: /emulsif/i, by: /emulsif/i },
+    { label: "sun protection", said: /\buv\b|sunscreen|\bspf\b|sun protection|ultraviolet/i, by: /uv|light stabil|sunscreen/i },
+    { label: "colour", said: /colou?r(?!less)|pigment|\bdye|\btint/i, by: /colou?r|pigment|dye|opacif/i },
+    { label: "thickening", said: /thicken|viscosity/i, by: /viscosity|thicken|gel|bulking|binding/i },
+    { label: "cleansing", said: /cleans|surfactant|foam|lather/i, by: /cleans|surfact|foam/i },
+    { label: "antioxidant", said: /antioxidant|oxidation/i, by: /antioxid|oxidi/i },
+    { label: "exfoliating", said: /exfoliat|peel/i, by: /exfoliat|keratolytic|abrasive/i },
+    { label: "solvent", said: /solvent|dissolv/i, by: /solvent/i }
+];
+/** The source text the definition may rest on: the record's functions and background, and PubChem's description. */
+function groundText(record, chem) {
+    const parts = [];
+    if (record) parts.push(record.functions.map((f) => `${f.name} ${f.what}`).join(" "), record.background, record.occurrence, record.groups.join(" "));
+    if (chem && chem.description) parts.push(chem.description);
+    return parts.join(" ");
+}
+/** The uses a text claims that the sources do not support ([] when every claim is supported). */
+function unsupportedClaims(description, record, chem) {
+    const ground = groundText(record, chem);
+    return CLAIMS.filter((c) => c.said.test(String(description || "")) && !c.by.test(ground) && !c.said.test(ground))
+        .map((c) => c.label);
+}
+/** A plain definition made from the record alone: "A synthetic ingredient that maintains the skin in good condition (skin conditioning)." */
+function recordDefinition(record) {
+    if (!record || record.functions.length === 0) return "";
+    const lower = (t) => String(t || "").trim().replace(/\.$/, "").replace(/^./, (c) => c.toLowerCase());
+    const what = record.functions.map((f) => lower(f.what)).filter(Boolean);
+    const names = record.functions.map((f) => f.name).filter(Boolean);
+    const kind = (String(record.origin || "").match(/synthetic|natural|mineral|animal|vegetable|plant/i) || [""])[0].toLowerCase();
+    const origin = kind ? kind + " " : "";
+    const article = /^[aeiou]/i.test(origin || "ingredient") ? "An" : "A";
+    const lead = what.length ? `${article} ${origin}ingredient that ${what.slice(0, 2).join(" and ")}` : `${article} ${origin}ingredient used in cosmetics`;
+    return text(`${lead} (${names.slice(0, 3).join(", ")}).`, 300);
+}
+/** Which source the definition rests on, with the words it was based on (null when nothing credible was found). */
+function definitionBasis(record, chem, replaced, aiPages) {
+    if (record) {
+        const quote = record.functions.map((f) => (f.what ? `${f.name}: ${f.what}` : f.name)).concat(record.background ? [text(record.background, 220)] : []).join(" · ");
+        return { source: "COSMILE Europe", title: "COSMILE Europe: " + record.inci, url: record.url, quote: text(quote, 400), how: replaced.length ? "made from the record" : "checked against the record", replaced };
+    }
+    if (chem && chem.description) return { source: "PubChem (NIH)", title: "PubChem compound " + chem.cid, url: chem.url, quote: text(chem.description, 300), how: "checked against PubChem", replaced: [] };
+    const page = (aiPages || []).find((p) => p && p.credible);
+    return page ? { source: page.site || hostOf(page.url), title: page.title || page.url, url: page.url, quote: "", how: "from a page the AI found", replaced: [] } : null;
+}
+
 /** The form's fields from an AI answer (and the record). Only text the form can hold. */
 function tidyDescriptionDraft(raw, record, chem) {
     const aliases = (Array.isArray(raw && raw.aliases) ? raw.aliases : []).concat(record ? record.names : [])
@@ -871,7 +927,11 @@ module.exports = async (req, res) => {
         if (mode === "description") {
             const name = text(body.name, 120);
             if (name.length < 2 || !/[a-z0-9]/i.test(name)) return send(res, 400, { error: "No ingredient name was sent." });
-            const [record, chem] = await Promise.all([cosmileLookup(name), pubchemLookup(name)]);       // each null when there is no exact match or the site did not answer
+            // the label name first, then the other names the admin already listed: COSMILE is the central source, PubChem names the substance
+            const others = (Array.isArray(body.aliases) ? body.aliases : []).map((a) => text(a, 120)).filter((a) => a.length >= 2 && plainKey(a) !== plainKey(name)).slice(0, 3);
+            const firstFound = async (look, names) => { for (const n of names) { const hit = await look(n); if (hit) return hit; } return null; };
+            let [record, chem] = await Promise.all([firstFound(cosmileLookup, [name].concat(others)), pubchemLookup(name)]);       // each null when there is no exact match or the site did not answer
+            if (!chem) chem = await firstFound(pubchemLookup, (record ? record.names : []).concat(others).slice(0, 3));
             const cosmile = record ? { found: true, url: record.url, inci: record.inci } : { found: false };
             const page = record ? [describeSource({ title: "COSMILE Europe: " + record.inci, url: record.url, site: "cosmileeurope.eu", credible: true }, "")] : [];
             let result;
@@ -881,14 +941,18 @@ module.exports = async (req, res) => {
                 // no AI could answer: the record alone still fills what it states
                 if (!record) throw error;
                 const draft = tidyDescriptionDraft(cosmileDraft(record), record, chem);
-                return send(res, 200, { found: draft.description.length > 0, draft, sources: page, fieldSources: fieldSourcesOf(record, chem, []), lookups: lookupLinks(name), model: "COSMILE Europe record (no AI answered)", searched: true, notes: [text(error.message, 300)], cosmile,
+                draft.description = recordDefinition(record) || draft.description;
+                return send(res, 200, { found: draft.description.length > 0, draft, basis: definitionBasis(record, chem, [], []), sources: page, fieldSources: fieldSourcesOf(record, chem, []), lookups: lookupLinks(name), model: "COSMILE Europe record (no AI answered)", searched: true, notes: [text(error.message, 300)], cosmile,
                     message: draft.description ? "" : "The record names no function, and no AI answered." });
             }
             const draft = tidyDescriptionDraft(result.object, record, chem);
+            // a use the sources do not give: the AI's definition is not kept; the record's own words are used instead
+            const replaced = record ? unsupportedClaims(draft.description, record, chem) : [];
+            if (record && (replaced.length > 0 || !draft.description)) draft.description = recordDefinition(record) || draft.description;
             const sources = page.concat((result.sources || []).filter((s) => !record || s.url !== record.url));
             return send(res, 200, {
-                found: draft.description.length > 0 && result.object.notFound !== true,
-                draft, sources, fieldSources: fieldSourcesOf(record, chem, result.sources), lookups: lookupLinks(name), model: result.model, searched: result.searched || !!record, notes: result.notes, cosmile,
+                found: draft.description.length > 0 && (result.object.notFound !== true || !!record),
+                draft, basis: definitionBasis(record, chem, replaced, result.sources), sources, fieldSources: fieldSourcesOf(record, chem, result.sources), lookups: lookupLinks(name), model: result.model, searched: result.searched || !!record, notes: result.notes, cosmile,
                 message: draft.description ? "" : "The AI could not find a sourced ingredient description."
             });
         }
@@ -943,4 +1007,4 @@ module.exports = async (req, res) => {
 };
 
 // for the checks in tests/ (pure helpers; no network)
-module.exports.helpers = { fieldSourcesOf, cosmileResults, parseCosmile, cosmileBlock, cosmileDraft, tidyDescriptionDraft, plainKey, sourceKind, describeSource, makerHost, suggestedWebsite, SOURCE_KINDS, SEARCH_KINDS, normalShade, ingredientImportQuestion, tidyIngredientImport, firstObject, tidy, tidyProduct, tidyBrand, tidyImport, isCredible, hostOf, question, descriptionQuestion, productQuestion, brandQuestion, importQuestion, lookupLinks, searchResultUrl, chatContent, share, PROJECT, KEY_REFERER, FIREBASE_WEB_KEY, text, httpsUrl, plainAddress, isRedirect, sourcesOf, withTimeout, order: () => ["Gemini"].concat(BACKUPS.map((b) => b.label)) };
+module.exports.helpers = { unsupportedClaims, recordDefinition, definitionBasis, fieldSourcesOf, cosmileResults, parseCosmile, cosmileBlock, cosmileDraft, tidyDescriptionDraft, plainKey, sourceKind, describeSource, makerHost, suggestedWebsite, SOURCE_KINDS, SEARCH_KINDS, normalShade, ingredientImportQuestion, tidyIngredientImport, firstObject, tidy, tidyProduct, tidyBrand, tidyImport, isCredible, hostOf, question, descriptionQuestion, productQuestion, brandQuestion, importQuestion, lookupLinks, searchResultUrl, chatContent, share, PROJECT, KEY_REFERER, FIREBASE_WEB_KEY, text, httpsUrl, plainAddress, isRedirect, sourcesOf, withTimeout, order: () => ["Gemini"].concat(BACKUPS.map((b) => b.label)) };
