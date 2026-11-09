@@ -352,7 +352,7 @@ html.sb-collapsed .nav-links a, html.sb-collapsed .sign-out { justify-content: c
 .panel-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; min-height: 30px; user-select: none; }
 /* a pager or a button never shrinks under its own size: on a narrow panel the title line wraps instead */
 .panel-head > .pager, .panel-head > .head-end, .panel-head > .icon-btn, .panel-head > .guide-badge { flex: none; }
-.panel-title { min-width: 0; overflow-wrap: anywhere; }
+.panel-title { min-width: min(7ch, 100%); overflow-wrap: anywhere; }
 .panel-title { font-size: var(--fs-md); font-weight: 650; }
 .panel-head .spacer { flex: 1; }
 .panel-count { font-size: var(--fs-xs); color: var(--muted); }
@@ -1190,7 +1190,7 @@ tr.detail-row > td { padding: 0 12px 12px; background: color-mix(in srgb, var(--
    that and the controls do not fit side by side, the controls go to a row of their own. No fixed breakpoint decides it. */
 .assist { flex-wrap: wrap; row-gap: 4px; column-gap: 12px; padding: 6px 6px 6px 10px; }
 .assist-main { display: flex; align-items: flex-start; gap: 8px; flex: 1000 1 max-content; min-width: 0; }
-.assist-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; padding-block: 3px; }
+.assist-text { flex: 1 1 auto; min-width: min(7ch, 100%); overflow-wrap: anywhere; padding-block: 3px; }
 .assist-text.swap { animation: rise .25s var(--ease); }
 .assist-icon { padding-top: 4px; }
 .assist-controls { display: flex; align-items: center; gap: 6px; flex: 1 0 auto; justify-content: flex-start; }
@@ -1293,11 +1293,11 @@ tr.detail-row > td { padding: 0 12px 12px; background: color-mix(in srgb, var(--
     transition: transform .16s var(--ease), box-shadow .2s, background-color .2s;
 }
 /* a tile says in full what it does: on a narrow panel its words wrap onto a second line instead of being cut */
-.tile .tile-title { flex: 1; min-width: 0; overflow-wrap: anywhere; line-height: 1.25; }
+.tile .tile-title { flex: 1; min-width: min(7ch, 100%); overflow-wrap: anywhere; line-height: 1.25; }
 .tile-pair { grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); }
 .result-legend li > span:not(.num) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* a ranked name wraps onto more lines; the count beside it never shrinks and is never covered */
-.rank-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.rank-name { flex: 1; min-width: min(7ch, 100%); overflow-wrap: anywhere; }
 .rank-value { flex: none; white-space: nowrap; }
 .tile svg.ic:first-child { color: var(--gold); }
 .tile svg.ic:last-child { color: var(--muted); }

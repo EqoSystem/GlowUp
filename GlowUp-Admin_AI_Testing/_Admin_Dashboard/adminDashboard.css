@@ -38,7 +38,7 @@
 .result-legend li { display: flex; align-items: center; gap: 8px; padding: 6px 2px; font-size: var(--fs-sm); }
 /* the legend of the bar: each name in its colour (no dot), its count right-aligned in a column of its own */
 .result-legend li { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; }
-.legend-name { min-width: 0; overflow-wrap: anywhere; font-weight: 650; --c: var(--muted); color: color-mix(in srgb, var(--c) 75%, var(--text)); }
+.legend-name { min-width: min(7ch, 100%); overflow-wrap: anywhere; font-weight: 650; --c: var(--muted); color: color-mix(in srgb, var(--c) 75%, var(--text)); }
 .legend-name.safe { --c: var(--ok); } .legend-name.caution { --c: var(--warn); } .legend-name.harmful { --c: var(--bad); }
 .result-legend .num { margin-left: 0; text-align: right; white-space: nowrap; font-weight: 650; font-variant-numeric: tabular-nums; }
 

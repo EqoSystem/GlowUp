@@ -26,6 +26,9 @@ export function makeSeed() {
         const [bid, bname] = brandNames[i % brandNames.length];
         products["p" + i] = { name: (i % 5 === 0 ? "Superstay Matte Ink Liquid Lipstick Longwear Extra Long Product Name Edition " : "Fit Me Matte + Poreless ") + i, brandId: bid, brandName: bname, cosmeticType: types[i % types.length], ingredients: ingNames.slice(0, 3 + (i % 8)), shades: [{ name: "Shade " + i, hex: "#c46a7a" }], sources: [], status: i % 6 === 5 ? "Pending" : "Active", scans: (i * 7) % 40, source: i % 7 === 0 ? "scan" : "admin", reviewed: i % 6 !== 5, barcode: "48000" + i, createdAt: ts(800 + i), updatedAt: ts(300 + i) };
     }
+    // a pending product with no ingredient list and a long name: its card has the wide "No ingredient list | Find with AI" chip
+    // (the name once broke into one letter per line beside it, 9 November 2026)
+    products.p28 = { name: "Colourbounce Jelly-Tint Lip & Cheek Stain Long Lasting", brandId: brandNames[0][0], brandName: brandNames[0][1], cosmeticType: "Lip Tint", ingredients: [], shades: [], sources: [], status: "Pending", scans: 0, source: "scan", reviewed: false, createdAt: ts(5), updatedAt: ts(5) };
     const scanActivity = {};
     for (let i = 0; i < 14; i++) {
         const [bid, bname] = brandNames[i % 4];

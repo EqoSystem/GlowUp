@@ -32,9 +32,9 @@
 .brand-toggle svg.ic { transition: transform .2s var(--ease); }
 .brand-row.closed .brand-toggle svg.ic { transform: rotate(-90deg); }
 .product-row > td { vertical-align: middle; }
-.name-line { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.name-line { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
 .product-row .name-line { padding-left: 2px; }
-.product-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.product-name { font-weight: 600; flex: 1 1 10ch; min-width: min(7ch, 100%); overflow-wrap: break-word; }
 .ingredient-missing { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; font-size: var(--fs-xs); }
 .button.ingredient-missing, button.ingredient-missing { margin: 0; padding: 2px 9px; font-family: inherit; font-weight: 500; cursor: pointer; }
 .button.ingredient-missing:hover, button.ingredient-missing:hover { background: color-mix(in srgb, var(--warn) 22%, transparent); }

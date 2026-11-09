@@ -77,7 +77,7 @@
 .class-cell { flex: none; display: inline-flex; }
 .as-rows .ingredient-card:not(.open) .class-cell { flex: 0 0 190px; }
 .lists-row.class-row { grid-template-columns: minmax(0, 1fr) auto; }
-.class-row-name { min-width: 0; overflow-wrap: anywhere; font-size: var(--fs-base); }
+.class-row-name { min-width: min(7ch, 100%); overflow-wrap: anywhere; font-size: var(--fs-base); }
 .migration-lines { margin: 0 0 10px; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-base); }
 
 /* shown on any address that is not the live site */
