@@ -83,13 +83,13 @@
                     <h3 class="panel-title">Import ingredients</h3>
                     <span class="spacer"></span>
                     <button type="button" class="btn" id="chooseIngredientFileBtn"><i data-icon="upload"></i>Choose file</button>
-                    <input id="ingredientFileInput" type="file" accept=".pdf,.xlsx,.docx,.csv,.txt,text/csv,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+                    <input id="ingredientFileInput" type="file" accept=".pdf,.xlsx,.xls,.docx,.csv,.txt,text/csv,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
                 </div>
                 <button type="button" id="ingredientDropBox" class="import-dropbox" aria-describedby="ingredientImportHint">
                     <span class="import-drop-icon"><i data-icon="upload"></i></span>
                     <span><strong>Drop a PDF, Excel, or Word file here</strong><small id="ingredientImportHint">Only ingredient data is accepted: name, INCI name, other names and description. Brand and product data in the file is ignored.</small></span>
                 </button>
-                <p class="import-types">Accepted: PDF (.pdf), Excel (.xlsx), Word (.docx), CSV (.csv), text (.txt). Up to 5 MB.</p>
+                <p class="import-types">Accepted: PDF (.pdf), Excel (.xlsx), Word (.docx), CSV (.csv), text (.txt). Any size: a long file is read in parts.</p>
                 <p class="field-hint import-status" id="ingredientImportStatus" role="status" aria-live="polite">Entries are saved as Pending for your review.</p>
             </section>
 

@@ -117,7 +117,23 @@ export function createOrganizer(spec) {
         } catch (error) { fail(error, "Moving"); refresh(); }
     }
 
-    async function toBin(keys) {
+    /**
+     * Every removal asks first (9 November 2026): from a row's button, the selection bar, the Delete key, a drag onto the
+     * bin or a data panel. `asked` = the caller has already asked with its own, more exact question.
+     * Escape, the backdrop or Cancel mean: keep them.
+     */
+    async function toBin(keys, asked) {
+        if (!keys || keys.length === 0) return;
+        if (!asked) {
+            const names = keys.map((key) => spec.titleOf(key) || "(no name)");
+            const one = keys.length === 1;
+            const sure = await askConfirm({
+                title: one ? `Delete "${names[0]}"?` : `Delete ${many(keys.length)}?`,
+                message: (one ? "It goes" : "They go") + " to the Recycle bin and leave the lists the app uses. " + (one ? "It" : "They") + " can be restored from the Recycle bin until deleted forever.",
+                items: one ? null : names, confirmLabel: "Move to Recycle bin", danger: true
+            });
+            if (!sure) { refresh(); return; }
+        }
         try {
             const done = await spec.bin(keys);
             forgetPicked(keys);
@@ -186,7 +202,7 @@ export function createOrganizer(spec) {
             {
                 label: "Delete folder", icon: "trash", danger: true, description: "Its entries stay in the list. Only the folder goes.", run: async () => {
                     const inside = spec.count({ kind: "folder", name });
-                    if (inside > 0 && !(await askConfirm({ title: `Delete the folder "${name}"?`, message: `Its ${many(inside)} stay in the list. Only the folder goes.`, confirmLabel: "Delete folder", danger: true }))) return;
+                    if (!(await askConfirm({ title: `Delete the folder "${name}"?`, message: inside > 0 ? `Its ${many(inside)} stay in the list. Only the folder goes.` : "It is empty. Only the folder goes.", confirmLabel: "Delete folder", danger: true }))) return;
                     try {
                         await spec.deleteFolder(name);
                         forget(name);

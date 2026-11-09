@@ -37,8 +37,8 @@ import { auth } from "../_Database/firebase-console.js";
 import { cleanupPlan, ingredientDuplicates, ingredientLookalikesAsync, lookalikeCount, ingredientIssues, mergeIngredients } from "../_Shared/glowupCatalog.js";
 import { openPlanDialog, openDuplicatesDialog, showScan } from "../_Shared/adminCleanup.js";
 import { mountShell, placeInHeader, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
-import { readAdminDocument, AI_TEXT_CHARACTERS } from "../_Shared/adminDocumentReader.js";
-import { parseImportText } from "../_Shared/importFormat.js";
+import { readAdminDocument, splitForAi } from "../_Shared/adminDocumentReader.js";
+import { parseImportText, inventoryNotHere } from "../_Shared/importFormat.js";
 import { loadLists, optionsOf, allOptions, openListManager, listsNow } from "../_Shared/adminLists.js";
 import { BUILT_IN_HIGHLIGHTS } from "../_Shared/listRules.js";
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
@@ -920,16 +920,12 @@ async function assistWithAi(name) {
 // ---------------------------------------------------------------------------------------------
 // Import ingredients from a file: ingredient data ONLY, saved as Pending (source "ai", not reviewed) for an admin to check
 // ---------------------------------------------------------------------------------------------
-const IMPORT_TYPES = ["docx", "xlsx", "pdf"];
-const IMPORT_MAX_BYTES = 5 * 1024 * 1024;
-const IMPORT_MAX_ROWS = 60;
+// No size limit (9 November 2026): any PDF, Excel, Word, CSV or text file, of any length (adminDocumentReader.js says which types it reads).
+const IMPORT_MAX_ROWS = 60;                   // ingredients saved per database batch (an import itself has no limit)
 
 async function importIngredientFile(file) {
     const status = el("ingredientImportStatus"), choose = el("chooseIngredientFileBtn"), dropbox = el("ingredientDropBox");
     const report = (message, failed) => { status.textContent = message; status.classList.toggle("error", !!failed); };
-    const extension = String(file.name || "").split(".").pop().toLowerCase();
-    if (!IMPORT_TYPES.includes(extension)) { report("Only .docx, .xlsx and .pdf files are accepted. The file was not read.", true); return; }
-    if (file.size > IMPORT_MAX_BYTES) { report("The file is larger than 5 MB. Split it into smaller files and try again.", true); return; }
     setBusy(choose, true, "Analyzing...");
     dropbox.disabled = true;
     try {
@@ -937,17 +933,34 @@ async function importIngredientFile(file) {
         const documentText = await readAdminDocument(file, (message) => report(message, false));
         // a file in the GlowUp import format is read as it is, with no AI; any other document is read by the AI as before
         const keyed = parseImportText(documentText);
-        if (keyed.kind === "inventory") { report("This file lists brands or products. Import it in Brand & Product Inventory.", true); return; }
-        if (keyed.kind === "mixed") { report("This file mixes ingredients with brands or products. Split it into two files.", true); return; }
+        if (keyed.kind === "inventory") { report("This file lists only brands or products. " + inventoryNotHere(keyed.draft.products.length + keyed.draft.brands.length), true); return; }
+        if (keyed.kind === "mixed") { report(`This file mixes ${many(keyed.counts.ingredients, "ingredient record", "ingredient records")} with brands or products, so nothing was imported. ` + inventoryNotHere(keyed.counts.inventory), true); return; }
         let body;
         if (keyed.kind === "ingredients") {
             report("Reading the file's own fields. No AI is used.", false);
             body = { found: keyed.draft.ingredients.length > 0, draft: keyed.draft, plain: true, notes: keyed.notes, message: keyed.notes.join(" ") };
         } else {
             if (assistsToday(false) >= ASSIST_PER_DAY) { report(`The AI was used ${ASSIST_PER_DAY} times today in this browser. Try again tomorrow.`, true); return; }
-            report("Asking the AI to pick out the ingredients. Only the extracted text is sent, not the file.", false);
-            body = await askCuratorApi({ mode: "ingredientImport", documentText: documentText.slice(0, AI_TEXT_CHARACTERS) });
+            // no size limit: the AI reads the file in parts, one after the other (the whole file counts once in the day's limit)
+            const parts = splitForAi(documentText);
+            const found = [], failedParts = [];
+            let model = "", inventoryRecords = 0;
+            for (let i = 0; i < parts.length; i++) {
+                report(parts.length > 1 ? `Asking the AI about part ${i + 1} of ${parts.length}. Only the extracted text is sent, not the file.` : "Asking the AI to pick out the ingredients. Only the extracted text is sent, not the file.", false);
+                try {
+                    const answer = await askCuratorApi({ mode: "ingredientImport", documentText: parts[i] });
+                    found.push(...((answer.draft && answer.draft.ingredients) || []));
+                    inventoryRecords += Number(answer.inventoryRecords) || 0;
+                    model = model || answer.model || "";
+                } catch (error) {
+                    if (i === 0) throw error;
+                    failedParts.push(`part ${i + 1} (${error && error.name === "AbortError" ? "the AI took too long" : (error && error.message) || "it failed"})`);
+                }
+            }
             assistsToday(true);
+            const notes = (failedParts.length ? [`Not read: ${failedParts.join("; ")}. Import the file again later for those parts; what was saved is skipped as a duplicate.`] : [])
+                .concat(inventoryRecords > 0 ? [inventoryNotHere(inventoryRecords)] : []);
+            body = { found: found.length > 0, draft: { ingredients: found }, model, notes, message: notes.join(" ") || "" };
         }
         if (!body.found || !body.draft || !Array.isArray(body.draft.ingredients) || body.draft.ingredients.length === 0) {
             report(body.message || "No ingredient records were found. Nothing was saved.", true);
@@ -967,7 +980,7 @@ async function importIngredientFile(file) {
         const skipped = result.skippedDuplicates + result.skippedInvalid;
         const summary = `Saved ${many(result.saved, "ingredient", "ingredients")} as Pending for review` + (skipped ? `; skipped ${skipped} duplicate or incomplete.` : ".")
             + (result.unmatched.length ? ` Not in your lists, so left out: ${result.unmatched.slice(0, 6).join(", ")}${result.unmatched.length > 6 ? " ..." : ""} (add them with Manage lists, then edit the ingredient).` : "")
-            + (body.plain ? " Read straight from the file's fields, no AI." + (body.notes.length ? " " + body.notes.slice(0, 3).join(" ") : "") : body.model ? ` Read by ${body.model}.` : "");
+            + (body.plain ? " Read straight from the file's fields, no AI." + (body.notes.length ? " " + body.notes.slice(0, 3).join(" ") : "") : (body.model ? ` Read by ${body.model}.` : "") + (body.notes && body.notes.length ? " " + body.notes.join(" ") : ""));
         report(summary, false);
         notify(summary, "ok");
         await loadIngredients();
