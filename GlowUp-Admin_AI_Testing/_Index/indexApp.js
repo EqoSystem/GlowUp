@@ -52,7 +52,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // sent back here by an admin page because the account is not in the admins list
     if (new URLSearchParams(window.location.search).get("denied")) say(NOT_ADMIN);
-    if (new URLSearchParams(window.location.search).get("idle")) say("You were signed out after 30 minutes without activity. Sign in again to continue.");
+    if (new URLSearchParams(window.location.search).get("idle")) {
+        // the "signed out" note goes by itself after 7 seconds (9 November 2026), unless another message has replaced it meanwhile
+        const idleNote = "You were signed out after 30 minutes without activity. Sign in again to continue.";
+        say(idleNote);
+        window.setTimeout(() => { if (message.textContent === idleNote) say(""); }, 7000);
+        // the address loses "?idle=1", so a reload does not show the note again
+        try { history.replaceState(null, "", window.location.pathname + window.location.hash); } catch (error) { /* keep the address */ }
+    }
 
     // already signed in (for example the page was reopened): go straight to the dashboard
     onAuthStateChanged(auth, async (user) => {
