@@ -168,6 +168,7 @@
         <div class="modal-content wide ing-modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
             <header class="ing-head">
                 <div class="ing-head-text">
+                    <p class="ing-eyebrow">Ingredient Curator</p>
                     <h3 id="modalTitle">Add Ingredient</h3>
                     <span class="chip src-count" id="ingredientSourceCount" aria-live="polite">Sources: 0 of 0 fields</span>
                     <p class="modal-intro">The first boxes are what app users read. The rest tells the app how to judge the ingredient for each user; leave any of it empty and the app uses its own built-in knowledge.</p>
@@ -287,13 +288,6 @@
                                 </div>
                                 <div class="checks pills" id="allergenTagsChecks"></div>
                             </div>
-                            <div class="field full">
-                                <div class="label-row"><label for="ingredientAllergyInput">Allergy risk with frequent use <span class="optional">(optional)</span></label></div>
-                                <input type="text" id="ingredientAllergyInput" maxlength="200" placeholder="e.g., May cause an allergic skin reaction in some people." autocomplete="off" aria-describedby="ingredientAllergyHint">
-                                <div class="hint-row"><p class="field-hint" id="ingredientAllergyHint">One plain sentence telling users this ingredient can cause an allergic reaction, taken from a regulator's classification. Leave it empty when no source lists one.</p></div>
-                                <div class="field-sources" data-field-sources="frequentAllergy" hidden></div>
-                            </div>
-
                             <!-- ONE row per skin type and per condition, with three named choices: Avoid, Neutral, Good -->
                             <div class="field full" role="group" aria-labelledby="skinTypesLabel">
                                 <div class="label-row"><span class="label-text" id="skinTypesLabel">Skin Types</span></div>

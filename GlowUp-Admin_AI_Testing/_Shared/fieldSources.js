@@ -75,7 +75,7 @@ const ADMIN_JUDGMENT = "Admin judgment. Add your evidence in Reference links.";
 export const FIELD_LABELS = {
     purpose: "Purpose", description: "User-Friendly Definition",
     chemicalDescription: "What the chemical is", aliases: "Also Known As", cautionNote: "Caution Note", commonUses: "Commonly Used In",
-    allergens: "Allergen Family", frequentAllergy: "Allergy risk with frequent use"
+    allergens: "Allergen Family"
 };
 
 /**
@@ -128,15 +128,6 @@ export const FIELD_GUIDE = {
             ["cosmile", "Copy the product types listed for the ingredient."],
             ["cosmeticsinfo", "Copy the product types listed for the ingredient."]
         ]
-    },
-    frequentAllergy: {
-        title: "Optional. Leave empty when no source lists a risk.",
-        sources: [
-            ["echa", "Search the name or CAS number (see Also Known As). If the classification lists H317, the official statement is \"May cause an allergic skin reaction\"."],
-            ["pubchem", "Open the compound page, then Safety and Hazards, GHS Classification. Look for H317 (the same statement)."],
-            ["fragrance", "For a fragrance ingredient: check whether it is on the EU list of fragrance allergens (named on labels because it can cause contact allergy)."]
-        ],
-        helper: "Write one plain sentence from what the source says, e.g. \"May cause an allergic skin reaction in some people.\" The EU classification is for the ingredient itself; the chance of a reaction in a finished product depends on the amount. Keep the page in Reference links."
     },
     judgment: { sources: [], helper: ADMIN_JUDGMENT }
 };

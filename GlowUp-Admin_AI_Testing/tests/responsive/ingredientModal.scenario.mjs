@@ -66,7 +66,6 @@ async function stress(page) {
     await page.fill("#ingredientSourcesInput", "https://www.cir-safety.org/" + "very-long-path-segment-".repeat(20));
     await page.fill("#ingredientAliasesInput", Array.from({ length: 30 }, (_, i) => `Alias number ${i + 1}`).join(", "));
     await page.fill("#ingredientCautionInput", "x".repeat(160));
-    await page.fill("#ingredientAllergyInput", "May cause an allergic skin reaction ".repeat(6).slice(0, 200));
     await page.evaluate(() => {
         document.querySelectorAll("#addIngredientForm details.sources-box").forEach((d) => { d.open = true; });
         document.querySelectorAll("#addIngredientForm input[type=text], #addIngredientForm input[type=number], #addIngredientForm textarea, #addIngredientForm select").forEach((n) => n.setAttribute("aria-invalid", "true"));
@@ -100,7 +99,7 @@ try {
         ok(await page.evaluate(() => Array.from(document.querySelectorAll(".ing-modal .label-row > label[for]")).every((l) => document.getElementById(l.htmlFor))), `${tag}: every label points at its box`);
         // order: allergy with Allergen Family; Risk, Age and Caution together
         const sequence = await page.evaluate(() => Array.from(document.querySelectorAll("#secJudge .label-row > label, #secJudge .label-row > .label-text")).map((l) => l.textContent.replace(/\(optional\)/, "").trim()));
-        ok(sequence.join("|") === "Risk Level|Minimum Age|Caution Note|Commonly Used In|Highlights|Allergen Family|Allergy risk with frequent use|Skin Types|Skin Conditions", `${tag}: order in the last section (got ${sequence.join("|")})`);
+        ok(sequence.join("|") === "Risk Level|Minimum Age|Caution Note|Commonly Used In|Highlights|Allergen Family|Skin Types|Skin Conditions", `${tag}: order in the last section (got ${sequence.join("|")})`);
         // columns: two only for short boxes, one below 768
         const halves = await page.evaluate(() => Array.from(document.querySelectorAll(".ing-grid > .half")).map((n) => n.querySelector("label").textContent.trim().replace(/\s*\*$/, "")));
         ok(halves.join("|") === "INCI name|Ingredient classification|Risk Level|Minimum Age", `${tag}: only the short boxes share a row`);
@@ -117,7 +116,7 @@ try {
         ok(await page.locator('[data-field-sources="purpose"]:visible').count() === 0, `${tag}: no sources before a name is typed`);
         ok(await page.locator('[data-field-sources="name"], [data-field-sources="classification"], [data-field-sources="allergens"]').count() === 0, `${tag}: no Sources row for the INCI name, the classification and the allergen family`);
         await page.fill("#ingredientNameInput", "Sodium Hyaluronate");
-        for (const field of ["purpose", "description", "chemicalDescription", "aliases", "sources", "cautionNote", "commonUses", "frequentAllergy"]) {
+        for (const field of ["purpose", "description", "chemicalDescription", "aliases", "sources", "cautionNote", "commonUses"]) {
             ok(await page.locator(`[data-field-sources="${field}"] details.sources-box`).count() === 1, `${tag}: one Sources row under ${field}`);
         }
         ok(await page.locator("details.sources-box[open]").count() === 0, `${tag}: Sources rows start closed`);

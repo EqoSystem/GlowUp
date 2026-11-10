@@ -12,7 +12,7 @@ const check = (ok, what) => { checks++; if (!ok) { failed++; console.log("FAILED
 const equal = (got, expected, what) => check(JSON.stringify(got) === JSON.stringify(expected), `${what} (got ${JSON.stringify(got)})`);
 
 // every box of the form has a guide; every source it names exists
-const FIELDS = ["purpose", "description", "chemicalDescription", "aliases", "sources", "cautionNote", "commonUses", "frequentAllergy", "judgment"];
+const FIELDS = ["purpose", "description", "chemicalDescription", "aliases", "sources", "cautionNote", "commonUses", "judgment"];
 // the INCI name, the classification and the allergen family are typed or chosen: no Sources row for them
 ["name", "classification", "allergens"].forEach((field) => check(!f.FIELD_GUIDE[field] && f.linksFor(field, "Aqua").length === 0, `no sources for ${field}`));
 FIELDS.forEach((field) => {
@@ -47,7 +47,6 @@ check(byId("purpose", "cosmile").kind === "search" && byId("purpose", "cosmile")
 check(byId("purpose", "cosmile").url === "https://cosmileeurope.eu/inci/results/?q=Aqua", "COSMILE search address");
 check(byId("description", "cosmeticsinfo").url === "https://www.cosmeticsinfo.org/?s=Aqua", "CosmeticsInfo search address");
 check(f.SOURCES.checker.search("Aqua") === "https://cosingchecker.com/search?q=Aqua", "CosIng Checker search address");
-check(byId("frequentAllergy", "fragrance").kind === "landing" && byId("frequentAllergy", "fragrance").copyName === false, "the fragrance list is a page to read: no name copied");
 check(f.linksFor("purpose", "Aqua / Water").find((l) => l.id === "cosmile").url.endsWith("Aqua%20%2F%20Water"), "the name is URL-encoded");
 // "+ ref" is only for the page of THIS ingredient (PubChem), never a landing or a search page
 Object.keys(f.SOURCES).forEach((id) => check(f.linkOf(id, "Aqua").canRef === (id === "pubchem"), `+ ref only for PubChem's ingredient page (${id})`));
@@ -79,7 +78,6 @@ equal(f.labelBareUrls("a\nhttps://cosingchecker.com/search?q=x\n\nb"), "a\nCosIn
 equal(f.labelBareUrls("https://cir-safety.org@evil.com/"), "https://cir-safety.org@evil.com/", "a user name before the host is left alone");
 
 
-equal(f.linksFor("frequentAllergy", "Aqua").map((l) => l.id), ["echa", "pubchem", "fragrance"], "allergy sources");
 equal(f.pasteResult("allergy", "  a  b ").text, "a b", "allergy paste is tidied");
 equal(f.pasteResult("allergy", "a".repeat(301)).note, f.NOTES.largePaste, "allergy large paste notice");
 

@@ -731,7 +731,6 @@ function detailOf(item, inBin) {
     if (item.commonUses) facts.push(["Used in", escapeHtml(item.commonUses)]);
     else if (item.usesBroken) facts.push(["Used in", `<span class="chip warn" data-tip="An older build of the app wrote text here that is not a description. It is not shown to anyone. Edit and save to replace it.">text from the app could not be read</span>`]);
     if (item.cautionNote) facts.push(["Caution", "It " + escapeHtml(item.cautionNote)]);
-    if (item.frequentUseAllergy) facts.push(["Allergy risk (frequent use)", escapeHtml(item.frequentUseAllergy)]);
     {
         const counted = countSaved(item);
         const links = SOURCE_LINK_FIELDS.filter((f) => f.enabled && item.sourceLinks && /^https:\/\//i.test(item.sourceLinks[f.key] || ""))
@@ -974,7 +973,7 @@ function labelReferenceLinks() {
 
 /** Pasting into the text boxes tidies the text (spaces, line breaks, list separators) and may show a non-blocking notice. Nothing is fetched. */
 function wirePasteTidy() {
-    const kinds = { ingredientNameInput: "name", ingredientPurposeInput: "purpose", ingredientDescInput: "description", ingredientChemInput: "chemical", ingredientAliasesInput: "aliases", ingredientAllergyInput: "allergy" };
+    const kinds = { ingredientNameInput: "name", ingredientPurposeInput: "purpose", ingredientDescInput: "description", ingredientChemInput: "chemical", ingredientAliasesInput: "aliases" };
     Object.entries(kinds).forEach(([id, kind]) => {
         const box = el(id);
         box.addEventListener("paste", (event) => {
@@ -1592,7 +1591,6 @@ function openIngredientForm(item) {
     el("ingredientRiskInput").value = item ? item.riskLevel : "";
     el("ingredientMinAgeInput").value = item && item.minAge > 0 ? item.minAge : "";
     el("ingredientCautionInput").value = item ? item.cautionNote : "";
-    el("ingredientAllergyInput").value = item ? item.frequentUseAllergy : "";
     el("ingredientUsesInput").value = item ? item.commonUses : "";
     renderPickers(item);
     el("ingredientKeyActiveInput").checked = item ? item.keyActive : false;
@@ -1684,9 +1682,6 @@ async function saveIngredient(event) {
     };
     // an admin who opens an entry that was not typed here and saves it has checked it
     const before = ingredients.find((i) => i.id === editingIngredientId);
-    // the allergy line is written only when there is one (or to clear one that was there), so an entry without it keeps its old shape
-    const allergy = clean("ingredientAllergyInput").slice(0, 200);
-    if (allergy || (before && before.frequentUseAllergy)) data.frequentUseAllergy = allergy;
     if (sourceUi) {
         const links = sourceUi.values();
         for (const f of SOURCE_LINK_FIELDS) {
