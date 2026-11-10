@@ -26,8 +26,8 @@ try {
         await page.press("#password", "Enter");
         const note = page.locator(".login-message");
         ok(await note.isVisible(), `${width}px: the message shows`);
-        await page.waitForTimeout(3500);
-        ok(!(await note.isVisible()), `${width}px: the message is gone after 3 seconds`);
+        await page.waitForTimeout(2200);
+        ok(!(await note.isVisible()), `${width}px: the message is gone after 1.5 seconds`);
         await page.fill("#password", "abc12");
         await page.press("#password", "Enter");
         await page.waitForSelector(".password-length-cover", { timeout: 4000 });

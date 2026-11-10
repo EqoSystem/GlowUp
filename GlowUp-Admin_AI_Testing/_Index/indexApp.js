@@ -54,9 +54,9 @@ document.addEventListener("DOMContentLoaded", () => {
     passwordInput.addEventListener("input", hideLengthCover);
     if (eye) eye.addEventListener("click", hideLengthCover);
 
-    // a message goes away by itself after 3 seconds (the "signed out" note passes its own, longer time)
+    // a message goes away by itself after 1.5 seconds (the "signed out" note passes its own, longer time)
     let messageTimer = 0;
-    function say(text, seconds = 3) {
+    function say(text, seconds = 1.5) {
         window.clearTimeout(messageTimer);
         message.textContent = text || "";
         message.style.display = text ? "block" : "none";
