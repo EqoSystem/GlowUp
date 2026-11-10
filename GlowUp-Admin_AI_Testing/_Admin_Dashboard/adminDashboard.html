@@ -157,6 +157,20 @@
                     <span class="empty-hint" id="suggestionEmptyHint">Nothing to review right now.</span>
                 </div>
             </section>
+
+            <!-- Contact support (10 November 2026): reports sent from the app's Settings > Contact support (Firestore "supportReports") -->
+            <section class="panel" data-panel="support" data-label="Support reports" data-w="8">
+                <div class="panel-head">
+                    <h3 class="panel-title">Support reports</h3>
+                    <span class="spacer"></span>
+                    <div class="pager" id="supportPager"></div>
+                </div>
+                <ul class="suggestion-list support-list" id="supportList" style="display: none;"></ul>
+                <div class="empty-state loading" id="supportEmpty"><div class="sk-list"><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div></div>
+                    <p class="empty-message" id="supportEmptyMessage">Loading reports...</p>
+                    <span class="empty-hint" id="supportEmptyHint">Reports from the app's Contact support show here.</span>
+                </div>
+            </section>
         </div>
     </main>
 

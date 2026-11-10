@@ -56,3 +56,10 @@
 .result-legend li:hover, .result-legend li.on { background: color-mix(in srgb, var(--text) 7%, transparent); }
 .rank-item.can-open { border-radius: 8px; transition: background-color .15s, transform .16s var(--ease); }
 .rank-item.can-open:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); transform: translateX(3px); }
+
+/* support reports from the app (10 November 2026) */
+.support-item { align-items: flex-start; }
+.support-message { flex-basis: 100%; margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--fs-sm); color: var(--text); }
+.support-scan { flex-basis: 100%; font-size: var(--fs-sm); }
+.support-scan summary { cursor: pointer; color: var(--text-2); }
+.support-scan p { margin: 4px 0 0; overflow-wrap: anywhere; }

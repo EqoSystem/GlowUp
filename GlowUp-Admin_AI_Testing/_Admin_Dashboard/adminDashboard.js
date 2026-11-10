@@ -29,6 +29,8 @@ const RECENT_ITEMS = 120;             // how many recent scans are fetched (the 
 const PAGE_SIZE = 8;                  // how many rows a panel shows at a time
 const activityPage = { page: 1, size: PAGE_SIZE };
 const suggestionPage = { page: 1, size: PAGE_SIZE };
+const supportPage = { page: 1, size: PAGE_SIZE };
+let supportReports = [];              // [{ id, category, message, uid, appVersion, device, createdAtUnix, lastScan }]
 let recentScans = [];
 const TOP_BRANDS = 5;
 const TODAY_LIMIT = 200;              // the live "today" listener reads at most this many scans; the exact total comes from one count
@@ -74,8 +76,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     watchScansToday();
     watchRecentActivity();
     loadSuggestions();
+    loadSupportReports();
     loadReviewQueue();
     el("suggestionList").addEventListener("click", onSuggestionClick);
+    el("supportList").addEventListener("click", onSupportClick);
 
     // things that answer a click
     const press = (node, run) => { node.addEventListener("click", (event) => { if (!event.target.closest(".guide-badge")) run(event); }); node.addEventListener("keydown", (event) => { if (event.key === "Enter" && event.target === node) run(event); }); };
@@ -434,6 +438,74 @@ async function onSuggestionClick(event) {
     } catch (error) {
         console.error("Error updating suggestion: ", error);
         notify("The suggestion was not updated. " + describeError(error), "error");
+        button.disabled = false;
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Support reports sent from the app (Settings > Contact support). Only admins can read them (firestore.rules: supportReports).
+// ---------------------------------------------------------------------------------------------
+async function loadSupportReports() {
+    try {
+        const snapshot = await getDocs(query(collection(db, "supportReports"), where("status", "==", "new")));
+        supportReports = [];
+        snapshot.forEach((d) => {
+            const data = d.data();
+            supportReports.push({
+                id: d.id, category: String(data.category || "Other"), message: String(data.message || ""), uid: String(data.uid || ""),
+                appVersion: String(data.appVersion || ""), device: String(data.device || ""), createdAtUnix: toWholeNumber(data.createdAtUnix),
+                lastScan: data.lastScan && typeof data.lastScan === "object" ? data.lastScan : null
+            });
+        });
+        renderSupportReports();
+    } catch (error) {
+        console.error("Error loading supportReports: ", error);
+        showEmpty("support", "Could not load the support reports.", true);
+        el("supportEmptyHint").textContent = describeError(error);
+    }
+}
+
+function renderSupportReports() {
+    setPanelQuiet("support", supportReports.length === 0, supportReports.length === 0 ? "No new reports" : many(supportReports.length, "new report", "new reports"));
+    if (supportReports.length === 0) { showEmpty("support", "No new support reports.", false); return; }
+    supportReports.sort((a, b) => b.createdAtUnix - a.createdAtUnix);
+    el("supportEmpty").style.display = "none";
+    const list = el("supportList");
+    list.style.display = "";
+    renderPager(el("supportPager"), supportPage, supportReports.length, renderSupportReports, "reports");
+    const tone = (c) => (c === "Bug" ? "bad" : c === "Wrong scan result" ? "warn" : "pink");
+    list.innerHTML = paginate(supportReports, supportPage).map((r) => {
+        const scan = r.lastScan ? `<details class="support-scan"><summary>Last scan: ${escapeHtml([r.lastScan.product, r.lastScan.brand].filter(Boolean).join(" · ") || "(no name)")}</summary>
+            <p class="small">Result: ${escapeHtml(r.lastScan.result || "-")}. ${escapeHtml(r.lastScan.summary || "")}</p>
+            <p class="small muted">Ingredients read: ${escapeHtml(r.lastScan.ingredients || "-")}</p></details>` : "";
+        return `<li class="suggestion-item support-item">
+            <div class="suggestion-main">
+                <span class="chip ${tone(r.category)}">${escapeHtml(r.category)}</span>
+                <span class="small muted">${escapeHtml(timeAgo(r.createdAtUnix))} · account ${escapeHtml(r.uid.slice(0, 8))}${r.appVersion ? " · app " + escapeHtml(r.appVersion) : ""}</span>
+                <p class="support-message">${escapeHtml(r.message)}</p>
+                ${scan}
+            </div>
+            <div class="suggestion-actions btn-group">
+                <button class="icon-btn small row-btn approve" data-action="handled" data-id="${escapeHtml(r.id)}" aria-label="Mark handled">${icon("check")}</button>
+                <button class="icon-btn small row-btn danger" data-action="dismissed" data-id="${escapeHtml(r.id)}" aria-label="Dismiss">${icon("x")}</button>
+            </div>
+        </li>`;
+    }).join("");
+}
+
+async function onSupportClick(event) {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    const id = button.getAttribute("data-id"), status = button.getAttribute("data-action");
+    button.disabled = true;
+    try {
+        await updateDoc(doc(db, "supportReports", id), { status, handledAt: serverTimestamp() });
+        supportReports = supportReports.filter((r) => r.id !== id);
+        renderSupportReports();
+        notify(status === "handled" ? "Marked as handled." : "Report dismissed.", "ok");
+    } catch (error) {
+        console.error("Error updating support report: ", error);
+        notify("The report was not updated. " + describeError(error), "error");
         button.disabled = false;
     }
 }

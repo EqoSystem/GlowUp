@@ -331,6 +331,24 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
+    // ---- Contact support (10 November 2026): the app writes a report, the admin website's Dashboard lists it -------------
+    // A signed-in user may CREATE their own report only (their own uid, status "new", a message of 3 to 2000 characters, one of three
+    // kinds). Nobody but an admin may read, change or delete a report. "lastScan" is there only when the user switched it on.
+    match /supportReports/{reportId} {
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid', 'category', 'message', 'status', 'appVersion', 'device', 'createdAtUnix', 'createdAt', 'lastScan'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.status == 'new'
+        && request.resource.data.category in ['Bug', 'Wrong scan result', 'Other']
+        && request.resource.data.message is string
+        && request.resource.data.message.size() >= 3
+        && request.resource.data.message.size() <= 2000
+        && request.resource.data.get('appVersion', '') is string && request.resource.data.get('appVersion', '').size() <= 40
+        && request.resource.data.get('device', '') is string && request.resource.data.get('device', '').size() <= 200
+        && (!('lastScan' in request.resource.data) || (request.resource.data.lastScan is map && request.resource.data.lastScan.size() <= 6));
+      allow read, update, delete: if isAdmin();
+    }
+
     // ---- AI photo snapshots: products the catalogue does not have, read by the AI from one photo -------------
     // Staged here, NOT in "products", so unverified user content never mixes with the curated catalogue. Signed-in app users
     // may read their OWN entry and create one: always pending, never approved, their own id, make-up only, short lists. Only an admin approves, edits or deletes.

@@ -110,7 +110,7 @@ namespace GlowUp.EditorTools
             // ---- contact support ----
             A.AppPopup supportPopup = A.Overlay(s, "SupportPanel", "Contact support");
             A.At(supportPopup.box, A.MC, new Vector2(0, 40), new Vector2(940, 1230));
-            TextMeshProUGUI supportIntro = A.Label(supportPopup.box, "IntroText", "Tell us what went wrong. Your message opens in your email app, ready to send.",
+            TextMeshProUGUI supportIntro = A.Label(supportPopup.box, "IntroText", "Tell us what went wrong. Your report goes straight to the GlowUp team.",
                                                    30, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             A.TopStrip(supportIntro.transform, 118, 88, 48, 48);
             ChoiceTabs categoryTabs = Tabs(supportPopup.box, "CategoryTabs", new[] { "Bug", "Wrong scan result", "Other" }, 0, out _, 28);
