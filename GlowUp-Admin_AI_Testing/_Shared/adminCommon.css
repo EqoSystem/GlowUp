@@ -2070,3 +2070,4 @@ body:has(> #addIngredientModal[style*="flex"]) .toast-host { top: 16px; bottom: 
     .ing-modal .fit-choice span { min-width: 0; width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .sources-box > summary::before { transition: none; } }
+.ing-modal .source-link.is-wait { opacity: .6; cursor: progress; }

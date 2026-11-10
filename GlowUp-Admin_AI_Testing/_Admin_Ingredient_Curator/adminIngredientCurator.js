@@ -879,12 +879,29 @@ function copyInciName(name) {
 }
 
 /** Clicks inside the Sources rows: a landing page copies the INCI name; PubChem opens this ingredient's page; "+ ref" adds that page to Reference links. */
+// Click limit: a source opens at most once every 2 seconds (the same site from any row), and "+ ref" once per lookup, so an admin
+// who taps again and again while a page is slow to open gets one tab and one message, not ten.
+const SOURCE_CLICK_GAP_MS = 2000;
+const lastSourceClick = new Map();
+function tooSoon(key, node) {
+    const now = Date.now();
+    if (now - (lastSourceClick.get(key) || 0) < SOURCE_CLICK_GAP_MS) return true;
+    lastSourceClick.set(key, now);
+    if (node) {
+        node.classList.add("is-wait");
+        node.setAttribute("aria-busy", "true");
+        window.setTimeout(() => { node.classList.remove("is-wait"); node.removeAttribute("aria-busy"); }, SOURCE_CLICK_GAP_MS);
+    }
+    return false;
+}
+
 async function onFieldSourceClick(event) {
     const name = el("ingredientNameInput").value.trim();
     const link = event.target.closest("a.source-link[data-source]");
     if (link) {
         const source = SOURCES[link.dataset.source];
         if (!source) return;
+        if (tooSoon("open:" + link.dataset.source, link)) { event.preventDefault(); return; }
         if (source.kind === "page") {
             event.preventDefault();
             const tab = window.open("about:blank", "_blank");              // opened now, while the click still counts, and sent on when PubChem has answered
@@ -904,6 +921,7 @@ async function onFieldSourceClick(event) {
     if (!add || add.disabled) return;
     const source = SOURCES[add.dataset.addRef];
     if (!source || source.kind !== "page") return;
+    if (tooSoon("ref:" + add.dataset.addRef, null)) return;
     add.disabled = true;
     try {
         const cid = await pubchemPage(name);

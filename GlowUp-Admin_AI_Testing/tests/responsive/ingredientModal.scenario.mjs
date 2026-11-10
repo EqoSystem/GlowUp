@@ -180,6 +180,13 @@ try {
         await page.click(`${purpose} a[data-source="cosing"]`);
         ok(await page.evaluate(() => window.__copied) === "Glycerin", "a landing page copies the INCI name");
         ok(await page.locator(".toast", { hasText: "INCI name copied. Paste it in the site's search box." }).count() >= 1, "and the toast says so");
+        // click limit: tapping the same source again and again opens it once and copies once
+        const toastsBefore = await page.locator(".toast").count();
+        await page.evaluate(() => { window.__copied = ""; });
+        for (let i = 0; i < 5; i++) await page.click(`${purpose} a[data-source="cosing"]`);
+        ok(await page.evaluate(() => window.__copied) === "", "repeated taps within 2 seconds do nothing more");
+        ok(await page.locator(".toast").count() === toastsBefore, "and add no more messages");
+        ok(await page.locator(`${purpose} a[data-source="cosing"].is-wait`).count() === 1, "the link shows it is waiting");
         await page.evaluate(() => { window.__copied = ""; });
         await page.click(`${purpose} a[data-source="cosmile"]`);
         ok(await page.evaluate(() => window.__copied) === "", "a search link copies nothing");
@@ -192,6 +199,7 @@ try {
         await page.locator(`${chem} [data-add-ref="pubchem"]`).click();
         await page.waitForTimeout(400);
         ok((await page.inputValue("#ingredientSourcesInput")).split("\n").length === 1, "the same page is not added twice");
+        await page.waitForTimeout(2100);                       // past the click limit
         await page.fill("#ingredientNameInput", "Nonsensename");
         await page.locator(`${chem} [data-add-ref="pubchem"]`).click();
         await page.waitForTimeout(500);
