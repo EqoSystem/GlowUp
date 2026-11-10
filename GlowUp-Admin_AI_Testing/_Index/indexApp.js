@@ -48,16 +48,19 @@ document.addEventListener("DOMContentLoaded", () => {
         lengthCover.style.fontSize = style.fontSize;
         lengthCover.style.fontFamily = style.fontFamily;
         lengthCover.style.paddingLeft = style.paddingLeft;
-        lengthCover.style.paddingRight = style.paddingRight;
         passwordBox.append(lengthCover);
         passwordBox.classList.add("length-hidden");
     };
     passwordInput.addEventListener("input", hideLengthCover);
     if (eye) eye.addEventListener("click", hideLengthCover);
 
-    function say(text) {
+    // a message goes away by itself after 3 seconds (the "signed out" note passes its own, longer time)
+    let messageTimer = 0;
+    function say(text, seconds = 3) {
+        window.clearTimeout(messageTimer);
         message.textContent = text || "";
         message.style.display = text ? "block" : "none";
+        if (text) messageTimer = window.setTimeout(() => { if (message.textContent === text) say(""); }, seconds * 1000);
     }
 
     function setButton(enabled, label) {
@@ -79,8 +82,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (new URLSearchParams(window.location.search).get("idle")) {
         // the "signed out" note goes by itself after 7 seconds (9 November 2026), unless another message has replaced it meanwhile
         const idleNote = "You were signed out after 30 minutes without activity. Sign in again to continue.";
-        say(idleNote);
-        window.setTimeout(() => { if (message.textContent === idleNote) say(""); }, 7000);
+        say(idleNote, 7);
         // the address loses "?idle=1", so a reload does not show the note again
         try { history.replaceState(null, "", window.location.pathname + window.location.hash); } catch (error) { /* keep the address */ }
     }
