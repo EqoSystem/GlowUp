@@ -28,7 +28,10 @@ namespace GlowUp.Onboarding
         {
             OnboardingSession.LoadDraft();
             if (skinToneGroup != null && !string.IsNullOrEmpty(OnboardingSession.SkinTone)) skinToneGroup.Select(OnboardingSession.SkinTone, false);
-            if (feedbackText != null) feedbackText.text = OnboardingSession.Social ? OnboardingSession.SocialReminder : "";
+            // the Google notice is a banner at the top of the page (New13 item 5C)
+            OnboardingNotices.OneLine(feedbackText);
+            if (feedbackText != null) feedbackText.text = "";
+            OnboardingNotices.SocialBanner(feedbackText, "step3", feedbackText);
             Refresh();
         }
 
@@ -41,7 +44,7 @@ namespace GlowUp.Onboarding
 
         void OnContinue()
         {
-            if (skinToneGroup == null || string.IsNullOrEmpty(skinToneGroup.Value)) { if (feedbackText != null) feedbackText.text = msgChooseTone; return; }
+            if (skinToneGroup == null || string.IsNullOrEmpty(skinToneGroup.Value)) { OnboardingNotices.Error(feedbackText, msgChooseTone); return; }
             OnboardingSession.SkinTone = skinToneGroup.Value;
             OnboardingSession.SaveDraft();
             SceneNavigator.Go(nextScene);

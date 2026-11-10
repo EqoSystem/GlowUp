@@ -50,8 +50,9 @@ def methods(source):
             name = m.group(1)
             depth, j, started = 0, i, False
             while j < len(lines):
-                depth += lines[j].count("{") - lines[j].count("}")
-                if "{" in lines[j] or "=>" in lines[j]:
+                code = re.sub(r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])\'|//.*$', "", lines[j])     # braces inside strings, chars and comments do not count
+                depth += code.count("{") - code.count("}")
+                if "{" in code or "=>" in code:
                     started = True
                 if started and depth <= 0 and (lines[j].rstrip().endswith("}") or lines[j].rstrip().endswith(";")):
                     break
@@ -80,7 +81,7 @@ def main():
     print("git diff --stat %s -- <live scan files>: %s" % (base, stat or "(empty: no live scan file changed)"))
     failed |= bool(stat)
 
-    old = run(["git", "show", "%s:%s" % (base, CONTROLLER)]).stdout
+    old = subprocess.run(["git", "show", "%s:%s" % (base, CONTROLLER)], cwd=ROOT, capture_output=True).stdout.decode("utf-8")
     with open(os.path.join(ROOT, CONTROLLER), encoding="utf-8") as f:
         new = f.read()
     mo, mn = methods(old.replace("\r\n", "\n")), methods(new.replace("\r\n", "\n"))

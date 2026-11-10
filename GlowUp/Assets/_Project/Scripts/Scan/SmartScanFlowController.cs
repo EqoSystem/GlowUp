@@ -85,6 +85,12 @@ namespace GlowUp.Scan
         [SerializeField] private TextMeshProUGUI lookUpLabel;
         [SerializeField] private string lookUpIdleLabel = "Look it up";
         [SerializeField] private string lookUpWorkingLabel = "Looking it up...";
+        [Tooltip("New13 item 2: the block with the ingredient list and Look it up, at the bottom of the camera view. Hidden until a scan or a photo found no list.")]
+        [SerializeField] private GameObject listHelp;
+        [Tooltip("The hint on the camera picture: it moves up above the list block while that block shows")]
+        [SerializeField] private RectTransform guideHint;
+        [Tooltip("The \"Is this ...?\" banner on the camera picture: it moves up above the list block too")]
+        [SerializeField] private RectTransform questionBanner;
 
         [Header("AI photo fallback: a product the catalogue does not have")]
         [Tooltip("The Scan Snapshot object (its own object in the Hierarchy, with every number and word in its Inspector)")]
@@ -93,8 +99,15 @@ namespace GlowUp.Scan
         [SerializeField] private bool offerSnapshotOnCatalogMiss = true;
         [Tooltip("On = when the scan is stuck and no product has been named, the photo pop-up is offered once")]
         [SerializeField] private bool offerSnapshotWhenStuck = true;
-        [Tooltip("The camera button on the scan screen: a photo of the product is sent to the web search. It appears when the scan takes long.")]
+        [Tooltip("New13 item 1: the round button at the RIGHT of the control bar. Live mode: the camera (take a photo). Photo mode: the live-scan frame (back to live scanning).")]
         [SerializeField] private Button photoButton;
+        [Tooltip("The camera icon of that button (live mode)")]
+        [SerializeField] private GameObject cameraModeIcon;
+        [Tooltip("The live-scan icon of that button (photo mode)")]
+        [SerializeField] private GameObject liveModeIcon;
+        [Tooltip("Said when the button is held (it has no words of its own)")]
+        [SerializeField] private string photoModeName = "Take a photo";
+        [SerializeField] private string liveModeName = "Back to live scan";
         [Tooltip("The photo button appears after the scan has run this many seconds without finishing")]
         [Min(1f)] [SerializeField] private float photoButtonAfterSeconds = 6f;
         [SerializeField] private string msgPhotoHint = "Slow or read wrong? Tap the camera button to take a photo of the product.";
@@ -265,7 +278,7 @@ namespace GlowUp.Scan
         [Tooltip("The AI has been asked as often as it may be in one visit of this screen")]
         [SerializeField] private string msgAiLimit = "The AI has been asked as often as it may be for now. Type the product's name, or tap Finish anyway.";
         [SerializeField] private string msgNeedList = "The ingredient list is not read yet. Show it to the camera, or tap Look it up.";
-        [SerializeField] private string msgStalled = "Not getting further? Tap Start over, or type the product in instead.";
+        [SerializeField] private string msgStalled = "Not getting further? Tap Start over, or tap Type it in.";
         [SerializeField] private string msgPauseReset = "The scan was paused for a while, so it was put back to the start.";
         [SerializeField] private string msgDifferentProduct = "That is a different product: a new scan was started for it.";
         [SerializeField] private string msgSameAgain = "Scanning the same product again. Its name is kept.";
@@ -419,7 +432,12 @@ namespace GlowUp.Scan
             if (sameProductButton != null) sameProductButton.onClick.AddListener(() => { ClosePanel(startOverPanel); StartOver(true, msgSameAgain); });
             if (differentProductButton != null) differentProductButton.onClick.AddListener(() => { ClosePanel(startOverPanel); StartOver(false, msgStartedOver); });
             if (manualEntryButton != null) manualEntryButton.onClick.AddListener(OpenManual);
-            if (photoButton != null) { photoButton.onClick.AddListener(OnPhotoButton); photoButton.gameObject.SetActive(false); }
+            if (photoButton != null)
+            {
+                photoButton.onClick.AddListener(OnPhotoButton);
+                modeHint = LongPressHint.On(photoButton.gameObject, photoModeName, statusText);
+            }
+            if (listHelp != null) listHelp.SetActive(false);
             if (snapshot != null) { snapshot.Analysed += OnSnapshotAnalysed; snapshot.NameOnly += OnSnapshotNameOnly; snapshot.TypeItIn += OpenManual; snapshot.CaptureModeRequested += EnterPhotoMode; snapshot.CatalogMatches += ShowPhotoMatches; }
             if (manualAnalyseButton != null) manualAnalyseButton.onClick.AddListener(AnalyseManual);
             if (lookUpButton != null) lookUpButton.onClick.AddListener(LookUp);
@@ -520,6 +538,7 @@ namespace GlowUp.Scan
             if (stage != Stage.Starting) return;
             if (!ok)
             {
+                photoAfterCameraStarts = false;
                 stage = Stage.Idle;
                 if (holdButton != null) holdButton.LetGo();
                 PaintButtonState();
@@ -534,6 +553,7 @@ namespace GlowUp.Scan
             nextLook = 0f; pausedFor = 0f; sinceProgress = 0f;
             PaintButtonState();
             ShowGuidance();
+            if (photoAfterCameraStarts) { photoAfterCameraStarts = false; EnterPhotoMode(); }
         }
 
         void StopCamera()
@@ -574,21 +594,73 @@ namespace GlowUp.Scan
             if (!Mathf.Approximately(t.localScale.x, size)) t.localScale = Vector3.one * size;
         }
 
-        /// <summary>The camera button shows while a scan has run for a while without finishing (wrong or slow): it takes ONE photo for the web search.</summary>
+        /// <summary>
+        /// The mode switch at the right of the control bar (New13 item 1, 10 November 2026). It is always in its slot (so nothing shifts),
+        /// usable while the screen is not busy: in live mode it shows the camera (take a photo), in photo mode the live-scan frame. It is
+        /// dimmed, not hidden, while it cannot be used. Also runs the list block (ShowListHelp).
+        /// </summary>
         void ShowPhotoButtonIfSlow()
         {
+            ShowListHelp();
             if (photoButton == null || snapshot == null) return;
-            // offered from the start (10 November 2026): live scan OR a photo, the user chooses; hidden in photo mode and under a pop-up
-            bool want = stage == Stage.Scanning && !photoMode && !snapshot.IsOpen && !snapshot.PreviewOpen && !PopupOpen;
-            if (want == photoButton.gameObject.activeSelf) return;
-            photoButton.gameObject.SetActive(want);
-            if (want && !photoHintSaid) { photoHintSaid = true; Say(msgPhotoHint); }
+            bool usable = (stage == Stage.Scanning || stage == Stage.Idle) && !snapshot.IsOpen && !snapshot.PreviewOpen && !PopupOpen;
+            if (!photoButton.gameObject.activeSelf) photoButton.gameObject.SetActive(true);
+            if (photoButton.interactable != usable) photoButton.interactable = usable;
+            if (cameraModeIcon != null && cameraModeIcon.activeSelf == photoMode) cameraModeIcon.SetActive(!photoMode);
+            if (liveModeIcon != null && liveModeIcon.activeSelf != photoMode) liveModeIcon.SetActive(photoMode);
+            if (modeHint != null) modeHint.words = photoMode ? liveModeName : photoModeName;
+            if (stage == Stage.Scanning && !photoMode && !photoHintSaid) { photoHintSaid = true; Say(msgPhotoHint); }
         }
+
+        LongPressHint modeHint;
+        bool photoAfterCameraStarts;                  // the camera button was tapped before the camera ran: photo mode once it runs
 
         void OnPhotoButton()
         {
-            if (snapshot == null || stage != Stage.Scanning) return;
-            EnterPhotoMode();
+            if (modeHint != null && modeHint.ConsumeHold()) return;        // the hold said the button's name; it is not a tap
+            if (snapshot == null) return;
+            if (photoMode) { ExitPhotoMode(); return; }
+            if (stage == Stage.Scanning) { EnterPhotoMode(); return; }
+            if (stage == Stage.Idle)
+            {
+                // the camera is off: switch it on for the photo (no live scanning in between)
+                photoAfterCameraStarts = true;
+                stage = Stage.Starting;
+                Say(msgStarting);
+                PaintButtonState();
+                if (cameraFeed != null) cameraFeed.StartCamera(); else OnCameraStarted(false, "No camera view in this scene.");
+            }
+        }
+
+        // ---------------------------------------------------------------------------------------
+        //  The ingredient list block (New13 item 2): hidden by default, shown after a scan or a photo that found no list (a failure
+        //  message was said, or the scan got stuck), and while a look-up runs. While it shows, the hint and the "Is this ...?" banner on
+        //  the camera picture move up above it, so they never cover each other. The type-it-in sheet has its own look-up (Analyse).
+        // ---------------------------------------------------------------------------------------
+        bool listHelpWanted;
+        float guideHintRestY = float.NaN, questionRestY = float.NaN;
+
+        /// <summary>The messages after which the list block is offered.</summary>
+        bool IsNoListMessage(string message) =>
+            !string.IsNullOrEmpty(message) && (message == msgNoListFound || message == msgWebNoMatch || message == msgAiUnavailable || message == msgStalled
+                || message.StartsWith(msgNoListButFda.Split('{')[0], StringComparison.Ordinal) || (snapshot != null && message == msgSnapshotStuck));
+
+        void ShowListHelp()
+        {
+            if (listHelp == null) return;
+            bool show = (listHelpWanted || lookingUp) && ingredientText == null && !photoMode && stage != Stage.Leaving && stage != Stage.Recognising;
+            if (listHelp.activeSelf != show) listHelp.SetActive(show);
+            float lift = show ? ((RectTransform)listHelp.transform).rect.height + 24f : 0f;
+            Lift(guideHint, ref guideHintRestY, lift);
+            Lift(questionBanner, ref questionRestY, lift);
+        }
+
+        static void Lift(RectTransform rt, ref float restY, float by)
+        {
+            if (rt == null) return;
+            if (float.IsNaN(restY)) restY = rt.anchoredPosition.y;
+            float y = restY + by;
+            if (!Mathf.Approximately(rt.anchoredPosition.y, y)) rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, y);
         }
 
         // ---------------------------------------------------------------------------------------
@@ -604,7 +676,6 @@ namespace GlowUp.Scan
 
         bool photoMode;
         Button shutter;
-        Button liveScanButton;
 
         void EnterPhotoMode()
         {
@@ -613,9 +684,7 @@ namespace GlowUp.Scan
             photoMode = true;
             BuildShutter();
             if (holdButton != null) holdButton.gameObject.SetActive(false);
-            if (photoButton != null) photoButton.gameObject.SetActive(false);
             if (shutter != null) shutter.gameObject.SetActive(true);
-            if (liveScanButton != null) liveScanButton.gameObject.SetActive(true);
             Say(msgPhotoModeHint);
         }
 
@@ -624,7 +693,6 @@ namespace GlowUp.Scan
             if (!photoMode) return;
             photoMode = false;
             if (shutter != null) shutter.gameObject.SetActive(false);
-            if (liveScanButton != null) liveScanButton.gameObject.SetActive(false);
             if (holdButton != null) holdButton.gameObject.SetActive(true);
             Say("");
         }
@@ -646,23 +714,15 @@ namespace GlowUp.Scan
             Image ring = RuntimeUiKit.Icon(rt, "Ring", RuntimeIcons.Circle, p.surface, side * 0.78f);
             Image core = RuntimeUiKit.Icon(rt, "Core", RuntimeIcons.Circle, p.buttonFill, side * 0.66f);
             Sprite camera = null;
-            if (photoButton != null) foreach (Image i in photoButton.GetComponentsInChildren<Image>(true)) if (i.gameObject != photoButton.gameObject && i.sprite != null) { camera = i.sprite; break; }
+            if (cameraModeIcon != null && cameraModeIcon.TryGetComponent(out Image modeIcon)) camera = modeIcon.sprite;
+            if (camera == null && photoButton != null) foreach (Image i in photoButton.GetComponentsInChildren<Image>(true)) if (i.gameObject != photoButton.gameObject && i.sprite != null) { camera = i.sprite; break; }
             if (camera != null) RuntimeUiKit.Icon(rt, "Camera", camera, p.buttonText, side * 0.36f);
             shutter = round.gameObject.AddComponent<Button>();
             shutter.targetGraphic = round;
             shutter.onClick.AddListener(() => { if (snapshot != null) snapshot.CaptureNow(); });
             _ = ring; _ = core;
-
-            // back to live scanning: a small pill above the capture button
-            liveScanButton = RuntimeUiKit.Pill(place.parent, "LiveScanButton", liveScanLabel, p.accent, p.mainText, RuntimeTheme.Font(GlowUp.Theme.FontRole.Button, scanButtonLabel), true);
-            var lrt = (RectTransform)liveScanButton.transform;
-            lrt.anchorMin = place.anchorMin; lrt.anchorMax = place.anchorMax; lrt.pivot = new Vector2(0.5f, 0f);
-            lrt.sizeDelta = new Vector2(320f, 112f);
-            lrt.anchoredPosition = place.anchoredPosition + new Vector2(0f, side * (1f - place.pivot.y) + 24f);
-            var le = liveScanButton.GetComponent<LayoutElement>(); if (le != null) le.ignoreLayout = true;
-            liveScanButton.onClick.AddListener(ExitPhotoMode);
+            // back to live scanning is the mode switch at the right of the bar (New13 item 1): no "Live scan" pill over the text any more
             shutter.gameObject.SetActive(false);
-            liveScanButton.gameObject.SetActive(false);
         }
 
         /// <summary>The text in the user's box matched catalogue products: the same pick list as the live scan uses.</summary>
@@ -705,7 +765,10 @@ namespace GlowUp.Scan
             {
                 // PAUSE, DON'T RESET: the ring keeps what it has. Only a long pause puts the scan back to the start
                 // (the time a pop-up is open does not count: the user is reading or typing).
-                if (!PopupOpen) pausedFor += Time.unscaledDeltaTime;
+                // New13 item 8: photo mode pauses live reading too, and this timer then switched the camera off after 30 s ("The scan was
+                // paused for a while..."): the next capture was black. Photo mode and its "Check your photo" card do not count as a pause.
+                bool photoBusy = photoMode || (snapshot != null && snapshot.PreviewOpen);
+                if (!PopupOpen && !photoBusy) pausedFor += Time.unscaledDeltaTime;
                 if (pausedFor > pauseResetSeconds)
                 {
                     bool hadSomething = evidence.Pictures > 0;
@@ -1136,6 +1199,7 @@ namespace GlowUp.Scan
         /// <summary>A message in the place of the status line. While scanning it stays until the status changes (a part of the ring fills, the button is pressed or let go).</summary>
         void Say(string message)
         {
+            if (IsNoListMessage(message)) listHelpWanted = true;
             if (statusText != null) statusText.text = message;
             shownStatus = null;
             messageOver = stage == Stage.Scanning ? StatusNow() : null;
@@ -1143,6 +1207,7 @@ namespace GlowUp.Scan
 
         void ResetChecklist()
         {
+            listHelpWanted = false;
             foreach (ScanCheckItem item in new[] { productCheck, brandCheck, typeCheck, shadeCheck, ingredientsCheck }) if (item != null) item.SetPending();
             if (shadeSwatch != null) shadeSwatch.gameObject.SetActive(false);
         }

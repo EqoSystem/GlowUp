@@ -94,6 +94,9 @@ namespace GlowUp.Onboarding
 
         IEnumerator Start()
         {
+            showSteps = !readOnly && openedFromSignUp;
+            openedFromSignUp = false;
+            LayHeader();
             if (!readOnly) OnboardingSession.LoadDraft();
             // reading only (from Settings or the log-in page): no status line at all (the old "Viewing only..." line read like a log, 7 November 2026)
             Say(readOnly ? "" : msgScrollFirst);
@@ -256,12 +259,83 @@ namespace GlowUp.Onboarding
             SyncQueue.EnqueueSet($"{collection}/{Guid.NewGuid():N}", rec);
         }
 
+        /// <summary>
+        /// The two hints about the boxes ("Scroll to the bottom...", "Tick the box...") stay in the one-line hint above Continue; everything
+        /// else (creating the profile, a slow connection, a lost session) is a toast at the top (New13 item 5, 10 November 2026).
+        /// </summary>
         void Say(string m)
         {
             if (feedbackText == null) return;
             if (readOnly) m = "";                        // nothing to tick or continue while only reading
+            bool hint = string.IsNullOrEmpty(m) || m == msgScrollFirst || m == msgTickToContinue;
+            if (!hint)
+            {
+                OnboardingNotices.Toast(feedbackText, m == msgCreating ? FormalToast.Kind.Info : FormalToast.Kind.Error, m);
+                m = "";
+            }
+            OnboardingNotices.OneLine(feedbackText);
             feedbackText.text = m;
             feedbackText.gameObject.SetActive(!string.IsNullOrEmpty(m));
+        }
+
+        // ---------------------------------------------------------------------------------------
+        //  The header (New13 item 3, 10 November 2026): the page name wrapped onto the progress bar. Now it flows: the name (at most two
+        //  lines, centred, clear of the Back arrow and the X), then the bar 12 units under it, then "Step 5 of 5", then the document.
+        //  The bar and its line show ONLY when the page was opened by Generate Profile on Step 5 (OpenFromSignUp).
+        // ---------------------------------------------------------------------------------------
+        static bool openedFromSignUp;
+        /// <summary>Step 5's Generate Profile opens this page as the last step of the sign-up (the progress bar shows).</summary>
+        public static void OpenFromSignUp() { openedFromSignUp = true; }
+        bool showSteps;
+
+        void LayHeader()
+        {
+            RectTransform card = feedbackText != null ? feedbackText.transform.parent as RectTransform : null;
+            if (card == null) return;
+            OnboardingProgressBar bar = FindObjectOfType<OnboardingProgressBar>(true);
+            TMP_Text subtitle = null;
+            foreach (TMP_Text t in card.GetComponentsInChildren<TMP_Text>(true))
+                if (t.transform.parent == card && (t.name == "PrivacyPolicySubtitleText" || t.name == "SubtitleText" || t.name == "SectionHeaderText")) { subtitle = t; break; }
+            if (subtitle == null) return;
+            TMP_Text stepLine = null;
+            foreach (TMP_Text t in card.GetComponentsInChildren<TMP_Text>(true)) if (t.name == "StepText") { stepLine = t; break; }
+
+            const float nameTop = 176f, sideRoom = 140f, gap = 12f, barHeight = 16f, stepHeight = 46f;
+            var srt = subtitle.rectTransform;
+            srt.anchorMin = new Vector2(0f, 1f); srt.anchorMax = new Vector2(1f, 1f); srt.pivot = new Vector2(0.5f, 1f);
+            subtitle.enableWordWrapping = true; subtitle.overflowMode = TextOverflowModes.Ellipsis;
+            subtitle.alignment = TextAlignmentOptions.Top;
+            float width = card.rect.width - 2f * sideRoom;
+            float size = subtitle.fontSize, lineHeight = 0f, height = 0f;
+            for (; size >= 34f; size -= 2f)
+            {
+                subtitle.fontSize = size;
+                height = subtitle.GetPreferredValues(subtitle.text, width, 0f).y;
+                lineHeight = subtitle.GetPreferredValues("Ag", width, 0f).y;
+                if (height <= lineHeight * 2.05f) break;
+            }
+            subtitle.enableAutoSizing = false;
+            height = Mathf.Min(height, lineHeight * 2.05f);
+            srt.sizeDelta = new Vector2(-2f * sideRoom, height);
+            srt.anchoredPosition = new Vector2(0f, -nameTop);
+            float y = nameTop + height + gap;
+
+            if (bar != null)
+            {
+                if (showSteps)
+                {
+                    var brt = (RectTransform)bar.transform;
+                    brt.anchoredPosition = new Vector2(brt.anchoredPosition.x, -y); y += barHeight + 8f;
+                    if (stepLine != null) { var lrt = stepLine.rectTransform; lrt.anchoredPosition = new Vector2(lrt.anchoredPosition.x, -y); y += stepHeight; }
+                }
+                else bar.HideForReading();
+            }
+            y += 14f;
+            if (policyScroll != null)
+            {
+                var prt = (RectTransform)policyScroll.transform;
+                if (prt.anchorMin.y < prt.anchorMax.y) prt.offsetMax = new Vector2(prt.offsetMax.x, -Mathf.Max(y, 300f));
+            }
         }
     }
 

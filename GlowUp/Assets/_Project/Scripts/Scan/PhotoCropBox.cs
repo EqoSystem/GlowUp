@@ -21,6 +21,11 @@ namespace GlowUp.Scan
 
         RectTransform photo, box;
         readonly List<Image> shapes = new List<Image>();
+        // New13 item 8: everything OUTSIDE the box is tinted blue (four pieces round the box = an even-odd cut-out), the box edge glows
+        readonly RectTransform[] outside = new RectTransform[4];
+        public static readonly Color OutsideTint = new Color(0.09f, 0.32f, 0.78f, 0.45f);
+        public static readonly Color EdgeLight = new Color(0.62f, 0.85f, 1f, 1f);       // light blue on a dark rim: 3:1 or more on any photo
+        public static readonly Color EdgeRim = new Color(0.02f, 0.08f, 0.2f, 0.85f);
         Rect area = new Rect(0.1f, 0.1f, 0.8f, 0.8f);
         Color line;
 
@@ -34,12 +39,29 @@ namespace GlowUp.Scan
             ThemeProfile.Palette p = RuntimeTheme.Palette;
             crop.line = p.buttonFill;
 
+            // the blue tint outside the box: under the box, over the photo; it takes no touches
+            for (int i = 0; i < 4; i++)
+            {
+                Image tint = RuntimeUiKit.Box(photoRect, "OutsideTint" + i, OutsideTint, false);
+                tint.raycastTarget = false;
+                crop.outside[i] = tint.rectTransform;
+            }
             crop.box = RuntimeUiKit.Rect("CropBox", photoRect);
-            // the edges: four thin lines (no fill, so the photo stays visible)
-            Edge(crop.box, "Top", new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, -2), new Vector2(0, 2), crop.line);
-            Edge(crop.box, "Bottom", new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, -2), new Vector2(0, 2), crop.line);
-            Edge(crop.box, "Left", new Vector2(0, 0), new Vector2(0, 1), new Vector2(-2, 0), new Vector2(2, 0), crop.line);
-            Edge(crop.box, "Right", new Vector2(1, 0), new Vector2(1, 1), new Vector2(-2, 0), new Vector2(2, 0), crop.line);
+            // a soft blue glow just outside the edge, then a dark rim and a light-blue line (readable on light and dark photos)
+            Image glow = RuntimeUiKit.Box(crop.box, "EdgeGlow", new Color(EdgeLight.r, EdgeLight.g, EdgeLight.b, 0.35f));
+            glow.raycastTarget = false; glow.fillCenter = false;
+            RuntimeUiKit.Stretch(glow.rectTransform, -10, -10, -10, -10);
+            foreach (var (name, min, max, offMin, offMax) in new[]
+            {
+                ("Top", new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, -2), new Vector2(0, 2)),
+                ("Bottom", new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, -2), new Vector2(0, 2)),
+                ("Left", new Vector2(0, 0), new Vector2(0, 1), new Vector2(-2, 0), new Vector2(2, 0)),
+                ("Right", new Vector2(1, 0), new Vector2(1, 1), new Vector2(-2, 0), new Vector2(2, 0))
+            })
+            {
+                Edge(crop.box, name + "Rim", min, max, offMin * 2.5f, offMax * 2.5f, EdgeRim);
+                Edge(crop.box, name, min, max, offMin, offMax, EdgeLight);
+            }
             // the whole box can be moved
             var body = crop.box.gameObject.AddComponent<Image>();
             body.color = new Color(1f, 1f, 1f, 0.001f);
@@ -53,6 +75,8 @@ namespace GlowUp.Scan
                 corner.sizeDelta = new Vector2(Handle, Handle);
                 var hit = corner.gameObject.AddComponent<Image>();
                 hit.color = new Color(1f, 1f, 1f, 0.001f);
+                Image rim = RuntimeUiKit.Icon(corner, "DotRim", RuntimeIcons.Circle, EdgeRim, 42);
+                rim.rectTransform.anchoredPosition = Vector2.zero;
                 Image dot = RuntimeUiKit.Icon(corner, "Dot", RuntimeIcons.Circle, crop.line, 34);
                 dot.rectTransform.anchoredPosition = Vector2.zero;
                 corner.gameObject.AddComponent<CropDrag>().Init(crop, i);
@@ -83,7 +107,24 @@ namespace GlowUp.Scan
             box.anchorMin = new Vector2(area.xMin, area.yMin);
             box.anchorMax = new Vector2(area.xMax, area.yMax);
             box.offsetMin = box.offsetMax = Vector2.zero;
+            // the tint: below, above, left of and right of the box (the inside stays clear)
+            Rect[] parts = OutsideParts(area);
+            for (int i = 0; i < 4; i++)
+            {
+                if (outside[i] == null) continue;
+                outside[i].anchorMin = parts[i].min; outside[i].anchorMax = parts[i].max;
+                outside[i].offsetMin = outside[i].offsetMax = Vector2.zero;
+            }
         }
+
+        /// <summary>The four pieces of the photo outside `inside` (0..1 space): below, above, left, right. Together with `inside` they cover the photo once.</summary>
+        public static Rect[] OutsideParts(Rect inside) => new[]
+        {
+            Rect.MinMaxRect(0f, 0f, 1f, inside.yMin),
+            Rect.MinMaxRect(0f, inside.yMax, 1f, 1f),
+            Rect.MinMaxRect(0f, inside.yMin, inside.xMin, inside.yMax),
+            Rect.MinMaxRect(inside.xMax, inside.yMin, 1f, inside.yMax)
+        };
 
         /// <summary>Outlines the text lines found: `found` is in the space of the CUT photo (0..1 of the box).</summary>
         public void ShowShapes(Rect[] found)

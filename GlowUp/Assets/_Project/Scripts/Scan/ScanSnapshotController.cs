@@ -95,6 +95,10 @@ namespace GlowUp.Scan
         [Tooltip("{0} = the product, in medium weight")]
         [SerializeField] private string msgSearching = "Searching for {0}…";
         [SerializeField] private string msgUnclear = "We couldn't read this clearly. Retake the photo in good light, or type the product in.";
+        [Tooltip("New13 item 8: the captured picture was (nearly) black: it is not shown")]
+        [SerializeField] private string msgTooDark = "Photo is too dark. Turn on the flashlight or move to the light, then retake it.";
+        [SerializeField] private string msgTooBlurry = "Photo is too blurry. Hold the phone steady and retake it.";
+        [SerializeField] private string msgNotReady = "The camera wasn't ready. Wait a moment, then take the photo again.";
         [SerializeField] private string msgNoCameraV2 = "The camera isn't running. Close this, tap the scan button, then try again.";
         [SerializeField] private string msgOfflineV2 = "You're offline. Try again when you're connected, or type the product in.";
         [SerializeField] private string msgNotAvailable = "Photo look-up isn't available right now. You can type the product in.";
@@ -259,6 +263,15 @@ namespace GlowUp.Scan
             DropPhoto();
             photo = cameraFeed.CaptureUpright(null, readSide);                   // the whole picture, not only the scan frame
             if (photo == null) { Say(StatusMessage.Kind.Error, msgNoCameraV2, true); return; }
+            // New13 item 8: a black, unready or very blurry picture is never shown as "Check your photo": the user retakes it
+            PhotoCaptureCheck.Verdict quality = PhotoCaptureCheck.Judge(photo);
+            if (quality != PhotoCaptureCheck.Verdict.Ok)
+            {
+                DropPhoto();
+                string why = quality == PhotoCaptureCheck.Verdict.TooDark ? msgTooDark : quality == PhotoCaptureCheck.Verdict.TooBlurry ? msgTooBlurry : msgNotReady;
+                if (CaptureModeRequested != null) Toast(why, FormalToast.Kind.Warning); else Say(StatusMessage.Kind.Error, why, true);
+                return;
+            }
             if (preview == null)
             {
                 preview = PhotoPreview.Build(panel != null ? panel.transform : transform, promptText, previewTitle, previewNotice, retakeLabel, usePhotoLabel, notNowLabel);
@@ -293,10 +306,10 @@ namespace GlowUp.Scan
         public void ClosePreviewByBack() { if (PreviewOpen) BackToCapture(); }
 
         FormalToast toast;
-        void Toast(string words)
+        void Toast(string words, FormalToast.Kind kind = FormalToast.Kind.Error)
         {
             if (toast == null) toast = FormalToast.OnScreen(transform, promptText);
-            if (toast != null) toast.Show(FormalToast.Kind.Error, StatusMessage.Plain(words));
+            if (toast != null) toast.Show(kind, StatusMessage.Plain(words));
         }
 
         TaskCompletionSource<bool> choice;

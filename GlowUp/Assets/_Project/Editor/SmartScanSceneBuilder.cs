@@ -21,7 +21,11 @@ namespace GlowUp.EditorTools
     /// </summary>
     public static class SmartScanSceneBuilder
     {
-        const float BottomBlock = 730;          // space under the camera view for the checklist, the status line and the hold button
+        // New13 items 1 and 2 (10 November 2026): under the camera, from the bottom up: the control bar (Type it in | scan | photo/live),
+        // the row of Start over / Finish, the status line, and ONE row of four chips (product, brand, type, shade). 130 units more camera.
+        const float BottomBlock = 600;          // space under the camera view
+        const float BarCentre = RingBottom + RingSize * 0.5f, SideButton = 132;          // 132 units = 44 dp
+        const float ActionRowY = 300, ActionRowH = 96, StatusY = 406, StatusH = 76, ChipRowY = 494, ChipRowH = 92;
         const float RingSize = 264, HoldSize = 190, RingBottom = 24;
         static readonly string[] ZoneNames = { "Brand", "ProductName", "CosmeticType", "Barcode", "Ingredients" };
 
@@ -118,10 +122,7 @@ namespace GlowUp.EditorTools
             var boost = SceneBuilderCore.Ensure<ScreenBrightnessBoost>(sun.gameObject);
             A.Set(boost, "screen", (int)ScreenBrightnessBoost.CameraScreen.Scanner); A.Set(boost, "toggleButton", sun); A.Set(boost, "toggleIcon", sunIcon);
 
-            // ---- the photo button: under the sun, shown when the scan takes long; one photo goes to the web search ----
-            Button photoFallback = CameraButton(viewport.transform, "PhotoFallbackButton", IconFactory.CameraIcon, out Image photoFallbackIcon);
-            A.At(photoFallback.transform, A.TR, new Vector2(-24, -128), new Vector2(92, 92));
-            photoFallback.gameObject.SetActive(false);
+            // (the small camera button that sat in the camera view under the sun is gone: New13 item 1 moved it to the bottom bar)
 
             // ---- the flashlight: its button, and the question that appears when it is dark ----
             GameObject lightHelper = A.Node(viewport.transform, "LightAssistant", typeof(ScanLightAssistant));
@@ -201,44 +202,44 @@ namespace GlowUp.EditorTools
             A.Set(productQuestion, "banner", questionBanner.gameObject); A.Set(productQuestion, "questionText", questionText);
             A.Set(productQuestion, "yesButton", questionYes); A.Set(productQuestion, "noButton", questionNo);
 
-            // ---- what was found: the product on the left, its ingredient list on the right ----
-            Image list = A.Panel(card, "ScanChecklist", ThemeRole.SurfaceAlt, Kit.PanelAlpha, 48f);
-            A.BottomStrip(list.transform, 446, 276);
-
-            GameObject foundProduct = A.Node(list.transform, "Found_Product");
-            A.Share(foundProduct.transform, 0f, 0.55f);
-            ScanCheckItem productCheck = CheckRow(foundProduct.transform, "ProductNameCheck", "Product name", 0);
-            ScanCheckItem brandCheck = CheckRow(foundProduct.transform, "BrandCheck", "Brand", 1);
-            ScanCheckItem typeCheck = CheckRow(foundProduct.transform, "CosmeticTypeCheck", "Cosmetic type", 2);
-            ScanCheckItem shadeCheck = CheckRow(foundProduct.transform, "ShadeCheck", "Shade colour and texture", 3);
-            Image swatch = A.RawPanel(shadeCheck.transform, "ShadeSwatch", new Color32(194, 75, 98, 255), 30f);
-            A.At(swatch.transform, A.MR, new Vector2(-4, 0), new Vector2(30, 30));
-            A.Outline(swatch.transform, ThemeRole.Gold, 30f);
+            // ---- what was found: ONE row of four chips (New13 item 2). A chip shows an empty ring until its thing is found, then a filled
+            //      check and what was found. The row has a fixed height, so nothing under it moves. ----
+            GameObject chips = A.Node(card, "FoundChips");
+            A.BottomStrip(chips.transform, ChipRowY, ChipRowH);
+            ScanCheckItem productCheck = Chip(chips.transform, "ProductNameCheck", "Product name", 0);
+            ScanCheckItem brandCheck = Chip(chips.transform, "BrandCheck", "Brand", 1);
+            ScanCheckItem typeCheck = Chip(chips.transform, "CosmeticTypeCheck", "Cosmetic type", 2);
+            ScanCheckItem shadeCheck = Chip(chips.transform, "ShadeCheck", "Shade & texture", 3);
+            Image swatch = A.RawPanel(shadeCheck.transform, "ShadeSwatch", new Color32(194, 75, 98, 255), 26f);
+            A.At(swatch.transform, A.TR, new Vector2(-8, -8), new Vector2(26, 26));
+            A.Outline(swatch.transform, ThemeRole.Gold, 26f);
             swatch.gameObject.SetActive(false);              // shown with the colour of the shade that was found
 
-            Image split = A.Panel(list.transform, "Divider", ThemeRole.Gold, 0.45f, 2f);
-            split.sprite = IconFactory.Square; split.type = Image.Type.Simple;
-            var splitRect = split.rectTransform; splitRect.anchorMin = new Vector2(0.55f, 0); splitRect.anchorMax = new Vector2(0.55f, 1); splitRect.pivot = A.MC;
-            splitRect.offsetMin = new Vector2(-1.5f, 24); splitRect.offsetMax = new Vector2(1.5f, -24);
-
-            GameObject foundList = A.Node(list.transform, "Found_Ingredients");
-            A.Share(foundList.transform, 0.55f, 1f);
+            // ---- the ingredient list block: HIDDEN until it helps (New13 item 2): after a scan or a photo that found no list. It sits at the
+            //      bottom of the camera view; the hint on the picture moves up above it while it shows. The type-it-in sheet has its own look-up. ----
+            Image listHelp = A.RawPanel(viewport.transform, "IngredientListHelp", new Color(0, 0, 0, 0.78f), 40f);
+            listHelp.raycastTarget = true;
+            A.BottomStrip(listHelp.transform, 24, 132, 24, 24);
+            GameObject foundList = A.Node(listHelp.transform, "Found_Ingredients");
+            A.Share(foundList.transform, 0f, 0.56f, 0, 0, 0);
             ScanCheckItem ingredientsCheck = CheckRow(foundList.transform, "IngredientListCheck", "Ingredient list", 0);
-            TextMeshProUGUI lookUpHint = A.Label(foundList.transform, "LookUpHintText", "No list on the product, or no packaging?", 24, ThemeRole.SecondaryText, FontRole.Body,
-                                                 TextAlignmentOptions.Center, true);
-            A.BottomStrip(lookUpHint.transform, 104, 70, 22, 22);
-            A.ShrinkWrapped(lookUpHint, 20);
-            Button lookUp = A.PillButton(foundList.transform, "LookUpButton", "Look it up", 28, ThemeRole.InputBackground, ThemeRole.MainText, IconFactory.Ai);
-            A.BottomStrip(lookUp.transform, 24, 72, 26, 26);
-            A.Outline(lookUp.transform, ThemeRole.Gold, 72f);
+            A.TopStrip(ingredientsCheck.transform, 16, 48, 26, 8);
+            TextMeshProUGUI lookUpHint = A.RawLabel(foundList.transform, "LookUpHintText", "No list on the product, or no packaging?", 24, new Color(1, 1, 1, 0.82f), FontRole.Body,
+                                                    TextAlignmentOptions.TopLeft, true);
+            A.TopStrip(lookUpHint.transform, 68, 56, 26, 8);
+            A.ShrinkWrapped(lookUpHint, 18);
+            Button lookUp = A.PillButton(listHelp.transform, "LookUpButton", "Look it up", 30, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Ai);
+            var lookUpRect = (RectTransform)lookUp.transform;
+            lookUpRect.anchorMin = new Vector2(0.58f, 0.5f); lookUpRect.anchorMax = new Vector2(1f, 0.5f); lookUpRect.pivot = A.MC;
+            lookUpRect.offsetMin = new Vector2(0, -50); lookUpRect.offsetMax = new Vector2(-20, 50);
+            A.Shrink(A.LabelOf(lookUp), 22);
+            listHelp.gameObject.SetActive(false);
 
-            // ---- the status line and the type-it-in link ----
-            TextMeshProUGUI status = A.Label(card, "StatusText", "Tap once to scan. Show one clear product view.", 31,
+            // ---- the status line: its own row (two lines at most), above the buttons ----
+            TextMeshProUGUI status = A.Label(card, "StatusText", "Tap once to scan. Show one clear product view.", 30,
                                              ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.Center, true);
-            A.BottomStrip(status.transform, 352, 86, 52, 52);
-            A.ShrinkWrapped(status, 24);
-            Button manualEntry = A.LinkButton(card, "ManualEntryButton", "Type the product in instead", 30, ThemeRole.SecondaryText);
-            A.BottomStrip(manualEntry.transform, 292, 56, 180, 180);
+            A.BottomStrip(status.transform, StatusY, StatusH, 52, 52);
+            A.ShrinkWrapped(status, 22);
 
             // ---- TAP TO SCAN: the round button, and round it the ring of five segments that fills as the product is read ----
             GameObject hold = A.Node(card, "HoldToScan");
@@ -268,13 +269,29 @@ namespace GlowUp.EditorTools
             // a Canvas Group on the button, so the dimming while it is locked is an object you can see in the Hierarchy and Inspector
             A.Set(holdButton, "dimGroup", SceneBuilderCore.Ensure<CanvasGroup>(disc.gameObject));
 
-            // beside the ring: start over (left) and finish (right). Both appear when there is something to start over or to finish.
-            float side = (Kit.CardWidth - RingSize) * 0.5f + 28f;       // from the card's edge to the far edge of a side button
+            // ---- the control bar (New13 item 1): three slots in one row, centred on the scan button.
+            //      LEFT: "Type it in" (a real button). CENTRE: the scan button (the capture button in photo mode). RIGHT: one round icon button
+            //      that switches mode: the camera (take a photo) in live mode, the live-scan frame in photo mode. Fixed sizes: nothing shifts. ----
+            float slot = (Kit.CardWidth - RingSize) * 0.5f - A.Pad - 24f;          // width of a side slot (from the card's padding to the ring's gap)
+            Button manualEntry = A.PillButton(card, "ManualEntryButton", "Type it in", 32, ThemeRole.Surface, ThemeRole.MainText, IconFactory.Pencil);
+            A.At(manualEntry.transform, A.BL, new Vector2(A.Pad, BarCentre - SideButton * 0.5f), new Vector2(slot, SideButton));
+            A.Outline(manualEntry.transform, ThemeRole.Accent, SideButton);
+            A.Shrink(A.LabelOf(manualEntry), 24);
+            Button photoFallback = A.IconButton(card, "ModeSwitchButton", IconFactory.CameraIcon, SideButton, 60, ThemeRole.MainText, ThemeRole.SurfaceAlt);
+            A.At(photoFallback.transform, A.BR, new Vector2(-(A.Pad + (slot - SideButton) * 0.5f), BarCentre - SideButton * 0.5f), new Vector2(SideButton, SideButton));
+            A.Outline(photoFallback.transform, ThemeRole.Accent, SideButton);
+            Image cameraModeIcon = photoFallback.transform.Find("Icon").GetComponent<Image>();
+            cameraModeIcon.name = "CameraIcon";
+            Image liveModeIcon = A.Icon(photoFallback.transform, "LiveScanIcon", IconFactory.ScanFrame, 60, ThemeRole.MainText);
+            liveModeIcon.gameObject.SetActive(false);        // shown in photo mode instead of the camera
+            SceneBuilderCore.Ensure<ButtonPressFeedback>(photoFallback.gameObject);
+
+            // ---- Start over (left) and Finish (right): their own row above the bar; each appears when it can be used ----
             Button startOver = A.PillButton(card, "StartOverButton", "Start over", 30, ThemeRole.SurfaceAlt, ThemeRole.MainText);
-            A.BottomStrip(startOver.transform, RingBottom + RingSize * 0.5f - 46, 92, A.Pad, Kit.CardWidth - side + 56f);
-            A.Outline(startOver.transform, ThemeRole.Accent, 92f);
+            A.BottomStrip(startOver.transform, ActionRowY, ActionRowH, A.Pad, Kit.CardWidth * 0.5f + 10f);
+            A.Outline(startOver.transform, ThemeRole.Accent, ActionRowH);
             Button finish = A.PillButton(card, "FinishButton", "Finish", 32, ThemeRole.ButtonFill, ThemeRole.ButtonText);
-            A.BottomStrip(finish.transform, RingBottom + RingSize * 0.5f - 46, 92, Kit.CardWidth - side + 56f, A.Pad);
+            A.BottomStrip(finish.transform, ActionRowY, ActionRowH, Kit.CardWidth * 0.5f + 10f, A.Pad);
             A.Shrink(A.LabelOf(finish), 22);
 
             // ---- "Start over": the same product, or a different one? ----
@@ -453,6 +470,10 @@ namespace GlowUp.EditorTools
             A.Set(controller, "typeCheck", typeCheck); A.Set(controller, "shadeCheck", shadeCheck); A.Set(controller, "shadeSwatch", swatch);
             A.Set(controller, "ingredientsCheck", ingredientsCheck);
             A.Set(controller, "lookUpButton", lookUp); A.Set(controller, "lookUpLabel", A.LabelOf(lookUp));
+            A.Set(controller, "listHelp", listHelp.gameObject); A.Set(controller, "guideHint", (RectTransform)hintPill.transform);
+            A.Set(controller, "questionBanner", (RectTransform)questionBanner.transform);
+            A.Set(controller, "cameraModeIcon", cameraModeIcon.gameObject); A.Set(controller, "liveModeIcon", liveModeIcon.gameObject);
+            SceneBuilderCore.ReplaceText(controller, "msgStalled", "Not getting further? Tap Start over, or tap Type it in.", "Not getting further? Tap Start over, or type the product in instead.");
             GlowUp.Scanning.GeminiApiConfig aiConfig = AppTiles.AiConfig();
             if (aiConfig != null) A.Set(controller, "aiConfig", aiConfig);
             A.Set(controller, "aiRecognisesProduct", true);
@@ -530,6 +551,36 @@ namespace GlowUp.EditorTools
         }
 
         /// <summary>One line of the checklist: an empty ring that becomes a glowing gold check mark, and the text.</summary>
+        /// <summary>One chip of the found row (index 0..3 of four equal chips): a soft rounded box, the ring / filled check on the left, the words beside it (two lines at most).</summary>
+        static ScanCheckItem Chip(Transform row, string name, string label, int index)
+        {
+            const float gap = 12f;
+            GameObject chip = A.Node(row, name, typeof(ScanCheckItem));
+            var rt = (RectTransform)chip.transform;
+            rt.anchorMin = new Vector2(index / 4f, 0f); rt.anchorMax = new Vector2((index + 1) / 4f, 1f); rt.pivot = A.MC;
+            rt.offsetMin = new Vector2(index == 0 ? 0f : gap * 0.5f, 0f); rt.offsetMax = new Vector2(index == 3 ? 0f : -gap * 0.5f, 0f);
+            Image back = A.Panel(chip.transform, "ChipBack", ThemeRole.SurfaceAlt, Kit.PanelAlpha, ChipRowH);
+            A.Fill(back.transform);
+            back.raycastTarget = false;
+            Image glow = A.RawIcon(chip.transform, "Glow", IconFactory.SoftDisc, 70, new Color32(184, 138, 59, 0));
+            A.At(glow.transform, A.ML, new Vector2(-4, 0), new Vector2(70, 70));
+            Image ring = A.RawIcon(chip.transform, "Ring", IconFactory.RingThin, 34, new Color32(139, 123, 122, 180));
+            A.At(ring.transform, A.ML, new Vector2(14, 0), new Vector2(34, 34));
+            Image mark = A.RawPanel(chip.transform, "CheckMark", new Color32(184, 138, 59, 255), 34f);
+            A.At(mark.transform, A.ML, new Vector2(14, 0), new Vector2(34, 34));
+            A.RawIcon(mark.transform, "Check", IconFactory.Check, 20, Color.white);
+            mark.gameObject.SetActive(false);                // fills in when the thing is found
+            TextMeshProUGUI text = A.Label(chip.transform, "Text", label, 24, ThemeRole.SecondaryText, FontRole.Label, TextAlignmentOptions.MidlineLeft, true);
+            A.Fill(text.transform, 56, 4, 12, 4);
+            A.ShrinkWrapped(text, 18);
+            text.overflowMode = TextOverflowModes.Ellipsis;
+            Object.DestroyImmediate(text.GetComponent<ThemedGraphic>());       // ScanCheckItem paints the text itself
+            var item = chip.GetComponent<ScanCheckItem>();
+            A.Set(item, "ring", ring); A.Set(item, "mark", mark.rectTransform); A.Set(item, "markDisc", mark);
+            A.Set(item, "glow", glow); A.Set(item, "text", text); A.Set(item, "label", label);
+            return item;
+        }
+
         static ScanCheckItem CheckRow(Transform parent, string name, string label, int index)
         {
             GameObject row = A.Node(parent, name, typeof(ScanCheckItem));

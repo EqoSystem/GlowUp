@@ -22,7 +22,7 @@ namespace GlowUp.Onboarding
 
         readonly List<GameObject> front = new List<GameObject>();
         CanvasGroup back;
-        Image tick;
+        CheckFillIndicator tick;
         bool showingBack, wantBack;
         float t = 1f;                       // 0..1 progress of the running turn; 1 = still
         bool swapped;
@@ -55,18 +55,15 @@ namespace GlowUp.Onboarding
             words.lineSpacing = -4;
             panel.gameObject.SetActive(false);
 
-            // the tick in the corner: the card is chosen, whichever face shows
-            tick = RuntimeUiKit.Icon(rt, "ChosenTick", RuntimeIcons.Check, p.buttonFill, 40);
-            var tr = tick.rectTransform;
-            tr.anchorMin = tr.anchorMax = tr.pivot = new Vector2(1f, 1f);
-            tr.anchoredPosition = new Vector2(-16f, -16f);
-            tick.gameObject.SetActive(false);
+            // the check in the corner: the card is chosen, whichever face shows. It FILLS when chosen (New13 item 7): the circle grows
+            // and fills with the brand colour, then the tick is drawn; it empties again when another card is chosen.
+            tick = CheckFillIndicator.AddTo(rt, 44f, 14f, p.buttonFill, p.buttonText);
         }
 
         /// <summary>The card was chosen (true) or another one was (false). `animate` = turn; false = jump (a page restoring a saved answer).</summary>
         public void SetSelected(bool on, bool wasSelected, bool animate)
         {
-            if (tick != null) { tick.gameObject.SetActive(on); tick.transform.SetAsLastSibling(); }
+            if (tick != null) tick.SetOn(on, animate);
             bool target;
             if (!on) target = false;                                   // another card was chosen: this one shows its front again
             else if (wasSelected) target = animate ? !wantBack : wantBack;   // the chosen card tapped again: it turns over

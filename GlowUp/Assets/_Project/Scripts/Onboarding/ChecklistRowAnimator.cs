@@ -65,9 +65,17 @@ namespace GlowUp.Onboarding
             checkCurve = AnimationCurve.Linear(0f, 0f, 1f, 1f);
         }
 
+        Color boxBorder = new Color32(110, 98, 101, 255);
+        Outline border;
+
         void Awake()
         {
             toggle = GetComponent<Toggle>();
+            if (checkBoxBackground != null && !checkBoxBackground.TryGetComponent(out border))
+            {
+                border = checkBoxBackground.gameObject.AddComponent<Outline>();
+                border.effectDistance = new Vector2(2.5f, -2.5f);
+            }
             baseScale = transform.localScale;
             shown = toggle.isOn;
             colorK = colorTarget = shown ? 1f : 0f;
@@ -79,7 +87,10 @@ namespace GlowUp.Onboarding
         {
             unselectedRow = p.inputBackground;
             selectedRow = Color.Lerp(p.inputBackground, p.accent, 0.38f);
-            unselectedBox = p.surfaceAlt;
+            // New13 item 3: the empty box was nearly the card's own colour. It is lighter now (dark theme) and always has a border
+            // in the secondary text colour, so an unticked box is clearly visible (at least 3:1 against the card).
+            unselectedBox = Color.Lerp(p.surfaceAlt, p.mainText, GlowUp.Common.RuntimeTheme.IsDark ? 0.30f : 0.06f); unselectedBox.a = 1f;
+            boxBorder = p.secondaryText;
             selectedBox = p.accent;
             checkColor = p.buttonText;
             glowColor = new Color(p.accent.r, p.accent.g, p.accent.b, 1f);
@@ -127,6 +138,7 @@ namespace GlowUp.Onboarding
         {
             if (rowBackground != null) rowBackground.color = Color.Lerp(unselectedRow, selectedRow, colorK);
             if (checkBoxBackground != null) checkBoxBackground.color = Color.Lerp(unselectedBox, selectedBox, colorK);
+            if (border != null) { Color b = Color.Lerp(boxBorder, selectedBox, colorK); b.a = 1f; border.effectColor = b; }
             if (checkmark != null) { var g = checkmark.GetComponent<Graphic>(); if (g != null) g.color = checkColor; }
             if (glowOutline != null) { var c = glowColor; c.a = glowMaxAlpha * colorK; glowOutline.color = c; }
         }

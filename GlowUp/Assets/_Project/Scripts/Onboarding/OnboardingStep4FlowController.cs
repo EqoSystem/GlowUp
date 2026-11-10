@@ -29,6 +29,7 @@ namespace GlowUp.Onboarding
 
         void Awake()
         {
+            OnboardingNotices.OneLine(feedbackText);          // the hint line above Continue stays one line (New13 item 5)
             if (allergens != null)
             {
                 allergens.Changed += Refresh;
@@ -80,7 +81,7 @@ namespace GlowUp.Onboarding
 
         void OnContinue()
         {
-            if (!Ready) { if (feedbackText != null) feedbackText.text = msgChooseOne; return; }
+            if (!Ready) { OnboardingNotices.Error(feedbackText, msgChooseOne); return; }
             OnboardingSession.Allergens = allergens.NoneSelected
                 ? new List<string> { UserProfileData.NoKnownAllergens }
                 : allergens.Selected;

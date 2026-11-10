@@ -70,3 +70,4 @@ graphify-out/
 GlowUp-Admin/
 tools/LiveScanGolden/bin/
 tools/LiveScanGolden/obj/
+tools/__pycache__/

@@ -68,7 +68,10 @@ namespace GlowUp.Onboarding
             _ = ListsRepository.Refresh();
             if (skinTypeGroup != null && !string.IsNullOrEmpty(OnboardingSession.SkinType)) skinTypeGroup.Select(OnboardingSession.SkinType, false);
             if (conditions != null) conditions.SetSelected(OnboardingSession.SkinConditions);
-            if (feedbackText != null) feedbackText.text = OnboardingSession.Social ? OnboardingSession.SocialReminder : "";
+            // the Google notice is a banner at the top of the page (New13 item 5C); the line under Add holds that row's own hints only
+            OnboardingNotices.OneLine(feedbackText);
+            if (feedbackText != null) feedbackText.text = "";
+            OnboardingNotices.SocialBanner(feedbackText, "step2", feedbackText);
             Refresh();
         }
 
@@ -89,7 +92,7 @@ namespace GlowUp.Onboarding
 
         void OnContinue()
         {
-            if (skinTypeGroup == null || string.IsNullOrEmpty(skinTypeGroup.Value)) { if (feedbackText != null) feedbackText.text = msgChooseSkinType; return; }
+            if (skinTypeGroup == null || string.IsNullOrEmpty(skinTypeGroup.Value)) { OnboardingNotices.Error(feedbackText, msgChooseSkinType); return; }
             OnboardingSession.SkinType = skinTypeGroup.Value;
             OnboardingSession.SkinConditions = conditions != null ? conditions.Selected : new System.Collections.Generic.List<string>();
             OnboardingSession.SaveDraft();

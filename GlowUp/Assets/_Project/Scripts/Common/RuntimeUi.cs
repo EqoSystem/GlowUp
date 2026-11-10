@@ -40,6 +40,20 @@ namespace GlowUp.Common
             return angle < 0f || angle > 80f;
         });
         public static Sprite Circle => Get("circle", (x, y) => x * x + y * y < 0.98f);
+        /// <summary>A tick alone (no ring), drawn left to right: Image.Type.Filled with Horizontal fill "draws" it.</summary>
+        public static Sprite Tick => Get("tick", (x, y) => Segment(x, y, -0.5f, 0.02f, -0.14f, -0.34f, 0.11f) || Segment(x, y, -0.14f, -0.34f, 0.52f, 0.32f, 0.11f));
+        /// <summary>A thin ring.</summary>
+        public static Sprite Ring => Get("ring", (x, y) => { float r = x * x + y * y; return r < 0.96f && r > 0.72f; });
+        /// <summary>Four corner brackets and a line across: the live scan icon.</summary>
+        public static Sprite ScanFrame => Get("scan_frame", (x, y) =>
+        {
+            const float a = 0.8f, len = 0.32f, h = 0.075f;
+            bool corner = false;
+            foreach (float sx in new[] { -1f, 1f })
+                foreach (float sy in new[] { -1f, 1f })
+                    corner |= Segment(x, y, sx * a, sy * a, sx * (a - len), sy * a, h) || Segment(x, y, sx * a, sy * a, sx * a, sy * (a - len), h);
+            return corner || Segment(x, y, -0.5f, 0f, 0.5f, 0f, h);
+        });
 
         /// <summary>A rounded box for 9-slicing (Image.Type.Sliced).</summary>
         public static Sprite RoundedBox

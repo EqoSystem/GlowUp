@@ -12,8 +12,9 @@ namespace GlowUp.EditorTools
     /// Builds/GlowUp.apk inside the project folder (next to Assets). Copy that file to the phone and open
     /// it there to install, or use File > Build Settings > Build And Run with the phone on a USB cable.
     ///
-    /// "Development Build" in File > Build Settings is respected (tick it to see the app's messages while
-    /// testing; leave it off for the version people will use).
+    /// This build is ALWAYS a release build (New13 item 6, 10 November 2026): Unity prints "Development Build" in the corner of every
+    /// screen of a development build, and that label must never reach users. The tick in File > Build Settings is ignored here; the
+    /// development build (the dev flag) is the separate menu GlowUp > Build Test APK (development).
     /// </summary>
     public static class AndroidApkBuilder
     {
@@ -65,7 +66,12 @@ namespace GlowUp.EditorTools
         }
 
         /// <summary>Builds the APK. Returns true when it was built; `message` says where it is, or what went wrong.</summary>
-        public static bool Build(out string message) => Build(out message, OutputFolder, FileName, EditorUserBuildSettings.development);
+        public static bool Build(out string message)
+        {
+            if (EditorUserBuildSettings.development)
+                Debug.Log("[GlowUp] \"Development Build\" is ticked in Build Settings: ignored for GlowUp > Build Android APK (a release build has no \"Development Build\" label). Use GlowUp > Build Test APK (development) for a test build.");
+            return Build(out message, OutputFolder, FileName, false);
+        }
 
         /// <summary>Builds an APK into `folder`/`file`; `development` = a development build.</summary>
         public static bool Build(out string message, string folder, string file, bool development)
@@ -107,6 +113,13 @@ namespace GlowUp.EditorTools
 
             if (summary.result == BuildResult.Succeeded)
             {
+                bool devLabel = (summary.options & BuildOptions.Development) != 0;
+                if (!development && devLabel)
+                {
+                    message = "The build was made as a DEVELOPMENT build although a release was asked for: it would show \"Development Build\". Not used.";
+                    return false;
+                }
+                Debug.Log("[GlowUp] " + (devLabel ? "Development build: Unity shows \"Development Build\" on screen." : "Release build: no \"Development Build\" label."));
                 message = $"Built in {summary.totalTime.TotalMinutes:0.0} minutes ({summary.totalSize / (1024f * 1024f):0} MB, {scenes.Count} scenes):\n" +
                           Path.GetFullPath(path) + "\n\nCopy this file to the phone and open it there to install the app.";
                 return true;

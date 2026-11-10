@@ -60,6 +60,8 @@ namespace GlowUp.Onboarding
         [SerializeField] private string msgNoFirstName = "Enter your first name.";
         [SerializeField] private string msgNoLastName = "Enter your last name.";
         [SerializeField] private string msgNoBirthday = "Enter your birthday: tap Edit and pick it. Your age is worked out from it.";
+        [Tooltip("The same reason while the lines are open (Edit was tapped): the user only has to tap the box")]
+        [SerializeField] private string msgPickBirthday = "Tap the box to pick your birthday. Your age is worked out from it.";
 
         [Header("Scenes")]
         [SerializeField] private string termsScene = SceneNames.Terms;
@@ -101,6 +103,7 @@ namespace GlowUp.Onboarding
             Pick(skinType, skinTypeOptions, OnboardingSession.SkinType); Pick(skinTone, skinToneOptions, OnboardingSession.SkinTone);
             Set(conditions, string.Join(", ", OnboardingSession.SkinConditions)); Set(allergens, string.Join(", ", OnboardingSession.Allergens));
             if (feedbackText != null) feedbackText.text = "";
+            OnboardingNotices.OneLine(feedbackText);
             if (email != null) email.characterLimit = emailMax;
             // something required is empty (a Google account has no birthday, and often only one name): the fields are open at once
             SetEditing(MissingRequired());
@@ -141,9 +144,12 @@ namespace GlowUp.Onboarding
         static List<string> ParseList(string s) =>
             s.Split(',').Select(x => x.Trim()).Where(x => x.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
-        bool Valid(out string reason)
+        bool Valid(out string reason) => Valid(out reason, out _);
+
+        /// <summary>`field` = the box the reason belongs to (its summary line shows the reason under it), null = none.</summary>
+        bool Valid(out string reason, out Component field)
         {
-            reason = "";
+            reason = ""; field = null;
             // Signed in with Google: Step 1 was skipped and Google gives no birthday, so the names and the birthday are asked here and
             // are required, like on Step 1. The email is the account's own.
             bool social = OnboardingSession.Social;
@@ -152,27 +158,51 @@ namespace GlowUp.Onboarding
             if (!social && !hasAccount && (emailCheck == null || !emailCheck.Look(T(email))))
             {
                 reason = emailCheck != null && emailCheck.Message.Length > 0 ? emailCheck.Message : msgNoEmail;
+                field = email;
                 return false;
             }
-            if (T(firstName).Length == 0) { reason = msgNoFirstName; return false; }
-            if (T(lastName).Length == 0) { reason = msgNoLastName; return false; }
+            if (T(firstName).Length == 0) { reason = msgNoFirstName; field = firstName; return false; }
+            if (T(lastName).Length == 0) { reason = msgNoLastName; field = lastName; return false; }
             bool hasBirthday = birthday != null && birthday.Value.HasValue;
-            if (!hasBirthday) { reason = msgNoBirthday; return false; }
-            if (InputRules.CalculateAge(birthday.Value.Value) < minimumAge) { reason = $"You must be at least {minimumAge} years old."; return false; }
+            if (!hasBirthday) { reason = editing ? msgPickBirthday : msgNoBirthday; field = birthday; return false; }
+            if (InputRules.CalculateAge(birthday.Value.Value) < minimumAge) { reason = $"You must be at least {minimumAge} years old."; field = birthday; return false; }
             return true;
+        }
+
+        /// <summary>
+        /// The reason Generate Profile is locked, UNDER the summary line it belongs to (New13 items 5A and 6, 10 November 2026): it used
+        /// to be a free line between Done and Generate Profile that ran over the Done button. The old line stays empty.
+        /// </summary>
+        void ShowReason(string reason, Component field)
+        {
+            if (feedbackText != null) { feedbackText.text = ""; OnboardingNotices.OneLine(feedbackText); }
+            SummaryRow target = field != null ? field.GetComponentInParent<SummaryRow>(true) : null;
+            if (rows != null)
+                foreach (SummaryRow r in rows)
+                {
+                    if (r == null) continue;
+                    FieldHint hint = FieldHint.In(r.transform, feedbackText, 28f);
+                    if (r == target && reason.Length > 0) hint.Show(FieldHint.Kind.Error, reason); else hint.Hide();
+                }
+            if (target == null && reason.Length > 0) OnboardingNotices.Error(feedbackText, reason);
         }
 
         void Refresh()
         {
-            bool ok = Valid(out string reason);
-            if (feedbackText != null) feedbackText.text = ok ? "" : reason;
+            bool ok = Valid(out string reason, out Component field);
+            ShowReason(ok ? "" : reason, field);
             if (generateAnimator != null) generateAnimator.SetReady(ok);
             else if (generateButton != null) generateButton.interactable = ok;
         }
 
         void OnGenerate()
         {
-            if (!Valid(out string reason)) { if (feedbackText != null) feedbackText.text = reason; return; }
+            if (!Valid(out string reason, out Component field))
+            {
+                ShowReason(reason, field);
+                if (!editing && field != null) SetEditing(true);            // the line to fix opens at once
+                return;
+            }
             OnboardingSession.FirstName = T(firstName); OnboardingSession.MiddleName = T(middleName); OnboardingSession.LastName = T(lastName);
             if (!OnboardingSession.Social && !OnboardingSession.HasAccount) OnboardingSession.Email = T(email).ToLowerInvariant();     // an account's email stays the account's
             if (birthday != null && birthday.Value.HasValue)
@@ -185,6 +215,7 @@ namespace GlowUp.Onboarding
             OnboardingSession.SkinConditions = ParseList(T(conditions));
             OnboardingSession.Allergens = ParseList(T(allergens));
             OnboardingSession.SaveDraft();
+            TermsAcceptanceFlowController.OpenFromSignUp();           // the progress bar shows on the next page only on this way in
             SceneNavigator.Go(termsScene);
         }
     }
