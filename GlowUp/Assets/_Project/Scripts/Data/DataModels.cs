@@ -57,6 +57,7 @@ namespace GlowUp.Data
         public string chemicalDescription;       // what the substance is, technically
         public string riskLevel;                 // "safe" | "caution" | "harmful"
         public string cautionNote;               // short reason shown when the ingredient is flagged
+        public string frequentUseAllergy;        // one plain sentence: this ingredient can cause an allergic reaction (a regulator's classification); "" = none: no line is shown
         public string commonUses;                // what kinds of product it is used in
         public int minAge;
         public bool keyActive;                   // worth highlighting as a chip

@@ -18,7 +18,7 @@ namespace GlowUp.Views
         /// <summary>What the row shows beside the finding itself. Every field may be empty.</summary>
         public class Details
         {
-            public string commonName, classification, purpose, aliases, chemical, allergen, caution, source, sourceUrl;
+            public string commonName, classification, purpose, aliases, chemical, allergen, allergy, caution, source, sourceUrl;
             public List<string> highlights = new List<string>();
         }
 
@@ -56,6 +56,7 @@ namespace GlowUp.Views
         [SerializeField] private string aliasesPrefix = "<b>Also known as:</b> ";
         [SerializeField] private string chemicalPrefix = "<b>What the chemical is:</b> ";
         [SerializeField] private string allergenPrefix = "<b>Allergen family:</b> ";
+        [SerializeField] private string allergyPrefix = "<b>Allergy risk with frequent use:</b> ";
         [SerializeField] private string cautionPrefix = "<b>Caution:</b> ";
         [Tooltip("The small tint behind each highlight tag, as #RRGGBBAA. It is neutral on purpose: colours mean this user's status.")]
         [SerializeField] private string tagTint = "#8C7F7F33";
@@ -115,7 +116,7 @@ namespace GlowUp.Views
             Line(aliasesText, aliasesPrefix, d.aliases);
             Line(chemicalText, chemicalPrefix, d.chemical);
             Line(usesText, fold != null ? usesPrefix : "Used in: ", f.commonUses);
-            Line(allergenText, allergenPrefix, d.allergen);
+            AllergyLines(d);                                                     // the allergen family and the allergy statement share one line group (no new scene field)
             Line(cautionText, cautionPrefix, d.caution);
             if (highlightsText != null)                                          // the tags carry their own (escaped) markup, so they do not go through Line
             {
@@ -148,9 +149,20 @@ namespace GlowUp.Views
 
             if (fold != null)
                 fold.SetActive(hasDefinition ||!string.IsNullOrWhiteSpace(d.aliases) || !string.IsNullOrWhiteSpace(d.chemical)
-                    || !string.IsNullOrWhiteSpace(f.commonUses) || !string.IsNullOrWhiteSpace(d.allergen) || !string.IsNullOrWhiteSpace(d.caution)
+                    || !string.IsNullOrWhiteSpace(f.commonUses) || !string.IsNullOrWhiteSpace(d.allergen) || !string.IsNullOrWhiteSpace(d.allergy) || !string.IsNullOrWhiteSpace(d.caution)
                     || d.highlights.Count > 0 || !string.IsNullOrWhiteSpace(d.source));
             Paint();
+        }
+
+        void AllergyLines(Details d)
+        {
+            if (allergenText == null) return;
+            string family = NoMarkdown(d.allergen), risk = NoMarkdown(d.allergy);
+            var lines = new List<string>();
+            if (!string.IsNullOrWhiteSpace(family)) lines.Add(allergenPrefix + Plain(family));
+            if (!string.IsNullOrWhiteSpace(risk)) lines.Add(allergyPrefix + Plain(risk));
+            if (lines.Count > 0) allergenText.text = string.Join("\n", lines);
+            allergenText.gameObject.SetActive(lines.Count > 0);
         }
 
         string Tags(List<string> names)

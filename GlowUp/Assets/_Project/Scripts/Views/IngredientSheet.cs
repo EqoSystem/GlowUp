@@ -147,6 +147,7 @@ namespace GlowUp.Views
             d.chemical = entry.chemicalDescription;
             if (!string.IsNullOrWhiteSpace(entry.cautionNote)) d.caution = "It " + entry.cautionNote.Trim().TrimEnd('.') + ".";
             if (entry.allergenTags != null && entry.allergenTags.Count > 0) d.allergen = string.Join(", ", entry.allergenTags.Select(GlowUp.Data.ListsRepository.AllergenLabel));
+            d.allergy = entry.frequentUseAllergy;
             if (entry.keyActive) d.highlights.Add("Key active");
             if (entry.umbrella) d.highlights.Add("Umbrella term");
             if (entry.highlights != null) d.highlights.AddRange(entry.highlights.Select(GlowUp.Data.ListsRepository.HighlightLabel));

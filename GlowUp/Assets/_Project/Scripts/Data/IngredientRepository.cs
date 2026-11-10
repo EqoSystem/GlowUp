@@ -94,7 +94,7 @@ namespace GlowUp.Data
                     {
                         id = f.Id, name = f.Str("name"), techName = f.Str("techName"), description = f.Str("description"),
                         classificationId = f.Str("classificationId"), purpose = f.Str("purpose"), chemicalDescription = f.Str("chemicalDescription"),
-                        riskLevel = f.Str("riskLevel"), cautionNote = f.Str("cautionNote"), commonUses = f.Str("commonUses"),
+                        riskLevel = f.Str("riskLevel"), cautionNote = f.Str("cautionNote"), frequentUseAllergy = f.Str("frequentUseAllergy"), commonUses = f.Str("commonUses"),
                         minAge = f.Int("minAge"), keyActive = f.Bool("keyActive"), umbrella = f.Bool("umbrella"),
                         aliases = f.List("aliases"), allergenTags = f.List("allergenTags"), highlights = f.List("highlights"),
                         avoidForSkinTypes = f.List("avoidForSkinTypes"), avoidForConditions = f.List("avoidForConditions"),
