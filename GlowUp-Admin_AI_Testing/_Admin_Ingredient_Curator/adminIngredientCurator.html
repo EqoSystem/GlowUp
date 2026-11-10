@@ -222,6 +222,7 @@
 
                 <div class="form-section">
                     <span class="form-section-title">How the app judges it</span>
+                    <div class="field-sources" data-field-sources="judgment" hidden></div>
 
                     <div class="form-row">
                         <div class="field">
@@ -236,7 +237,6 @@
                         <div class="field">
                             <label for="ingredientMinAgeInput">Minimum Age</label>
                             <input type="number" id="ingredientMinAgeInput" min="0" max="99" step="1" placeholder="0 = no age limit">
-                            <div class="field-sources" data-field-sources="judgment" hidden></div>
                         </div>
                     </div>
 
@@ -262,7 +262,6 @@
                                 <label class="check"><input type="checkbox" id="ingredientUmbrellaInput"> <span>Umbrella term</span></label>
                             </div>
                             <div class="checks pills" id="highlightTagsChecks"></div>
-                            <div class="field-sources" data-field-sources="judgment" hidden></div>
                         </div>
                         <div class="field">
                             <span class="field-label">Allergen Family<button type="button" class="icon-btn small list-edit" data-list-edit="allergens" aria-label="Edit the allergen families list" data-tip-title="Allergen families" data-tip="Add, rename, retire or delete allergen families. They reach the app too."><i data-icon="edit"></i></button><span class="info-slot" data-info="A user who picked that allergen in the app is warned about this ingredient." data-info-label="About Allergen Family"></span></span>
@@ -277,12 +276,10 @@
                         <div class="field">
                             <span class="field-label">Skin Types</span>
                             <div class="fit-list" id="skinTypesFit"></div>
-                            <div class="field-sources" data-field-sources="judgment" hidden></div>
                         </div>
                         <div class="field">
                             <span class="field-label">Skin Conditions<button type="button" class="icon-btn small list-edit" data-list-edit="conditions" aria-label="Edit the skin conditions list" data-tip-title="Skin conditions" data-tip="Add, rename, retire or delete skin conditions. They reach the app too."><i data-icon="edit"></i></button><span class="info-slot" data-info="Choose Avoid or Good only where this ingredient matters; leave the rest on the dash." data-info-label="About Skin Conditions"></span></span>
                             <div class="fit-list" id="conditionsFit"></div>
-                            <div class="field-sources" data-field-sources="judgment" hidden></div>
                         </div>
                     </div>
                 </div>

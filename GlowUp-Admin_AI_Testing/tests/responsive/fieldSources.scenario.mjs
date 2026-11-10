@@ -11,7 +11,7 @@ try {
         await settle(800);
         await page.click("#addIngredientBtn");
         await page.waitForSelector("#addIngredientForm", { state: "visible" });
-        ok(await page.locator('[data-field-sources="judgment"]:visible').count() >= 3, `${width}px: the judgment helper shows under the judgment boxes`);
+        ok(await page.locator('[data-field-sources="judgment"]:visible').count() === 1, `${width}px: the judgment helper shows once, under the section title`);
         ok(await page.locator('[data-field-sources="name"]:visible').count() === 0, `${width}px: no source links before a name is typed`);
         await page.fill("#ingredientNameInput", "Sodium Hyaluronate");
         for (const field of ["name", "classification", "purpose", "description", "chemicalDescription", "aliases", "cautionNote", "commonUses", "allergens"]) {
