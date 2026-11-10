@@ -355,17 +355,17 @@ namespace GlowUp.Scan
                     DropPhoto();
                     photo = cut;
                 }
-                OcrRead read = OcrService.Shared.Read(photo);
-                float waited = 0f;
-                while (!read.Done && waited < 10f) { await Task.Delay(50); waited += 0.05f; if (this == null || mine != attempt) return; }
-                PhotoTextQuality.Verdict verdict = PhotoTextQuality.Judge(read.Done ? read.Text : "", KnownWord);
+                // New13 item 9: read upright AND turned a quarter each way, like the live scan (sideways words on a bottle)
+                PhotoTextReader.Result read = await PhotoTextReader.Read(photo, KnownWord, () => this == null || mine != attempt);
+                if (this == null || mine != attempt) return;
+                PhotoTextQuality.Verdict verdict = read.verdict;
                 if (!verdict.readable)
                 {
                     // nothing of an unclear reading is shown or sent; the photo can be taken again
                     preview.Problem(msgUnclear, typeItInLabel, OpenTyping, false);
                     return;
                 }
-                preview.ShowTextShapes(read.Boxes);                    // the lines that were read, outlined inside the box
+                preview.ShowTextShapes(read.boxes);                    // the lines that were read, outlined inside the box
 
                 // the catalogue first, with the same matcher as the live scan: the closest products to pick from
                 if (CatalogMatches != null)
@@ -390,12 +390,12 @@ namespace GlowUp.Scan
                 }
 
                 // the photo cut to the product's text; the full frame is thrown away
-                byte[] jpeg = CutAndSqueeze(photo, read.Boxes);
+                byte[] jpeg = CutAndSqueeze(photo, read.boxes);
                 DropPhoto();
                 if (jpeg == null) { preview.Problem(msgUnclear, typeItInLabel, OpenTyping, false); return; }
 
                 // a list printed on the pack and read on the phone comes first (not the AI's)
-                List<string> printed = PrintedList(read.Text);
+                List<string> printed = PrintedList(read.rawText);
                 string ocrBrand = BrandIn(verdict.cleanText);
 
                 // from here on the photo leaves the phone (after the user's tap); the cool-down starts now

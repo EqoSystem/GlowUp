@@ -62,6 +62,10 @@ namespace GlowUp.Scan
         /// `isKnownWord` = extra known words (catalogue brands, product names, ingredient names), lower case; may be null.
         /// </summary>
         public static Verdict Judge(string text, Func<string, bool> isKnownWord)
+            => Judge(text, isKnownWord, MinimumKnownWords, MinimumKnownShare);
+
+        /// <summary>Same, with the thresholds given (PhotoTextReader judges each turned reading with one known word).</summary>
+        public static Verdict Judge(string text, Func<string, bool> isKnownWord, int minimumKnownWords, float minimumKnownShare)
         {
             var verdict = new Verdict();
             if (string.IsNullOrWhiteSpace(text)) return verdict;
@@ -81,7 +85,7 @@ namespace GlowUp.Scan
                 if (keep && kept.Length + line.Length + 1 <= 1500) { if (kept.Length > 0) kept.Append('\n'); kept.Append(Tidy(line)); }
             }
             verdict.score = verdict.words == 0 ? 0f : (float)verdict.knownWords / verdict.words;
-            verdict.readable = verdict.knownWords >= MinimumKnownWords && verdict.score >= MinimumKnownShare;
+            verdict.readable = verdict.knownWords >= minimumKnownWords && verdict.score >= minimumKnownShare;
             verdict.cleanText = verdict.readable ? kept.ToString() : "";
             return verdict;
         }
