@@ -1,0 +1,369 @@
+index.Count => 21
+Normalize "MAYBELLINE\nNEW YORK\nSUPERSTAY\nMATTE INK\nLIQUID LIPSTICK\n65 SEDUCTRESS" => "maybelline new york superstay matte ink liquid lipstick 65 seductress" compact="maybellinenewyorksuperstaymatteinkliquidlipstick65seductress"
+TypeFromLabel "MAYBELLINE\nNEW YORK\nSUPERSTAY\nMATTE INK\nLIQUID LIPSTICK\n65 SEDUCTRESS" => "Lipstick"
+JudgeLabel "MAYBELLINE\nNEW YORK\nSUPERSTAY\nMATTE INK\nLIQUID LIPSTICK\n65 SEDUCTRESS" => {family="" kind=Makeup word="lipstick"}
+InText3 "MAYBELLINE\nNEW YORK\nSUPERSTAY\nMATTE INK\nLIQUID LIPSTICK\n65 SEDUCTRESS" => [fda_1 s=1 b=True x=True w=False e=12.559257; fda_12 s=0.5110262 b=False x=False w=False e=3.983519; fda_18 s=0.17390996 b=False x=False w=False e=2.2794416]
+InTextAll "MAYBELLINE\nNEW YORK\nSUPERSTAY\nMATTE INK\nLIQUID LIPSTICK\n65 SEDUCTRESS" => [fda_1 s=1 b=True x=True w=False e=12.559257; fda_12 s=0.5110262 b=False x=False w=False e=3.983519; fda_18 s=0.17390996 b=False x=False w=False e=2.2794416; fda_2 s=0.11667959 b=True x=False w=False e=2.642347; fda_20 s=0.1055632 b=True x=False w=False e=2.642347; fda_3 s=0.07923018 b=True x=False w=False e=1.7040775; fda_5 s=0.07378457 b=True x=False w=False e=1.7040775; fda_6 s=0.04871004 b=False x=False w=False e=1.7040775; fda_16 s=0.037056074 b=False x=False w=False e=1.7040775]
+ShortlistFor "MAYBELLINE\nNEW YORK\nSUPERSTAY\nMATTE INK\nLIQUID LIPSTICK\n65 SEDUCTRESS" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Lipstick" look=null product=fda_1 productName="Superstay Matte Ink Liquid Lipstick" score=1}; {brandName="Ever Bilena" byLook=False byText=True byTyping=False cosmeticType="Lipstick" look=null product=fda_12 productName="Advance Matte Lipstick" score=0.5110262}]
+ShortlistFor4 "MAYBELLINE\nNEW YORK\nSUPERSTAY\nMATTE INK\nLIQUID LIPSTICK\n65 SEDUCTRESS" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Lipstick" look=null product=fda_1 productName="Superstay Matte Ink Liquid Lipstick" score=1}; {brandName="Ever Bilena" byLook=False byText=True byTyping=False cosmeticType="Lipstick" look=null product=fda_12 productName="Advance Matte Lipstick" score=0.5110262}]
+Normalize "SUPER STAY\nMATTE INK\nmaybelline" => "super stay matte ink maybelline" compact="superstaymatteinkmaybelline"
+TypeFromLabel "SUPER STAY\nMATTE INK\nmaybelline" => ""
+JudgeLabel "SUPER STAY\nMATTE INK\nmaybelline" => {family="" kind=Unclear word=""}
+InText3 "SUPER STAY\nMATTE INK\nmaybelline" => [fda_1 s=0.6081146 b=True x=False w=False e=7.6374674; fda_2 s=0.11667959 b=True x=False w=False e=2.642347; fda_12 s=0.1093039 b=False x=False w=False e=1.7040775]
+InTextAll "SUPER STAY\nMATTE INK\nmaybelline" => [fda_1 s=0.6081146 b=True x=False w=False e=7.6374674; fda_2 s=0.11667959 b=True x=False w=False e=2.642347; fda_12 s=0.1093039 b=False x=False w=False e=1.7040775; fda_7 s=0.09316652 b=False x=False w=False e=3.2910426; fda_3 s=0.07923018 b=True x=False w=False e=1.7040775; fda_5 s=0.07378457 b=True x=False w=False e=1.7040775; fda_6 s=0.04871004 b=False x=False w=False e=1.7040775; fda_16 s=0.037056074 b=False x=False w=False e=1.7040775]
+ShortlistFor "SUPER STAY\nMATTE INK\nmaybelline" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Lipstick" look=null product=fda_1 productName="Superstay Matte Ink Liquid Lipstick" score=0.6081146}]
+ShortlistFor4 "SUPER STAY\nMATTE INK\nmaybelline" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Lipstick" look=null product=fda_1 productName="Superstay Matte Ink Liquid Lipstick" score=0.6081146}]
+Normalize "MAYBELLINE SUPERSTAY 30H ACTIVE WEAR FOUNDATION 128 WARM NUDE" => "maybelline superstay 30h active wear foundation 128 warm nude" compact="maybellinesuperstay30hactivewearfoundation128warmnude"
+TypeFromLabel "MAYBELLINE SUPERSTAY 30H ACTIVE WEAR FOUNDATION 128 WARM NUDE" => "Foundation"
+JudgeLabel "MAYBELLINE SUPERSTAY 30H ACTIVE WEAR FOUNDATION 128 WARM NUDE" => {family="" kind=Makeup word="foundation"}
+InText3 "MAYBELLINE SUPERSTAY 30H ACTIVE WEAR FOUNDATION 128 WARM NUDE" => [fda_2 s=1 b=True x=True w=False e=11.323091; fda_1 s=0.1051952 b=True x=False w=False e=2.642347; fda_17 s=0.10096056 b=False x=False w=False e=1.8486587]
+InTextAll "MAYBELLINE SUPERSTAY 30H ACTIVE WEAR FOUNDATION 128 WARM NUDE" => [fda_2 s=1 b=True x=True w=False e=11.323091; fda_1 s=0.1051952 b=True x=False w=False e=2.642347; fda_17 s=0.10096056 b=False x=False w=False e=1.8486587; fda_3 s=0.08595241 b=True x=False w=False e=1.8486587; fda_21 s=0.08282411 b=False x=False w=False e=1.8486587; fda_7 s=0.052333906 b=False x=False w=False e=1.8486587]
+ShortlistFor "MAYBELLINE SUPERSTAY 30H ACTIVE WEAR FOUNDATION 128 WARM NUDE" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_2 productName="Superstay 30H Active Wear Foundation" score=1}]
+ShortlistFor4 "MAYBELLINE SUPERSTAY 30H ACTIVE WEAR FOUNDATION 128 WARM NUDE" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_2 productName="Superstay 30H Active Wear Foundation" score=1}]
+Normalize "SUPER\nSTAY\n30H\nACTIVE WEAR\nFOUNDATION\n120" => "super stay 30h active wear foundation 120" compact="superstay30hactivewearfoundation120"
+TypeFromLabel "SUPER\nSTAY\n30H\nACTIVE WEAR\nFOUNDATION\n120" => "Foundation"
+JudgeLabel "SUPER\nSTAY\n30H\nACTIVE WEAR\nFOUNDATION\n120" => {family="" kind=Makeup word="foundation"}
+InText3 "SUPER\nSTAY\n30H\nACTIVE WEAR\nFOUNDATION\n120" => [fda_2 s=0.85 b=False x=True w=False e=11.323091; fda_7 s=0.29100087 b=False x=False w=False e=5.1397014; fda_17 s=0.10096056 b=False x=False w=False e=1.8486587]
+InTextAll "SUPER\nSTAY\n30H\nACTIVE WEAR\nFOUNDATION\n120" => [fda_2 s=0.85 b=False x=True w=False e=11.323091; fda_7 s=0.29100087 b=False x=False w=False e=5.1397014; fda_17 s=0.10096056 b=False x=False w=False e=1.8486587; fda_1 s=0.08941592 b=False x=False w=False e=2.642347; fda_21 s=0.08282411 b=False x=False w=False e=1.8486587; fda_3 s=0.07305955 b=False x=False w=False e=1.8486587]
+ShortlistFor "SUPER\nSTAY\n30H\nACTIVE WEAR\nFOUNDATION\n120" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_2 productName="Superstay 30H Active Wear Foundation" score=0.85}]
+ShortlistFor4 "SUPER\nSTAY\n30H\nACTIVE WEAR\nFOUNDATION\n120" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_2 productName="Superstay 30H Active Wear Foundation" score=0.85}]
+Normalize "superstay 3OH active wear foundati0n" => "superstay 3oh active wear foundati0n" compact="superstay3ohactivewearfoundati0n"
+TypeFromLabel "superstay 3OH active wear foundati0n" => "Foundation"
+JudgeLabel "superstay 3OH active wear foundati0n" => {family="" kind=Unclear word=""}
+InText3 "superstay 3OH active wear foundati0n" => [fda_2 s=0.85 b=False x=True w=False e=11.323091; fda_17 s=0.10096056 b=False x=False w=False e=1.8486587; fda_1 s=0.08941592 b=False x=False w=False e=2.642347]
+InTextAll "superstay 3OH active wear foundati0n" => [fda_2 s=0.85 b=False x=True w=False e=11.323091; fda_17 s=0.10096056 b=False x=False w=False e=1.8486587; fda_1 s=0.08941592 b=False x=False w=False e=2.642347; fda_21 s=0.08282411 b=False x=False w=False e=1.8486587; fda_3 s=0.07305955 b=False x=False w=False e=1.8486587; fda_7 s=0.052333906 b=False x=False w=False e=1.8486587]
+ShortlistFor "superstay 3OH active wear foundati0n" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_2 productName="Superstay 30H Active Wear Foundation" score=0.85}]
+ShortlistFor4 "superstay 3OH active wear foundati0n" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_2 productName="Superstay 30H Active Wear Foundation" score=0.85}]
+Normalize "FIT ME\nMATTE + PORELESS\nFOUNDATION\n220 NATURAL BEIGE" => "fit me matte poreless foundation 220 natural beige" compact="fitmematteporelessfoundation220naturalbeige"
+TypeFromLabel "FIT ME\nMATTE + PORELESS\nFOUNDATION\n220 NATURAL BEIGE" => "Foundation"
+JudgeLabel "FIT ME\nMATTE + PORELESS\nFOUNDATION\n220 NATURAL BEIGE" => {family="" kind=Makeup word="foundation"}
+InText3 "FIT ME\nMATTE + PORELESS\nFOUNDATION\n220 NATURAL BEIGE" => [fda_3 s=0.85 b=False x=True w=False e=10.753966; fda_5 s=0.6555021 b=False x=False w=False e=8.905308; fda_4 s=0.4936417 b=False x=False w=False e=4.558883]
+InTextAll "FIT ME\nMATTE + PORELESS\nFOUNDATION\n220 NATURAL BEIGE" => [fda_3 s=0.85 b=False x=True w=False e=10.753966; fda_5 s=0.6555021 b=False x=False w=False e=8.905308; fda_4 s=0.4936417 b=False x=False w=False e=4.558883; fda_12 s=0.1093039 b=False x=False w=False e=1.7040775; fda_17 s=0.10096056 b=False x=False w=False e=1.8486587; fda_21 s=0.08282411 b=False x=False w=False e=1.8486587; fda_2 s=0.06938741 b=False x=False w=False e=1.8486587; fda_1 s=0.05766527 b=False x=False w=False e=1.7040775; fda_7 s=0.052333906 b=False x=False w=False e=1.8486587; fda_6 s=0.04871004 b=False x=False w=False e=1.7040775; fda_16 s=0.037056074 b=False x=False w=False e=1.7040775]
+ShortlistFor "FIT ME\nMATTE + PORELESS\nFOUNDATION\n220 NATURAL BEIGE" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_3 productName="Fit Me Matte + Poreless Foundation" score=0.85}; {brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Powder" look=null product=fda_5 productName="Fit Me Matte + Poreless Powder" score=0.6555021}; {brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Concealer" look=null product=fda_4 productName="Fit Me Concealer" score=0.4936417}]
+ShortlistFor4 "FIT ME\nMATTE + PORELESS\nFOUNDATION\n220 NATURAL BEIGE" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_3 productName="Fit Me Matte + Poreless Foundation" score=0.85}; {brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Powder" look=null product=fda_5 productName="Fit Me Matte + Poreless Powder" score=0.6555021}; {brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Concealer" look=null product=fda_4 productName="Fit Me Concealer" score=0.4936417}]
+Normalize "FIT ME\nMATTE + PORELESS\nPOWDER\n120" => "fit me matte poreless powder 120" compact="fitmematteporelesspowder120"
+TypeFromLabel "FIT ME\nMATTE + PORELESS\nPOWDER\n120" => "Powder"
+JudgeLabel "FIT ME\nMATTE + PORELESS\nPOWDER\n120" => {family="" kind=Unclear word=""}
+InText3 "FIT ME\nMATTE + PORELESS\nPOWDER\n120" => [fda_5 s=0.85 b=False x=True w=False e=11.547655; fda_3 s=0.70388097 b=False x=False w=False e=8.905308; fda_4 s=0.4936417 b=False x=False w=False e=4.558883]
+InTextAll "FIT ME\nMATTE + PORELESS\nPOWDER\n120" => [fda_5 s=0.85 b=False x=True w=False e=11.547655; fda_3 s=0.70388097 b=False x=False w=False e=8.905308; fda_4 s=0.4936417 b=False x=False w=False e=4.558883; fda_12 s=0.1093039 b=False x=False w=False e=1.7040775; fda_8 s=0.07104649 b=False x=False w=False e=2.642347; fda_1 s=0.05766527 b=False x=False w=False e=1.7040775; fda_6 s=0.04871004 b=False x=False w=False e=1.7040775; fda_16 s=0.037056074 b=False x=False w=False e=1.7040775]
+ShortlistFor "FIT ME\nMATTE + PORELESS\nPOWDER\n120" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Powder" look=null product=fda_5 productName="Fit Me Matte + Poreless Powder" score=0.85}; {brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_3 productName="Fit Me Matte + Poreless Foundation" score=0.70388097}; {brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Concealer" look=null product=fda_4 productName="Fit Me Concealer" score=0.4936417}]
+ShortlistFor4 "FIT ME\nMATTE + PORELESS\nPOWDER\n120" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Powder" look=null product=fda_5 productName="Fit Me Matte + Poreless Powder" score=0.85}; {brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_3 productName="Fit Me Matte + Poreless Foundation" score=0.70388097}; {brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Concealer" look=null product=fda_4 productName="Fit Me Concealer" score=0.4936417}]
+Normalize "fit me concealer 15 fair" => "fit me concealer 15 fair" compact="fitmeconcealer15fair"
+TypeFromLabel "fit me concealer 15 fair" => "Concealer"
+JudgeLabel "fit me concealer 15 fair" => {family="" kind=Makeup word="concealer"}
+InText3 "fit me concealer 15 fair" => [fda_4 s=0.85 b=False x=True w=False e=7.849926; fda_3 s=0.3603369 b=False x=False w=False e=4.558883; fda_5 s=0.33557037 b=False x=False w=False e=4.558883]
+InTextAll "fit me concealer 15 fair" => [fda_4 s=0.85 b=False x=True w=False e=7.849926; fda_3 s=0.3603369 b=False x=False w=False e=4.558883; fda_5 s=0.33557037 b=False x=False w=False e=4.558883]
+ShortlistFor "fit me concealer 15 fair" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Concealer" look=null product=fda_4 productName="Fit Me Concealer" score=0.85}]
+ShortlistFor4 "fit me concealer 15 fair" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Concealer" look=null product=fda_4 productName="Fit Me Concealer" score=0.85}]
+Normalize "FIT ME" => "fit me" compact="fitme"
+TypeFromLabel "FIT ME" => ""
+JudgeLabel "FIT ME" => {family="" kind=Unclear word=""}
+InText3 "FIT ME" => [fda_4 s=0.4936417 b=False x=False w=False e=4.558883; fda_3 s=0.3603369 b=False x=False w=False e=4.558883; fda_5 s=0.33557037 b=False x=False w=False e=4.558883]
+InTextAll "FIT ME" => [fda_4 s=0.4936417 b=False x=False w=False e=4.558883; fda_3 s=0.3603369 b=False x=False w=False e=4.558883; fda_5 s=0.33557037 b=False x=False w=False e=4.558883]
+ShortlistFor "FIT ME" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Concealer" look=null product=fda_4 productName="Fit Me Concealer" score=0.4936417}]
+ShortlistFor4 "FIT ME" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Concealer" look=null product=fda_4 productName="Fit Me Concealer" score=0.4936417}]
+Normalize "L'OREAL PARIS\nCOLOR RICHE\nINTENSE VOLUME MATTE\n601" => "l oreal paris color riche intense volume matte 601" compact="lorealpariscolorricheintensevolumematte601"
+TypeFromLabel "L'OREAL PARIS\nCOLOR RICHE\nINTENSE VOLUME MATTE\n601" => ""
+JudgeLabel "L'OREAL PARIS\nCOLOR RICHE\nINTENSE VOLUME MATTE\n601" => {family="" kind=Unclear word=""}
+InText3 "L'OREAL PARIS\nCOLOR RICHE\nINTENSE VOLUME MATTE\n601" => [fda_6 s=1 b=True x=True w=False e=14.868248; fda_12 s=0.1093039 b=False x=False w=False e=1.7040775; fda_3 s=0.06734566 b=False x=False w=False e=1.7040775]
+InTextAll "L'OREAL PARIS\nCOLOR RICHE\nINTENSE VOLUME MATTE\n601" => [fda_6 s=1 b=True x=True w=False e=14.868248; fda_12 s=0.1093039 b=False x=False w=False e=1.7040775; fda_3 s=0.06734566 b=False x=False w=False e=1.7040775; fda_5 s=0.06271689 b=False x=False w=False e=1.7040775; fda_1 s=0.05766527 b=False x=False w=False e=1.7040775; fda_16 s=0.037056074 b=False x=False w=False e=1.7040775]
+ShortlistFor "L'OREAL PARIS\nCOLOR RICHE\nINTENSE VOLUME MATTE\n601" => [{brandName="L'Oréal Paris" byLook=False byText=True byTyping=False cosmeticType="Lipstick" look=null product=fda_6 productName="Color Riche Intense Volume Matte" score=1}]
+ShortlistFor4 "L'OREAL PARIS\nCOLOR RICHE\nINTENSE VOLUME MATTE\n601" => [{brandName="L'Oréal Paris" byLook=False byText=True byTyping=False cosmeticType="Lipstick" look=null product=fda_6 productName="Color Riche Intense Volume Matte" score=1}]
+Normalize "LOREAL TRUE MATCH SUPER BLENDABLE FOUNDATION N4" => "loreal true match super blendable foundation n4" compact="lorealtruematchsuperblendablefoundationn4"
+TypeFromLabel "LOREAL TRUE MATCH SUPER BLENDABLE FOUNDATION N4" => "Foundation"
+JudgeLabel "LOREAL TRUE MATCH SUPER BLENDABLE FOUNDATION N4" => {family="" kind=Makeup word="foundation"}
+InText3 "LOREAL TRUE MATCH SUPER BLENDABLE FOUNDATION N4" => [fda_7 s=0.85 b=False x=True w=False e=15.012829; fda_17 s=0.10096056 b=False x=False w=False e=1.8486587; fda_21 s=0.08282411 b=False x=False w=False e=1.8486587]
+InTextAll "LOREAL TRUE MATCH SUPER BLENDABLE FOUNDATION N4" => [fda_7 s=0.85 b=False x=True w=False e=15.012829; fda_17 s=0.10096056 b=False x=False w=False e=1.8486587; fda_21 s=0.08282411 b=False x=False w=False e=1.8486587; fda_3 s=0.07305955 b=False x=False w=False e=1.8486587; fda_2 s=0.06938741 b=False x=False w=False e=1.8486587]
+ShortlistFor "LOREAL TRUE MATCH SUPER BLENDABLE FOUNDATION N4" => [{brandName="L'Oréal Paris" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_7 productName="True Match Super-Blendable Foundation" score=0.85}]
+ShortlistFor4 "LOREAL TRUE MATCH SUPER BLENDABLE FOUNDATION N4" => [{brandName="L'Oréal Paris" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_7 productName="True Match Super-Blendable Foundation" score=0.85}]
+Normalize "ABSIDY\nCOMPLEXION BLUR\nPOWDER" => "absidy complexion blur powder" compact="absidycomplexionblurpowder"
+TypeFromLabel "ABSIDY\nCOMPLEXION BLUR\nPOWDER" => "Powder"
+JudgeLabel "ABSIDY\nCOMPLEXION BLUR\nPOWDER" => {family="" kind=Unclear word=""}
+InText3 "ABSIDY\nCOMPLEXION BLUR\nPOWDER" => [fda_8 s=0.5835841 b=True x=False w=False e=9.224432; fda_5 s=0.09724897 b=False x=False w=False e=2.642347]
+InTextAll "ABSIDY\nCOMPLEXION BLUR\nPOWDER" => [fda_8 s=0.5835841 b=True x=False w=False e=9.224432; fda_5 s=0.09724897 b=False x=False w=False e=2.642347]
+ShortlistFor "ABSIDY\nCOMPLEXION BLUR\nPOWDER" => [{brandName="Absidy" byLook=False byText=True byTyping=False cosmeticType="Powder" look=null product=fda_8 productName="Complexion Blur Translucent Perfecting Powder" score=0.5835841}]
+ShortlistFor4 "ABSIDY\nCOMPLEXION BLUR\nPOWDER" => [{brandName="Absidy" byLook=False byText=True byTyping=False cosmeticType="Powder" look=null product=fda_8 productName="Complexion Blur Translucent Perfecting Powder" score=0.5835841}]
+Normalize "complexion blur translucent perfecting powder" => "complexion blur translucent perfecting powder" compact="complexionblurtranslucentperfectingpowder"
+TypeFromLabel "complexion blur translucent perfecting powder" => "Powder"
+JudgeLabel "complexion blur translucent perfecting powder" => {family="" kind=Unclear word=""}
+InText3 "complexion blur translucent perfecting powder" => [fda_8 s=0.85 b=False x=True w=False e=15.806518; fda_5 s=0.09724897 b=False x=False w=False e=2.642347]
+InTextAll "complexion blur translucent perfecting powder" => [fda_8 s=0.85 b=False x=True w=False e=15.806518; fda_5 s=0.09724897 b=False x=False w=False e=2.642347]
+ShortlistFor "complexion blur translucent perfecting powder" => [{brandName="Absidy" byLook=False byText=True byTyping=False cosmeticType="Powder" look=null product=fda_8 productName="Complexion Blur Translucent Perfecting Powder" score=0.85}]
+ShortlistFor4 "complexion blur translucent perfecting powder" => [{brandName="Absidy" byLook=False byText=True byTyping=False cosmeticType="Powder" look=null product=fda_8 productName="Complexion Blur Translucent Perfecting Powder" score=0.85}]
+Normalize "NIVEA LIP TINT" => "nivea lip tint" compact="nivealiptint"
+TypeFromLabel "NIVEA LIP TINT" => "Lip Tint"
+JudgeLabel "NIVEA LIP TINT" => {family="" kind=Makeup word="lip tint"}
+InText3 "NIVEA LIP TINT" => [obf_9 s=1 b=True x=True w=False e=3.408155; fda_10 s=0.85 b=False x=True w=False e=3.408155; fda_14 s=0.43242967 b=False x=False w=False e=3.408155]
+InTextAll "NIVEA LIP TINT" => [obf_9 s=1 b=True x=True w=False e=3.408155; fda_10 s=0.85 b=False x=True w=False e=3.408155; fda_14 s=0.43242967 b=False x=False w=False e=3.408155; fda_11 s=0.36361465 b=False x=False w=False e=3.408155; fda_16 s=0.1482243 b=False x=False w=False e=3.408155; fda_15 s=0.07580413 b=False x=False w=False e=1.7040775; fda_21 s=0.07634655 b=False x=False w=False e=1.7040775]
+ShortlistFor "NIVEA LIP TINT" => [{brandName="NIVEA" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=obf_9 productName="Lip Tint" score=1}; {brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=fda_10 productName="Lip Tint" score=0.85}]
+ShortlistFor4 "NIVEA LIP TINT" => [{brandName="NIVEA" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=obf_9 productName="Lip Tint" score=1}; {brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=fda_10 productName="Lip Tint" score=0.85}]
+Normalize "CARELINE\nLIP TINT\n02" => "careline lip tint 02" compact="carelineliptint02"
+TypeFromLabel "CARELINE\nLIP TINT\n02" => "Lip Tint"
+JudgeLabel "CARELINE\nLIP TINT\n02" => {family="" kind=Makeup word="lip tint"}
+InText3 "CARELINE\nLIP TINT\n02" => [fda_10 s=1 b=True x=True w=False e=3.408155; obf_9 s=0.85 b=False x=True w=False e=3.408155; fda_14 s=0.43242967 b=False x=False w=False e=3.408155]
+InTextAll "CARELINE\nLIP TINT\n02" => [fda_10 s=1 b=True x=True w=False e=3.408155; obf_9 s=0.85 b=False x=True w=False e=3.408155; fda_14 s=0.43242967 b=False x=False w=False e=3.408155; fda_11 s=0.42778194 b=True x=False w=False e=3.408155; fda_16 s=0.1482243 b=False x=False w=False e=3.408155; fda_15 s=0.07580413 b=False x=False w=False e=1.7040775; fda_21 s=0.07634655 b=False x=False w=False e=1.7040775]
+ShortlistFor "CARELINE\nLIP TINT\n02" => [{brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=fda_10 productName="Lip Tint" score=1}; {brandName="NIVEA" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=obf_9 productName="Lip Tint" score=0.85}]
+ShortlistFor4 "CARELINE\nLIP TINT\n02" => [{brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=fda_10 productName="Lip Tint" score=1}; {brandName="NIVEA" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=obf_9 productName="Lip Tint" score=0.85}]
+Normalize "Careline lip & cheek tint" => "careline lip cheek tint" compact="carelinelipcheektint"
+TypeFromLabel "Careline lip & cheek tint" => "Blush"
+JudgeLabel "Careline lip & cheek tint" => {family="" kind=Makeup word="cheek tint"}
+InText3 "Careline lip & cheek tint" => [fda_10 s=1 b=True x=True w=False e=3.408155; obf_9 s=0.85 b=False x=True w=False e=3.408155; fda_11 s=0.7138909 b=True x=False w=False e=5.6875963]
+InTextAll "Careline lip & cheek tint" => [fda_10 s=1 b=True x=True w=False e=3.408155; obf_9 s=0.85 b=False x=True w=False e=3.408155; fda_11 s=0.7138909 b=True x=False w=False e=5.6875963; fda_14 s=0.43242967 b=False x=False w=False e=3.408155; fda_15 s=0.35440546 b=False x=False w=False e=3.983519; fda_16 s=0.24735963 b=False x=False w=False e=5.6875963; fda_21 s=0.07634655 b=False x=False w=False e=1.7040775]
+ShortlistFor "Careline lip & cheek tint" => [{brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=fda_10 productName="Lip Tint" score=1}; {brandName="NIVEA" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=obf_9 productName="Lip Tint" score=0.85}; {brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip & Cheek Tint" look=null product=fda_11 productName="Lip and Cheek Tint" score=0.7138909}]
+ShortlistFor4 "Careline lip & cheek tint" => [{brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=fda_10 productName="Lip Tint" score=1}; {brandName="NIVEA" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=obf_9 productName="Lip Tint" score=0.85}; {brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip & Cheek Tint" look=null product=fda_11 productName="Lip and Cheek Tint" score=0.7138909}]
+Normalize "EVER BILENA ADVANCE MATTE LIPSTICK EB02" => "ever bilena advance matte lipstick eb02" compact="everbilenaadvancemattelipstickeb02"
+TypeFromLabel "EVER BILENA ADVANCE MATTE LIPSTICK EB02" => "Lipstick"
+JudgeLabel "EVER BILENA ADVANCE MATTE LIPSTICK EB02" => {family="" kind=Makeup word="lipstick"}
+InText3 "EVER BILENA ADVANCE MATTE LIPSTICK EB02" => [fda_12 s=1 b=True x=True w=False e=6.625866; fda_1 s=0.26960126 b=False x=False w=False e=3.983519; fda_18 s=0.17390996 b=False x=False w=False e=2.2794416]
+InTextAll "EVER BILENA ADVANCE MATTE LIPSTICK EB02" => [fda_12 s=1 b=True x=True w=False e=6.625866; fda_1 s=0.26960126 b=False x=False w=False e=3.983519; fda_18 s=0.17390996 b=False x=False w=False e=2.2794416; fda_13 s=0.08358411 b=True x=False w=False e=2.642347; fda_3 s=0.06734566 b=False x=False w=False e=1.7040775; fda_5 s=0.06271689 b=False x=False w=False e=1.7040775; fda_6 s=0.04871004 b=False x=False w=False e=1.7040775; fda_16 s=0.037056074 b=False x=False w=False e=1.7040775]
+ShortlistFor "EVER BILENA ADVANCE MATTE LIPSTICK EB02" => [{brandName="Ever Bilena" byLook=False byText=True byTyping=False cosmeticType="Lipstick" look=null product=fda_12 productName="Advance Matte Lipstick" score=1}]
+ShortlistFor4 "EVER BILENA ADVANCE MATTE LIPSTICK EB02" => [{brandName="Ever Bilena" byLook=False byText=True byTyping=False cosmeticType="Lipstick" look=null product=fda_12 productName="Advance Matte Lipstick" score=1}]
+Normalize "EBA TWO WAY CAKE" => "eba two way cake" compact="ebatwowaycake"
+TypeFromLabel "EBA TWO WAY CAKE" => ""
+JudgeLabel "EBA TWO WAY CAKE" => {family="" kind=Unclear word=""}
+InText3 "EBA TWO WAY CAKE" => [fda_13 s=0.53093034 b=False x=False w=False e=9.873128]
+InTextAll "EBA TWO WAY CAKE" => [fda_13 s=0.53093034 b=False x=False w=False e=9.873128]
+ShortlistFor "EBA TWO WAY CAKE" => [{brandName="Ever Bilena" byLook=False byText=True byTyping=False cosmeticType="Powder" look=null product=fda_13 productName="EB Advance Two Way Cake" score=0.53093034}]
+ShortlistFor4 "EBA TWO WAY CAKE" => [{brandName="Ever Bilena" byLook=False byText=True byTyping=False cosmeticType="Powder" look=null product=fda_13 productName="EB Advance Two Way Cake" score=0.53093034}]
+Normalize "ISSY & CO VELVET LIP TINT ROSEWOOD" => "issy co velvet lip tint rosewood" compact="issycovelvetliptintrosewood"
+TypeFromLabel "ISSY & CO VELVET LIP TINT ROSEWOOD" => "Lip Tint"
+JudgeLabel "ISSY & CO VELVET LIP TINT ROSEWOOD" => {family="" kind=Makeup word="lip tint"}
+InText3 "ISSY & CO VELVET LIP TINT ROSEWOOD" => [fda_14 s=1 b=True x=True w=False e=6.699198; obf_9 s=0.85 b=False x=True w=False e=3.408155; fda_10 s=0.85 b=False x=True w=False e=3.408155]
+InTextAll "ISSY & CO VELVET LIP TINT ROSEWOOD" => [fda_14 s=1 b=True x=True w=False e=6.699198; obf_9 s=0.85 b=False x=True w=False e=3.408155; fda_10 s=0.85 b=False x=True w=False e=3.408155; fda_11 s=0.36361465 b=False x=False w=False e=3.408155; fda_16 s=0.1482243 b=False x=False w=False e=3.408155; fda_15 s=0.07580413 b=False x=False w=False e=1.7040775; fda_21 s=0.07634655 b=False x=False w=False e=1.7040775]
+ShortlistFor "ISSY & CO VELVET LIP TINT ROSEWOOD" => [{brandName="Issy & Co" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=fda_14 productName="Velvet Lip Tint" score=1}; {brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=fda_10 productName="Lip Tint" score=0.85}; {brandName="NIVEA" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=obf_9 productName="Lip Tint" score=0.85}]
+ShortlistFor4 "ISSY & CO VELVET LIP TINT ROSEWOOD" => [{brandName="Issy & Co" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=fda_14 productName="Velvet Lip Tint" score=1}; {brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=fda_10 productName="Lip Tint" score=0.85}; {brandName="NIVEA" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=obf_9 productName="Lip Tint" score=0.85}]
+Normalize "COLOURETTE COLOURPOP LIP AND CHEEK" => "colourette colourpop lip and cheek" compact="colourettecolourpoplipandcheek"
+TypeFromLabel "COLOURETTE COLOURPOP LIP AND CHEEK" => ""
+JudgeLabel "COLOURETTE COLOURPOP LIP AND CHEEK" => {family="" kind=Unclear word=""}
+InText3 "COLOURETTE COLOURPOP LIP AND CHEEK" => [fda_15 s=1 b=True x=True w=False e=9.554004; fda_11 s=0.6681927 b=False x=False w=False e=6.2629604; fda_16 s=0.27238286 b=False x=False w=False e=6.2629604]
+InTextAll "COLOURETTE COLOURPOP LIP AND CHEEK" => [fda_15 s=1 b=True x=True w=False e=9.554004; fda_11 s=0.6681927 b=False x=False w=False e=6.2629604; fda_16 s=0.27238286 b=False x=False w=False e=6.2629604; obf_9 s=0.2125 b=False x=False w=False e=1.7040775; fda_10 s=0.2125 b=False x=False w=False e=1.7040775; fda_14 s=0.10810742 b=False x=False w=False e=1.7040775]
+ShortlistFor "COLOURETTE COLOURPOP LIP AND CHEEK" => [{brandName="Colourette" byLook=False byText=True byTyping=False cosmeticType="Lip & Cheek Tint" look=null product=fda_15 productName="Colourpop Lip and Cheek" score=1}; {brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip & Cheek Tint" look=null product=fda_11 productName="Lip and Cheek Tint" score=0.6681927}]
+ShortlistFor4 "COLOURETTE COLOURPOP LIP AND CHEEK" => [{brandName="Colourette" byLook=False byText=True byTyping=False cosmeticType="Lip & Cheek Tint" look=null product=fda_15 productName="Colourpop Lip and Cheek" score=1}; {brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip & Cheek Tint" look=null product=fda_11 productName="Lip and Cheek Tint" score=0.6681927}]
+Normalize "BLK UNIVERSAL ALL DAY LIP AND CHEEK MATTE TINT" => "blk universal all day lip and cheek matte tint" compact="blkuniversalalldaylipandcheekmattetint"
+TypeFromLabel "BLK UNIVERSAL ALL DAY LIP AND CHEEK MATTE TINT" => ""
+JudgeLabel "BLK UNIVERSAL ALL DAY LIP AND CHEEK MATTE TINT" => {family="" kind=Unclear word=""}
+InText3 "BLK UNIVERSAL ALL DAY LIP AND CHEEK MATTE TINT" => [fda_16 s=0.85 b=False x=True w=False e=19.544243; fda_11 s=0.85 b=False x=True w=False e=7.967038; obf_9 s=0.85 b=False x=True w=False e=3.408155]
+InTextAll "BLK UNIVERSAL ALL DAY LIP AND CHEEK MATTE TINT" => [fda_16 s=0.85 b=False x=True w=False e=19.544243; fda_11 s=0.85 b=False x=True w=False e=7.967038; obf_9 s=0.85 b=False x=True w=False e=3.408155; fda_10 s=0.85 b=False x=True w=False e=3.408155; fda_15 s=0.5572027 b=False x=False w=False e=6.2629604; fda_14 s=0.43242967 b=False x=False w=False e=3.408155; fda_12 s=0.1093039 b=False x=False w=False e=1.7040775; fda_21 s=0.07634655 b=False x=False w=False e=1.7040775; fda_3 s=0.06734566 b=False x=False w=False e=1.7040775; fda_5 s=0.06271689 b=False x=False w=False e=1.7040775; fda_1 s=0.05766527 b=False x=False w=False e=1.7040775; fda_6 s=0.04871004 b=False x=False w=False e=1.7040775]
+ShortlistFor "BLK UNIVERSAL ALL DAY LIP AND CHEEK MATTE TINT" => [{brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=fda_10 productName="Lip Tint" score=0.85}; {brandName="NIVEA" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=obf_9 productName="Lip Tint" score=0.85}; {brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip & Cheek Tint" look=null product=fda_11 productName="Lip and Cheek Tint" score=0.85}]
+ShortlistFor4 "BLK UNIVERSAL ALL DAY LIP AND CHEEK MATTE TINT" => [{brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=fda_10 productName="Lip Tint" score=0.85}; {brandName="NIVEA" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=obf_9 productName="Lip Tint" score=0.85}; {brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip & Cheek Tint" look=null product=fda_11 productName="Lip and Cheek Tint" score=0.85}; {brandName="BLK Cosmetics" byLook=False byText=True byTyping=False cosmeticType="Lip & Cheek Tint" look=null product=fda_16 productName="Universal All Day Lip and Cheek Matte Tint" score=0.85}]
+Normalize "HAPPY SKIN SECOND SKIN FOUNDATION MEDIUM" => "happy skin second skin foundation medium" compact="happyskinsecondskinfoundationmedium"
+TypeFromLabel "HAPPY SKIN SECOND SKIN FOUNDATION MEDIUM" => "Foundation"
+JudgeLabel "HAPPY SKIN SECOND SKIN FOUNDATION MEDIUM" => {family="" kind=Makeup word="foundation"}
+InText3 "HAPPY SKIN SECOND SKIN FOUNDATION MEDIUM" => [fda_17 s=1 b=True x=True w=False e=7.782048; fda_21 s=0.40241456 b=False x=False w=False e=4.491006; fda_3 s=0.07305955 b=False x=False w=False e=1.8486587]
+InTextAll "HAPPY SKIN SECOND SKIN FOUNDATION MEDIUM" => [fda_17 s=1 b=True x=True w=False e=7.782048; fda_21 s=0.40241456 b=False x=False w=False e=4.491006; fda_3 s=0.07305955 b=False x=False w=False e=1.8486587; fda_2 s=0.06938741 b=False x=False w=False e=1.8486587; fda_7 s=0.052333906 b=False x=False w=False e=1.8486587]
+ShortlistFor "HAPPY SKIN SECOND SKIN FOUNDATION MEDIUM" => [{brandName="Happy Skin" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_17 productName="Second Skin Foundation" score=1}]
+ShortlistFor4 "HAPPY SKIN SECOND SKIN FOUNDATION MEDIUM" => [{brandName="Happy Skin" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_17 productName="Second Skin Foundation" score=1}]
+Normalize "SUNNIES FACE FLUFFMATTE" => "sunnies face fluffmatte" compact="sunniesfacefluffmatte"
+TypeFromLabel "SUNNIES FACE FLUFFMATTE" => ""
+JudgeLabel "SUNNIES FACE FLUFFMATTE" => {family="" kind=Unclear word=""}
+InText3 "SUNNIES FACE FLUFFMATTE" => [fda_18 s=0.29540005 b=True x=False w=False e=3.2910426]
+InTextAll "SUNNIES FACE FLUFFMATTE" => [fda_18 s=0.29540005 b=True x=False w=False e=3.2910426]
+ShortlistFor "SUNNIES FACE FLUFFMATTE" => []
+ShortlistFor4 "SUNNIES FACE FLUFFMATTE" => []
+Normalize "LASH SENSATIONAL\nWASHABLE MASCARA\nMAYBELLINE" => "lash sensational washable mascara maybelline" compact="lashsensationalwashablemascaramaybelline"
+TypeFromLabel "LASH SENSATIONAL\nWASHABLE MASCARA\nMAYBELLINE" => "Mascara"
+JudgeLabel "LASH SENSATIONAL\nWASHABLE MASCARA\nMAYBELLINE" => {family="" kind=Makeup word="mascara"}
+InText3 "LASH SENSATIONAL\nWASHABLE MASCARA\nMAYBELLINE" => [fda_19 s=1 b=True x=True w=False e=9.873128]
+InTextAll "LASH SENSATIONAL\nWASHABLE MASCARA\nMAYBELLINE" => [fda_19 s=1 b=True x=True w=False e=9.873128]
+ShortlistFor "LASH SENSATIONAL\nWASHABLE MASCARA\nMAYBELLINE" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Mascara" look=null product=fda_19 productName="Lash Sensational Mascara" score=1}]
+ShortlistFor4 "LASH SENSATIONAL\nWASHABLE MASCARA\nMAYBELLINE" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Mascara" look=null product=fda_19 productName="Lash Sensational Mascara" score=1}]
+Normalize "HYPER EASY LIQUID LINER" => "hyper easy liquid liner" compact="hypereasyliquidliner"
+TypeFromLabel "HYPER EASY LIQUID LINER" => ""
+JudgeLabel "HYPER EASY LIQUID LINER" => {family="" kind=Unclear word=""}
+InText3 "HYPER EASY LIQUID LINER" => [fda_20 s=0.85 b=False x=True w=False e=12.515474; fda_1 s=0.08941592 b=False x=False w=False e=2.642347]
+InTextAll "HYPER EASY LIQUID LINER" => [fda_20 s=0.85 b=False x=True w=False e=12.515474; fda_1 s=0.08941592 b=False x=False w=False e=2.642347]
+ShortlistFor "HYPER EASY LIQUID LINER" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Eyeliner" look=null product=fda_20 productName="Hyper Easy Liquid Liner" score=0.85}]
+ShortlistFor4 "HYPER EASY LIQUID LINER" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Eyeliner" look=null product=fda_20 productName="Hyper Easy Liquid Liner" score=0.85}]
+Normalize "DETAIL SKIN TINT SERUM FOUNDATION" => "detail skin tint serum foundation" compact="detailskintintserumfoundation"
+TypeFromLabel "DETAIL SKIN TINT SERUM FOUNDATION" => "Foundation"
+JudgeLabel "DETAIL SKIN TINT SERUM FOUNDATION" => {family="" kind=Makeup word="foundation"}
+InText3 "DETAIL SKIN TINT SERUM FOUNDATION" => [fda_21 s=0.85 b=False x=True w=False e=9.486126; fda_17 s=0.49053347 b=False x=False w=False e=4.491006; obf_9 s=0.2125 b=False x=False w=False e=1.7040775]
+InTextAll "DETAIL SKIN TINT SERUM FOUNDATION" => [fda_21 s=0.85 b=False x=True w=False e=9.486126; fda_17 s=0.49053347 b=False x=False w=False e=4.491006; obf_9 s=0.2125 b=False x=False w=False e=1.7040775; fda_10 s=0.2125 b=False x=False w=False e=1.7040775; fda_14 s=0.10810742 b=False x=False w=False e=1.7040775; fda_11 s=0.09090366 b=False x=False w=False e=1.7040775; fda_3 s=0.07305955 b=False x=False w=False e=1.8486587; fda_2 s=0.06938741 b=False x=False w=False e=1.8486587; fda_7 s=0.052333906 b=False x=False w=False e=1.8486587; fda_16 s=0.037056074 b=False x=False w=False e=1.7040775]
+ShortlistFor "DETAIL SKIN TINT SERUM FOUNDATION" => [{brandName="Detail Cosmetics" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_21 productName="Skin Tint Serum Foundation" score=0.85}; {brandName="Happy Skin" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_17 productName="Second Skin Foundation" score=0.49053347}]
+ShortlistFor4 "DETAIL SKIN TINT SERUM FOUNDATION" => [{brandName="Detail Cosmetics" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_21 productName="Skin Tint Serum Foundation" score=0.85}; {brandName="Happy Skin" byLook=False byText=True byTyping=False cosmeticType="Foundation" look=null product=fda_17 productName="Second Skin Foundation" score=0.49053347}]
+Normalize "MAYBELLINE NEW YORK" => "maybelline new york" compact="maybellinenewyork"
+TypeFromLabel "MAYBELLINE NEW YORK" => ""
+JudgeLabel "MAYBELLINE NEW YORK" => {family="" kind=Unclear word=""}
+InText3 "MAYBELLINE NEW YORK" => []
+InTextAll "MAYBELLINE NEW YORK" => []
+ShortlistFor "MAYBELLINE NEW YORK" => []
+ShortlistFor4 "MAYBELLINE NEW YORK" => []
+Normalize "LIPSTICK" => "lipstick" compact="lipstick"
+TypeFromLabel "LIPSTICK" => "Lipstick"
+JudgeLabel "LIPSTICK" => {family="" kind=Makeup word="lipstick"}
+InText3 "LIPSTICK" => [fda_18 s=0.17390996 b=False x=False w=False e=2.2794416; fda_12 s=0.14620921 b=False x=False w=False e=2.2794416; fda_1 s=0.077135354 b=False x=False w=False e=2.2794416]
+InTextAll "LIPSTICK" => [fda_18 s=0.17390996 b=False x=False w=False e=2.2794416; fda_12 s=0.14620921 b=False x=False w=False e=2.2794416; fda_1 s=0.077135354 b=False x=False w=False e=2.2794416]
+ShortlistFor "LIPSTICK" => []
+ShortlistFor4 "LIPSTICK" => []
+Normalize "FOUNDATION SPF 15" => "foundation spf 15" compact="foundationspf15"
+TypeFromLabel "FOUNDATION SPF 15" => "Foundation"
+JudgeLabel "FOUNDATION SPF 15" => {family="" kind=Makeup word="foundation"}
+InText3 "FOUNDATION SPF 15" => [fda_17 s=0.10096056 b=False x=False w=False e=1.8486587; fda_21 s=0.08282411 b=False x=False w=False e=1.8486587; fda_3 s=0.07305955 b=False x=False w=False e=1.8486587]
+InTextAll "FOUNDATION SPF 15" => [fda_17 s=0.10096056 b=False x=False w=False e=1.8486587; fda_21 s=0.08282411 b=False x=False w=False e=1.8486587; fda_3 s=0.07305955 b=False x=False w=False e=1.8486587; fda_2 s=0.06938741 b=False x=False w=False e=1.8486587; fda_7 s=0.052333906 b=False x=False w=False e=1.8486587]
+ShortlistFor "FOUNDATION SPF 15" => []
+ShortlistFor4 "FOUNDATION SPF 15" => []
+Normalize "CETAPHIL GENTLE SKIN CLEANSER" => "cetaphil gentle skin cleanser" compact="cetaphilgentleskincleanser"
+TypeFromLabel "CETAPHIL GENTLE SKIN CLEANSER" => ""
+JudgeLabel "CETAPHIL GENTLE SKIN CLEANSER" => {family="" kind=Unclear word=""}
+InText3 "CETAPHIL GENTLE SKIN CLEANSER" => [fda_17 s=0.14430617 b=False x=False w=False e=2.642347; fda_21 s=0.118383154 b=False x=False w=False e=2.642347]
+InTextAll "CETAPHIL GENTLE SKIN CLEANSER" => [fda_17 s=0.14430617 b=False x=False w=False e=2.642347; fda_21 s=0.118383154 b=False x=False w=False e=2.642347]
+ShortlistFor "CETAPHIL GENTLE SKIN CLEANSER" => []
+ShortlistFor4 "CETAPHIL GENTLE SKIN CLEANSER" => []
+Normalize "SAFEGUARD PURE WHITE BAR SOAP" => "safeguard pure white bar soap" compact="safeguardpurewhitebarsoap"
+TypeFromLabel "SAFEGUARD PURE WHITE BAR SOAP" => ""
+JudgeLabel "SAFEGUARD PURE WHITE BAR SOAP" => {family="" kind=Unclear word=""}
+InText3 "SAFEGUARD PURE WHITE BAR SOAP" => []
+InTextAll "SAFEGUARD PURE WHITE BAR SOAP" => []
+ShortlistFor "SAFEGUARD PURE WHITE BAR SOAP" => []
+ShortlistFor4 "SAFEGUARD PURE WHITE BAR SOAP" => []
+Normalize "COLGATE TOOTHPASTE" => "colgate toothpaste" compact="colgatetoothpaste"
+TypeFromLabel "COLGATE TOOTHPASTE" => ""
+JudgeLabel "COLGATE TOOTHPASTE" => {family="body care" kind=OutOfScope word="toothpaste"}
+InText3 "COLGATE TOOTHPASTE" => []
+InTextAll "COLGATE TOOTHPASTE" => []
+ShortlistFor "COLGATE TOOTHPASTE" => []
+ShortlistFor4 "COLGATE TOOTHPASTE" => []
+Normalize "NIVEA SOFT MOISTURISING CREME" => "nivea soft moisturising creme" compact="niveasoftmoisturisingcreme"
+TypeFromLabel "NIVEA SOFT MOISTURISING CREME" => ""
+JudgeLabel "NIVEA SOFT MOISTURISING CREME" => {family="" kind=Unclear word=""}
+InText3 "NIVEA SOFT MOISTURISING CREME" => []
+InTextAll "NIVEA SOFT MOISTURISING CREME" => []
+ShortlistFor "NIVEA SOFT MOISTURISING CREME" => []
+ShortlistFor4 "NIVEA SOFT MOISTURISING CREME" => []
+Normalize "Ingredients: Water, Glycerin, Dimethicone, CI 77891" => "ingredients water glycerin dimethicone ci 77891" compact="ingredientswaterglycerindimethiconeci77891"
+TypeFromLabel "Ingredients: Water, Glycerin, Dimethicone, CI 77891" => ""
+JudgeLabel "Ingredients: Water, Glycerin, Dimethicone, CI 77891" => {family="" kind=Unclear word=""}
+InText3 "Ingredients: Water, Glycerin, Dimethicone, CI 77891" => []
+InTextAll "Ingredients: Water, Glycerin, Dimethicone, CI 77891" => []
+ShortlistFor "Ingredients: Water, Glycerin, Dimethicone, CI 77891" => []
+ShortlistFor4 "Ingredients: Water, Glycerin, Dimethicone, CI 77891" => []
+Normalize "" => "" compact=""
+TypeFromLabel "" => ""
+JudgeLabel "" => {family="" kind=Unclear word=""}
+InText3 "" => []
+InTextAll "" => []
+ShortlistFor "" => []
+ShortlistFor4 "" => []
+Normalize "    " => "" compact=""
+TypeFromLabel "    " => ""
+JudgeLabel "    " => {family="" kind=Unclear word=""}
+InText3 "    " => []
+InTextAll "    " => []
+ShortlistFor "    " => []
+ShortlistFor4 "    " => []
+Normalize "M4YBELL1NE SUPERST4Y MATTE 1NK" => "m4ybell1ne superst4y matte 1nk" compact="m4ybell1nesuperst4ymatte1nk"
+TypeFromLabel "M4YBELL1NE SUPERST4Y MATTE 1NK" => ""
+JudgeLabel "M4YBELL1NE SUPERST4Y MATTE 1NK" => {family="" kind=Unclear word=""}
+InText3 "M4YBELL1NE SUPERST4Y MATTE 1NK" => [fda_1 s=0.51689744 b=False x=False w=False e=7.6374674; fda_12 s=0.1093039 b=False x=False w=False e=1.7040775; fda_2 s=0.09917765 b=False x=False w=False e=2.642347]
+InTextAll "M4YBELL1NE SUPERST4Y MATTE 1NK" => [fda_1 s=0.51689744 b=False x=False w=False e=7.6374674; fda_12 s=0.1093039 b=False x=False w=False e=1.7040775; fda_2 s=0.09917765 b=False x=False w=False e=2.642347; fda_3 s=0.06734566 b=False x=False w=False e=1.7040775; fda_5 s=0.06271689 b=False x=False w=False e=1.7040775; fda_6 s=0.04871004 b=False x=False w=False e=1.7040775; fda_16 s=0.037056074 b=False x=False w=False e=1.7040775]
+ShortlistFor "M4YBELL1NE SUPERST4Y MATTE 1NK" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Lipstick" look=null product=fda_1 productName="Superstay Matte Ink Liquid Lipstick" score=0.51689744}]
+ShortlistFor4 "M4YBELL1NE SUPERST4Y MATTE 1NK" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Lipstick" look=null product=fda_1 productName="Superstay Matte Ink Liquid Lipstick" score=0.51689744}]
+Normalize "superstay matte ink lipstick 20 pioneer" => "superstay matte ink lipstick 20 pioneer" compact="superstaymatteinklipstick20pioneer"
+TypeFromLabel "superstay matte ink lipstick 20 pioneer" => "Lipstick"
+JudgeLabel "superstay matte ink lipstick 20 pioneer" => {family="" kind=Makeup word="lipstick"}
+InText3 "superstay matte ink lipstick 20 pioneer" => [fda_1 s=0.67116815 b=False x=False w=False e=9.916909; fda_12 s=0.5110262 b=False x=False w=False e=3.983519; fda_18 s=0.17390996 b=False x=False w=False e=2.2794416]
+InTextAll "superstay matte ink lipstick 20 pioneer" => [fda_1 s=0.67116815 b=False x=False w=False e=9.916909; fda_12 s=0.5110262 b=False x=False w=False e=3.983519; fda_18 s=0.17390996 b=False x=False w=False e=2.2794416; fda_2 s=0.09917765 b=False x=False w=False e=2.642347; fda_3 s=0.06734566 b=False x=False w=False e=1.7040775; fda_5 s=0.06271689 b=False x=False w=False e=1.7040775; fda_6 s=0.04871004 b=False x=False w=False e=1.7040775; fda_16 s=0.037056074 b=False x=False w=False e=1.7040775]
+ShortlistFor "superstay matte ink lipstick 20 pioneer" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Lipstick" look=null product=fda_1 productName="Superstay Matte Ink Liquid Lipstick" score=0.67116815}; {brandName="Ever Bilena" byLook=False byText=True byTyping=False cosmeticType="Lipstick" look=null product=fda_12 productName="Advance Matte Lipstick" score=0.5110262}]
+ShortlistFor4 "superstay matte ink lipstick 20 pioneer" => [{brandName="Maybelline" byLook=False byText=True byTyping=False cosmeticType="Lipstick" look=null product=fda_1 productName="Superstay Matte Ink Liquid Lipstick" score=0.67116815}; {brandName="Ever Bilena" byLook=False byText=True byTyping=False cosmeticType="Lipstick" look=null product=fda_12 productName="Advance Matte Lipstick" score=0.5110262}]
+Normalize "VELVET LIP TINT CHERRY" => "velvet lip tint cherry" compact="velvetliptintcherry"
+TypeFromLabel "VELVET LIP TINT CHERRY" => "Lip Tint"
+JudgeLabel "VELVET LIP TINT CHERRY" => {family="" kind=Makeup word="lip tint"}
+InText3 "VELVET LIP TINT CHERRY" => [fda_14 s=0.85 b=False x=True w=False e=6.699198; obf_9 s=0.85 b=False x=True w=False e=3.408155; fda_10 s=0.85 b=False x=True w=False e=3.408155]
+InTextAll "VELVET LIP TINT CHERRY" => [fda_14 s=0.85 b=False x=True w=False e=6.699198; obf_9 s=0.85 b=False x=True w=False e=3.408155; fda_10 s=0.85 b=False x=True w=False e=3.408155; fda_11 s=0.36361465 b=False x=False w=False e=3.408155; fda_16 s=0.1482243 b=False x=False w=False e=3.408155; fda_15 s=0.07580413 b=False x=False w=False e=1.7040775; fda_21 s=0.07634655 b=False x=False w=False e=1.7040775]
+ShortlistFor "VELVET LIP TINT CHERRY" => [{brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=fda_10 productName="Lip Tint" score=0.85}; {brandName="NIVEA" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=obf_9 productName="Lip Tint" score=0.85}; {brandName="Issy & Co" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=fda_14 productName="Velvet Lip Tint" score=0.85}]
+ShortlistFor4 "VELVET LIP TINT CHERRY" => [{brandName="Careline" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=fda_10 productName="Lip Tint" score=0.85}; {brandName="NIVEA" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=obf_9 productName="Lip Tint" score=0.85}; {brandName="Issy & Co" byLook=False byText=True byTyping=False cosmeticType="Lip Tint" look=null product=fda_14 productName="Velvet Lip Tint" score=0.85}]
+Normalize "COLOR RICHE 300" => "color riche 300" compact="colorriche300"
+TypeFromLabel "COLOR RICHE 300" => ""
+JudgeLabel "COLOR RICHE 300" => {family="" kind=Unclear word=""}
+InText3 "COLOR RICHE 300" => [fda_6 s=0.37628996 b=False x=False w=False e=6.582085]
+InTextAll "COLOR RICHE 300" => [fda_6 s=0.37628996 b=False x=False w=False e=6.582085]
+ShortlistFor "COLOR RICHE 300" => []
+ShortlistFor4 "COLOR RICHE 300" => []
+Search "Maybelline" "Superstay Matte Ink" => [fda_1 s=0.88243437 b=True x=False w=False e=7.6374674; fda_2 s=0.3121879 b=True x=False w=False e=2.642347; fda_3 s=0.20372264 b=True x=False w=False e=1.7040775; fda_5 s=0.20045526 b=True x=False w=False e=1.7040775]
+Exact "Maybelline" "Superstay Matte Ink" => null
+SameNameDifferentKind "Maybelline" "Superstay Matte Ink" => []
+Typed "Maybelline" "Superstay Matte Ink" => [{brandName="Maybelline" byLook=False byText=False byTyping=True cosmeticType="Lipstick" look=null product=fda_1 productName="Superstay Matte Ink Liquid Lipstick" score=0.83709675}]
+Search "" "fit me foundation" => [fda_3 s=0.87874913 b=False x=False w=False e=6.4075418; fda_4 s=0.67226744 b=False x=False w=False e=4.558883; fda_5 s=0.61647755 b=False x=False w=False e=4.558883; fda_17 s=0.27322534 b=False x=False w=False e=1.8486587; fda_21 s=0.26042312 b=False x=False w=False e=1.8486587]
+Exact "" "fit me foundation" => null
+SameNameDifferentKind "" "fit me foundation" => []
+Typed "" "fit me foundation" => [{brandName="Maybelline" byLook=False byText=False byTyping=True cosmeticType="Foundation" look=null product=fda_3 productName="Fit Me Matte + Poreless Foundation" score=0.8339286}; {brandName="Maybelline" byLook=False byText=False byTyping=True cosmeticType="Concealer" look=null product=fda_4 productName="Fit Me Concealer" score=0.67226744}; {brandName="Maybelline" byLook=False byText=False byTyping=True cosmeticType="Powder" look=null product=fda_5 productName="Fit Me Matte + Poreless Powder" score=0.61647755}]
+Search "Careline" "lip tint" => [fda_10 s=1 b=True x=True w=False e=3.408155; fda_11 s=0.82833457 b=True x=False w=False e=3.408155]
+Exact "Careline" "lip tint" => fda_10
+SameNameDifferentKind "Careline" "lip tint" => []
+Typed "Careline" "lip tint" => [{brandName="Careline" byLook=False byText=False byTyping=True cosmeticType="Lip Tint" look=null product=fda_10 productName="Lip Tint" score=1}; {brandName="Careline" byLook=False byText=False byTyping=True cosmeticType="Lip & Cheek Tint" look=null product=fda_11 productName="Lip and Cheek Tint" score=0.81666666}]
+Search "" "lip tint" => [obf_9 s=1 b=False x=True w=False e=3.408155; fda_10 s=1 b=False x=True w=False e=3.408155; fda_14 s=0.8526222 b=False x=False w=False e=3.408155; fda_11 s=0.82833457 b=False x=False w=False e=3.408155; fda_16 s=0.75231445 b=False x=False w=False e=3.408155]
+Exact "" "lip tint" => null
+SameNameDifferentKind "" "lip tint" => []
+Typed "" "lip tint" => [{brandName="Careline" byLook=False byText=False byTyping=True cosmeticType="Lip Tint" look=null product=fda_10 productName="Lip Tint" score=0.95}; {brandName="NIVEA" byLook=False byText=False byTyping=True cosmeticType="Lip Tint" look=null product=obf_9 productName="Lip Tint" score=0.95}; {brandName="Issy & Co" byLook=False byText=False byTyping=True cosmeticType="Lip Tint" look=null product=fda_14 productName="Velvet Lip Tint" score=0.83461535}]
+Search "L'Oreal" "color riche" => [fda_6 s=0.8328082 b=True x=False w=False e=6.582085]
+Exact "L'Oreal" "color riche" => null
+SameNameDifferentKind "L'Oreal" "color riche" => []
+Typed "L'Oreal" "color riche" => [{brandName="L'Oréal Paris" byLook=False byText=False byTyping=True cosmeticType="Lipstick" look=null product=fda_6 productName="Color Riche Intense Volume Matte" score=0.7892857}]
+Search "Absidy" "complexion blur powder" => [fda_8 s=1 b=True x=True w=False e=9.224432]
+Exact "Absidy" "complexion blur powder" => fda_8
+SameNameDifferentKind "Absidy" "complexion blur powder" => []
+Typed "Absidy" "complexion blur powder" => [{brandName="Absidy" byLook=False byText=False byTyping=True cosmeticType="Powder" look=null product=fda_8 productName="Complexion Blur Translucent Perfecting Powder" score=1}]
+Search "" "two way cake" => [fda_13 s=0.88738716 b=False x=False w=False e=9.873128]
+Exact "" "two way cake" => null
+SameNameDifferentKind "" "two way cake" => []
+Typed "" "two way cake" => [{brandName="Ever Bilena" byLook=False byText=False byTyping=True cosmeticType="Powder" look=null product=fda_13 productName="EB Advance Two Way Cake" score=0.83157897}]
+Search "Nonexistent Brand" "Glow Serum" => []
+Exact "Nonexistent Brand" "Glow Serum" => null
+SameNameDifferentKind "Nonexistent Brand" "Glow Serum" => []
+Typed "Nonexistent Brand" "Glow Serum" => []
+Search "" "" => []
+Exact "" "" => null
+SameNameDifferentKind "" "" => []
+Typed "" "" => []
+Search "Maybeline" "supersty 30h" => []
+Exact "Maybeline" "supersty 30h" => null
+SameNameDifferentKind "Maybeline" "supersty 30h" => []
+Typed "Maybeline" "supersty 30h" => []
+ByBarcode "0041554496536" => fda_1 key="41554496536"
+ByBarcode "41554496536" => fda_1 key="41554496536"
+ByBarcode " 0 041554 496536 " => fda_1 key="41554496536"
+ByBarcode "3600531324506" => fda_3 key="3600531324506"
+ByBarcode "3600522806035" => fda_7 key="3600522806035"
+ByBarcode "4800047000123" => fda_12 key="4800047000123"
+ByBarcode "0041554433265" => fda_19 key="41554433265"
+ByBarcode "123" => null key=""
+ByBarcode "" => null key=""
+ByBarcode "9999999999999" => null key="9999999999999"
+ShadeCode "65" fda_1 => key="65" folded="65" find=2 hex="#B5655A"
+ShadeCode "065" fda_1 => key="065" folded="065" find=-1 hex=""
+ShadeCode "6S" fda_1 => key="6S" folded="65" find=2 hex="#B5655A"
+ShadeCode "128" fda_2 => key="128" folded="128" find=2 hex="#DDB28F"
+ShadeCode "12B" fda_2 => key="12B" folded="128" find=2 hex="#DDB28F"
+ShadeCode "220 NATURAL BEIGE" fda_3 => key="220NATURALBEIGE" folded="220NATURA18E1GE" find=4 hex="#CFA07A"
+ShadeCode "N4" fda_7 => key="N4" folded="N4" find=0 hex=""
+ShadeCode "n 4" fda_7 => key="4" folded="4" find=-1 hex=""
+ShadeCode "EB02" fda_12 => key="EB02" folded="E802" find=1 hex=""
+ShadeCode "ROSEWOOD" fda_14 => key="ROSEWOOD" folded="R05EW00D" find=0 hex=""
+ShadeCode "999" fda_1 => key="999" folded="999" find=-1 hex=""
+ShadeCode "" fda_1 => key="" folded="" find=-1 hex=""
+ShadeCode "02" fda_10 => key="02" folded="02" find=1 hex=""
+ShadeCode "Medium" fda_17 => key="MEDIUM" folded="MED1UM" find=1 hex=""
+Judge "Lipstick" "Superstay Matte Ink" => {family="" kind=Makeup word="lipstick"} makeupType="Lipstick"
+Judge "Foundation" "Fit Me" => {family="" kind=Makeup word="foundation"} makeupType="Foundation"
+Judge "" "Cetaphil Gentle Skin Cleanser" => {family="skin care" kind=SkinCare word="cleanser"} makeupType=""
+Judge "Moisturizer" "Nivea Creme" => {family="skin care" kind=SkinCare word="moisturizer"} makeupType=""
+Judge "" "Lip Tint" => {family="" kind=Makeup word="lip tint"} makeupType="Lip Tint"
+Judge "Serum" "Skin Tint Serum Foundation" => {family="" kind=Makeup word="foundation"} makeupType="Foundation"
+Judge "Soap" "Safeguard" => {family="body care" kind=OutOfScope word="soap"} makeupType=""
+Judge "Mascara" "" => {family="" kind=Makeup word="mascara"} makeupType="Mascara"
+Judge "" "" => {family="" kind=Unclear word=""} makeupType=""
+Judge "Sunscreen" "UV Shield SPF 50" => {family="skin care" kind=SkinCare word="sunscreen"} makeupType=""
+Judge "Powder" "Two Way Cake" => {family="" kind=Makeup word="powder"} makeupType="Powder"
+ProductMatcher Dimethicone|Trimethylsiloxysilicate|Isododecane|Nylon-611/Dimethicone Copolymer|CI 77491 => fda_1
+ProductMatcher(brand maybelline) Dimethicone|Trimethylsiloxysilicate|Isododecane|Nylon-611/Dimethicone Copolymer|CI 77491 => fda_1
+ProductMatcher Isododecane|Dimethicone|CI 77491 => null
+ProductMatcher(brand maybelline) Isododecane|Dimethicone|CI 77491 => null
+ProductMatcher Water|Glycerin => null
+ProductMatcher(brand maybelline) Water|Glycerin => null
+ProductMatcher  => null
+ProductMatcher(brand maybelline)  => null
+ComputeShadeMatchCounts 65|superstay => {65:1}
+ComputeShadeMatchCounts 128|120 => {120:3,128:2}
+ComputeShadeMatchCounts n4 => {n4:1}
+ComputeShadeMatchCounts rosewood|velvet => {rosewood:1}
+ComputeShadeMatchCounts  => {}
