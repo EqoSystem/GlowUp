@@ -206,8 +206,8 @@
 
                             <div class="field full">
                                 <div class="label-row"><label for="ingredientPurposeInput">Purpose <span class="required" aria-hidden="true">*</span></label></div>
-                                <input type="text" id="ingredientPurposeInput" autocomplete="off" placeholder="e.g., Helps prevent microbial growth and maintain product quality." aria-required="true" aria-describedby="ingredientPurposeHint">
-                                <div class="hint-row"><p class="field-hint" id="ingredientPurposeHint">One line on what this ingredient does in a product.</p><span class="counter" id="ingredientPurposeCount"></span></div>
+                                <textarea id="ingredientPurposeInput" rows="1" class="limited one-line" spellcheck="true" placeholder="e.g., Helps prevent microbial growth and maintain product quality." aria-required="true" aria-describedby="ingredientPurposeHint"></textarea>
+                                <div class="hint-row"><p class="field-hint" id="ingredientPurposeHint">One line on what this ingredient does in a product.</p></div>
                                 <div class="field-sources" data-field-sources="purpose" hidden></div>
                             </div>
 
@@ -230,7 +230,7 @@
                         <div class="ing-grid">
                             <div class="field full">
                                 <div class="label-row"><label for="ingredientAliasesInput">Also Known As</label></div>
-                                <input type="text" id="ingredientAliasesInput" maxlength="300" placeholder="e.g., Water, Eau" autocomplete="off" aria-describedby="ingredientAliasesHint">
+                                <textarea id="ingredientAliasesInput" rows="1" class="limited one-line" spellcheck="true" maxlength="300" placeholder="e.g., Water, Eau" aria-describedby="ingredientAliasesHint"></textarea>
                                 <div class="hint-row"><p class="field-hint" id="ingredientAliasesHint">Other spellings found on labels, separated by commas. A scan of any of them finds this ingredient. The first one is shown as the common name.</p></div>
                                 <div class="field-sources" data-field-sources="aliases" hidden></div>
                             </div>
@@ -262,13 +262,13 @@
                             </div>
                             <div class="field full">
                                 <div class="label-row"><label for="ingredientCautionInput">Caution Note</label></div>
-                                <input type="text" id="ingredientCautionInput" maxlength="160" placeholder="e.g., can clog pores" autocomplete="off" aria-describedby="ingredientCautionHint">
+                                <textarea id="ingredientCautionInput" rows="1" class="limited one-line" spellcheck="true" maxlength="160" placeholder="e.g., can clog pores" aria-describedby="ingredientCautionHint"></textarea>
                                 <div class="hint-row"><p class="field-hint" id="ingredientCautionHint">Finish the sentence "It ...". The app shows it when the ingredient is flagged, for example: "May not suit Oily skin: it can clog pores."</p></div>
                                 <div class="field-sources" data-field-sources="cautionNote" hidden></div>
                             </div>
                             <div class="field full">
                                 <div class="label-row"><label for="ingredientUsesInput">Commonly Used In</label></div>
-                                <input type="text" id="ingredientUsesInput" maxlength="160" placeholder="e.g., serums, moisturisers, toners" autocomplete="off">
+                                <textarea id="ingredientUsesInput" rows="1" class="limited one-line" spellcheck="true" maxlength="160" placeholder="e.g., serums, moisturisers, toners"></textarea>
                                 <div class="field-sources" data-field-sources="commonUses" hidden></div>
                             </div>
 

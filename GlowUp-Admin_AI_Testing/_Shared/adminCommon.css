@@ -1966,6 +1966,8 @@ body:has(> .modal-overlay[style*="flex"]) .toast-host { bottom: 96px; }
 .hint-row { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 4px 12px; margin-top: 6px; min-width: 0; }
 .ing-modal .field-hint { margin: 0; font-size: 13px; font-weight: 400; line-height: 1.45; color: var(--im-hint); min-width: 0; }
 .hint-row .field-hint { flex: 1 1 220px; }
+.ing-modal textarea.limited { min-height: 0; resize: vertical; }
+.hint-row .counter.is-full { color: var(--im-danger); font-weight: 600; }
 .hint-row .counter { margin-left: auto; flex: none; font-size: 13px; color: var(--im-hint); font-variant-numeric: tabular-nums; }
 .ing-modal .field-hint.warn { color: var(--im-danger); }
 .ing-modal .paste-note { margin-top: 6px; }

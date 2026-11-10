@@ -278,6 +278,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     el("ingredientNameInput").addEventListener("input", () => sourceUi.refresh());
     wirePasteTidy();
+    wireLimited();
     el("ingredientAliasesInput").addEventListener("input", showNameClash);
     el("ingredientsList").addEventListener("click", onListClick);
     el("ingredientsList").addEventListener("dblclick", (event) => {
@@ -497,7 +498,65 @@ function wirePurposeAndClassification() {
         if (made) { fillClassFilter(); renderIngredients(); }
     });
 }
-function paintPurposeCount() { el("ingredientPurposeCount").textContent = `${el("ingredientPurposeInput").value.length} / ${MAX_PURPOSE}`; }
+function paintPurposeCount() { paintLimited(); }
+
+/**
+ * Every box with a character limit: a wrapping box that is tall enough for the WHOLE limit (so a full-length text is always in view, no
+ * scrolling), still resizable by dragging, with a "n / limit" counter under it. Single-line boxes keep Enter from adding a line.
+ */
+const LIMITED_IDS = ["ingredientPurposeInput", "ingredientCautionInput", "ingredientUsesInput", "ingredientAliasesInput", "ingredientDescInput", "ingredientChemInput", "ingredientSourcesInput"];
+let limitedWidth = 0;
+function wireLimited() {
+    LIMITED_IDS.forEach((id) => {
+        const box = el(id), field = box.closest(".field");
+        if (!field || box.dataset.limitedWired) return;
+        box.dataset.limitedWired = "1";
+        let row = field.querySelector(".hint-row");
+        if (!row) { row = document.createElement("div"); row.className = "hint-row"; box.insertAdjacentElement("afterend", row); }
+        let counter = row.querySelector(".counter");
+        if (!counter) { counter = document.createElement("span"); counter.className = "counter"; row.appendChild(counter); }
+        box._counter = counter;
+        counter.setAttribute("aria-live", "off");
+        if (box.classList.contains("one-line")) {
+            box.addEventListener("keydown", (e) => { if (e.key === "Enter") e.preventDefault(); });
+            box.addEventListener("input", () => { if (/[\r\n]/.test(box.value)) box.value = box.value.replace(/\s*[\r\n]+\s*/g, " "); });
+        }
+        box.addEventListener("input", () => paintLimited(box));
+    });
+    if (typeof ResizeObserver === "function") {
+        const body = el("ingBody");
+        new ResizeObserver(() => { const w = body.clientWidth; if (w !== limitedWidth) { limitedWidth = w; fitLimited(); } }).observe(body);
+    }
+}
+function paintLimited(only) {
+    LIMITED_IDS.forEach((id) => {
+        const box = el(id);
+        if (only && only !== box) return;
+        if (!box._counter) return;
+        const max = box.maxLength > 0 ? box.maxLength : 0;
+        box._counter.textContent = max ? `${box.value.length} / ${max}` : `${box.value.length}`;
+        box._counter.classList.toggle("is-full", max > 0 && box.value.length >= max);
+    });
+    if (!only) fitLimited();
+}
+/** The least height that shows a text of the full limit, measured with the box's own font and current width. */
+function fitLimited() {
+    const canvas = fitLimited.canvas || (fitLimited.canvas = document.createElement("canvas")), ctx = canvas.getContext("2d");
+    LIMITED_IDS.forEach((id) => {
+        const box = el(id);
+        if (!box.maxLength || box.maxLength < 0 || !box.offsetParent) return;
+        const cs = getComputedStyle(box);
+        ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        const sample = "abcdefghijklmnopqrstuvwxyz ABCDEFGHIJKLMNOPQRSTUVWXYZ .,-";
+        const perChar = ctx.measureText(sample).width / sample.length;
+        const inner = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        if (inner <= 0) return;
+        const lines = Math.min(box.maxLength > 200 ? 4 : 99, Math.max(1, Math.ceil((box.maxLength * perChar * 1.08) / inner)));
+        const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.45;
+        const extra = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+        box.style.minHeight = Math.ceil(lines * lh + extra) + "px";
+    });
+}
 
 /** True while the one-time field change has something left to do. */
 const fieldChangeWaits = () => everyIngredient.length > 0 && (classifications().length === 0 || everyIngredient.some((item) => item.rawTech || !item.rawMarked));
@@ -1600,6 +1659,7 @@ function openIngredientForm(item) {
     writeFit(el("skinTypesFit"), item ? item.avoidForSkinTypes : [], item ? item.goodForSkinTypes : []);
     writeFit(el("conditionsFit"), item ? item.avoidForConditions : [], item ? item.goodForConditions : []);
     modal.open();
+    paintLimited();
     if (sourceUi) sourceUi.fill(item);
     windowKit.reset();
 }
