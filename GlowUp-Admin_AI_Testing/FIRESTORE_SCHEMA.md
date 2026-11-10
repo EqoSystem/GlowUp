@@ -114,7 +114,7 @@ The classification list, managed by admins in the Ingredient Curator. Everyone c
 | `aliases` | list of text | Other spellings found on labels. The first one is shown as the common name. |
 | `riskLevel` | text | `safe`, `caution`, `harmful`, or empty to let the app decide. |
 | `cautionNote` | text | Finishes the sentence "It ...", for example `can clog pores`. |
-| `frequentUseAllergy` | text, optional | Who may react allergically when products with this ingredient are used often, one plain sentence (max 200). Written only when there is one. The app does not read it yet. |
+| `frequentUseAllergy` | text, optional | Who may react allergically when products with this ingredient are used often, one plain sentence (max 200). Written only when there is one, from a regulator's classification (ECHA C&L H317 or the EU fragrance allergen list). The app does not read it yet. |
 | `commonUses` | text | For example `serums, moisturisers`. |
 | `minAge` | number | 0 means no limit. |
 | `keyActive` | yes/no | Shown as a highlighted chip in results. |

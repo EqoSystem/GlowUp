@@ -17,8 +17,8 @@ export const SOURCES = {
     cir: { label: "Cosmetic Ingredient Review", deep: true, url: (name) => google("cir-safety.org", name), ref: () => "https://www.cir-safety.org/" },
     pubchem: { label: "PubChem (NIH)", deep: true, url: (name) => `https://pubchem.ncbi.nlm.nih.gov/#query=${encodeURIComponent(name)}`, ref: (name) => SOURCES.pubchem.url(name) },
     cosmeticsinfo: { label: "CosmeticsInfo.org", deep: true, url: (name) => google("cosmeticsinfo.org", name), ref: () => "https://www.cosmeticsinfo.org/" },
-    sccs: { label: "EU SCCS opinions", deep: true, url: (name) => google("health.ec.europa.eu", name, " SCCS opinion"), ref: () => "https://health.ec.europa.eu/scientific-committees/scientific-committee-consumer-safety-sccs_en" },
-    dermnet: { label: "DermNet (contact allergy)", deep: true, url: (name) => google("dermnetnz.org", name, " contact allergy"), ref: () => "https://dermnetnz.org/" },
+    echa: { label: "ECHA C&L Inventory (EU)", deep: false, url: () => "https://echa.europa.eu/information-on-chemicals/cl-inventory-database", ref: () => "https://echa.europa.eu/information-on-chemicals/cl-inventory-database" },
+    fragrance: { label: "EU fragrance allergen list", deep: true, url: () => "https://single-market-economy.ec.europa.eu/sectors/cosmetics/cosmetic-products-specific-topics/fragrance-allergens-labelling_en", ref: () => "https://single-market-economy.ec.europa.eu/sectors/cosmetics/cosmetic-products-specific-topics/fragrance-allergens-labelling_en" },
     checker: { label: "CosIng Checker (unofficial)", deep: true, url: (name) => `https://www.google.com/search?q=${encodeURIComponent("CosIng checker " + name)}`, ref: () => "" }
 };
 
@@ -93,15 +93,13 @@ export const FIELD_GUIDE = {
         ]
     },
     frequentAllergy: {
-        title: "Optional. Leave empty when no source names a risk",
+        title: "Optional. Leave empty when no source lists a risk",
         sources: [
-            ["cir", "Open the ingredient's report and read the skin sensitization and irritation findings, and any limit on use."],
-            ["cosing", "Annex III lists fragrance allergens that must be named on the label. Check \"Restriction\" too."],
-            ["sccs", "Search for an opinion on the ingredient and read its sensitization conclusion."],
-            ["dermnet", "Search the ingredient for contact allergy or contact dermatitis."],
-            ["pubchem", "Open the compound page and read the skin sensitization entry under Safety and Hazards."]
+            ["echa", "Search the name or CAS number (see Also Known As). If the classification lists H317, the official statement is \"May cause an allergic skin reaction\"."],
+            ["pubchem", "Open the compound page, then Safety and Hazards, GHS Classification. Look for H317 (the same statement, easier to search by name)."],
+            ["fragrance", "For a fragrance ingredient: check whether it is on the EU list of fragrance allergens (named on labels because it can cause contact allergy)."]
         ],
-        helper: "One plain sentence: who may react, and why a product used often (for example daily) makes it more likely. Write it in your own words and keep the evidence in Reference links."
+        helper: "Write one plain sentence from what the source says, e.g. \"May cause an allergic skin reaction in some people.\" The EU classification is for the ingredient itself; the chance of a reaction in a finished product depends on the amount. Keep the page in Reference links."
     },
     judgment: { sources: [], helper: ADMIN_JUDGMENT }
 };

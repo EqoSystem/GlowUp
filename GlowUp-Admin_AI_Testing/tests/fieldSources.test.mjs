@@ -26,7 +26,7 @@ check(f.linksFor("name", "Aqua").find((l) => l.id === "incipedia").deep === fals
 check(f.linksFor("name", "Aqua").find((l) => l.id === "cosmile").deep === true, "COSMILE links straight to the search");
 check(f.linksFor("name", "Aqua / Water").find((l) => l.id === "cosmile").url.endsWith("Aqua%20%2F%20Water"), "the name is URL-encoded");
 
-equal(f.linksFor("frequentAllergy", "Aqua").map((l) => l.id), ["cir", "cosing", "sccs", "dermnet", "pubchem"], "allergy sources");
+equal(f.linksFor("frequentAllergy", "Aqua").map((l) => l.id), ["echa", "pubchem", "fragrance"], "allergy sources");
 equal(f.pasteResult("allergy", "  a  b ").text, "a b", "allergy paste is tidied");
 equal(f.pasteResult("allergy", "a".repeat(301)).note, f.NOTES.largePaste, "allergy large paste notice");
 
