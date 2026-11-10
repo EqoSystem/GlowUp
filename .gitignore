@@ -68,3 +68,5 @@ graphify-out/
 .vercel
 .env*
 GlowUp-Admin/
+tools/LiveScanGolden/bin/
+tools/LiveScanGolden/obj/
