@@ -39,7 +39,7 @@ namespace GlowUp.Onboarding
 
         [Range(0f, 0.2f)] [SerializeField] private float bottomThreshold = 0.03f;
         [SerializeField] private string healthText = "I agree that GlowUp keeps my skin type, skin tone, skin conditions and allergies, to personalise my results (sensitive personal information)";
-        [SerializeField] private string readLabel = "I have read and agree to the Privacy Policy and Terms & Conditions";
+        [SerializeField] private string readLabel = "I have read and agree to the Privacy Policy and the Terms and Conditions";
         [SerializeField] private string dashboardScene = SceneNames.Dashboard;
         [SerializeField] private string previousScene = SceneNames.Onboarding5;
         [SerializeField] private string msgScrollFirst = "Scroll to the bottom to read everything first.";
@@ -57,12 +57,20 @@ namespace GlowUp.Onboarding
         bool reachedBottom, busy, readOnly;
         bool watching;          // false until the document has been laid out, so nothing unlocks by accident while the scene opens
 
-        public static void OpenReadOnlyFromLogin() { openReadOnlyFromLogin = true; }
+        static string openAtPhrase;
+
+        /// <summary>
+        /// Opens this page for READING only (from the log-in page): no progress bar, no status line, no boxes, no Continue. `section` =
+        /// a heading to start at ("Privacy Policy" or "Terms and Conditions"); null = the top.
+        /// </summary>
+        public static void OpenReadOnlyFromLogin(string section = null) { openReadOnlyFromLogin = true; openAtPhrase = section; }
 
         void Awake()
         {
             readOnly = openReadOnlyFromLogin;
             openReadOnlyFromLogin = false;
+            if (readLabel != null) readLabel = readLabel.Replace("Terms & Conditions", UiWording.TermsAndConditions);   // a scene saved earlier keeps the old words
+            UiWording.Retitle("Privacy Policy & Terms", UiWording.LegalTitle);           // one name everywhere (10 November 2026)
             if (readOnly)
             {
                 previousScene = "LogInScene";
@@ -70,6 +78,10 @@ namespace GlowUp.Onboarding
                 if (toggleLabel != null) toggleLabel.gameObject.SetActive(false);
                 if (healthToggle != null) healthToggle.gameObject.SetActive(false);
                 if (continueButton != null) continueButton.gameObject.SetActive(false);
+                // reading is not a sign-up step: no "Step 5 of 5" bar, and the X simply goes back (no "Leave sign-up?" question)
+                foreach (OnboardingProgressBar bar in FindObjectsOfType<OnboardingProgressBar>(true)) bar.HideForReading();
+                OnboardingLeaveGuard.PlainExitScene = previousScene;
+                if (backButton != null) backButton.gameObject.SetActive(true);            // the arrow (and the phone's back key) return to the log-in page
             }
             if (policyScroll != null) policyScroll.onValueChanged.AddListener(_ => CheckBottom());
             if (readToggle != null) { readToggle.isOn = false; readToggle.interactable = false; readToggle.onValueChanged.AddListener(_ => OnToggled()); }
@@ -92,6 +104,16 @@ namespace GlowUp.Onboarding
             yield return null;
             Canvas.ForceUpdateCanvases();
             if (policyScroll != null) policyScroll.verticalNormalizedPosition = 1f;
+            // opened from one of the two links on the log-in page: start at that part of the document
+            string phrase = readOnly ? openAtPhrase : null;
+            openAtPhrase = null;
+            if (!string.IsNullOrEmpty(phrase) && policyScroll != null && policyScroll.content != null)
+            {
+                TMP_Text doc = policyScroll.content.GetComponentInChildren<TMP_Text>(true);
+                yield return null;                                                  // the document's own text is set on its first frame
+                Canvas.ForceUpdateCanvases();
+                UiWording.ScrollToPhrase(policyScroll, doc, phrase);
+            }
             yield return null;
             watching = true;
             CheckBottom();      // a text short enough to fit on the screen has nothing to scroll: it counts as read
@@ -139,7 +161,7 @@ namespace GlowUp.Onboarding
         /// <summary>The policy box is ticked and, when the scene has it, so is the health-information box.</summary>
         bool AgreedToAll() => readToggle != null && readToggle.isOn && (healthToggle == null || healthToggle.isOn);
 
-        void OnDestroy() { OnboardingLeaveGuard.Locked = false; }
+        void OnDestroy() { OnboardingLeaveGuard.Locked = false; OnboardingLeaveGuard.PlainExitScene = null; }
 
         async Task Create()
         {

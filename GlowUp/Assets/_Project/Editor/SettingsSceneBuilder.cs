@@ -95,7 +95,7 @@ namespace GlowUp.EditorTools
             A.BottomStrip(deleteCancel.transform, 44, 108, 48, 48);
 
             // ---- privacy policy and terms ----
-            A.AppPopup legalPopup = A.Overlay(s, "LegalPanel", "Privacy Policy & Terms");
+            A.AppPopup legalPopup = A.Overlay(s, "LegalPanel", "Privacy Policy and Terms and Conditions");
             A.Fill(legalPopup.box, 40, 40, 40, 150);
             GameObject legalArea = A.Node(legalPopup.box, "TextArea");
             A.Fill(legalArea.transform, 36, 44, 30, 130);
@@ -346,7 +346,7 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.Ensure<AppVersionLabel>(version.gameObject).Apply();
             Divider(about);
             GameObject legalRow = Row(about, "LegalRow");
-            RowTexts(legalRow.transform, "Privacy Policy & Terms", "How your skin profile and scans are kept and used.");
+            RowTexts(legalRow.transform, "Privacy Policy and Terms and Conditions", "How your skin profile and scans are kept and used.");
             Button openLegal = A.PillButton(legalRow.transform, "OpenLegalButton", "Read", ButtonFont, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Document);
             A.Size(openLegal, 210, ButtonHeight);
             var openLegalAction = SceneBuilderCore.Ensure<OpenPanelButton>(openLegal.gameObject);

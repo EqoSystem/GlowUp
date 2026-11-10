@@ -234,7 +234,7 @@ namespace GlowUp.EditorTools
         public static void BuildTerms()
         {
             var scene = SceneBuilderCore.Open("TermsAndConditionScene");
-            var c = BuildChrome(5, "Privacy Policy & Terms", continueLabel: "Continue", subtitleExisting: "PrivacyPolicySubtitleText");
+            var c = BuildChrome(5, "Privacy Policy and Terms and Conditions", continueLabel: "Continue", subtitleExisting: "PrivacyPolicySubtitleText");
             var ct = c.canvas;
             const float toggleY = FooterTop + 6, toggleH = 110, healthY = toggleY + toggleH + 8;      // the health-information box sits above the policy box
 
@@ -320,7 +320,7 @@ namespace GlowUp.EditorTools
                 // label takes its place. The old one is hidden, not removed.
                 Transform oldLabel = toggleT.Find("Label");
                 if (oldLabel != null && oldLabel.GetComponent<TextMeshProUGUI>() == null) oldLabel.gameObject.SetActive(false);
-                toggleLabel = ChildText(toggleT, "ReadLabel", "I have read and agree to the Privacy Policy and the Terms & Conditions", 32, TextAlignmentOptions.MidlineLeft);
+                toggleLabel = ChildText(toggleT, "ReadLabel", "I have read and agree to the Privacy Policy and the Terms and Conditions", 32, TextAlignmentOptions.MidlineLeft);
                 toggleLabel.enableWordWrapping = true; toggleLabel.raycastTarget = false;
                 var lrt = toggleLabel.rectTransform; lrt.anchorMin = Vector2.zero; lrt.anchorMax = Vector2.one; lrt.pivot = new Vector2(0.5f, 0.5f);
                 lrt.offsetMin = new Vector2(92, 0); lrt.offsetMax = Vector2.zero;

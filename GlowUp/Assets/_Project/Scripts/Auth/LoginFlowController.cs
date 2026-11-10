@@ -5,6 +5,7 @@ using GlowUp.Common;
 using GlowUp.Data;
 using GlowUp.Net;
 using GlowUp.Onboarding;
+using GlowUp.Theme;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -82,24 +83,55 @@ namespace GlowUp.Auth
                     GameObject legalObject = GameObject.Find("TermsText");
                     if (legalObject != null) legalEntryText = legalObject.GetComponent<TextMeshProUGUI>();
                 }
-                if (legalEntryText != null)
-                {
-                    legalEntryText.text = "Read the Privacy Policy and Terms before signing up";
-                    legalEntryText.raycastTarget = true;
-                    Button legalButton = legalEntryText.GetComponent<Button>();
-                    if (legalButton == null) legalButton = legalEntryText.gameObject.AddComponent<Button>();
-                    legalButton.targetGraphic = legalEntryText;
-                    legalButton.transition = Selectable.Transition.None;
-                    Hook(legalButton, OpenLegalDocuments);
-                }
+                if (legalEntryText != null) FooterLinks(legalEntryText);
             }
+        }
+
+        /// <summary>
+        /// The footer line: "Read the Privacy Policy and Terms and Conditions before signing up." The two names are separate links in
+        /// gold, underlined, each opening the document at its own part. The line is at least 132 units high (44 dp) so a finger hits it.
+        /// </summary>
+        void FooterLinks(TextMeshProUGUI line)
+        {
+            Color gold = LinkGold();
+            string hex = ColorUtility.ToHtmlStringRGB(gold);
+            line.richText = true;
+            line.text = "Read the <link=\"privacy\"><color=#" + hex + "><u>" + UiWording.PrivacyPolicy + "</u></color></link> and <link=\"terms\"><color=#" + hex + "><u>"
+                + UiWording.TermsAndConditions + "</u></color></link> before signing up.";
+            line.enableWordWrapping = true;
+            line.raycastTarget = true;
+            RectTransform rt = line.rectTransform;
+            if (rt.rect.height < 132f) rt.sizeDelta = new Vector2(rt.sizeDelta.x, rt.sizeDelta.y + (132f - rt.rect.height));     // grows equally up and down
+            Button old = line.GetComponent<Button>();
+            if (old != null) old.onClick.RemoveAllListeners();
+            TextLinkClicks clicks = line.GetComponent<TextLinkClicks>() ?? line.gameObject.AddComponent<TextLinkClicks>();
+            clicks.Clicked = id => OpenLegalDocuments(id == "terms" ? UiWording.TermsAndConditions : UiWording.PrivacyPolicy);
+        }
+
+        /// <summary>The logo's gold, darkened on a light page until small text on it reads at 4.5 : 1 (WCAG AA).</summary>
+        static Color LinkGold()
+        {
+            ThemeProfile.Palette p = RuntimeTheme.Palette;
+            Color gold = p.gold;
+            if (RuntimeTheme.IsDark) return gold;
+            for (int i = 0; i < 20 && Contrast(gold, p.surface) < 4.6f; i++) gold = Color.Lerp(gold, Color.black, 0.08f);
+            return gold;
+        }
+
+        static float Contrast(Color a, Color b)
+        {
+            float L(Color c) { float f(float v) => v <= 0.03928f ? v / 12.92f : Mathf.Pow((v + 0.055f) / 1.055f, 2.4f); return 0.2126f * f(c.r) + 0.7152f * f(c.g) + 0.0722f * f(c.b); }
+            float x = L(a), y = L(b);
+            return (Mathf.Max(x, y) + 0.05f) / (Mathf.Min(x, y) + 0.05f);
         }
 
         static void Hook(Button b, Action a) { if (b != null) b.onClick.AddListener(() => a()); }
 
-        void OpenLegalDocuments()
+        void OpenLegalDocuments() => OpenLegalDocuments(null);
+
+        void OpenLegalDocuments(string section)
         {
-            GlowUp.Onboarding.TermsAcceptanceFlowController.OpenReadOnlyFromLogin();
+            GlowUp.Onboarding.TermsAcceptanceFlowController.OpenReadOnlyFromLogin(section);
             SceneNavigator.Go(legalDocumentsScene);
         }
 
@@ -306,33 +338,54 @@ namespace GlowUp.Auth
         /// <summary>A sign-in with Google that did not finish: a friendly message with a "Try again" link (never a raw error page).</summary>
         void FailWithRetry(string m, string name)
         {
-            StatusMessage box = Status();
+            FormalToast box = Toast();
             if (box == null) { Fail(m); return; }
-            box.Show(StatusMessage.Kind.Error, m, "Try again", () => Social(name));
+            box.Show(FormalToast.Kind.Error, StatusMessage.Plain(m), "Try again", () => Social(name));
             ContextualHintController.Instance?.ReportValidationError();
         }
 
-        StatusMessage status;
-        /// <summary>The page's message line as the app's one status message (made on first use; see StatusMessage).</summary>
-        StatusMessage Status()
+        // ---------------------------------------------------------------------------------------
+        //  Messages: ONE formal toast inside the card, directly above the footer line (10 November 2026). The old message line
+        //  under the Log-In button is never shown any more: wrapped in a status box it collapsed to one letter per line.
+        //  Other parts of the page (the space guard of the boxes, the saved e-mails) still write into that line: what they
+        //  write is moved into the toast (Update).
+        // ---------------------------------------------------------------------------------------
+        FormalToast toast;
+        string mirrored = "";
+
+        FormalToast Toast()
         {
-            if (status == null && feedbackText != null) status = StatusMessage.Wrap(feedbackText);
-            return status;
+            if (toast != null) return toast;
+            RectTransform anchor = legalEntryText != null ? legalEntryText.rectTransform : null;
+            RectTransform card = anchor != null ? anchor.parent as RectTransform : feedbackText != null ? feedbackText.rectTransform.parent as RectTransform : null;
+            RectTransform widthFrom = emailInput != null ? (RectTransform)emailInput.transform : null;
+            if (card == null) return null;
+            Canvas.ForceUpdateCanvases();
+            toast = FormalToast.Above(card, anchor, widthFrom, feedbackText != null ? feedbackText : legalEntryText);
+            return toast;
         }
+
         void Show(string m, Color? c = null)
         {
+            if (feedbackText != null) { feedbackText.text = ""; feedbackText.gameObject.SetActive(false); }
+            mirrored = "";
+            FormalToast box = Toast();
+            if (box == null) return;
+            if (string.IsNullOrEmpty(m)) { box.Hide(); return; }
+            bool error = c.HasValue && c.Value == errorColor;
+            box.Show(error ? FormalToast.Kind.Error : FormalToast.Kind.Info, StatusMessage.Plain(m));
+        }
+
+        void Update()
+        {
             if (feedbackText == null) return;
-            StatusMessage box = Status();
-            if (box != null)
-            {
-                if (string.IsNullOrEmpty(m)) { box.Hide(); return; }
-                bool error = c.HasValue && c.Value == errorColor;
-                bool working = !error && m.EndsWith("...", StringComparison.Ordinal);
-                box.Show(error ? StatusMessage.Kind.Error : working ? StatusMessage.Kind.Progress : StatusMessage.Kind.Info, StatusMessage.Plain(m));
-                return;
-            }
-            feedbackText.text = m;
-            if (c.HasValue) feedbackText.color = c.Value;
+            string written = feedbackText.text ?? "";
+            if (written.Length == 0 || written == mirrored) { if (feedbackText.gameObject.activeSelf) feedbackText.gameObject.SetActive(false); return; }
+            mirrored = written;
+            FormalToast box = Toast();
+            bool info = feedbackText.color == infoColor;
+            feedbackText.gameObject.SetActive(false);
+            if (box != null) box.Show(info ? FormalToast.Kind.Info : FormalToast.Kind.Error, StatusMessage.Plain(written));
         }
     }
 }

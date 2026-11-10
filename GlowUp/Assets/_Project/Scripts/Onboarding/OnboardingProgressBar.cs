@@ -27,6 +27,13 @@ namespace GlowUp.Onboarding
 
         float[] k;
 
+        /// <summary>The page is only being read, not filled in as a step of the sign-up: the bar and its "Step n of 5" line are hidden.</summary>
+        public void HideForReading()
+        {
+            if (stepLabel != null) stepLabel.gameObject.SetActive(false);
+            gameObject.SetActive(false);
+        }
+
         void Start()
         {
             if (segments == null) return;
