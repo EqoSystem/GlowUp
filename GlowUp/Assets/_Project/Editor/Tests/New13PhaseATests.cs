@@ -42,7 +42,7 @@ namespace GlowUp.Tests
                 root.renderMode = RenderMode.WorldSpace;
                 var rootRt = (RectTransform)root.transform;
                 rootRt.sizeDelta = new Vector2(1080f, height); rootRt.localScale = Vector3.one; rootRt.position = Vector3.zero;
-                Canvas.ForceUpdateCanvases();
+                for (int pass = 0; pass < 3; pass++) { LayoutRebuilder.ForceRebuildLayoutImmediate(rootRt); Canvas.ForceUpdateCanvases(); }
 
                 TMPro.TMP_Text font = root.GetComponentInChildren<TMPro.TMP_Text>(true);
                 FormalToast toast = FormalToast.OnScreen(root.transform, font);
@@ -59,17 +59,31 @@ namespace GlowUp.Tests
                     if (control.transform.IsChildOf(toast.transform)) continue;
                     if (!control.isActiveAndEnabled || !control.gameObject.activeInHierarchy) continue;
                     if (control.GetComponentInParent<CanvasGroup>() is CanvasGroup g && g.alpha < 0.01f) continue;
-                    Rect r = WorldRect((RectTransform)control.transform);
-                    if (r.width < 1f || r.height < 1f) continue;
+                    Rect r = VisibleRect((RectTransform)control.transform);
+                    if (r.width < 1f || r.height < 1f) continue;          // outside its scroll view: not on screen
                     if (r.Overlaps(toastRect)) hits.Add(control.name + " " + r);
                 }
                 Assert.IsEmpty(hits, sceneName + " (" + height + " high): the toast " + toastRect + " lies over " + string.Join(", ", hits));
-                Assert.LessOrEqual(toastRect.height, ToastPlacement.MaxHeight + 70f, "two lines at most (plus the link line)");
+                Assert.LessOrEqual(toastRect.height, ToastPlacement.MaxHeight + 1f, "two lines at most (the link stands beside the words)");
             }
             finally
             {
                 EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);      // never saved: the scene file is untouched
             }
+        }
+
+        /// <summary>The part of `rt` that is on screen: cut by every Mask / RectMask2D above it (a scroll view's viewport).</summary>
+        static Rect VisibleRect(RectTransform rt)
+        {
+            Rect r = WorldRect(rt);
+            for (Transform t = rt.parent; t != null; t = t.parent)
+            {
+                if (t.GetComponent<RectMask2D>() == null && t.GetComponent<Mask>() == null) continue;
+                Rect m = WorldRect((RectTransform)t);
+                r = Rect.MinMaxRect(Mathf.Max(r.xMin, m.xMin), Mathf.Max(r.yMin, m.yMin), Mathf.Min(r.xMax, m.xMax), Mathf.Min(r.yMax, m.yMax));
+                if (r.width <= 0f || r.height <= 0f) return Rect.zero;
+            }
+            return r;
         }
 
         static Rect WorldRect(RectTransform rt)

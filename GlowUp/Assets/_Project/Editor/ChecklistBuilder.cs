@@ -177,6 +177,9 @@ namespace GlowUp.EditorTools
             var anim = go.GetComponent<ChecklistRowAnimator>();
             SceneBuilderCore.SetField(anim, "rowBackground", row);
             SceneBuilderCore.SetField(anim, "checkBoxBackground", bimg);
+            // New13 item 3: an unticked box has a visible border (ChecklistRowAnimator keeps its colour in step with the theme)
+            var boxBorder = SceneBuilderCore.Ensure<Outline>(bimg.gameObject);
+            boxBorder.effectDistance = new Vector2(2.5f, -2.5f); boxBorder.effectColor = new Color32(110, 98, 101, 255);
             SceneBuilderCore.SetField(anim, "checkmark", crt);
             SceneBuilderCore.SetField(anim, "glowOutline", glow);
             go.SetActive(false);        // template stays inactive; the rows are copies of it

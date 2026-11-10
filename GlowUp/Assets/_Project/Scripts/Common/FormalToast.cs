@@ -115,11 +115,13 @@ namespace GlowUp.Common
             toast.words = RuntimeUiKit.Label(column, "Message", "", ToastPlacement.FontSize, p.mainText, RuntimeTheme.Font(FontRole.Body, fontFrom), TextAlignmentOptions.MidlineLeft);
             toast.words.enableWordWrapping = true; toast.words.overflowMode = TextOverflowModes.Ellipsis;
             toast.wordsElement = toast.words.gameObject.AddComponent<LayoutElement>();
-            toast.link = RuntimeUiKit.Label(column, "Link", "", ToastPlacement.FontSize, p.accentText, RuntimeTheme.Font(FontRole.Body, fontFrom), TextAlignmentOptions.MidlineLeft);
+            // the link ("Try again") stands at the right of the same row, so a toast is never more than two lines high
+            toast.link = RuntimeUiKit.Label(rt, "Link", "", ToastPlacement.FontSize, p.accentText, RuntimeTheme.Font(FontRole.Body, fontFrom), TextAlignmentOptions.Center);
             toast.link.fontStyle = FontStyles.Bold | FontStyles.Underline;
+            toast.link.enableWordWrapping = false;
             toast.link.raycastTarget = true;
             var linkElement = toast.link.gameObject.AddComponent<LayoutElement>();
-            linkElement.minHeight = 64f;                                       // a reachable tap target inside the toast
+            linkElement.minHeight = 80f; linkElement.minWidth = 96f;           // a reachable tap target inside the toast
             toast.link.gameObject.AddComponent<Button>().onClick.AddListener(toast.RunLink);
             toast.link.gameObject.SetActive(false);
             rt.gameObject.SetActive(false);
@@ -167,7 +169,8 @@ namespace GlowUp.Common
         void FitTwoLines()
         {
             var rt = (RectTransform)transform;
-            float textWidth = rt.sizeDelta.x - 2 * ToastPlacement.PadX - ToastPlacement.IconSize - 18f;
+            float linkWidth = link.gameObject.activeSelf ? Mathf.Max(96f, link.GetPreferredValues(link.text).x) + 18f : 0f;
+            float textWidth = rt.sizeDelta.x - 2 * ToastPlacement.PadX - ToastPlacement.IconSize - 18f - linkWidth;
             words.fontSize = ToastPlacement.FontSize;
             wordsElement.preferredHeight = -1f;
             for (float size = ToastPlacement.FontSize; size >= ToastPlacement.SmallestFont; size -= 2f)

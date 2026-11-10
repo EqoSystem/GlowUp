@@ -236,6 +236,18 @@ namespace GlowUp.EditorTools
             var scene = SceneBuilderCore.Open("TermsAndConditionScene");
             var c = BuildChrome(5, "Privacy Policy and Terms and Conditions", continueLabel: "Continue", subtitleExisting: "PrivacyPolicySubtitleText");
             var ct = c.canvas;
+            // New13 item 3: the page name takes two lines; they flow: name (clear of the Back arrow and the X), the bar 12 units under it,
+            // "Step 5 of 5", then the document. (TermsAcceptanceFlowController does the same at run time, and hides the bar unless the page
+            // was opened by Generate Profile on Step 5.)
+            const float termsNameTop = 176, termsNameH = 128, termsBarTop = termsNameTop + termsNameH + 12, termsStepTop = termsBarTop + 24, termsContentTop = termsStepTop + 46 + 14;
+            Transform termsName = c.subtitle.transform;
+            Top(termsName, c.card, termsNameTop, termsNameH);
+            var tnrt = (RectTransform)termsName; tnrt.sizeDelta = new Vector2(-2 * 140f, termsNameH);
+            SetText(c.subtitle, c.subtitle.text, 40, TextAlignmentOptions.Top);
+            c.subtitle.enableWordWrapping = true; c.subtitle.overflowMode = TextOverflowModes.Ellipsis;
+            c.subtitle.margin = Vector4.zero;                       // the original object had a 49-unit top margin: room for one line only
+            Transform termsBar = Loose(ct, "ProgressBar"); if (termsBar != null) Top(termsBar, c.card, termsBarTop, 16);
+            Transform termsStep = Loose(ct, "StepText"); if (termsStep != null) Top(termsStep, c.card, termsStepTop, 46);
             const float toggleY = FooterTop + 6, toggleH = 110, healthY = toggleY + toggleH + 8;      // the health-information box sits above the policy box
 
             // ---- the scrollable policy text ----
@@ -244,7 +256,7 @@ namespace GlowUp.EditorTools
             if (scrollT != null)
             {
                 var panel = EnsurePanel(c.card, "PrivacyPolicy_Scroll View", ThemeRole.SurfaceAlt, PanelAlpha, scrollT);
-                TopBottom(panel, c.card, HeaderBottom, healthY + toggleH + 14);
+                TopBottom(panel, c.card, termsContentTop, healthY + toggleH + 14);
                 if (scroll != null)
                 {
                     scroll.vertical = true; scroll.horizontal = false; scroll.scrollSensitivity = 40;
@@ -307,6 +319,9 @@ namespace GlowUp.EditorTools
                     var brt = (RectTransform)box; brt.anchorMin = brt.anchorMax = new Vector2(0, 0.5f); brt.pivot = new Vector2(0, 0.5f);
                     brt.anchoredPosition = new Vector2(8, 0); brt.sizeDelta = new Vector2(64, 64);
                     boxImg = box.GetComponent<Image>(); if (boxImg != null) StyleRounded(boxImg);
+                    // New13 item 3: an unticked box is clearly visible: a border in the secondary text colour (ChecklistRowAnimator keeps it in step)
+                    var border = SceneBuilderCore.Ensure<Outline>(box.gameObject);
+                    border.effectDistance = new Vector2(2.5f, -2.5f); border.effectColor = new Color32(110, 98, 101, 255);
                     Transform ck = box.Find("Checkmark");
                     if (ck != null)
                     {

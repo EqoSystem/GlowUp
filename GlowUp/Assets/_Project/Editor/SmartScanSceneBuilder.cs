@@ -217,15 +217,15 @@ namespace GlowUp.EditorTools
 
             // ---- the ingredient list block: HIDDEN until it helps (New13 item 2): after a scan or a photo that found no list. It sits at the
             //      bottom of the camera view; the hint on the picture moves up above it while it shows. The type-it-in sheet has its own look-up. ----
-            Image listHelp = A.RawPanel(viewport.transform, "IngredientListHelp", new Color(0, 0, 0, 0.78f), 40f);
+            Image listHelp = A.Panel(viewport.transform, "IngredientListHelp", ThemeRole.Surface, 1f, 40f);       // themed: its words read in light and dark mode
             listHelp.raycastTarget = true;
             A.BottomStrip(listHelp.transform, 24, 132, 24, 24);
             GameObject foundList = A.Node(listHelp.transform, "Found_Ingredients");
             A.Share(foundList.transform, 0f, 0.56f, 0, 0, 0);
             ScanCheckItem ingredientsCheck = CheckRow(foundList.transform, "IngredientListCheck", "Ingredient list", 0);
             A.TopStrip(ingredientsCheck.transform, 16, 48, 26, 8);
-            TextMeshProUGUI lookUpHint = A.RawLabel(foundList.transform, "LookUpHintText", "No list on the product, or no packaging?", 24, new Color(1, 1, 1, 0.82f), FontRole.Body,
-                                                    TextAlignmentOptions.TopLeft, true);
+            TextMeshProUGUI lookUpHint = A.Label(foundList.transform, "LookUpHintText", "No list on the product, or no packaging?", 24, ThemeRole.SecondaryText, FontRole.Body,
+                                                 TextAlignmentOptions.TopLeft, true);
             A.TopStrip(lookUpHint.transform, 68, 56, 26, 8);
             A.ShrinkWrapped(lookUpHint, 18);
             Button lookUp = A.PillButton(listHelp.transform, "LookUpButton", "Look it up", 30, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Ai);

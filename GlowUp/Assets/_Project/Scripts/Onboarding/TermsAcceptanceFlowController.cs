@@ -304,6 +304,7 @@ namespace GlowUp.Onboarding
             var srt = subtitle.rectTransform;
             srt.anchorMin = new Vector2(0f, 1f); srt.anchorMax = new Vector2(1f, 1f); srt.pivot = new Vector2(0.5f, 1f);
             subtitle.enableWordWrapping = true; subtitle.overflowMode = TextOverflowModes.Ellipsis;
+            subtitle.margin = Vector4.zero;                         // an older scene kept a 49-unit top margin (one line only)
             subtitle.alignment = TextAlignmentOptions.Top;
             float width = card.rect.width - 2f * sideRoom;
             float size = subtitle.fontSize, lineHeight = 0f, height = 0f;
