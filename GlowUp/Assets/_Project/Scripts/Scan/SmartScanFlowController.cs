@@ -420,7 +420,7 @@ namespace GlowUp.Scan
             if (differentProductButton != null) differentProductButton.onClick.AddListener(() => { ClosePanel(startOverPanel); StartOver(false, msgStartedOver); });
             if (manualEntryButton != null) manualEntryButton.onClick.AddListener(OpenManual);
             if (photoButton != null) { photoButton.onClick.AddListener(OnPhotoButton); photoButton.gameObject.SetActive(false); }
-            if (snapshot != null) { snapshot.Analysed += OnSnapshotAnalysed; snapshot.NameOnly += OnSnapshotNameOnly; snapshot.TypeItIn += OpenManual; }
+            if (snapshot != null) { snapshot.Analysed += OnSnapshotAnalysed; snapshot.NameOnly += OnSnapshotNameOnly; snapshot.TypeItIn += OpenManual; snapshot.CaptureModeRequested += EnterPhotoMode; snapshot.CatalogMatches += ShowPhotoMatches; }
             if (manualAnalyseButton != null) manualAnalyseButton.onClick.AddListener(AnalyseManual);
             if (lookUpButton != null) lookUpButton.onClick.AddListener(LookUp);
             if (backButton != null) backButton.onClick.AddListener(() => { StopCamera(); SceneNavigator.Go(backScene); });
@@ -489,7 +489,7 @@ namespace GlowUp.Scan
 
         void OnDestroy()
         {
-            if (snapshot != null) { snapshot.Analysed -= OnSnapshotAnalysed; snapshot.NameOnly -= OnSnapshotNameOnly; snapshot.TypeItIn -= OpenManual; }
+            if (snapshot != null) { snapshot.Analysed -= OnSnapshotAnalysed; snapshot.NameOnly -= OnSnapshotNameOnly; snapshot.TypeItIn -= OpenManual; snapshot.CaptureModeRequested -= EnterPhotoMode; snapshot.CatalogMatches -= ShowPhotoMatches; }
             if (cameraFeed != null) cameraFeed.Started -= OnCameraStarted;
             if (holdButton != null) { holdButton.ScanStarted -= OnScanStarted; holdButton.ScanPaused -= OnScanPaused; }
         }
@@ -578,7 +578,8 @@ namespace GlowUp.Scan
         void ShowPhotoButtonIfSlow()
         {
             if (photoButton == null || snapshot == null) return;
-            bool want = stage == Stage.Scanning && scanningFor >= photoButtonAfterSeconds && !snapshot.IsOpen;
+            // offered from the start (10 November 2026): live scan OR a photo, the user chooses; hidden in photo mode and under a pop-up
+            bool want = stage == Stage.Scanning && !photoMode && !snapshot.IsOpen && !snapshot.PreviewOpen && !PopupOpen;
             if (want == photoButton.gameObject.activeSelf) return;
             photoButton.gameObject.SetActive(want);
             if (want && !photoHintSaid) { photoHintSaid = true; Say(msgPhotoHint); }
@@ -587,12 +588,111 @@ namespace GlowUp.Scan
         void OnPhotoButton()
         {
             if (snapshot == null || stage != Stage.Scanning) return;
-            if (holdButton != null) holdButton.LetGo();        // reading pauses while the pop-up is open
-            snapshot.Offer(msgPhotoOffer, identity.brandName, identity.productName);
+            EnterPhotoMode();
+        }
+
+        // ---------------------------------------------------------------------------------------
+        //  PHOTO MODE (10 November 2026): live scanning pauses, every pop-up is closed so the camera is fully visible, and a capture
+        //  button takes the live-scan button's place. Nothing is captured until it is tapped. A small "Live scan" button (and the phone's
+        //  back key) returns to live scanning. The photo goes through the same chain: text read in the user's box -> catalogue matches
+        //  -> online look-up -> typing it in.
+        // ---------------------------------------------------------------------------------------
+        [Header("Photo mode")]
+        [SerializeField] private string msgPhotoModeHint = "Frame the front of the pack, then tap capture.";
+        [SerializeField] private string liveScanLabel = "Live scan";
+        [SerializeField] private string photoMatchesMessage = "Tap your product. If it is not here, choose None of these and we look the photo up online.";
+
+        bool photoMode;
+        Button shutter;
+        Button liveScanButton;
+
+        void EnterPhotoMode()
+        {
+            if (snapshot == null || stage != Stage.Scanning) return;
+            if (holdButton != null) holdButton.LetGo();                 // reading pauses
+            photoMode = true;
+            BuildShutter();
+            if (holdButton != null) holdButton.gameObject.SetActive(false);
+            if (photoButton != null) photoButton.gameObject.SetActive(false);
+            if (shutter != null) shutter.gameObject.SetActive(true);
+            if (liveScanButton != null) liveScanButton.gameObject.SetActive(true);
+            Say(msgPhotoModeHint);
+        }
+
+        void ExitPhotoMode()
+        {
+            if (!photoMode) return;
+            photoMode = false;
+            if (shutter != null) shutter.gameObject.SetActive(false);
+            if (liveScanButton != null) liveScanButton.gameObject.SetActive(false);
+            if (holdButton != null) holdButton.gameObject.SetActive(true);
+            Say("");
+        }
+
+        /// <summary>The capture button: a round button in the live-scan button's place, with the camera button's own icon.</summary>
+        void BuildShutter()
+        {
+            if (shutter != null || holdButton == null) return;
+            var place = (RectTransform)holdButton.transform;
+            GlowUp.Theme.ThemeProfile.Palette p = RuntimeTheme.Palette;
+            Image round = RuntimeUiKit.Box(place.parent, "CaptureButton", p.buttonFill);
+            round.sprite = RuntimeIcons.Circle; round.type = Image.Type.Simple; round.preserveAspect = true; round.raycastTarget = true;
+            var rt = round.rectTransform;
+            rt.anchorMin = place.anchorMin; rt.anchorMax = place.anchorMax; rt.pivot = place.pivot;
+            rt.anchoredPosition = place.anchoredPosition;
+            float side = Mathf.Max(132f, Mathf.Min(place.rect.width, place.rect.height));
+            rt.sizeDelta = new Vector2(side, side);
+            rt.SetSiblingIndex(place.GetSiblingIndex() + 1);
+            Image ring = RuntimeUiKit.Icon(rt, "Ring", RuntimeIcons.Circle, p.surface, side * 0.78f);
+            Image core = RuntimeUiKit.Icon(rt, "Core", RuntimeIcons.Circle, p.buttonFill, side * 0.66f);
+            Sprite camera = null;
+            if (photoButton != null) foreach (Image i in photoButton.GetComponentsInChildren<Image>(true)) if (i.gameObject != photoButton.gameObject && i.sprite != null) { camera = i.sprite; break; }
+            if (camera != null) RuntimeUiKit.Icon(rt, "Camera", camera, p.buttonText, side * 0.36f);
+            shutter = round.gameObject.AddComponent<Button>();
+            shutter.targetGraphic = round;
+            shutter.onClick.AddListener(() => { if (snapshot != null) snapshot.CaptureNow(); });
+            _ = ring; _ = core;
+
+            // back to live scanning: a small pill above the capture button
+            liveScanButton = RuntimeUiKit.Pill(place.parent, "LiveScanButton", liveScanLabel, p.accent, p.mainText, RuntimeTheme.Font(GlowUp.Theme.FontRole.Button, scanButtonLabel), true);
+            var lrt = (RectTransform)liveScanButton.transform;
+            lrt.anchorMin = place.anchorMin; lrt.anchorMax = place.anchorMax; lrt.pivot = new Vector2(0.5f, 0f);
+            lrt.sizeDelta = new Vector2(320f, 112f);
+            lrt.anchoredPosition = place.anchoredPosition + new Vector2(0f, side * (1f - place.pivot.y) + 24f);
+            var le = liveScanButton.GetComponent<LayoutElement>(); if (le != null) le.ignoreLayout = true;
+            liveScanButton.onClick.AddListener(ExitPhotoMode);
+            shutter.gameObject.SetActive(false);
+            liveScanButton.gameObject.SetActive(false);
+        }
+
+        /// <summary>The text in the user's box matched catalogue products: the same pick list as the live scan uses.</summary>
+        void ShowPhotoMatches(List<ScanShortlist.Entry> entries)
+        {
+            OpenShortlist(shortlistTitle, photoMatchesMessage, shortlistNoneLabel,
+                () => { ExitPhotoMode(); if (snapshot != null) snapshot.MatchesAnswered(true); },
+                () => { if (snapshot != null) snapshot.MatchesAnswered(false); },
+                entries);
+        }
+
+        /// <summary>
+        /// The phone's back key on this screen (it had none before 10 November 2026): it closes the top-most thing first - "Check your
+        /// photo" (back to photo mode), then a pop-up, then photo mode - and only then leaves the screen as the Back arrow does.
+        /// </summary>
+        void BackKey()
+        {
+            if (snapshot != null && snapshot.PreviewOpen) { snapshot.ClosePreviewByBack(); return; }
+            if (shortlist != null && shortlist.IsOpen) { shortlist.Hide(); if (snapshot != null) snapshot.MatchesAnswered(true); return; }
+            if (manualPanel != null && manualPanel.IsOpen) { manualPanel.Hide(); return; }
+            if (startOverPanel != null && startOverPanel.IsOpen) { startOverPanel.Hide(); return; }
+            if (snapshot != null && snapshot.IsOpen) { snapshot.Close(); return; }
+            if (photoMode) { ExitPhotoMode(); return; }
+            StopCamera();
+            SceneNavigator.Go(backScene);
         }
 
         void Update()
         {
+            if (Input.GetKeyDown(KeyCode.Escape)) { BackKey(); return; }
             if (stage != Stage.Scanning) return;
             TakeEarlyBarcode();                              // fast early barcode / QR recognition
             if (stage != Stage.Scanning) return;
@@ -2936,6 +3036,7 @@ namespace GlowUp.Scan
 
         void OnSnapshotAnalysed(ProductData listed, PendingProductData staged)
         {
+            ExitPhotoMode();
             if (stage == Stage.Leaving || stage == Stage.Recognising) return;
             if (listed != null)
             {
@@ -2988,6 +3089,7 @@ namespace GlowUp.Scan
         // ---------------------------------------------------------------------------------------
         void OpenManual()
         {
+            ExitPhotoMode();
             if (stage == Stage.Leaving || stage == Stage.Recognising || manualPanel == null) return;
             if (holdButton != null) holdButton.LetGo();
             ManualStatus(StatusMessage.Kind.Info, "");

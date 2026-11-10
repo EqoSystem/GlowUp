@@ -1,0 +1,156 @@
+using System.Collections.Generic;
+using GlowUp.Common;
+using GlowUp.Theme;
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
+
+namespace GlowUp.Scan
+{
+    /// <summary>
+    /// The adjustable box over the photo (10 November 2026, like Google Lens): the user drags its corners or the box itself so it covers
+    /// the product's text and leaves out what surrounds it. Only the part inside the box is read. While it is read, the lines of text
+    /// that were found are outlined inside the box, so the user sees the reader at work.
+    ///
+    /// Area is in the photo's own 0..1 space, origin at the bottom-left (the same space as OcrRead.Boxes and Texture2D pixels).
+    /// </summary>
+    public class PhotoCropBox : MonoBehaviour
+    {
+        const float MinSide = 0.15f;
+        const float Handle = 96f;               // touch size of a corner, canvas units (about 32 dp)
+
+        RectTransform photo, box;
+        readonly List<Image> shapes = new List<Image>();
+        Rect area = new Rect(0.1f, 0.1f, 0.8f, 0.8f);
+        Color line;
+
+        public Rect Area => area;
+
+        /// <summary>Lays the box over `photoRect` (the photo as it is shown).</summary>
+        public static PhotoCropBox Over(RectTransform photoRect)
+        {
+            var crop = photoRect.gameObject.AddComponent<PhotoCropBox>();
+            crop.photo = photoRect;
+            ThemeProfile.Palette p = RuntimeTheme.Palette;
+            crop.line = p.buttonFill;
+
+            crop.box = RuntimeUiKit.Rect("CropBox", photoRect);
+            // the edges: four thin lines (no fill, so the photo stays visible)
+            Edge(crop.box, "Top", new Vector2(0, 1), new Vector2(1, 1), new Vector2(0, -2), new Vector2(0, 2), crop.line);
+            Edge(crop.box, "Bottom", new Vector2(0, 0), new Vector2(1, 0), new Vector2(0, -2), new Vector2(0, 2), crop.line);
+            Edge(crop.box, "Left", new Vector2(0, 0), new Vector2(0, 1), new Vector2(-2, 0), new Vector2(2, 0), crop.line);
+            Edge(crop.box, "Right", new Vector2(1, 0), new Vector2(1, 1), new Vector2(-2, 0), new Vector2(2, 0), crop.line);
+            // the whole box can be moved
+            var body = crop.box.gameObject.AddComponent<Image>();
+            body.color = new Color(1f, 1f, 1f, 0.001f);
+            crop.box.gameObject.AddComponent<CropDrag>().Init(crop, -1);
+            // the four corners
+            for (int i = 0; i < 4; i++)
+            {
+                Vector2 at = new Vector2(i == 1 || i == 2 ? 1 : 0, i >= 2 ? 1 : 0);      // 0 = bottom-left, 1 = bottom-right, 2 = top-right, 3 = top-left
+                RectTransform corner = RuntimeUiKit.Rect("Corner" + i, crop.box);
+                corner.anchorMin = corner.anchorMax = at; corner.pivot = new Vector2(0.5f, 0.5f);
+                corner.sizeDelta = new Vector2(Handle, Handle);
+                var hit = corner.gameObject.AddComponent<Image>();
+                hit.color = new Color(1f, 1f, 1f, 0.001f);
+                Image dot = RuntimeUiKit.Icon(corner, "Dot", RuntimeIcons.Circle, crop.line, 34);
+                dot.rectTransform.anchoredPosition = Vector2.zero;
+                corner.gameObject.AddComponent<CropDrag>().Init(crop, i);
+            }
+            crop.Apply();
+            return crop;
+        }
+
+        static void Edge(RectTransform parent, string name, Vector2 min, Vector2 max, Vector2 offMin, Vector2 offMax, Color color)
+        {
+            Image e = RuntimeUiKit.Box(parent, name, color, false);
+            e.raycastTarget = false;
+            e.rectTransform.anchorMin = min; e.rectTransform.anchorMax = max;
+            e.rectTransform.offsetMin = offMin; e.rectTransform.offsetMax = offMax;
+        }
+
+        /// <summary>Back to the default: the middle 80 % of the photo.</summary>
+        public void Reset() { area = new Rect(0.1f, 0.1f, 0.8f, 0.8f); ClearShapes(); Apply(); }
+
+        public void SetEditable(bool on)
+        {
+            foreach (CropDrag d in box.GetComponentsInChildren<CropDrag>(true)) d.enabled = on;
+            foreach (Image i in box.GetComponentsInChildren<Image>(true)) if (i.color.a < 0.01f) i.raycastTarget = on;
+        }
+
+        void Apply()
+        {
+            box.anchorMin = new Vector2(area.xMin, area.yMin);
+            box.anchorMax = new Vector2(area.xMax, area.yMax);
+            box.offsetMin = box.offsetMax = Vector2.zero;
+        }
+
+        /// <summary>Outlines the text lines found: `found` is in the space of the CUT photo (0..1 of the box).</summary>
+        public void ShowShapes(Rect[] found)
+        {
+            ClearShapes();
+            if (found == null) return;
+            Color c = line; c.a = 0.9f;
+            foreach (Rect r in found)
+            {
+                RectTransform shape = RuntimeUiKit.Rect("TextShape", box);
+                shape.anchorMin = new Vector2(Mathf.Clamp01(r.xMin), Mathf.Clamp01(r.yMin));
+                shape.anchorMax = new Vector2(Mathf.Clamp01(r.xMax), Mathf.Clamp01(r.yMax));
+                shape.offsetMin = shape.offsetMax = Vector2.zero;
+                var outline = shape.gameObject.AddComponent<Image>();
+                outline.sprite = RuntimeIcons.RoundedBox; outline.type = Image.Type.Sliced; outline.fillCenter = false;
+                outline.color = c; outline.raycastTarget = false;
+                shapes.Add(outline);
+            }
+        }
+
+        public void ClearShapes()
+        {
+            foreach (Image s in shapes) if (s != null) Destroy(s.gameObject);
+            shapes.Clear();
+        }
+
+        /// <summary>A drag on a corner (0..3) or on the box (-1), as a point in the photo's 0..1 space.</summary>
+        internal void Drag(int corner, PointerEventData e, ref Vector2 lastPoint)
+        {
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(photo, e.position, e.pressEventCamera, out Vector2 local)) return;
+            Rect pr = photo.rect;
+            Vector2 p = new Vector2(Mathf.Clamp01((local.x - pr.xMin) / Mathf.Max(1f, pr.width)), Mathf.Clamp01((local.y - pr.yMin) / Mathf.Max(1f, pr.height)));
+            if (corner < 0)
+            {
+                Vector2 move = p - lastPoint;
+                lastPoint = p;
+                float x = Mathf.Clamp(area.x + move.x, 0f, 1f - area.width), y = Mathf.Clamp(area.y + move.y, 0f, 1f - area.height);
+                area = new Rect(x, y, area.width, area.height);
+            }
+            else
+            {
+                float x0 = area.xMin, y0 = area.yMin, x1 = area.xMax, y1 = area.yMax;
+                if (corner == 0 || corner == 3) x0 = Mathf.Min(p.x, x1 - MinSide); else x1 = Mathf.Max(p.x, x0 + MinSide);
+                if (corner == 0 || corner == 1) y0 = Mathf.Min(p.y, y1 - MinSide); else y1 = Mathf.Max(p.y, y0 + MinSide);
+                area = Rect.MinMaxRect(Mathf.Clamp01(x0), Mathf.Clamp01(y0), Mathf.Clamp01(x1), Mathf.Clamp01(y1));
+            }
+            ClearShapes();
+            Apply();
+        }
+
+        internal Vector2 PointOf(PointerEventData e)
+        {
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(photo, e.position, e.pressEventCamera, out Vector2 local)) return area.center;
+            Rect pr = photo.rect;
+            return new Vector2(Mathf.Clamp01((local.x - pr.xMin) / Mathf.Max(1f, pr.width)), Mathf.Clamp01((local.y - pr.yMin) / Mathf.Max(1f, pr.height)));
+        }
+    }
+
+    /// <summary>Hands the drags of one corner (or of the whole box) to its PhotoCropBox.</summary>
+    public class CropDrag : MonoBehaviour, IBeginDragHandler, IDragHandler
+    {
+        PhotoCropBox owner;
+        int corner;
+        Vector2 last;
+
+        public void Init(PhotoCropBox box, int which) { owner = box; corner = which; }
+        public void OnBeginDrag(PointerEventData e) { if (enabled && owner != null) last = owner.PointOf(e); }
+        public void OnDrag(PointerEventData e) { if (enabled && owner != null) owner.Drag(corner, e, ref last); }
+    }
+}

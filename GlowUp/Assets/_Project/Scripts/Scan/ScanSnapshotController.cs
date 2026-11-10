@@ -90,7 +90,8 @@ namespace GlowUp.Scan
         [SerializeField] private string usePhotoLabel = "Use photo";
         [SerializeField] private string notNowLabel = "Not now";
         [SerializeField] private string typeItInLabel = "Type it in";
-        [SerializeField] private string msgReading = "Reading the photo…";
+        [SerializeField] private string msgReading = "Reading text…";
+        [SerializeField] private string msgCatalog = "Searching catalog…";
         [Tooltip("{0} = the product, in medium weight")]
         [SerializeField] private string msgSearching = "Searching for {0}…";
         [SerializeField] private string msgUnclear = "We couldn't read this clearly. Retake the photo in good light, or type the product in.";
@@ -115,6 +116,14 @@ namespace GlowUp.Scan
         public event Action<ProductAiAdvisor.Identity> NameOnly;
         /// <summary>"Type it in": the scan screen opens its type-it-in sheet.</summary>
         public event Action TypeItIn;
+        /// <summary>
+        /// PHOTO MODE (10 November 2026): "Take photo" no longer captures at once. It closes this pop-up and asks the scan screen to switch
+        /// to photo mode (a capture button instead of the live-scan button, the camera fully visible). The scan screen then calls CaptureNow().
+        /// </summary>
+        public event Action CaptureModeRequested;
+        /// <summary>The text read inside the user's box matched products in the catalogue: the scan screen shows them as a list to pick from.
+        /// It answers with MatchesAnswered(true) when one was picked, MatchesAnswered(false) for "None of these" (the photo is then looked up online).</summary>
+        public event Action<List<ScanShortlist.Entry>> CatalogMatches;
 
         public const float CooldownSeconds = 30f;
         public const int DailyLimit = 5;
@@ -222,6 +231,28 @@ namespace GlowUp.Scan
         void Take()
         {
             if (busy || Time.unscaledTime < lockedUntil) return;
+            if (CaptureModeRequested != null)
+            {
+                // nothing is captured yet: the pop-up closes so the camera is fully visible, and the scan screen shows the capture button
+                attempt++;
+                if (panel != null && panel.IsOpen) panel.Hide();
+                CaptureModeRequested.Invoke();
+                return;
+            }
+            CaptureNow();
+        }
+
+        /// <summary>The capture button of photo mode: takes the photo now and opens "Check your photo" with the box to adjust.</summary>
+        public void CaptureNow()
+        {
+            if (busy || Time.unscaledTime < lockedUntil) { if (Time.unscaledTime < lockedUntil) Toast(string.Format(msgCooldownV2, Mathf.CeilToInt(lockedUntil - Time.unscaledTime))); return; }
+            if (CaptureModeRequested != null)
+            {
+                // in photo mode the pop-up is closed: problems are said in a toast
+                if (cameraFeed == null || !cameraFeed.IsPlaying) { Toast(msgNoCameraV2); return; }
+                if (!ConnectivityMonitor.Online) { Toast(msgOfflineV2); return; }
+                if (SentToday() >= DailyLimit) { Toast(string.Format(msgDailyLimitV2, DailyLimit)); return; }
+            }
             if (cameraFeed == null || !cameraFeed.IsPlaying) { Say(StatusMessage.Kind.Error, msgNoCameraV2, true); return; }
             if (!ConnectivityMonitor.Online) { Say(StatusMessage.Kind.Error, msgOfflineV2, true); return; }
             if (SentToday() >= DailyLimit) { Say(StatusMessage.Kind.Error, string.Format(msgDailyLimitV2, DailyLimit), true); return; }
@@ -234,16 +265,53 @@ namespace GlowUp.Scan
                 if (preview == null) { DropPhoto(); Say(StatusMessage.Kind.Error, msgNotAvailable, true); return; }
                 preview.Retake += Retake;
                 preview.Use += UsePhoto;
-                preview.NotNow += () => { attempt++; busy = false; Paint(); preview.Hide(); DropPhoto(); };
+                preview.NotNow += BackToCapture;
+                preview.Closed += BackToCapture;
             }
             preview.Show(photo, !NoticeSeen);
         }
 
         void Retake()
         {
-            preview.Hide();
+            if (CaptureModeRequested == null) { preview.Hide(); DropPhoto(); CaptureNow(); return; }
+            BackToCapture();
+        }
+
+        /// <summary>Back to photo mode (Retake, Not now, the X, a tap beside the card, the phone's back key): a running reading is cancelled.</summary>
+        void BackToCapture()
+        {
+            attempt++;
+            busy = false; Paint();
+            if (preview != null) preview.Hide();
             DropPhoto();
-            Take();
+            if (choice != null) { choice.TrySetResult(true); choice = null; }
+            if (CaptureModeRequested != null) CaptureModeRequested.Invoke();
+        }
+
+        /// <summary>True while "Check your photo" is open (the scan screen's back key closes it first).</summary>
+        public bool PreviewOpen => preview != null && preview.IsOpen;
+        public void ClosePreviewByBack() { if (PreviewOpen) BackToCapture(); }
+
+        FormalToast toast;
+        void Toast(string words)
+        {
+            if (toast == null) toast = FormalToast.OnScreen(transform, promptText);
+            if (toast != null) toast.Show(FormalToast.Kind.Error, StatusMessage.Plain(words));
+        }
+
+        TaskCompletionSource<bool> choice;
+        /// <summary>The scan screen's answer to CatalogMatches: true = a product was picked (this look-up ends), false = none of these.</summary>
+        public void MatchesAnswered(bool picked) { if (choice != null) { choice.TrySetResult(picked); } }
+
+        /// <summary>The part of the photo inside the user's box, as a new texture (the whole photo when the box covers it).</summary>
+        static Texture2D CutTo(Texture2D source, Rect area)
+        {
+            int px = Mathf.Clamp(Mathf.FloorToInt(area.xMin * source.width), 0, source.width - 16), py = Mathf.Clamp(Mathf.FloorToInt(area.yMin * source.height), 0, source.height - 16);
+            int pw = Mathf.Clamp(Mathf.CeilToInt(area.width * source.width), 16, source.width - px), ph = Mathf.Clamp(Mathf.CeilToInt(area.height * source.height), 16, source.height - py);
+            var cut = new Texture2D(pw, ph, TextureFormat.RGB24, false);
+            cut.SetPixels(source.GetPixels(px, py, pw, ph));
+            cut.Apply(false);
+            return cut;
         }
 
         void DropPhoto()
@@ -266,7 +334,14 @@ namespace GlowUp.Scan
             preview.Say(StatusMessage.Kind.Progress, msgReading);
             try
             {
-                // the phone reads the WHOLE photo
+                // the phone reads ONLY the part inside the user's box (10 November 2026)
+                Rect area = preview.CropArea;
+                if (area.width < 0.999f || area.height < 0.999f)
+                {
+                    Texture2D cut = CutTo(photo, area);
+                    DropPhoto();
+                    photo = cut;
+                }
                 OcrRead read = OcrService.Shared.Read(photo);
                 float waited = 0f;
                 while (!read.Done && waited < 10f) { await Task.Delay(50); waited += 0.05f; if (this == null || mine != attempt) return; }
@@ -276,6 +351,29 @@ namespace GlowUp.Scan
                     // nothing of an unclear reading is shown or sent; the photo can be taken again
                     preview.Problem(msgUnclear, typeItInLabel, OpenTyping, false);
                     return;
+                }
+                preview.ShowTextShapes(read.Boxes);                    // the lines that were read, outlined inside the box
+
+                // the catalogue first, with the same matcher as the live scan: the closest products to pick from
+                if (CatalogMatches != null)
+                {
+                    preview.Say(StatusMessage.Kind.Progress, msgCatalog);
+                    List<ScanShortlist.Entry> matches = ScanShortlist.For(ProductRepository.Index, verdict.cleanText, null, null, 6);
+                    if (matches.Count > 0)
+                    {
+                        await Task.Delay(350);                          // the outlines stay in view for a moment
+                        if (this == null || mine != attempt) return;
+                        choice = new TaskCompletionSource<bool>();
+                        Texture2D keep = photo;
+                        preview.Hide();
+                        CatalogMatches.Invoke(matches);
+                        bool picked = await choice.Task;
+                        choice = null;
+                        if (this == null || mine != attempt) return;
+                        if (picked) { Close(); return; }
+                        preview.Show(keep, false);                      // "None of these": the photo is looked up online
+                        preview.SetBusy(true, busyLabel, busyShortLabel);
+                    }
                 }
 
                 // the photo cut to the product's text; the full frame is thrown away

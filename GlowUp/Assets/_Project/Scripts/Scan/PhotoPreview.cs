@@ -18,6 +18,14 @@ namespace GlowUp.Scan
     public class PhotoPreview
     {
         public event Action Retake, Use, NotNow;
+        /// <summary>The card was closed without a choice: the X, a tap beside the card, or the phone's back key.</summary>
+        public event Action Closed;
+
+        PhotoCropBox crop;
+        /// <summary>The part of the photo the user boxed, in the photo's 0..1 space (bottom-left origin).</summary>
+        public Rect CropArea => crop != null ? crop.Area : new Rect(0f, 0f, 1f, 1f);
+        public void ShowTextShapes(Rect[] inCrop) { if (crop != null) crop.ShowShapes(inCrop); }
+        public void CloseByBack() { if (IsOpen) Closed?.Invoke(); }
 
         GameObject root;
         RawImage picture;
@@ -48,6 +56,9 @@ namespace GlowUp.Scan
             preview.root.AddComponent<GraphicRaycaster>();
             var dim = preview.root.AddComponent<Image>();
             dim.color = new Color(0f, 0f, 0f, 0.6f);                   // blocks the screen behind it
+            var outside = preview.root.AddComponent<Button>();          // a tap beside the card closes it
+            outside.transition = Selectable.Transition.None;
+            outside.onClick.AddListener(() => preview.Closed?.Invoke());
 
             Image card = RuntimeUiKit.Box(rootRt, "Card", p.surface);
             RectTransform cardRt = card.rectTransform;
@@ -60,6 +71,24 @@ namespace GlowUp.Scan
 
             preview.title = RuntimeUiKit.Label(cardRt, "Title", titleWords, 50, p.heading, RuntimeTheme.Font(FontRole.Heading, fontFrom), TextAlignmentOptions.Left);
             preview.title.fontStyle = FontStyles.Bold;
+            preview.title.margin = new Vector4(0f, 0f, 110f, 0f);                     // room for the X
+            // the X at the top right of the card (outside the column's layout)
+            Button close = RuntimeUiKit.Pill(cardRt, "CloseButton", "×", p.surfaceAlt, p.mainText, RuntimeTheme.Font(FontRole.Button, fontFrom));
+            var closeElement = close.GetComponent<LayoutElement>(); closeElement.ignoreLayout = true;
+            var closeRt = (RectTransform)close.transform;
+            closeRt.anchorMin = closeRt.anchorMax = closeRt.pivot = new Vector2(1f, 1f);
+            closeRt.sizeDelta = new Vector2(96f, 96f); closeRt.anchoredPosition = new Vector2(-24f, -24f);
+            close.GetComponentInChildren<TextMeshProUGUI>().text = "";
+            for (int i = 0; i < 2; i++)                                                 // the X drawn as two bars (no font glyph needed)
+            {
+                Image bar = RuntimeUiKit.Box(closeRt, "Bar" + i, p.mainText, false);
+                bar.raycastTarget = false;
+                bar.rectTransform.sizeDelta = new Vector2(40f, 5f);
+                bar.rectTransform.localRotation = Quaternion.Euler(0f, 0f, i == 0 ? 45f : -45f);
+            }
+            close.onClick.AddListener(() => preview.Closed?.Invoke());
+            // a click on the card itself must not reach the "tap beside" button behind it
+            card.raycastTarget = true;
 
             // the photo: shown whole (fitted), on a soft frame
             Image frame = RuntimeUiKit.Box(cardRt, "PhotoFrame", p.surfaceAlt);
@@ -71,6 +100,7 @@ namespace GlowUp.Scan
             preview.picture.raycastTarget = false;
             preview.fit = holder.gameObject.AddComponent<AspectRatioFitter>();
             preview.fit.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+            preview.crop = PhotoCropBox.Over(holder);                  // the box the user moves over the product's text
 
             preview.notice = RuntimeUiKit.Label(cardRt, "Notice", noticeWords, 40, p.secondaryText, RuntimeTheme.Font(FontRole.Body, fontFrom), TextAlignmentOptions.Left);
 
@@ -99,6 +129,7 @@ namespace GlowUp.Scan
         {
             if (root == null) return;
             picture.texture = photo;
+            if (crop != null) { crop.Reset(); crop.SetEditable(true); }
             fit.aspectRatio = photo != null && photo.height > 0 ? photo.width / (float)photo.height : 1f;
             notice.gameObject.SetActive(firstTime);
             status.Hide();
@@ -120,6 +151,7 @@ namespace GlowUp.Scan
         public void SetBusy(bool on, string busyWords, string shortBusyWords)
         {
             busy = on;
+            if (crop != null) crop.SetEditable(!on);            // the box cannot move while its text is being read
             ButtonBusy.Set(useButton, useLabel, on, on ? busyWords : useWords, shortBusyWords);
             if (retakeLabel != null) retakeLabel.text = on ? notNowWords : retakeWords;
         }
