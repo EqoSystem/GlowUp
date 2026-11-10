@@ -13,8 +13,8 @@ namespace GlowUp.Auth
     ///
     /// GOOGLE, since 7 November 2026: the phone's own Google account sheet (Android Credential Manager, NativeGoogleSignIn) gives an
     /// ID token and Firebase signs in with it. No browser is opened, so browsers that block or split storage (Brave, strict privacy
-    /// modes) can no longer break it with "missing initial state" on firebaseapp.com. Only when that is not possible (an older build,
-    /// no Google account on the phone) does the old way run: Firebase opens Google's page in the phone's browser.
+    /// modes) can no longer break it with "missing initial state" on firebaseapp.com. Since 10 November 2026 the browser is NEVER used: when the
+    /// phone has no Google account or cannot run its own sign-in, a clear message says so (NoGoogleAccount / GoogleUnavailable).
     /// In the Firebase console the Google provider must be switched on and the app's SHA-1 fingerprint added (Project settings >
     /// Your apps), then the new google-services.json put in Assets. It only works on a phone, not in the Editor.
     /// </summary>
@@ -71,14 +71,19 @@ namespace GlowUp.Auth
                 Debug.LogWarning("[GlowUp] Google sign-in on the phone failed: " + native.detail);
                 return new Outcome { Problem = DidNotComplete };
             }
-            // 2. no account on the phone, or an older build: Google's page in the browser, as before
-            try
-            {
-                AuthResult result = await FirebaseAuth.DefaultInstance.SignInWithProviderAsync(GoogleProvider());
-                return new Outcome { User = result != null ? result.User : FirebaseAuth.DefaultInstance.CurrentUser };
-            }
-            catch (Exception e) { return Failed(e, "Google"); }
+            // 2. NO BROWSER any more (10 November 2026). The old fallback opened Google's page in the phone's browser and came back through
+            //    glowup-admin-portal.firebaseapp.com/__/auth/handler. Browsers that partition or clear storage (Brave with Shields, private
+            //    tabs, some in-app browsers) lose the sign-in state there and show Firebase's black "missing initial state" page, which the
+            //    app cannot style or recover from. A clear message is shown instead.
+            if (native.result == NativeGoogleSignIn.Result.NoAccount) return new Outcome { Problem = NoGoogleAccount };
+            Debug.LogWarning("[GlowUp] Google sign-in on the phone is not available: " + native.detail);
+            return new Outcome { Problem = GoogleUnavailable };
         }
+
+        /// <summary>No Google account on the phone (or none was picked).</summary>
+        public const string NoGoogleAccount = "No Google account was found on this phone. Add one in your phone's Settings > Accounts, then try again, or sign in with your email.";
+        /// <summary>The phone's Google sign-in cannot run (no Google Play services, or this build is missing its setup).</summary>
+        public const string GoogleUnavailable = "Google sign-in isn't available on this phone right now. Please sign in with your email.";
 
         static FederatedOAuthProvider GoogleProvider()
         {
@@ -105,8 +110,7 @@ namespace GlowUp.Auth
                 NativeGoogleSignIn.Answer native = await NativeGoogleSignIn.RequestToken();
                 if (native.result == NativeGoogleSignIn.Result.Cancelled) throw new OperationCanceledException();
                 if (native.result == NativeGoogleSignIn.Result.Token) { await user.ReauthenticateAsync(GoogleAuthProvider.GetCredential(native.idToken, null)); return; }
-                await user.ReauthenticateWithProviderAsync(GoogleProvider());
-                return;
+                throw new InvalidOperationException(native.result == NativeGoogleSignIn.Result.NoAccount ? NoGoogleAccount : GoogleUnavailable);   // never the browser (see WithGoogle)
             }
             throw new InvalidOperationException("This account cannot be checked again on this phone.");
         }
