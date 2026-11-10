@@ -91,10 +91,14 @@ namespace GlowUp.Common
             t = to; PaintColors(t); ApplyMotion(t);
         }
 
+        bool calm;
+        /// <summary>Calm: the ready state shows as a steady glow; nothing loops (no pulse, no sliding arrow).</summary>
+        public void Calm() { calm = true; }
+
         void Update()
         {
             if (!ready) return;
-            bool still = GlowUp.Performance.PerformanceSettings.ReduceEffects;      // Performance Mode: no looping arrow, a steady glow
+            bool still = calm || GlowUp.Performance.PerformanceSettings.ReduceEffects;      // Performance Mode: no looping arrow, a steady glow
             float loop = still ? 0f : Mathf.PingPong(Time.unscaledTime / Mathf.Max(0.05f, arrowLoopSeconds), 1f);
             if (arrow != null) arrow.anchoredPosition = arrowStart + Vector2.right * (arrowSlideDistance * loop * t);
             if (glowImage != null)

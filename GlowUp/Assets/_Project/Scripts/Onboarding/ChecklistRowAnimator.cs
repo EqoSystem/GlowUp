@@ -55,6 +55,16 @@ namespace GlowUp.Onboarding
         float punchT = 1f, colorK, colorTarget, checkT = 1f;
         Vector3 baseScale = Vector3.one;
 
+        /// <summary>
+        /// Calm: an ordinary press - the colours change in 0.12 s, the tick appears without an overshoot, the outline is steady, and the
+        /// row never changes size (no layout shift). Nothing keeps moving after the tap.
+        /// </summary>
+        public void Calm()
+        {
+            punchScale = 1f; colorSeconds = 0.12f; checkSeconds = 0.12f; checkSpinDegrees = 0f; glowPulseDepth = 0f;
+            checkCurve = AnimationCurve.Linear(0f, 0f, 1f, 1f);
+        }
+
         void Awake()
         {
             toggle = GetComponent<Toggle>();

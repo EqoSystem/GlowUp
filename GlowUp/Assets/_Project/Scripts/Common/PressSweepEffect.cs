@@ -88,6 +88,17 @@ namespace GlowUp.Common
             if (sweep != null) sweep.color = sweepColor;
         }
 
+        /// <summary>
+        /// Calm: only a short press feedback (a 2 % lift in about 0.1 s, back without a bounce). No squares, no aura, nothing that keeps
+        /// running after the tap (the skin quiz, 10 November 2026).
+        /// </summary>
+        public void Calm()
+        {
+            hoverScale = 1.02f; liftSeconds = 0.08f; settleSeconds = 0.12f; settleBounce = 0f;
+            if (sweep != null) { sweep.Stop(); sweep.gameObject.SetActive(false); sweep = null; }
+            glowPeak = 0f; SetGlow(0f, 1f);
+        }
+
         bool CanPlay => playWhenNotInteractable || selectable == null || selectable.IsInteractable();
 
         public void OnPointerDown(PointerEventData eventData) { if (CanPlay) down = true; }

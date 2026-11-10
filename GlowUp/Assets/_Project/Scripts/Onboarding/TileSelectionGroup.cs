@@ -30,7 +30,7 @@ namespace GlowUp.Onboarding
         {
             Value = v ?? "";
             if (tiles != null)
-                foreach (var t in tiles) if (t != null) t.SetSelected(t.Value == Value);
+                foreach (var t in tiles) if (t != null) t.SetSelected(t.Value == Value, notify);      // a restored answer (notify false) does not animate
             if (notify) Changed?.Invoke(Value);
         }
     }
