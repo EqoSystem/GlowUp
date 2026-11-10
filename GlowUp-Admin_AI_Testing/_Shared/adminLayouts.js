@@ -18,12 +18,12 @@
 //
 // Layouts are kept in this browser (localStorage). Export / Import carries one to another computer.
 // What a panel CONTAINS is never changed here: that is the pages' own code and the database.
-import { icon, esc, hydrate, currentTheme, toast, openMenu, closeMenu, flip, askText, askConfirm, guideBadge, hideTip } from "./adminShell.js";
+import { icon, esc, hydrate, currentTheme, toast, openMenu, closeMenu, flip, askText, askConfirm, guideBadge, hideTip, playSweep } from "./adminShell.js";
 import { datasetList, datasetSpec, measuresOf, mountWidget, unmountWidget, normalizeConfig, defaultTitle, VIEWS, CHARTS } from "./adminWidgets.js";
 import { hasAssist, assistHidden, setAssistHidden, anyAssistHidden, showAllAssists } from "./adminAssist.js";
 import { rowsFor, ROW_UNIT } from "./layoutRules.js";
 import { setFoldPage, foldButton, FOLD_PARTS, paintFold, toggleFold, foldedNow, anyFoldChoice, forgetFoldChoices } from "./adminFold.js";
-import { ANIMATIONS, ANIMATION_FRAMES, TRANSITIONS, EDGES, ORIENTS, NOTE_PLACES, LIMITS, cleanStyle, cleanTexts, cleanPanelMap, contrast, applyPanelStyle, applyPanelTexts, ownTexts } from "./componentStyle.js";
+import { ANIMATIONS, ANIMATION_FRAMES, TRANSITIONS, EDGES, BUTTON_FX, SHADOWS, ORIENTS, NOTE_PLACES, LIMITS, cleanStyle, cleanTexts, cleanPanelMap, contrast, applyPanelStyle, applyPanelTexts, ownTexts } from "./componentStyle.js";
 import { SHARED_PAGES, cachedShared, readShared, writeShared, clearShared } from "./sharedLayouts.js";
 
 const LAYOUT_KEY = "glowup.layouts.v1";
@@ -956,7 +956,8 @@ const COLOUR_FIELDS = [
     { key: "card", label: "Cards inside", token: "--surface-2" },
     { key: "text", label: "Text", token: "--text" },
     { key: "accent", label: "Accent", token: "--accent" },
-    { key: "border", label: "Outline", token: "--border" }
+    { key: "border", label: "Outline", token: "--border" },
+    { key: "shadow", label: "Shadow", token: "", def: "#000000" }
 ];
 const WIDTHS = [[12, "Whole width"], [9, "Three quarters"], [8, "Two thirds"], [6, "Half"], [4, "One third"], [3, "One quarter"]];
 
@@ -1033,6 +1034,15 @@ async function openStyleDialog(id) {
                 </div>
 
                 <div class="form-section">
+                    <span class="form-section-title">Shadow</span>
+                    <div class="form-row">
+                        <div class="field"><label for="sdShadow">Panel shadow</label><select id="sdShadow">${opt(SHADOWS, style.shadow)}</select></div>
+                        <div class="field"><label for="sdCardShadow">Cards inside</label><select id="sdCardShadow">${opt(SHADOWS, style.cardShadow)}</select></div>
+                    </div>
+                    <span class="field-hint">The shadow's colour is the "Shadow" colour above (black when you leave it on the page colour). It is kept for each mode on its own.</span>
+                </div>
+
+                <div class="form-section">
                     <span class="form-section-title">Corners</span>
                     <div class="drawer-row"><label class="check"><input type="checkbox" id="sdRadiusOwn"${style.radius !== undefined ? " checked" : ""}> <span>Own roundness</span></label><input type="range" id="sdRadius" min="0" max="${LIMITS.radiusMax}" step="1" value="${style.radius !== undefined ? style.radius : 14}"></div>
                 </div>
@@ -1045,6 +1055,7 @@ async function openStyleDialog(id) {
                     </div>
                     <button type="button" class="btn sd-play" id="sdPlay" aria-label="Play the animation">${icon("play")}Play the animation</button>
                     <div class="field"><label for="sdEdge">Edge light</label><select id="sdEdge">${opt(EDGES, style.edge)}</select></div>
+                    <div class="field"><label for="sdBtn">Buttons when pressed</label><select id="sdBtn">${opt(BUTTON_FX, style.btn)}</select></div>
                     <span class="field-hint" id="sdMotionHint"></span>
                 </div>
 
@@ -1078,7 +1089,7 @@ async function openStyleDialog(id) {
         q("#sdScaleText").textContent = Math.round((Number(q("#sdScale").value) || 1) * 100) + " %";
         q("#sdRadius").disabled = !q("#sdRadiusOwn").checked;
         const pick = (list, value) => (list.find((o) => o.id === (value || "")) || list[0]).hint;
-        q("#sdMotionHint").textContent = `${pick(ANIMATIONS, style.anim)} ${pick(TRANSITIONS, style.trans)} ${pick(EDGES, style.edge)}`;
+        q("#sdMotionHint").textContent = `${pick(ANIMATIONS, style.anim)} ${pick(TRANSITIONS, style.trans)} ${pick(EDGES, style.edge)} ${pick(BUTTON_FX, style.btn)}`;
         paintColours();
         queueFit();
     };
@@ -1086,14 +1097,14 @@ async function openStyleDialog(id) {
     const paintColours = () => {
         const mine = (style.colors && style.colors[theme]) || {};
         const css = getComputedStyle(panel);
-        const toHex = (value) => { const v = String(value || "").trim(); return /^#[0-9a-f]{6}$/i.test(v) ? v : "#888888"; };
+        const toHex = (value, def) => { const v = String(value || "").trim(); return /^#[0-9a-f]{6}$/i.test(v) ? v : (def || "#888888"); };
         const host = q("#sdColours");
         if (!host.childElementCount) {
             host.innerHTML = COLOUR_FIELDS.map((f) => `<label>${esc(f.label)} <input type="color" data-colour="${f.key}"> <button type="button" class="row-btn" data-colour-clear="${f.key}">Page colour</button></label>`).join("");
         }
         COLOUR_FIELDS.forEach((f) => {
             const input = host.querySelector(`[data-colour="${f.key}"]`);
-            if (document.activeElement !== input) input.value = mine[f.key] || toHex(css.getPropertyValue(f.token));
+            if (document.activeElement !== input) input.value = mine[f.key] || toHex(f.token ? css.getPropertyValue(f.token) : "", f.def);
             host.querySelector(`[data-colour-clear="${f.key}"]`).disabled = !mine[f.key];
         });
         const read = (key, token) => mine[key] || toHex(css.getPropertyValue(token));
@@ -1153,6 +1164,9 @@ async function openStyleDialog(id) {
     q("#sdAnim").addEventListener("change", (event) => { setStyle("anim", event.target.value); play(); });
     q("#sdTrans").addEventListener("change", (event) => setStyle("trans", event.target.value));
     q("#sdEdge").addEventListener("change", (event) => setStyle("edge", event.target.value));
+    q("#sdBtn").addEventListener("change", (event) => { setStyle("btn", event.target.value); const b = panel.querySelector(".fx:not(:disabled)"); if (b) playSweep(b); });
+    q("#sdShadow").addEventListener("change", (event) => setStyle("shadow", event.target.value));
+    q("#sdCardShadow").addEventListener("change", (event) => setStyle("cardShadow", event.target.value));
     const play = () => {
         const frames = ANIMATION_FRAMES[style.anim || ""];
         if (!frames || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -1186,7 +1200,7 @@ async function openStyleDialog(id) {
         style = {}; texts = {};
         overlay.querySelectorAll("#sdSubtitle, #sdNote, [data-label-index]").forEach((input) => { input.value = ""; });
         if (!named) q("#sdTitleText").value = "";
-        ["#sdOrient", "#sdFont", "#sdAnim", "#sdTrans", "#sdEdge"].forEach((selector) => { q(selector).value = ""; });
+        ["#sdOrient", "#sdFont", "#sdAnim", "#sdTrans", "#sdEdge", "#sdBtn", "#sdShadow", "#sdCardShadow"].forEach((selector) => { q(selector).value = ""; });
         q("#sdScale").value = 1; q("#sdRadiusOwn").checked = false;
         show();
         toast("This panel has its page look again. Save keeps it; Cancel brings your settings back.", "info");

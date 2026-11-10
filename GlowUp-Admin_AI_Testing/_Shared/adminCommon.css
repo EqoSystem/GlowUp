@@ -349,6 +349,9 @@ html.sb-collapsed .nav-links a, html.sb-collapsed .sign-out { justify-content: c
 /* a panel's content sits in its inner box, so a fixed height scrolls the content and never cuts the panel's own frame */
 .panel-inner { display: flex; flex-direction: column; gap: 12px; padding: var(--pad); height: 100%; min-height: 0; border-radius: inherit; }
 .panel[data-fixed-h] > .panel-inner { overflow: auto; }
+/* the shadow an admin chose for a panel and for the cards inside it (Style and text > Shadow); "Page default" sets nothing */
+.panel[data-pshadow] { box-shadow: var(--panel-shadow); }
+.panel[data-cshadow] :is(.kpi, .stat, .w-tile, .w-card, .ingredient-card, .tile):not(:hover) { box-shadow: var(--card-shadow); }
 /* a panel is not clickable: it does not lift or cast a shadow under the pointer (9 November 2026); only its edge light below shows */
 .panel.bare { background: none; border: none; }
 .panel.bare > .panel-inner { padding: 0; }
@@ -759,8 +762,10 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
     -webkit-mask-composite: source-in; mask-composite: intersect;
     -webkit-mask-position: 0 0, 0 0, 100% 0%; mask-position: 0 0, 0 0, 100% 0%;
 }
-.fx.fx-run::after { animation: fx-sweep .52s var(--ease); }
+/* the pixel sweep is only for panels whose admin chose it in Style and text > Buttons when pressed (12 November 2026) */
+[data-btn="pixel"] .fx.fx-run::after { animation: fx-sweep .52s var(--ease); }
 .fx.fx-run { animation: fx-glow .52s ease-out; }
+[data-btn="none"] .fx.fx-run { animation: none; }
 .primary-btn.fx, .save-btn.fx, .login-btn.fx, .btn.primary.fx { --fx: #ffffff; }
 @keyframes fx-sweep {
     0% { opacity: .0; -webkit-mask-position: 0 0, 0 0, 100% 0%; mask-position: 0 0, 0 0, 100% 0%; }

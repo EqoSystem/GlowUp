@@ -37,6 +37,14 @@ equal(contrast("red", "#ffffff"), 0, "a value that is not a colour gives 0");
 
 check(ANIMATIONS.every((a) => a.id === "none" || ANIMATION_FRAMES[a.id]), "every entrance has frames for Play");
 
+import { BUTTON_FX, SHADOWS, shadowCss } from "../_Shared/componentStyle.js";
+equal(cleanStyle({ btn: "pixel", shadow: "strong", cardShadow: "glow" }, FONTS), { btn: "pixel", shadow: "strong", cardShadow: "glow" }, "button effect and shadows are kept");
+equal(cleanStyle({ btn: "boom", shadow: "huge", cardShadow: "x" }, FONTS), {}, "unknown button effect and shadows are dropped");
+equal(cleanStyle({ colors: { light: { shadow: "#112233", bad: "#fff" } } }, FONTS), { colors: { light: { shadow: "#112233" } } }, "shadow colour kept");
+check(SHADOWS.every((o) => o.id === "" || shadowCss(o.id, "") !== ""), "every shadow preset gives a box-shadow");
+check(shadowCss("soft", "#112233").includes("#112233") && shadowCss("") === "" && shadowCss("none") === "none", "shadow css uses the colour");
+check(BUTTON_FX[0].id === "" && BUTTON_FX.some((o) => o.id === "pixel"), "default has no pixel sweep, pixel is a choice");
+
 console.log(`checks made: ${checks}`);
 if (failed) { console.log(`${failed} FAILED`); process.exit(1); }
 console.log("ALL PASSED");

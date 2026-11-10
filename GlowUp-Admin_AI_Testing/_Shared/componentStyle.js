@@ -49,6 +49,34 @@ export const EDGES = [
     { id: "always", label: "Always, moving", hint: "A light travels round the edge all the time." },
     { id: "off", label: "Off", hint: "No edge light." }
 ];
+/** What a press does to a button inside the panel. The pixel sweep is a choice now: no button has it unless an admin picks it here. */
+export const BUTTON_FX = [
+    { id: "", label: "Glow ring (default)", hint: "A pressed button sends out one soft ring of light." },
+    { id: "pixel", label: "Pixel sweep", hint: "A pressed button gets a band of small squares across it, with the ring." },
+    { id: "none", label: "Plain", hint: "A pressed button only moves a little: no ring, no squares." }
+];
+/** How much shadow a panel, or the cards inside it, casts. Its colour is the "Shadow" colour of the colour list (black when not set). */
+export const SHADOWS = [
+    { id: "", label: "Page default", hint: "The page's own shadow." },
+    { id: "none", label: "None", hint: "No shadow." },
+    { id: "soft", label: "Soft", hint: "A small, light shadow." },
+    { id: "medium", label: "Medium", hint: "A clear shadow." },
+    { id: "strong", label: "Strong", hint: "A deep, wide shadow." },
+    { id: "glow", label: "Glow", hint: "A shadow that spreads evenly on all sides, like a glow (the accent colour unless a shadow colour is set)." }
+];
+/** The box-shadow of one preset; `colour` = #rrggbb or "" (black; the accent for "glow"). */
+export function shadowCss(id, colour) {
+    const c = hex(colour);
+    const mix = (pct, base) => `color-mix(in srgb, ${c || base} ${pct}%, transparent)`;
+    switch (id) {
+        case "none": return "none";
+        case "soft": return `0 2px 8px ${mix(16, "#000000")}`;
+        case "medium": return `0 6px 18px ${mix(26, "#000000")}`;
+        case "strong": return `0 12px 32px ${mix(38, "#000000")}`;
+        case "glow": return `0 0 20px ${mix(50, "var(--accent)")}`;
+        default: return "";
+    }
+}
 export const ORIENTS = [
     { id: "", label: "Automatic (default)", hint: "As the page sets it: side by side when there is room." },
     { id: "row", label: "Side by side", hint: "The cards stand in one row. A narrow panel puts them two by two." },
@@ -70,7 +98,7 @@ export function plainText(value, most, lines = false) {
         : text.replace(/\s+/g, " ").trim();
     return text.slice(0, most);
 }
-const COLOUR_KEYS = ["bg", "card", "text", "accent", "border"];
+const COLOUR_KEYS = ["bg", "card", "text", "accent", "border", "shadow"];
 
 /** Only the known settings of a panel's look; {} when nothing is set. `fonts` = the ids of the site's fonts. */
 export function cleanStyle(raw, fonts = []) {
@@ -81,6 +109,9 @@ export function cleanStyle(raw, fonts = []) {
     put("trans", oneOf(s.trans, TRANSITIONS));
     put("edge", oneOf(s.edge, EDGES));
     put("orient", oneOf(s.orient, ORIENTS));
+    put("btn", oneOf(s.btn, BUTTON_FX));
+    put("shadow", oneOf(s.shadow, SHADOWS));
+    put("cardShadow", oneOf(s.cardShadow, SHADOWS));
     if (fonts.includes(String(s.font || "")) && s.font) out.font = String(s.font);
     const scale = Number(s.scale);
     if (s.scale !== undefined && s.scale !== "" && scale >= LIMITS.scaleMin && scale <= LIMITS.scaleMax && scale !== 1) out.scale = Math.round(scale * 100) / 100;
@@ -140,7 +171,7 @@ export function contrast(a, b) {
 }
 
 // ---- on the page --------------------------------------------------------------------------------------------------
-const DATA = { anim: "anim", trans: "trans", edge: "edge", orient: "orient" };
+const DATA = { anim: "anim", trans: "trans", edge: "edge", orient: "orient", btn: "btn", shadow: "pshadow", cardShadow: "cshadow" };
 const PROPS = { bg: "--panel-bg", card: "--card-bg", text: "--text", accent: "--accent", border: "--border" };
 
 /** Puts a panel's look on it (and takes off what is no longer set). `fontStack` = the CSS font list of style.font ("" = none). */
@@ -150,6 +181,8 @@ export function applyPanelStyle(panel, style, theme, fontStack) {
     Object.keys(DATA).forEach((key) => { if (s[key]) panel.dataset[DATA[key]] = s[key]; else delete panel.dataset[DATA[key]]; });
     const set = (name, value) => { if (value === undefined || value === null || value === "") panel.style.removeProperty(name); else panel.style.setProperty(name, value); };
     const colours = (s.colors && s.colors[theme]) || {};
+    set("--panel-shadow", shadowCss(s.shadow, colours.shadow));
+    set("--card-shadow", shadowCss(s.cardShadow, colours.shadow));
     Object.keys(PROPS).forEach((key) => set(PROPS[key], colours[key]));
     set("--accent-text", colours.accent);
     set("--text-2", colours.text ? `color-mix(in srgb, ${colours.text} 78%, transparent)` : "");
