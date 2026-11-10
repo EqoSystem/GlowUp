@@ -168,7 +168,7 @@ try {
         ok(await page.locator(`${purpose} details[open]`).count() === 1, "an open Sources row stays open while the name changes");
         await page.fill("#ingredientNameInput", "Glycerin");
         // rows: link | what to look for | + ref
-        const rows = await page.evaluate((sel) => Array.from(document.querySelectorAll(sel + " .source-row")).map((r) => ({ name: r.querySelector(".source-link").textContent, look: r.querySelector(".source-look").textContent.length > 15, ref: r.querySelector(".ref-add").disabled })), purpose);
+        const rows = await page.evaluate((sel) => Array.from(document.querySelectorAll(sel + " .lookup-row")).map((r) => ({ name: r.querySelector(".source-link").textContent, look: r.querySelector(".lookup-text").textContent.length > 15, ref: r.querySelector(".ref-add").disabled })), purpose);
         ok(rows.length === 2 && rows.every((r) => r.look), "each row has the source and what to look for");
         ok(rows.find((r) => r.name === "EU CosIng").ref === true && rows.find((r) => r.name === "COSMILE Europe").ref === true, "+ ref is off for a landing or a search page");
         // every link of every box goes to an allowed site, never a search engine, and opens in a new tab safely
@@ -209,8 +209,8 @@ try {
         // Reference links list
         const refs = '[data-field-sources="sources"]';
         await page.click(`${refs} summary`);
-        ok(await page.locator(`${refs} .source-row`).count() >= 8, "Reference links lists each source once");
-        ok(/Used for:/.test(await page.textContent(`${refs} .source-look`)), "with what it is used for");
+        ok(await page.locator(`${refs} .lookup-row`).count() >= 8, "Reference links lists each source once");
+        ok(/Used for:/.test(await page.textContent(`${refs} .lookup-text`)), "with what it is used for");
         // bare address gets its label on blur
         await page.fill("#ingredientSourcesInput", "https://www.cir-safety.org/ingredients\nMy note | https://example.com/x\nhttps://unknown.example/y");
         await page.focus("#ingredientAliasesInput");

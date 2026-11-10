@@ -49,6 +49,7 @@ import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAs
 import { setPageSettings } from "../_Shared/adminSettingsMenu.js";
 import { loadClassifications, classifications, classificationName, openClassificationManager, askNewClassification, openFieldMigration, addStartingClassifications, TEST_MODE } from "../_Shared/adminClassifications.js";
 import { makeCombo } from "../_Shared/adminSelect.js";
+import { wireWindow } from "../_Shared/adminWindow.js";
 import { FIELD_GUIDE, SOURCES, linksFor, allSourcesFor, addReference, labelBareUrls, pubchemLookupUrl, firstCompoundId, pubchemPageUrl, insertPaste } from "../_Shared/fieldSources.js";
 import { aliasesWithInci, firstAlias, needsClassification, MAX_PURPOSE, CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING } from "../_Shared/classificationRules.js";
 
@@ -83,7 +84,7 @@ let productUse = new Map();           // ingredient key -> number of catalogue p
 let productUseKnown = false;
 let editingIngredientId = null;
 let modal = null;
-let markSection = () => {};          // moves the section bar's marker (set when the page starts)
+let windowKit = { reset() {} };          // the section bar, focus trap and invalid marks of the window (set when the page starts)
 let fromProducts = [];                // ingredient names the inventory's products list that the Curator has no entry for: [{ key, name, products[] }]
 let fdaBrands = [];                   // the brands whose products were checked on the FDA Philippines list (for the helper line)
 let fieldFound = {};                 // pages Assist found for each box of the form: { purpose: [page], description: [page], ... }
@@ -257,9 +258,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("addIngredientForm").addEventListener("click", onFieldSourceClick);
     el("addIngredientForm").addEventListener("toggle", onSourcesToggle, true);       // "toggle" does not bubble: caught on the way down
     el("ingredientSourcesInput").addEventListener("blur", labelReferenceLinks);
-    markSection = wireSectionBar();
-    wireFocusTrap();
-    wireInvalidMarks();
+    windowKit = wireWindow(el("addIngredientModal"));
     wirePasteTidy();
     el("ingredientAliasesInput").addEventListener("input", showNameClash);
     el("ingredientsList").addEventListener("click", onListClick);
@@ -827,8 +826,8 @@ function sourceRow(link, detail) {
     const act = link.canRef
         ? `<button type="button" class="ref-add" data-add-ref="${escapeHtml(link.id)}" aria-label="Add ${escapeHtml(link.label)} page of this ingredient to Reference links">+ ref</button>`
         : `<button type="button" class="ref-add" disabled aria-disabled="true" aria-label="Add ${escapeHtml(link.label)} to Reference links (not available: no page of this ingredient)">+ ref</button>`;
-    return `<li class="source-row"><span class="source-name"><a class="source-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" data-source="${escapeHtml(link.id)}">${escapeHtml(link.label)}</a>${hint}</span>`
-        + `<span class="source-look">${escapeHtml(detail)}</span><span class="source-act">${act}</span></li>`;
+    return `<li class="lookup-row"><span class="lookup-name"><a class="source-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" data-source="${escapeHtml(link.id)}">${escapeHtml(link.label)}</a>${hint}</span>`
+        + `<span class="lookup-text">${escapeHtml(detail)}</span><span class="lookup-act">${act}</span></li>`;
 }
 
 function paintFieldSources() {
@@ -837,7 +836,7 @@ function paintFieldSources() {
         const field = box.dataset.fieldSources;
         const guide = FIELD_GUIDE[field];
         if (!guide) { box.hidden = true; box.innerHTML = ""; return; }
-        const helper = guide.helper ? `<p class="field-hint source-helper">${escapeHtml(guide.helper)}</p>` : "";
+        const helper = guide.helper ? `<p class="field-hint lookup-helper">${escapeHtml(guide.helper)}</p>` : "";
         if (guide.sources.length === 0 && field !== "sources") { box.innerHTML = helper; box.hidden = !helper; return; }
         const links = field === "sources" ? allSourcesFor(name) : linksFor(field, name);
         if (links.length === 0) { box.hidden = true; box.innerHTML = ""; return; }
@@ -853,8 +852,8 @@ function paintFieldSources() {
         const where = found.length && !basis ? `<p class="definition-basis"><b>Where this box's text came from:</b> ${found.join(" · ")}</p>` : "";
         const rows = links.map((link) => sourceRow(link, field === "sources" ? "Used for: " + link.usedFor.join(", ") : link.lookFor)).join("");
         const extra = (guide.title ? `<p class="field-hint"><b>${escapeHtml(guide.title)}</b></p>` : "") + helper
-            + `<p class="field-hint source-note">+ ref is only for a page of this ingredient. For any other source, find the ingredient on its site and paste the page address in Reference links.</p>`;
-        box.innerHTML = basis + where + `<details class="sources-box" data-sources-field="${escapeHtml(field)}"${sourcesOpen.get(field) ? " open" : ""}><summary>Sources (${links.length})</summary><ul class="source-list">${rows}</ul>${extra}</details>`;
+            + `<p class="field-hint lookup-note">+ ref is only for a page of this ingredient. For any other source, find the ingredient on its site and paste the page address in Reference links.</p>`;
+        box.innerHTML = basis + where + `<details class="sources-box" data-sources-field="${escapeHtml(field)}"${sourcesOpen.get(field) ? " open" : ""}><summary>Sources (${links.length})</summary><ul class="lookup-list">${rows}</ul>${extra}</details>`;
         box.hidden = false;
     });
 }
@@ -946,56 +945,6 @@ function labelReferenceLinks() {
     const box = el("ingredientSourcesInput");
     const labelled = labelBareUrls(box.value);
     if (labelled !== box.value) box.value = labelled.slice(0, box.maxLength > 0 ? box.maxLength : 900);
-}
-
-// ---------------------------------------------------------------------------------------------
-// The window itself: section bar with its place marker, a focus that stays inside, and the box that failed marked for screen readers
-// ---------------------------------------------------------------------------------------------
-function wireSectionBar() {
-    const body = el("ingBody"), buttons = Array.from(document.querySelectorAll(".ing-nav-btn"));
-    const sections = buttons.map((button) => el(button.dataset.jump));
-    const mark = () => {
-        const line = body.getBoundingClientRect().top + 24;
-        let current = sections[0];
-        sections.forEach((section) => { if (section.getBoundingClientRect().top <= line) current = section; });
-        if (body.scrollTop + body.clientHeight >= body.scrollHeight - 2) current = sections[sections.length - 1];
-        buttons.forEach((button, i) => button.setAttribute("aria-current", String(sections[i] === current)));
-    };
-    body.addEventListener("scroll", mark, { passive: true });
-    buttons.forEach((button) => button.addEventListener("click", () => {
-        const calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        el(button.dataset.jump).scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" });
-    }));
-    return mark;
-}
-
-/** Tab and Shift+Tab go round inside the open window instead of leaving it. */
-function wireFocusTrap() {
-    const overlay = el("addIngredientModal");
-    overlay.addEventListener("keydown", (event) => {
-        if (event.key !== "Tab" || overlay.style.display === "none") return;
-        const focusable = Array.from(overlay.querySelectorAll("a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex='-1'])"))
-            .filter((node) => !node.disabled && node.getAttribute("tabindex") !== "-1" && node.offsetParent !== null && getComputedStyle(node).visibility !== "hidden" && node.getBoundingClientRect().width > 1);
-        if (focusable.length === 0) return;
-        const first = focusable[0], last = focusable[focusable.length - 1];
-        if (event.shiftKey && (document.activeElement === first || !overlay.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
-        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    });
-}
-
-/** When a message appears, the box that was focused for it (the save code focuses the box it complains about) is marked invalid until it is edited. */
-function wireInvalidMarks() {
-    const form = el("addIngredientForm"), line = form.querySelector(".form-error");
-    const clear = () => form.querySelectorAll("[aria-invalid]").forEach((node) => node.removeAttribute("aria-invalid"));
-    new MutationObserver(() => {
-        if (!line.textContent.trim()) { clear(); return; }
-        window.setTimeout(() => {
-            const active = document.activeElement;
-            if (active && form.contains(active) && /^(INPUT|SELECT|TEXTAREA)$/.test(active.tagName)) { clear(); active.setAttribute("aria-invalid", "true"); active.setAttribute("aria-describedby", ((active.getAttribute("aria-describedby") || "").replace(/\s*formErrorLine/, "") + " formErrorLine").trim()); }
-        }, 0);
-    }).observe(line, { childList: true, characterData: true, subtree: true });
-    line.id = "formErrorLine";
-    form.addEventListener("input", (event) => { if (event.target.removeAttribute) event.target.removeAttribute("aria-invalid"); });
 }
 
 /** Pasting into the text boxes tidies the text (spaces, line breaks, list separators) and may show a non-blocking notice. Nothing is fetched. */
@@ -1628,8 +1577,7 @@ function openIngredientForm(item) {
     writeFit(el("skinTypesFit"), item ? item.avoidForSkinTypes : [], item ? item.goodForSkinTypes : []);
     writeFit(el("conditionsFit"), item ? item.avoidForConditions : [], item ? item.goodForConditions : []);
     modal.open();
-    el("ingBody").scrollTop = 0;
-    markSection();
+    windowKit.reset();
 }
 
 async function saveIngredient(event) {

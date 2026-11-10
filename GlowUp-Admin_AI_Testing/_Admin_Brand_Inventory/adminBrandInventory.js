@@ -56,6 +56,7 @@ import { bindActions, bindButtons, comboFor } from "../_Shared/shortcuts.js";
 import { EXPORT_MAX_ROWS, EXPORT_FILE_PREFIX, toCsv, downloadCsv, today } from "../_Shared/adminExport.js";
 import { setPageSettings } from "../_Shared/adminSettingsMenu.js";
 import { mountSourceEditor, openApplyWindow } from "./productSources.js";
+import { wireWindow } from "../_Shared/adminWindow.js";
 import { applyRole, brandPageOf, groupByType, bulkAllowed } from "../_Shared/sourceEdit.js";
 import { countPending, openSnapshotReview, finishSnapshot, APPROVED_DESCRIPTION } from "../_Shared/adminSnapshots.js";
 import { gs1Hint, VERIFIED_BY_GS1 } from "../_Shared/gs1Hint.js";
@@ -116,6 +117,8 @@ let formShadeCodes = [];                    // the shade codes printed on the pa
 let assistedProductSources = [];
 let brandModal = null;
 let productModal = null;
+let brandWindow = { reset() {} };           // the section bar etc. of the two windows (set when the page starts)
+let productWindow = { reset() {} };
 let org = null;                             // folders, the Recycle bin, picking and dragging
 let openId = "";                            // the product whose details are open
 let quick = "";                             // a filter a helper switched on: "" | a key of QUICK
@@ -178,6 +181,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     brandModal = setupModal(el("addBrandModal"), () => { editingBrandId = null; });
     productModal = setupModal(el("productModal"), () => { editingProductId = null; });
+    brandWindow = wireWindow(el("addBrandModal"));          // section bar, focus that stays inside, the box that failed marked
+    productWindow = wireWindow(el("productModal"));
 
     org = createOrganizer({
         kind: "products", noun: "products", nounOne: "product", allLabel: "All",
@@ -2352,6 +2357,7 @@ function openBrandForm(brand) {
     paintWebsiteBox(brand);
     showReviewNote(el("brandReviewNote"), brand, "brand");
     brandModal.open();
+    brandWindow.reset();
 }
 
 async function saveBrand(event) {
@@ -2520,6 +2526,7 @@ function openProductForm(product, brandId) {
     renderShadeEditor();
     showReviewNote(el("productReviewNote"), product, "product");
     productModal.open();
+    productWindow.reset();
 
     if (brands.length === 0) setFormError(form, "There are no brands yet. Close this, add a brand first, then add the brand's products.");
 }
