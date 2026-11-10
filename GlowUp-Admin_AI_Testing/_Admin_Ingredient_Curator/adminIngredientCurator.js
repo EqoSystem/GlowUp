@@ -50,6 +50,8 @@ import { setPageSettings } from "../_Shared/adminSettingsMenu.js";
 import { loadClassifications, classifications, classificationName, openClassificationManager, askNewClassification, openFieldMigration, addStartingClassifications, TEST_MODE } from "../_Shared/adminClassifications.js";
 import { makeCombo } from "../_Shared/adminSelect.js";
 import { wireWindow } from "../_Shared/adminWindow.js";
+import { mountSourceLinks, countSaved } from "./sourceLinks.js";
+import { SOURCE_LINK_FIELDS } from "../_Shared/fieldSources.js";
 import { FIELD_GUIDE, SOURCES, linksFor, allSourcesFor, addReference, labelBareUrls, pubchemLookupUrl, firstCompoundId, pubchemPageUrl, insertPaste } from "../_Shared/fieldSources.js";
 import { aliasesWithInci, firstAlias, needsClassification, MAX_PURPOSE, CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING } from "../_Shared/classificationRules.js";
 
@@ -84,6 +86,15 @@ let productUse = new Map();           // ingredient key -> number of catalogue p
 let productUseKnown = false;
 let editingIngredientId = null;
 let modal = null;
+let sourceUi = null;                     // the source link beside each box and the Source Finder (sourceLinks.js)
+/** The header's "Sources: n of N fields" (N = boxes with a value, n = those with a source link). */
+function paintSourceCount() {
+    const chip = el("ingredientSourceCount");
+    if (!chip || !sourceUi) return;
+    const { n, total } = sourceUi.count();
+    chip.textContent = `Sources: ${n} of ${total} fields`;
+    chip.classList.toggle("ok", total > 0 && n === total);
+}
 let windowKit = { reset() {} };          // the section bar, focus trap and invalid marks of the window (set when the page starts)
 let fromProducts = [];                // ingredient names the inventory's products list that the Curator has no entry for: [{ key, name, products[] }]
 let fdaBrands = [];                   // the brands whose products were checked on the FDA Philippines list (for the helper line)
@@ -259,6 +270,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("addIngredientForm").addEventListener("toggle", onSourcesToggle, true);       // "toggle" does not bubble: caught on the way down
     el("ingredientSourcesInput").addEventListener("blur", labelReferenceLinks);
     windowKit = wireWindow(el("addIngredientModal"));
+    sourceUi = mountSourceLinks({
+        getName: () => el("ingredientNameInput").value,
+        getCas: () => ((el("ingredientAliasesInput").value + " " + el("ingredientChemInput").value).match(/\b\d{2,7}-\d{2}-\d\b/) || [""])[0],
+        getToken: async () => (auth.currentUser ? auth.currentUser.getIdToken() : ""),
+        onChange: paintSourceCount
+    });
+    el("ingredientNameInput").addEventListener("input", () => sourceUi.refresh());
     wirePasteTidy();
     el("ingredientAliasesInput").addEventListener("input", showNameClash);
     el("ingredientsList").addEventListener("click", onListClick);
@@ -327,6 +345,7 @@ async function loadIngredients() {
                 riskLevel: RISK_LEVELS.includes(risk) ? risk : "",
                 cautionNote: data.cautionNote || "",
                 frequentUseAllergy: String(data.frequentUseAllergy || ""),
+                sourceLinks: Object.fromEntries(SOURCE_LINK_FIELDS.map((f) => [f.key, typeof data[f.data] === "string" ? data[f.data] : ""])),
                 commonUses: brokenText(uses) ? "" : uses,
                 usesBroken: brokenText(uses),
                 minAge: toWholeNumber(data.minAge),
@@ -713,6 +732,12 @@ function detailOf(item, inBin) {
     else if (item.usesBroken) facts.push(["Used in", `<span class="chip warn" data-tip="An older build of the app wrote text here that is not a description. It is not shown to anyone. Edit and save to replace it.">text from the app could not be read</span>`]);
     if (item.cautionNote) facts.push(["Caution", "It " + escapeHtml(item.cautionNote)]);
     if (item.frequentUseAllergy) facts.push(["Allergy risk (frequent use)", escapeHtml(item.frequentUseAllergy)]);
+    {
+        const counted = countSaved(item);
+        const links = SOURCE_LINK_FIELDS.filter((f) => f.enabled && item.sourceLinks && /^https:\/\//i.test(item.sourceLinks[f.key] || ""))
+            .map((f) => `<a class="source-link" href="${escapeHtml(item.sourceLinks[f.key])}" target="_blank" rel="noopener noreferrer">${escapeHtml(f.label)}</a>`);
+        if (counted.total > 0) facts.push(["Field sources", `<span class="chip">Sources: ${counted.n} of ${counted.total} fields</span>${links.length ? " " + links.join(" · ") : ""}`]);
+    }
 
     const chips = [];
     if (item.keyActive) chips.push(`<span class="chip pink">Key active</span>`);
@@ -1577,6 +1602,7 @@ function openIngredientForm(item) {
     writeFit(el("skinTypesFit"), item ? item.avoidForSkinTypes : [], item ? item.goodForSkinTypes : []);
     writeFit(el("conditionsFit"), item ? item.avoidForConditions : [], item ? item.goodForConditions : []);
     modal.open();
+    if (sourceUi) sourceUi.fill(item);
     windowKit.reset();
 }
 
@@ -1622,6 +1648,8 @@ async function saveIngredient(event) {
     const sourceLines = el("ingredientSourcesInput").value.split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
     const badLine = sourceLines.find((line) => { try { return new URL((line.split("|").pop() || "").trim()).protocol !== "https:"; } catch (error) { return true; } });
     if (badLine) { setFormError(form, "Each reference link must contain a web address that starts with https://  (" + badLine.slice(0, 50) + ")"); el("ingredientSourcesInput").focus(); return; }
+    const badSource = sourceUi ? sourceUi.firstError() : null;
+    if (badSource) { setFormError(form, badSource.message); badSource.input.focus(); return; }
     if (minAgeText !== "" && (!/^\d+$/.test(minAgeText) || minAge > 99)) { setFormError(form, "Minimum age must be a whole number from 0 to 99."); el("ingredientMinAgeInput").focus(); return; }
 
     // the same ingredient must not be in the list twice (any of its names matching any name of another entry)
@@ -1659,6 +1687,14 @@ async function saveIngredient(event) {
     // the allergy line is written only when there is one (or to clear one that was there), so an entry without it keeps its old shape
     const allergy = clean("ingredientAllergyInput").slice(0, 200);
     if (allergy || (before && before.frequentUseAllergy)) data.frequentUseAllergy = allergy;
+    if (sourceUi) {
+        const links = sourceUi.values();
+        for (const f of SOURCE_LINK_FIELDS) {
+            if (!(f.data in links)) continue;
+            const had = before && before.sourceLinks && before.sourceLinks[f.key];
+            if (links[f.data] || had) data[f.data] = links[f.data];
+        }
+    }
     const nowReviewed = !!before && before.source !== "" && before.source !== "admin" && !before.reviewed;
     if (nowReviewed) { data.reviewed = true; data.reviewedBy = reviewer(); data.reviewedAt = serverTimestamp(); }
     // a draft the AI wrote and the admin has now read and saved: the pages it came from are kept with the entry

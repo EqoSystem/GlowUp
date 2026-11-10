@@ -306,3 +306,31 @@ export function insertPaste(kind, value, start, end, pasted, maxLength = 0) {
     }
     return { value: next, caret, note };
 }
+
+// ----------------------------------------------------------------------------------------------------------------
+// SOURCE LINK per box (10 November 2026): the one page that supports what a box says. One entry per box; `enabled` false hides it
+// (and leaves it out of "Sources: n of N"). `data` = the ingredient document's field (a nullable string). `finder` = the sites listed
+// under "Where to look" in the Source Finder, in this order. The rules for an address are in sourceLinkRules.mjs.
+// ----------------------------------------------------------------------------------------------------------------
+export const SOURCE_LINK_FIELDS = [
+    { key: "purpose", label: "Purpose", input: "ingredientPurposeInput", data: "purposeSourceUrl", enabled: true, finder: ["cosmile", "cosing"] },
+    { key: "description", label: "User-Friendly Definition", input: "ingredientDescInput", data: "definitionSourceUrl", enabled: true, finder: ["cosmile", "cosing", "cir", "cosmeticsinfo"] },
+    { key: "chemicalDescription", label: "What the chemical is", input: "ingredientChemInput", data: "chemicalSourceUrl", enabled: true, finder: ["pubchem", "cosing"] },
+    { key: "aliases", label: "Also Known As", input: "ingredientAliasesInput", data: "aliasesSourceUrl", enabled: true, finder: ["cosmile", "cosing", "pubchem", "incipedia"] },
+    { key: "cautionNote", label: "Caution Note", input: "ingredientCautionInput", data: "cautionSourceUrl", enabled: true, finder: ["cir", "cosing"] },
+    { key: "commonUses", label: "Commonly Used In", input: "ingredientUsesInput", data: "commonlyUsedInSourceUrl", enabled: true, finder: ["cosmile", "cosmeticsinfo"] }
+];
+
+/** The server search of the CosIng Checker index in the Source Finder (verified 10 November 2026: its /ingredients/<slug>/ pages answer 200 and name the ingredient). */
+export const COSING_INDEX_ENABLED = true;
+
+/** What to copy from a site for a box: the box's own instruction when it has one, else a general line. */
+export function finderWhat(field, id) {
+    const guide = FIELD_GUIDE[field];
+    const own = guide ? guide.sources.find(([sid]) => sid === id) : null;
+    if (own) return own[1];
+    return {
+        cosmile: "Find the ingredient and read its page.", cosing: "Search the name and open its entry.", cir: "Open the ingredient's report.",
+        cosmeticsinfo: "Open the ingredient's page.", pubchem: "Open the compound page.", incipedia: "Search the name (sign-in required)."
+    }[id] || "Find the ingredient's page.";
+}

@@ -115,6 +115,7 @@ The classification list, managed by admins in the Ingredient Curator. Everyone c
 | `riskLevel` | text | `safe`, `caution`, `harmful`, or empty to let the app decide. |
 | `cautionNote` | text | Finishes the sentence "It ...", for example `can clog pores`. |
 | `frequentUseAllergy` | text, optional | Who may react allergically when products with this ingredient are used often, one plain sentence (max 200). Written only when there is one, from a regulator's classification (ECHA C&L H317 or the EU fragrance allergen list). The app (from the next build) shows it on the ingredient card under "More about this ingredient", only when it is not empty and the ingredient is not in the Recycle bin. |
+| `purposeSourceUrl`, `definitionSourceUrl`, `chemicalSourceUrl`, `aliasesSourceUrl`, `cautionSourceUrl`, `commonlyUsedInSourceUrl` | text, optional | The one page that supports that box (Purpose, User-Friendly Definition, What the chemical is, Also Known As, Caution Note, Commonly Used In). Empty or one https address (max 600). Absent on older entries = no source; nothing to migrate. Rules: `sourceLinkOrEmpty`. The website shows "Sources: n of N fields". |
 | `commonUses` | text | For example `serums, moisturisers`. |
 | `minAge` | number | 0 means no limit. |
 | `keyActive` | yes/no | Shown as a highlighted chip in results. |

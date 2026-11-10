@@ -56,7 +56,8 @@ export function wireWindow(overlay) {
                 }
             }, 0);
         }).observe(line, { childList: true, characterData: true, subtree: true });
-        form.addEventListener("input", (event) => { if (event.target.removeAttribute) event.target.removeAttribute("aria-invalid"); });
+        // (a box that judges itself as it is typed in, data-own-validity, keeps its own mark)
+        form.addEventListener("input", (event) => { if (event.target.removeAttribute && !event.target.hasAttribute("data-own-validity")) event.target.removeAttribute("aria-invalid"); });
     }
 
     return { reset() { body.scrollTop = 0; mark(); } };

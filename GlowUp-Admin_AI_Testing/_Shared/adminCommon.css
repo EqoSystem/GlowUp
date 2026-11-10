@@ -2093,3 +2093,95 @@ body:has(> :is(#addIngredientModal, #addBrandModal, #productModal)[style*="flex"
 
 .ing-modal .hint-row:has(> .field-hint:empty) { display: none; }
 #addBrandModal .ing-foot .form-error, #productModal .ing-foot .form-error, #addIngredientModal .ing-foot .form-error { max-height: 96px; overflow-y: auto; }
+
+/* ---- the SOURCE LINK beside a box, and the Source Finder (10 November 2026) ----
+   Wide window (640 px or more): two columns, 2fr box / 1fr source; the source box is top-aligned with the box (not with its label) and
+   spans the box and its hint. Narrow: one column, the source directly under the box and above the hint. Counters stay in the box's
+   own hint line. No absolute positioning; every grid child may shrink (min-width 0). */
+.ing-modal { container-type: inline-size; container-name: ingwindow; }
+.ing-modal .field.has-src {
+    display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); column-gap: 16px; row-gap: 0; align-items: start;
+    grid-template-areas: "label slabel" "control sbody" "hint sbody" "note note" "sources sources" "finder finder";
+    grid-template-rows: auto auto 1fr auto auto auto;          /* the source column's extra height goes under the hint, so the hint stays right under its box */
+}
+.ing-modal .field.has-src > .label-row { grid-area: label; }
+.ing-modal .field.has-src > input, .ing-modal .field.has-src > textarea, .ing-modal .field.has-src > select { grid-area: control; }
+.ing-modal .field.has-src > .src-label { grid-area: slabel; }
+.ing-modal .field.has-src > .src-body { grid-area: sbody; }
+.ing-modal .field.has-src > .hint-row { grid-area: hint; }
+.ing-modal .field.has-src > .paste-note { grid-area: note; }
+.ing-modal .field.has-src > .field-sources { grid-area: sources; }
+.ing-modal .field.has-src > .src-finder { grid-area: finder; }
+@container ingwindow (max-width: 639px) {
+    .ing-modal .field.has-src {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: "label" "control" "slabel" "sbody" "hint" "note" "sources" "finder";
+        grid-template-rows: none;
+    }
+    .ing-modal .field.has-src > .src-label { margin-top: 8px; }
+}
+.ing-modal .src-label { display: flex; align-items: center; min-height: 32px; margin-bottom: 2px; min-width: 0; }
+.ing-modal .src-label > label { font-size: 13px; font-weight: 600; color: var(--text); }
+.ing-modal .src-label .optional { font-weight: 400; color: var(--im-hint); }
+.ing-modal .src-body { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ing-modal .src-input-row { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.ing-modal .src-input-row > input {
+    flex: 1 1 auto; min-width: 0; height: 40px; padding: 8px 12px; border: 1px solid var(--im-border); border-radius: 8px;
+    background: var(--im-input-bg); color: var(--im-text); font: inherit; font-size: 14px; text-overflow: ellipsis;
+}
+.ing-modal .src-input-row > input::placeholder { color: var(--im-placeholder); opacity: 1; }
+.ing-modal .src-input-row > input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-color: var(--accent); text-overflow: clip; }
+.ing-modal .src-input-row > input.src-bad { border-color: var(--im-danger); box-shadow: 0 0 0 1px var(--im-danger); }
+.ing-modal .src-open { flex: none; width: 40px; height: 40px; border-radius: 8px; border: 1px solid var(--border); display: inline-grid; place-items: center; color: var(--im-hint); }
+.ing-modal .src-open[aria-disabled="true"] { opacity: .45; pointer-events: none; }
+.ing-modal .src-open:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ing-modal .src-open svg.ic { width: 16px; height: 16px; }
+.ing-modal .src-status { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 12px; line-height: 1.4; color: var(--im-hint); min-width: 0; }
+.ing-modal .src-status:empty { display: none; }
+.ing-modal .src-status .chip { margin: 0; font-size: 12px; }
+.ing-modal .src-tier.official { --c: var(--ok); }
+.ing-modal .src-tier.industry { --c: var(--info); }
+.ing-modal .src-tier.unofficial, .ing-modal .src-tier.other { --c: var(--warn); }
+.ing-modal .src-msg, .ing-modal .src-tag { display: inline-flex; gap: 6px; align-items: flex-start; min-width: 0; overflow-wrap: anywhere; }
+.ing-modal .src-msg.bad { color: var(--im-danger); }
+.ing-modal .src-msg.warn { color: var(--text-2); }
+.ing-modal .src-msg.ok { color: var(--ok); }
+.ing-modal .src-glyph {
+    flex: none; display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid currentColor;
+    font-size: 11px; font-weight: 700; line-height: 1;
+}
+.ing-modal .src-glyph.none { border-style: dashed; }
+.ing-modal .src-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; min-width: 0; }
+.ing-modal .src-actions .row-btn { min-height: 32px; padding: 0 12px; border-radius: 8px; font-size: 13px; }
+.ing-modal .src-find { background: none; border: 0; padding: 4px 0; min-height: 32px; font: inherit; font-size: 13px; font-weight: 600; color: var(--im-link); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.ing-modal .src-find:disabled { color: var(--im-hint); text-decoration: none; cursor: not-allowed; }
+.ing-modal .src-find:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.ing-modal .src-find-hint { font-size: 12px; color: var(--im-hint); }
+.ing-modal .src-find-hint:empty { display: none; }
+.ing-modal .src-count { margin: 8px 0 0; display: inline-block; font-size: 12px; }
+.ing-modal .src-count.ok { --c: var(--ok); }
+
+.ing-modal .src-finder { margin-top: 12px; padding: 12px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ing-modal .src-finder[hidden] { display: none; }
+.ing-modal .finder-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ing-modal .finder-title { margin: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+.ing-modal .finder-close { width: 32px; height: 32px; border-radius: 8px; flex: none; color: var(--im-hint); }
+.ing-modal .finder-close svg.ic { width: 16px; height: 16px; }
+.ing-modal .finder-name { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ing-modal .finder-name label { font-size: 13px; font-weight: 600; color: var(--text); }
+.ing-modal .finder-name input { flex: 1 1 200px; min-width: 0; height: 40px; padding: 8px 12px; border: 1px solid var(--im-border); border-radius: 8px; background: var(--im-input-bg); color: var(--im-text); font: inherit; font-size: 14px; }
+.ing-modal .finder-name input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ing-modal .finder-sub { margin: 4px 0 0; font-size: 13px; font-weight: 600; color: var(--text); }
+.ing-modal .finder-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.ing-modal .finder-row { display: grid; grid-template-columns: minmax(110px, 180px) minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; padding: 8px 0; border-top: 1px solid var(--border); font-size: 13px; min-width: 0; }
+.ing-modal .finder-row .row-btn { min-height: 32px; border-radius: 8px; font-size: 13px; white-space: nowrap; }
+.ing-modal .finder-what { color: var(--text-2); line-height: 1.45; min-width: 0; overflow-wrap: anywhere; }
+.ing-modal .finder-inci { font-weight: 600; overflow-wrap: anywhere; min-width: 0; }
+.ing-modal .finder-inci .chip { margin: 0 0 0 4px; font-size: 11px; }
+.ing-modal .src-note { font-size: 12px; color: var(--im-hint); margin: 0; }
+.ing-modal .finder-cosing { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ing-modal .finder-official { align-self: flex-start; min-height: 32px; border-radius: 8px; font-size: 13px; }
+@container ingwindow (max-width: 639px) {
+    .ing-modal .finder-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .ing-modal .finder-row .finder-what { grid-column: 1 / -1; grid-row: 2; }
+}

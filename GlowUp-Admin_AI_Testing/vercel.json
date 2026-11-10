@@ -48,6 +48,10 @@
     },
     "api/archive-purge.js": {
       "maxDuration": 60
+    },
+    "api/source-link.js": {
+      "maxDuration": 20,
+      "includeFiles": "_Shared/sourceLinkRules.mjs"
     }
   },
   "crons": [

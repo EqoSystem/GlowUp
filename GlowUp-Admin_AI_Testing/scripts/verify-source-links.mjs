@@ -57,6 +57,28 @@ for (const [id, source] of Object.entries(f.SOURCES)) {
     }
 }
 
+// ---- the CosIng Checker index (Source Finder): each sample's own page must answer 200, stay on cosingchecker.com and name the ingredient
+const rules = await import(new URL("../_Shared/sourceLinkRules.mjs", import.meta.url).href);
+for (const name of SAMPLES) {
+    const api = `https://cosingchecker.com/api/v1/ingredients/?q=${encodeURIComponent(name)}&per_page=50`;
+    try {
+        const answer = JSON.parse((await get(api)).text);
+        const hit = (answer.results || []).find((x) => String(x.inci_name).toUpperCase() === name.toUpperCase());
+        const page = hit ? rules.cosingCheckerPage(hit.url) : "";
+        if (!page) { note("CosIng Checker index", "page", api, false, "no exact result with a page"); continue; }
+        const r = await get(page);
+        const named = r.text.toLowerCase().includes(name.toLowerCase()) || (hit.cas_number && r.text.includes(hit.cas_number));
+        note("CosIng Checker index", "page", page, r.status === 200 && new URL(r.finalUrl).hostname === "cosingchecker.com" && named, `status ${r.status}, name in page: ${named}`);
+        // the official CosIng page for the same reference number: used only if it shows the ingredient without scripts
+        if (hit.ref_number) {
+            const official = `https://ec.europa.eu/growth/tools-databases/cosing/details/${hit.ref_number}`;
+            const o = await get(official);
+            const shows = o.text.toLowerCase().includes(name.toLowerCase());
+            rows.push(["EU CosIng details/<ref>", shows ? "page (would ship)" : "removed", official, shows ? "PASS" : `NOT USED: status ${o.status}, name in page: ${shows} (page needs scripts)`]);
+        }
+    } catch (error) { note("CosIng Checker index", "page", api, false, String(error.message || error)); }
+}
+
 const widths = [0, 1, 2, 3].map((i) => Math.min(70, Math.max(...rows.map((r) => String(r[i]).length), 6)));
 console.log(["source", "type shipped", "tested URL", "result"].map((h, i) => h.padEnd(widths[i])).join(" | "));
 rows.forEach((r) => console.log(r.map((c, i) => String(c).slice(0, widths[i]).padEnd(widths[i])).join(" | ")));
