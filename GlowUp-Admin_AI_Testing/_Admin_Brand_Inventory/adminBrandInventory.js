@@ -2063,7 +2063,7 @@ async function purgeFromBin(keys) {
 function showScopeHint() {
     const hint = el("productScopeHint");
     const type = el("productTypeInput").value === OTHER_TYPE ? el("productTypeOtherInput").value : el("productTypeInput").value;
-    if (!type.trim()) { hint.textContent = ""; return; }
+    if (!type.trim()) { hint.textContent = "Only make-up products are accepted, even from a brand that also sells skin care."; hint.className = "field-hint"; return; }
     const name = el("productNameInput").value, scope = productScope(type, name);
     hint.textContent = scope === "makeup" ? "Make-up: the app checks it and offers AR Try-On."
         : scope === "unclear" ? `The app cannot tell that this is make-up: ${scopeWords(type, name)}. It can only be saved as Pending, and the app hides it until its kind is clear.`
@@ -2349,7 +2349,6 @@ function openBrandForm(brand) {
     editingBrandId = brand ? brand.id : null;
     el("brandModalTitle").textContent = brand ? "Edit Brand" : "Add New Brand";
     el("brandNameInput").value = brand ? brand.name : "";
-    el("brandCategoryInput").value = BRAND_CATEGORY;           // every brand is a make-up brand; saving one that had another category corrects it
     el("brandMarketInput").value = brand ? brand.market : "Global";
     el("brandStatusInput").value = brand && STATUSES.includes(brand.status) ? brand.status : "Active";
     el("brandLogoInput").value = brand ? brand.logoUrl : "";
