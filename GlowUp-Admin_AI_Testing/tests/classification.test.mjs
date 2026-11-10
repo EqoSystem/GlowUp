@@ -102,7 +102,7 @@ const js = read("_Admin_Ingredient_Curator/adminIngredientCurator.js"), html = r
 // (shared is read above)
 check(/<label for="ingredientNameInput">INCI name/.test(html), 'the name box is called "INCI name"');
 check(!/ingredientTechInput/.test(html + js), "the old INCI box is gone");
-check(/<select id="ingredientClassInput">/.test(html), "the classification is a drop-down, not free text");
+check(/<select id="ingredientClassInput"[^>]*>/.test(html), "the classification is a drop-down, not free text");
 check(/\+ Add new classification/.test(js), 'the drop-down ends with "+ Add new classification"');
 check(/One line on what this ingredient does in a product\./.test(html) && /ingredientPurposeCount/.test(html) && /MAX_PURPOSE/.test(js), "Purpose has its help text and a counter");
 check(/Choose the ingredient classification/.test(js) && /Write one line on what this ingredient does/.test(js), "classification and purpose are required");

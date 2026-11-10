@@ -161,142 +161,161 @@
         </div>
     </main>
 
+    <!-- The Add / Edit Ingredient window: a header, a section bar, a scrolling body and a footer, as three flex parts of one column, so the
+         footer is never laid over the fields. Every box has the same anatomy: label row (label left, info and edit icons right), the control,
+         one hint line (hint left, counter right), and one "Sources (N)" row that opens the list of where to look. -->
     <div id="addIngredientModal" class="modal-overlay">
-        <div class="modal-content wide">
-            <h3 id="modalTitle">Add Ingredient</h3>
-            <p class="modal-intro">The first boxes are what app users read. The rest tells the app how to judge the ingredient for each user; leave any of it empty and the app uses its own built-in knowledge.</p>
-            <p class="review-note" id="ingredientReviewNote" style="display: none;"></p>
-            <form id="addIngredientForm" class="modal-form" novalidate>
-                <span class="form-section-title">What app users read</span>
-                <div class="form-row">
-                    <div class="field">
-                        <label for="ingredientNameInput">INCI name <span class="required">*</span></label>
-                        <input type="text" id="ingredientNameInput" maxlength="80" placeholder="e.g., Aqua" autocomplete="off">
-                        <span class="field-hint">Only the one official name printed on labels, for example Aqua. Do not add other names here (not "Aqua / Water"): put Water, Eau under Also known as.</span>
-                        <div class="field-sources" data-field-sources="name" hidden></div>
-                    </div>
-                    <div class="field">
-                        <span class="field-label"><label for="ingredientClassInput">Ingredient classification <span class="required">*</span></label><button type="button" class="icon-btn small list-edit" data-list-edit="classifications" aria-label="Manage classifications"><i data-icon="edit"></i></button></span>
-                        <select id="ingredientClassInput"></select>
-                        <div class="field-sources" data-field-sources="classification" hidden></div>
-                    </div>
+        <div class="modal-content wide ing-modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+            <header class="ing-head">
+                <div class="ing-head-text">
+                    <h3 id="modalTitle">Add Ingredient</h3>
+                    <p class="modal-intro">The first boxes are what app users read. The rest tells the app how to judge the ingredient for each user; leave any of it empty and the app uses its own built-in knowledge.</p>
                 </div>
-                <div class="name-clash" id="ingredientNameClash" hidden></div>
+                <button type="button" class="icon-btn ing-close" data-close aria-label="Close"><i data-icon="x"></i></button>
+            </header>
+            <nav class="ing-nav" aria-label="Sections of this form">
+                <button type="button" class="ing-nav-btn" data-jump="secUsers" aria-current="true">What app users read</button>
+                <button type="button" class="ing-nav-btn" data-jump="secNames">Other names and sources</button>
+                <button type="button" class="ing-nav-btn" data-jump="secJudge">How the app judges it</button>
+            </nav>
+            <form id="addIngredientForm" class="modal-form ing-form" novalidate>
+                <div class="ing-body" id="ingBody">
+                    <p class="review-note" id="ingredientReviewNote" style="display: none;"></p>
 
-                <div class="field">
-                    <label for="ingredientPurposeInput">Purpose <span class="required">*</span></label>
-                    <input type="text" id="ingredientPurposeInput" autocomplete="off" placeholder="e.g., Helps prevent microbial growth and maintain product quality.">
-                    <span class="field-hint">One line on what this ingredient does in a product. <span id="ingredientPurposeCount"></span></span>
-                    <div class="field-sources" data-field-sources="purpose" hidden></div>
-                </div>
-
-                <div class="field">
-                    <label for="ingredientDescInput">User-Friendly Definition <span class="required">*</span></label>
-                    <textarea id="ingredientDescInput" rows="3" maxlength="600" placeholder="What it is and what it does, in plain words."></textarea>
-                    <div class="field-sources" data-field-sources="description" hidden></div>
-                </div>
-
-                <div class="field">
-                    <label for="ingredientChemInput">What the chemical is <span class="optional">(optional)</span></label>
-                    <textarea id="ingredientChemInput" rows="2" maxlength="600" placeholder="The technical description: what the substance is, for example a salt of hyaluronic acid."></textarea>
-                    <div class="field-sources" data-field-sources="chemicalDescription" hidden></div>
-                </div>
-
-                <div class="form-section">
-                    <span class="form-section-title">Other names and sources</span>
-                    <div class="form-row">
-                        <div class="field">
-                            <label for="ingredientAliasesInput">Also Known As</label>
-                            <input type="text" id="ingredientAliasesInput" maxlength="300" placeholder="e.g., Water, Eau" autocomplete="off">
-                            <span class="field-hint">Other spellings found on labels, separated by commas. A scan of any of them finds this ingredient. The first one is shown as the common name.</span>
-                            <div class="field-sources" data-field-sources="aliases" hidden></div>
-                        </div>
-                        <div class="field">
-                            <label for="ingredientSourcesInput">Reference links <span class="optional">(optional)</span></label>
-                            <textarea id="ingredientSourcesInput" rows="2" maxlength="900" placeholder="One per line, for example: CIR safety report | https://www.cir-safety.org/..."></textarea>
-                            <span class="field-hint">Where this ingredient's safety information came from. Only https addresses are kept.</span>
-                            <div class="field-sources" data-field-sources="sources" hidden></div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-section">
-                    <span class="form-section-title">How the app judges it</span>
-                    <div class="field-sources" data-field-sources="judgment" hidden></div>
-
-                    <div class="form-row">
-                        <div class="field">
-                            <label for="ingredientRiskInput">Risk Level</label>
-                            <select id="ingredientRiskInput">
-                                <option value="">Let the app decide</option>
-                                <option value="safe">Safe</option>
-                                <option value="caution">Caution</option>
-                                <option value="harmful">Harmful</option>
-                            </select>
-                        </div>
-                        <div class="field">
-                            <label for="ingredientMinAgeInput">Minimum Age</label>
-                            <input type="number" id="ingredientMinAgeInput" min="0" max="99" step="1" placeholder="0 = no age limit">
-                        </div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="field">
-                            <label for="ingredientCautionInput">Caution Note</label>
-                            <input type="text" id="ingredientCautionInput" maxlength="160" placeholder="e.g., can clog pores" autocomplete="off">
-                            <span class="field-hint">Finish the sentence "It ...". The app shows it when the ingredient is flagged, for example: "May not suit Oily skin: it can clog pores."</span>
-                            <div class="field-sources" data-field-sources="cautionNote" hidden></div>
-                        </div>
-                        <div class="field">
-                            <label for="ingredientUsesInput">Commonly Used In</label>
-                            <input type="text" id="ingredientUsesInput" maxlength="160" placeholder="e.g., serums, moisturisers, toners" autocomplete="off">
-                            <div class="field-sources" data-field-sources="commonUses" hidden></div>
-                        </div>
-                    </div>
-
-                    <div class="field">
-                        <label for="ingredientAllergyInput">Allergy risk with frequent use <span class="optional">(optional)</span></label>
-                        <input type="text" id="ingredientAllergyInput" maxlength="200" placeholder="e.g., May cause an allergic skin reaction in some people." autocomplete="off">
-                        <span class="field-hint">One plain sentence telling users this ingredient can cause an allergic reaction, taken from a regulator's classification. Leave it empty when no source lists one. Saved with the ingredient.</span>
-                        <div class="field-sources" data-field-sources="frequentAllergy" hidden></div>
-                    </div>
-
-                    <div class="form-row">
-                        <div class="field">
-                            <span class="field-label">Highlights<button type="button" class="icon-btn small list-edit" data-list-edit="highlights" aria-label="Edit the highlights list" data-tip-title="Highlights" data-tip="Add, rename, retire or delete highlights. They reach the app too."><i data-icon="edit"></i></button></span>
-                            <div class="checks pills">
-                                <label class="check"><input type="checkbox" id="ingredientKeyActiveInput"> <span>Key active</span></label>
-                                <label class="check"><input type="checkbox" id="ingredientUmbrellaInput"> <span>Umbrella term</span></label>
+                    <section class="ing-section" id="secUsers" aria-labelledby="secUsersTitle">
+                        <h4 class="ing-section-title" id="secUsersTitle">What app users read</h4>
+                        <div class="ing-grid">
+                            <div class="field half">
+                                <div class="label-row"><label for="ingredientNameInput">INCI name <span class="required" aria-hidden="true">*</span></label></div>
+                                <input type="text" id="ingredientNameInput" maxlength="80" placeholder="e.g., Aqua" autocomplete="off" aria-required="true" aria-describedby="ingredientNameHint">
+                                <div class="hint-row"><p class="field-hint" id="ingredientNameHint">Only the one official name printed on labels, for example Aqua. Do not add other names here (not "Aqua / Water"): put Water, Eau under Also known as.</p></div>
                             </div>
-                            <div class="checks pills" id="highlightTagsChecks"></div>
-                        </div>
-                        <div class="field">
-                            <span class="field-label">Allergen Family<button type="button" class="icon-btn small list-edit" data-list-edit="allergens" aria-label="Edit the allergen families list" data-tip-title="Allergen families" data-tip="Add, rename, retire or delete allergen families. They reach the app too."><i data-icon="edit"></i></button><span class="info-slot" data-info="A user who picked that allergen in the app is warned about this ingredient." data-info-label="About Allergen Family"></span></span>
-                            <div class="checks pills" id="allergenTagsChecks"></div>
-                            <div class="field-sources" data-field-sources="allergens" hidden></div>
-                        </div>
-                    </div>
+                            <div class="field half">
+                                <div class="label-row">
+                                    <label for="ingredientClassInput">Ingredient classification <span class="required" aria-hidden="true">*</span></label>
+                                    <span class="label-actions"><button type="button" class="icon-btn small list-edit" data-list-edit="classifications" aria-label="Manage classifications"><i data-icon="edit"></i></button></span>
+                                </div>
+                                <select id="ingredientClassInput" aria-required="true"></select>
+                                <div class="hint-row"><p class="field-hint" id="ingredientClassHint">Choose from the list. Do not paste.</p></div>
+                            </div>
+                            <div class="name-clash full" id="ingredientNameClash" hidden></div>
 
-                    <!-- ONE row per skin type and per condition, with three choices: Avoid, no effect, Good. (Before, each name
-                         stood twice, in an "Avoid" list and in a "Good" list, and could be ticked in both.) -->
-                    <div class="form-row">
-                        <div class="field">
-                            <span class="field-label">Skin Types</span>
-                            <div class="fit-list" id="skinTypesFit"></div>
+                            <div class="field full">
+                                <div class="label-row"><label for="ingredientPurposeInput">Purpose <span class="required" aria-hidden="true">*</span></label></div>
+                                <input type="text" id="ingredientPurposeInput" autocomplete="off" placeholder="e.g., Helps prevent microbial growth and maintain product quality." aria-required="true" aria-describedby="ingredientPurposeHint">
+                                <div class="hint-row"><p class="field-hint" id="ingredientPurposeHint">One line on what this ingredient does in a product.</p><span class="counter" id="ingredientPurposeCount"></span></div>
+                                <div class="field-sources" data-field-sources="purpose" hidden></div>
+                            </div>
+
+                            <div class="field full">
+                                <div class="label-row"><label for="ingredientDescInput">User-Friendly Definition <span class="required" aria-hidden="true">*</span></label></div>
+                                <textarea id="ingredientDescInput" rows="3" maxlength="600" placeholder="What it is and what it does, in plain words." aria-required="true"></textarea>
+                                <div class="field-sources" data-field-sources="description" hidden></div>
+                            </div>
+
+                            <div class="field full">
+                                <div class="label-row"><label for="ingredientChemInput">What the chemical is <span class="optional">(optional)</span></label></div>
+                                <textarea id="ingredientChemInput" rows="2" maxlength="600" placeholder="The technical description: what the substance is, for example a salt of hyaluronic acid."></textarea>
+                                <div class="field-sources" data-field-sources="chemicalDescription" hidden></div>
+                            </div>
                         </div>
-                        <div class="field">
-                            <span class="field-label">Skin Conditions<button type="button" class="icon-btn small list-edit" data-list-edit="conditions" aria-label="Edit the skin conditions list" data-tip-title="Skin conditions" data-tip="Add, rename, retire or delete skin conditions. They reach the app too."><i data-icon="edit"></i></button><span class="info-slot" data-info="Choose Avoid or Good only where this ingredient matters; leave the rest on the dash." data-info-label="About Skin Conditions"></span></span>
-                            <div class="fit-list" id="conditionsFit"></div>
+                    </section>
+
+                    <section class="ing-section" id="secNames" aria-labelledby="secNamesTitle">
+                        <h4 class="ing-section-title" id="secNamesTitle">Other names and sources</h4>
+                        <div class="ing-grid">
+                            <div class="field full">
+                                <div class="label-row"><label for="ingredientAliasesInput">Also Known As</label></div>
+                                <input type="text" id="ingredientAliasesInput" maxlength="300" placeholder="e.g., Water, Eau" autocomplete="off" aria-describedby="ingredientAliasesHint">
+                                <div class="hint-row"><p class="field-hint" id="ingredientAliasesHint">Other spellings found on labels, separated by commas. A scan of any of them finds this ingredient. The first one is shown as the common name.</p></div>
+                                <div class="field-sources" data-field-sources="aliases" hidden></div>
+                            </div>
+                            <div class="field full">
+                                <div class="label-row"><label for="ingredientSourcesInput">Reference links <span class="optional">(optional)</span></label></div>
+                                <textarea id="ingredientSourcesInput" rows="3" maxlength="900" placeholder="One per line, for example: CIR safety report | https://www.cir-safety.org/..." aria-describedby="ingredientSourcesHint"></textarea>
+                                <div class="hint-row"><p class="field-hint" id="ingredientSourcesHint">Where this ingredient's safety information came from. Only https addresses are kept.</p></div>
+                                <div class="field-sources" data-field-sources="sources" hidden></div>
+                            </div>
                         </div>
-                    </div>
+                    </section>
+
+                    <section class="ing-section" id="secJudge" aria-labelledby="secJudgeTitle">
+                        <h4 class="ing-section-title" id="secJudgeTitle">How the app judges it</h4>
+                        <div class="field-sources section-note" data-field-sources="judgment" hidden></div>
+                        <div class="ing-grid">
+                            <div class="field half">
+                                <div class="label-row"><label for="ingredientRiskInput">Risk Level</label></div>
+                                <select id="ingredientRiskInput">
+                                    <option value="">Let the app decide</option>
+                                    <option value="safe">Safe</option>
+                                    <option value="caution">Caution</option>
+                                    <option value="harmful">Harmful</option>
+                                </select>
+                            </div>
+                            <div class="field half">
+                                <div class="label-row"><label for="ingredientMinAgeInput">Minimum Age</label></div>
+                                <input type="number" id="ingredientMinAgeInput" min="0" max="99" step="1" placeholder="0 = no age limit">
+                            </div>
+                            <div class="field full">
+                                <div class="label-row"><label for="ingredientCautionInput">Caution Note</label></div>
+                                <input type="text" id="ingredientCautionInput" maxlength="160" placeholder="e.g., can clog pores" autocomplete="off" aria-describedby="ingredientCautionHint">
+                                <div class="hint-row"><p class="field-hint" id="ingredientCautionHint">Finish the sentence "It ...". The app shows it when the ingredient is flagged, for example: "May not suit Oily skin: it can clog pores."</p></div>
+                                <div class="field-sources" data-field-sources="cautionNote" hidden></div>
+                            </div>
+                            <div class="field full">
+                                <div class="label-row"><label for="ingredientUsesInput">Commonly Used In</label></div>
+                                <input type="text" id="ingredientUsesInput" maxlength="160" placeholder="e.g., serums, moisturisers, toners" autocomplete="off">
+                                <div class="field-sources" data-field-sources="commonUses" hidden></div>
+                            </div>
+
+                            <div class="field full" role="group" aria-labelledby="highlightsLabel">
+                                <div class="label-row">
+                                    <span class="label-text" id="highlightsLabel">Highlights</span>
+                                    <span class="label-actions"><button type="button" class="icon-btn small list-edit" data-list-edit="highlights" aria-label="Edit the highlights list"><i data-icon="edit"></i></button></span>
+                                </div>
+                                <div class="checks pills">
+                                    <label class="check"><input type="checkbox" id="ingredientKeyActiveInput"> <span>Key active</span></label>
+                                    <label class="check"><input type="checkbox" id="ingredientUmbrellaInput"> <span>Umbrella term</span></label>
+                                </div>
+                                <div class="checks pills" id="highlightTagsChecks"></div>
+                            </div>
+                            <div class="field full" role="group" aria-labelledby="allergenLabel">
+                                <div class="label-row">
+                                    <span class="label-text" id="allergenLabel">Allergen Family</span>
+                                    <span class="label-actions"><span class="info-slot" data-info="A user who picked that allergen in the app is warned about this ingredient." data-info-label="About Allergen Family"></span><button type="button" class="icon-btn small list-edit" data-list-edit="allergens" aria-label="Edit the allergen families list"><i data-icon="edit"></i></button></span>
+                                </div>
+                                <div class="checks pills" id="allergenTagsChecks"></div>
+                            </div>
+                            <div class="field full">
+                                <div class="label-row"><label for="ingredientAllergyInput">Allergy risk with frequent use <span class="optional">(optional)</span></label></div>
+                                <input type="text" id="ingredientAllergyInput" maxlength="200" placeholder="e.g., May cause an allergic skin reaction in some people." autocomplete="off" aria-describedby="ingredientAllergyHint">
+                                <div class="hint-row"><p class="field-hint" id="ingredientAllergyHint">One plain sentence telling users this ingredient can cause an allergic reaction, taken from a regulator's classification. Leave it empty when no source lists one.</p></div>
+                                <div class="field-sources" data-field-sources="frequentAllergy" hidden></div>
+                            </div>
+
+                            <!-- ONE row per skin type and per condition, with three named choices: Avoid, Neutral, Good -->
+                            <div class="field full" role="group" aria-labelledby="skinTypesLabel">
+                                <div class="label-row"><span class="label-text" id="skinTypesLabel">Skin Types</span></div>
+                                <div class="fit-list" id="skinTypesFit"></div>
+                            </div>
+                            <div class="field full" role="group" aria-labelledby="conditionsLabel">
+                                <div class="label-row">
+                                    <span class="label-text" id="conditionsLabel">Skin Conditions</span>
+                                    <span class="label-actions"><span class="info-slot" data-info="Choose Avoid or Good only where this ingredient matters; leave the rest on Neutral." data-info-label="About Skin Conditions"></span><button type="button" class="icon-btn small list-edit" data-list-edit="conditions" aria-label="Edit the skin conditions list"><i data-icon="edit"></i></button></span>
+                                </div>
+                                <div class="fit-list" id="conditionsFit"></div>
+                            </div>
+                        </div>
+                    </section>
                 </div>
 
-                <p class="form-error" role="alert"></p>
-
-                <div class="modal-actions">
-                    <button type="button" id="cancelModalBtn" class="cancel-btn" data-close>Cancel</button>
-                    <button type="submit" id="saveIngredientBtn" class="save-btn">Save Ingredient</button>
-                </div>
+                <footer class="ing-foot">
+                    <p class="form-error" role="alert"></p>
+                    <div class="modal-actions">
+                        <button type="button" id="cancelModalBtn" class="cancel-btn" data-close>Cancel</button>
+                        <button type="submit" id="saveIngredientBtn" class="save-btn">Save Ingredient</button>
+                    </div>
+                </footer>
             </form>
         </div>
     </div>

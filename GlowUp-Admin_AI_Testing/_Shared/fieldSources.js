@@ -1,46 +1,89 @@
-// "Find it yourself" for the Ingredient form: for each box, which dictionaries/databases hold its value, what to look for
-// there, and what to do with it. PURE logic (no page, no network) so tests/fieldSources.test.mjs can check it.
+// Sources for the Ingredient form: for each box, which dictionaries/databases hold its value, what to look for there, and
+// where the link goes. PURE logic (no page) so tests/fieldSources.test.mjs can check it; the one network call (PubChem's
+// name -> compound number) is made by the page, with the helpers below.
 //
-// The work stays by hand: the admin opens a source, finds the value, and types or pastes it. Nothing here fetches,
-// scrapes or fills a box. The paste helpers only tidy text the admin pastes (spaces, line breaks, list separators).
+// LINK POLICY (2026-11-10)
+//   * Every link goes to the source's OWN site (the allowlist below). Never a search engine, in any link or fallback.
+//   * Three kinds of link, each tested by scripts/verify-source-links.mjs before it is shipped:
+//       landing  the site's home or search page. Always works, is not about this ingredient. The INCI name is copied when it is
+//                opened (copyName), so it can be pasted into the site's own search box.
+//       search   the site's OWN search page, built from the INCI name through a plain GET address that shows results without
+//                scripts (COSMILE Europe, CosmeticsInfo.org, CosIng Checker). Opens the results for this name.
+//       page     the page of THIS ingredient (PubChem's compound page; the compound number is looked up with PubChem's documented
+//                PUG REST service). Only a page can be added to Reference links with "+ ref": a landing or search page is not a source.
+//   * Tried and NOT shipped (the script showed it): CIR /ingredients/<slug> answers 200 for any word, including nonsense, with the
+//     same generic page; CosIng's details/<id> and CosmeticsInfo's /ingredient/<slug>/ need the site's own internal name or id
+//     (404 for names it does not have); INCIpedia and CosIng are script-driven with no address for a name; the ECHA site answers
+//     403 to a script, so ECHA CHEM is linked instead.
+//
+// The work stays by hand: the admin opens a source, finds the value, and types or pastes it. Nothing fetches, scrapes or fills
+// a box. The paste helpers only tidy text the admin pastes (spaces, line breaks, list separators).
 
-const google = (host, name, extra) => `https://www.google.com/search?q=${encodeURIComponent("site:" + host + " " + name + (extra || ""))}`;
+/** The only hosts a source link may have (a sub-site of one is fine: www.cir-safety.org, chem.echa.europa.eu). */
+export const ALLOWED_HOSTS = [
+    "ec.europa.eu", "single-market-economy.ec.europa.eu", "cosmileeurope.eu", "cir-safety.org", "pubchem.ncbi.nlm.nih.gov",
+    "incipedia.personalcarecouncil.org", "cosmeticsinfo.org", "cosingchecker.com", "echa.europa.eu", "eur-lex.europa.eu"
+];
+export const SEARCH_ENGINES = ["google.", "bing.", "duckduckgo.", "yahoo.", "yandex.", "baidu.", "ecosia.", "startpage.", "brave.com", "search."];
+
+/** true when `url` is https, has no user name, and its host is an allowed one (not a search engine). */
+export function hostAllowed(url) {
+    let parsed;
+    try { parsed = new URL(String(url)); } catch (error) { return false; }
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password) return false;
+    const host = parsed.hostname.toLowerCase();
+    if (SEARCH_ENGINES.some((engine) => host.includes(engine))) return false;
+    return ALLOWED_HOSTS.some((allowed) => host === allowed || host.endsWith("." + allowed));
+}
+
+const enc = encodeURIComponent;
 
 /**
- * Every source. `url(name)` = the link opened; `deep` = that link is built from the INCI name (the page already shows the
- * search for it), so the name need not be copied. `ref(name)` = the page to keep in Reference links: the ingredient's own results page where the link is that, else the site's home ("" = none).
+ * Every source. `landing` = the site's own page that always works. `search(name)` = the site's own search results for the name
+ * (only where a plain GET address was tested). `copyName` = a landing page with a search box: the name is copied when it is
+ * opened. `kind` = what the link is for the admin: "page" (PubChem, resolved on click), "search" or "landing".
  */
 export const SOURCES = {
-    cosing: { label: "EU CosIng", deep: true, url: (name) => google("ec.europa.eu", name, " cosing"), ref: () => "https://ec.europa.eu/growth/tools-databases/cosing/" },
-    incipedia: { label: "INCIpedia", deep: false, url: () => "https://incipedia.personalcarecouncil.org/", ref: () => "https://incipedia.personalcarecouncil.org/" },
-    cosmile: { label: "COSMILE Europe", deep: true, url: (name) => `https://cosmileeurope.eu/inci/results/?q=${encodeURIComponent(name)}`, ref: (name) => SOURCES.cosmile.url(name) },
-    cir: { label: "Cosmetic Ingredient Review", deep: true, url: (name) => google("cir-safety.org", name), ref: () => "https://www.cir-safety.org/" },
-    pubchem: { label: "PubChem (NIH)", deep: true, url: (name) => `https://pubchem.ncbi.nlm.nih.gov/#query=${encodeURIComponent(name)}`, ref: (name) => SOURCES.pubchem.url(name) },
-    cosmeticsinfo: { label: "CosmeticsInfo.org", deep: true, url: (name) => google("cosmeticsinfo.org", name), ref: () => "https://www.cosmeticsinfo.org/" },
-    echa: { label: "ECHA C&L Inventory (EU)", deep: false, url: () => "https://echa.europa.eu/information-on-chemicals/cl-inventory-database", ref: () => "https://echa.europa.eu/information-on-chemicals/cl-inventory-database" },
-    fragrance: { label: "EU fragrance allergen list", deep: true, url: () => "https://single-market-economy.ec.europa.eu/sectors/cosmetics/cosmetic-products-specific-topics/fragrance-allergens-labelling_en", ref: () => "https://single-market-economy.ec.europa.eu/sectors/cosmetics/cosmetic-products-specific-topics/fragrance-allergens-labelling_en" },
-    checker: { label: "CosIng Checker (unofficial)", deep: true, url: (name) => `https://www.google.com/search?q=${encodeURIComponent("CosIng checker " + name)}`, ref: () => "" }
+    cosing: { label: "EU CosIng", kind: "landing", copyName: true, landing: "https://ec.europa.eu/growth/tools-databases/cosing/" },
+    incipedia: { label: "INCIpedia", kind: "landing", copyName: true, landing: "https://incipedia.personalcarecouncil.org/" },
+    cosmile: { label: "COSMILE Europe", kind: "search", landing: "https://cosmileeurope.eu/", search: (name) => `https://cosmileeurope.eu/inci/results/?q=${enc(name)}` },
+    cir: { label: "Cosmetic Ingredient Review", kind: "landing", copyName: true, landing: "https://www.cir-safety.org/ingredients" },
+    pubchem: { label: "PubChem (NIH)", kind: "page", copyName: true, landing: "https://pubchem.ncbi.nlm.nih.gov/" },
+    cosmeticsinfo: { label: "CosmeticsInfo.org", kind: "search", landing: "https://www.cosmeticsinfo.org/", search: (name) => `https://www.cosmeticsinfo.org/?s=${enc(name)}` },
+    echa: { label: "ECHA CHEM (EU)", kind: "landing", copyName: true, landing: "https://chem.echa.europa.eu/" },
+    fragrance: { label: "EU fragrance allergen list", kind: "landing", copyName: false, landing: "https://single-market-economy.ec.europa.eu/sectors/cosmetics/cosmetic-products-specific-topics/fragrance-allergens-labelling_en" },
+    checker: { label: "CosIng Checker (unofficial)", kind: "search", landing: "https://cosingchecker.com/", search: (name) => `https://cosingchecker.com/search?q=${enc(name)}` }
+};
+
+/** What a bare address in Reference links is called (the longest matching host wins). */
+export const HOST_LABELS = {
+    "cir-safety.org": "Cosmetic Ingredient Review",
+    "ec.europa.eu": "EU CosIng",
+    "single-market-economy.ec.europa.eu": "European Commission",
+    "pubchem.ncbi.nlm.nih.gov": "PubChem (NIH)",
+    "cosmileeurope.eu": "COSMILE Europe",
+    "incipedia.personalcarecouncil.org": "INCIpedia",
+    "cosmeticsinfo.org": "CosmeticsInfo.org",
+    "cosingchecker.com": "CosIng Checker (unofficial)",
+    "echa.europa.eu": "ECHA",
+    "eur-lex.europa.eu": "EUR-Lex"
 };
 
 const ADMIN_JUDGMENT = "Admin judgment. Add your evidence in Reference links.";
 
-/** Per box: `sources` = [source id, what to look for there], `helper` = one line under the guide. */
+/** The name of each box, as the admin reads it (used for "Used for: ..." in the Reference links source list). */
+export const FIELD_LABELS = {
+    purpose: "Purpose", description: "User-Friendly Definition",
+    chemicalDescription: "What the chemical is", aliases: "Also Known As", cautionNote: "Caution Note", commonUses: "Commonly Used In",
+    allergens: "Allergen Family", frequentAllergy: "Allergy risk with frequent use"
+};
+
+/**
+ * Per box: `sources` = [source id, what to look for there], `helper` = one line under the list, `title` = a line above it.
+ * Only boxes whose text is WRITTEN from a source have an entry. The INCI name, the classification and the allergen family are typed
+ * or chosen from a list, so they have no Sources row (the admin's rule of 2026-11-10).
+ */
 export const FIELD_GUIDE = {
-    name: {
-        sources: [
-            ["cosing", "Search the name, open the entry, copy \"INCI name\"."],
-            ["incipedia", "Search, copy the INCI name (sign-in required)."],
-            ["cosmile", "Search, copy the INCI name as shown."]
-        ]
-    },
-    classification: {
-        title: "Choose from the dropdown, do not paste",
-        sources: [
-            ["cosing", "Check the \"Restriction\" field. Empty = no EU restriction listed. Otherwise note the Annex."],
-            ["cir", "Open the ingredient's report, read the conclusion (safe as used / safe with qualifications / insufficient data / unsafe)."],
-            ["pubchem", "Open the \"Classification\" section for the chemical family."]
-        ]
-    },
     purpose: {
         sources: [
             ["cosing", "Copy the \"Function\" value(s). These are short terms like PRESERVATIVE or HUMECTANT, not sentences."],
@@ -72,7 +115,7 @@ export const FIELD_GUIDE = {
     },
     sources: {
         sources: [],
-        helper: "Copy the page address from the browser address bar of the page you used, or use the \"+ ref\" buttons next to the links above."
+        helper: "Paste the page address from the browser address bar of the page you used. A bare address gets its label when you leave the box."
     },
     cautionNote: {
         sources: [
@@ -86,17 +129,11 @@ export const FIELD_GUIDE = {
             ["cosmeticsinfo", "Copy the product types listed for the ingredient."]
         ]
     },
-    allergens: {
-        sources: [
-            ["cosing", "Annex III entries: check whether the ingredient appears as a fragrance allergen or in another family; pick the matching chip."],
-            ["checker", "Same check; pick the matching chip."]
-        ]
-    },
     frequentAllergy: {
-        title: "Optional. Leave empty when no source lists a risk",
+        title: "Optional. Leave empty when no source lists a risk.",
         sources: [
             ["echa", "Search the name or CAS number (see Also Known As). If the classification lists H317, the official statement is \"May cause an allergic skin reaction\"."],
-            ["pubchem", "Open the compound page, then Safety and Hazards, GHS Classification. Look for H317 (the same statement, easier to search by name)."],
+            ["pubchem", "Open the compound page, then Safety and Hazards, GHS Classification. Look for H317 (the same statement)."],
             ["fragrance", "For a fragrance ingredient: check whether it is on the EU list of fragrance allergens (named on labels because it can cause contact allergy)."]
         ],
         helper: "Write one plain sentence from what the source says, e.g. \"May cause an allergic skin reaction in some people.\" The EU classification is for the ingredient itself; the chance of a reaction in a finished product depends on the amount. Keep the page in Reference links."
@@ -104,13 +141,56 @@ export const FIELD_GUIDE = {
     judgment: { sources: [], helper: ADMIN_JUDGMENT }
 };
 
-/** The links of one box for an INCI name: [{ id, label, url, ref, deep, lookFor }]. Every link is https. */
+/**
+ * The links of one box for an INCI name: [{ id, label, kind, url, lookFor, copyName, canRef }]. `url` is what opens (the search
+ * results for a "search" source, else the landing page; PubChem's page address is looked up when it is clicked). `canRef` = a "+ ref"
+ * button is enabled: only for a "page" source. Every url passes hostAllowed().
+ */
 export function linksFor(field, name) {
     const guide = FIELD_GUIDE[field];
     const clean = cleanLine(name);
     if (!guide || clean.length < 2) return [];
-    return guide.sources.map(([id, lookFor]) => ({ id, label: SOURCES[id].label, url: SOURCES[id].url(clean), ref: SOURCES[id].ref(clean), deep: SOURCES[id].deep, lookFor }));
+    return guide.sources.map(([id, lookFor]) => linkOf(id, clean, lookFor));
 }
+
+export function linkOf(id, name, lookFor = "") {
+    const source = SOURCES[id];
+    return {
+        id, label: source.label, kind: source.kind, lookFor,
+        url: source.kind === "search" ? source.search(name) : source.landing,
+        copyName: source.kind !== "search" && source.copyName === true,
+        canRef: source.kind === "page"
+    };
+}
+
+/** Each distinct source used by any box, with the boxes it serves: [{ ...link, usedFor: ["Purpose", ...] }] (the Reference links list). */
+export function allSourcesFor(name) {
+    const clean = cleanLine(name);
+    if (clean.length < 2) return [];
+    const used = new Map();
+    Object.entries(FIELD_GUIDE).forEach(([field, guide]) => guide.sources.forEach(([id]) => {
+        if (!used.has(id)) used.set(id, []);
+        used.get(id).push(FIELD_LABELS[field]);
+    }));
+    return Array.from(used, ([id, boxes]) => ({ ...linkOf(id, clean), usedFor: boxes }));
+}
+
+/** Every address this file can make for a name (the test checks each one against the allowlist). */
+export function everyGeneratedUrl(name) {
+    return Object.keys(SOURCES).flatMap((id) => [SOURCES[id].landing].concat(SOURCES[id].search ? [SOURCES[id].search(name)] : []));
+}
+
+// ----------------------------------------------------------------------------------------------------------------
+// PubChem: the page of THIS ingredient
+// ----------------------------------------------------------------------------------------------------------------
+/** PubChem's documented PUG REST address that answers a name with its compound number(s), one per line. */
+export const pubchemLookupUrl = (name) => `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${enc(cleanLine(name))}/cids/TXT`;
+/** The first compound number of the answer, or 0. */
+export function firstCompoundId(text) {
+    const first = String(text || "").trim().split(/\s+/)[0];
+    return /^[1-9][0-9]{0,11}$/.test(first) ? Number(first) : 0;
+}
+export const pubchemPageUrl = (cid) => `https://pubchem.ncbi.nlm.nih.gov/compound/${Number(cid)}`;
 
 // ----------------------------------------------------------------------------------------------------------------
 // Reference links: "Label | https://address", one per line
@@ -132,6 +212,28 @@ export function addReference(current, label, url, maxLength = 900) {
     const next = lines.concat(`${String(label).replace(/\s*\|\s*/g, " ").trim()} | ${address}`).join("\n");
     if (next.length > maxLength) return { text, added: false, reason: "full" };
     return { text: next, added: true, reason: "" };
+}
+
+/** The label of a known host (the longest matching host wins), or "". */
+export function labelForHost(host) {
+    const name = String(host || "").toLowerCase().replace(/^www\./, "");
+    const known = Object.keys(HOST_LABELS).filter((h) => name === h || name.endsWith("." + h)).sort((a, b) => b.length - a.length)[0];
+    return known ? HOST_LABELS[known] : "";
+}
+
+/**
+ * Every line that is only an https address and comes from a known site gets its label: "https://..." -> "Label | https://...".
+ * Lines that already have a label, unknown sites, and anything that is not an https address are left as they are.
+ */
+export function labelBareUrls(text) {
+    return String(text || "").split(/\r?\n/).map((line) => {
+        const bare = line.trim();
+        if (!/^https:\/\/[^\s"'<>|]+$/i.test(bare)) return line;
+        let host = "";
+        try { const parsed = new URL(bare); if (parsed.username || parsed.password) return line; host = parsed.hostname; } catch (error) { return line; }
+        const label = labelForHost(host);
+        return label ? `${label} | ${bare}` : line;
+    }).join("\n");
 }
 
 // ----------------------------------------------------------------------------------------------------------------
@@ -164,7 +266,7 @@ export const NOTES = {
 };
 
 /**
- * What a paste into a box does. `kind` = "purpose" | "description" | "chemical" | "aliases" | "name".
+ * What a paste into a box does. `kind` = "purpose" | "description" | "chemical" | "aliases" | "name" | "allergy".
  * Returns { text, note } : the text to insert (the pasted part only) and a non-blocking notice ("" = none).
  */
 export function pasteResult(kind, pasted) {

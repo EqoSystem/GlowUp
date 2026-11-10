@@ -628,13 +628,6 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .field textarea { resize: vertical; line-height: 1.45; }
 .field-hint { font-size: var(--fs-xs); color: var(--muted); line-height: 1.4; }
 .field-hint.warn { color: var(--warn); }
-.find-item { white-space: normal; }
-.ref-add { font: inherit; font-size: var(--fs-xs); line-height: 1.2; padding: 1px 7px; margin-left: 2px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); color: var(--text-2); cursor: pointer; }
-.ref-add:hover { border-color: var(--accent-text); color: var(--accent-text); }
-.how-to-fill { font-size: var(--fs-xs); color: var(--muted); }
-.how-to-fill summary { cursor: pointer; width: max-content; color: var(--text-2); font-weight: 550; }
-.how-to-fill ul { margin: 6px 0 4px; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; line-height: 1.4; }
-.how-to-fill .field-hint { display: block; margin-top: 2px; }
 .form-section { border-top: 1px solid var(--border); padding-top: 14px; display: flex; flex-direction: column; gap: 14px; }
 .form-section-title { font-size: var(--fs-sm); font-weight: 650; color: var(--accent-text); text-transform: uppercase; letter-spacing: .5px; }
 /* two boxes side by side start on the same line, read left to right; one column on a narrow window */
@@ -1889,3 +1882,191 @@ body:has(> .modal-overlay[style*="flex"]) .toast-host { bottom: 96px; }
     .kb-modal { animation: none; }
     .kb-test .kb-bar { animation: none; }
 }
+
+/* =====================================================================================================================
+   THE ADD / EDIT INGREDIENT WINDOW (10 November 2026)
+   One column of three flex parts (header, section bar, form = scrolling body + footer), so the footer is never laid over a field.
+   One field pattern everywhere: label row (label left, info and edit icons right) / control / hint line (hint left, counter right) /
+   one "Sources (N)" row. A 12-column grid with the spacing steps 4, 8, 12, 16, 24, 32 only. Radius: boxes and buttons 8, section
+   cards 12, the window 16, chips fully round. Brand pink: the Save button and the active marker only. Colours below were measured
+   against WCAG AA (text 4.5:1, borders and focus rings 3:1) in both themes: see scripts/contrast-check.mjs.
+   ===================================================================================================================== */
+#addIngredientModal {
+    --im-input-bg: #1d1d24; --im-border: #8b8894; --im-hint: #b0adb8; --im-placeholder: #a8a5b0; --im-link: #86b7f7; --im-danger: #ff8a8a;
+    --im-selected: #4a2433; --im-text: #f2f1f4;
+}
+:root[data-theme="light"] #addIngredientModal {
+    --im-input-bg: #ffffff; --im-border: #857a7d; --im-hint: #6a5e61; --im-placeholder: #6f6366; --im-link: #1f5fae; --im-danger: #b42323;
+    --im-selected: #f9e3ea; --im-text: #2b2426;
+}
+#addIngredientModal .ing-modal {
+    width: min(760px, 100%); max-height: 100%; padding: 0; overflow: hidden; display: flex; flex-direction: column; border-radius: 16px;
+    font-size: 14px; line-height: 1.45; overflow-wrap: anywhere;
+}
+.ing-head { flex: none; display: flex; align-items: flex-start; gap: 16px; padding: 24px 24px 12px; }
+.ing-head-text { flex: 1; min-width: 0; }
+.ing-head h3 { margin: 0; font-size: 20px; font-weight: 600; line-height: 1.3; color: var(--text); }
+.ing-head .modal-intro { margin: 4px 0 0; font-size: 13px; line-height: 1.45; color: var(--im-hint); }
+.ing-close { width: 32px; height: 32px; border-radius: 8px; flex: none; color: var(--im-hint); }
+
+/* the section bar: always in view above the scrolling body; the section being read is marked */
+.ing-nav { flex: none; display: flex; flex-wrap: wrap; gap: 8px; padding: 0 24px 12px; border-bottom: 1px solid var(--border); }
+.ing-nav-btn {
+    flex: none; min-height: 32px; padding: 4px 12px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text-2);
+    font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;
+}
+.ing-nav-btn:hover { background: var(--surface-2); }
+.ing-nav-btn[aria-current="true"] { color: var(--accent-text); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); font-weight: 600; }
+.ing-nav-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.ing-form { flex: 1 1 auto; min-height: 0; margin: 0; padding: 0; gap: 0; display: flex; flex-direction: column; }
+.ing-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 24px 24px 32px; scroll-padding: 16px 0 24px; display: flex; flex-direction: column; gap: 32px; }
+.ing-body > .review-note { margin: 0; }
+.ing-section { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.ing-section + .ing-section { border-top: 1px solid var(--border); padding-top: 32px; }
+.ing-section-title { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--text); text-transform: none; letter-spacing: 0; }
+.ing-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 24px 16px; align-items: start; }
+.ing-grid > * { min-width: 0; }
+.ing-grid > .full { grid-column: 1 / -1; }
+.ing-grid > .half { grid-column: span 6; }
+.ing-modal .section-note { margin: -8px 0 0; }
+
+/* the field pattern */
+.ing-modal .field { display: flex; flex-direction: column; gap: 0; min-width: 0; }
+.label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; margin-bottom: 2px; min-width: 0; }
+.label-row > label, .label-row > .label-text { font-size: 14px; font-weight: 600; line-height: 1.3; color: var(--text); min-width: 0; display: block; }
+.label-row .optional { font-size: 13px; font-weight: 400; color: var(--im-hint); }
+.label-row .required { color: var(--im-danger); font-weight: 600; }
+.label-actions { display: inline-flex; align-items: center; gap: 8px; flex: none; }
+.label-actions .info-slot { margin: 0; display: inline-flex; vertical-align: baseline; }
+.label-actions .icon-btn, .label-actions .guide-badge {
+    width: 32px; height: 32px; min-width: 32px; border-radius: 8px; padding: 0; display: inline-grid; place-items: center;
+    border: 1px solid var(--border); background: transparent; color: var(--im-hint); font-size: 14px; transform: none;
+}
+.label-actions .icon-btn svg.ic { width: 16px; height: 16px; }
+.label-actions .icon-btn:hover, .label-actions .guide-badge:hover { background: var(--surface-2); color: var(--text); transform: none; }
+.label-actions .icon-btn:focus-visible, .label-actions .guide-badge:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.ing-modal input[type="text"], .ing-modal input[type="number"], .ing-modal select:not(.combo-native), .ing-modal textarea, .ing-modal .combo-btn {
+    width: 100%; min-width: 0; min-height: 40px; padding: 8px 12px; border: 1px solid var(--im-border); border-radius: 8px;
+    background: var(--im-input-bg); color: var(--im-text); font: inherit; font-size: 15px; font-weight: 400; line-height: 1.4;
+}
+.ing-modal select.combo-native { width: 1px; height: 1px; min-height: 0; padding: 0; border: 0; }       /* the real list behind the drop-down box stays invisible */
+.ing-modal textarea { min-height: 96px; resize: vertical; }
+.ing-modal input::placeholder, .ing-modal textarea::placeholder { color: var(--im-placeholder); opacity: 1; }
+.ing-modal .combo-btn.is-placeholder .combo-label { color: var(--im-placeholder); }
+.ing-modal input:focus-visible, .ing-modal select:not(.combo-native):focus-visible, .ing-modal textarea:focus-visible, .ing-modal .combo-btn:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px; border-color: var(--accent);
+}
+#addIngredientModal .ing-modal [aria-invalid="true"] { border-color: var(--im-danger); box-shadow: 0 0 0 1px var(--im-danger); }
+.hint-row { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 4px 12px; margin-top: 6px; min-width: 0; }
+.ing-modal .field-hint { margin: 0; font-size: 13px; font-weight: 400; line-height: 1.45; color: var(--im-hint); min-width: 0; }
+.hint-row .field-hint { flex: 1 1 220px; }
+.hint-row .counter { margin-left: auto; flex: none; font-size: 13px; color: var(--im-hint); font-variant-numeric: tabular-nums; }
+.ing-modal .field-hint.warn { color: var(--im-danger); }
+.ing-modal .paste-note { margin-top: 6px; }
+.ing-modal .name-clash { margin: 0; }
+
+/* Sources (N): one closed row under a box; inside, one list: source | what to look for | + ref */
+.ing-modal .field-sources { margin-top: 8px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.ing-modal .field-sources[hidden] { display: none; }
+.ing-modal .definition-basis { margin: 0; font-size: 13px; line-height: 1.45; color: var(--im-hint); }
+.ing-modal .source-link { color: var(--im-link); text-decoration: underline; text-underline-offset: 2px; }
+.ing-modal .source-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.sources-box { border: 1px solid var(--border); border-radius: 8px; min-width: 0; }
+.sources-box > summary {
+    display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 4px 12px; cursor: pointer; list-style: none;
+    font-size: 13px; font-weight: 600; color: var(--text-2); border-radius: 8px;
+}
+.sources-box > summary::-webkit-details-marker { display: none; }
+.sources-box > summary::before { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--im-hint); border-bottom: 2px solid var(--im-hint); transform: rotate(-45deg); transition: transform .15s var(--ease); flex: none; }
+.sources-box[open] > summary::before { transform: rotate(45deg); }
+.sources-box > summary:hover { background: var(--surface-2); }
+.sources-box > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.source-list { list-style: none; margin: 0; padding: 0 12px; display: flex; flex-direction: column; }
+.source-row { display: grid; grid-template-columns: minmax(120px, 190px) minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; padding: 8px 0; border-top: 1px solid var(--border); min-width: 0; }
+.source-name { font-size: 13px; font-weight: 500; min-width: 0; }
+.source-name .site-hint { display: inline-block; font-size: 12px; font-weight: 400; color: var(--im-hint); }
+.source-look { font-size: 13px; line-height: 1.45; color: var(--text-2); min-width: 0; }
+.source-act { justify-self: end; }
+.ref-add {
+    min-height: 32px; padding: 0 12px; border: 1px solid var(--im-border); border-radius: 8px; background: var(--im-input-bg); color: var(--text);
+    font: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.ref-add:hover:not(:disabled) { background: var(--surface-2); }
+.ref-add:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ref-add:disabled { cursor: not-allowed; color: var(--im-hint); border-style: dashed; opacity: .75; }
+.sources-box > .field-hint { padding: 0 12px 8px; }
+.sources-box > .field-hint:first-of-type { padding-top: 8px; }
+
+/* chips: outline when off, filled with a check when on (never colour alone) */
+.ing-modal .checks.pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.ing-modal .checks.pills + .checks.pills { margin-top: 8px; }
+.ing-modal .checks.pills:empty { display: none; }
+.ing-modal .checks.pills .check {
+    position: relative; display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 4px 12px; border: 1px solid var(--im-border);
+    border-radius: 999px; background: transparent; color: var(--text); font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.ing-modal .checks.pills .check:hover { background: var(--surface-2); }
+.ing-modal .checks.pills .check:has(input:checked) { background: var(--im-selected); border-color: var(--accent); color: var(--im-text); font-weight: 600; }
+.ing-modal .checks.pills .check:has(input:checked)::before { content: "\2713"; font-size: 12px; line-height: 1; }
+.ing-modal .checks.pills .check:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Skin Types and Skin Conditions: full-width tables, every row the same height; Avoid | Neutral | Good, fill plus icon when chosen */
+.ing-modal .fit-list { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.ing-modal .fit-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; min-height: 48px; margin: 0; padding: 8px 12px; border: 0; min-width: 0; font-size: 14px; }
+.ing-modal .fit-row + .fit-row { border-top: 1px solid var(--border); }
+.ing-modal .fit-name { min-width: 0; flex: 1 1 140px; color: var(--text); font-weight: 500; }
+.ing-modal .fit-choices { display: inline-flex; flex: none; gap: 0; padding: 0; border: 1px solid var(--im-border); border-radius: 8px; background: transparent; overflow: hidden; }
+.ing-modal .fit-choice { position: relative; cursor: pointer; }
+.ing-modal .fit-choice span {
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px; min-width: 76px; min-height: 32px; padding: 0 12px; border-radius: 0;
+    font-size: 13px; font-weight: 500; color: var(--text-2);
+}
+.ing-modal .fit-choice + .fit-choice span { border-left: 1px solid var(--im-border); }
+.ing-modal .fit-choice:hover span { background: var(--surface-2); color: var(--text); }
+.ing-modal .fit-choice input:checked + span { color: var(--im-text); font-weight: 600; }
+.ing-modal .fit-choice.avoid input:checked + span { background: color-mix(in srgb, var(--bad) 24%, transparent); }
+.ing-modal .fit-choice.none input:checked + span { background: var(--surface-3); }
+.ing-modal .fit-choice.good input:checked + span { background: color-mix(in srgb, var(--ok) 24%, transparent); }
+.ing-modal .fit-choice.avoid input:checked + span::before { content: "\2715"; font-size: 11px; }
+.ing-modal .fit-choice.none input:checked + span::before { content: "\2022"; font-size: 13px; }
+.ing-modal .fit-choice.good input:checked + span::before { content: "\2713"; font-size: 12px; }
+.ing-modal .fit-choice input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* the footer is a flex sibling of the body: it cannot cover a field. The message of a failed save sits in it, with an icon. */
+.ing-foot { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 24px 16px; border-top: 1px solid var(--border); background: var(--surface); }
+#addIngredientModal .ing-foot .form-error {
+    position: static; margin: 0; padding: 8px 12px; font-size: 13px; line-height: 1.45; color: var(--im-danger); border-radius: 8px;
+    background: color-mix(in srgb, var(--bad) 10%, var(--surface)); border: 1px solid var(--im-danger); overflow-wrap: anywhere;
+}
+#addIngredientModal .ing-foot .form-error::before { content: "\26A0\FE0E"; margin-right: 8px; font-weight: 700; }
+#addIngredientModal .ing-foot .modal-actions { position: static; margin: 0; padding: 0; border: 0; background: none; display: flex; justify-content: flex-end; gap: 8px; }
+.ing-foot .cancel-btn, .ing-foot .save-btn { min-height: 40px; padding: 0 16px; border-radius: 8px; font-size: 14px; font-weight: 600; }
+.ing-foot .cancel-btn { background: var(--surface-2); color: var(--text); border: 1px solid var(--im-border); }
+.ing-foot .cancel-btn:focus-visible, .ing-foot .save-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ing-foot .save-btn { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); }
+
+/* a toast never sits over Save or Cancel: with this window open it is at the top, in the middle */
+body:has(> #addIngredientModal[style*="flex"]) .toast-host { top: 16px; bottom: auto; left: 50%; right: auto; transform: translateX(-50%); align-items: center; max-width: min(380px, calc(100vw - 32px)); }
+
+@media (pointer: coarse) {
+    .ing-close, .label-actions .icon-btn, .label-actions .guide-badge { width: 40px; height: 40px; min-width: 40px; }
+    .ref-add, .ing-nav-btn { min-height: 40px; }
+}
+@media (max-width: 767px) {
+    #addIngredientModal { padding: 8px; }
+    .ing-head { padding: 16px 16px 8px; }
+    .ing-nav { padding: 0 16px 8px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .ing-nav-btn { white-space: normal; text-align: center; line-height: 1.25; padding: 4px 8px; }
+    .ing-body { padding: 16px 16px 24px; }
+    .ing-foot { padding: 12px 16px; }
+    .ing-grid > .half { grid-column: 1 / -1; }
+    .ing-modal input[type="text"], .ing-modal input[type="number"], .ing-modal select:not(.combo-native), .ing-modal textarea, .ing-modal .combo-btn { font-size: 16px; }
+    .source-row { grid-template-columns: minmax(0, 1fr) auto; }
+    .source-look { grid-column: 1 / -1; grid-row: 2; }
+    .ing-modal .fit-choices { width: 100%; }
+    .ing-modal .fit-choice { flex: 1; }
+    .ing-modal .fit-choice span { min-width: 0; width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) { .sources-box > summary::before { transition: none; } }

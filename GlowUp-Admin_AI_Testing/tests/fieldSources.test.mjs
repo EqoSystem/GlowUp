@@ -11,20 +11,73 @@ let checks = 0, failed = 0;
 const check = (ok, what) => { checks++; if (!ok) { failed++; console.log("FAILED: " + what); } };
 const equal = (got, expected, what) => check(JSON.stringify(got) === JSON.stringify(expected), `${what} (got ${JSON.stringify(got)})`);
 
-// every box of the form has a guide; every source it names exists; every link is https
-["name", "classification", "purpose", "description", "chemicalDescription", "aliases", "sources", "cautionNote", "commonUses", "allergens", "frequentAllergy", "judgment"].forEach((field) => {
+// every box of the form has a guide; every source it names exists
+const FIELDS = ["purpose", "description", "chemicalDescription", "aliases", "sources", "cautionNote", "commonUses", "frequentAllergy", "judgment"];
+// the INCI name, the classification and the allergen family are typed or chosen: no Sources row for them
+["name", "classification", "allergens"].forEach((field) => check(!f.FIELD_GUIDE[field] && f.linksFor(field, "Aqua").length === 0, `no sources for ${field}`));
+FIELDS.forEach((field) => {
     check(!!f.FIELD_GUIDE[field], `guide for ${field}`);
     f.FIELD_GUIDE[field].sources.forEach(([id, look]) => check(!!f.SOURCES[id] && look.length > 10, `${field}: source ${id} and its instruction`));
-    f.linksFor(field, "Sodium Hyaluronate").forEach((l) => check(/^https:\/\//.test(l.url) && (l.ref === "" || /^https:\/\//.test(l.ref)), `${field}/${l.id}: https links`));
 });
-equal(f.linksFor("name", "A"), [], "no links for a one-letter name");
-equal(f.linksFor("name", "Aqua").map((l) => l.id), ["cosing", "incipedia", "cosmile"], "INCI name sources, in order");
+
+// LINK POLICY: every address that can be made is https, on an allowed site, and never a search engine
+const NAMES = ["Glycerin", "Sodium Hyaluronate", "Aqua / Water", "1-Methylhydantoin-2-Imide", "Cafe & <b>x</b>", "a".repeat(80)];
+NAMES.forEach((name) => {
+    f.everyGeneratedUrl(name).forEach((url) => check(f.hostAllowed(url) && !/google|bing|duckduckgo|yahoo/i.test(new URL(url).hostname), `allowed host: ${url.slice(0, 80)}`));
+    FIELDS.forEach((field) => f.linksFor(field, name).forEach((l) => check(f.hostAllowed(l.url), `${field}/${l.id} link on an allowed host`)));
+    f.allSourcesFor(name).forEach((l) => check(f.hostAllowed(l.url), `reference list / ${l.id} link on an allowed host`));
+});
+check(!f.hostAllowed("https://www.google.com/search?q=cosing"), "google is refused");
+check(!f.hostAllowed("https://www.bing.com/search?q=x") && !f.hostAllowed("https://duckduckgo.com/?q=x"), "bing and duckduckgo are refused");
+check(!f.hostAllowed("http://cir-safety.org/"), "http is refused");
+check(!f.hostAllowed("https://cir-safety.org.evil.com/"), "a look-alike host is refused");
+check(!f.hostAllowed("https://cir-safety.org@evil.com/"), "a user name in front of the host is refused");
+check(f.hostAllowed("https://www.cir-safety.org/ingredients") && f.hostAllowed("https://chem.echa.europa.eu/"), "sub-sites of an allowed host are allowed");
+Object.values(f.SOURCES).forEach((s) => check(!s.landing.includes("google"), `${s.label}: no search engine in the landing address`));
+
+// link kinds and what they allow
+equal(f.linksFor("purpose", "A"), [], "no links for a one-letter name");
 equal(f.linksFor("purpose", "Aqua").map((l) => l.id), ["cosing", "cosmile"], "purpose sources");
 equal(f.linksFor("judgment", "Aqua"), [], "judgment boxes have no source");
 check(f.FIELD_GUIDE.judgment.helper === "Admin judgment. Add your evidence in Reference links.", "judgment helper text");
-check(f.linksFor("name", "Aqua").find((l) => l.id === "incipedia").deep === false, "INCIpedia has no deep link (the name is copied)");
-check(f.linksFor("name", "Aqua").find((l) => l.id === "cosmile").deep === true, "COSMILE links straight to the search");
-check(f.linksFor("name", "Aqua / Water").find((l) => l.id === "cosmile").url.endsWith("Aqua%20%2F%20Water"), "the name is URL-encoded");
+const byId = (field, id) => f.linksFor(field, "Aqua").find((l) => l.id === id);
+check(byId("aliases", "incipedia").kind === "landing" && byId("aliases", "incipedia").copyName === true, "INCIpedia: landing page, the name is copied");
+check(byId("purpose", "cosing").kind === "landing" && byId("purpose", "cosing").copyName === true, "CosIng: landing page, the name is copied");
+check(byId("purpose", "cosmile").kind === "search" && byId("purpose", "cosmile").copyName === false, "COSMILE: the site's own search, no copy needed");
+check(byId("purpose", "cosmile").url === "https://cosmileeurope.eu/inci/results/?q=Aqua", "COSMILE search address");
+check(byId("description", "cosmeticsinfo").url === "https://www.cosmeticsinfo.org/?s=Aqua", "CosmeticsInfo search address");
+check(f.SOURCES.checker.search("Aqua") === "https://cosingchecker.com/search?q=Aqua", "CosIng Checker search address");
+check(byId("frequentAllergy", "fragrance").kind === "landing" && byId("frequentAllergy", "fragrance").copyName === false, "the fragrance list is a page to read: no name copied");
+check(f.linksFor("purpose", "Aqua / Water").find((l) => l.id === "cosmile").url.endsWith("Aqua%20%2F%20Water"), "the name is URL-encoded");
+// "+ ref" is only for the page of THIS ingredient (PubChem), never a landing or a search page
+Object.keys(f.SOURCES).forEach((id) => check(f.linkOf(id, "Aqua").canRef === (id === "pubchem"), `+ ref only for PubChem's ingredient page (${id})`));
+// the Reference links source list: each source once, with the boxes it serves
+const all = f.allSourcesFor("Aqua");
+equal(new Set(all.map((l) => l.id)).size, all.length, "each source once in the reference list");
+check(all.find((l) => l.id === "cosing").usedFor.includes("Purpose") && all.find((l) => l.id === "cosing").usedFor.includes("What the chemical is"), "the list says what each source is used for");
+equal(f.allSourcesFor("A"), [], "no list for a one-letter name");
+
+// PubChem: the page of this ingredient
+equal(f.pubchemLookupUrl("Sodium  Hyaluronate"), "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/Sodium%20Hyaluronate/cids/TXT", "PubChem lookup address");
+equal(f.firstCompoundId("753\n1234\n"), 753, "first compound number");
+equal(f.firstCompoundId(""), 0, "empty answer = none");
+equal(f.firstCompoundId("<html>Not found</html>"), 0, "an error page is not a number");
+equal(f.firstCompoundId("0"), 0, "0 is not a compound");
+equal(f.pubchemPageUrl(753), "https://pubchem.ncbi.nlm.nih.gov/compound/753", "PubChem page address");
+check(f.hostAllowed(f.pubchemPageUrl(753)) && f.hostAllowed(f.pubchemLookupUrl("x")), "PubChem addresses are allowed");
+
+// bare addresses in Reference links get their label when the box is left
+equal(f.labelBareUrls("https://www.cir-safety.org/ingredients"), "Cosmetic Ingredient Review | https://www.cir-safety.org/ingredients", "CIR label");
+equal(f.labelBareUrls("https://pubchem.ncbi.nlm.nih.gov/compound/753"), "PubChem (NIH) | https://pubchem.ncbi.nlm.nih.gov/compound/753", "PubChem label");
+equal(f.labelBareUrls("https://cosmileeurope.eu/inci/results/?q=Aqua"), "COSMILE Europe | https://cosmileeurope.eu/inci/results/?q=Aqua", "COSMILE label");
+equal(f.labelBareUrls("https://ec.europa.eu/growth/tools-databases/cosing/"), "EU CosIng | https://ec.europa.eu/growth/tools-databases/cosing/", "CosIng label");
+equal(f.labelBareUrls("https://single-market-economy.ec.europa.eu/x"), "European Commission | https://single-market-economy.ec.europa.eu/x", "the longest host wins");
+equal(f.labelBareUrls("My note | https://www.cir-safety.org/x"), "My note | https://www.cir-safety.org/x", "a line with a label is left alone");
+equal(f.labelBareUrls("https://unknown-site.example/x"), "https://unknown-site.example/x", "an unknown site is left alone");
+equal(f.labelBareUrls("http://www.cir-safety.org/x"), "http://www.cir-safety.org/x", "http is not touched (it is refused on save)");
+equal(f.labelBareUrls("a\nhttps://cosingchecker.com/search?q=x\n\nb"), "a\nCosIng Checker (unofficial) | https://cosingchecker.com/search?q=x\n\nb", "other lines and blank lines stay");
+equal(f.labelBareUrls("https://cir-safety.org@evil.com/"), "https://cir-safety.org@evil.com/", "a user name before the host is left alone");
+
 
 equal(f.linksFor("frequentAllergy", "Aqua").map((l) => l.id), ["echa", "pubchem", "fragrance"], "allergy sources");
 equal(f.pasteResult("allergy", "  a  b ").text, "a b", "allergy paste is tidied");

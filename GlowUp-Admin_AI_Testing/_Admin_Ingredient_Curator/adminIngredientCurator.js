@@ -49,7 +49,7 @@ import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAs
 import { setPageSettings } from "../_Shared/adminSettingsMenu.js";
 import { loadClassifications, classifications, classificationName, openClassificationManager, askNewClassification, openFieldMigration, addStartingClassifications, TEST_MODE } from "../_Shared/adminClassifications.js";
 import { makeCombo } from "../_Shared/adminSelect.js";
-import { FIELD_GUIDE, SOURCES, linksFor, addReference, insertPaste } from "../_Shared/fieldSources.js";
+import { FIELD_GUIDE, SOURCES, linksFor, allSourcesFor, addReference, labelBareUrls, pubchemLookupUrl, firstCompoundId, pubchemPageUrl, insertPaste } from "../_Shared/fieldSources.js";
 import { aliasesWithInci, firstAlias, needsClassification, MAX_PURPOSE, CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING } from "../_Shared/classificationRules.js";
 
 const pageState = { page: 1, size: 10 };          // the list shows ten ingredients at a time
@@ -83,6 +83,7 @@ let productUse = new Map();           // ingredient key -> number of catalogue p
 let productUseKnown = false;
 let editingIngredientId = null;
 let modal = null;
+let markSection = () => {};          // moves the section bar's marker (set when the page starts)
 let fromProducts = [];                // ingredient names the inventory's products list that the Curator has no entry for: [{ key, name, products[] }]
 let fdaBrands = [];                   // the brands whose products were checked on the FDA Philippines list (for the helper line)
 let fieldFound = {};                 // pages Assist found for each box of the form: { purpose: [page], description: [page], ... }
@@ -254,6 +255,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("ingredientNameInput").addEventListener("input", showNameClash);
     el("ingredientNameInput").addEventListener("input", paintFieldSources);
     el("addIngredientForm").addEventListener("click", onFieldSourceClick);
+    el("addIngredientForm").addEventListener("toggle", onSourcesToggle, true);       // "toggle" does not bubble: caught on the way down
+    el("ingredientSourcesInput").addEventListener("blur", labelReferenceLinks);
+    markSection = wireSectionBar();
+    wireFocusTrap();
+    wireInvalidMarks();
     wirePasteTidy();
     el("ingredientAliasesInput").addEventListener("input", showNameClash);
     el("ingredientsList").addEventListener("click", onListClick);
@@ -756,9 +762,9 @@ function renderFit(container, group, options) {
     container.innerHTML = options.map((o, i) => {
         const name = `fit_${group}_${i}`;
         const choice = (value, label, cls, tip) => `<label class="fit-choice ${cls}"><input type="radio" aria-label="${tip}" name="${name}" value="${value}"${value === "" ? " checked" : ""}><span>${label}</span></label>`;
-        return `<div class="fit-row" data-value="${escapeHtml(o.value)}"><span class="fit-name">${escapeHtml(o.label)}</span><span class="fit-choices">`
-            + choice("avoid", "Avoid", "avoid", "The app warns users with this") + choice("", "&ndash;", "none", "No effect either way") + choice("good", "Good", "good", "The app counts it as a plus for users with this")
-            + `</span></div>`;
+        return `<fieldset class="fit-row" data-value="${escapeHtml(o.value)}"><legend class="sr-only">${escapeHtml(o.label)}</legend><span class="fit-name" aria-hidden="true">${escapeHtml(o.label)}</span><span class="fit-choices">`
+            + choice("avoid", "Avoid", "avoid", "The app warns users with this") + choice("", "Neutral", "none", "No effect either way") + choice("good", "Good", "good", "The app counts it as a plus for users with this")
+            + `</span></fieldset>`;
     }).join("");
 }
 
@@ -805,68 +811,173 @@ function assistSources(pages) {
 }
 
 /**
- * Under each box of the form that has a credible home: the page Assist took it from (when it did), and search pages of
- * credible sites the admin can open to find the same thing by hand and paste it. Nothing is fetched here.
+ * Under each box of the form that has a home in a dictionary or database: ONE "Sources (N)" row, closed until opened. Inside, one
+ * list: the source (a link to its own site), what to look for there, and "+ ref" (only for the page of THIS ingredient). The page
+ * Assist took a box's text from, and the source a definition rests on, stay above the row. Nothing is fetched here (see
+ * _Shared/fieldSources.js for what each link is).
  */
+const sourcesOpen = new Map();        // box name -> is its list open? (kept until the page is closed, so a repaint or the next ingredient does not fold it)
+try { JSON.parse(sessionStorage.getItem("glowup.curator.sourcesOpen") || "[]").forEach((field) => sourcesOpen.set(field, true)); } catch (error) { /* browser storage may be blocked */ }
+function rememberSources() {
+    try { sessionStorage.setItem("glowup.curator.sourcesOpen", JSON.stringify(Array.from(sourcesOpen).filter(([, open]) => open).map(([field]) => field))); } catch (error) { /* keep it in memory only */ }
+}
+
+function sourceRow(link, detail) {
+    const hint = link.kind === "search" ? "" : link.copyName ? ` <span class="site-hint">site search</span>` : ` <span class="site-hint">list</span>`;
+    const act = link.canRef
+        ? `<button type="button" class="ref-add" data-add-ref="${escapeHtml(link.id)}" aria-label="Add ${escapeHtml(link.label)} page of this ingredient to Reference links">+ ref</button>`
+        : `<button type="button" class="ref-add" disabled aria-disabled="true" aria-label="Add ${escapeHtml(link.label)} to Reference links (not available: no page of this ingredient)">+ ref</button>`;
+    return `<li class="source-row"><span class="source-name"><a class="source-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer" data-source="${escapeHtml(link.id)}">${escapeHtml(link.label)}</a>${hint}</span>`
+        + `<span class="source-look">${escapeHtml(detail)}</span><span class="source-act">${act}</span></li>`;
+}
+
 function paintFieldSources() {
     const name = el("ingredientNameInput").value.trim();
     document.querySelectorAll("[data-field-sources]").forEach((box) => {
         const field = box.dataset.fieldSources;
         const guide = FIELD_GUIDE[field];
-        const links = linksFor(field, name);
-        if (!guide || (guide.sources.length > 0 && links.length === 0)) { box.hidden = true; box.innerHTML = ""; return; }
-        const wasOpen = !!(box.querySelector("details") && box.querySelector("details").open);        // (the central list under Reference links starts open)       // typing in the name must not fold the guide
+        if (!guide) { box.hidden = true; box.innerHTML = ""; return; }
+        const helper = guide.helper ? `<p class="field-hint source-helper">${escapeHtml(guide.helper)}</p>` : "";
+        if (guide.sources.length === 0 && field !== "sources") { box.innerHTML = helper; box.hidden = !helper; return; }
+        const links = field === "sources" ? allSourcesFor(name) : linksFor(field, name);
+        if (links.length === 0) { box.hidden = true; box.innerHTML = ""; return; }
         const found = (fieldFound[field] || []).filter((page) => page && /^https:\/\//i.test(page.url || "")).map((page) =>
             `<a class="source-link" href="${escapeHtml(page.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(page.title || page.site || page.url)}</a> `
             + `<span class="chip source-kind${page.tone ? " " + page.tone : ""}">${escapeHtml(page.label || "Source")}</span>`);
         // the definition says which source it rests on, with that source's own words, so the admin can check it in one look
         const basis = field === "description" && definitionBasis && /^https:\/\//i.test(definitionBasis.url || "")
-            ? `<span class="definition-basis"><b>Based on:</b> <a class="source-link" href="${escapeHtml(definitionBasis.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(definitionBasis.title)}</a>`
+            ? `<p class="definition-basis"><b>Based on:</b> <a class="source-link" href="${escapeHtml(definitionBasis.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(definitionBasis.title)}</a>`
                 + (definitionBasis.quote ? ` <q>${escapeHtml(definitionBasis.quote)}</q>` : "")
                 + (definitionBasis.replaced && definitionBasis.replaced.length ? `<br><span class="warn-text">The AI's text named a use this source does not give (${escapeHtml(definitionBasis.replaced.join(", "))}), so the definition was written from the source instead.</span>` : "")
-                + `</span><br>` : "";
-        const helper = guide.helper ? `<span class="field-hint">${escapeHtml(guide.helper)}</span>` : "";
-        if (field === "sources") { box.innerHTML = helper + centralSourcesHtml(name, box.querySelector("details") ? wasOpen : true); box.hidden = false; return; }
-        if (links.length === 0) { box.innerHTML = helper; box.hidden = false; return; }
-        // a link with no search built from the name (INCIpedia) gets the name copied when it is clicked
-        const items = links.map((link) => `<span class="find-item"><a class="source-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"${link.deep ? "" : " data-copy-name"}>${escapeHtml(link.label)}</a>`
-            + (link.ref ? ` <button type="button" class="ref-add" data-add-ref="${escapeHtml(link.id)}" aria-label="Add ${escapeHtml(link.label)} to Reference links">+ ref</button>` : "") + `</span>`);
-        const how = links.map((link) => `<li><b>${escapeHtml(link.label)}:</b> ${escapeHtml(link.lookFor)}</li>`).join("");
-        box.innerHTML = `<span class="field-hint">` + basis + (found.length && !basis ? `<b>Where this box's text came from:</b> ${found.join(" · ")}<br>` : "")
-            + `Find it yourself: ${items.join(" · ")}</span>`
-            + `<details class="how-to-fill"${wasOpen ? " open" : ""}><summary>How to fill this</summary>${guide.title ? `<p class="field-hint"><b>${escapeHtml(guide.title)}.</b></p>` : ""}<ul>${how}</ul>${helper}</details>`;
+                + `</p>` : "";
+        const where = found.length && !basis ? `<p class="definition-basis"><b>Where this box's text came from:</b> ${found.join(" · ")}</p>` : "";
+        const rows = links.map((link) => sourceRow(link, field === "sources" ? "Used for: " + link.usedFor.join(", ") : link.lookFor)).join("");
+        const extra = (guide.title ? `<p class="field-hint"><b>${escapeHtml(guide.title)}</b></p>` : "") + helper
+            + `<p class="field-hint source-note">+ ref is only for a page of this ingredient. For any other source, find the ingredient on its site and paste the page address in Reference links.</p>`;
+        box.innerHTML = basis + where + `<details class="sources-box" data-sources-field="${escapeHtml(field)}"${sourcesOpen.get(field) ? " open" : ""}><summary>Sources (${links.length})</summary><ul class="source-list">${rows}</ul>${extra}</details>`;
         box.hidden = false;
     });
 }
 
-/** One central list for this ingredient: where each of the main boxes is looked up. Built from the central file; nothing is saved. */
-const CENTRAL_FIELDS = [["classification", "Ingredient classification"], ["purpose", "Purpose"], ["description", "User-Friendly Definition"], ["aliases", "Also Known As"], ["frequentAllergy", "Allergy risk with frequent use"]];
-function centralSourcesHtml(name, open) {
-    const rows = CENTRAL_FIELDS.map(([field, label]) => {
-        const links = linksFor(field, name).map((link) => `<a class="source-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"${link.deep ? "" : " data-copy-name"}>${escapeHtml(link.label)}</a>`);
-        return links.length ? `<li><b>${escapeHtml(label)}:</b> ${links.join(" · ")}</li>` : "";
-    }).join("");
-    return rows ? `<details class="how-to-fill central-sources"${open ? " open" : ""}><summary>Central sources for this ingredient</summary><ul>${rows}</ul><span class="field-hint">The same list for every ingredient, from one place. It is not saved with the ingredient.</span></details>` : "";
+// PubChem's page of THIS ingredient: its documented PUG REST service answers a name with a compound number. One request per click,
+// 5 seconds at most, remembered for the name. (PubChem allows requests from a web page; nothing else is asked for.)
+const pubchemAnswers = new Map();
+async function pubchemPage(name) {
+    const key = name.trim().toLowerCase();
+    if (pubchemAnswers.has(key)) return pubchemAnswers.get(key);
+    let cid = 0;
+    try {
+        const answer = await fetch(pubchemLookupUrl(name), { signal: AbortSignal.timeout(5000) });
+        cid = answer.ok ? firstCompoundId(await answer.text()) : 0;
+        if (answer.ok || answer.status === 404) pubchemAnswers.set(key, cid);      // a slow or failed answer is not remembered
+    } catch (error) { cid = 0; }
+    return cid;
 }
 
-/** Clicks inside the "Find it yourself" rows: a link without a built-in search copies the INCI name; "+ ref" adds the source to Reference links. */
-function onFieldSourceClick(event) {
-    const copy = event.target.closest("a[data-copy-name]");
-    if (copy) {
-        const name = el("ingredientNameInput").value.trim();
-        if (name && navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(name).then(() => notify("INCI name copied. Paste it in the search box", "ok"), () => {});
+function copyInciName(name) {
+    if (name && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(name).catch(() => {});
+}
+
+/** Clicks inside the Sources rows: a landing page copies the INCI name; PubChem opens this ingredient's page; "+ ref" adds that page to Reference links. */
+async function onFieldSourceClick(event) {
+    const name = el("ingredientNameInput").value.trim();
+    const link = event.target.closest("a.source-link[data-source]");
+    if (link) {
+        const source = SOURCES[link.dataset.source];
+        if (!source) return;
+        if (source.kind === "page") {
+            event.preventDefault();
+            const tab = window.open("about:blank", "_blank");              // opened now, while the click still counts, and sent on when PubChem has answered
+            if (tab) tab.opener = null;
+            const cid = await pubchemPage(name);
+            if (cid) { if (tab) tab.location.href = pubchemPageUrl(cid); else notify("PubChem opened in a new tab was blocked. Allow pop-ups for this site.", "error"); return; }
+            copyInciName(name);
+            if (tab) tab.location.href = source.landing;
+            notify("PubChem has no page for this exact name. Its home page opened; the INCI name is copied. Paste it in the site's search box.", "ok");
+        } else if (source.copyName) {
+            copyInciName(name);
+            notify("INCI name copied. Paste it in the site's search box.", "ok");
         }
         return;
     }
     const add = event.target.closest("button[data-add-ref]");
-    if (!add) return;
-    const source = SOURCES[add.dataset.addRef], name = el("ingredientNameInput").value.trim();
-    if (!source) return;
+    if (!add || add.disabled) return;
+    const source = SOURCES[add.dataset.addRef];
+    if (!source || source.kind !== "page") return;
+    add.disabled = true;
+    try {
+        const cid = await pubchemPage(name);
+        if (!cid) { notify("PubChem has no page for this exact name, so nothing was added. Find it on the site and paste its address.", "error"); return; }
+        const box = el("ingredientSourcesInput");
+        const done = addReference(box.value, source.label, pubchemPageUrl(cid), box.maxLength > 0 ? box.maxLength : 900);
+        if (done.added) { box.value = done.text; box.dispatchEvent(new Event("input", { bubbles: true })); notify(`${source.label} page added to Reference links.`, "ok"); }
+        else notify(done.reason === "exists" ? `${source.label} is already in Reference links.` : done.reason === "full" ? "Reference links is full. Remove a line first." : "That page cannot be added.", done.reason === "exists" ? "ok" : "error");
+    } finally { add.disabled = false; }
+}
+
+/** Remembers which Sources rows are open (until the page is closed). */
+function onSourcesToggle(event) {
+    const box = event.target.closest && event.target.closest("details.sources-box");
+    if (!box || event.target !== box) return;
+    sourcesOpen.set(box.dataset.sourcesField, box.open);
+    rememberSources();
+}
+
+/** A bare address in Reference links gets its label (from the site it is on) when the box is left. */
+function labelReferenceLinks() {
     const box = el("ingredientSourcesInput");
-    const done = addReference(box.value, source.label, source.ref(name), box.maxLength > 0 ? box.maxLength : 900);
-    if (done.added) { box.value = done.text; box.dispatchEvent(new Event("input", { bubbles: true })); notify(`${source.label} added to Reference links.`, "ok"); }
-    else notify(done.reason === "exists" ? `${source.label} is already in Reference links.` : done.reason === "full" ? "Reference links is full. Remove a line first." : "That source cannot be added.", done.reason === "exists" ? "ok" : "error");
+    const labelled = labelBareUrls(box.value);
+    if (labelled !== box.value) box.value = labelled.slice(0, box.maxLength > 0 ? box.maxLength : 900);
+}
+
+// ---------------------------------------------------------------------------------------------
+// The window itself: section bar with its place marker, a focus that stays inside, and the box that failed marked for screen readers
+// ---------------------------------------------------------------------------------------------
+function wireSectionBar() {
+    const body = el("ingBody"), buttons = Array.from(document.querySelectorAll(".ing-nav-btn"));
+    const sections = buttons.map((button) => el(button.dataset.jump));
+    const mark = () => {
+        const line = body.getBoundingClientRect().top + 24;
+        let current = sections[0];
+        sections.forEach((section) => { if (section.getBoundingClientRect().top <= line) current = section; });
+        if (body.scrollTop + body.clientHeight >= body.scrollHeight - 2) current = sections[sections.length - 1];
+        buttons.forEach((button, i) => button.setAttribute("aria-current", String(sections[i] === current)));
+    };
+    body.addEventListener("scroll", mark, { passive: true });
+    buttons.forEach((button) => button.addEventListener("click", () => {
+        const calm = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        el(button.dataset.jump).scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" });
+    }));
+    return mark;
+}
+
+/** Tab and Shift+Tab go round inside the open window instead of leaving it. */
+function wireFocusTrap() {
+    const overlay = el("addIngredientModal");
+    overlay.addEventListener("keydown", (event) => {
+        if (event.key !== "Tab" || overlay.style.display === "none") return;
+        const focusable = Array.from(overlay.querySelectorAll("a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex='-1'])"))
+            .filter((node) => !node.disabled && node.getAttribute("tabindex") !== "-1" && node.offsetParent !== null && getComputedStyle(node).visibility !== "hidden" && node.getBoundingClientRect().width > 1);
+        if (focusable.length === 0) return;
+        const first = focusable[0], last = focusable[focusable.length - 1];
+        if (event.shiftKey && (document.activeElement === first || !overlay.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    });
+}
+
+/** When a message appears, the box that was focused for it (the save code focuses the box it complains about) is marked invalid until it is edited. */
+function wireInvalidMarks() {
+    const form = el("addIngredientForm"), line = form.querySelector(".form-error");
+    const clear = () => form.querySelectorAll("[aria-invalid]").forEach((node) => node.removeAttribute("aria-invalid"));
+    new MutationObserver(() => {
+        if (!line.textContent.trim()) { clear(); return; }
+        window.setTimeout(() => {
+            const active = document.activeElement;
+            if (active && form.contains(active) && /^(INPUT|SELECT|TEXTAREA)$/.test(active.tagName)) { clear(); active.setAttribute("aria-invalid", "true"); active.setAttribute("aria-describedby", ((active.getAttribute("aria-describedby") || "").replace(/\s*formErrorLine/, "") + " formErrorLine").trim()); }
+        }, 0);
+    }).observe(line, { childList: true, characterData: true, subtree: true });
+    line.id = "formErrorLine";
+    form.addEventListener("input", (event) => { if (event.target.removeAttribute) event.target.removeAttribute("aria-invalid"); });
 }
 
 /** Pasting into the text boxes tidies the text (spaces, line breaks, list separators) and may show a non-blocking notice. Nothing is fetched. */
@@ -1499,6 +1610,8 @@ function openIngredientForm(item) {
     writeFit(el("skinTypesFit"), item ? item.avoidForSkinTypes : [], item ? item.goodForSkinTypes : []);
     writeFit(el("conditionsFit"), item ? item.avoidForConditions : [], item ? item.goodForConditions : []);
     modal.open();
+    el("ingBody").scrollTop = 0;
+    markSection();
 }
 
 async function saveIngredient(event) {
