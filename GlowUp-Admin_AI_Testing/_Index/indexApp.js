@@ -32,6 +32,29 @@ document.addEventListener("DOMContentLoaded", () => {
         loginForm.addEventListener("submit", () => showPassword(false));
     }
 
+    // When the form is sent, the dots in the password box suddenly become a long row, so someone looking over the shoulder cannot count
+    // the characters. Only a picture is laid over the box: the real value stays in the input (password managers and sign-in read it).
+    // The long row goes away as soon as the box is used again (typing, or the eye).
+    const passwordBox = passwordInput.parentElement;
+    let lengthCover = null;
+    const hideLengthCover = () => { if (lengthCover) { lengthCover.remove(); lengthCover = null; passwordBox.classList.remove("length-hidden"); } };
+    const hidePasswordLength = () => {
+        hideLengthCover();
+        const style = getComputedStyle(passwordInput);
+        lengthCover = document.createElement("span");
+        lengthCover.className = "password-length-cover";
+        lengthCover.setAttribute("aria-hidden", "true");
+        lengthCover.textContent = String.fromCharCode(8226).repeat(60);
+        lengthCover.style.fontSize = style.fontSize;
+        lengthCover.style.fontFamily = style.fontFamily;
+        lengthCover.style.paddingLeft = style.paddingLeft;
+        lengthCover.style.paddingRight = style.paddingRight;
+        passwordBox.append(lengthCover);
+        passwordBox.classList.add("length-hidden");
+    };
+    passwordInput.addEventListener("input", hideLengthCover);
+    if (eye) eye.addEventListener("click", hideLengthCover);
+
     function say(text) {
         message.textContent = text || "";
         message.style.display = text ? "block" : "none";
@@ -77,6 +100,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const password = passwordInput.value;
         if (email === "" || password === "") { say("Enter your email and your password."); return; }
 
+        hidePasswordLength();
         signingIn = true;
         say("");
         setButton(false, "Signing in...");

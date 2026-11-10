@@ -71,6 +71,12 @@ html:has(.terms-dialog[open]) { overflow: hidden; }
 /* the password box with its eye: the eye sits inside the box at the right */
 .password-box { position: relative; display: flex; }
 .password-box input { flex: 1; min-width: 0; padding-right: 46px; }
+/* the long row of dots laid over the box while the form is being sent (see hidePasswordLength in indexApp.js) */
+.password-box.length-hidden input { color: transparent; caret-color: transparent; text-shadow: none; -webkit-text-fill-color: transparent; }
+.password-length-cover {
+    position: absolute; inset: 0; display: flex; align-items: center; overflow: hidden; white-space: nowrap; pointer-events: none;
+    font: inherit; letter-spacing: 1px; color: var(--text); box-sizing: border-box; border-radius: inherit;
+}
 .password-eye {
     position: absolute; right: 6px; top: 50%; translate: 0 -50%; width: 34px; height: 34px; display: grid; place-items: center;
     border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer;
