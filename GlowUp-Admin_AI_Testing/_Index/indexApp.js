@@ -54,7 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
     passwordInput.addEventListener("input", hideLengthCover);
     if (eye) eye.addEventListener("click", hideLengthCover);
 
-    // a message goes away by itself after 1.5 seconds (the "signed out" note passes its own, longer time)
+    // a message goes away by itself after 1.5 seconds (the "signed out" note passes its own time, 2 seconds)
     let messageTimer = 0;
     function say(text, seconds = 1.5) {
         window.clearTimeout(messageTimer);
@@ -82,7 +82,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (new URLSearchParams(window.location.search).get("idle")) {
         // the "signed out" note goes by itself after 7 seconds (9 November 2026), unless another message has replaced it meanwhile
         const idleNote = "You were signed out after 30 minutes without activity. Sign in again to continue.";
-        say(idleNote, 7);
+        say(idleNote, 2);
         // the address loses "?idle=1", so a reload does not show the note again
         try { history.replaceState(null, "", window.location.pathname + window.location.hash); } catch (error) { /* keep the address */ }
     }
