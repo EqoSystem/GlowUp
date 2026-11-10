@@ -49,6 +49,7 @@ import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAs
 import { setPageSettings } from "../_Shared/adminSettingsMenu.js";
 import { loadClassifications, classifications, classificationName, openClassificationManager, askNewClassification, openFieldMigration, addStartingClassifications, TEST_MODE } from "../_Shared/adminClassifications.js";
 import { makeCombo } from "../_Shared/adminSelect.js";
+import { FIELD_GUIDE, SOURCES, linksFor, addReference, insertPaste } from "../_Shared/fieldSources.js";
 import { aliasesWithInci, firstAlias, needsClassification, MAX_PURPOSE, CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING } from "../_Shared/classificationRules.js";
 
 const pageState = { page: 1, size: 10 };          // the list shows ten ingredients at a time
@@ -250,9 +251,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (file) importIngredientFile(file);
     });
     el("addIngredientForm").addEventListener("submit", saveIngredient);
-    el("mergeIntoBtn").addEventListener("click", useAsAnotherName);
     el("ingredientNameInput").addEventListener("input", showNameClash);
     el("ingredientNameInput").addEventListener("input", paintFieldSources);
+    el("addIngredientForm").addEventListener("click", onFieldSourceClick);
+    wirePasteTidy();
     el("ingredientAliasesInput").addEventListener("input", showNameClash);
     el("ingredientsList").addEventListener("click", onListClick);
     el("ingredientsList").addEventListener("dblclick", (event) => {
@@ -518,44 +520,6 @@ function showNameClash() {
         row.append(words, actions);
         box.append(row);
     });
-}
-
-/** "Is this only another name of an ingredient?": shown for an existing entry, with every other listed ingredient to choose from. */
-function fillMergeInto(item) {
-    const field = el("mergeIntoField");
-    if (!field) return;
-    el("mergeIntoInput").value = "";
-    field.hidden = !item || item.binned;
-    el("mergeIntoList").replaceChildren(...(item ? everyIngredient.filter((other) => other.id !== item.id && !other.binned && other.name).map((other) => {
-        const option = document.createElement("option");
-        option.value = other.name;
-        return option;
-    }) : []));
-}
-
-/** Makes the entry in the form another name of the ingredient typed in the box: its names go to that ingredient, the entry goes to the Recycle bin. */
-async function useAsAnotherName() {
-    const form = el("addIngredientForm");
-    if (TEST_MODE) { setFormError(form, "This is the test copy of the site: nothing is changed here."); return; }
-    const item = everyIngredient.find((x) => x.id === editingIngredientId);
-    const typed = el("mergeIntoInput").value.replace(/\s+/g, " ").trim();
-    if (!item || !typed) { setFormError(form, "Type the INCI name of the ingredient this is another name of."); el("mergeIntoInput").focus(); return; }
-    const target = everyIngredient.find((x) => x.id !== item.id && !x.binned && (sameKey(x.name) === sameKey(typed))) || everyIngredient.find((x) => x.id !== item.id && !x.binned && keysOf(x).includes(sameKey(typed)));
-    if (!target) { setFormError(form, `No ingredient in the library is called "${typed}". Add it first, or pick one from the list.`); return; }
-    const merged = mergeIngredients(target, [item]);
-    const learns = merged.keepChanges.aliases ? merged.keepChanges.aliases.filter((a) => !target.aliases.some((t) => sameKey(t) === sameKey(a))) : [];
-    const used = productUseKnown ? usedInProducts(item) : 0;
-    if (!(await askConfirm({
-        title: `Use "${titleOf(item)}" as another name of "${titleOf(target)}"?`,
-        message: `"${titleOf(target)}" is kept and now also answers to: ${learns.length > 0 ? learns.join(", ") : "its names already"}. "${titleOf(item)}" goes to the Recycle bin (it can be restored)${used > 0 ? `; ${many(used, "listed product uses", "listed products use")} it, and those lists are still explained by "${titleOf(target)}"` : ""}. What "${titleOf(item)}" says about itself is not copied over.`,
-        confirmLabel: "Use as another name"
-    }))) return;
-    try {
-        await applyChanges((Object.keys(merged.keepChanges).length > 0 ? [{ collection: "ingredients", docId: target.id, action: "update", fields: merged.keepChanges }] : [])
-            .concat([{ collection: "ingredients", docId: item.id, action: "bin", reason: `Another name of "${titleOf(target)}": merged into it.` }]));
-    } catch (error) { console.error("Use as another name failed:", error); setFormError(form, "It could not be saved. Nothing was changed. Please try again."); return; }
-    modal.close();
-    notify(`"${titleOf(item)}" is now another name of "${titleOf(target)}".`, "ok");
 }
 
 function usedInProducts(item) {
@@ -844,30 +808,80 @@ function assistSources(pages) {
  */
 function paintFieldSources() {
     const name = el("ingredientNameInput").value.trim();
-    const q = encodeURIComponent(name);
-    const site = (host, extra) => `https://www.google.com/search?q=${encodeURIComponent("site:" + host + " " + name + (extra || ""))}`;
-    const cosmile = ["COSMILE Europe", `https://cosmileeurope.eu/inci/results/?q=${q}`];
-    const pubchem = ["PubChem (NIH)", `https://pubchem.ncbi.nlm.nih.gov/#query=${q}`];
-    const cosing = ["EU CosIng", site("ec.europa.eu", " cosing")];
-    const cir = ["Cosmetic Ingredient Review", site("cir-safety.org")];
-    const manual = { purpose: [cosmile, cosing], description: [cosmile, cosing, cir], chemicalDescription: [pubchem], aliases: [pubchem, cosmile], commonUses: [cosmile] };
     document.querySelectorAll("[data-field-sources]").forEach((box) => {
         const field = box.dataset.fieldSources;
-        if (name.length < 2 || !manual[field]) { box.hidden = true; box.innerHTML = ""; return; }
+        const guide = FIELD_GUIDE[field];
+        const links = linksFor(field, name);
+        if (!guide || (guide.sources.length > 0 && links.length === 0)) { box.hidden = true; box.innerHTML = ""; return; }
+        const wasOpen = !!(box.querySelector("details") && box.querySelector("details").open);       // typing in the name must not fold the guide
         const found = (fieldFound[field] || []).filter((page) => page && /^https:\/\//i.test(page.url || "")).map((page) =>
             `<a class="source-link" href="${escapeHtml(page.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(page.title || page.site || page.url)}</a> `
             + `<span class="chip source-kind${page.tone ? " " + page.tone : ""}">${escapeHtml(page.label || "Source")}</span>`);
-        const links = manual[field].map(([label, url]) => `<a class="source-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(label)}</a>`);
         // the definition says which source it rests on, with that source's own words, so the admin can check it in one look
         const basis = field === "description" && definitionBasis && /^https:\/\//i.test(definitionBasis.url || "")
             ? `<span class="definition-basis"><b>Based on:</b> <a class="source-link" href="${escapeHtml(definitionBasis.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(definitionBasis.title)}</a>`
                 + (definitionBasis.quote ? ` <q>${escapeHtml(definitionBasis.quote)}</q>` : "")
                 + (definitionBasis.replaced && definitionBasis.replaced.length ? `<br><span class="warn-text">The AI's text named a use this source does not give (${escapeHtml(definitionBasis.replaced.join(", "))}), so the definition was written from the source instead.</span>` : "")
                 + `</span><br>` : "";
+        const helper = guide.helper ? `<span class="field-hint">${escapeHtml(guide.helper)}</span>` : "";
+        if (links.length === 0) { box.innerHTML = helper; box.hidden = false; return; }
+        // a link with no search built from the name (INCIpedia) gets the name copied when it is clicked
+        const items = links.map((link) => `<span class="find-item"><a class="source-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"${link.deep ? "" : " data-copy-name"}>${escapeHtml(link.label)}</a>`
+            + (link.ref ? ` <button type="button" class="ref-add" data-add-ref="${escapeHtml(link.id)}" aria-label="Add ${escapeHtml(link.label)} to Reference links">+ ref</button>` : "") + `</span>`);
+        const how = links.map((link) => `<li><b>${escapeHtml(link.label)}:</b> ${escapeHtml(link.lookFor)}</li>`).join("");
         box.innerHTML = `<span class="field-hint">` + basis + (found.length && !basis ? `<b>Where this box's text came from:</b> ${found.join(" · ")}<br>` : "")
-            + `Find it yourself: ${links.join(" · ")}</span>`;
+            + `Find it yourself: ${items.join(" · ")}</span>`
+            + `<details class="how-to-fill"${wasOpen ? " open" : ""}><summary>How to fill this</summary>${guide.title ? `<p class="field-hint"><b>${escapeHtml(guide.title)}.</b></p>` : ""}<ul>${how}</ul>${helper}</details>`;
         box.hidden = false;
     });
+}
+
+/** Clicks inside the "Find it yourself" rows: a link without a built-in search copies the INCI name; "+ ref" adds the source to Reference links. */
+function onFieldSourceClick(event) {
+    const copy = event.target.closest("a[data-copy-name]");
+    if (copy) {
+        const name = el("ingredientNameInput").value.trim();
+        if (name && navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(name).then(() => notify("INCI name copied. Paste it in the search box", "ok"), () => {});
+        }
+        return;
+    }
+    const add = event.target.closest("button[data-add-ref]");
+    if (!add) return;
+    const source = SOURCES[add.dataset.addRef], name = el("ingredientNameInput").value.trim();
+    if (!source) return;
+    const box = el("ingredientSourcesInput");
+    const done = addReference(box.value, source.label, source.ref(name), box.maxLength > 0 ? box.maxLength : 900);
+    if (done.added) { box.value = done.text; box.dispatchEvent(new Event("input", { bubbles: true })); notify(`${source.label} added to Reference links.`, "ok"); }
+    else notify(done.reason === "exists" ? `${source.label} is already in Reference links.` : done.reason === "full" ? "Reference links is full. Remove a line first." : "That source cannot be added.", done.reason === "exists" ? "ok" : "error");
+}
+
+/** Pasting into the text boxes tidies the text (spaces, line breaks, list separators) and may show a non-blocking notice. Nothing is fetched. */
+function wirePasteTidy() {
+    const kinds = { ingredientNameInput: "name", ingredientPurposeInput: "purpose", ingredientDescInput: "description", ingredientChemInput: "chemical", ingredientAliasesInput: "aliases" };
+    Object.entries(kinds).forEach(([id, kind]) => {
+        const box = el(id);
+        box.addEventListener("paste", (event) => {
+            const raw = event.clipboardData ? event.clipboardData.getData("text") : "";
+            if (!raw) return;
+            event.preventDefault();
+            const done = insertPaste(kind, box.value, box.selectionStart, box.selectionEnd, raw, box.maxLength > 0 ? box.maxLength : 0);
+            box.value = done.value;
+            box.setSelectionRange(done.caret, done.caret);
+            box._pasting = true;
+            box.dispatchEvent(new Event("input", { bubbles: true }));
+            box._pasting = false;
+            showPasteNote(box, done.note);
+        });
+        box.addEventListener("input", () => { if (!box._pasting) showPasteNote(box, ""); });
+    });
+}
+function showPasteNote(box, text) {
+    const field = box.closest(".field");
+    let note = field.querySelector(".paste-note");
+    if (!text) { if (note) note.remove(); return; }
+    if (!note) { note = document.createElement("span"); note.className = "field-hint warn paste-note"; note.setAttribute("role", "status"); field.insertBefore(note, field.querySelector(".field-sources")); }
+    note.textContent = text;
 }
 
 /** Asks the server for a description draft of `name`; other ingredient fields stay under the admin's control. */
@@ -1429,6 +1443,7 @@ function openIngredientForm(item) {
     const form = el("addIngredientForm");
     form.reset();
     setFormError(form, "");
+    form.querySelectorAll(".paste-note").forEach((note) => note.remove());
     editingIngredientId = item ? item.id : null;
     differentIds = new Set(item ? item.differentFrom : []);
     assisted = null;
@@ -1456,7 +1471,6 @@ function openIngredientForm(item) {
     el("ingredientDescInput").value = item ? item.description : "";
     el("ingredientAliasesInput").value = item ? item.aliases.join(", ") : "";
     showNameClash();
-    fillMergeInto(item);
     el("ingredientChemInput").value = item ? item.chemicalDescription : "";
     el("ingredientSourcesInput").value = item ? item.sources.join("\n") : "";
     el("ingredientRiskInput").value = item ? item.riskLevel : "";

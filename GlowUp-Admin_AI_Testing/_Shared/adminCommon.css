@@ -628,6 +628,13 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .field textarea { resize: vertical; line-height: 1.45; }
 .field-hint { font-size: var(--fs-xs); color: var(--muted); line-height: 1.4; }
 .field-hint.warn { color: var(--warn); }
+.find-item { white-space: normal; }
+.ref-add { font: inherit; font-size: var(--fs-xs); line-height: 1.2; padding: 1px 7px; margin-left: 2px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); color: var(--text-2); cursor: pointer; }
+.ref-add:hover { border-color: var(--accent-text); color: var(--accent-text); }
+.how-to-fill { font-size: var(--fs-xs); color: var(--muted); }
+.how-to-fill summary { cursor: pointer; width: max-content; color: var(--text-2); font-weight: 550; }
+.how-to-fill ul { margin: 6px 0 4px; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; line-height: 1.4; }
+.how-to-fill .field-hint { display: block; margin-top: 2px; }
 .form-section { border-top: 1px solid var(--border); padding-top: 14px; display: flex; flex-direction: column; gap: 14px; }
 .form-section-title { font-size: var(--fs-sm); font-weight: 650; color: var(--accent-text); text-transform: uppercase; letter-spacing: .5px; }
 /* two boxes side by side start on the same line, read left to right; one column on a narrow window */
@@ -637,7 +644,6 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .inline-actions { display: flex; align-items: center; gap: 8px; }
 .inline-actions > input, .inline-actions > select { flex: 1 1 0; min-width: 0; }
 .inline-actions > .btn { flex: none; white-space: nowrap; }
-.merge-tool { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
 /* "Already in the library": a note across the form with its two buttons at the right of the words */
 .name-clash { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); font-size: var(--fs-sm); color: var(--text-2); }
 .name-clash[hidden] { display: none; }

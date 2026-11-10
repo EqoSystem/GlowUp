@@ -173,10 +173,12 @@
                         <label for="ingredientNameInput">INCI name <span class="required">*</span></label>
                         <input type="text" id="ingredientNameInput" maxlength="80" placeholder="e.g., Aqua" autocomplete="off">
                         <span class="field-hint">Only the one official name printed on labels, for example Aqua. Do not add other names here (not "Aqua / Water"): put Water, Eau under Also known as.</span>
+                        <div class="field-sources" data-field-sources="name" hidden></div>
                     </div>
                     <div class="field">
                         <span class="field-label"><label for="ingredientClassInput">Ingredient classification <span class="required">*</span></label><button type="button" class="icon-btn small list-edit" data-list-edit="classifications" aria-label="Manage classifications"><i data-icon="edit"></i></button></span>
                         <select id="ingredientClassInput"></select>
+                        <div class="field-sources" data-field-sources="classification" hidden></div>
                     </div>
                 </div>
                 <div class="name-clash" id="ingredientNameClash" hidden></div>
@@ -213,16 +215,8 @@
                             <label for="ingredientSourcesInput">Reference links <span class="optional">(optional)</span></label>
                             <textarea id="ingredientSourcesInput" rows="2" maxlength="900" placeholder="One per line, for example: CIR safety report | https://www.cir-safety.org/..."></textarea>
                             <span class="field-hint">Where this ingredient's safety information came from. Only https addresses are kept.</span>
+                            <div class="field-sources" data-field-sources="sources" hidden></div>
                         </div>
-                    </div>
-                    <div class="field merge-tool" id="mergeIntoField" hidden>
-                        <label for="mergeIntoInput">Is this only another name of an ingredient?</label>
-                        <div class="inline-actions">
-                            <input type="text" id="mergeIntoInput" list="mergeIntoList" maxlength="80" placeholder="Type the INCI name it belongs to, e.g. Aqua" autocomplete="off">
-                            <datalist id="mergeIntoList"></datalist>
-                            <button type="button" class="btn" id="mergeIntoBtn">Use it as another name</button>
-                        </div>
-                        <span class="field-hint">For an entry like "Water", which is an everyday name and not an INCI name. Its names are added to Also known as of the ingredient you choose, and this entry goes to the Recycle bin.</span>
                     </div>
                 </div>
 
@@ -242,6 +236,7 @@
                         <div class="field">
                             <label for="ingredientMinAgeInput">Minimum Age</label>
                             <input type="number" id="ingredientMinAgeInput" min="0" max="99" step="1" placeholder="0 = no age limit">
+                            <div class="field-sources" data-field-sources="judgment" hidden></div>
                         </div>
                     </div>
 
@@ -250,6 +245,7 @@
                             <label for="ingredientCautionInput">Caution Note</label>
                             <input type="text" id="ingredientCautionInput" maxlength="160" placeholder="e.g., can clog pores" autocomplete="off">
                             <span class="field-hint">Finish the sentence "It ...". The app shows it when the ingredient is flagged, for example: "May not suit Oily skin: it can clog pores."</span>
+                            <div class="field-sources" data-field-sources="cautionNote" hidden></div>
                         </div>
                         <div class="field">
                             <label for="ingredientUsesInput">Commonly Used In</label>
@@ -266,10 +262,12 @@
                                 <label class="check"><input type="checkbox" id="ingredientUmbrellaInput"> <span>Umbrella term</span></label>
                             </div>
                             <div class="checks pills" id="highlightTagsChecks"></div>
+                            <div class="field-sources" data-field-sources="judgment" hidden></div>
                         </div>
                         <div class="field">
                             <span class="field-label">Allergen Family<button type="button" class="icon-btn small list-edit" data-list-edit="allergens" aria-label="Edit the allergen families list" data-tip-title="Allergen families" data-tip="Add, rename, retire or delete allergen families. They reach the app too."><i data-icon="edit"></i></button><span class="info-slot" data-info="A user who picked that allergen in the app is warned about this ingredient." data-info-label="About Allergen Family"></span></span>
                             <div class="checks pills" id="allergenTagsChecks"></div>
+                            <div class="field-sources" data-field-sources="allergens" hidden></div>
                         </div>
                     </div>
 
@@ -279,10 +277,12 @@
                         <div class="field">
                             <span class="field-label">Skin Types</span>
                             <div class="fit-list" id="skinTypesFit"></div>
+                            <div class="field-sources" data-field-sources="judgment" hidden></div>
                         </div>
                         <div class="field">
                             <span class="field-label">Skin Conditions<button type="button" class="icon-btn small list-edit" data-list-edit="conditions" aria-label="Edit the skin conditions list" data-tip-title="Skin conditions" data-tip="Add, rename, retire or delete skin conditions. They reach the app too."><i data-icon="edit"></i></button><span class="info-slot" data-info="Choose Avoid or Good only where this ingredient matters; leave the rest on the dash." data-info-label="About Skin Conditions"></span></span>
                             <div class="fit-list" id="conditionsFit"></div>
+                            <div class="field-sources" data-field-sources="judgment" hidden></div>
                         </div>
                     </div>
                 </div>
