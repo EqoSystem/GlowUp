@@ -23,6 +23,7 @@ namespace GlowUp.Auth
         [SerializeField] private TMP_InputField emailInput;
         [SerializeField] private TMP_InputField passwordInput;
         [SerializeField] private TextMeshProUGUI feedbackText;
+        PasswordLengthMask passwordMask;          // added at run time: when the password is sent, the asterisks become a long row (nobody can count them)
 
         [Header("Buttons")]
         [SerializeField] private Button signInButton;
@@ -68,6 +69,7 @@ namespace GlowUp.Auth
                 msgSocialNotConfigured = "{0} sign-in isn't available right now. Try again later, or sign in with your email.";
             // both boxes start EMPTY (the grey hint shows until the first letter); nothing has to be deleted before typing
             ClearField(emailInput); ClearField(passwordInput);
+            if (passwordInput != null && !passwordInput.TryGetComponent(out passwordMask)) passwordMask = passwordInput.gameObject.AddComponent<PasswordLengthMask>();
 
             Hook(signInButton, SignIn); Hook(forgotPasswordButton, ForgotPassword); Hook(signUpButton, SignUp);
             Hook(googleButton, () => Social("Google"));
@@ -158,6 +160,7 @@ namespace GlowUp.Auth
             string pw = passwordInput != null ? passwordInput.text : "";
             if (email.Length == 0) { Fail(msgEnterEmail); return; }
             if (pw.Length == 0) { Fail(msgEnterPassword); return; }
+            if (passwordMask != null) passwordMask.Mask();
             if (signInButton != null) signInButton.interactable = false;
 
             try
