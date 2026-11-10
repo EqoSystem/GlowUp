@@ -254,6 +254,13 @@
                         </div>
                     </div>
 
+                    <div class="field">
+                        <label for="ingredientAllergyInput">Allergy risk with frequent use <span class="optional">(optional)</span></label>
+                        <input type="text" id="ingredientAllergyInput" maxlength="200" placeholder="e.g., People allergic to fragrance may react if they use it every day." autocomplete="off">
+                        <span class="field-hint">Who may get an allergic reaction when products with this ingredient are used often, in plain words. Leave it empty when no source names a risk. It is saved with the ingredient; the app does not show it yet.</span>
+                        <div class="field-sources" data-field-sources="frequentAllergy" hidden></div>
+                    </div>
+
                     <div class="form-row">
                         <div class="field">
                             <span class="field-label">Highlights<button type="button" class="icon-btn small list-edit" data-list-edit="highlights" aria-label="Edit the highlights list" data-tip-title="Highlights" data-tip="Add, rename, retire or delete highlights. They reach the app too."><i data-icon="edit"></i></button></span>

@@ -18,6 +18,13 @@ try {
             ok(await page.locator(`[data-field-sources="${field}"] details.how-to-fill`).count() === 1, `${width}px: guide under ${field}`);
         }
         ok(await page.locator('[data-field-sources="sources"]:visible').count() === 1, `${width}px: helper under Reference links`);
+        ok(await page.locator('[data-field-sources="frequentAllergy"] details.how-to-fill li').count() === 5, `${width}px: five sources for the allergy box`);
+        const central = await page.textContent('[data-field-sources="sources"] details.central-sources');
+        ok(["Ingredient classification", "Purpose", "User-Friendly Definition", "Also Known As", "Allergy risk with frequent use"].every((t) => central.includes(t)), `${width}px: central list under Reference links names the five boxes`);
+        await page.locator('[data-field-sources="sources"] summary').click();
+        await page.type("#ingredientNameInput", "y");
+        ok(await page.locator('[data-field-sources="sources"] details[open]').count() === 0, `${width}px: a folded central list stays folded while typing`);
+        await page.fill("#ingredientNameInput", "Sodium Hyaluronate");
         // the guide stays open while the name is edited
         await page.locator('[data-field-sources="purpose"] summary').click();
         await page.type("#ingredientNameInput", "x");

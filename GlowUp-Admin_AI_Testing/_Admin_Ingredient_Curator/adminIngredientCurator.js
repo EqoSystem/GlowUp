@@ -321,6 +321,7 @@ async function loadIngredients() {
                 purpose: String(data.purpose || ""),
                 riskLevel: RISK_LEVELS.includes(risk) ? risk : "",
                 cautionNote: data.cautionNote || "",
+                frequentUseAllergy: String(data.frequentUseAllergy || ""),
                 commonUses: brokenText(uses) ? "" : uses,
                 usesBroken: brokenText(uses),
                 minAge: toWholeNumber(data.minAge),
@@ -706,6 +707,7 @@ function detailOf(item, inBin) {
     if (item.commonUses) facts.push(["Used in", escapeHtml(item.commonUses)]);
     else if (item.usesBroken) facts.push(["Used in", `<span class="chip warn" data-tip="An older build of the app wrote text here that is not a description. It is not shown to anyone. Edit and save to replace it.">text from the app could not be read</span>`]);
     if (item.cautionNote) facts.push(["Caution", "It " + escapeHtml(item.cautionNote)]);
+    if (item.frequentUseAllergy) facts.push(["Allergy risk (frequent use)", escapeHtml(item.frequentUseAllergy)]);
 
     const chips = [];
     if (item.keyActive) chips.push(`<span class="chip pink">Key active</span>`);
@@ -813,7 +815,7 @@ function paintFieldSources() {
         const guide = FIELD_GUIDE[field];
         const links = linksFor(field, name);
         if (!guide || (guide.sources.length > 0 && links.length === 0)) { box.hidden = true; box.innerHTML = ""; return; }
-        const wasOpen = !!(box.querySelector("details") && box.querySelector("details").open);       // typing in the name must not fold the guide
+        const wasOpen = !!(box.querySelector("details") && box.querySelector("details").open);        // (the central list under Reference links starts open)       // typing in the name must not fold the guide
         const found = (fieldFound[field] || []).filter((page) => page && /^https:\/\//i.test(page.url || "")).map((page) =>
             `<a class="source-link" href="${escapeHtml(page.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(page.title || page.site || page.url)}</a> `
             + `<span class="chip source-kind${page.tone ? " " + page.tone : ""}">${escapeHtml(page.label || "Source")}</span>`);
@@ -824,6 +826,7 @@ function paintFieldSources() {
                 + (definitionBasis.replaced && definitionBasis.replaced.length ? `<br><span class="warn-text">The AI's text named a use this source does not give (${escapeHtml(definitionBasis.replaced.join(", "))}), so the definition was written from the source instead.</span>` : "")
                 + `</span><br>` : "";
         const helper = guide.helper ? `<span class="field-hint">${escapeHtml(guide.helper)}</span>` : "";
+        if (field === "sources") { box.innerHTML = helper + centralSourcesHtml(name, box.querySelector("details") ? wasOpen : true); box.hidden = false; return; }
         if (links.length === 0) { box.innerHTML = helper; box.hidden = false; return; }
         // a link with no search built from the name (INCIpedia) gets the name copied when it is clicked
         const items = links.map((link) => `<span class="find-item"><a class="source-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"${link.deep ? "" : " data-copy-name"}>${escapeHtml(link.label)}</a>`
@@ -834,6 +837,16 @@ function paintFieldSources() {
             + `<details class="how-to-fill"${wasOpen ? " open" : ""}><summary>How to fill this</summary>${guide.title ? `<p class="field-hint"><b>${escapeHtml(guide.title)}.</b></p>` : ""}<ul>${how}</ul>${helper}</details>`;
         box.hidden = false;
     });
+}
+
+/** One central list for this ingredient: where each of the main boxes is looked up. Built from the central file; nothing is saved. */
+const CENTRAL_FIELDS = [["classification", "Ingredient classification"], ["purpose", "Purpose"], ["description", "User-Friendly Definition"], ["aliases", "Also Known As"], ["frequentAllergy", "Allergy risk with frequent use"]];
+function centralSourcesHtml(name, open) {
+    const rows = CENTRAL_FIELDS.map(([field, label]) => {
+        const links = linksFor(field, name).map((link) => `<a class="source-link" href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer"${link.deep ? "" : " data-copy-name"}>${escapeHtml(link.label)}</a>`);
+        return links.length ? `<li><b>${escapeHtml(label)}:</b> ${links.join(" · ")}</li>` : "";
+    }).join("");
+    return rows ? `<details class="how-to-fill central-sources"${open ? " open" : ""}><summary>Central sources for this ingredient</summary><ul>${rows}</ul><span class="field-hint">The same list for every ingredient, from one place. It is not saved with the ingredient.</span></details>` : "";
 }
 
 /** Clicks inside the "Find it yourself" rows: a link without a built-in search copies the INCI name; "+ ref" adds the source to Reference links. */
@@ -858,7 +871,7 @@ function onFieldSourceClick(event) {
 
 /** Pasting into the text boxes tidies the text (spaces, line breaks, list separators) and may show a non-blocking notice. Nothing is fetched. */
 function wirePasteTidy() {
-    const kinds = { ingredientNameInput: "name", ingredientPurposeInput: "purpose", ingredientDescInput: "description", ingredientChemInput: "chemical", ingredientAliasesInput: "aliases" };
+    const kinds = { ingredientNameInput: "name", ingredientPurposeInput: "purpose", ingredientDescInput: "description", ingredientChemInput: "chemical", ingredientAliasesInput: "aliases", ingredientAllergyInput: "allergy" };
     Object.entries(kinds).forEach(([id, kind]) => {
         const box = el(id);
         box.addEventListener("paste", (event) => {
@@ -1476,6 +1489,7 @@ function openIngredientForm(item) {
     el("ingredientRiskInput").value = item ? item.riskLevel : "";
     el("ingredientMinAgeInput").value = item && item.minAge > 0 ? item.minAge : "";
     el("ingredientCautionInput").value = item ? item.cautionNote : "";
+    el("ingredientAllergyInput").value = item ? item.frequentUseAllergy : "";
     el("ingredientUsesInput").value = item ? item.commonUses : "";
     renderPickers(item);
     el("ingredientKeyActiveInput").checked = item ? item.keyActive : false;
@@ -1563,6 +1577,9 @@ async function saveIngredient(event) {
     };
     // an admin who opens an entry that was not typed here and saves it has checked it
     const before = ingredients.find((i) => i.id === editingIngredientId);
+    // the allergy line is written only when there is one (or to clear one that was there), so an entry without it keeps its old shape
+    const allergy = clean("ingredientAllergyInput").slice(0, 200);
+    if (allergy || (before && before.frequentUseAllergy)) data.frequentUseAllergy = allergy;
     const nowReviewed = !!before && before.source !== "" && before.source !== "admin" && !before.reviewed;
     if (nowReviewed) { data.reviewed = true; data.reviewedBy = reviewer(); data.reviewedAt = serverTimestamp(); }
     // a draft the AI wrote and the admin has now read and saved: the pages it came from are kept with the entry

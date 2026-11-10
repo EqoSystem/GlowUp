@@ -12,7 +12,7 @@ const check = (ok, what) => { checks++; if (!ok) { failed++; console.log("FAILED
 const equal = (got, expected, what) => check(JSON.stringify(got) === JSON.stringify(expected), `${what} (got ${JSON.stringify(got)})`);
 
 // every box of the form has a guide; every source it names exists; every link is https
-["name", "classification", "purpose", "description", "chemicalDescription", "aliases", "sources", "cautionNote", "commonUses", "allergens", "judgment"].forEach((field) => {
+["name", "classification", "purpose", "description", "chemicalDescription", "aliases", "sources", "cautionNote", "commonUses", "allergens", "frequentAllergy", "judgment"].forEach((field) => {
     check(!!f.FIELD_GUIDE[field], `guide for ${field}`);
     f.FIELD_GUIDE[field].sources.forEach(([id, look]) => check(!!f.SOURCES[id] && look.length > 10, `${field}: source ${id} and its instruction`));
     f.linksFor(field, "Sodium Hyaluronate").forEach((l) => check(/^https:\/\//.test(l.url) && (l.ref === "" || /^https:\/\//.test(l.ref)), `${field}/${l.id}: https links`));
@@ -25,6 +25,10 @@ check(f.FIELD_GUIDE.judgment.helper === "Admin judgment. Add your evidence in Re
 check(f.linksFor("name", "Aqua").find((l) => l.id === "incipedia").deep === false, "INCIpedia has no deep link (the name is copied)");
 check(f.linksFor("name", "Aqua").find((l) => l.id === "cosmile").deep === true, "COSMILE links straight to the search");
 check(f.linksFor("name", "Aqua / Water").find((l) => l.id === "cosmile").url.endsWith("Aqua%20%2F%20Water"), "the name is URL-encoded");
+
+equal(f.linksFor("frequentAllergy", "Aqua").map((l) => l.id), ["cir", "cosing", "sccs", "dermnet", "pubchem"], "allergy sources");
+equal(f.pasteResult("allergy", "  a  b ").text, "a b", "allergy paste is tidied");
+equal(f.pasteResult("allergy", "a".repeat(301)).note, f.NOTES.largePaste, "allergy large paste notice");
 
 // Reference links: dedupe, never overwrite, label | address
 let r = f.addReference("", "PubChem (NIH)", "https://pubchem.ncbi.nlm.nih.gov/#query=Aqua");
