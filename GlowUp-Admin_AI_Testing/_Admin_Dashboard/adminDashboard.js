@@ -41,7 +41,9 @@ let exactToday = null;                // its answer (null = not asked yet, or th
 const el = (id) => document.getElementById(id);
 let stopToday = null;                 // switches the "today" listener off (it is restarted when the date changes)
 let todayStart = 0;
-let suggestions = [];                 // [{ id, collection, kind, text, createdAtUnix }]
+let suggestions = [];                 // [{ id, collection, kind, text, createdAtUnix, lastScan }]
+let appSuggestions = [];              // "Suggestion" reports from the app's Contact support (11 November 2026): shown in Suggestions, not in Support reports
+let typedSuggestions = [];            // allergen / skin condition suggestions
 let allBrands = [];                   // [{ id, name, category, status, scans }]
 let todayResults = { safe: 0, caution: 0, harmful: 0 };
 let activityFilter = "";              // "" | "safe" | "caution" | "harmful" | "flagged": what the activity list is narrowed to
@@ -361,20 +363,21 @@ async function loadSuggestions() {
         { name: "allergenSuggestions", kind: "Allergen" },
         { name: "conditionSuggestions", kind: "Skin condition" }
     ];
-    suggestions = [];
+    typedSuggestions = [];
     let failed = null;
     for (const source of sources) {
         try {
             const snapshot = await getDocs(query(collection(db, source.name), where("status", "==", "pending")));
-            snapshot.forEach((d) => suggestions.push({
+            snapshot.forEach((d) => typedSuggestions.push({
                 id: d.id, collection: source.name, kind: source.kind,
-                text: d.data().text || "", createdAtUnix: toWholeNumber(d.data().createdAtUnix)
+                text: d.data().text || "", createdAtUnix: toWholeNumber(d.data().createdAtUnix), lastScan: null
             }));
         } catch (error) {
             console.error(`Error loading ${source.name}: `, error);
             failed = error;
         }
     }
+    suggestions = typedSuggestions.concat(appSuggestions);
     if (failed && suggestions.length === 0) {
         suggestionsLoaded = true;
         refreshAssist("suggestions");
@@ -400,8 +403,9 @@ function renderSuggestions() {
         <li class="suggestion-item">
             <div class="suggestion-main">
                 <span class="suggestion-text">${escapeHtml(s.text || "(empty)")}</span>
-                <span class="chip ${s.kind === "Allergen" ? "warn" : "pink"}">${escapeHtml(s.kind)}</span>
-                <span class="small muted">${escapeHtml(timeAgo(s.createdAtUnix))}</span>
+                <span class="chip ${s.kind === "Allergen" ? "warn" : s.kind === "App suggestion" ? "good" : "pink"}">${escapeHtml(s.kind)}</span>
+                <span class="small muted">${escapeHtml(formatWhen(s.createdAtUnix))} · ${escapeHtml(timeAgo(s.createdAtUnix))}</span>
+                ${lastScanDetails(s.lastScan)}
             </div>
             <div class="suggestion-actions btn-group">
                 <button class="icon-btn small row-btn approve" data-action="reviewed" data-id="${escapeHtml(s.id)}" data-collection="${escapeHtml(s.collection)}" aria-label="Mark reviewed" data-tip-title="Mark reviewed" data-tip="You have dealt with it, for example added it to the Ingredient Curator." data-tip-preview="It leaves this list.">${icon("check")}</button>
@@ -418,8 +422,12 @@ async function onSuggestionClick(event) {
     const status = button.getAttribute("data-action");
     button.disabled = true;
     try {
-        await updateDoc(doc(db, collectionName, id), { status, reviewedAt: serverTimestamp() });
+        // an app suggestion is a support report: it closes the way reports do (handled / dismissed, handledAt)
+        if (collectionName === "supportReports") await updateDoc(doc(db, collectionName, id), { status: status === "reviewed" ? "handled" : status, handledAt: serverTimestamp() });
+        else await updateDoc(doc(db, collectionName, id), { status, reviewedAt: serverTimestamp() });
         suggestions = suggestions.filter((s) => !(s.id === id && s.collection === collectionName));
+        if (collectionName === "supportReports") appSuggestions = appSuggestions.filter((s) => s.id !== id);
+        else typedSuggestions = typedSuggestions.filter((s) => !(s.id === id && s.collection === collectionName));
         renderSuggestions();
         notify(status === "reviewed" ? "Marked as reviewed." : "Suggestion dismissed.", "ok");
     } catch (error) {
@@ -436,15 +444,24 @@ async function loadSupportReports() {
     try {
         const snapshot = await getDocs(query(collection(db, "supportReports"), where("status", "==", "new")));
         supportReports = [];
+        appSuggestions = [];
         snapshot.forEach((d) => {
             const data = d.data();
+            const lastScan = data.lastScan && typeof data.lastScan === "object" ? data.lastScan : null;
+            if (String(data.category || "") === "Suggestion") {
+                // the app's Suggestion kind belongs in the Suggestions panel (for review), not among the support reports
+                appSuggestions.push({ id: d.id, collection: "supportReports", kind: "App suggestion", text: String(data.message || ""), createdAtUnix: toWholeNumber(data.createdAtUnix), lastScan });
+                return;
+            }
             supportReports.push({
                 id: d.id, category: String(data.category || "Other"), message: String(data.message || ""), uid: String(data.uid || ""),
                 appVersion: String(data.appVersion || ""), device: String(data.device || ""), createdAtUnix: toWholeNumber(data.createdAtUnix),
-                lastScan: data.lastScan && typeof data.lastScan === "object" ? data.lastScan : null
+                lastScan
             });
         });
         renderSupportReports();
+        suggestions = typedSuggestions.concat(appSuggestions);
+        if (suggestionsLoaded) renderSuggestions();
     } catch (error) {
         console.error("Error loading supportReports: ", error);
         showEmpty("support", "Could not load the support reports.", true);
@@ -462,9 +479,7 @@ function renderSupportReports() {
     renderPager(el("supportPager"), supportPage, supportReports.length, renderSupportReports, "reports");
     const tone = (c) => (c === "Bug" ? "bad" : c === "Wrong scan result" ? "warn" : "pink");
     list.innerHTML = paginate(supportReports, supportPage).map((r) => {
-        const scan = r.lastScan ? `<details class="support-scan"><summary>Last scan: ${escapeHtml([r.lastScan.product, r.lastScan.brand].filter(Boolean).join(" · ") || "(no name)")}</summary>
-            <p class="small">Result: ${escapeHtml(r.lastScan.result || "-")}. ${escapeHtml(r.lastScan.summary || "")}</p>
-            <p class="small muted">Ingredients read: ${escapeHtml(r.lastScan.ingredients || "-")}</p></details>` : "";
+        const scan = lastScanDetails(r.lastScan);
         return `<li class="suggestion-item support-item">
             <div class="suggestion-main">
                 <span class="chip ${tone(r.category)}">${escapeHtml(r.category)}</span>
@@ -478,6 +493,14 @@ function renderSupportReports() {
             </div>
         </li>`;
     }).join("");
+}
+
+/** The optional last scan a report or app suggestion carries, folded (empty when there is none). */
+function lastScanDetails(scan) {
+    if (!scan) return "";
+    return `<details class="support-scan"><summary>Last scan: ${escapeHtml([scan.product, scan.brand].filter(Boolean).join(" · ") || "(no name)")}</summary>
+            <p class="small">Result: ${escapeHtml(scan.result || "-")}. ${escapeHtml(scan.summary || "")}</p>
+            <p class="small muted">Ingredients read: ${escapeHtml(scan.ingredients || "-")}</p></details>`;
 }
 
 async function onSupportClick(event) {

@@ -18,7 +18,8 @@ namespace GlowUp.AppSettings
     /// Contact support (10 November 2026): the report goes STRAIGHT to the GlowUp team. It is written to the Firestore collection
     /// "supportReports", which the admin website's Dashboard lists (panel "Support reports"). No e-mail app, nothing copied.
     ///
-    /// A report = the kind (Bug / Wrong scan result / Other), the message (3 to 2000 characters, any words, any language), the account id,
+    /// A report = the kind (Bug / Wrong scan result / Suggestion / Other; Suggestion added 11 November 2026, phase 4: the website's Dashboard
+    /// lists those in its "Suggestions" panel too), the message (3 to 2000 characters, any words, any language), the account id,
     /// the app version and phone model, and - only while "Include my last scan" is on - the last scan's product, result and ingredients.
     /// The security rules let a signed-in user CREATE their own report only (not read, change or delete any).
     /// Sent: a toast "Report sent. Thank you.", the form is emptied and closes. Not sent: the text stays and a toast offers Retry.
@@ -28,7 +29,7 @@ namespace GlowUp.AppSettings
         public const string Collection = "supportReports";
 
         [SerializeField] private OverlayPanel panel;
-        [Tooltip("Tab 0, 1, 2 = the three kinds of report, named in Category Names")]
+        [Tooltip("Tab 0, 1, 2, 3 = the four kinds of report, named in Category Names")]
         [SerializeField] private ChoiceTabs categoryTabs;
         [SerializeField] private TMP_InputField messageInput;
         [SerializeField] private Toggle includeLastScanToggle;
@@ -41,7 +42,7 @@ namespace GlowUp.AppSettings
         [SerializeField] private string subjectFormat = "GlowUp feedback: {0}";
 
         [Header("Report")]
-        [SerializeField] private string[] categoryNames = { "Bug", "Wrong scan result", "Other" };
+        [SerializeField] private string[] categoryNames = { "Bug", "Wrong scan result", "Suggestion", "Other" };
         [SerializeField] private int minimumCharacters = 3;
         [SerializeField] private int maximumCharacters = 2000;
         [Tooltip("The scan's ingredient list is cut after this many characters")]
@@ -51,8 +52,8 @@ namespace GlowUp.AppSettings
         [Header("Wording")]
         [SerializeField] private string introWords = "Tell us what went wrong. Your report goes straight to the GlowUp team.";
         [SerializeField] private string msgTooShort = "Write at least a few words.";
-        [SerializeField] private string msgSent = "Report sent. Thank you.";
-        [SerializeField] private string msgNotSent = "The report could not be sent. Check your connection.";
+        [SerializeField] private string msgSent = "Report sent. Thank you!";
+        [SerializeField] private string msgNotSent = "Your report couldn't be sent. Check your connection and try again.";
         [SerializeField] private string msgSignIn = "Sign in with an internet connection to send a report.";
         [SerializeField] private string msgSending = "Sending…";
         [SerializeField] private string tipsTitle = "Tips";
@@ -142,6 +143,7 @@ namespace GlowUp.AppSettings
                 await FirebaseFirestore.DefaultInstance.Collection(Collection).Document().SetAsync(report).OrTimeout(sendWaitSeconds, "Sending the report");
                 if (this == null) return;
                 if (messageInput != null) messageInput.text = "";
+                if (categoryTabs != null) categoryTabs.Select(0, true);             // the form is reset for the next report
                 Toast()?.Show(FormalToast.Kind.Success, msgSent);
                 if (panel != null && panel.IsOpen) panel.Hide();
             }

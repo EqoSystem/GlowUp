@@ -356,7 +356,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['uid', 'category', 'message', 'status', 'appVersion', 'device', 'createdAtUnix', 'createdAt', 'lastScan'])
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.status == 'new'
-        && request.resource.data.category in ['Bug', 'Wrong scan result', 'Other']
+        && request.resource.data.category in ['Bug', 'Wrong scan result', 'Suggestion', 'Other']     // Suggestion: 11 November 2026 (app Settings > Contact support)
         && request.resource.data.message is string
         && request.resource.data.message.size() >= 3
         && request.resource.data.message.size() <= 2000

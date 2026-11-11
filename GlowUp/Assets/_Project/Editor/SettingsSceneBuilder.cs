@@ -113,29 +113,37 @@ namespace GlowUp.EditorTools
             TextMeshProUGUI supportIntro = A.Label(supportPopup.box, "IntroText", "Tell us what went wrong. Your report goes straight to the GlowUp team.",
                                                    30, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             A.TopStrip(supportIntro.transform, 118, 88, 48, 48);
-            ChoiceTabs categoryTabs = Tabs(supportPopup.box, "CategoryTabs", new[] { "Bug", "Wrong scan result", "Other" }, 0, out _, 28);
-            A.TopStrip(categoryTabs.transform.parent, 222, 96, 48, 48);
-            TMP_InputField feedbackInput = SceneBuilderCore.MakeInput(supportPopup.box, "FeedbackInputField", "Describe what happened...", A.TC, Vector2.zero, new Vector2(840, 420));
-            A.TopStrip(feedbackInput.transform, 340, 420, 48, 48);
+            // phase 4 (11 November 2026): four kinds, Suggestion between Wrong scan result and Other, as two rows of two so every name fits
+            ChoiceTabs categoryTabs = TabsGrid(supportPopup.box, "CategoryTabs", new[] { "Bug", "Wrong scan result", "Suggestion", "Other" }, 0, 2, 28);
+            A.TopStrip(categoryTabs.transform.parent, 222, TwoRowTrack, 48, 48);
+            TMP_InputField feedbackInput = SceneBuilderCore.MakeInput(supportPopup.box, "FeedbackInputField", "Describe what happened...", A.TC, Vector2.zero, new Vector2(840, 360));
+            A.TopStrip(feedbackInput.transform, 222 + TwoRowTrack + 18, 360, 48, 48);
             Kit.StyleInput(feedbackInput, "Describe what happened...", ThemeRole.InputBackground);
             SmartScanSceneBuilder.MakeMultiLine(feedbackInput, 32);
             var feedbackBehaviour = SceneBuilderCore.Ensure<InputFieldBehaviour>(feedbackInput.gameObject);
             A.Set(feedbackBehaviour, "characterLimit", 1000);
             GameObject includeRow = A.Node(supportPopup.box, "IncludeLastScanRow");
-            A.TopStrip(includeRow.transform, 784, 84, 56, 56);
+            A.TopStrip(includeRow.transform, 222 + TwoRowTrack + 18 + 360 + 12, 84, 56, 56);
             A.HStack(includeRow, 20);
             TextMeshProUGUI includeLabel = A.Label(includeRow.transform, "Label", "Include my last scan (product and ingredients)", 30, ThemeRole.MainText, FontRole.Label,
                                                    TextAlignmentOptions.MidlineLeft, true);
             A.Size(includeLabel, -1, -1, 1);
             Toggle includeScan = Switch(includeRow.transform, "IncludeLastScanSwitch", true);
             TextMeshProUGUI supportMessage = A.Label(supportPopup.box, "FeedbackText", "", 28, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            A.TopStrip(supportMessage.transform, 886, 140, 48, 48);
+            A.TopStrip(supportMessage.transform, 222 + TwoRowTrack + 18 + 360 + 12 + 84 + 8, 140, 48, 48);
             Button supportSend = A.PillButton(supportPopup.box, "SendButton", "Send Report", 38, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Mail);
             A.BottomStrip(supportSend.transform, 44, 112, 48, 48);
 
             var support = Feature<SupportFeedbackForm>(features, "SupportFeedbackForm");
             A.Set(support, "panel", supportPopup.panel); A.Set(support, "categoryTabs", categoryTabs); A.Set(support, "messageInput", feedbackInput);
             A.Set(support, "includeLastScanToggle", includeScan); A.Set(support, "sendButton", supportSend); A.Set(support, "feedbackText", supportMessage);
+            // a form saved before phase 4 keeps its own words: the kinds and the two messages are brought up to date
+            var supportSo = new SerializedObject(support);
+            SerializedProperty kinds = supportSo.FindProperty("categoryNames");
+            string[] kindNames = { "Bug", "Wrong scan result", "Suggestion", "Other" };
+            if (kinds != null) { kinds.arraySize = kindNames.Length; for (int k = 0; k < kindNames.Length; k++) kinds.GetArrayElementAtIndex(k).stringValue = kindNames[k]; supportSo.ApplyModifiedPropertiesWithoutUndo(); }
+            SceneBuilderCore.ReplaceText(support, "msgSent", "Report sent. Thank you!", "Report sent. Thank you.");
+            SceneBuilderCore.ReplaceText(support, "msgNotSent", "Your report couldn't be sent. Check your connection and try again.", "The report could not be sent. Check your connection.");
 
             // =====================================================================================
             //  1. Appearance and performance
@@ -641,6 +649,45 @@ namespace GlowUp.EditorTools
         /// Pill tabs where one is chosen, on a soft track so the tabs that are not chosen still show on a white panel.
         /// Returns the ChoiceTabs (its parent is the track object to place or size).
         /// </summary>
+        const float TwoRowTrack = 8 + 80 + 8 + 80 + 8;
+
+        /// <summary>
+        /// Tabs in rows of `columns` (phase 4): a vertical layout group of horizontal rows, each tab sharing its row's width, so long names never
+        /// overlap. The ChoiceTabs works as with one row (its tabs are numbered left to right, row by row).
+        /// </summary>
+        static ChoiceTabs TabsGrid(Transform parent, string name, string[] captions, int selected, int columns, float fontSize)
+        {
+            int rows = Mathf.CeilToInt(captions.Length / (float)Mathf.Max(1, columns));
+            GameObject trackObject = A.Node(parent, name + "Track");
+            A.Size(trackObject.transform, -1, 8 + rows * 88);
+            A.Backdrop(trackObject.transform, ThemeRole.SurfaceAlt, 1f, 48f);
+            GameObject tabsObject = A.Node(trackObject.transform, name, typeof(ChoiceTabs));
+            A.Fill(tabsObject.transform, 8, 8, 8, 8);
+            A.VStack(tabsObject, 8, 0, 0, 0, 0, TextAnchor.MiddleCenter).childForceExpandHeight = true;
+            var buttons = new Button[captions.Length];
+            var labels = new TextMeshProUGUI[captions.Length];
+            for (int r = 0; r < rows; r++)
+            {
+                GameObject row = A.Node(tabsObject.transform, "Row" + (r + 1));
+                A.HStack(row, 8, 0, 0, 0, 0, TextAnchor.MiddleCenter, true).childForceExpandHeight = true;
+                for (int c = 0; c < columns; c++)
+                {
+                    int i = r * columns + c;
+                    if (i >= captions.Length) break;
+                    Button tab = A.PillButton(row.transform, "Tab" + (i + 1), captions[i], fontSize, ThemeRole.InputBackground, ThemeRole.MainText);
+                    A.Size(tab, 120, 80, 1);
+                    buttons[i] = tab; labels[i] = A.LabelOf(tab);
+                    A.Shrink(labels[i], fontSize * 0.7f);
+                    Object.DestroyImmediate(tab.GetComponent<ThemedGraphic>());
+                    Object.DestroyImmediate(labels[i].GetComponent<ThemedGraphic>());
+                }
+            }
+            var tabs = tabsObject.GetComponent<ChoiceTabs>();
+            Kit.SetArray(tabs, "tabs", buttons); Kit.SetArray(tabs, "labels", labels);
+            A.Set(tabs, "selectedIndex", Mathf.Clamp(selected, 0, captions.Length - 1));
+            return tabs;
+        }
+
         static ChoiceTabs Tabs(Transform parent, string name, string[] captions, int selected, out TextMeshProUGUI[] labels, float fontSize)
         {
             GameObject trackObject = A.Node(parent, name + "Track");

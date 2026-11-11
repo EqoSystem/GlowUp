@@ -297,6 +297,14 @@ await can("an admin saves their own shortcuts", () => setDoc(doc(adminDoc(), "ad
 await can("an admin reads their own shortcuts", () => getDoc(doc(adminDoc(), "adminShortcuts/a1")));
 await cannot("an admin reads another admin's shortcuts", () => getDoc(doc(adminDoc(), "adminShortcuts/a2")));
 await cannot("an admin writes another admin's shortcuts", () => setDoc(doc(adminDoc(), "adminShortcuts/a2"), keys()));
+// support reports from the app (Settings > Contact support); "Suggestion" added 11 November 2026
+const report = (category) => ({ uid: "u1", category, message: "Please add a shade finder", status: "new", appVersion: "1.0", device: "Pixel", createdAtUnix: now });
+await can("a user sends a Suggestion report", () => setDoc(doc(user(), "supportReports/r1"), report("Suggestion")));
+await can("a user sends a Bug report", () => setDoc(doc(user(), "supportReports/r2"), report("Bug")));
+await cannot("a user sends a report of an unknown kind", () => setDoc(doc(user(), "supportReports/r3"), report("Spam")));
+await cannot("a user sends a report in someone else's name", () => setDoc(doc(other(), "supportReports/r4"), report("Suggestion")));
+await cannot("a user reads support reports", () => getDoc(doc(user(), "supportReports/r1")));
+
 await cannot("a plain user saves shortcuts (the 403 of the endpoint)", () => setDoc(doc(user(), "adminShortcuts/u1"), keys()));
 await cannot("a plain user reads shortcuts", () => getDoc(doc(user(), "adminShortcuts/u1")));
 await cannot("nobody signed in reads shortcuts", () => getDoc(doc(anon(), "adminShortcuts/a1")));
