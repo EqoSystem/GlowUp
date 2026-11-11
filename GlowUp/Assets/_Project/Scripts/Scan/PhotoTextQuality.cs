@@ -90,6 +90,9 @@ namespace GlowUp.Scan
             return verdict;
         }
 
+        /// <summary>Is this word one a make-up pack carries (pack words, or `isKnownWord`)?</summary>
+        public static bool IsKnown(string word, Func<string, bool> isKnownWord) => Known(word, isKnownWord);
+
         static bool Known(string word, Func<string, bool> isKnownWord)
         {
             if (PackWords.Contains(word)) return true;

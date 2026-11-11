@@ -95,6 +95,8 @@ namespace GlowUp.Scan
         [Tooltip("{0} = the product, in medium weight")]
         [SerializeField] private string msgSearching = "Searching for {0}…";
         [SerializeField] private string msgUnclear = "We couldn't read this clearly. Retake the photo in good light, or type the product in.";
+        [Tooltip("The status line while the photo is read: {0} = the first words found")]
+        [SerializeField] private string msgWeRead = "Reading the photo… found {0}";
         [Tooltip("New13 item 8: the captured picture was (nearly) black: it is not shown")]
         [SerializeField] private string msgTooDark = "Photo is too dark. Turn on the flashlight or move to the light, then retake it.";
         [SerializeField] private string msgTooBlurry = "Photo is too blurry. Hold the phone steady and retake it.";
@@ -360,18 +362,25 @@ namespace GlowUp.Scan
                     photo = cut;
                 }
                 // New13 item 9: read upright AND turned a quarter each way, like the live scan (sideways words on a bottle)
-                PhotoTextReader.Result read = await PhotoTextReader.Read(photo, KnownWord, () => this == null || mine != attempt);
+                // the text the reader finds is outlined on the photo as it is found (one turn's outlines at a time), with the words in the status line
+                PhotoTextReader.Result read = await PhotoTextReader.Read(photo, KnownWord, () => this == null || mine != attempt, (shapes, words) =>
+                {
+                    if (this == null || mine != attempt || preview == null) return;
+                    preview.ShowTextShapes(shapes);
+                    if (words.Count > 0) preview.Say(StatusMessage.Kind.Progress, string.Format(msgWeRead, "<b>" + StatusMessage.Plain(string.Join(" · ", words)) + "</b>"));
+                });
                 if (this == null || mine != attempt) return;
                 PhotoTextQuality.Verdict verdict = read.verdict;
                 // an unclear reading of the phone no longer stops the look-up (11 November 2026): the server's vision reads the picture itself,
                 // as Google Lens does. Nothing of the unclear reading is shown or sent (cleanText stays empty).
-                if (verdict.readable) preview.ShowTextShapes(read.boxes);                    // the lines that were read, outlined inside the box
 
                 // the catalogue first, with the same matcher as the live scan: the closest products to pick from
-                if (CatalogMatches != null && verdict.cleanText.Length > 0)
+                // the catalogue first (the live scan's matcher, tolerant of misread letters), the web only when it has nothing
+                string catalogueText = verdict.cleanText.Length > 0 ? verdict.cleanText : read.anyText;
+                if (CatalogMatches != null && catalogueText.Length > 0)
                 {
                     preview.Say(StatusMessage.Kind.Progress, msgCatalog);
-                    List<ScanShortlist.Entry> matches = ScanShortlist.For(ProductRepository.Index, verdict.cleanText, null, null, 6);
+                    List<ScanShortlist.Entry> matches = ScanShortlist.For(ProductRepository.Index, catalogueText, null, null, 6);
                     if (matches.Count > 0)
                     {
                         await Task.Delay(350);                          // the outlines stay in view for a moment

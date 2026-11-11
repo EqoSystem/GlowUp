@@ -25,48 +25,67 @@ namespace GlowUp.Scan
             public PhotoTextQuality.Verdict verdict = new PhotoTextQuality.Verdict();
             /// <summary>0 = upright, 90 = read after turning clockwise, 270 = counter-clockwise; the turns that held words.</summary>
             public List<int> turns = new List<int>();
+            /// <summary>Everything the reader saw in its best turn, even when no word was known (the catalogue matcher is tolerant of misreads).</summary>
+            public string anyText = "";
+            /// <summary>Up to three known words, in reading order, for the "We read" line.</summary>
+            public List<string> knownWords = new List<string>();
         }
 
         const float SecondsPerReading = 10f;
 
-        /// <summary>Reads `photo` (readable texture) in up to three turns. `cancelled` is polled between readings.</summary>
-        public static async Task<Result> Read(Texture2D photo, Func<string, bool> isKnownWord, Func<bool> cancelled)
+        /// <summary>
+        /// Reads `photo` (readable texture) in up to three turns. `cancelled` is polled between readings. `onShapes` is called each
+        /// time a better turn is found, with that ONE turn's text boxes (0 to 1 in the photo): the outlines never pile up.
+        /// </summary>
+        public static async Task<Result> Read(Texture2D photo, Func<string, bool> isKnownWord, Func<bool> cancelled, Action<Rect[], List<string>> onShapes = null)
         {
             var result = new Result();
             if (photo == null) return result;
             var texts = new StringBuilder();
             var boxes = new List<Rect>();
-            int knownSum = 0, wordSum = 0;
             string bestText = ""; PhotoTextQuality.Verdict best = null;
+            int shownKnown = -1, shownLength = 0;
 
             // the part inside the user's box is often a narrow strip: enlarged so its letters are big enough for the reader
             Texture2D source = Enlarged(photo);
             try
             {
-            foreach (int turn in new[] { 0, 90, 270 })
-            {
-                Texture2D picture = turn == 0 ? source : Turned(source, turn == 90);
-                try
+                foreach (int turn in new[] { 0, 90, 270 })
                 {
-                    OcrRead read = OcrService.Shared.Read(picture);
-                    float waited = 0f;
-                    while (!read.Done && waited < SecondsPerReading)
+                    Texture2D picture = turn == 0 ? source : Turned(source, turn == 90);
+                    try
                     {
-                        await Task.Delay(40); waited += 0.04f;
-                        if (cancelled != null && cancelled()) return result;
+                        OcrRead read = OcrService.Shared.Read(picture);
+                        float waited = 0f;
+                        while (!read.Done && waited < SecondsPerReading)
+                        {
+                            await Task.Delay(40); waited += 0.04f;
+                            if (cancelled != null && cancelled()) return result;
+                        }
+                        if (!read.Done || string.IsNullOrWhiteSpace(read.Text)) continue;
+                        PhotoTextQuality.Verdict v = PhotoTextQuality.Judge(read.Text, isKnownWord, 1, PhotoTextQuality.MinimumKnownShare);
+                        var turnBoxes = new Rect[read.Boxes.Length];
+                        for (int i = 0; i < turnBoxes.Length; i++) turnBoxes[i] = turn == 0 ? read.Boxes[i] : Back(read.Boxes[i], turn == 90);
+
+                        // the outlines of the best turn so far: most known words, then most text
+                        int len = read.Text.Trim().Length;
+                        if (v.knownWords > shownKnown || (v.knownWords == shownKnown && len > shownLength))
+                        {
+                            shownKnown = v.knownWords; shownLength = len;
+                            result.anyText = read.Text.Trim();
+                            result.knownWords = KnownWords(read.Text, isKnownWord, 3);
+                            onShapes?.Invoke(turnBoxes, result.knownWords);
+                        }
+
+                        if (v.knownWords < 1 || v.score < PhotoTextQuality.MinimumKnownShare) continue;     // a wrong turn reads nonsense: left out
+                        if (texts.Length > 0) texts.Append('\n');
+                        texts.Append(read.Text.Trim());
+                        boxes.AddRange(turnBoxes);
+                        result.turns.Add(turn);
+                        if (best == null || v.knownWords > best.knownWords) { best = v; bestText = read.Text; }
                     }
-                    if (!read.Done || string.IsNullOrWhiteSpace(read.Text)) continue;
-                    PhotoTextQuality.Verdict v = PhotoTextQuality.Judge(read.Text, isKnownWord, 1, PhotoTextQuality.MinimumKnownShare);
-                    if (v.knownWords < 1 || v.score < PhotoTextQuality.MinimumKnownShare) continue;     // a wrong turn reads nonsense: left out
-                    knownSum += v.knownWords; wordSum += v.words;
-                    if (texts.Length > 0) texts.Append('\n');
-                    texts.Append(read.Text.Trim());
-                    foreach (Rect b in read.Boxes) boxes.Add(turn == 0 ? b : Back(b, turn == 90));
-                    result.turns.Add(turn);
-                    if (best == null || v.knownWords > best.knownWords) { best = v; bestText = read.Text; }
+                    finally { if (turn != 0 && picture != null) UnityEngine.Object.Destroy(picture); }
                 }
-                finally { if (turn != 0 && picture != null) UnityEngine.Object.Destroy(picture); }
-            }
             }
             finally { if (source != photo) UnityEngine.Object.Destroy(source); }
 
@@ -78,6 +97,26 @@ namespace GlowUp.Scan
             if (!whole.readable) whole = PhotoTextQuality.Judge(bestText, isKnownWord);       // the best single turn alone
             result.verdict = whole;
             return result;
+        }
+
+        static readonly System.Text.RegularExpressions.Regex Word = new System.Text.RegularExpressions.Regex(@"[A-Za-zÀ-ÿ]{3,}");
+
+        // small pack words that say nothing about the product: never shown in the "We read" line
+        static readonly HashSet<string> Filler = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        { "the", "and", "for", "with", "use", "only", "out", "keep", "made", "net", "new", "lot", "exp", "mfg", "batch", "store", "place", "dry", "cool" };
+
+        /// <summary>The first known words of a reading, each once, in ordinary capitals ("MAYBELLINE" = "Maybelline").</summary>
+        public static List<string> KnownWords(string text, Func<string, bool> isKnownWord, int most)
+        {
+            var list = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (System.Text.RegularExpressions.Match m in Word.Matches(text ?? ""))
+            {
+                if (list.Count >= most) break;
+                if (Filler.Contains(m.Value) || !PhotoTextQuality.IsKnown(m.Value, isKnownWord) || !seen.Add(m.Value)) continue;
+                list.Add(BrandNameNormalizer.Tidy(m.Value));
+            }
+            return list;
         }
 
         /// <summary>Shorter side below this: the picture is enlarged (at most 2x, longer side at most 2400) before reading.</summary>
