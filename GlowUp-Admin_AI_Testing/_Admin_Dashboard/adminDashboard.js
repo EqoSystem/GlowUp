@@ -29,7 +29,14 @@ const RECENT_ITEMS = 120;             // how many recent scans are fetched (the 
 const PAGE_SIZE = 8;                  // how many rows a panel shows at a time
 const activityPage = { page: 1, size: PAGE_SIZE };
 const suggestionPage = { page: 1, size: PAGE_SIZE };
-const supportPage = { page: 1, size: PAGE_SIZE };
+// the support reports are shown in one panel for each kind (12 November 2026); an unknown kind goes with "Other". `prefix` names the panel's parts
+// (<prefix>List, <prefix>Pager, <prefix>Empty, <prefix>ClearAll ...); the Bug panel keeps the old id "support".
+const SUPPORT_KINDS = [
+    { prefix: "support", category: "Bug", title: "bug reports", none: "No new bug reports.", page: { page: 1, size: PAGE_SIZE } },
+    { prefix: "supportWrong", category: "Wrong scan result", title: "wrong scan results", none: "No new wrong scan results.", page: { page: 1, size: PAGE_SIZE } },
+    { prefix: "supportOther", category: "Other", title: "other reports", none: "No new reports.", page: { page: 1, size: PAGE_SIZE } }
+];
+const kindOf = (category) => (SUPPORT_KINDS.find((k) => k.category === category) || SUPPORT_KINDS[2]);
 let supportReports = [];              // [{ id, category, message, uid, appVersion, device, createdAtUnix, lastScan }]
 let recentScans = [];
 const TOP_BRANDS = 5;
@@ -82,8 +89,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     loadReviewQueue();
     el("suggestionList").addEventListener("click", onSuggestionClick);
     el("suggestionClearAll").addEventListener("click", clearAllSuggestions);
-    el("supportClearAll").addEventListener("click", clearAllSupportReports);
-    el("supportList").addEventListener("click", onSupportClick);
+    SUPPORT_KINDS.forEach((kind) => {
+        el(kind.prefix + "ClearAll").addEventListener("click", () => clearAllSupportReports(kind));
+        el(kind.prefix + "List").addEventListener("click", onSupportClick);
+    });
 
     // things that answer a click
     const press = (node, run) => { node.addEventListener("click", (event) => { if (!event.target.closest(".guide-badge")) run(event); }); node.addEventListener("keydown", (event) => { if (event.key === "Enter" && event.target === node) run(event); }); };
@@ -467,27 +476,34 @@ async function loadSupportReports() {
         if (suggestionsLoaded) renderSuggestions();
     } catch (error) {
         console.error("Error loading supportReports: ", error);
-        showEmpty("support", "Could not load the support reports.", true);
-        el("supportEmptyHint").textContent = describeError(error);
+        SUPPORT_KINDS.forEach((kind) => {
+            showEmpty(kind.prefix, "Could not load the reports.", true);
+            el(kind.prefix + "EmptyHint").textContent = describeError(error);
+        });
     }
 }
 
 function renderSupportReports() {
-    el("supportClearAll").hidden = supportReports.length === 0;
-    setPanelQuiet("support", supportReports.length === 0, supportReports.length === 0 ? "No new reports" : many(supportReports.length, "new report", "new reports"));
-    if (supportReports.length === 0) { showEmpty("support", "No new support reports.", false); return; }
-    supportReports.sort((a, b) => b.createdAtUnix - a.createdAtUnix);
-    el("supportEmpty").style.display = "none";
-    const list = el("supportList");
+    SUPPORT_KINDS.forEach((kind) => renderSupportKind(kind));
+}
+
+function renderSupportKind(kind) {
+    const mine = supportReports.filter((r) => kindOf(r.category) === kind);
+    el(kind.prefix + "ClearAll").hidden = mine.length === 0;
+    setPanelQuiet(kind.prefix, mine.length === 0, mine.length === 0 ? "No new reports" : many(mine.length, "new report", "new reports"));
+    if (mine.length === 0) { showEmpty(kind.prefix, kind.none, false); return; }
+    mine.sort((a, b) => b.createdAtUnix - a.createdAtUnix);
+    el(kind.prefix + "Empty").style.display = "none";
+    const list = el(kind.prefix + "List");
     list.style.display = "";
-    renderPager(el("supportPager"), supportPage, supportReports.length, renderSupportReports, "reports");
+    renderPager(el(kind.prefix + "Pager"), kind.page, mine.length, () => renderSupportKind(kind), "reports");
     const tone = (c) => (c === "Bug" ? "bad" : c === "Wrong scan result" ? "warn" : "pink");
-    list.innerHTML = paginate(supportReports, supportPage).map((r) => {
+    list.innerHTML = paginate(mine, kind.page).map((r) => {
         const scan = lastScanDetails(r.lastScan);
         return `<li class="suggestion-item support-item">
             <div class="suggestion-main">
                 <span class="chip ${tone(r.category)}">${escapeHtml(r.category)}</span>
-                <span class="small muted">${escapeHtml(timeAgo(r.createdAtUnix))} · account ${escapeHtml(r.uid.slice(0, 8))}${r.appVersion ? " · app " + escapeHtml(r.appVersion) : ""}</span>
+                <span class="small muted">${escapeHtml(formatWhen(r.createdAtUnix))} · ${escapeHtml(timeAgo(r.createdAtUnix))} · account ${escapeHtml(r.uid.slice(0, 8))}${r.appVersion ? " · app " + escapeHtml(r.appVersion) : ""}</span>
                 <p class="support-message">${escapeHtml(r.message)}</p>
                 ${scan}
             </div>
@@ -542,21 +558,21 @@ async function clearAllSuggestions() {
     } finally { button.disabled = false; }
 }
 
-async function clearAllSupportReports() {
-    if (supportReports.length === 0) return;
+async function clearAllSupportReports(kind) {
+    const mine = supportReports.filter((r) => kindOf(r.category) === kind);
+    if (mine.length === 0) return;
     const ok = await askConfirm({
-        title: "Clear all support reports?", danger: true, confirmLabel: "Clear all",
-        message: `All ${supportReports.length} reports leave this list (they are marked dismissed, not deleted).`
+        title: `Clear all ${kind.title}?`, danger: true, confirmLabel: "Clear all",
+        message: `All ${mine.length} ${kind.title} leave this list (they are marked dismissed, not deleted).`
     });
     if (!ok) return;
-    const button = el("supportClearAll");
+    const button = el(kind.prefix + "ClearAll");
     button.disabled = true;
     try {
-        await dismissAll(supportReports.map((r) => ({ id: r.id, collection: "supportReports" })), () => ({ status: "dismissed", handledAt: serverTimestamp() }));
-        const count = supportReports.length;
-        supportReports = [];
+        await dismissAll(mine.map((r) => ({ id: r.id, collection: "supportReports" })), () => ({ status: "dismissed", handledAt: serverTimestamp() }));
+        supportReports = supportReports.filter((r) => kindOf(r.category) !== kind);
         renderSupportReports();
-        notify(`${count} reports cleared.`, "ok");
+        notify(`${mine.length} ${kind.title} cleared.`, "ok");
     } catch (error) {
         console.error("Error clearing support reports: ", error);
         notify("The reports were not cleared. " + describeError(error), "error");

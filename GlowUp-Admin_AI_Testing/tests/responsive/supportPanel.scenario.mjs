@@ -24,7 +24,14 @@ try {
         if (width < 500) await page.locator("[data-panel=suggestions]").screenshot({ path: `${process.env.SHOT_DIR || "."}/dashboard_suggestions_${width}.png` });
         await page.click('#supportList button[data-action="handled"]');
         await page.waitForTimeout(500);
-        ok(/No new support reports/.test(await page.textContent("[data-panel=support]")), `${width}px: marking it handled empties the list`);
+        ok(/No new bug reports/.test(await page.textContent("[data-panel=support]")), `${width}px: marking it handled empties the Bug list`);
+        // one panel for each kind (12 November 2026): Wrong scan results and Other reports have their own panels
+        ok(/the scan said harmful/.test(await page.textContent("#supportWrongList")), `${width}px: the wrong scan result is in its own panel`);
+        ok(/how do I change my email/.test(await page.textContent("#supportOtherList")), `${width}px: the other report is in its own panel`);
+        ok(!/how do I change/.test(await page.textContent("#supportList")), `${width}px: kinds are not mixed`);
+        ok(await page.evaluate(() => ["support", "supportWrong", "supportOther"].every((id) => document.querySelector(`[data-panel=${id}] .panel-fold-btn`) && document.getElementById(id + "ClearAll"))), `${width}px: each panel has its fold arrow and Clear all`);
+        await page.click('#supportWrongList button[data-action="handled"]'); await page.waitForTimeout(400);
+        ok(/No new wrong scan results/.test(await page.textContent("[data-panel=supportWrong]")), `${width}px: the Wrong scan results panel empties too`);
         await page.click('#suggestionList button[data-collection="supportReports"][data-action="reviewed"]');
         await page.waitForTimeout(500);
         ok(!/shade finder/.test(await page.textContent("[data-panel=suggestions]")), `${width}px: marking the app suggestion reviewed takes it off the list`);

@@ -110,7 +110,7 @@ export async function setSidebar(page, state) {
         const root = document.documentElement, wide = innerWidth >= 1024;
         const open = wide ? !root.classList.contains("sb-collapsed") : root.classList.contains("sb-peek");
         if (open === (state === "expanded")) return;
-        const button = innerWidth < 768 ? document.querySelector(".topbar > .menu-btn") : document.getElementById("sidebarToggle");
+        const button = innerWidth < 768 ? document.querySelector(".topbar > .menu-btn") : document.getElementById("sbMenuBtn");
         if (button) button.click();
     }, state);
 }

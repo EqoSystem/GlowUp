@@ -44,7 +44,11 @@
     ];
     // the menu can be folded to its icons; the choice is kept in this browser (and applied before the menu is drawn)
     var FOLD_KEY = "glowup.sidebar.folded";
-    try { if (localStorage.getItem(FOLD_KEY) === "1") root.classList.add("sb-collapsed"); } catch (error) { /* a private window */ }
+    // GMAIL-STYLE MENU (12 November 2026): the menu starts as the icon rail; hovering it opens it over the page, leaving it closes it again,
+    // and the menu button at its top (left of the logo) pins it open ("0" = pinned open, kept in this browser) or folds it back.
+    var pinnedOpen = false;
+    try { pinnedOpen = localStorage.getItem(FOLD_KEY) === "0"; } catch (error) { /* a private window */ }
+    if (!pinnedOpen) root.classList.add("sb-collapsed");
     // the width animates only from here on: a page that opens with the menu folded must not show it folding
     requestAnimationFrame(function () { requestAnimationFrame(function () { root.classList.add("sb-ready"); }); });
     var esc = function (value) { return String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); };
@@ -62,7 +66,7 @@
         // The bottom holds the signed-in e-mail and Sign Out. adminCommon.js fills the e-mail
         // in once the sign-in check has answered, and wires the button.
         sidebar.innerHTML =
-            '<div class="sidebar-brand"><a class="brand-home" href="' + NAV[0].href + '" aria-label="GlowUp – go to dashboard"><span class="brand-mark"><span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"></span></span><span class="brand-title label">Glow Up</span></a></div>' +
+            '<div class="sidebar-brand"><button type="button" class="sb-menu-btn" id="sbMenuBtn" aria-controls="sidebarNav" aria-expanded="false" aria-label="Main menu">' + svg("menu") + '</button><a class="brand-home" href="' + NAV[0].href + '" aria-label="GlowUp – go to dashboard"><span class="brand-mark"><span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"></span></span><span class="brand-title label">Glow Up</span></a></div>' +
             '<ul class="nav-links" id="sidebarNav" aria-label="Pages"><li class="nav-drop" aria-hidden="true"></li>' +
             NAV.map(function (n) {
                 var here = n.id === page;
@@ -97,11 +101,13 @@
         document.body.insertBefore(toggle, main);
         var narrow = window.matchMedia("(max-width: 1023px)");
         var links = sidebar.querySelectorAll(".nav-links a");
+        var sbMenu = sidebar.querySelector("#sbMenuBtn");
         var paintToggle = function () {
             var open = narrow.matches ? root.classList.contains("sb-peek") : !root.classList.contains("sb-collapsed");
             var text = open ? "Collapse sidebar" : "Expand sidebar";
             toggle.setAttribute("aria-expanded", open ? "true" : "false");
             toggle.setAttribute("aria-label", text);
+            if (sbMenu) { sbMenu.setAttribute("aria-expanded", open ? "true" : "false"); sbMenu.setAttribute("aria-label", open ? "Close the main menu" : "Open the main menu"); }
         };
         // lower-middle of the window, but always below the last link and never off the bottom (on a very short window the bottom wins:
         // the tab stays reachable, and it is too narrow to reach the links beside it)
@@ -129,6 +135,32 @@
                 slideTimer = setTimeout(function () { root.classList.remove("sb-moving"); }, 240);
             });
         };
+        // the menu button: pins the menu open, or folds it back (the same as the old edge tab, which is hidden now)
+        var hoverTimer = 0, hoverPeek = false;
+        sbMenu.addEventListener("click", function () {
+            clearTimeout(hoverTimer);
+            if (narrow.matches && hoverPeek) { hoverPeek = false; return; }        // opened by the pointer: a click keeps it open
+            root.classList.remove("sb-hover");
+            toggle.click();
+        });
+        // hovering the rail opens the menu OVER the page (the page does not move); leaving it closes it. Mouse and pen only.
+        var canHover = window.matchMedia("(hover: hover)");
+        var hoverOpen = function () {
+            clearTimeout(hoverTimer);
+            if (!canHover.matches || window.innerWidth < 768) return;
+            if (narrow.matches) {
+                if (!root.classList.contains("sb-peek")) { root.classList.add("sb-peek"); hoverPeek = true; paintToggle(); }
+            } else if (root.classList.contains("sb-collapsed")) root.classList.add("sb-hover");
+        };
+        var hoverClose = function () {
+            clearTimeout(hoverTimer);
+            hoverTimer = setTimeout(function () {
+                root.classList.remove("sb-hover");
+                if (hoverPeek) { hoverPeek = false; root.classList.remove("sb-peek"); paintToggle(); }
+            }, 160);
+        };
+        sidebar.addEventListener("pointerenter", function (event) { if (event.pointerType !== "touch") hoverOpen(); });
+        sidebar.addEventListener("pointerleave", hoverClose);
         toggle.addEventListener("click", function () {
             slidePage(function () {
                 if (narrow.matches) root.classList.toggle("sb-peek");

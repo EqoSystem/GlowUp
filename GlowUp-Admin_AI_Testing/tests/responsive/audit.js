@@ -69,6 +69,7 @@ window.__audit = function () {
         const el = t.parentElement;
         if (!visCache.has(el)) visCache.set(el, shown(el));
         if (!visCache.get(el)) continue;
+        { const folded = el.closest("details:not([open])"); if (folded && !el.closest("summary")) continue; }       // the inside of a closed <details> is not on the page
         if (el.closest(".modal-overlay") && cs(el.closest(".modal-overlay")).display === "none") continue;
         const range = document.createRange(); range.selectNodeContents(t);
         const rects = Array.from(range.getClientRects()).filter((q) => q.width > 1 && q.height > 1);

@@ -784,7 +784,8 @@ export function dialogFrame(title, onDismiss) {
 
 /**
  * "Are you sure?" as a proper dialog. Resolves true when confirmed.
- * options = { title, message, items: [names], confirmLabel, danger }
+ * options = { title, message, items: [names], confirmLabel, danger, inline }
+ * inline = true: the question and its buttons stand on ONE row (title left, Cancel and the answer right), for a question with no more words (Sign out?).
  */
 export function askConfirm(options) {
     return new Promise((resolve) => {
@@ -800,7 +801,8 @@ export function askConfirm(options) {
         }
         const actions = document.createElement("div");
         actions.className = "modal-actions";
-        actions.style.marginTop = "18px";
+        if (options.inline) frame.box.classList.add("confirm-inline");
+        else actions.style.marginTop = "18px";
         const cancel = document.createElement("button");
         cancel.type = "button"; cancel.className = "cancel-btn"; cancel.textContent = options.cancelLabel || "Cancel";
         const ok = document.createElement("button");

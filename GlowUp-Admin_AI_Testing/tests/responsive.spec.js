@@ -92,8 +92,8 @@ try {
             for (let i = 0; i < 2; i++) {
                 await phase("Quick settings opening"); await setQuickSettings(page, true); await page.waitForTimeout(350);
                 await phase("Quick settings closing"); await setQuickSettings(page, false); await page.waitForTimeout(350);
-                await phase("menu folding"); await page.evaluate(() => document.getElementById("sidebarToggle").click()); await page.waitForTimeout(350);
-                await phase("menu unfolding"); await page.evaluate(() => document.getElementById("sidebarToggle").click()); await page.waitForTimeout(350);
+                await phase("menu folding"); await page.evaluate(() => document.getElementById("sbMenuBtn").click()); await page.waitForTimeout(350);
+                await phase("menu unfolding"); await page.evaluate(() => document.getElementById("sbMenuBtn").click()); await page.waitForTimeout(350);
             }
             return dragMs;
         };

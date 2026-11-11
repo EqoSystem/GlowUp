@@ -158,10 +158,12 @@
                 </div>
             </section>
 
-            <!-- Contact support (10 November 2026): reports sent from the app's Settings > Contact support (Firestore "supportReports") -->
-            <section class="panel" data-panel="support" data-label="Support reports" data-w="8">
+            <!-- Contact support (12 November 2026): reports sent from the app's Settings > Contact support (Firestore "supportReports"), one panel for each kind.
+                 "Suggestion" reports are in the Suggestions panel above. The id "support" is kept for the Bug panel, so saved layouts still find it. -->
+            <section class="panel" data-panel="support" data-label="Bug reports" data-w="8">
                 <div class="panel-head">
-                    <h3 class="panel-title">Support reports</h3>
+                    <h3 class="panel-title">Bug reports</h3>
+                    <button type="button" class="guide-badge" data-tip-title="Bug reports" data-tip="Bugs that users reported from the app's Contact support." data-tip-preview="Mark one handled when you dealt with it, or dismiss it.">i</button>
                     <span class="spacer"></span>
                     <div class="pager" id="supportPager"></div>
                     <button type="button" class="btn small ghost clear-all-btn" id="supportClearAll" hidden>Clear all</button>
@@ -169,7 +171,37 @@
                 <ul class="suggestion-list support-list" id="supportList" style="display: none;"></ul>
                 <div class="empty-state loading" id="supportEmpty"><div class="sk-list"><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div></div>
                     <p class="empty-message" id="supportEmptyMessage">Loading reports...</p>
-                    <span class="empty-hint" id="supportEmptyHint">Reports from the app's Contact support show here.</span>
+                    <span class="empty-hint" id="supportEmptyHint">Bug reports from the app's Contact support show here.</span>
+                </div>
+            </section>
+
+            <section class="panel" data-panel="supportWrong" data-label="Wrong scan results" data-w="8">
+                <div class="panel-head">
+                    <h3 class="panel-title">Wrong scan results</h3>
+                    <button type="button" class="guide-badge" data-tip-title="Wrong scan results" data-tip="Scan results that users said were wrong, with their last scan when they attached it." data-tip-preview="Mark one handled when you dealt with it, or dismiss it.">i</button>
+                    <span class="spacer"></span>
+                    <div class="pager" id="supportWrongPager"></div>
+                    <button type="button" class="btn small ghost clear-all-btn" id="supportWrongClearAll" hidden>Clear all</button>
+                </div>
+                <ul class="suggestion-list support-list" id="supportWrongList" style="display: none;"></ul>
+                <div class="empty-state loading" id="supportWrongEmpty"><div class="sk-list"><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div></div>
+                    <p class="empty-message" id="supportWrongEmptyMessage">Loading reports...</p>
+                    <span class="empty-hint" id="supportWrongEmptyHint">Wrong scan results reported from the app show here.</span>
+                </div>
+            </section>
+
+            <section class="panel" data-panel="supportOther" data-label="Other reports" data-w="8">
+                <div class="panel-head">
+                    <h3 class="panel-title">Other reports</h3>
+                    <button type="button" class="guide-badge" data-tip-title="Other reports" data-tip="Any other message users sent from the app's Contact support." data-tip-preview="Mark one handled when you dealt with it, or dismiss it.">i</button>
+                    <span class="spacer"></span>
+                    <div class="pager" id="supportOtherPager"></div>
+                    <button type="button" class="btn small ghost clear-all-btn" id="supportOtherClearAll" hidden>Clear all</button>
+                </div>
+                <ul class="suggestion-list support-list" id="supportOtherList" style="display: none;"></ul>
+                <div class="empty-state loading" id="supportOtherEmpty"><div class="sk-list"><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div></div>
+                    <p class="empty-message" id="supportOtherEmptyMessage">Loading reports...</p>
+                    <span class="empty-hint" id="supportOtherEmptyHint">Other messages from the app's Contact support show here.</span>
                 </div>
             </section>
         </div>

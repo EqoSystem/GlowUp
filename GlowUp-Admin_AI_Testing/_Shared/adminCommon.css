@@ -2204,3 +2204,36 @@ body:has(> :is(#addIngredientModal, #addBrandModal, #productModal)[style*="flex"
     .ing-modal .finder-row { grid-template-columns: minmax(0, 1fr) auto; }
     .ing-modal .finder-row .finder-what { grid-column: 1 / -1; grid-row: 2; }
 }
+
+/* "Sign out?" and other one-line questions: the question on the left, its buttons on the right, one row (12 November 2026) */
+.modal-content.confirm-inline { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px 28px; }
+.modal-content.confirm-inline > h3 { margin: 0; flex: 0 1 auto; }
+.modal-content.confirm-inline > .modal-actions { margin: 0; flex: 0 0 auto; }
+
+/* ============================================================== GMAIL-STYLE MENU (12 November 2026)
+   The menu is the icon rail by default. Hovering it opens it OVER the page (html.sb-hover from 1024 px; html.sb-peek below), leaving it
+   closes it. The menu button left of the logo pins it open (the page moves over, as before) or folds it back. The old edge tab is hidden. */
+.sb-menu-btn { display: none; }
+@media (min-width: 768px) {
+    .sb-menu-btn { display: inline-grid; place-items: center; flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text-2); cursor: pointer; }
+    .sb-menu-btn:hover { background: var(--surface-3); color: var(--text); }
+    .sb-menu-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .sb-menu-btn svg.ic { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+    #sidebarToggle { display: none; }
+}
+@media (min-width: 1024px) {
+    html.sb-collapsed:not(.sb-hover) .sidebar-brand .brand-home { display: none; }                       /* the rail shows only the menu button */
+    html.sb-collapsed .sidebar-brand { flex-direction: row; justify-content: center; }
+    html.sb-collapsed.sb-hover .sidebar { width: 232px; z-index: 900; box-shadow: var(--shadow); }       /* over the page: the grid column stays 72 px */
+    html.sb-collapsed.sb-hover .sidebar > * { width: 204px; flex-shrink: 0; }
+    html.sb-collapsed.sb-hover .sidebar > .nav-links { flex-shrink: 1; }
+    html.sb-collapsed.sb-hover .sidebar .label, html.sb-collapsed.sb-hover .signed-in-as { display: inline; animation: sb-label-in .18s ease-out both; }
+    html.sb-collapsed.sb-hover .sidebar-brand { flex-direction: row; justify-content: flex-start; gap: 10px; }
+    html.sb-collapsed.sb-hover .brand-home { flex-direction: row; gap: 10px; }
+    html.sb-collapsed.sb-hover .nav-links a, html.sb-collapsed.sb-hover .sign-out { justify-content: flex-start; padding-left: 12px; padding-right: 12px; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+    html:not(.sb-peek) .sidebar-brand .brand-home { display: none; }
+    html.sb-peek .sidebar-brand, html.sb-peek.sb-collapsed .sidebar-brand { flex-direction: row; justify-content: flex-start; align-items: center; gap: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { html.sb-hover .sidebar .label { animation: none !important; } }

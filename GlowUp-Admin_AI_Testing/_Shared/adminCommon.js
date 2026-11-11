@@ -140,7 +140,7 @@ function watchIdle() {
 }
 
 async function confirmSignOut() {
-    const sure = await askConfirm({ title: "Sign out?", message: "You will need your e-mail and password to come back in.", confirmLabel: "Sign out", danger: true });
+    const sure = await askConfirm({ title: "Sign out?", confirmLabel: "Sign out", danger: true, inline: true });
     if (!sure) return;
     remember(false);
     clearStore();                    // the lists this tab kept belong to the signed-in admin
