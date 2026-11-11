@@ -217,7 +217,7 @@ namespace GlowUp.EditorTools
             // =====================================================================================
             //  Camera helpers: bright screen, flashlight, screen light
             // =====================================================================================
-            Transform cameraHelpers = TileSection(content, scroll, "CameraSection", "Camera Helpers", "Bright screen, flashlight, face light", IconFactory.CameraIcon, SettingsIconAnimator.Style.Spin, 2);
+            Transform cameraHelpers = TileSection(content, scroll, "CameraSection", "Camera Helpers", "Bright screen, flashlight, volume button", IconFactory.CameraIcon, SettingsIconAnimator.Style.Spin, 2);
             PreferenceRow(cameraHelpers, "ScanBrightRow", "Bright screen while scanning", "Full screen brightness in AI Smart Scan.", true, UiPreferenceToggle.Preference.ScanBrightScreen);
             Divider(cameraHelpers);
             PreferenceRow(cameraHelpers, "FlashlightRow", "Flashlight in the dark", "Offer the flashlight when the scanner finds it too dark.", true, UiPreferenceToggle.Preference.AutoFlashlight);
@@ -225,6 +225,15 @@ namespace GlowUp.EditorTools
             PreferenceRow(cameraHelpers, "TryOnBrightRow", "Bright screen in AR Try-On", "Full screen brightness while you try a product on.", true, UiPreferenceToggle.Preference.TryOnBrightScreen);
             Divider(cameraHelpers);
             PreferenceRow(cameraHelpers, "ScreenLightRow", "Face light in the dark", "A bright white frame on the screen lights your face.", true, UiPreferenceToggle.Preference.TryOnScreenLight);
+            // phase 2A (11 November 2026): what the phone's volume buttons do on AI Smart Scan (saved in UiPreferences.VolumeButton)
+            Divider(cameraHelpers);
+            GameObject volumeBlock = Block(cameraHelpers, "VolumeButtonBlock");
+            A.Label(volumeBlock.transform, "Title", "Volume button does:", RowTitle, ThemeRole.MainText, FontRole.Label);
+            ChoiceTabs volumeTabs = Tabs(volumeBlock.transform, "VolumeButtonTabs", new[] { "Capture photo", "Start/stop scan", "Do nothing" }, 2, out _, 28);
+            TextMeshProUGUI volumeStatus = A.Label(volumeBlock.transform, "StatusText", "The volume buttons only change the volume.",
+                                                   RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            var volumeSetting = Feature<VolumeButtonSetting>(features, "VolumeButtonSetting");
+            A.Set(volumeSetting, "tabs", volumeTabs); A.Set(volumeSetting, "statusText", volumeStatus);
 
             // =====================================================================================
             //  2. Account

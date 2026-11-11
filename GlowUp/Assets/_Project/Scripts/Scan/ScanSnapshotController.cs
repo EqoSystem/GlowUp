@@ -425,7 +425,26 @@ namespace GlowUp.Scan
                 // THE GLOWUP CATALOGUE ONLY (11 November 2026, the owner's decision: the web search had a daily limit, so it was taken out).
                 // The text read on the pack goes to the live scan's matcher; the user picks the product. Nothing leaves the phone.
                 string catalogueText = verdict.cleanText.Length > 0 ? verdict.cleanText : read.anyText;
-                if (catalogueText.Length == 0) { preview.Problem(msgNoTextRead, typeItInLabel, OpenTyping, false); return; }
+                // phase 2B (11 November 2026): the bars were not read, but the number printed under them may have been read as text. A complete
+                // number with the right check digit that the catalogue knows is the product (as sure as the bars); any other number goes to the
+                // Barcode card, whose Find offers the catalogue products with the nearest barcodes for the user to pick from.
+                if (barcodeSeen.Length == 0)
+                    foreach (string number in BarcodeFuzzy.NumbersIn(read.anyText + " | " + catalogueText))
+                    {
+                        ProductData exact = BarcodeFuzzy.IsValidGtin(number) ? PhotoBarcode.Find(MlKitBarcodeReader.Key(number)) : null;
+                        if (exact != null)
+                        {
+                            preview.Say(StatusMessage.Kind.Progress, msgBarcodeMatched);
+                            await Task.Delay(400);
+                            if (this == null || mine != attempt) return;
+                            Close();
+                            Analysed?.Invoke(exact, null);
+                            return;
+                        }
+                        string key = MlKitBarcodeReader.Key(number);
+                        if (key.Length > 0) { barcodeSeen = key; break; }
+                    }
+                if (catalogueText.Length == 0) { if (HandOverBarcode()) return; preview.Problem(msgNoTextRead, typeItInLabel, OpenTyping, false); return; }
                 preview.Say(StatusMessage.Kind.Progress, msgCatalog);
                 List<ScanShortlist.Entry> matches = CatalogMatches != null ? ScanShortlist.For(ProductRepository.Index, catalogueText, null, null, 6) : new List<ScanShortlist.Entry>();
                 if (matches.Count == 0) { if (HandOverBarcode()) return; preview.Problem(NotInCatalogueWords(), typeItInLabel, OpenTyping, false); return; }

@@ -103,6 +103,16 @@ namespace GlowUp.Common
         /// <summary>AR Try-On lights the face with a bright white frame on the screen when it is dark (the "front flash").</summary>
         public static bool TryOnScreenLight { get => Get("GlowUp.Camera.TryOnScreenLight", true); set => Set("GlowUp.Camera.TryOnScreenLight", value); }
 
+        /// <summary>What the phone's volume buttons do on the AI Smart Scan screen (Settings > Camera Helpers; phase 2A, 11 November 2026).</summary>
+        public enum VolumeButtonAction { CapturePhoto = 0, StartStopScan = 1, DoNothing = 2 }
+
+        /// <summary>Default: Do nothing (the buttons change the volume, as on any other screen).</summary>
+        public static VolumeButtonAction VolumeButton
+        {
+            get => (VolumeButtonAction)Mathf.Clamp(PlayerPrefs.GetInt("GlowUp.Camera.VolumeButton", (int)VolumeButtonAction.DoNothing), 0, 2);
+            set { PlayerPrefs.SetInt("GlowUp.Camera.VolumeButton", (int)value); Save(); }
+        }
+
         static bool Get(string key, bool fallback) => PlayerPrefs.GetInt(key, fallback ? 1 : 0) == 1;
         static void Set(string key, bool value) { PlayerPrefs.SetInt(key, value ? 1 : 0); Save(); }
         static void Save() { PlayerPrefs.Save(); Changed?.Invoke(); }

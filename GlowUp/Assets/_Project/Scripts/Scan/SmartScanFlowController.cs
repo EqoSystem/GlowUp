@@ -516,6 +516,11 @@ namespace GlowUp.Scan
             catch (Exception e) { Debug.LogWarning("Scan: brands and products could not be loaded: " + e.Message); }
         }
 
+        // phase 2A: the volume buttons belong to this screen only while it is shown, and only when Settings gives them a job
+        void OnEnable() { VolumeKeyInput.SetActive(UiPreferences.VolumeButton != UiPreferences.VolumeButtonAction.DoNothing); }
+        void OnDisable() { VolumeKeyInput.SetActive(false); }
+        void OnApplicationFocus(bool focused) { VolumeKeyInput.SetActive(focused && isActiveAndEnabled && UiPreferences.VolumeButton != UiPreferences.VolumeButtonAction.DoNothing); }
+
         void OnDestroy()
         {
             if (snapshot != null) { snapshot.Analysed -= OnSnapshotAnalysed; snapshot.NameOnly -= OnSnapshotNameOnly; snapshot.TypeItIn -= OpenManual; snapshot.CaptureModeRequested -= EnterPhotoMode; snapshot.CatalogMatches -= ShowPhotoMatches; }
@@ -630,6 +635,29 @@ namespace GlowUp.Scan
 
         LongPressHint modeHint;
         bool photoAfterCameraStarts;                  // the camera button was tapped before the camera ran: photo mode once it runs
+
+        /// <summary>
+        /// The phone's volume button (phase 2A, 11 November 2026; Settings > Camera Helpers > "Volume button does:"). It does exactly what a
+        /// tap on the matching button would do, and nothing while that button cannot be used (a pop-up is open, the screen is busy).
+        ///   Capture photo: in photo mode the capture button; otherwise the Photo button (it switches to photo mode first).
+        ///   Start/stop scan: the scan button. In photo mode it goes back to live scanning first.
+        /// </summary>
+        void VolumeButtonPressed()
+        {
+            if (PopupOpen || stage == Stage.Recognising || stage == Stage.Leaving) return;
+            if (snapshot != null && (snapshot.IsOpen || snapshot.PreviewOpen)) return;
+            switch (UiPreferences.VolumeButton)
+            {
+                case UiPreferences.VolumeButtonAction.CapturePhoto:
+                    if (photoMode) { if (shutter != null && shutter.isActiveAndEnabled && shutter.interactable) shutter.onClick.Invoke(); }
+                    else if (photoButton != null && photoButton.interactable) OnPhotoButton();
+                    break;
+                case UiPreferences.VolumeButtonAction.StartStopScan:
+                    if (photoMode) { ExitPhotoMode(); break; }
+                    if (holdButton != null && holdButton.isActiveAndEnabled) holdButton.Toggle();
+                    break;
+            }
+        }
 
         void OnPhotoButton()
         {
@@ -770,6 +798,7 @@ namespace GlowUp.Scan
         void Update()
         {
             if (Input.GetKeyDown(KeyCode.Escape)) { BackKey(); return; }
+            if (VolumeKeyInput.TakePresses() > 0) VolumeButtonPressed();
             if (stage != Stage.Scanning) return;
             TakeEarlyBarcode();                              // fast early barcode / QR recognition
             if (stage != Stage.Scanning) return;
@@ -2469,6 +2498,7 @@ namespace GlowUp.Scan
             barcode = ""; lastColour = "";
             shadeCandidate = lockedShade = ""; shadeStableCount = 0; photoHintSaid = false;
             declined.Clear(); shortlistAnswered = false; detailsAnswered = false; frontChecked = "";
+            nearBarcodesFor = "";
             scanNumber++;
             ResetScanRankingState();
             ReadCounter.NewScan();
@@ -3192,10 +3222,46 @@ namespace GlowUp.Scan
         /// no daily limit; only the number is sent): its name, brand and ingredient list go to the usual analysis, and the scan adds the
         /// product to the catalogue as Pending with this barcode, so an admin reviews it on the website; 3. the user names the product.
         /// </summary>
+        // ---------------------------------------------------------------------------------------
+        //  A BARCODE READ ONLY PARTLY (phase 2B, 11 November 2026): the number under the bars, read as text, is checked; a complete
+        //  number with the right check digit that the catalogue knows is the product. A number that is incomplete or has a wrong check
+        //  digit offers the catalogue products with the NEAREST barcodes as a list to pick from: it is never taken by itself.
+        // ---------------------------------------------------------------------------------------
+        [Header("A barcode read only partly")]
+        [SerializeField] private string msgBarcodeUnclear = "The barcode was only partly read. Pick your product, or choose None of these.";
+        string nearBarcodesFor = "";
+
+        /// <summary>Opens "Is it one of these?" with the catalogue products whose barcodes are nearest to `read`. False = none is near.</summary>
+        bool OfferNearBarcodes(string read, Action noneOfThese)
+        {
+            List<BarcodeFuzzy.Near> near = BarcodeFuzzy.Nearest(read, BarcodeFuzzy.BarcodesOf(ProductRepository.Index.Products));
+            if (near.Count == 0) return false;
+            var entries = new List<ScanShortlist.Entry>();
+            var seen = new HashSet<string>();
+            foreach (BarcodeFuzzy.Near n in near)
+            {
+                ProductData p = n.product;
+                var entry = new ScanShortlist.Entry { product = p, productName = p.name ?? "", brandName = p.brandName ?? "", cosmeticType = p.cosmeticType ?? "", score = n.score, byText = true };
+                if (seen.Add(entry.Key)) entries.Add(entry);
+            }
+            nearBarcodesFor = read;
+            Debug.Log("[Barcode] partly read (" + read.Length + " digits): " + entries.Count + " nearest catalogue product(s) offered");
+            OpenShortlist(shortlistTitle, msgBarcodeUnclear, shortlistNoneLabel, () => { nearBarcodesFor = ""; }, () => noneOfThese?.Invoke(), entries);      // after None, the same number is not offered again
+            return true;
+        }
+
         async void OnBarcodeFind(string key, string typedName)
         {
             ProductData found = PhotoBarcode.Find(key);
             if (found != null) { barcodeCard.Hide(); barcode = key; OnSnapshotAnalysed(found, null); return; }
+            // phase 2B: an incomplete number, or one with a wrong check digit: the nearest catalogue barcodes first (the user picks)
+            if (typedName.Length == 0 && !BarcodeFuzzy.IsValidGtin(key) && nearBarcodesFor != key)
+            {
+                string number = key;
+                barcodeCard.Hide();
+                if (OfferNearBarcodes(number, () => { if (barcodeCard != null) { barcodeCard.Show(number); barcodeCard.AskForName(); } })) return;
+                barcodeCard.Show(number);
+            }
             if (typedName.Length == 0 && OpenBeautyFacts.Enabled && ConnectivityMonitor.Online)
             {
                 barcodeCard.Say(msgBarcodeLookingUp);

@@ -78,6 +78,17 @@ namespace GlowUp.Scan
             if (locked) ScanStarted?.Invoke(); else ScanPaused?.Invoke();
         }
 
+        /// <summary>A tap from code (the volume button, phase 2A): the same rules as a finger's tap. True when it was taken.</summary>
+        public bool Toggle()
+        {
+            if (!usable || tapsIgnored || pressed) return false;
+            if (debounceSeconds > 0f && Time.unscaledTime - lastTap < debounceSeconds) return false;
+            lastTap = Time.unscaledTime;
+            locked = !locked;
+            if (locked) ScanStarted?.Invoke(); else ScanPaused?.Invoke();
+            return true;
+        }
+
         /// <summary>Stops scanning and clears any touch state from code (the scan finished, the screen is left).</summary>
         public void LetGo()
         {
