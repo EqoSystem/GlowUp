@@ -87,8 +87,13 @@ namespace GlowUp.EditorTools
             Kit.StyleInput(password, "Your password", ThemeRole.InputBackground);
             password.contentType = TMP_InputField.ContentType.Password;
             Kit.AddEye(password);
+            // accounts with both a password and Google can switch the way they confirm (12 November 2026); hidden for the others
+            Button switchMethod = A.LinkButton(deletePopup.box, "SwitchMethodButton", "Confirm with Google instead", 28, ThemeRole.AccentText);
+            A.TopStrip(switchMethod.transform, 394 + Kit.FieldHeight + 8, 56, 48, 48);
+            switchMethod.gameObject.SetActive(false);
             TextMeshProUGUI deleteMessage = A.Label(deletePopup.box, "DeleteMessageText", "", 29, ThemeRole.Warning, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            A.TopStrip(deleteMessage.transform, 546, 150, 48, 48);
+            A.TopStrip(deleteMessage.transform, 394 + Kit.FieldHeight + 72, 130, 48, 48);
+            A.ShrinkWrapped(deleteMessage, 22);
             Button deleteConfirm = A.PillButton(deletePopup.box, "ConfirmDeleteButton", "Delete My Account", 36, ThemeRole.Warning, ThemeRole.Background, IconFactory.Trash);
             A.BottomStrip(deleteConfirm.transform, 168, 108, 48, 48);
             Button deleteCancel = A.PillButton(deletePopup.box, "CancelDeleteButton", "Keep My Account", 36, ThemeRole.SurfaceAlt, ThemeRole.MainText);
@@ -394,6 +399,7 @@ namespace GlowUp.EditorTools
             A.Set(accountActions, "passwordInput", password); A.Set(accountActions, "confirmDeleteButton", deleteConfirm);
             A.Set(accountActions, "confirmDeleteLabel", A.LabelOf(deleteConfirm)); A.Set(accountActions, "cancelDeleteButton", deleteCancel);
             A.Set(accountActions, "deleteMessageText", deleteMessage);
+            A.Set(accountActions, "passwordLabel", passwordLabel); A.Set(accountActions, "warningText", deleteWarning); A.Set(accountActions, "switchMethodButton", switchMethod);
 
             // ---- the page itself ----
             var controller = A.Controller<SettingsFlowController>("SettingsFlowController");

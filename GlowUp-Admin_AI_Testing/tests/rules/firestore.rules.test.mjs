@@ -297,6 +297,14 @@ await can("an admin saves their own shortcuts", () => setDoc(doc(adminDoc(), "ad
 await can("an admin reads their own shortcuts", () => getDoc(doc(adminDoc(), "adminShortcuts/a1")));
 await cannot("an admin reads another admin's shortcuts", () => getDoc(doc(adminDoc(), "adminShortcuts/a2")));
 await cannot("an admin writes another admin's shortcuts", () => setDoc(doc(adminDoc(), "adminShortcuts/a2"), keys()));
+// account deletion (12 November 2026): the profile is deleted only right after a fresh sign-in
+const fresh = () => env.authenticatedContext("u1", { auth_time: Math.floor(Date.now() / 1000) - 30 }).firestore();
+const stale = () => env.authenticatedContext("u1", { auth_time: Math.floor(Date.now() / 1000) - 3600 }).firestore();
+await can("the owner deletes the profile right after signing in again", () => deleteDoc(doc(fresh(), "users/u1")));
+await cannot("the owner deletes the profile on an old sign-in", () => deleteDoc(doc(stale(), "users/u1")));
+await cannot("another user deletes the profile", () => deleteDoc(doc(other(), "users/u1")));
+await can("the owner still updates the profile on an old sign-in", () => setDoc(doc(stale(), "users/u1"), { firstName: "Changed" }));
+await can("the owner deletes a scan (Recent Scans: Delete forever)", () => deleteDoc(doc(stale(), "users/u1/scans/s1")));
 // support reports from the app (Settings > Contact support); "Suggestion" added 11 November 2026
 const report = (category) => ({ uid: "u1", category, message: "Please add a shade finder", status: "new", appVersion: "1.0", device: "Pixel", createdAtUnix: now });
 await can("a user sends a Suggestion report", () => setDoc(doc(user(), "supportReports/r1"), report("Suggestion")));

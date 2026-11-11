@@ -28,6 +28,11 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    // signed in within the last 5 minutes (account deletion, 12 November 2026): the app re-authenticates and refreshes its token first
+    function recentLogin() {
+      return request.auth.token.auth_time > request.time.toMillis() / 1000 - 300;
+    }
+
     // What the app itself adds to the catalogue (an ingredient its AI lookup found, a product or
     // brand it met in a scan) must carry the user's own id and must be marked "not reviewed".
     // The app can only CREATE such entries: it can never change or delete anything in the catalogue.
@@ -303,7 +308,8 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read, write: if isOwner(uid);
+      allow read, create, update: if isOwner(uid);
+      allow delete: if isOwner(uid) && recentLogin();       // only during account deletion, right after a fresh sign-in
 
       match /scans/{scanId} {
         allow read, write: if isOwner(uid);
