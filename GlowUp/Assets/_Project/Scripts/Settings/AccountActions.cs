@@ -120,7 +120,7 @@ namespace GlowUp.AppSettings
             Providers(user, out hasPassword, out hasGoogle);
             Say("");
             SetBusy(false);
-            ShowMode(!hasPassword && hasGoogle);            // a password account confirms with its password; a Google-only account with Google
+            ShowMode(hasGoogle);                              // a Google account (alone or with a password) confirms with Google first; "Confirm with my password instead" is offered when it also has a password
             if (deletePanel != null) deletePanel.Show();
         }
 
