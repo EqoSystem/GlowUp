@@ -37,13 +37,25 @@ namespace GlowUp.EditorTools
         public static void Build()
         {
             WebSearchResultView view = null;
-            GameObject brandCard = null, productCard = null, sourcesCard = null, shadesCard = null;
+            GameObject overviewCard = null, brandCard = null, productCard = null, sourcesCard = null, shadesCard = null;
             ScanResultSceneBuilder.BuildScene("WebSearchResultScene", "Web Search Result", (s, content) =>
             {
                 view = A.Controller<WebSearchResultView>("WebSearchResultView");
 
+                // ---- 0. what the pages say (an AI summary of the web search): a row per kind, each hidden when nothing was found
+                overviewCard = ScanResultSceneBuilder.Section(content, "WebOverviewCard", "From the web");
+                var notes = new[]
+                {
+                    Field(overviewCard.transform, "FinishField", "Finish and coverage", "Buildable medium to full coverage with a luminous matte finish that wears up to 30 hours."),
+                    Field(overviewCard.transform, "ShadeField", "Shade", "Shade 119 is made for light skin with warm or neutral undertones."),
+                    Field(overviewCard.transform, "PriceField", "Price and availability", "About PHP 699 for 35 ml in the Philippines (approximate), sold by Maybelline Philippines, Watsons and Shopee."),
+                    Field(overviewCard.transform, "ApplyField", "How to apply", "Shake well, then blend one or two pumps with a damp sponge, a brush or your fingertips.")
+                };
+                A.Label(overviewCard.transform, "OverviewNote", "Summarised by AI from the pages under Sources. It can contain mistakes: check the brand's own page.", SmallSize,
+                        ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+
                 // ---- 1. the brand
-                brandCard = ScanResultSceneBuilder.Section(content, "WebBrandCard", "Brand");
+                brandCard =ScanResultSceneBuilder.Section(content, "WebBrandCard", "Brand");
                 GameObject head = A.Node(brandCard.transform, "BrandHead");
                 A.HStack(head, 24, 0, 0, 0, 0, TextAnchor.MiddleLeft);
                 RawImage logo = PictureFrame(head.transform, "LogoFrame", 168, 168, IconFactory.Shield, out GameObject logoPlaceholder);
@@ -108,7 +120,9 @@ namespace GlowUp.EditorTools
                 A.Set(view, "shadesCard", shadesCard);
                 Kit.SetArray(view, "shadeSwatches", swatches);
                 Kit.SetArray(view, "shadeLabels", labels);
-                Kit.SetArray(view, "webCards", new[] { brandCard, productCard, sourcesCard, shadesCard });
+                A.Set(view, "overviewCard", overviewCard);
+                Kit.SetArray(view, "overviewTexts", notes);
+                Kit.SetArray(view, "webCards", new[] { overviewCard, brandCard, productCard, sourcesCard, shadesCard });
             });
             Debug.Log("[GlowUp] WebSearchResultScene built: the AI Scan Result screen with the Brand, Product details, Sources and Shade on the pack cards under the verdict (WebSearchResultView fills them).");
         }

@@ -54,7 +54,12 @@ namespace GlowUp.Result
         [SerializeField] private Image[] shadeSwatches;
         [SerializeField] private TextMeshProUGUI[] shadeLabels;
 
-        [Tooltip("The four web cards: hidden together when the screen opens without a web search result")]
+        [Header("From the web (what the pages say)")]
+        [SerializeField] private GameObject overviewCard;
+        [Tooltip("Finish and coverage, Shade, Price and availability, How to apply: each value's row is hidden when the search found nothing for it")]
+        [SerializeField] private TextMeshProUGUI[] overviewTexts;
+
+        [Tooltip("The web cards: hidden together when the screen opens without a web search result")]
         [SerializeField] private GameObject[] webCards;
 
         [Header("Words")]
@@ -92,6 +97,16 @@ namespace GlowUp.Result
 
         public void Show(WebSearchResult web)
         {
+            // ---- what the pages say: one row per kind, a kind with nothing found takes no room
+            string[] notes = { web.finishNote, web.shadeNote, web.priceNote, web.applyNote };
+            for (int i = 0; overviewTexts != null && i < overviewTexts.Length && i < notes.Length; i++)
+            {
+                if (overviewTexts[i] == null) continue;
+                overviewTexts[i].text = notes[i] ?? "";
+                overviewTexts[i].transform.parent.gameObject.SetActive(!string.IsNullOrEmpty(notes[i]));      // the row: its label and the value
+            }
+            if (overviewCard != null) overviewCard.SetActive(web.HasHighlights);
+
             // ---- brand
             Text(brandNameText, web.brandName);
             Text(marketText, string.IsNullOrEmpty(web.market) ? "Global" : web.market);

@@ -135,6 +135,12 @@ r = await call({ quota: 403, quotaDoc: { fields: { count: { integerValue: "1" },
 check(r.status === 429 && r.body.code === "busy", "own limits fine but the commit refused: the global cap is reached");
 equal([handler.helpers.COOLDOWN_SECONDS, handler.helpers.PER_UID_DAILY, handler.helpers.GLOBAL_DAILY], [30, 5, 150], "the constants: 30 s, 5 a day, 150 a day for everybody");
 
+// ---- the web highlights (11 November 2026)
+const lit = tidySnapshot({ found: true, brand: "A", highlights: { finish: "Matte, medium to full. See https://x.example/a", shade: 7, price: "About PHP 699 at Watsons.", apply: "x".repeat(500), other: "dropped" } });
+equal([lit.highlights.finish, lit.highlights.shade, lit.highlights.price, lit.highlights.apply.length, Object.keys(lit.highlights).length],
+    ["Matte, medium to full. See", "", "About PHP 699 at Watsons.", 240, 4], "highlights: plain text without links, at most 240 characters, only the four kinds");
+equal(tidySnapshot({ found: true, brand: "A" }).highlights, { finish: "", shade: "", price: "", apply: "" }, "no highlights: four empty ones");
+
 // ---- the web search result's facts (11 November 2026)
 const facts = tidySnapshot({ found: true, brand: "Maybelline New York", productName: "Super Stay Lumi-Matte Foundation", shadeCode: "119<script>", description: "A long-wear matte foundation. See https://evil.example/x now.",
     officialSite: "https://www.maybelline.com/", minimumAge: 3, confidence: 0.9 });

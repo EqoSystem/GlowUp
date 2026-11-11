@@ -442,7 +442,7 @@ namespace GlowUp.Scan
                 if (listed != null) { Close(); Analysed?.Invoke(listed, null); return; }
 
                 // the user's OWN earlier photo of this product (another user's entry never is)
-                PendingProductData staged = who.productName.Length > 0 ? await PendingProductRepository.FindAsync(who.brandName, who.productName) : null;
+                PendingProductData staged = who.productName.Length > 0 ? await PendingProductRepository.FindConfirmedAsync(who.brandName, who.productName) : null;
                 if (this == null || mine != attempt) return;
                 if (staged != null && staged.ingredients.Count > 0) { Close(); Analysed?.Invoke(null, staged); return; }
 

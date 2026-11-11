@@ -38,6 +38,10 @@ namespace GlowUp.Scan
         public List<Shade> shades = new List<Shade>();
         public List<string> ingredients = new List<string>();
 
+        // ---- what the pages say (an AI summary of the web search, like a search engine's overview); "" = nothing found
+        public string finishNote = "", shadeNote = "", priceNote = "", applyNote = "";
+        public bool HasHighlights => finishNote.Length + shadeNote.Length + priceNote.Length + applyNote.Length > 0;
+
         // ---- the sources: the maker's site (or an unverified one), a shop, and one more page
         public Source primary, secondary, third;
 
@@ -73,6 +77,11 @@ namespace GlowUp.Scan
                     var shade = new Shade { code = Str(s, "code", 30), hex = Hex(Str(s, "hex", 7)) };
                     if (shade.code.Length > 0 || shade.hex.Length > 0) r.shades.Add(shade);
                 }
+            if (d.TryGetValue("highlights", out object rawNotes) && rawNotes is Dictionary<string, object> notes)
+            {
+                r.finishNote = Str(notes, "finish", 240); r.shadeNote = Str(notes, "shade", 240);
+                r.priceNote = Str(notes, "price", 240); r.applyNote = Str(notes, "apply", 240);
+            }
             if (d.TryGetValue("sources", out object rawTiers) && rawTiers is Dictionary<string, object> tiers)
             {
                 r.primary = SourceOf(tiers, "primary");

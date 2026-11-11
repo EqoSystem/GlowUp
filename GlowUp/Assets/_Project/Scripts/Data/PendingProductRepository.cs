@@ -176,6 +176,39 @@ namespace GlowUp.Data
             catch (Exception e) { TaskLimits.NoteFailure(e); Debug.LogWarning("Pending products: the look-up failed: " + e.Message); return null; }
         }
 
+        /// <summary>
+        /// PHOTO LOOK-UP ONLY (11 November 2026; the live scan keeps FindAsync as it is): the user's own earlier entry of this product,
+        /// but only one the DATABASE still has. FindAsync trusts the phone's copy, so an entry the admin rejected (deleted), or one
+        /// whose write never arrived, was reused by every later photo and nothing new was sent to Pending Snapshots. Here such a
+        /// copy is forgotten and null is returned, so the photo is sent again. Offline: null (the photo needs the internet anyway).
+        /// </summary>
+        public static async Task<PendingProductData> FindConfirmedAsync(string brandName, string productName)
+        {
+            string id = IdFor(brandName, productName);
+            if (id.Length == 0) return null;
+            if (!ConnectivityMonitor.Reachable || !await FirebaseBootstrap.Ready) return null;
+            try
+            {
+                DocumentSnapshot snapshot = await FirebaseFirestore.DefaultInstance.Collection(Collection).Document(id).GetSnapshotAsync().OrTimeout(8f, "Looking for your earlier photo of the product");
+                ReadCounter.Add("pending_products lookup", 1);
+                var f = snapshot.Exists ? new FirestoreFields(snapshot) : null;
+                if (f == null || !IsMine(f.Str("createdByUid")) || f.Bool("isApproved"))
+                {
+                    PendingProductCache c = Cache;
+                    if (c.items.RemoveAll(p => p.id == id) > 0) OfflineCache.Save(CacheKey, c);      // a stale copy on the phone is forgotten
+                    return null;
+                }
+                var found = new PendingProductData
+                {
+                    id = id, name = f.Str("name"), brandName = f.Str("brandName"), cosmeticType = f.Str("cosmeticType"), shadeHex = f.Str("shadeHex"),
+                    model = f.Str("model"), createdByUid = f.Str("createdByUid"), ingredients = f.List("ingredients"), isApproved = false, savedAtUnix = Now
+                };
+                Keep(found);
+                return found;
+            }
+            catch (Exception e) { TaskLimits.NoteFailure(e); Debug.LogWarning("Pending products: the photo look-up check failed: " + e.Message); return null; }
+        }
+
         /// <summary>Stages a product the AI read from a photo. The photo (JPG bytes, may be null) goes to its own document.</summary>
         public static PendingProductData Submit(PendingProductRecord record, byte[] jpeg, int maximumImageBytes)
         {

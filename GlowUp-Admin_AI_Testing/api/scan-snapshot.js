@@ -124,14 +124,27 @@ function question(brandHint, productHint, ocrText) {
         "description: one or two plain sentences that describe this product as its official page or a shop page does (what it is, finish, coverage). No health or safety claims, no prices, no links. Empty when no page describes it.",
         "officialSite: the brand's own official website (https address of its home page), only when the search showed it; otherwise empty.",
         "minimumAge: the minimum age of use ONLY when the maker states one (e.g. \"not for children under 3\" = 3); otherwise null.",
+        "highlights: what the pages you found say, one or two plain sentences each, in your own words, empty when no page says it:",
+        "  finish (finish and coverage, how it wears), shade (this shade: what skin tone and undertone it is made for), price (the usual price and where it is sold, in the Philippines when a page says so; say it is approximate; write a price as "PHP 699", never with a currency symbol),",
+        "  apply (how the maker says to apply it). No health, medical or safety claims, no links.",
         "Do NOT write any ingredient list: GlowUp takes ingredient lists only from product pages it opens itself.",
         "Write the brand as it is officially spelled (with its spaces and capitals, e.g. \"Maybelline New York\", not \"MAYBELLINE NEWYORK\").",
         "confidence: 0 to 1. Do not guess a brand or a name you can neither read nor clearly recognise: leave it empty.",
-        'Reply with ONE JSON object only: {"found":true,"brand":"","productName":"","variant":"","size":"","cosmeticType":"","shadeHex":"","shadeCode":"","description":"","officialSite":"","minimumAge":null,"confidence":0.0}'
+        'Reply with ONE JSON object only: {"found":true,"brand":"","productName":"","variant":"","size":"","cosmeticType":"","shadeHex":"","shadeCode":"","description":"","officialSite":"","minimumAge":null,"highlights":{"finish":"","shade":"","price":"","apply":""},"confidence":0.0}'
     ].join("\n");
 }
 
 const WORDS = { high: 0.85, medium: 0.6, low: 0.3 };
+
+/** The web highlights (finish, shade, price, apply): plain text, no links, at most 240 characters each; a missing one is "". */
+const HIGHLIGHTS = ["finish", "shade", "price", "apply"];
+function highlightsOf(raw) {
+    const out = {};
+    HIGHLIGHTS.forEach((key) => {
+        out[key] = text(raw && typeof raw === "object" && typeof raw[key] === "string" ? raw[key] : "", 400).replace(/https?:\/\/\S+/gi, "").replace(/\s+/g, " ").trim().slice(0, 240);
+    });
+    return out;
+}
 
 /** The AI's "official site" is used only when its host carries the brand's own name (the AI's word alone is not trusted further). */
 function fetchableOfficial(url, brand) {
@@ -181,6 +194,7 @@ function tidySnapshot(raw) {
         description: text(raw.description, 400).replace(/https?:\/\/\S+/gi, "").replace(/\s+/g, " ").trim().slice(0, 300),
         officialSite: httpsUrl(raw.officialSite) || "",
         minimumAge: Number.isInteger(raw.minimumAge) && raw.minimumAge > 0 && raw.minimumAge <= 18 ? raw.minimumAge : 0,
+        highlights: highlightsOf(raw.highlights),
         confidence: Number.isFinite(asked) ? Math.max(0, Math.min(1, Math.round(asked * 100) / 100)) : 0
     };
 }
@@ -290,6 +304,7 @@ module.exports = async (req, res) => {
             productPhotoUrl: photoPage ? photoPage.image : "", productPageUrl: officialPage ? officialPage.url : (tiers.primary ? tiers.primary.url : ""),
             shades: draft.shadeCode || draft.shadeHex ? [{ code: draft.shadeCode || draft.variant || "", hex: draft.shadeHex || "" }] : [],
             minimumAge: draft.minimumAge,
+            highlights: draft.highlights,
             sources: tiers
         } : null;
         const sourceUrls = (listPage.url ? cleanLinks([{ url: listPage.url }]) : []).concat(others.filter((url) => url !== listPage.url)).slice(0, MAX_SOURCES);
