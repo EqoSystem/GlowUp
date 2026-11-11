@@ -38,7 +38,7 @@ namespace GlowUp.EditorTools
         }
 
         public const string TestFolder = "Builds/Android";
-        public const string TestFileName = "GlowUp-AR-debug.apk";
+        public const string TestFileName = "GlowUp.35-dev.apk";      // development build: the safe-area overlay and the AR debug overlay (12 November 2026)
 
         /// <summary>
         /// Menu: GlowUp > Build Test APK (development). A DEVELOPMENT build for testing on a phone: the AR debug overlay can be

@@ -48,7 +48,7 @@ namespace GlowUp.SafeAreaFix
             if (edgeToEdge && (n.Contains("Camera") || child.GetComponent<RawImage>() != null))
             { why = "full-bleed camera picture: stays in the background layer"; return Kind.Background; }
             // a full-screen light or camera layer without buttons (AR Try-On's face light frames the whole screen): full-bleed
-            if (full && graphic != null && child.GetComponentInChildren<Selectable>(true) == null && (n.Contains("Light") || n.Contains("Camera") || n.Contains("Preview")))
+            if (full && child.GetComponentInChildren<Graphic>(true) != null && child.GetComponentInChildren<Selectable>(true) == null && (n.Contains("Light") || n.Contains("Camera") || n.Contains("Preview")))
             { why = "full-bleed light / camera layer (no buttons): stays in the background layer"; return Kind.Background; }
             why = full ? "content container (inset card)" : "content";
             return Kind.Content;

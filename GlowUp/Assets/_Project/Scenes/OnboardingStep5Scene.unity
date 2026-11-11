@@ -1107,7 +1107,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &37981611
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -1916,7 +1916,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &67671864
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -2333,7 +2333,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &87331615
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -3984,7 +3984,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.3333334
 --- !u!222 &141481606
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -4288,7 +4288,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.3333334
 --- !u!222 &148456538
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -4506,7 +4506,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.4545455
 --- !u!222 &156801459
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -5892,7 +5892,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &191401753
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -6004,7 +6004,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &199795102
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -6392,7 +6392,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &213762336
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -7157,7 +7157,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &233265972
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -8365,7 +8365,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &295331265
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -8726,7 +8726,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.3333334
 --- !u!222 &313234571
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -8838,7 +8838,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &327682458
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -9449,7 +9449,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.1034483
 --- !u!222 &339235773
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -9561,7 +9561,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &348017789
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -9913,7 +9913,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &370717755
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -10190,7 +10190,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &390653743
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -10377,7 +10377,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &398989500
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -11224,7 +11224,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &435073104
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -11748,7 +11748,7 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1808944747}
-  - {fileID: 470043079}
+  - {fileID: 1186193429}
   - {fileID: 1560552680}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -12585,7 +12585,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &462186476
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -12733,7 +12733,7 @@ RectTransform:
   - {fileID: 3510982}
   - {fileID: 2002202763}
   - {fileID: 849314317}
-  m_Father: {fileID: 449127587}
+  m_Father: {fileID: 1186193429}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 1, y: 1}
@@ -12957,7 +12957,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.7777778
 --- !u!222 &471067944
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -13647,7 +13647,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &502388525
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -14492,7 +14492,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &544453428
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -14729,7 +14729,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.1034483
 --- !u!222 &570076840
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -14928,7 +14928,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &573817108
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -15019,7 +15019,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.1034483
 --- !u!222 &575336106
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -16650,7 +16650,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.1034483
 --- !u!222 &642999254
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -16852,7 +16852,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.1851852
 --- !u!222 &650853036
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -16964,7 +16964,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.3333334
 --- !u!222 &653232092
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -18658,7 +18658,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &713195640
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -19250,7 +19250,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &730263759
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -20083,7 +20083,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 6.4
 --- !u!222 &753904330
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -20807,7 +20807,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &811680705
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -20919,7 +20919,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &813358516
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -22520,7 +22520,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.5238096
 --- !u!222 &891041777
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -23036,7 +23036,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.1034483
 --- !u!222 &906409453
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -23520,7 +23520,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &915747870
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -24556,7 +24556,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &960737744
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -25017,7 +25017,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &985695336
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -25129,7 +25129,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &998016101
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -25385,7 +25385,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.3333334
 --- !u!222 &1000048343
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -26849,7 +26849,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &1070656179
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -27218,7 +27218,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &1083065224
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -27510,7 +27510,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &1093920481
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -27877,7 +27877,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &1116140604
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -28584,7 +28584,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &1146124014
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -29076,7 +29076,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 6.4
 --- !u!222 &1164860032
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -29580,7 +29580,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.7777778
 --- !u!222 &1182705569
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -29692,7 +29692,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &1185457527
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -29701,6 +29701,55 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1185457522}
   m_CullTransparentMesh: 1
+--- !u!1 &1186193428
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1186193429}
+  - component: {fileID: 1186193430}
+  m_Layer: 5
+  m_Name: SafeAreaRoot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1186193429
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1186193428}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 470043079}
+  m_Father: {fileID: 449127587}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1186193430
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1186193428}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: acdce5a3dd8b0f1498f2656aead86156, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1193420121
 GameObject:
   m_ObjectHideFlags: 0
@@ -30521,7 +30570,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &1225642843
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -31467,7 +31516,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &1268172338
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -33944,7 +33993,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 6.4
 --- !u!222 &1401624452
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -36386,7 +36435,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &1496629524
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -37224,7 +37273,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &1545468297
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -40334,7 +40383,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &1643928728
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -40861,7 +40910,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &1673994230
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -41229,7 +41278,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.1034483
 --- !u!222 &1682811596
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -41827,7 +41876,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &1704270476
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -42056,7 +42105,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.7777778
 --- !u!222 &1728617680
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -42258,7 +42307,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &1734614030
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -44454,7 +44503,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &1790065917
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -44971,7 +45020,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.1034483
 --- !u!222 &1809928790
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -45840,7 +45889,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 6.4
 --- !u!222 &1872572403
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -48546,7 +48595,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.1851852
 --- !u!222 &1968852092
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -48637,7 +48686,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.1034483
 --- !u!222 &1972878596
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -49188,7 +49237,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.28
 --- !u!222 &2014874150
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -50505,7 +50554,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.1034483
 --- !u!222 &2077874543
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -51144,7 +51193,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.3333334
 --- !u!222 &2098980332
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -51283,7 +51332,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.7777778
 --- !u!222 &2113540449
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -51374,7 +51423,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.1636363
 --- !u!222 &2115053066
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -52045,7 +52094,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.1636363
 --- !u!222 &2142683780
 CanvasRenderer:
   m_ObjectHideFlags: 0
