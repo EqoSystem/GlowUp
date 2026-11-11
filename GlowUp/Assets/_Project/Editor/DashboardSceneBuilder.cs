@@ -81,14 +81,17 @@ namespace GlowUp.EditorTools
             HelpBadge recommendedBadge = OnboardingKit.InfoBadge(card, recommendedHeader, null, "No ingredients flagged for your profile. This is not medical advice.");
             var badgeRect = (RectTransform)recommendedBadge.transform;
             badgeRect.anchorMin = badgeRect.anchorMax = new Vector2(0f, 0.5f); badgeRect.pivot = new Vector2(0f, 0.5f);
-            badgeRect.anchoredPosition = new Vector2(recommendedHeader.preferredWidth + 18f, 0f);
+            badgeRect.anchoredPosition = new Vector2(recommendedHeader.preferredWidth + 18f, 0f);        // a first guess; TextEndFollower corrects it from the real font
             var bubbleRect = (RectTransform)recommendedBadge.transform.Find("HelpBubble");
             if (bubbleRect != null)
             {
                 bubbleRect.anchorMin = bubbleRect.anchorMax = new Vector2(0f, 0f); bubbleRect.pivot = new Vector2(0f, 1f);
-                bubbleRect.anchoredPosition = new Vector2(-(recommendedHeader.preferredWidth + 18f), -10f);      // its left edge on the heading's left edge
+                bubbleRect.anchoredPosition = new Vector2(0f, -10f);      // TextEndFollower puts its left edge on the heading's left edge
                 bubbleRect.sizeDelta = new Vector2(880f, 96f);
             }
+            var follower = SceneBuilderCore.Ensure<TextEndFollower>(recommendedBadge.gameObject);
+            A.Set(follower, "text", recommendedHeader); A.Set(follower, "bubble", bubbleRect);
+            follower.Apply();
 
             GameObject listArea = A.Node(card, "RecommendationsArea");
             A.Between(listArea.transform, listTop + 70, A.AboveBar);        // the note line is gone from under the heading: the list starts higher
