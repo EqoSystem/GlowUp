@@ -75,7 +75,12 @@ namespace GlowUp.Scan
                         result.outcome = code == "cooldown" ? Outcome.Cooldown : code == "daily" ? Outcome.DailyLimit : Outcome.Busy;
                         return result;
                     }
-                    if (request.result != UnityWebRequest.Result.Success || status != 200 || json == null) return result;     // Down
+                    if (request.result != UnityWebRequest.Result.Success || status != 200 || json == null)
+                    {
+                        // logcat only (never on screen): why the look-up failed, so a phone test can tell a timeout from a server refusal
+                        Debug.LogWarning("[ScanPhotoService] look-up failed: HTTP " + status + " " + request.result + " " + (request.error ?? "") + " " + Str(json, "error"));
+                        return result;                                                    // Down
+                    }
 
                     result.model = Str(json, "model");
                     result.webSources = json.TryGetValue("webSources", out object w) && w is bool b && b;

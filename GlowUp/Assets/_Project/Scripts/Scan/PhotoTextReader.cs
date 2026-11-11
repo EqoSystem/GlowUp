@@ -41,6 +41,20 @@ namespace GlowUp.Scan
         {
             var result = new Result();
             if (photo == null) return result;
+            // the phone's text reader for still pictures. Live scan reads through its own Java reader (GlowUpFrameReader), so on a
+            // phone nothing else ever starts this one: without this line every photo read as "no text" (found 11 November 2026).
+            OcrService.Shared.Initialise();
+            float started = 0f;
+            while (!OcrService.Shared.Ready && started < 4f)
+            {
+                await Task.Delay(50); started += 0.05f;
+                if (cancelled != null && cancelled()) return result;
+            }
+            if (!OcrService.Shared.Ready)
+            {
+                Debug.LogWarning("[PhotoTextReader] The text reader did not start: " + (OcrService.Shared.Error ?? "unknown reason"));
+                return result;
+            }
             var texts = new StringBuilder();
             var boxes = new List<Rect>();
             string bestText = ""; PhotoTextQuality.Verdict best = null;

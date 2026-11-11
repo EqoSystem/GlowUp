@@ -29,6 +29,7 @@ const MAX_OCR_CHARS = 3000;                // the text the phone's own reader fo
 const MAX_SOURCES = 5;
 const MAX_LINK_CHARS = 300;
 const AUTH_SECONDS = 6, QUOTA_SECONDS = 6, SEARCH_SECONDS = 25, PLAIN_SECONDS = 12;
+const HOME_BUDGET_MS = 40000;              // the brand's home page (logo) is opened only when less than this has passed
 const LABEL = "Unverified, pending review";
 const DOCUMENTS = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
 
@@ -221,6 +222,7 @@ const REFUSED = {
 };
 
 module.exports = async (req, res) => {
+    const startedAt = Date.now();
     try {
         if (req.method !== "POST") return send(res, 405, { error: "Use POST." });
         const key = process.env.GLOWUP_WEB_AI || process.env.GEMINI_API_KEY;
@@ -275,8 +277,10 @@ module.exports = async (req, res) => {
         const tiers = sourceTiers(opened);
         const officialPage = opened.find((p) => p.kind === "official");
         let home = { website: "", logoUrl: "", imageUrl: "" };
-        if (draft.found && officialPage) home = await brandHomeFacts(officialPage.url).catch(() => home);
-        else if (draft.found && draft.officialSite && fetchableOfficial(draft.officialSite, brandName)) home = await brandHomeFacts(draft.officialSite).catch(() => home);
+        // the brand's home page only while time is left: the app gives up after 58 s and Vercel stops the function at 60 s
+        const homeUrl = officialPage ? officialPage.url : (draft.officialSite && fetchableOfficial(draft.officialSite, brandName) ? draft.officialSite : "");
+        if (draft.found && homeUrl && Date.now() - startedAt < HOME_BUDGET_MS) home = await brandHomeFacts(homeUrl).catch(() => home);
+        else if (homeUrl) home = { website: new URL(homeUrl).origin + "/", logoUrl: "", imageUrl: "" };
         const photoPage = opened.find((p) => p.image && p.kind === "official") || opened.find((p) => p.image && p.kind === "retailer") || null;
         const details = draft.found ? {
             market: "Global",

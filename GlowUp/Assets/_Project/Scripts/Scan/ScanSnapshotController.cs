@@ -149,6 +149,7 @@ namespace GlowUp.Scan
 
         void Awake()
         {
+            OcrService.Shared.Initialise();              // the still-picture reader is started early, so the first photo does not wait for it
             if (takePhotoLabel != null && !takePhotoLabel.enableAutoSizing)
             {
                 takePhotoLabel.enableWordWrapping = false; takePhotoLabel.enableAutoSizing = true;
