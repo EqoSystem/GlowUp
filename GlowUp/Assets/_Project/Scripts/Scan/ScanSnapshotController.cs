@@ -115,6 +115,11 @@ namespace GlowUp.Scan
         [SerializeField] private string previewNoticeCatalogue = "The text on your pack is matched with the GlowUp catalogue. The photo stays on your phone.";
         [SerializeField] private string msgNotInCatalogue = "This product isn't in the GlowUp catalogue yet. Type it in, or retake the photo showing the front of the pack.";
         [SerializeField] private string msgNoTextRead = "We couldn't read any text on this photo. Retake it closer, in good light, or type the product in.";
+        [Tooltip("{0} = the number under the barcode that was read")]
+        [SerializeField] private string msgBarcodeRead = "Barcode read: {0}";
+        [SerializeField] private string msgBarcodeMatched = "Barcode matched in the catalogue.";
+        [Tooltip("{0} = the number under the barcode that was read")]
+        [SerializeField] private string msgNotInCatalogueBarcode = "This product (barcode {0}) isn't in the GlowUp catalogue yet. Type it in, or retake the photo showing the front of the pack.";
         [SerializeField] private string msgSendingForReview = "Sending it to GlowUp for review…";
         [Tooltip("{0} = why (\"the database did not accept it\", \"the connection failed\" ...)")]
         [SerializeField] private string msgNotSent = "We found it online, but couldn't send it for review: {0}. Try again later.";
@@ -319,7 +324,16 @@ namespace GlowUp.Scan
 
         TaskCompletionSource<bool> choice;
         /// <summary>The scan screen's answer to CatalogMatches: true = a product was picked (this look-up ends), false = none of these.</summary>
-        public void MatchesAnswered(bool picked) { if (choice != null) { choice.TrySetResult(picked); } }
+        public void MatchesAnswered(bool picked, ProductData chosen = null)
+        {
+            // a barcode was read on this photo and the user named its product: this phone remembers the number for it (photo only)
+            if (picked && chosen != null && barcodeSeen.Length > 0 && PhotoBarcodeMemory.Learn(barcodeSeen, chosen))
+                Debug.Log("[PhotoBarcode] learned " + barcodeSeen + " for " + chosen.name);
+            if (choice != null) { choice.TrySetResult(picked); }
+        }
+
+        string barcodeSeen = "";           // the barcode key read on the photo being looked up ("" = none)
+        string NotInCatalogueWords() => barcodeSeen.Length > 0 ? string.Format(msgNotInCatalogueBarcode, barcodeSeen) : msgNotInCatalogue;
 
         /// <summary>The part of the photo inside the user's box, as a new texture (the whole photo when the box covers it).</summary>
         static Texture2D CutTo(Texture2D source, Rect area)
@@ -336,6 +350,7 @@ namespace GlowUp.Scan
 
         void DropPhoto()
         {
+            barcodeSeen = "";
             if (shownPhoto != null) { Destroy(shownPhoto); shownPhoto = null; }
             if (photo != null) { Destroy(photo); photo = null; }
         }
@@ -353,7 +368,11 @@ namespace GlowUp.Scan
             preview.Say(StatusMessage.Kind.Progress, msgReading);
             try
             {
-                // the phone reads ONLY the part inside the user's box (10 November 2026)
+                // THE BARCODE FIRST (11 November 2026): it names one product for certain. The whole photo is tried (the barcode is often
+                // outside the box that frames the front), then the part inside the box.
+                preview.Say(StatusMessage.Kind.Progress, msgReading);
+                barcodeSeen = await PhotoBarcode.Read(photo);
+                if (this == null || mine != attempt) return;
                 Rect area = preview.CropArea;
                 if (area.width < 0.999f || area.height < 0.999f)
                 {
@@ -361,6 +380,25 @@ namespace GlowUp.Scan
                     if (shownPhoto != null && shownPhoto != photo) Destroy(shownPhoto);
                     shownPhoto = photo;                                  // the card keeps showing the whole photo (it was destroyed here: black picture)
                     photo = cut;
+                }
+                if (barcodeSeen.Length == 0 && photo != shownPhoto && shownPhoto != null)
+                {
+                    barcodeSeen = await PhotoBarcode.Read(photo);
+                    if (this == null || mine != attempt) return;
+                }
+                if (barcodeSeen.Length > 0)
+                {
+                    ProductData byBarcode = PhotoBarcode.Find(barcodeSeen);
+                    if (byBarcode != null)
+                    {
+                        preview.Say(StatusMessage.Kind.Progress, msgBarcodeMatched);
+                        await Task.Delay(400);
+                        if (this == null || mine != attempt) return;
+                        Close();
+                        Analysed?.Invoke(byBarcode, null);
+                        return;
+                    }
+                    preview.Say(StatusMessage.Kind.Progress, string.Format(msgBarcodeRead, barcodeSeen));      // read, but no product has it yet: the text decides
                 }
                 // New13 item 9: read upright AND turned a quarter each way, like the live scan (sideways words on a bottle)
                 // the text the reader finds is outlined on the photo as it is found (one turn's outlines at a time), with the words in the status line
@@ -378,7 +416,7 @@ namespace GlowUp.Scan
                 if (catalogueText.Length == 0) { preview.Problem(msgNoTextRead, typeItInLabel, OpenTyping, false); return; }
                 preview.Say(StatusMessage.Kind.Progress, msgCatalog);
                 List<ScanShortlist.Entry> matches = CatalogMatches != null ? ScanShortlist.For(ProductRepository.Index, catalogueText, null, null, 6) : new List<ScanShortlist.Entry>();
-                if (matches.Count == 0) { preview.Problem(msgNotInCatalogue, typeItInLabel, OpenTyping, false); return; }
+                if (matches.Count == 0) { preview.Problem(NotInCatalogueWords(), typeItInLabel, OpenTyping, false); return; }
                 await Task.Delay(350);                          // the outlines stay in view for a moment
                 if (this == null || mine != attempt) return;
                 choice = new TaskCompletionSource<bool>();
@@ -390,7 +428,7 @@ namespace GlowUp.Scan
                 if (this == null || mine != attempt) return;
                 if (picked) { Close(); return; }
                 preview.Show(keep, false);                      // "None of these": it is not in the catalogue yet
-                preview.Problem(msgNotInCatalogue, typeItInLabel, OpenTyping, false);
+                preview.Problem(NotInCatalogueWords(), typeItInLabel, OpenTyping, false);
             }
             catch (Exception e)
             {

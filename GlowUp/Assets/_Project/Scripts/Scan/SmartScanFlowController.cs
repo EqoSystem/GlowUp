@@ -729,7 +729,7 @@ namespace GlowUp.Scan
         void ShowPhotoMatches(List<ScanShortlist.Entry> entries)
         {
             OpenShortlist(shortlistTitle, photoMatchesMessageCatalogue, shortlistNoneLabel,
-                () => { ExitPhotoMode(); if (snapshot != null) snapshot.MatchesAnswered(true); },
+                () => { ExitPhotoMode(); if (snapshot != null) snapshot.MatchesAnswered(true, knownProduct); },
                 () => { if (snapshot != null) snapshot.MatchesAnswered(false); },
                 entries);
         }
