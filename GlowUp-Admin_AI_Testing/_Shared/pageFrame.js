@@ -62,7 +62,7 @@
         sidebar.className = "sidebar";
         // the logo and the name "Glow Up" are ONE link to the dashboard (like a site's home logo, 7 November 2026): a real <a href>,
         // so a middle click or "open in new tab" works. It only opens a page; the dashboard runs its own sign-in check as always.
-        // The Quick settings gear is in the top bar (adminShell.js, adminSettingsMenu.js). The name folds away with the other labels.
+        // The Quick settings gear is in the top bar (adminShell.js, adminSettingsMenu.js). Navigation labels fold away; the brand stays visible.
         // The bottom holds the signed-in e-mail and Sign Out. adminCommon.js fills the e-mail
         // in once the sign-in check has answered, and wires the button.
         sidebar.innerHTML =
