@@ -26,6 +26,7 @@ namespace GlowUp.EditorTools
         const float BottomBlock = 600;          // space under the camera view
         // Brief of 11 November 2026 (phase 1B): from the top down under the camera: the status line, the four chips (two rows of two),
         // then ONE row of controls: Start over | Type it in | SCAN (centred, the largest) | Photo | Finish. Nothing crowds or clips.
+        const float CornerStep = 112;                                                       // 92 button + 20 gap
         const float SideButton = 120;                                                       // the round part of a side control (40 dp)
         const float ChipRowY = RingBottom + RingSize + 16, ChipRowH = 2 * 60 + 12;          // 304 .. 436
         const float StatusY = ChipRowY + ChipRowH + 14, StatusH = BottomBlock - StatusY - 10; // 450 .. 590: two lines
@@ -131,7 +132,7 @@ namespace GlowUp.EditorTools
             GameObject lightHelper = A.Node(viewport.transform, "LightAssistant", typeof(ScanLightAssistant));
             A.Fill(lightHelper.transform);
             Button flash = CameraButton(lightHelper.transform, "FlashlightButton", IconFactory.Bolt, out Image flashIcon);
-            A.At(flash.transform, A.TL, new Vector2(24, -24), new Vector2(92, 92));
+            A.At(flash.transform, A.TR, new Vector2(-24, -24 - CornerStep), new Vector2(92, 92));      // the owner's layout (11 November 2026): sun, flashlight, lock stacked down the right edge
             Image lightPrompt = A.RawPanel(lightHelper.transform, "LightPrompt", new Color(0, 0, 0, 0.72f), 44f);
             lightPrompt.raycastTarget = true;
             A.TopStrip(lightPrompt.transform, 136, 176, 40, 40);
@@ -158,10 +159,10 @@ namespace GlowUp.EditorTools
             GameObject focusHelper = A.Node(viewport.transform, "FocusAssistant", typeof(ScanFocusAssistant));
             A.Fill(focusHelper.transform);
             Button focusLock = CameraButton(focusHelper.transform, "FocusLockButton", IconFactory.LockOpen, out Image focusLockIcon);
-            A.At(focusLock.transform, A.TL, new Vector2(132, -24), new Vector2(92, 92));
+            A.At(focusLock.transform, A.TR, new Vector2(-24, -24 - 2 * CornerStep), new Vector2(92, 92));
             Image focusNote = A.RawPanel(focusHelper.transform, "FocusNote", new Color(0, 0, 0, 0.72f), 40f);
             focusNote.raycastTarget = false;
-            A.At(focusNote.transform, A.TL, new Vector2(240, -34), new Vector2(520, 72));
+            A.At(focusNote.transform, A.TL, new Vector2(24, -34), new Vector2(520, 72));
             TextMeshProUGUI focusNoteText = A.RawLabel(focusNote.transform, "NoteText", "Focus locked. Tap the padlock to release it.", 26, Color.white, FontRole.Label,
                                                        TextAlignmentOptions.Center, true);
             A.Fill(focusNoteText.transform, 22, 6, 22, 6);
