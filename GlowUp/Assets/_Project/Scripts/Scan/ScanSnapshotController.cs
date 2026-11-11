@@ -327,8 +327,11 @@ namespace GlowUp.Scan
             return cut;
         }
 
+        Texture2D shownPhoto;          // the whole photo while `photo` holds the part inside the box
+
         void DropPhoto()
         {
+            if (shownPhoto != null) { Destroy(shownPhoto); shownPhoto = null; }
             if (photo != null) { Destroy(photo); photo = null; }
         }
 
@@ -352,23 +355,20 @@ namespace GlowUp.Scan
                 if (area.width < 0.999f || area.height < 0.999f)
                 {
                     Texture2D cut = CutTo(photo, area);
-                    DropPhoto();
+                    if (shownPhoto != null && shownPhoto != photo) Destroy(shownPhoto);
+                    shownPhoto = photo;                                  // the card keeps showing the whole photo (it was destroyed here: black picture)
                     photo = cut;
                 }
                 // New13 item 9: read upright AND turned a quarter each way, like the live scan (sideways words on a bottle)
                 PhotoTextReader.Result read = await PhotoTextReader.Read(photo, KnownWord, () => this == null || mine != attempt);
                 if (this == null || mine != attempt) return;
                 PhotoTextQuality.Verdict verdict = read.verdict;
-                if (!verdict.readable)
-                {
-                    // nothing of an unclear reading is shown or sent; the photo can be taken again
-                    preview.Problem(msgUnclear, typeItInLabel, OpenTyping, false);
-                    return;
-                }
-                preview.ShowTextShapes(read.boxes);                    // the lines that were read, outlined inside the box
+                // an unclear reading of the phone no longer stops the look-up (11 November 2026): the server's vision reads the picture itself,
+                // as Google Lens does. Nothing of the unclear reading is shown or sent (cleanText stays empty).
+                if (verdict.readable) preview.ShowTextShapes(read.boxes);                    // the lines that were read, outlined inside the box
 
                 // the catalogue first, with the same matcher as the live scan: the closest products to pick from
-                if (CatalogMatches != null)
+                if (CatalogMatches != null && verdict.cleanText.Length > 0)
                 {
                     preview.Say(StatusMessage.Kind.Progress, msgCatalog);
                     List<ScanShortlist.Entry> matches = ScanShortlist.For(ProductRepository.Index, verdict.cleanText, null, null, 6);
@@ -377,7 +377,7 @@ namespace GlowUp.Scan
                         await Task.Delay(350);                          // the outlines stay in view for a moment
                         if (this == null || mine != attempt) return;
                         choice = new TaskCompletionSource<bool>();
-                        Texture2D keep = photo;
+                        Texture2D keep = shownPhoto != null ? shownPhoto : photo;
                         preview.Hide();
                         CatalogMatches.Invoke(matches);
                         bool picked = await choice.Task;
@@ -391,7 +391,7 @@ namespace GlowUp.Scan
 
                 // the photo cut to the product's text; the full frame is thrown away
                 byte[] jpeg = CutAndSqueeze(photo, read.boxes);
-                DropPhoto();
+                if (shownPhoto != null) { Destroy(photo); photo = null; }       // only the part cut for reading; the card keeps the whole photo
                 if (jpeg == null) { preview.Problem(msgUnclear, typeItInLabel, OpenTyping, false); return; }
 
                 // a list printed on the pack and read on the phone comes first (not the AI's)
@@ -558,7 +558,7 @@ namespace GlowUp.Scan
         /// </summary>
         byte[] CutAndSqueeze(Texture2D source, Rect[] boxes)
         {
-            Rect area = new Rect(0.15f, 0.15f, 0.7f, 0.7f);
+            Rect area = new Rect(0f, 0f, 1f, 1f);                     // no text boxes: the whole part inside the user's box goes to the server's vision
             if (boxes != null && boxes.Length > 0)
             {
                 float x0 = 1f, y0 = 1f, x1 = 0f, y1 = 0f;
