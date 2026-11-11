@@ -72,6 +72,8 @@ export async function check(page) {
         const faults = [];
         const vw = document.documentElement.clientWidth;
         if (document.documentElement.scrollWidth > vw) faults.push(`document scrollWidth ${document.documentElement.scrollWidth} > ${vw}`);
+        const brandTitle = document.querySelector(".sidebar-brand .brand-title");
+        if (brandTitle && getComputedStyle(brandTitle).display === "none") faults.push("sidebar brand name is hidden");
         const a = window.__audit();
         for (const [kind, list] of Object.entries(a)) list.forEach((item) => faults.push(kind + ": " + item));
         // every element of the page content: its right edge inside the window (or inside a box that scrolls on purpose)

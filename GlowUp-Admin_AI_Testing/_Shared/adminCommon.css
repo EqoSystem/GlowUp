@@ -277,7 +277,9 @@ html.sb-collapsed .brand-home { flex-direction: column; gap: 12px; }
 #sidebarToggle:hover { background: var(--surface-3); color: var(--text); }
 #sidebarToggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .sidebar-toggle svg.ic { width: 16px; height: 16px; transition: transform .2s var(--ease); }
-html.sb-collapsed .sidebar .label, html.sb-collapsed .signed-in-as { display: none; }
+html.sb-collapsed .sidebar { padding-left: 6px; padding-right: 6px; }
+html.sb-collapsed .sidebar .nav-links .label, html.sb-collapsed .sidebar-footer .label, html.sb-collapsed .signed-in-as { display: none; }
+html.sb-collapsed .sidebar-brand .brand-title { font-size: var(--fs-xs); white-space: nowrap; }
 html.sb-collapsed .sidebar-brand { flex-direction: column; padding: 0; gap: 12px; }
 html.sb-collapsed .sidebar-toggle svg.ic { transform: rotate(180deg); }
 html.sb-collapsed .nav-links a, html.sb-collapsed .sign-out { justify-content: center; padding-left: 0; padding-right: 0; }
@@ -425,12 +427,15 @@ html.qs-open .board > .panel[data-qs-grow] { grid-column: span var(--qs-span) !i
     .board > .panel { grid-column: 1 / -1 !important; }
     .panel.group[data-group="side"] > .panel-inner > .group-body { grid-template-columns: minmax(0, 1fr); }
 }
-@media (max-width: 1023px) { body.app { grid-template-columns: 72px 1fr; } .sidebar .label, .signed-in-as { display: none; } }
+@media (max-width: 1023px) { body.app { grid-template-columns: 72px 1fr; } .sidebar .nav-links .label, .sidebar-footer .label, .signed-in-as { display: none; } }
 /* up to 1023 px (half a screen) the sidebar is icons only; the edge tab opens the whole menu OVER the page (html.sb-peek, not kept) */
 @media (max-width: 1023px) {
     :root { --sidebar-w: 72px; }
     html.sb-peek, html.sb-peek.sb-collapsed { --sidebar-w: 232px; }
-    html:not(.sb-peek) .sidebar-brand { justify-content: center; }
+    html:not(.sb-peek) .sidebar { padding-left: 6px; padding-right: 6px; }
+    html:not(.sb-peek) .sidebar-brand { justify-content: center; flex-direction: column; padding: 0; gap: 12px; }
+    html:not(.sb-peek) .sidebar-brand .brand-home { flex-direction: column; gap: 12px; }
+    html:not(.sb-peek) .sidebar-brand .brand-title { font-size: var(--fs-xs); white-space: nowrap; }
     .sidebar-toggle svg.ic { transform: rotate(180deg); }
     html.sb-peek .sidebar-toggle svg.ic, html.sb-peek.sb-collapsed .sidebar-toggle svg.ic { transform: none; }
     .sidebar { position: fixed; top: 0; bottom: 0; left: 0; width: var(--sidebar-w); z-index: 900; }
