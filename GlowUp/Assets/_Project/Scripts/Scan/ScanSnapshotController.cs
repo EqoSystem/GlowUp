@@ -111,6 +111,10 @@ namespace GlowUp.Scan
         [SerializeField] private string msgDailyLimitV2 = "You've sent {0} photos today. Try again tomorrow, or type the product in.";
         [SerializeField] private string msgBusyV2 = "Photo look-up is busy today. Type the product in, or try again tomorrow.";
         [SerializeField] private string msgDownV2 = "The photo couldn't be looked up.";
+        [Tooltip("The notice on Check your photo (catalogue only: the photo never leaves the phone)")]
+        [SerializeField] private string previewNoticeCatalogue = "The text on your pack is matched with the GlowUp catalogue. The photo stays on your phone.";
+        [SerializeField] private string msgNotInCatalogue = "This product isn't in the GlowUp catalogue yet. Type it in, or retake the photo showing the front of the pack.";
+        [SerializeField] private string msgNoTextRead = "We couldn't read any text on this photo. Retake it closer, in good light, or type the product in.";
         [SerializeField] private string msgSendingForReview = "Sending it to GlowUp for review…";
         [Tooltip("{0} = why (\"the database did not accept it\", \"the connection failed\" ...)")]
         [SerializeField] private string msgNotSent = "We found it online, but couldn't send it for review: {0}. Try again later.";
@@ -261,12 +265,8 @@ namespace GlowUp.Scan
             {
                 // in photo mode the pop-up is closed: problems are said in a toast
                 if (cameraFeed == null || !cameraFeed.IsPlaying) { Toast(msgNoCameraV2); return; }
-                if (!ConnectivityMonitor.Online) { Toast(msgOfflineV2); return; }
-                if (SentToday() >= DailyLimit) { Toast(string.Format(msgDailyLimitV2, DailyLimit)); return; }
             }
             if (cameraFeed == null || !cameraFeed.IsPlaying) { Say(StatusMessage.Kind.Error, msgNoCameraV2, true); return; }
-            if (!ConnectivityMonitor.Online) { Say(StatusMessage.Kind.Error, msgOfflineV2, true); return; }
-            if (SentToday() >= DailyLimit) { Say(StatusMessage.Kind.Error, string.Format(msgDailyLimitV2, DailyLimit), true); return; }
             DropPhoto();
             photo = cameraFeed.CaptureUpright(null, Mathf.Max(readSide, 1920));   // full camera resolution: small label letters stay readable                   // the whole picture, not only the scan frame
             if (photo == null) { Say(StatusMessage.Kind.Error, msgNoCameraV2, true); return; }
@@ -281,7 +281,7 @@ namespace GlowUp.Scan
             }
             if (preview == null)
             {
-                preview = PhotoPreview.Build(panel != null ? panel.transform : transform, promptText, previewTitle, previewNotice, retakeLabel, usePhotoLabel, notNowLabel);
+                preview = PhotoPreview.Build(panel != null ? panel.transform : transform, promptText, previewTitle, previewNoticeCatalogue, retakeLabel, usePhotoLabel, notNowLabel);
                 if (preview == null) { DropPhoto(); Say(StatusMessage.Kind.Error, msgNotAvailable, true); return; }
                 preview.Retake += Retake;
                 preview.Use += UsePhoto;
@@ -348,8 +348,6 @@ namespace GlowUp.Scan
         async void UsePhoto()
         {
             if (busy || photo == null) return;
-            if (!ConnectivityMonitor.Online) { preview.Problem(msgOfflineV2, typeItInLabel, OpenTyping, true); return; }
-            if (string.IsNullOrEmpty(ScanPhotoService.FunctionUrl)) { preview.Problem(msgNotAvailable, typeItInLabel, OpenTyping, false); return; }
             int mine = ++attempt;
             busy = true;
             Paint();
@@ -376,145 +374,25 @@ namespace GlowUp.Scan
                 });
                 if (this == null || mine != attempt) return;
                 PhotoTextQuality.Verdict verdict = read.verdict;
-                // an unclear reading of the phone no longer stops the look-up (11 November 2026): the server's vision reads the picture itself,
-                // as Google Lens does. Nothing of the unclear reading is shown or sent (cleanText stays empty).
-
-                // the catalogue first, with the same matcher as the live scan: the closest products to pick from
-                // the catalogue first (the live scan's matcher, tolerant of misread letters), the web only when it has nothing
+                // THE GLOWUP CATALOGUE ONLY (11 November 2026, the owner's decision: the web search had a daily limit, so it was taken out).
+                // The text read on the pack goes to the live scan's matcher; the user picks the product. Nothing leaves the phone.
                 string catalogueText = verdict.cleanText.Length > 0 ? verdict.cleanText : read.anyText;
-                if (CatalogMatches != null && catalogueText.Length > 0)
-                {
-                    preview.Say(StatusMessage.Kind.Progress, msgCatalog);
-                    List<ScanShortlist.Entry> matches = ScanShortlist.For(ProductRepository.Index, catalogueText, null, null, 6);
-                    if (matches.Count > 0)
-                    {
-                        await Task.Delay(350);                          // the outlines stay in view for a moment
-                        if (this == null || mine != attempt) return;
-                        choice = new TaskCompletionSource<bool>();
-                        Texture2D keep = shownPhoto != null ? shownPhoto : photo;
-                        preview.Hide();
-                        CatalogMatches.Invoke(matches);
-                        bool picked = await choice.Task;
-                        choice = null;
-                        if (this == null || mine != attempt) return;
-                        if (picked) { Close(); return; }
-                        preview.Show(keep, false);                      // "None of these": the photo is looked up online
-                        preview.SetBusy(true, busyLabel, busyShortLabel);
-                    }
-                }
-
-                // the photo cut to the product's text; the full frame is thrown away
-                byte[] jpeg = CutAndSqueeze(photo, read.boxes);
-                if (shownPhoto != null) { Destroy(photo); photo = null; }       // only the part cut for reading; the card keeps the whole photo
-                if (jpeg == null) { preview.Problem(msgUnclear, typeItInLabel, OpenTyping, false); return; }
-
-                // a list printed on the pack and read on the phone comes first (not the AI's)
-                List<string> printed = PrintedList(read.rawText);
-                string ocrBrand = BrandIn(verdict.cleanText);
-
-                // from here on the photo leaves the phone (after the user's tap); the cool-down starts now
-                lockedUntil = Time.unscaledTime + CooldownSeconds;
-                CountOne();
-                PlayerPrefs.SetInt(NoticeKey, 1); PlayerPrefs.Save();
-                string lookingFor = (ocrBrand.Length > 0 ? ocrBrand : brandHint) + " " + productHint;
-                preview.Say(StatusMessage.Kind.Progress, lookingFor.Trim().Length > 0
-                    ? string.Format(msgSearching, "<b>" + StatusMessage.Plain(lookingFor.Trim()) + "</b>") : msgReading);
-
-                ScanPhotoService.Reading answer = await ScanPhotoService.Read(jpeg, ocrBrand.Length > 0 ? ocrBrand : brandHint, productHint, verdict.cleanText);
+                if (catalogueText.Length == 0) { preview.Problem(msgNoTextRead, typeItInLabel, OpenTyping, false); return; }
+                preview.Say(StatusMessage.Kind.Progress, msgCatalog);
+                List<ScanShortlist.Entry> matches = CatalogMatches != null ? ScanShortlist.For(ProductRepository.Index, catalogueText, null, null, 6) : new List<ScanShortlist.Entry>();
+                if (matches.Count == 0) { preview.Problem(msgNotInCatalogue, typeItInLabel, OpenTyping, false); return; }
+                await Task.Delay(350);                          // the outlines stay in view for a moment
                 if (this == null || mine != attempt) return;
-                switch (answer.outcome)
-                {
-                    case ScanPhotoService.Outcome.Offline: preview.Problem(msgOfflineV2, typeItInLabel, OpenTyping, false); return;
-                    case ScanPhotoService.Outcome.NotSetUp: preview.Problem(msgNotAvailable, typeItInLabel, OpenTyping, false); return;
-                    case ScanPhotoService.Outcome.SignIn: preview.Problem(msgSignInV2, typeItInLabel, OpenTyping, false); return;
-                    case ScanPhotoService.Outcome.Cooldown: preview.Problem(string.Format(msgCooldownV2, (int)CooldownSeconds), typeItInLabel, OpenTyping, false); return;
-                    case ScanPhotoService.Outcome.DailyLimit: preview.Problem(string.Format(msgDailyLimitV2, DailyLimit), typeItInLabel, OpenTyping, false); return;
-                    case ScanPhotoService.Outcome.Busy: preview.Problem(msgBusyV2, typeItInLabel, OpenTyping, false); return;
-                    case ScanPhotoService.Outcome.NotFound: preview.Problem(msgNothingV2, typeItInLabel, OpenTyping, false); return;
-                    case ScanPhotoService.Outcome.Down: preview.Problem(msgDownV2, typeItInLabel, OpenTyping, false); return;
-                }
-
-                var who = new ProductAiAdvisor.Identity
-                {
-                    found = true, brandName = BrandNameNormalizer.Normalize(answer.brand.Length > 0 ? answer.brand : ocrBrand, CatalogueBrands()),
-                    productName = answer.productName, cosmeticType = answer.cosmeticType, shadeHex = answer.shadeHex, confidence = answer.confidence, model = answer.model
-                };
-                if (who.confidence < minimumConfidence || (who.productName.Length == 0 && who.brandName.Length == 0)) { preview.Problem(msgNothingV2, typeItInLabel, OpenTyping, false); return; }
-
-                // the catalogue has it after all (the label was hard to read live): its own entry is used
-                ProductData listed = who.productName.Length > 0 ? ProductRepository.Index.Exact(who.brandName, who.productName) : null;
-                if (listed != null) { Close(); Analysed?.Invoke(listed, null); return; }
-
-                // the user's OWN earlier photo of this product (another user's entry never is)
-                PendingProductData staged = who.productName.Length > 0 ? await PendingProductRepository.FindConfirmedAsync(who.brandName, who.productName) : null;
+                choice = new TaskCompletionSource<bool>();
+                Texture2D keep = shownPhoto != null ? shownPhoto : photo;
+                preview.Hide();
+                CatalogMatches.Invoke(matches);
+                bool picked = await choice.Task;
+                choice = null;
                 if (this == null || mine != attempt) return;
-                if (staged != null && staged.ingredients.Count > 0) { Close(); Analysed?.Invoke(null, staged); return; }
-
-                // MAKE-UP ONLY, as everywhere else
-                ProductScope.Verdict scope = ProductScope.Judge(who.cosmeticType, who.productName);
-                if (scope.IsNotMakeup) { preview.Problem(ProductScope.StopMessage(scope), null, null, false); return; }
-
-                bool fromPack = printed.Count > 0;
-                List<string> list = fromPack ? printed : answer.ingredients;
-                var sources = new List<string>();
-                if (!fromPack && answer.ingredientSourceUrl.Length > 0) sources.Add(answer.ingredientSourceUrl);
-                foreach (string url in answer.sourceUrls) if (!sources.Contains(url) && sources.Count < 5) sources.Add(url);
-                var record = new PendingProductRecord
-                {
-                    name = Limit(who.productName.Length > 0 ? who.productName : productHint, 100), brandName = Limit(who.brandName, 60), cosmeticType = Limit(who.cosmeticType, 40),
-                    shadeHex = who.shadeHex ?? "", ingredients = Limited(list), confidence = who.confidence, model = Limit(who.model, 60),
-                    variant = Limit(answer.variant, 60), size = Limit(answer.size, 40), sourceUrls = sources,
-                    ocrText = Limit(verdict.cleanText, 1500), ocrBrand = Limit(ocrBrand, 60),
-                    ingredientsFrom = fromPack ? "printed" : list.Count > 0 ? "page" : "none",
-                    ingredientSourceUrl = !fromPack && list.Count > 0 ? answer.ingredientSourceUrl : "",
-                    ingredientSourceKind = !fromPack && list.Count > 0 ? answer.ingredientSourceKind : ""
-                };
-                // the web search result's facts (11 November 2026): kept for the Web Search Result screen and sent along for the admin's form
-                WebSearchResult web = answer.details ?? new WebSearchResult();
-                web.brandName = record.brandName; web.productName = record.name; web.cosmeticType = record.cosmeticType;
-                web.key = WebSearchResult.KeyOf(record.brandName, record.name);
-                web.ingredients = new List<string>(record.ingredients);
-                if (web.shades.Count == 0 && (answer.variant.Length > 0 || record.shadeHex.Length > 0))
-                    web.shades.Add(new WebSearchResult.Shade { code = Limit(answer.variant, 30), hex = record.shadeHex });
-                record.description = Limit(web.description, 300);
-                record.shadeCode = web.shades.Count > 0 ? Limit(web.shades[0].code, 30) : "";
-                record.minimumAge = web.minimumAge;
-                record.brandWebsite = web.brandWebsite; record.brandLogoUrl = web.brandLogoUrl; record.brandImageUrl = web.brandImageUrl;
-                record.productPhotoUrl = web.productPhotoUrl; record.productPageUrl = web.productPageUrl;
-                if (web.primary != null) { record.primarySourceUrl = web.primary.url; record.primarySourceKind = web.primary.tier == "official" ? "official" : "unverified"; }
-                if (web.secondary != null) record.secondarySourceUrl = web.secondary.url;
-                if (web.third != null) { record.thirdSourceUrl = web.third.url; record.thirdSourceKind = web.third.tier == "unverified" ? "other" : web.third.tier; }
-                ScanSession.WebResult = web;
-                // sent NOW, with the database's answer (the background queue dropped refused entries silently, 11 November 2026)
-                preview.Say(StatusMessage.Kind.Progress, msgSendingForReview);
-                PendingProductRepository.SubmitResult sent = record.name.Length > 0
-                    ? await PendingProductRepository.SubmitNowAsync(record, keepPhotoForAdmin ? jpeg : null, maximumPhotoBytes)
-                    : new PendingProductRepository.SubmitResult { problem = "no product name was found" };
-                if (this == null || mine != attempt) return;
-                PendingProductData made = sent.entry;
-                if (made == null && list.Count > 0)
-                {
-                    // not sent: said plainly, and the result can still be seen (it is then only on this phone)
-                    var local = new PendingProductData
-                    {
-                        id = "", name = record.name, brandName = record.brandName, cosmeticType = record.cosmeticType, shadeHex = record.shadeHex,
-                        model = record.model, ingredients = new List<string>(record.ingredients), sourceUrls = new List<string>(record.sourceUrls), ingredientsFrom = record.ingredientsFrom
-                    };
-                    preview.Problem(string.Format(msgNotSent, sent.problem), seeResultLabel, () => { Close(); Analysed?.Invoke(null, local); }, false);
-                    return;
-                }
-
-                if (list.Count == 0)
-                {
-                    // named, but no page had a list: the user types it (the entry still waits for review, with its photo)
-                    string name = (who.brandName + " " + who.productName).Trim();
-                    preview.Problem(string.Format(msgNoListV2, name.Length > 0 ? StatusMessage.Plain(name) : "the product"), typeItInLabel, () => { NameOnly?.Invoke(who); OpenTyping(); }, false);
-                    NameOnly?.Invoke(who);
-                    return;
-                }
-                if (made == null) { preview.Problem(msgNothingV2, typeItInLabel, OpenTyping, false); return; }
-                Close();
-                Analysed?.Invoke(null, made);
+                if (picked) { Close(); return; }
+                preview.Show(keep, false);                      // "None of these": it is not in the catalogue yet
+                preview.Problem(msgNotInCatalogue, typeItInLabel, OpenTyping, false);
             }
             catch (Exception e)
             {

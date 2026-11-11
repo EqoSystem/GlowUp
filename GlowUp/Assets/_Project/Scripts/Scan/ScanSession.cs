@@ -62,11 +62,6 @@ namespace GlowUp.Scan
 
         /// <summary>The product the result scene shows.</summary>
         public static ScanRecord Current;
-        /// <summary>
-        /// What the web search of a product photo found (11 November 2026). Set by the photo look-up just before the scan finishes;
-        /// the scan screen then opens the Web Search Result screen instead of the usual result. Null = no web search in this scan.
-        /// </summary>
-        public static WebSearchResult WebResult;
         /// <summary>Where the result scene's Back button goes (dashboard after a new scan, recent scans when opened from the list).</summary>
         public static string ResultBackScene;
 

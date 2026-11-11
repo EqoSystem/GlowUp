@@ -425,7 +425,6 @@ namespace GlowUp.Scan
 
         void Awake()
         {
-            ScanSession.WebResult = null;                 // a web search result belongs to one visit of this screen
             PlainWording();
             if (holdButton != null) { holdButton.ScanStarted += OnScanStarted; holdButton.ScanPaused += OnScanPaused; }
             if (finishButton != null) finishButton.onClick.AddListener(OnFinishTapped);
@@ -673,7 +672,7 @@ namespace GlowUp.Scan
         [Header("Photo mode")]
         [SerializeField] private string msgPhotoModeHint = "Frame the front of the pack, then tap capture.";
         [SerializeField] private string liveScanLabel = "Live scan";
-        [SerializeField] private string photoMatchesMessage = "Tap your product. If it is not here, choose None of these and we look the photo up online.";
+        [SerializeField] private string photoMatchesMessageCatalogue = "Tap your product. If it is not here, choose None of these, then type it in.";
 
         bool photoMode;
         Button shutter;
@@ -729,7 +728,7 @@ namespace GlowUp.Scan
         /// <summary>The text in the user's box matched catalogue products: the same pick list as the live scan uses.</summary>
         void ShowPhotoMatches(List<ScanShortlist.Entry> entries)
         {
-            OpenShortlist(shortlistTitle, photoMatchesMessage, shortlistNoneLabel,
+            OpenShortlist(shortlistTitle, photoMatchesMessageCatalogue, shortlistNoneLabel,
                 () => { ExitPhotoMode(); if (snapshot != null) snapshot.MatchesAnswered(true); },
                 () => { if (snapshot != null) snapshot.MatchesAnswered(false); },
                 entries);
@@ -2949,19 +2948,7 @@ namespace GlowUp.Scan
             float leaveAt = Time.unscaledTime + recognisedHoldSeconds;
             while (Time.unscaledTime < leaveAt) yield return null;
             if (cameraFeed != null) cameraFeed.StopCamera();
-            SceneNavigator.GoViaLoading(NextResultScene(), loadingMessage, ScanAnalysisPipeline.Run);
-        }
-
-        /// <summary>
-        /// The Web Search Result screen when the product was found by the web search of a photo in this visit (11 November 2026),
-        /// otherwise the usual result screen. The web facts must be about the product that is analysed.
-        /// </summary>
-        string NextResultScene()
-        {
-            WebSearchResult web = ScanSession.WebResult;
-            if (web != null && web.IsAbout(ScanSession.PendingBrandName, ScanSession.PendingProductName)) return SceneNames.WebResult;
-            ScanSession.WebResult = null;
-            return resultScene;
+            SceneNavigator.GoViaLoading(resultScene, loadingMessage, ScanAnalysisPipeline.Run);
         }
 
         // ---------------------------------------------------------------------------------------
@@ -3371,7 +3358,7 @@ namespace GlowUp.Scan
             ScanSession.PendingShadeName = identity.shadeName; ScanSession.PendingFinish = identity.finish;
             ScanSession.PendingBarcode = barcode;
             ScanSession.PendingReplaces = rescanOf; ScanSession.PendingReplacesSame = rescanSame;
-            SceneNavigator.GoViaLoading(NextResultScene(), loadingMessage, ScanAnalysisPipeline.Run);
+            SceneNavigator.GoViaLoading(resultScene, loadingMessage, ScanAnalysisPipeline.Run);
         }
     }
 }
