@@ -94,13 +94,13 @@ namespace GlowUp.Tests
         }
 
         [Test]
-        public void VolumeButtonDefaultsToDoNothingAndIsSaved()
+        public void VolumeKeysDefaultToBothAndAreSaved()
         {
-            UnityEngine.PlayerPrefs.DeleteKey("GlowUp.Camera.VolumeButton");
-            Assert.AreEqual(UiPreferences.VolumeButtonAction.DoNothing, UiPreferences.VolumeButton);
-            UiPreferences.VolumeButton = UiPreferences.VolumeButtonAction.CapturePhoto;
-            Assert.AreEqual(UiPreferences.VolumeButtonAction.CapturePhoto, UiPreferences.VolumeButton);
-            UnityEngine.PlayerPrefs.DeleteKey("GlowUp.Camera.VolumeButton");
+            UnityEngine.PlayerPrefs.DeleteKey("GlowUp.Camera.VolumeKeys");
+            Assert.AreEqual(UiPreferences.VolumeKeys.Both, UiPreferences.VolumeKey);
+            UiPreferences.VolumeKey = UiPreferences.VolumeKeys.Off;
+            Assert.AreEqual(UiPreferences.VolumeKeys.Off, UiPreferences.VolumeKey);
+            UnityEngine.PlayerPrefs.DeleteKey("GlowUp.Camera.VolumeKeys");
         }
     }
 }

@@ -46,6 +46,22 @@ namespace GlowUp.Common
         string heldText;
 
         RangeInt lastKeyboardSelection = new RangeInt(-1, 0);
+        string lastText = "";
+        bool syncKeyboardText;                         // while a caret is held after the text was changed by code (a removed space): the keyboard gets the text too
+        float keyboardActiveSince;
+
+        /// <summary>
+        /// The text of `field` was changed by code (a space taken out): its caret is set to `position` and handed to the phone keyboard's
+        /// box together with the text, so the caret does not jump to the start on the next letter.
+        /// </summary>
+        public static void KeepCaret(TMP_InputField field, int position)
+        {
+            if (field == null) return;
+            InputCaretTouch touch = field.GetComponent<InputCaretTouch>();
+            if (touch == null) return;
+            touch.syncKeyboardText = true;
+            touch.Want(position, position);
+        }
 
         void Awake()
         {
@@ -101,6 +117,8 @@ namespace GlowUp.Common
             }
 
             TouchScreenKeyboard keyboard = Keyboard();
+            if (keyboard != null && keyboard.active) { if (keyboardActiveSince <= 0f) keyboardActiveSince = Time.unscaledTime; }
+            else keyboardActiveSince = 0f;
 
             // 3. hold the wanted caret for a moment: the hidden box may report its old caret for a frame or two
             if (Time.unscaledTime < holdUntil && field.text == heldText)
@@ -115,13 +133,21 @@ namespace GlowUp.Common
                 return;
             }
             holdUntil = 0f;
+            syncKeyboardText = false;
 
             // 4. the keyboard moved its own caret (space-bar swipe): the field follows
             if (keyboard == null || !keyboard.active || !keyboard.canGetSelection) return;
             RangeInt now = keyboard.selection;
+            // typing changes the text AND the keyboard's caret: that is the field's business, not a caret move of the user
+            if (field.text != lastText) { lastText = field.text; lastKeyboardSelection = now; return; }
             if (now.start == lastKeyboardSelection.start && now.length == lastKeyboardSelection.length) return;
+            RangeInt before = lastKeyboardSelection;
             lastKeyboardSelection = now;
             if (keyboard.text != field.text) return;                   // typing in progress: the field reads it itself
+            // a swipe along the space bar moves the caret a place or two at a time; a jump to the very start from far in the text is the
+            // keyboard's box answering with its default (it has never been told the caret), not the user
+            if (now.start == 0 && now.length == 0 && field.caretPosition > 1 && before.start != 1 && before.start != 0) return;
+            if (Time.unscaledTime - keyboardActiveSince < 0.4f) return;
             int length = field.text.Length;
             int a = Mathf.Clamp(now.start, 0, length), f = Mathf.Clamp(now.start + now.length, 0, length);
             if (field.selectionAnchorPosition == a && field.selectionFocusPosition == f) return;
@@ -166,6 +192,7 @@ namespace GlowUp.Common
             int start = Mathf.Min(anchor, focus), length = Mathf.Abs(focus - anchor);
             RangeInt now = keyboard.selection;
             if (now.start == start && now.length == length) return;
+            if (syncKeyboardText && keyboard.text != field.text) keyboard.text = field.text;
             keyboard.selection = new RangeInt(start, length);
             lastKeyboardSelection = new RangeInt(start, length);
         }

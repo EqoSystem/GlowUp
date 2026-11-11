@@ -29,19 +29,22 @@ namespace GlowUp.Common
 #endif
         }
 
-        /// <summary>Presses since the last call (0 while not active).</summary>
-        public static int TakePresses()
+        /// <summary>Presses since the last call of the keys that count (0 while not active). `up` / `down` = which volume keys count.</summary>
+        public static int TakePresses(bool up, bool down)
         {
             if (!active) return 0;
 #if UNITY_ANDROID && !UNITY_EDITOR
             try
             {
                 using (var keys = new AndroidJavaClass("com.glowup.input.GlowUpVolumeKeys"))
-                    return keys.CallStatic<int>("takePresses");
+                {
+                    int u = keys.CallStatic<int>("takeUpPresses"), d = keys.CallStatic<int>("takeDownPresses");
+                    return (up ? u : 0) + (down ? d : 0);
+                }
             }
             catch (Exception) { return 0; }
 #elif UNITY_EDITOR
-            return Input.GetKeyDown(KeyCode.PageUp) || Input.GetKeyDown(KeyCode.PageDown) ? 1 : 0;
+            return (up && Input.GetKeyDown(KeyCode.PageUp) ? 1 : 0) + (down && Input.GetKeyDown(KeyCode.PageDown) ? 1 : 0);
 #else
             return 0;
 #endif

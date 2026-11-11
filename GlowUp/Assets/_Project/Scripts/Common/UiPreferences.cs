@@ -103,14 +103,16 @@ namespace GlowUp.Common
         /// <summary>AR Try-On lights the face with a bright white frame on the screen when it is dark (the "front flash").</summary>
         public static bool TryOnScreenLight { get => Get("GlowUp.Camera.TryOnScreenLight", true); set => Set("GlowUp.Camera.TryOnScreenLight", value); }
 
-        /// <summary>What the phone's volume buttons do on the AI Smart Scan screen (Settings > Camera Helpers; phase 2A, 11 November 2026).</summary>
-        public enum VolumeButtonAction { CapturePhoto = 0, StartStopScan = 1, DoNothing = 2 }
+        /// <summary>
+        /// Which phone volume key works as the scan button on the AI Smart Scan screen (Settings > Camera Helpers; 11 November 2026): the key
+        /// starts / pauses the live scan, and in photo mode it takes the photo. Off = the keys only change the volume.
+        /// </summary>
+        public enum VolumeKeys { Both = 0, Up = 1, Down = 2, Off = 3 }
 
-        /// <summary>Default: Do nothing (the buttons change the volume, as on any other screen).</summary>
-        public static VolumeButtonAction VolumeButton
+        public static VolumeKeys VolumeKey
         {
-            get => (VolumeButtonAction)Mathf.Clamp(PlayerPrefs.GetInt("GlowUp.Camera.VolumeButton", (int)VolumeButtonAction.DoNothing), 0, 2);
-            set { PlayerPrefs.SetInt("GlowUp.Camera.VolumeButton", (int)value); Save(); }
+            get => (VolumeKeys)Mathf.Clamp(PlayerPrefs.GetInt("GlowUp.Camera.VolumeKeys", (int)VolumeKeys.Both), 0, 3);
+            set { PlayerPrefs.SetInt("GlowUp.Camera.VolumeKeys", (int)value); Save(); }
         }
 
         static bool Get(string key, bool fallback) => PlayerPrefs.GetInt(key, fallback ? 1 : 0) == 1;

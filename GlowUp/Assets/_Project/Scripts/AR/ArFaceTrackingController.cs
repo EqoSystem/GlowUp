@@ -105,7 +105,7 @@ namespace GlowUp.AR
         [Tooltip("The phone's question about the camera comes when the screen has been on show this long. Asked in the very first moment, it stood over a screen that was not drawn yet.")]
         [SerializeField] private float askAfterSeconds = 0.4f;
         [Tooltip("After the camera question closes, wait until the app is in front again for this long before the AR camera opens (opening it while the app is still coming back can leave a black screen)")]
-        [Min(0f)] [SerializeField] private float settleAfterPermissionSeconds = 0.8f;
+        [Min(0f)] [SerializeField] private float settleAfterPermissionSeconds = 1.5f;
         [Tooltip("The longest wait for Google's check of AR support; after that the guided preview is used")]
         [Min(2f)] [SerializeField] private float availabilityTimeoutSeconds = 10f;
         [Tooltip("The longest wait for the install of Google's AR service (the time the app is away does not count)")]
@@ -119,6 +119,7 @@ namespace GlowUp.AR
 
         [Header("Wording")]
         [SerializeField] private string msgChecking = "Getting the camera ready...";
+        [SerializeField] private string msgLiveNextTime = "Camera allowed. Live face tracking starts the next time you open AR Try-On.";
         [SerializeField] private string msgInstalling = "Live try-on needs Google Play Services for AR. Follow the steps on screen.";
         [SerializeField] private string msgStarting = "Starting live try-on...";
         [SerializeField] private string msgLookingForFace = "Looking for your face. Hold the phone in front of you.";
@@ -144,7 +145,6 @@ namespace GlowUp.AR
         public float HeadRoll { get; private set; }
 
         const string GuardName = "ar-live-tracking";
-        static bool reloadedAfterPermission;
         bool guarding;
         float liveSince;
         Coroutine blackWatch;
@@ -280,7 +280,7 @@ namespace GlowUp.AR
             Say(msgChecking);
 
             // 1. the camera permission: one clear question before anything opens the camera
-            bool allowed = true;
+            bool allowed = true, firstAllow = false;
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (!Permission.HasUserAuthorizedPermission(Permission.Camera))
             {
@@ -303,17 +303,12 @@ namespace GlowUp.AR
                 }
                 allowed = granted;
                 // The phone pauses and resumes the app around its question. Opening the AR camera in the middle of that has left a black screen
-                // with the camera light on (reported on phones, 2026-10-26). So after a first "allow" the screen is simply loaded again: the
-                // camera is then already allowed, no question, no pause, a clean start. Once per app run.
-                if (granted && !reloadedAfterPermission)
-                {
-                    reloadedAfterPermission = true;
-                    Debug.Log("[GlowUp] AR Try-On: the camera was just allowed; loading the screen again for a clean start.");
-                    routine = null;
-                    if (quality != null) quality.EndSession();
-                    UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
-                    yield break;
-                }
+                // with the camera light on and a dead back key (reported on phones, 2026-10-26 and 2026-11-11, right after the first "allow"
+                // when the user came straight from sign-up). The earlier cure, loading the screen again, made it worse: the new screen started
+                // the AR camera in its very first frames, while the app was still coming back to the front. Now the first "allow" never starts
+                // live tracking in the same visit: the screen waits until the app is in front again (below) and then uses the guided preview, which
+                // follows the face with the ordinary camera; the next visit starts live tracking normally.
+                firstAllow = granted;
                 // the question has just closed: the app is still coming back to the front. Opening the AR camera in that moment can leave a
                 // black screen until the app is restarted, so wait until the app is in front again and has had a moment to draw.
                 float settled = 0f, front = 0f;
@@ -322,6 +317,12 @@ namespace GlowUp.AR
                     front += Time.unscaledDeltaTime;
                     if (Application.isFocused) settled += Time.unscaledDeltaTime;
                     yield return null;
+                }
+                if (firstAllow)
+                {
+                    Debug.Log("[GlowUp] AR Try-On: the camera was just allowed; the guided preview is used for this visit (live tracking next time).");
+                    UseGuidedPreview("the camera was just allowed: the phone is still coming back from its question", msgLiveNextTime);
+                    yield break;
                 }
             }
 #endif

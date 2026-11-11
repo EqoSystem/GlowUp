@@ -287,7 +287,7 @@ namespace GlowUp.Scan
         [SerializeField] private string msgAiLimit = "The AI has been asked as often as it may be for now. Type the product's name, or tap Finish anyway.";
         [SerializeField] private string msgNeedList = "The ingredient list is not read yet. Show it to the camera, or tap Look it up.";
         [SerializeField] private string msgStalled = "Not getting further? Tap Start over, or tap Type it in.";
-        [SerializeField] private string msgPauseReset = "The scan was paused for a while, so it was put back to the start.";
+        [SerializeField] private string msgPauseReset = "The scan was paused for a while, so it was put back to the start. Double-tap the screen to wake the camera.";
         [SerializeField] private string msgDifferentProduct = "That is a different product: a new scan was started for it.";
         [SerializeField] private string msgSameAgain = "Scanning the same product again. Its name is kept.";
         [SerializeField] private string msgStartedOver = "Ready for a new product.";
@@ -517,9 +517,9 @@ namespace GlowUp.Scan
         }
 
         // phase 2A: the volume buttons belong to this screen only while it is shown, and only when Settings gives them a job
-        void OnEnable() { VolumeKeyInput.SetActive(UiPreferences.VolumeButton != UiPreferences.VolumeButtonAction.DoNothing); }
+        void OnEnable() { VolumeKeyInput.SetActive(UiPreferences.VolumeKey != UiPreferences.VolumeKeys.Off); }
         void OnDisable() { VolumeKeyInput.SetActive(false); }
-        void OnApplicationFocus(bool focused) { VolumeKeyInput.SetActive(focused && isActiveAndEnabled && UiPreferences.VolumeButton != UiPreferences.VolumeButtonAction.DoNothing); }
+        void OnApplicationFocus(bool focused) { VolumeKeyInput.SetActive(focused && isActiveAndEnabled && UiPreferences.VolumeKey != UiPreferences.VolumeKeys.Off); }
 
         void OnDestroy()
         {
@@ -637,26 +637,55 @@ namespace GlowUp.Scan
         bool photoAfterCameraStarts;                  // the camera button was tapped before the camera ran: photo mode once it runs
 
         /// <summary>
-        /// The phone's volume button (phase 2A, 11 November 2026; Settings > Camera Helpers > "Volume button does:"). It does exactly what a
-        /// tap on the matching button would do, and nothing while that button cannot be used (a pop-up is open, the screen is busy).
-        ///   Capture photo: in photo mode the capture button; otherwise the Photo button (it switches to photo mode first).
-        ///   Start/stop scan: the scan button. In photo mode it goes back to live scanning first.
+        /// The phone's volume key (Settings > Camera Helpers > "Volume keys as shutter", 11 November 2026): the same as a tap on the screen's main
+        /// button, and nothing while that button cannot be used (a pop-up is open, the screen is busy). In photo mode the capture button, otherwise
+        /// the scan button (it also wakes a sleeping camera).
         /// </summary>
         void VolumeButtonPressed()
         {
             if (PopupOpen || stage == Stage.Recognising || stage == Stage.Leaving) return;
             if (snapshot != null && (snapshot.IsOpen || snapshot.PreviewOpen)) return;
-            switch (UiPreferences.VolumeButton)
+            // the chosen key does what the screen's main button does NOW: in photo mode it takes the photo, otherwise it starts / pauses the live scan
+            if (photoMode) { if (shutter != null && shutter.isActiveAndEnabled && shutter.interactable) shutter.onClick.Invoke(); }
+            else if (holdButton != null && holdButton.isActiveAndEnabled) holdButton.Toggle();
+        }
+
+        // ---------------------------------------------------------------------------------------
+        //  A sleeping camera (the scan was paused for a while: the camera went off and the white idle picture shows) wakes with a double tap
+        //  anywhere on the camera picture (11 November 2026). A tap on a button of the picture (flashlight, lock, sun) is not counted.
+        // ---------------------------------------------------------------------------------------
+        float lastTapAt = -10f;
+        Vector2 lastTapPoint;
+
+        void WakeByDoubleTap()
+        {
+            if (stage != Stage.Idle || photoMode || PopupOpen || cameraFeed == null || cameraFeed.Viewport == null) return;
+            bool began = false; Vector2 at = Vector2.zero;
+            if (Input.touchCount > 0) { Touch t = Input.GetTouch(0); if (t.phase == TouchPhase.Began) { began = true; at = t.position; } }
+            else if (Input.GetMouseButtonDown(0)) { began = true; at = Input.mousePosition; }
+            if (!began) return;
+            Canvas canvas = cameraFeed.Viewport.GetComponentInParent<Canvas>();
+            Camera ui = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+            if (!RectTransformUtility.RectangleContainsScreenPoint(cameraFeed.Viewport, at, ui) || TappedAButton(at)) { lastTapAt = -10f; return; }
+            float limit = (Screen.dpi > 0f ? Screen.dpi : 160f) * 0.4f;                  // the two taps are about 1 cm apart at most
+            if (Time.unscaledTime - lastTapAt < 0.4f && (at - lastTapPoint).sqrMagnitude < limit * limit)
             {
-                case UiPreferences.VolumeButtonAction.CapturePhoto:
-                    if (photoMode) { if (shutter != null && shutter.isActiveAndEnabled && shutter.interactable) shutter.onClick.Invoke(); }
-                    else if (photoButton != null && photoButton.interactable) OnPhotoButton();
-                    break;
-                case UiPreferences.VolumeButtonAction.StartStopScan:
-                    if (photoMode) { ExitPhotoMode(); break; }
-                    if (holdButton != null && holdButton.isActiveAndEnabled) holdButton.Toggle();
-                    break;
+                lastTapAt = -10f;
+                if (holdButton != null && holdButton.isActiveAndEnabled) holdButton.Toggle();      // the same as tapping the scan button: the camera wakes
+                return;
             }
+            lastTapAt = Time.unscaledTime; lastTapPoint = at;
+        }
+
+        static readonly List<UnityEngine.EventSystems.RaycastResult> wakeHits = new List<UnityEngine.EventSystems.RaycastResult>();
+        static bool TappedAButton(Vector2 at)
+        {
+            var events = UnityEngine.EventSystems.EventSystem.current;
+            if (events == null) return false;
+            wakeHits.Clear();
+            events.RaycastAll(new UnityEngine.EventSystems.PointerEventData(events) { position = at }, wakeHits);
+            foreach (var hit in wakeHits) if (hit.gameObject != null && hit.gameObject.GetComponentInParent<Button>() != null) return true;
+            return false;
         }
 
         void OnPhotoButton()
@@ -798,7 +827,9 @@ namespace GlowUp.Scan
         void Update()
         {
             if (Input.GetKeyDown(KeyCode.Escape)) { BackKey(); return; }
-            if (VolumeKeyInput.TakePresses() > 0) VolumeButtonPressed();
+            UiPreferences.VolumeKeys keys = UiPreferences.VolumeKey;
+            if (keys != UiPreferences.VolumeKeys.Off && VolumeKeyInput.TakePresses(keys != UiPreferences.VolumeKeys.Down, keys != UiPreferences.VolumeKeys.Up) > 0) VolumeButtonPressed();
+            WakeByDoubleTap();
             if (stage != Stage.Scanning) return;
             TakeEarlyBarcode();                              // fast early barcode / QR recognition
             if (stage != Stage.Scanning) return;

@@ -515,7 +515,7 @@ namespace GlowUp.EditorTools
         /// pill slides along, stretches like liquid and snaps to the icon of the screen that opens (LiquidTabBar).
         /// </summary>
         /// <param name="current">0 = none (the dashboard), 1 = Recent, 2 = Scan, 3 = Try On (the screen this bar is on)</param>
-        public static BottomActionBar BottomBar(AppScreen s, int current)
+        public static BottomActionBar BottomBar(AppScreen s, int current, float pill = BarPill)
         {
             var bar = Panel(s.card, "BottomActionBar", ThemeRole.SurfaceAlt, 0.94f, BarHeight);
             bar.raycastTarget = true;
@@ -527,9 +527,9 @@ namespace GlowUp.EditorTools
 
             // the pink pill: created before the buttons, so it is drawn BEHIND their icons. In Edit mode it stands where it
             // rests; LiquidTabBar moves and stretches it while the app runs.
-            Image drop = Panel(bar.transform, "LiquidDrop", ThemeRole.ButtonFill, 1f, BarPill);
+            Image drop = Panel(bar.transform, "LiquidDrop", ThemeRole.ButtonFill, 1f, pill);
             float third = (Kit.CardWidth - 56f) / 3f;
-            At(drop.transform, MC, new Vector2((pillSlot - 1) * third, BarIconY), new Vector2(BarPill, BarPill));
+            At(drop.transform, MC, new Vector2((pillSlot - 1) * third, BarIconY), new Vector2(pill, pill));
 
             Button recent = BarButton(bar.transform, "RecentScansButton", "Recent", IconFactory.History, 0f, 1f / 3f, current == 1, pillSlot == 0);
             Button scan = BarButton(bar.transform, "StartScanButton", "Start Scan", IconFactory.Scan, 1f / 3f, 2f / 3f, current == 2, pillSlot == 1);
@@ -540,7 +540,7 @@ namespace GlowUp.EditorTools
             Kit.SetArray(liquid, "slots", new Object[] { recent.transform, scan.transform, tryOn.transform });
             Kit.SetArray(liquid, "slotIcons", new Object[] { recent.targetGraphic, scan.targetGraphic, tryOn.targetGraphic });
             Set(liquid, "current", pillSlot);
-            Set(liquid, "restWidth", BarPill); Set(liquid, "restHeight", BarPill);
+            Set(liquid, "restWidth", pill); Set(liquid, "restHeight", pill);
 
             var view = SceneBuilderCore.Ensure<BottomActionBar>(bar.gameObject);
             Set(view, "recentButton", recent); Set(view, "scanButton", scan); Set(view, "tryOnButton", tryOn);

@@ -26,6 +26,7 @@ namespace GlowUp.EditorTools
         const float BottomBlock = 600;          // space under the camera view
         // Brief of 11 November 2026 (phase 1B): from the top down under the camera: the status line, the four chips (two rows of two),
         // then ONE row of controls: Start over | Type it in | SCAN (centred, the largest) | Photo | Finish. Nothing crowds or clips.
+        static readonly Color ScanDisc = new Color32(255, 185, 213, 255), ScanDiscInk = new Color32(58, 47, 48, 255);
         const float CornerStep = 112;                                                       // 92 button + 20 gap
         const float SideButton = 120;                                                       // the round part of a side control (40 dp)
         const float ChipRowY = RingBottom + RingSize + 16, ChipRowH = 2 * 60 + 12;          // 304 .. 436
@@ -55,7 +56,7 @@ namespace GlowUp.EditorTools
             A.Fill(idle.transform);
             Image cameraIcon = A.RawIcon(idle.transform, "CameraIcon", IconFactory.CameraIcon, 150, new Color(1, 1, 1, 0.55f));
             cameraIcon.rectTransform.anchoredPosition = new Vector2(0, 60);
-            TextMeshProUGUI idleText = A.RawLabel(idle.transform, "IdleText", "Tap the button below to start scanning", 34,
+            TextMeshProUGUI idleText = A.RawLabel(idle.transform, "IdleText", "Tap the button below, or double-tap the screen, to start scanning", 34,
                                                   new Color(1, 1, 1, 0.82f), FontRole.Body, TextAlignmentOptions.Center, true);
             A.At(idleText.transform, A.MC, new Vector2(0, -90), new Vector2(640, 110));
 
@@ -274,12 +275,13 @@ namespace GlowUp.EditorTools
             foreach (Image fill in fills) { fill.fillAmount = 0f; EditorUtility.SetDirty(fill); }
             foreach (Image track in tracks) EditorUtility.SetDirty(track);
 
-            Image disc = A.Panel(hold.transform, "HoldButton", ThemeRole.ButtonFill, 1f, HoldSize);
+            // 11 November 2026: the scan button is a pale pink disc with dark words (the owner's reference picture), the same in light and dark mode
+            Image disc = A.RawPanel(hold.transform, "HoldButton", ScanDisc, HoldSize);
             disc.raycastTarget = true;                       // the button takes the touch
             A.At(disc.transform, A.MC, Vector2.zero, new Vector2(HoldSize, HoldSize));
-            Image holdIcon = A.Icon(disc.transform, "Icon", IconFactory.Scan, 56, ThemeRole.ButtonText);
+            Image holdIcon = A.RawIcon(disc.transform, "Icon", IconFactory.Scan, 56, ScanDiscInk);
             holdIcon.rectTransform.anchoredPosition = new Vector2(0, 26);
-            TextMeshProUGUI holdLabel = A.Label(disc.transform, "Label", "Tap to scan", 23, ThemeRole.ButtonText, FontRole.Button, TextAlignmentOptions.Center);
+            TextMeshProUGUI holdLabel = A.RawLabel(disc.transform, "Label", "Tap to scan", 23, ScanDiscInk, FontRole.Button, TextAlignmentOptions.Center);
             A.At(holdLabel.transform, A.MC, new Vector2(0, -34), new Vector2(HoldSize - 36, 40));
             A.Shrink(holdLabel, 17);
             holdLabel.raycastTarget = false;

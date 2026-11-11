@@ -113,7 +113,7 @@ namespace GlowUp.EditorTools
             A.Set(notice, "notice", noticeGroup); A.Set(notice, "messageText", noticeText); A.Set(notice, "closeButton", noticeClose);
             noticePill.gameObject.SetActive(false);
 
-            BottomActionBar bar = A.BottomBar(s, 0);
+            BottomActionBar bar = A.BottomBar(s, 0, 85f);      // the liquid drop is 85 x 85 on Recent Scans and the dashboard (owner, 11 November 2026)
             AppTiles.SwipeNavigation(s, bar);       // drag the dashboard right: Recent Scans comes in; left: AR Try-On (the scanner is opened with its button only)
 
             // ---- account pop-up (opens from the avatar) ----

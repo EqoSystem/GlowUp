@@ -109,7 +109,7 @@ namespace GlowUp.EditorTools
             Button restore = A.PillButton(restoreBar.transform, "RestoreButton", "Restore", 30, ThemeRole.ButtonFill, ThemeRole.ButtonText);
             A.At(restore.transform, A.MR, new Vector2(-16, 0), new Vector2(196, 66));
 
-            BottomActionBar bar = A.BottomBar(s, 1);
+            BottomActionBar bar = A.BottomBar(s, 1, 85f);      // the liquid drop is 85 x 85 on Recent Scans and the dashboard (owner, 11 November 2026)
             AppTiles.SwipeNavigation(s, bar);
 
             // ---- pop-ups ----

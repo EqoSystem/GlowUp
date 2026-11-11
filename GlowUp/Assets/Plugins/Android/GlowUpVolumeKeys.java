@@ -24,7 +24,7 @@ import java.lang.reflect.Proxy;
 public final class GlowUpVolumeKeys {
 
     private static volatile boolean active;
-    private static int presses;
+    private static int upPresses, downPresses;
     private static boolean installed;
 
     private GlowUpVolumeKeys() { }
@@ -32,7 +32,7 @@ public final class GlowUpVolumeKeys {
     /** On = volume keys are taken by the app; off = they change the volume as usual. Installs the stand-in callback the first time. */
     public static void setActive(final Activity activity, boolean on) {
         active = on;
-        if (!on) { synchronized (GlowUpVolumeKeys.class) { presses = 0; } return; }
+        if (!on) { synchronized (GlowUpVolumeKeys.class) { upPresses = 0; downPresses = 0; } return; }
         if (installed || activity == null) return;
         activity.runOnUiThread(new Runnable() {
             @Override
@@ -40,10 +40,17 @@ public final class GlowUpVolumeKeys {
         });
     }
 
-    /** The presses since the last call (a key held down counts once). */
-    public static synchronized int takePresses() {
-        int n = presses;
-        presses = 0;
+    /** The volume-up presses since the last call (a key held down counts once). */
+    public static synchronized int takeUpPresses() {
+        int n = upPresses;
+        upPresses = 0;
+        return n;
+    }
+
+    /** The volume-down presses since the last call. */
+    public static synchronized int takeDownPresses() {
+        int n = downPresses;
+        downPresses = 0;
         return n;
     }
 
@@ -65,7 +72,7 @@ public final class GlowUpVolumeKeys {
                             int code = key.getKeyCode();
                             if (code == KeyEvent.KEYCODE_VOLUME_UP || code == KeyEvent.KEYCODE_VOLUME_DOWN) {
                                 if (key.getAction() == KeyEvent.ACTION_DOWN && key.getRepeatCount() == 0) {
-                                    synchronized (GlowUpVolumeKeys.class) { presses++; }
+                                    synchronized (GlowUpVolumeKeys.class) { if (code == KeyEvent.KEYCODE_VOLUME_UP) upPresses++; else downPresses++; }
                                 }
                                 return Boolean.TRUE;               // taken: the volume does not change, no volume panel
                             }
