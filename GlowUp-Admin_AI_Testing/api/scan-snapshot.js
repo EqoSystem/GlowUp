@@ -18,7 +18,7 @@
 
 const assist = require("./assist-ingredient.js").helpers;
 const { PROJECT, FIREBASE_WEB_KEY, KEY_REFERER, firstObject, normalShade, text, httpsUrl, plainAddress, isRedirect, sourcesOf, withTimeout, searchResultUrl, sourceKind } = assist;
-const { findPageIngredients } = require("./_lib/pageIngredients.js");
+const { findPageIngredients, brandHomeFacts, isOfficial, absoluteHttps } = require("./_lib/pageIngredients.js");
 
 const COOLDOWN_SECONDS = 30;
 const PER_UID_DAILY = 5;
@@ -119,14 +119,49 @@ function question(brandHint, productHint, ocrText) {
         "brand: the company or label (its logo). productName: what this one product is called, without the brand, the shade or the size.",
         "variant: shade name or number, or finish, only when printed. size: the net content as printed (e.g. \"30 ml\"). cosmeticType: the kind of make-up (e.g. lipstick, foundation, mascara).",
         "shadeHex: the product's own colour as #RRGGBB when the shade is visible and the cap is off; otherwise empty.",
+        "shadeCode: the shade code or shade name PRINTED on the pack (e.g. \"119\", \"N20\", \"Warm Nude\"); otherwise empty.",
+        "description: one or two plain sentences that describe this product as its official page or a shop page does (what it is, finish, coverage). No health or safety claims, no prices, no links. Empty when no page describes it.",
+        "officialSite: the brand's own official website (https address of its home page), only when the search showed it; otherwise empty.",
+        "minimumAge: the minimum age of use ONLY when the maker states one (e.g. \"not for children under 3\" = 3); otherwise null.",
         "Do NOT write any ingredient list: GlowUp takes ingredient lists only from product pages it opens itself.",
         "Write the brand as it is officially spelled (with its spaces and capitals, e.g. \"Maybelline New York\", not \"MAYBELLINE NEWYORK\").",
         "confidence: 0 to 1. Do not guess a brand or a name you can neither read nor clearly recognise: leave it empty.",
-        'Reply with ONE JSON object only: {"found":true,"brand":"","productName":"","variant":"","size":"","cosmeticType":"","shadeHex":"","confidence":0.0}'
+        'Reply with ONE JSON object only: {"found":true,"brand":"","productName":"","variant":"","size":"","cosmeticType":"","shadeHex":"","shadeCode":"","description":"","officialSite":"","minimumAge":null,"confidence":0.0}'
     ].join("\n");
 }
 
 const WORDS = { high: 0.85, medium: 0.6, low: 0.3 };
+
+/** The AI's "official site" is used only when its host carries the brand's own name (the AI's word alone is not trusted further). */
+function fetchableOfficial(url, brand) {
+    try { const u = new URL(url); return !!absoluteHttps(u.href, u.href) && isOfficial(u.hostname, brand); } catch (error) { return false; }
+}
+
+const TIER_LABEL = { official: "Official manufacturer site", unverified: "Unverified site", retailer: "E-commerce retailer", other: "Other site" };
+
+/**
+ * The three sources of the web search result (11 November 2026):
+ *   primary   = the maker's own site (a page on the brand's own domain) = "Official manufacturer site"; when there is none,
+ *               the best other page = "Unverified site";
+ *   secondary = an e-commerce retailer's page;
+ *   third     = one more page, preferably one that printed an ingredient list.
+ * `pages` = { url, site, kind (official | retailer | other), hasList }, best first. Each address once; an empty slot is null.
+ */
+function sourceTiers(pages) {
+    const used = new Set();
+    const take = (pick, tierOf) => {
+        const page = (pages || []).find((p) => p && p.url && !used.has(p.url) && pick(p));
+        if (!page) return null;
+        used.add(page.url);
+        const tier = tierOf(page);
+        return { url: page.url, site: page.site, tier, label: TIER_LABEL[tier], hasList: !!page.hasList };
+    };
+    const primary = take((p) => p.kind === "official", () => "official") || take((p) => p.kind === "other", () => "unverified");
+    const secondary = take((p) => p.kind === "retailer", () => "retailer");
+    const ownKind = (p) => (p.kind === "official" || p.kind === "retailer" ? p.kind : "other");
+    const third = take((p) => p.hasList, ownKind) || take(() => true, ownKind);
+    return { primary, secondary, third };
+}
 
 /** The answer reduced to plain, bounded fields. Nothing the model says is kept as it came. */
 function tidySnapshot(raw) {
@@ -140,6 +175,11 @@ function tidySnapshot(raw) {
         found: brand.length + productName.length > 0,
         brand, productName, variant: text(raw.variant, 60), size: text(raw.size, 40), cosmeticType: text(raw.cosmeticType, 40).toLowerCase(),
         shadeHex: normalShade(raw.shadeHex), ingredients,
+        // 11 November 2026: the web search result's extra facts (all optional; every link is checked again below)
+        shadeCode: text(raw.shadeCode, 30).replace(/[^\p{L}\p{N} .\/-]/gu, "").trim().slice(0, 30),
+        description: text(raw.description, 400).replace(/https?:\/\/\S+/gi, "").replace(/\s+/g, " ").trim().slice(0, 300),
+        officialSite: httpsUrl(raw.officialSite) || "",
+        minimumAge: Number.isInteger(raw.minimumAge) && raw.minimumAge > 0 && raw.minimumAge <= 18 ? raw.minimumAge : 0,
         confidence: Number.isFinite(asked) ? Math.max(0, Math.min(1, Math.round(asked * 100) / 100)) : 0
     };
 }
@@ -219,11 +259,41 @@ module.exports = async (req, res) => {
         }
         draft.ingredients = listPage.ingredients;
         const others = draft.found ? cleanLinks(got.sources) : [];
+
+        // the web search result's facts: sources in three tiers, the brand's site and logo, the product's photo (from pages THIS server opened)
+        const brandName = draft.brand;
+        const order = { official: 0, retailer: 1, other: 2 };
+        const opened = (listPage.pages || []).filter((p) => cleanLinks([{ url: p.url }]).length === 1);
+        const seenUrls = new Set(opened.map((p) => p.url));
+        others.forEach((url) => {
+            if (seenUrls.has(url)) return;
+            seenUrls.add(url);
+            const site = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+            opened.push({ url, site, kind: isOfficial(site, brandName) ? "official" : sourceKind("page | " + url, "") === "retailer" ? "retailer" : "other", hasList: false, image: "" });
+        });
+        opened.sort((a, b) => order[a.kind] - order[b.kind]);
+        const tiers = sourceTiers(opened);
+        const officialPage = opened.find((p) => p.kind === "official");
+        let home = { website: "", logoUrl: "", imageUrl: "" };
+        if (draft.found && officialPage) home = await brandHomeFacts(officialPage.url).catch(() => home);
+        else if (draft.found && draft.officialSite && fetchableOfficial(draft.officialSite, brandName)) home = await brandHomeFacts(draft.officialSite).catch(() => home);
+        const photoPage = opened.find((p) => p.image && p.kind === "official") || opened.find((p) => p.image && p.kind === "retailer") || null;
+        const details = draft.found ? {
+            market: "Global",
+            description: draft.description,
+            brandWebsite: home.website, brandWebsiteOfficial: !!officialPage,
+            brandLogoUrl: home.logoUrl, brandImageUrl: home.imageUrl,
+            productPhotoUrl: photoPage ? photoPage.image : "", productPageUrl: officialPage ? officialPage.url : (tiers.primary ? tiers.primary.url : ""),
+            shades: draft.shadeCode || draft.shadeHex ? [{ code: draft.shadeCode || draft.variant || "", hex: draft.shadeHex || "" }] : [],
+            minimumAge: draft.minimumAge,
+            sources: tiers
+        } : null;
         const sourceUrls = (listPage.url ? cleanLinks([{ url: listPage.url }]) : []).concat(others.filter((url) => url !== listPage.url)).slice(0, MAX_SOURCES);
         if (sourceUrls.length === 0 && !notes.includes("no web sources found")) notes.push("no web sources found");
         return send(res, 200, {
             found: draft.found, draft, sourceUrls, webSources: sourceUrls.length > 0, label: LABEL,
             ingredientSource: listPage.url ? { url: listPage.url, site: listPage.site, kind: listPage.kind } : null,
+            details,
             model: "Gemini " + got.model, notes
         });
     } catch (error) {
@@ -231,4 +301,4 @@ module.exports = async (req, res) => {
     }
 };
 
-module.exports.helpers = { hint, ocrOf, question, photoOf, tidySnapshot, cleanLinks, dayStamp, takeSlot, COOLDOWN_SECONDS, PER_UID_DAILY, GLOBAL_DAILY };
+module.exports.helpers = { sourceTiers, fetchableOfficial, hint, ocrOf, question, photoOf, tidySnapshot, cleanLinks, dayStamp, takeSlot, COOLDOWN_SECONDS, PER_UID_DAILY, GLOBAL_DAILY };

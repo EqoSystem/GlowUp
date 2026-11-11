@@ -464,6 +464,22 @@ namespace GlowUp.Scan
                     ingredientSourceUrl = !fromPack && list.Count > 0 ? answer.ingredientSourceUrl : "",
                     ingredientSourceKind = !fromPack && list.Count > 0 ? answer.ingredientSourceKind : ""
                 };
+                // the web search result's facts (11 November 2026): kept for the Web Search Result screen and sent along for the admin's form
+                WebSearchResult web = answer.details ?? new WebSearchResult();
+                web.brandName = record.brandName; web.productName = record.name; web.cosmeticType = record.cosmeticType;
+                web.key = WebSearchResult.KeyOf(record.brandName, record.name);
+                web.ingredients = new List<string>(record.ingredients);
+                if (web.shades.Count == 0 && (answer.variant.Length > 0 || record.shadeHex.Length > 0))
+                    web.shades.Add(new WebSearchResult.Shade { code = Limit(answer.variant, 30), hex = record.shadeHex });
+                record.description = Limit(web.description, 300);
+                record.shadeCode = web.shades.Count > 0 ? Limit(web.shades[0].code, 30) : "";
+                record.minimumAge = web.minimumAge;
+                record.brandWebsite = web.brandWebsite; record.brandLogoUrl = web.brandLogoUrl; record.brandImageUrl = web.brandImageUrl;
+                record.productPhotoUrl = web.productPhotoUrl; record.productPageUrl = web.productPageUrl;
+                if (web.primary != null) { record.primarySourceUrl = web.primary.url; record.primarySourceKind = web.primary.tier == "official" ? "official" : "unverified"; }
+                if (web.secondary != null) record.secondarySourceUrl = web.secondary.url;
+                if (web.third != null) { record.thirdSourceUrl = web.third.url; record.thirdSourceKind = web.third.tier == "unverified" ? "other" : web.third.tier; }
+                ScanSession.WebResult = web;
                 PendingProductData made = record.name.Length > 0 ? PendingProductRepository.Submit(record, keepPhotoForAdmin ? jpeg : null, maximumPhotoBytes) : null;
 
                 if (list.Count == 0)

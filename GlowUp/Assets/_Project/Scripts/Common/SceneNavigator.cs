@@ -25,6 +25,8 @@ namespace GlowUp.Common
         public const string AiSmartAnalysis = "AiSmartAnalysisScene";
         public const string Loading = "LoadingScene";
         public const string AiResult = "AiSmartAnalysisResultScene";
+        /// <summary>The result of a product found by the web search of a photo: the same analysis, plus what the web said about the product.</summary>
+        public const string WebResult = "WebSearchResultScene";
         public const string ArTryOn = "ARTryOnScene";
         public const string Settings = "SettingsScene";
     }

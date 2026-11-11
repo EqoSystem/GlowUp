@@ -135,6 +135,30 @@ r = await call({ quota: 403, quotaDoc: { fields: { count: { integerValue: "1" },
 check(r.status === 429 && r.body.code === "busy", "own limits fine but the commit refused: the global cap is reached");
 equal([handler.helpers.COOLDOWN_SECONDS, handler.helpers.PER_UID_DAILY, handler.helpers.GLOBAL_DAILY], [30, 5, 150], "the constants: 30 s, 5 a day, 150 a day for everybody");
 
+// ---- the web search result's facts (11 November 2026)
+const facts = tidySnapshot({ found: true, brand: "Maybelline New York", productName: "Super Stay Lumi-Matte Foundation", shadeCode: "119<script>", description: "A long-wear matte foundation. See https://evil.example/x now.",
+    officialSite: "https://www.maybelline.com/", minimumAge: 3, confidence: 0.9 });
+equal([facts.shadeCode, facts.description, facts.officialSite, facts.minimumAge], ["119script", "A long-wear matte foundation. See now.", "https://www.maybelline.com/", 3],
+    "shade code, description (no links), official site and minimum age are kept, cleaned");
+equal([tidySnapshot({ found: true, brand: "A", minimumAge: 40 }).minimumAge, tidySnapshot({ found: true, brand: "A", minimumAge: "3" }).minimumAge, tidySnapshot({ found: true, brand: "A", officialSite: "http://a.example" }).officialSite],
+    [0, 0, ""], "an age over 18 or not a whole number, and an http site, are dropped");
+const tiers = handler.helpers.sourceTiers([
+    { url: "https://www.maybelline.com/p/119", site: "maybelline.com", kind: "official", hasList: false },
+    { url: "https://www.watsons.com.ph/p/1", site: "watsons.com.ph", kind: "retailer", hasList: true },
+    { url: "https://blog.example/review", site: "blog.example", kind: "other", hasList: false },
+    { url: "https://www.lazada.com.ph/p/2", site: "lazada.com.ph", kind: "retailer", hasList: true }]);
+equal([tiers.primary.label, tiers.secondary.label, tiers.third.label, tiers.third.url], ["Official manufacturer site", "E-commerce retailer", "E-commerce retailer", "https://www.lazada.com.ph/p/2"],
+    "primary = the maker's own site, secondary = a shop, third = another page with a list");
+const noMaker = handler.helpers.sourceTiers([{ url: "https://blog.example/review", site: "blog.example", kind: "other" }, { url: "https://shop.example/p", site: "shop.example", kind: "retailer" }]);
+equal([noMaker.primary.label, noMaker.secondary.label, noMaker.third], ["Unverified site", "E-commerce retailer", null], "no maker's page: the primary is an unverified site; an empty slot is null");
+check(handler.helpers.fetchableOfficial("https://www.maybelline.com/", "Maybelline New York") && !handler.helpers.fetchableOfficial("https://cheap-makeup.example/", "Maybelline New York"),
+    "the AI's official site counts only when it carries the brand's own name");
+const pages = require("../api/_lib/pageIngredients.js");
+equal(pages.imageOf('<head><meta content="/img/p.jpg" property="og:image"></head>', "https://www.maybelline.com/p/119"), "https://www.maybelline.com/img/p.jpg", "the share picture, made absolute (either attribute order)");
+equal(pages.imageOf('<meta property="og:image" content="http://x.example/p.jpg">', "https://a.example/"), "", "an http picture is not used");
+equal(pages.logoOf('<link rel="icon" href="/f.svg"><link rel="apple-touch-icon" href="/touch.png">', "https://www.maybelline.com/"), "https://www.maybelline.com/touch.png", "the logo: the apple-touch-icon first");
+equal(pages.logoOf('<link rel="icon" href="/f.svg"><link rel="shortcut icon" href="/logo.png">', "https://b.example/"), "https://b.example/logo.png", "then a PNG icon (an SVG cannot be shown in the app)");
+
 console.log("checks made: " + checks);
 console.log(failed === 0 ? "ALL PASSED" : failed + " FAILED");
 process.exit(failed === 0 ? 0 : 1);

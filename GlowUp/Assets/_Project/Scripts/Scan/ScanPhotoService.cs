@@ -30,6 +30,8 @@ namespace GlowUp.Scan
             public bool webSources;
             /// <summary>The page the ingredient list was cut from by the server ("" = no page had a list), and its kind: official / retailer / other.</summary>
             public string ingredientSourceUrl = "", ingredientSourceKind = "";
+            /// <summary>The web search result's facts (brand site and logo, product photo, description, shades, minimum age, three sources); null when the server sent none.</summary>
+            public WebSearchResult details;
         }
 
         /// <summary>The address of the function, set by ScanSnapshotController (https only).</summary>
@@ -92,6 +94,7 @@ namespace GlowUp.Scan
                         result.ingredientSourceKind = kind == "official" || kind == "retailer" || kind == "other" ? kind : "";
                     }
                     if (result.ingredientSourceUrl.Length == 0) result.ingredients.Clear();      // a list must name the page it came from
+                    if (json.TryGetValue("details", out object facts) && facts is Dictionary<string, object> details) result.details = WebSearchResult.From(details);
                     result.outcome = Outcome.Ok;
                     return result;
                 }

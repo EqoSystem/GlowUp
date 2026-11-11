@@ -87,6 +87,59 @@ function extractIngredientList(html) {
     return null;
 }
 
+/** An https address made absolute against the page it stands on; "" when it is not a fetchable https address. */
+function absoluteHttps(raw, base) {
+    try {
+        const url = new URL(String(raw || "").replace(/&amp;/gi, "&").trim(), base);
+        return fetchable(url.href) && url.href.length <= 300 ? url.href : "";
+    } catch (error) { return ""; }
+}
+
+/** The value of a <meta property|name="key" content="..."> tag, either attribute order. */
+function metaContent(html, key) {
+    const wanted = String(key).toLowerCase();
+    for (const match of String(html || "").matchAll(/<meta\b[^>]*>/gi)) {
+        const tag = match[0];
+        const name = /\b(?:property|name)\s*=\s*["']([^"']+)["']/i.exec(tag);
+        if (!name || name[1].toLowerCase() !== wanted) continue;
+        const content = /\bcontent\s*=\s*["']([^"']+)["']/i.exec(tag);
+        if (content) return content[1];
+    }
+    return "";
+}
+
+/** The page's own share picture (og:image, then twitter:image): on a product page that is the product's photo. "" when none. */
+function imageOf(html, base) {
+    const h = String(html || "").slice(0, 400000);
+    return absoluteHttps(metaContent(h, "og:image:secure_url") || metaContent(h, "og:image") || metaContent(h, "twitter:image"), base);
+}
+
+/** A brand home page's logo: the apple-touch-icon (a square logo), then a PNG/JPEG icon, then the share picture. "" when none. */
+function logoOf(html, base) {
+    const h = String(html || "").slice(0, 400000);
+    const links = Array.from(h.matchAll(/<link\b[^>]*>/gi)).map((m) => m[0]);
+    const href = (tag) => { const m = /\bhref\s*=\s*["']([^"']+)["']/i.exec(tag); return m ? m[1] : ""; };
+    const rel = (tag) => { const m = /\brel\s*=\s*["']([^"']+)["']/i.exec(tag); return m ? m[1].toLowerCase() : ""; };
+    const touch = links.find((tag) => rel(tag).includes("apple-touch-icon"));
+    if (touch && absoluteHttps(href(touch), base)) return absoluteHttps(href(touch), base);
+    const icon = links.find((tag) => /(^|\s)icon(\s|$)/.test(rel(tag)) && /\.(png|jpe?g)(\?|$)/i.test(href(tag)));
+    if (icon && absoluteHttps(href(icon), base)) return absoluteHttps(href(icon), base);
+    return imageOf(h, base);
+}
+
+/** The brand's home page (the origin of its official product page): its logo and its share picture. Never throws. */
+async function brandHomeFacts(pageUrl, fetcher) {
+    const facts = { website: "", logoUrl: "", imageUrl: "" };
+    try {
+        const home = new URL(pageUrl).origin + "/";
+        if (!fetchable(home)) return facts;
+        facts.website = home;
+        const html = await fetchPage(home, fetcher);
+        if (html) { facts.logoUrl = logoOf(html, home); facts.imageUrl = imageOf(html, home); }
+    } catch (error) { /* no facts */ }
+    return facts;
+}
+
 /** "www.shop.maybelline.com" gives "maybelline.com"-like checks: true when the brand's name is the site's own name. */
 function isOfficial(host, brand) {
     const h = String(host || "").toLowerCase().replace(/^www\./, "");
@@ -235,7 +288,7 @@ async function searchPages(query, fetcher, resultUrl) {
  * `kindOf(url)` = "retailer" for a known shop (from assist-ingredient.js), anything else otherwise.
  */
 async function findPageIngredients({ brand, productName, pages, fetcher, searchFetcher, resultUrl, kindOf, notes }) {
-    const result = { ingredients: [], url: "", site: "", kind: "", tried: 0 };
+    const result = { ingredients: [], url: "", site: "", kind: "", tried: 0, pages: [] };
     if (!brand || !productName) return result;
     // the search goes to one fixed public address (DuckDuckGo); product pages go through the vetted fetch (fetchPage)
     const doSearch = searchFetcher || fetcher || fetch;
@@ -248,12 +301,17 @@ async function findPageIngredients({ brand, productName, pages, fetcher, searchF
         return { url, site, kind, rank: kind === "official" ? 0 : kind === "retailer" ? 1 : 2 };
     }).sort((a, b) => a.rank - b.rank).slice(0, MAX_PAGES);
     // fetched side by side; the best-ranked page that has a list wins
-    const found = await Promise.all(ranked.map(async (page) => ({ page, list: extractIngredientList(await fetchPage(page.url, fetcher)) })));
+    const found = await Promise.all(ranked.map(async (page) => {
+        const html = await fetchPage(page.url, fetcher);
+        return { page, list: extractIngredientList(html), opened: !!html, image: html ? imageOf(html, page.url) : "" };
+    }));
     result.tried = ranked.length;
+    // every page that opened, best-ranked first: its kind, whether it had a list, and its own share picture (the product photo)
+    result.pages = found.filter((f) => f.opened).map((f) => ({ url: f.page.url, site: f.page.site, kind: f.page.kind, hasList: !!(f.list && f.list.length), image: f.image }));
     const best = found.find((f) => f.list && f.list.length > 0);
     if (best) Object.assign(result, { ingredients: best.list.slice(0, 80).map((item) => item.slice(0, 100)), url: best.page.url, site: best.page.site, kind: best.page.kind });
     if (notes) notes.push(best ? `ingredient list from ${best.page.kind} page ${best.page.site}` : `no ingredient list on ${ranked.length} page(s)`);
     return result;
 }
 
-module.exports = { pageText, listFrom, extractIngredientList, isOfficial, fetchable, publicAddress, safeGet, findPageIngredients, setPageGetterForTests, MAX_PAGES };
+module.exports = { imageOf, logoOf, brandHomeFacts, absoluteHttps, pageText, listFrom, extractIngredientList, isOfficial, fetchable, publicAddress, safeGet, findPageIngredients, setPageGetterForTests, MAX_PAGES };

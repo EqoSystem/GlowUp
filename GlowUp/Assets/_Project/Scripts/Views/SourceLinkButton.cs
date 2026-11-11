@@ -48,6 +48,9 @@ namespace GlowUp.Views
 
         void Open() { if (Url.Length > 0) Application.OpenURL(Url); }
 
+        /// <summary>Puts other words on the second line (the Web Search Result names its three sources itself: "Official manufacturer site" ...).</summary>
+        public void ShowKind(string words) { if (kindLabel != null && !string.IsNullOrEmpty(words)) kindLabel.text = words; }
+
         /// <summary>A page nobody at GlowUp has checked yet: "Unverified source · site" (the whole words, never cut; 7 November 2026).</summary>
         public void LabelUnverified()
         {

@@ -55,6 +55,11 @@ service cloud.firestore {
     }
 
     // item i of a list of links: absent, or text of at most 300 characters starting with https:// (nothing else is accepted)
+    // an optional field that is "" or one https link of at most 300 characters
+    function linkOrEmpty(data, key) {
+      return !(key in data) || (data[key] is string && (data[key] == '' || (data[key].size() <= 300 && data[key].matches('https://[^ ]+'))));
+    }
+
     function httpsLink(list, i) {
       return list.size() <= i || (list[i] is string && list[i].size() <= 300 && list[i].matches('https://[^ ]+'));
     }
@@ -377,7 +382,9 @@ service cloud.firestore {
         && idFitsNames(pendingId, request.resource.data, request.auth.uid)
         && request.resource.data.keys().hasOnly(['name', 'brandName', 'cosmeticType', 'shadeHex', 'ingredients', 'key', 'status', 'source',
              'isApproved', 'hasImage', 'confidence', 'model', 'createdByUid', 'createdAtUnix', 'variant', 'size', 'sourceUrls',
-             'ocrText', 'ocrBrand', 'ingredientsFrom', 'ingredientSourceUrl', 'ingredientSourceKind'])
+             'ocrText', 'ocrBrand', 'ingredientsFrom', 'ingredientSourceUrl', 'ingredientSourceKind',
+             'market', 'description', 'shadeCode', 'minimumAge', 'brandWebsite', 'brandLogoUrl', 'brandImageUrl', 'productPhotoUrl', 'productPageUrl',
+             'primarySourceUrl', 'primarySourceKind', 'secondarySourceUrl', 'thirdSourceUrl', 'thirdSourceKind'])
         && request.resource.data.createdByUid == request.auth.uid
         && request.resource.data.isApproved == false
         && request.resource.data.status == 'pending'
@@ -399,6 +406,16 @@ service cloud.firestore {
         && (!('ingredientSourceUrl' in request.resource.data) || (request.resource.data.ingredientSourceUrl is string
              && (request.resource.data.ingredientSourceUrl == '' || (request.resource.data.ingredientSourceUrl.matches('https://.+') && request.resource.data.ingredientSourceUrl.size() <= 300))))
         && (!('ingredientSourceKind' in request.resource.data) || request.resource.data.ingredientSourceKind in ['', 'official', 'retailer', 'other'])
+        // the web search result's facts (11 November 2026): short text, a small age, https links or "" (an admin checks every one)
+        && (!('market' in request.resource.data) || request.resource.data.market in ['', 'Global'])
+        && (!('description' in request.resource.data) || (request.resource.data.description is string && request.resource.data.description.size() <= 300))
+        && (!('shadeCode' in request.resource.data) || (request.resource.data.shadeCode is string && request.resource.data.shadeCode.size() <= 30))
+        && (!('minimumAge' in request.resource.data) || (request.resource.data.minimumAge is number && request.resource.data.minimumAge >= 0 && request.resource.data.minimumAge <= 18))
+        && linkOrEmpty(request.resource.data, 'brandWebsite') && linkOrEmpty(request.resource.data, 'brandLogoUrl') && linkOrEmpty(request.resource.data, 'brandImageUrl')
+        && linkOrEmpty(request.resource.data, 'productPhotoUrl') && linkOrEmpty(request.resource.data, 'productPageUrl')
+        && linkOrEmpty(request.resource.data, 'primarySourceUrl') && linkOrEmpty(request.resource.data, 'secondarySourceUrl') && linkOrEmpty(request.resource.data, 'thirdSourceUrl')
+        && (!('primarySourceKind' in request.resource.data) || request.resource.data.primarySourceKind in ['', 'official', 'unverified'])
+        && (!('thirdSourceKind' in request.resource.data) || request.resource.data.thirdSourceKind in ['', 'official', 'retailer', 'other'])
         && request.resource.data.createdAtUnix is number;
       allow update, delete: if isAdmin();
     }

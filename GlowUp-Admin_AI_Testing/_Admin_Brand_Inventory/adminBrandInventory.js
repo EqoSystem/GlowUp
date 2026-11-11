@@ -1383,9 +1383,16 @@ async function openSnapshotInForm(entry, v) {
     const known = COSMETIC_TYPES.find((t) => sameKey(t) === sameKey(v.kind));
     el("productTypeInput").value = known ? known : OTHER_TYPE;
     el("productTypeOtherInput").value = known ? "" : v.kind;
-    el("productDescInput").value = APPROVED_DESCRIPTION;
+    el("productDescInput").value = v.description || APPROVED_DESCRIPTION;
     el("productIngredientsInput").value = v.ingredients.join(", ");
+    // the app's web search (11 November 2026): photo link, minimum age, FDA number, status, shade code and the three sources, all to check
+    el("productImageInput").value = v.productPhotoUrl || "";
+    el("productMinAgeInput").value = v.minimumAge > 0 ? v.minimumAge : "";
+    el("productFdaInput").value = v.fdaNumber || "";
+    if (v.productStatus) el("productStatusInput").value = v.productStatus;
     formShades = v.shade ? [v.shade] : [];
+    formShadeCodes = formShades.length && v.shadeCode ? [v.shadeCode.toUpperCase().slice(0, 16)] : formShades.map(() => "");
+    if (Array.isArray(v.sources) && v.sources.length) { assistedProductSources = v.sources.slice(0, 10); sourceEditor.paint(); }
     showOtherTypeBox(); showIngredientSummary(); renderShadeEditor();
     const note = el("productAiNote");
     note.textContent = "From an app user's photo. Pending approval, unverified, AI-generated: compare every field with the packaging before you save.";

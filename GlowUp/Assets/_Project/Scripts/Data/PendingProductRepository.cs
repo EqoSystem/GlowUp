@@ -34,6 +34,15 @@ namespace GlowUp.Data
         public string ingredientsFrom = "none";                // "page" | "printed" | "none" (the rules allow only these)
         public string ingredientSourceUrl = "";                // https page the list was cut from ("" when none)
         public string ingredientSourceKind = "";               // "official" (the brand's own site) | "retailer" | "other" | ""
+        // 11 November 2026: the web search result's facts, for the admin's form (the rules check each: short text, https links or "")
+        public string market = "Global";
+        public string description = "";                       // at most 300 characters
+        public string shadeCode = "";                         // the shade code or name printed on the pack, at most 30
+        public int minimumAge;                                // as the maker states it; 0 = not stated (at most 18)
+        public string brandWebsite = "", brandLogoUrl = "", brandImageUrl = "", productPhotoUrl = "", productPageUrl = "";
+        public string primarySourceUrl = "", primarySourceKind = "";     // kind: "official" | "unverified" | ""
+        public string secondarySourceUrl = "";                // an e-commerce retailer
+        public string thirdSourceUrl = "", thirdSourceKind = "";         // kind: "official" | "retailer" | "other" | ""
     }
 
     /// <summary>The photo of a staged product, in its own document so that phones never download it (only admins read it).</summary>

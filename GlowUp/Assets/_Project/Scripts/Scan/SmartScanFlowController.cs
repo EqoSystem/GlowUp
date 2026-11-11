@@ -425,6 +425,7 @@ namespace GlowUp.Scan
 
         void Awake()
         {
+            ScanSession.WebResult = null;                 // a web search result belongs to one visit of this screen
             PlainWording();
             if (holdButton != null) { holdButton.ScanStarted += OnScanStarted; holdButton.ScanPaused += OnScanPaused; }
             if (finishButton != null) finishButton.onClick.AddListener(OnFinishTapped);
@@ -2948,7 +2949,19 @@ namespace GlowUp.Scan
             float leaveAt = Time.unscaledTime + recognisedHoldSeconds;
             while (Time.unscaledTime < leaveAt) yield return null;
             if (cameraFeed != null) cameraFeed.StopCamera();
-            SceneNavigator.GoViaLoading(resultScene, loadingMessage, ScanAnalysisPipeline.Run);
+            SceneNavigator.GoViaLoading(NextResultScene(), loadingMessage, ScanAnalysisPipeline.Run);
+        }
+
+        /// <summary>
+        /// The Web Search Result screen when the product was found by the web search of a photo in this visit (11 November 2026),
+        /// otherwise the usual result screen. The web facts must be about the product that is analysed.
+        /// </summary>
+        string NextResultScene()
+        {
+            WebSearchResult web = ScanSession.WebResult;
+            if (web != null && web.IsAbout(ScanSession.PendingBrandName, ScanSession.PendingProductName)) return SceneNames.WebResult;
+            ScanSession.WebResult = null;
+            return resultScene;
         }
 
         // ---------------------------------------------------------------------------------------
@@ -3358,7 +3371,7 @@ namespace GlowUp.Scan
             ScanSession.PendingShadeName = identity.shadeName; ScanSession.PendingFinish = identity.finish;
             ScanSession.PendingBarcode = barcode;
             ScanSession.PendingReplaces = rescanOf; ScanSession.PendingReplacesSame = rescanSame;
-            SceneNavigator.GoViaLoading(resultScene, loadingMessage, ScanAnalysisPipeline.Run);
+            SceneNavigator.GoViaLoading(NextResultScene(), loadingMessage, ScanAnalysisPipeline.Run);
         }
     }
 }

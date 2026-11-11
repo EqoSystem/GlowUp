@@ -1551,6 +1551,14 @@ body.snapx-open { overflow: hidden; }
 .snapx-pill.new { border-style: dashed; color: var(--text-2); }
 .snapx-badge { margin: 0; width: fit-content; padding: 3px 10px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 600; color: var(--text); border: 1px dashed color-mix(in srgb, var(--warn) 70%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); }
 .snapx-extra { display: flex; flex-direction: column; gap: 6px; }
+/* what the app's web search found (11 November 2026): a folding block, fields like the ones above, links that wrap */
+.snapx-web { display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; background: var(--surface-2); }
+.snapx-web > summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.snapx-web[open] > summary { margin-bottom: 6px; }
+.snapx-web textarea { width: 100%; resize: vertical; min-height: 4.5em; box-sizing: border-box; }
+.snapx-stack { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.snapx-link { font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.snapx-none { color: var(--muted); }
 .snapx-details, .snapx-sources { margin: 0; font-size: var(--fs-sm); color: var(--muted); overflow-wrap: anywhere; }
 .snapx-sources a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .snapx-sources a:focus-visible { outline: 2px solid var(--focus, currentColor); outline-offset: 2px; }

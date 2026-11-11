@@ -21,8 +21,39 @@ namespace GlowUp.Tests
         static readonly string[] Scenes =
         {
             "LogInScene", "OnboardingStep1Scene", "OnboardingStep2Scene", "OnboardingStep3Scene", "OnboardingStep4Scene", "OnboardingStep5Scene",
-            "TermsAndConditionScene", "AiSmartAnalysisScene", "SettingsScene", "UserDashboardScene"
+            "TermsAndConditionScene", "AiSmartAnalysisScene", "SettingsScene", "UserDashboardScene", "WebSearchResultScene"
         };
+
+        // ---------------------------------------------------------------------------------------
+        //  The Web Search Result screen (11 November 2026)
+        // ---------------------------------------------------------------------------------------
+        [Test]
+        public void TheWebSearchResultReadsOnlyCheckedValues()
+        {
+            var details = new Dictionary<string, object>
+            {
+                { "market", "Global" }, { "description", "A matte <b>foundation</b>." }, { "brandWebsite", "https://www.maybelline.com/" },
+                { "brandLogoUrl", "http://insecure.example/logo.png" }, { "productPhotoUrl", "https://evil.example@x.test/p.jpg" },
+                { "productPageUrl", "https://www.maybelline.com/p/119" }, { "minimumAge", 40L },
+                { "shades", new List<object> { new Dictionary<string, object> { { "code", "119" }, { "hex", "#d9a57e" } }, new Dictionary<string, object> { { "code", "" }, { "hex", "red" } } } },
+                { "sources", new Dictionary<string, object> {
+                    { "primary", new Dictionary<string, object> { { "url", "https://www.maybelline.com/p/119" }, { "site", "maybelline.com" }, { "tier", "official" } } },
+                    { "secondary", new Dictionary<string, object> { { "url", "javascript:alert(1)" }, { "tier", "retailer" } } } } }
+            };
+            WebSearchResult r = WebSearchResult.From(details);
+            Assert.AreEqual("A matte  b foundation /b .", r.description, "text only, never markup");
+            Assert.AreEqual("https://www.maybelline.com/", r.brandWebsite);
+            Assert.AreEqual("", r.brandLogoUrl, "http is refused");
+            Assert.AreEqual("", r.productPhotoUrl, "a user name in front of the host is refused");
+            Assert.AreEqual(0, r.minimumAge, "an age over 18 is dropped");
+            Assert.AreEqual(1, r.shades.Count, "a shade with neither a code nor a real colour is dropped");
+            Assert.AreEqual("#D9A57E", r.shades[0].hex);
+            Assert.AreEqual("Official manufacturer site", r.primary.label);
+            Assert.IsNull(r.secondary, "a source without an https address is left out");
+            r.key = WebSearchResult.KeyOf("Maybelline New York", "Super Stay");
+            Assert.IsTrue(r.IsAbout("maybelline new york", "SUPER STAY"));
+            Assert.IsFalse(r.IsAbout("Maybelline New York", "Fit Me"));
+        }
 
         const string LongMessage = "Enter your birthday: tap Edit and pick it. Your age is worked out from it. This sentence is made long on purpose so it needs the second line.";
 

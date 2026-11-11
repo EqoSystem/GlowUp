@@ -40,6 +40,7 @@ namespace GlowUp.EditorTools
             new Step("AI Smart Scan", SmartScanSceneBuilder.Build),
             new Step("Loading", LoadingSceneBuilder.Build),
             new Step("AI Scan Result", ScanResultSceneBuilder.Build),
+            new Step("Web Search Result", WebSearchResultSceneBuilder.Build),
             new Step("AR Try-On", ArTryOnSceneBuilder.Build),
             new Step("Settings", SettingsSceneBuilder.Build)
         };

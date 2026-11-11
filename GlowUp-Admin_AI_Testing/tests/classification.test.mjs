@@ -104,7 +104,7 @@ check(/<label for="ingredientNameInput">INCI name/.test(html), 'the name box is 
 check(!/ingredientTechInput/.test(html + js), "the old INCI box is gone");
 check(/<select id="ingredientClassInput"[^>]*>/.test(html), "the classification is a drop-down, not free text");
 check(/\+ Add new classification/.test(js), 'the drop-down ends with "+ Add new classification"');
-check(/One line on what this ingredient does in a product\./.test(html) && /ingredientPurposeCount/.test(html) && /MAX_PURPOSE/.test(js), "Purpose has its help text and a counter");
+check(/One line on what this ingredient does in a product\./.test(html) && /LIMITED_IDS = \[[^\]]*"ingredientPurposeInput"/.test(js) && /MAX_PURPOSE/.test(js), "Purpose has its help text and a counter (the shared counter of the limited boxes)");
 check(/Choose the ingredient classification/.test(js) && /Write one line on what this ingredient does/.test(js), "classification and purpose are required");
 check(/classificationId: target/.test(shared) && /usersOf\(context\.ingredients\(\), item\.id\)/.test(shared), "removing moves the users first");
 check(shared.indexOf("batch.commit()") < shared.indexOf("deleteDoc(doc(db, COLLECTION, item.id))"), "the classification is deleted only after the move");

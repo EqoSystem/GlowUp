@@ -17,7 +17,20 @@ export const MAX_NEW_INGREDIENTS = 80;        // ingredients one approval may ad
 export const SURE_ABOVE = 0.75;               // the AI's own confidence at or above this counts as "looks right"
 export const SIMILAR_PRODUCT = 0.88;          // a product this alike (0 to 1) is shown as "looks like", the same measure as Find duplicates
 export const SIMILAR_INGREDIENT = 0.93;       // the Ingredient Curator's own limit for names that are nearly the same
-export const APPROVED_DESCRIPTION = "Added from an app user's photo (read by the AI), checked by an admin.";
+/** The statuses an admin can give a brand or product approved from a snapshot (a first-time entry: the admin decides). */
+export const STATUSES = ["Active", "Pending", "Inactive"];
+
+/** The three web sources of a snapshot as the catalogue keeps sources ("label | address"), each once. */
+export function snapshotSources(entry) {
+    const out = [];
+    const add = (label, url) => { if (url && !out.some((s) => s.endsWith(" | " + url))) out.push(`${label} | ${url}`); };
+    add(entry.primarySourceKind === "official" ? "Official manufacturer site" : "Unverified site", entry.primarySourceUrl);
+    add("E-commerce retailer", entry.secondarySourceUrl);
+    add(entry.thirdSourceKind === "official" ? "Official manufacturer site" : entry.thirdSourceKind === "retailer" ? "E-commerce retailer" : "Other site", entry.thirdSourceUrl);
+    return out;
+}
+
+export const APPROVED_DESCRIPTION ="Added from an app user's photo (read by the AI), checked by an admin.";
 const EXIT_MS = 320;                          // how long a card takes to slide out
 
 import { db } from "../_Database/firebase-console.js";
@@ -74,7 +87,16 @@ export async function loadPending() {
             ocrText: String(data.ocrText || "").slice(0, 1500), ocrBrand: String(data.ocrBrand || "").slice(0, 60),
             ingredientsFrom: ["page", "printed", "none"].includes(data.ingredientsFrom) ? data.ingredientsFrom : "",
             ingredientSourceUrl: httpsLinks([data.ingredientSourceUrl])[0] || "",
-            ingredientSourceKind: ["official", "retailer", "other"].includes(data.ingredientSourceKind) ? data.ingredientSourceKind : ""
+            ingredientSourceKind: ["official", "retailer", "other"].includes(data.ingredientSourceKind) ? data.ingredientSourceKind : "",
+            // the web search result's facts (11 November 2026; older entries have none). Sent by the app: claims to check, never proof.
+            description: String(data.description || "").replace(/\s+/g, " ").trim().slice(0, 300),
+            shadeCode: String(data.shadeCode || "").replace(/\s+/g, " ").trim().slice(0, 30),
+            minimumAge: Number.isInteger(data.minimumAge) && data.minimumAge > 0 && data.minimumAge <= 18 ? data.minimumAge : 0,
+            brandWebsite: httpsLinks([data.brandWebsite])[0] || "", brandLogoUrl: httpsLinks([data.brandLogoUrl])[0] || "", brandImageUrl: httpsLinks([data.brandImageUrl])[0] || "",
+            productPhotoUrl: httpsLinks([data.productPhotoUrl])[0] || "", productPageUrl: httpsLinks([data.productPageUrl])[0] || "",
+            primarySourceUrl: httpsLinks([data.primarySourceUrl])[0] || "", primarySourceKind: data.primarySourceKind === "official" ? "official" : "unverified",
+            secondarySourceUrl: httpsLinks([data.secondarySourceUrl])[0] || "",
+            thirdSourceUrl: httpsLinks([data.thirdSourceUrl])[0] || "", thirdSourceKind: ["official", "retailer"].includes(data.thirdSourceKind) ? data.thirdSourceKind : "other"
         };
     }).sort((a, b) => b.createdAtUnix - a.createdAtUnix);
 }
@@ -166,7 +188,12 @@ export async function approveSnapshot(entry, v, context) {
     else {
         const ref = doc(collection(db, "brands"));
         brandId = ref.id; brandName = v.brand;
-        batch.set(ref, { name: v.brand, category: "Makeup", market: "Global", status: "Active", scans: 0, source: "snapshot", reviewed: true, reviewedAt: now, createdAt: now, updatedAt: now });
+        const brandData = { name: v.brand, category: "Makeup", market: "Global", status: STATUSES.includes(v.brandStatus) ? v.brandStatus : "Active", scans: 0, source: "snapshot", reviewed: true, reviewedAt: now, createdAt: now, updatedAt: now };
+        // the web search's brand links: the logo and picture as addresses only; the website only as a SUGGESTION (an admin confirms it on the Brand form)
+        if (v.brandLogoUrl) brandData.logoUrl = v.brandLogoUrl;
+        if (v.brandImageUrl) brandData.imageUrl = v.brandImageUrl;
+        if (v.brandWebsite) brandData.websiteSuggested = v.brandWebsite;
+        batch.set(ref, brandData);
     }
     const ids = addMissingIngredients(batch, v.ingredients, libraryIds, now);
     const existing = brand ? findProduct(brandId, v.name) : null;
@@ -179,8 +206,11 @@ export async function approveSnapshot(entry, v, context) {
         productId = ref.id;
         const shades = v.shade ? [v.shade] : [];
         batch.set(ref, {
-            name: v.name, brandId, brandName, cosmeticType: v.kind, description: APPROVED_DESCRIPTION, ingredients: v.ingredients, shades, minAge: 0,
-            status: "Active", scans: 0, folder: "", source: "snapshot", reviewed: true, reviewedAt: now, imageUrl: "", sources: [],
+            name: v.name, brandId, brandName, cosmeticType: v.kind, description: v.description || APPROVED_DESCRIPTION, ingredients: v.ingredients, shades,
+            ...(shades.length && v.shadeCode ? { shadeCodes: [v.shadeCode.toUpperCase().slice(0, 16)] } : {}),
+            minAge: v.minimumAge || 0, fdaNumber: v.fdaNumber || "",
+            status: STATUSES.includes(v.productStatus) ? v.productStatus : "Active", scans: 0, folder: "", source: "snapshot", reviewed: true, reviewedAt: now,
+            imageUrl: v.productPhotoUrl || "", sources: v.sources || [],
             ingredientIds: Array.from(new Set(ids)), ingredientCount: v.ingredients.length, ingredientNotes: [],
             tags: [slug(v.kind), slug(brandName)].concat(shades.length ? ["has-shades"] : []).filter(Boolean),
             createdAt: now, updatedAt: now
@@ -486,7 +516,51 @@ export function openSnapshotReview(options) {
         if (closeIngredients.size > 0) extra.append(make("p", "snapx-similar", `${closeIngredients.size} ingredient${closeIngredients.size === 1 ? "" : "s"} nearly equal one in the library (hover the dashed pills). Add them as new only if they are different.`));
         const badge = make("p", "snapx-badge", entry.ingredientsFrom ? "Pending review · unverified · everything here was sent by the app: check it against the photo and the page" : "Pending approval · unverified · AI-generated");
         const error = make("p", "snapx-error"); error.setAttribute("role", "alert");
-        right.append(summary, badge, rows, extra, listField, error);
+
+        // ---- what the app's web search found (11 November 2026): editable with Edit & Approve, every link to be opened and checked
+        const web = make("details", "snapx-web");
+        const hasWeb = !!(entry.description || entry.brandWebsite || entry.brandLogoUrl || entry.productPhotoUrl || entry.primarySourceUrl || entry.secondarySourceUrl || entry.minimumAge || entry.shadeCode);
+        web.open = hasWeb;
+        web.append(make("summary", "", hasWeb ? "From the app's web search (check each before approving)" : "From the app's web search: nothing was found"));
+        const descBox = make("textarea"); descBox.id = "snapxDesc"; descBox.rows = 3; descBox.maxLength = 300; descBox.value = entry.description; descBox.readOnly = true;
+        descBox.placeholder = "No description was found";
+        const ageBox = make("input"); ageBox.type = "number"; ageBox.id = "snapxAge"; ageBox.min = "0"; ageBox.max = "18"; ageBox.step = "1"; ageBox.value = String(entry.minimumAge || 0); ageBox.readOnly = true;
+        const codeBox = input("snapxShadeCode", entry.shadeCode, 16); codeBox.placeholder = "e.g. 119";
+        const fdaBox = input("snapxFda", "", 40); fdaBox.placeholder = "Optional: find it on the FDA Philippines portal";
+        const fdaLink = make("a", "snapx-link", "Open the FDA Philippines verification portal");
+        fdaLink.href = "https://verification.fda.gov.ph/"; fdaLink.target = "_blank"; fdaLink.rel = "noopener noreferrer nofollow";
+        const fdaWrap = make("div", "snapx-stack"); fdaWrap.append(fdaBox, fdaLink);
+        const pick = (id, chosen) => { const box = make("select"); box.id = id; STATUSES.forEach((s) => { const o = make("option", "", s); o.value = s; box.appendChild(o); }); box.value = chosen; return box; };
+        const brandStatus = pick("snapxBrandStatus", "Active"), productStatus = pick("snapxProductStatus", "Active");
+        const newBrand = !brandHit;
+        const webPair1 = make("div", "snapx-pair"), webPair2 = make("div", "snapx-pair"), webPair3 = make("div", "snapx-pair");
+        webPair1.append(field("Minimum age of use", ageBox, entry.minimumAge > 0, "Not stated by the maker"), field("Shade code on the pack", codeBox, !!entry.shadeCode, "No code read"));
+        webPair2.append(field("Brand status", brandStatus, true, ""), field("Product status", productStatus, true, ""));
+        fdaBox.readOnly = false;                                        // optional, typed by the admin at any time
+        const cueText = (pair, i, words) => { pair.children[i].querySelector(".snapx-cue span:last-child").textContent = words; };
+        cueText(webPair2, 0, newBrand ? "New brand: you decide" : "Brand already listed: unchanged");
+        cueText(webPair2, 1, "First entry: you decide");
+        if (!newBrand) brandStatus.disabled = true;
+        webPair3.append(field("FDA registration number", fdaWrap, false, "Optional: the admin looks it up"));
+        const linkLine = (label, url, note) => {
+            const line = make("p", "snapx-sources", label + ": ");
+            if (!url) { line.append(make("span", "snapx-none", "not found")); return line; }
+            const a = make("a", "", new URL(url).hostname.replace(/^www\./, "") + new URL(url).pathname.slice(0, 40));
+            a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer nofollow";
+            line.append(a);
+            if (note) line.append(make("span", "snapx-none", " (" + note + ")"));
+            return line;
+        };
+        web.append(
+            field("Description", descBox, !!entry.description, "No description found"),
+            webPair1, webPair2, webPair3,
+            linkLine("Official website", entry.brandWebsite, entry.brandWebsite ? "saved as a suggestion; confirm it on the Brand form" : ""),
+            linkLine("Brand logo", entry.brandLogoUrl), linkLine("Brand picture", entry.brandImageUrl),
+            linkLine("Product photo", entry.productPhotoUrl), linkLine("Official product page", entry.productPageUrl),
+            linkLine("Primary source (" + (entry.primarySourceKind === "official" ? "official manufacturer site" : "unverified site") + ")", entry.primarySourceUrl),
+            linkLine("Secondary source (e-commerce retailer)", entry.secondarySourceUrl),
+            linkLine("Third source", entry.thirdSourceUrl));
+        right.append(summary, badge, rows, extra, listField, web, error);
 
         // ---- actions
         const actions = make("div", "snapx-actions");
@@ -503,13 +577,24 @@ export function openSnapshotReview(options) {
         if (typeof options.onOpenForm !== "function") toForm.hidden = true;
         actions.append(nav, make("span", "spacer"), reject, edit, toForm, approve);
 
-        const values = () => ({ brand: brandBox.value.replace(/\s+/g, " ").trim(), name: nameBox.value.replace(/\s+/g, " ").trim(), kind: kindBox.value, shade: cleanHex(shadeBox.value), ingredients: toList(listBox.value) });
+        const values = () => {
+            const age = Math.round(Number(ageBox.value));
+            return {
+                brand: brandBox.value.replace(/\s+/g, " ").trim(), name: nameBox.value.replace(/\s+/g, " ").trim(), kind: kindBox.value, shade: cleanHex(shadeBox.value), ingredients: toList(listBox.value),
+                description: descBox.value.replace(/\s+/g, " ").trim().slice(0, 300), minimumAge: Number.isFinite(age) && age > 0 && age <= 18 ? age : 0,
+                shadeCode: codeBox.value.replace(/[^\p{L}\p{N} .\/-]/gu, "").trim().slice(0, 16), fdaNumber: fdaBox.value.replace(/\s+/g, " ").trim().slice(0, 40),
+                brandStatus: brandStatus.value, productStatus: productStatus.value,
+                brandWebsite: entry.brandWebsite, brandLogoUrl: entry.brandLogoUrl, brandImageUrl: entry.brandImageUrl, productPhotoUrl: entry.productPhotoUrl,
+                sources: snapshotSources(entry)
+            };
+        };
         const lock = (on) => { busy = on; [reject, edit, toForm, approve, back, next].forEach((b) => { b.disabled = on || (b === back && at === 0) || (b === next && at >= queue.length - 1); }); };
 
         edit.addEventListener("click", async () => {
             if (!editing) {
                 editing = true;
-                [brandBox, nameBox, shadeBox, listBox].forEach((b) => { b.readOnly = false; });
+                [brandBox, nameBox, shadeBox, listBox, descBox, ageBox, codeBox].forEach((b) => { b.readOnly = false; });
+                web.open = true;
                 kindBox.disabled = false;
                 listBox.hidden = false;
                 card.classList.add("editing");
