@@ -637,9 +637,20 @@ namespace GlowUp.Scan
         bool photoAfterCameraStarts;                  // the camera button was tapped before the camera ran: photo mode once it runs
 
         /// <summary>
-        /// The phone's volume key (Settings > Camera Helpers > "Volume keys as shutter", 11 November 2026): the same as a tap on the screen's main
-        /// button, and nothing while that button cannot be used (a pop-up is open, the screen is busy). In photo mode the capture button, otherwise
-        /// the scan button (it also wakes a sleeping camera).
+        /// VOLUME UP (owner's rule, 12 November 2026): switches between live scan and photo capture, as the Photo / Live scan button does.
+        /// </summary>
+        void VolumeUpPressed()
+        {
+            if (PopupOpen || stage == Stage.Recognising || stage == Stage.Leaving) return;
+            if (snapshot != null && (snapshot.IsOpen || snapshot.PreviewOpen)) return;
+            if (photoMode) { ExitPhotoMode(); return; }
+            if (photoButton != null && photoButton.interactable) OnPhotoButton();
+        }
+
+        /// <summary>
+        /// VOLUME DOWN, the trigger (Settings > Camera Helpers > "Volume keys"): the same as a tap on the screen's main button, and nothing while
+        /// that button cannot be used (a pop-up is open, the screen is busy). In photo capture the capture button, otherwise the scan button
+        /// (it also wakes a sleeping camera).
         /// </summary>
         void VolumeButtonPressed()
         {
@@ -828,7 +839,12 @@ namespace GlowUp.Scan
         {
             if (Input.GetKeyDown(KeyCode.Escape)) { BackKey(); return; }
             UiPreferences.VolumeKeys keys = UiPreferences.VolumeKey;
-            if (keys != UiPreferences.VolumeKeys.Off && VolumeKeyInput.TakePresses(keys != UiPreferences.VolumeKeys.Down, keys != UiPreferences.VolumeKeys.Up) > 0) VolumeButtonPressed();
+            if (keys != UiPreferences.VolumeKeys.Off)
+            {
+                VolumeKeyInput.Take(out int up, out int down);
+                if (up > 0 && keys != UiPreferences.VolumeKeys.Down) VolumeUpPressed();
+                if (down > 0 && keys != UiPreferences.VolumeKeys.Up) VolumeButtonPressed();
+            }
             WakeByDoubleTap();
             if (stage != Stage.Scanning) return;
             TakeEarlyBarcode();                              // fast early barcode / QR recognition

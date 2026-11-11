@@ -104,8 +104,9 @@ namespace GlowUp.Common
         public static bool TryOnScreenLight { get => Get("GlowUp.Camera.TryOnScreenLight", true); set => Set("GlowUp.Camera.TryOnScreenLight", value); }
 
         /// <summary>
-        /// Which phone volume key works as the scan button on the AI Smart Scan screen (Settings > Camera Helpers; 11 November 2026): the key
-        /// starts / pauses the live scan, and in photo mode it takes the photo. Off = the keys only change the volume.
+        /// The phone's volume keys on the AI Smart Scan screen (Settings > Camera Helpers; owner's rule of 12 November 2026):
+        ///   volume UP switches between live scan and photo capture; volume DOWN is the trigger (starts / pauses the live scan, takes the
+        ///   photo in photo capture). Both = both keys work, Up / Down = only that key, Off = the keys only change the volume.
         /// </summary>
         public enum VolumeKeys { Both = 0, Up = 1, Down = 2, Off = 3 }
 

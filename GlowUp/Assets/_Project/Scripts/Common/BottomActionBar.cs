@@ -38,8 +38,20 @@ namespace GlowUp.Common
             {
                 if (current == Tab.TryOn) return;
                 ScanSession.TryOn = null;            // from the bar, Try On always starts by choosing a saved product
+                if (!TryOnGate.Allowed) { SayNeedsProduct(); return; }     // no saved product yet: the bar's pill stays where it is
                 Open(tryOnScene, 2);
             });
+            TryOnGate.Blocked += SayNeedsProduct;    // a swipe or another button asked for AR Try-On without a product
+        }
+
+        void OnDestroy() { TryOnGate.Blocked -= SayNeedsProduct; }
+
+        void SayNeedsProduct()
+        {
+            if (this == null || !isActiveAndEnabled) return;
+            if (pill != null) pill.Release();
+            FormalToast toast = FormalToast.OnScreen(transform, GetComponentInChildren<TMPro.TMP_Text>(true));
+            if (toast != null) toast.Show(FormalToast.Kind.Info, TryOnGate.Message, "Scan now", () => Open(scanScene, 1));
         }
 
         /// <summary>

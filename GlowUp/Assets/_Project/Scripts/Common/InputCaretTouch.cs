@@ -47,6 +47,11 @@ namespace GlowUp.Common
 
         RangeInt lastKeyboardSelection = new RangeInt(-1, 0);
         string lastText = "";
+        // the phone has ONE hidden keyboard box for every field: a field that has just got the focus can read the text the previous field
+        // left in it (an emptied e-mail) and lose its own (the password was wiped, 12 November 2026). That is undone here.
+        bool wasFocused;
+        float focusedAt;
+        string textAtFocus = "";
         bool syncKeyboardText;                         // while a caret is held after the text was changed by code (a removed space): the keyboard gets the text too
         float keyboardActiveSince;
 
@@ -103,6 +108,18 @@ namespace GlowUp.Common
         void LateUpdate()
         {
             if (field == null) return;
+            if (field.isFocused && !wasFocused) { focusedAt = Time.unscaledTime; textAtFocus = field.text ?? ""; }
+            wasFocused = field.isFocused;
+            if (field.isFocused && Time.unscaledTime - focusedAt < 0.6f && textAtFocus.Length >= 2 && string.IsNullOrEmpty(field.text))
+            {
+                string back = textAtFocus;
+                field.text = back;                                    // with the change event: the page's own checks see the text again
+                TouchScreenKeyboard kb = Keyboard();
+                if (kb != null && kb.active) { kb.text = back; if (kb.canSetSelection) kb.selection = new RangeInt(back.Length, 0); }
+                field.caretPosition = back.Length;
+                lastText = back;
+                return;
+            }
             if (!field.isFocused)
             {
                 if (pending && Time.unscaledTime > pendingUntil) pending = false;
@@ -189,6 +206,8 @@ namespace GlowUp.Common
         void HandToKeyboard(TouchScreenKeyboard keyboard, int anchor, int focus)
         {
             if (keyboard == null || !keyboard.active || !keyboard.canSetSelection) return;
+            // the box still holds another field's text: a caret handed to it now would land in the wrong text
+            if (!syncKeyboardText && keyboard.text != field.text) return;
             int start = Mathf.Min(anchor, focus), length = Mathf.Abs(focus - anchor);
             RangeInt now = keyboard.selection;
             if (now.start == start && now.length == length) return;

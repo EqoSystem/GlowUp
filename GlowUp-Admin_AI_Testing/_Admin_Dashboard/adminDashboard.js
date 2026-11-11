@@ -18,7 +18,7 @@ import {
     requireAdmin, wireSignOut, setupNavigationGuard, escapeHtml, asArray, toWholeNumber, timeAgo, formatWhen, startOfTodayUnix,
     notify, describeError, toneBadge
 } from "../_Shared/adminCommon.js";
-import { mountShell, paginate, renderPager, icon } from "../_Shared/adminShell.js";
+import { mountShell, paginate, renderPager, icon, askConfirm } from "../_Shared/adminShell.js";
 import { bindButtons } from "../_Shared/shortcuts.js";
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
@@ -81,6 +81,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     loadSupportReports();
     loadReviewQueue();
     el("suggestionList").addEventListener("click", onSuggestionClick);
+    el("suggestionClearAll").addEventListener("click", clearAllSuggestions);
+    el("supportClearAll").addEventListener("click", clearAllSupportReports);
     el("supportList").addEventListener("click", onSupportClick);
 
     // things that answer a click
@@ -390,6 +392,7 @@ async function loadSuggestions() {
 
 function renderSuggestions() {
     suggestionsLoaded = true;
+    el("suggestionClearAll").hidden = suggestions.length === 0;
     datasetChanged("suggestions");
     refreshAssist("suggestions");
     setPanelQuiet("suggestions", suggestions.length === 0, suggestions.length === 0 ? "Nothing waiting" : `${many(suggestions.length, "suggestion waits", "suggestions wait")} for review`);
@@ -470,6 +473,7 @@ async function loadSupportReports() {
 }
 
 function renderSupportReports() {
+    el("supportClearAll").hidden = supportReports.length === 0;
     setPanelQuiet("support", supportReports.length === 0, supportReports.length === 0 ? "No new reports" : many(supportReports.length, "new report", "new reports"));
     if (supportReports.length === 0) { showEmpty("support", "No new support reports.", false); return; }
     supportReports.sort((a, b) => b.createdAtUnix - a.createdAtUnix);
@@ -501,6 +505,62 @@ function lastScanDetails(scan) {
     return `<details class="support-scan"><summary>Last scan: ${escapeHtml([scan.product, scan.brand].filter(Boolean).join(" · ") || "(no name)")}</summary>
             <p class="small">Result: ${escapeHtml(scan.result || "-")}. ${escapeHtml(scan.summary || "")}</p>
             <p class="small muted">Ingredients read: ${escapeHtml(scan.ingredients || "-")}</p></details>`;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Clear all (12 November 2026): beside the fold arrow of Suggestions and of Support reports. Nothing is deleted: every item waiting in
+// the list is marked dismissed (the same as its own X), in batches of at most 400 writes, after a confirmation that defaults to Cancel.
+// ---------------------------------------------------------------------------------------------
+async function dismissAll(items, fields) {
+    for (let i = 0; i < items.length; i += 400) {
+        const batch = writeBatch(db);
+        items.slice(i, i + 400).forEach((item) => batch.update(doc(db, item.collection, item.id), fields(item)));
+        await batch.commit();
+    }
+}
+
+async function clearAllSuggestions() {
+    if (suggestions.length === 0) return;
+    const ok = await askConfirm({
+        title: "Clear all suggestions?", danger: true, confirmLabel: "Clear all",
+        message: `All ${suggestions.length} suggestions leave this list (they are marked dismissed, not deleted).`
+    });
+    if (!ok) return;
+    const button = el("suggestionClearAll");
+    button.disabled = true;
+    try {
+        await dismissAll(suggestions, (item) => item.collection === "supportReports"
+            ? { status: "dismissed", handledAt: serverTimestamp() }
+            : { status: "dismissed", reviewedAt: serverTimestamp() });
+        const count = suggestions.length;
+        suggestions = []; typedSuggestions = []; appSuggestions = [];
+        renderSuggestions();
+        notify(`${count} suggestions cleared.`, "ok");
+    } catch (error) {
+        console.error("Error clearing suggestions: ", error);
+        notify("The suggestions were not cleared. " + describeError(error), "error");
+    } finally { button.disabled = false; }
+}
+
+async function clearAllSupportReports() {
+    if (supportReports.length === 0) return;
+    const ok = await askConfirm({
+        title: "Clear all support reports?", danger: true, confirmLabel: "Clear all",
+        message: `All ${supportReports.length} reports leave this list (they are marked dismissed, not deleted).`
+    });
+    if (!ok) return;
+    const button = el("supportClearAll");
+    button.disabled = true;
+    try {
+        await dismissAll(supportReports.map((r) => ({ id: r.id, collection: "supportReports" })), () => ({ status: "dismissed", handledAt: serverTimestamp() }));
+        const count = supportReports.length;
+        supportReports = [];
+        renderSupportReports();
+        notify(`${count} reports cleared.`, "ok");
+    } catch (error) {
+        console.error("Error clearing support reports: ", error);
+        notify("The reports were not cleared. " + describeError(error), "error");
+    } finally { button.disabled = false; }
 }
 
 async function onSupportClick(event) {

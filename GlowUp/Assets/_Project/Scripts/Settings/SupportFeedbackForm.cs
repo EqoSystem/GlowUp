@@ -56,6 +56,10 @@ namespace GlowUp.AppSettings
         [SerializeField] private string msgNotSent = "Your report couldn't be sent. Check your connection and try again.";
         [SerializeField] private string msgSignIn = "Sign in with an internet connection to send a report.";
         [SerializeField] private string msgSending = "Sending…";
+        [Tooltip("The Send button's words for a moment after a report was sent")]
+        [SerializeField] private string msgSentButton = "Sent ✓";
+        [Tooltip("How long the form shows that the report was sent before it closes (seconds)")]
+        [Min(0f)] [SerializeField] private float sentShowSeconds = 1.6f;
         [SerializeField] private string tipsTitle = "Tips";
 
         bool sending;
@@ -143,8 +147,13 @@ namespace GlowUp.AppSettings
                 await FirebaseFirestore.DefaultInstance.Collection(Collection).Document().SetAsync(report).OrTimeout(sendWaitSeconds, "Sending the report");
                 if (this == null) return;
                 if (messageInput != null) messageInput.text = "";
-                if (categoryTabs != null) categoryTabs.Select(0, true);             // the form is reset for the next report
+                // 12 November 2026: the user SEES it was sent, in the form itself (the button and the line above it), before the form closes
+                if (sendLabel != null) sendLabel.text = msgSentButton;
+                if (tips != null) { tips.gameObject.SetActive(true); tips.text = "<b><color=#3E8E5A>" + StatusMessage.Plain(msgSent) + "</color></b>"; }
                 Toast()?.Show(FormalToast.Kind.Success, msgSent);
+                await Task.Delay(Mathf.RoundToInt(sentShowSeconds * 1000f));
+                if (this == null) return;
+                if (categoryTabs != null) categoryTabs.Select(0, true);             // the form is reset for the next report (the tips come back)
                 if (panel != null && panel.IsOpen) panel.Hide();
             }
             catch (Exception e)

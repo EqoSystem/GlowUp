@@ -236,9 +236,9 @@ namespace GlowUp.EditorTools
             // phase 2A (11 November 2026): what the phone's volume buttons do on AI Smart Scan (saved in UiPreferences.VolumeButton)
             Divider(cameraHelpers);
             GameObject volumeBlock = Block(cameraHelpers, "VolumeButtonBlock");
-            A.Label(volumeBlock.transform, "Title", "Volume keys as shutter", RowTitle, ThemeRole.MainText, FontRole.Label);
-            ChoiceTabs volumeTabs = TabsGrid(volumeBlock.transform, "VolumeButtonTabs", new[] { "Both keys", "Volume up", "Volume down", "Off" }, 0, 2, 28);
-            TextMeshProUGUI volumeStatus = A.Label(volumeBlock.transform, "StatusText", "On AI Smart Scan, volume up or volume down starts or pauses the live scan, and takes the photo in photo mode.",
+            A.Label(volumeBlock.transform, "Title", "Volume keys", RowTitle, ThemeRole.MainText, FontRole.Label);
+            ChoiceTabs volumeTabs = TabsGrid(volumeBlock.transform, "VolumeButtonTabs", new[] { "Both keys", "Up: switch mode", "Down: trigger", "Off" }, 0, 2, 28);
+            TextMeshProUGUI volumeStatus = A.Label(volumeBlock.transform, "StatusText", "On AI Smart Scan: volume up switches between live scan and photo capture; volume down starts or pauses the scan, or takes the photo.",
                                                    RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             var volumeSetting = Feature<VolumeButtonSetting>(features, "VolumeButtonSetting");
             A.Set(volumeSetting, "tabs", volumeTabs); A.Set(volumeSetting, "statusText", volumeStatus);

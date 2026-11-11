@@ -17,9 +17,9 @@ namespace GlowUp.AppSettings
         [SerializeField] private TextMeshProUGUI statusText;
 
         [Header("Wording")]
-        [SerializeField] private string bothEffect = "On AI Smart Scan, volume up or volume down starts or pauses the live scan, and takes the photo in photo mode.";
-        [SerializeField] private string upEffect = "On AI Smart Scan, volume up starts or pauses the live scan, and takes the photo in photo mode. Volume down changes the volume.";
-        [SerializeField] private string downEffect = "On AI Smart Scan, volume down starts or pauses the live scan, and takes the photo in photo mode. Volume up changes the volume.";
+        [SerializeField] private string bothEffect = "On AI Smart Scan: volume up switches between live scan and photo capture; volume down starts or pauses the scan, or takes the photo.";
+        [SerializeField] private string upEffect = "On AI Smart Scan: volume up switches between live scan and photo capture. Volume down changes the volume.";
+        [SerializeField] private string downEffect = "On AI Smart Scan: volume down starts or pauses the scan, or takes the photo. Volume up changes the volume.";
         [SerializeField] private string offEffect = "The volume keys only change the volume.";
 
         void Awake()

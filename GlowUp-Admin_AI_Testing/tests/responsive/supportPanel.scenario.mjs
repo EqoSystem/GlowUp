@@ -28,6 +28,17 @@ try {
         await page.click('#suggestionList button[data-collection="supportReports"][data-action="reviewed"]');
         await page.waitForTimeout(500);
         ok(!/shade finder/.test(await page.textContent("[data-panel=suggestions]")), `${width}px: marking the app suggestion reviewed takes it off the list`);
+        // Clear all (12 November 2026): beside the fold arrow, asks first, then empties the list
+        await page.reload(); await settle(800);
+        await page.waitForSelector("#suggestionList li", { timeout: 6000 });
+        const order = await page.evaluate(() => { const head = document.querySelector("[data-panel=suggestions] .panel-head"); const b = [...head.querySelectorAll("button")].map((x) => x.id || x.className); return b.join(","); });
+        ok(/suggestionClearAll,[^,]*panel-fold-btn/.test(order), `${width}px: Clear all stands just left of the fold arrow (${order})`);
+        await page.click("#suggestionClearAll");
+        await page.waitForSelector(".modal-actions .btn.danger", { timeout: 4000 });
+        await page.click(".modal-actions .btn.danger");
+        await page.waitForTimeout(600);
+        ok(/No suggestions waiting/.test(await page.textContent("[data-panel=suggestions]")), `${width}px: Clear all empties Suggestions`);
+        ok(await page.$eval("#suggestionClearAll", (b) => b.hidden), `${width}px: Clear all hides when the list is empty`);
         ok(errors.length === 0, `${width}px: no page errors ${errors.join("; ")}`);
         await page.context().close();
     }
