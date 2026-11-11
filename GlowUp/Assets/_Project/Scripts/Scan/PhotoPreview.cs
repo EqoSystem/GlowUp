@@ -55,7 +55,7 @@ namespace GlowUp.Scan
             layer.overrideSorting = true; layer.sortingOrder = 5000;
             preview.root.AddComponent<GraphicRaycaster>();
             var dim = preview.root.AddComponent<Image>();
-            dim.color = new Color(0f, 0f, 0f, 0.6f);                   // blocks the screen behind it
+            dim.color = new Color32(43, 27, 33, 158);                   // a warm deep rose dim (not black or blue): blocks the screen behind it
             var outside = preview.root.AddComponent<Button>();          // a tap beside the card closes it
             outside.transition = Selectable.Transition.None;
             outside.onClick.AddListener(() => preview.Closed?.Invoke());
@@ -105,8 +105,14 @@ namespace GlowUp.Scan
             preview.notice = RuntimeUiKit.Label(cardRt, "Notice", noticeWords, 40, p.secondaryText, RuntimeTheme.Font(FontRole.Body, fontFrom), TextAlignmentOptions.Left);
 
             TextMeshProUGUI statusText = RuntimeUiKit.Label(cardRt, "Status", "", 40, p.mainText, RuntimeTheme.Font(FontRole.Body, fontFrom), TextAlignmentOptions.Left);
+            statusText.enableWordWrapping = true;
             preview.status = StatusMessage.Wrap(statusText);
             preview.status.Hide();
+            // Phase 1C: the way on ("Type it in") is a full-width button under the message, not small underlined words inside it
+            preview.linkButton = RuntimeUiKit.Pill(cardRt, "MessageLinkButton", "", p.accentText, p.accentText, RuntimeTheme.Font(FontRole.Button, fontFrom), true);
+            preview.linkLabel = preview.linkButton.GetComponentInChildren<TextMeshProUGUI>();
+            preview.linkButton.onClick.AddListener(() => preview.linkAction?.Invoke());
+            preview.linkButton.gameObject.SetActive(false);
 
             RectTransform row = RuntimeUiKit.Rect("Buttons", cardRt);
             var rowLayout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
@@ -133,6 +139,7 @@ namespace GlowUp.Scan
             fit.aspectRatio = photo != null && photo.height > 0 ? photo.width / (float)photo.height : 1f;
             notice.gameObject.SetActive(firstTime);
             status.Hide();
+            HideLink();
             useButton.gameObject.SetActive(true);
             SetBusy(false, "", "");
             root.transform.SetAsLastSibling();
@@ -158,7 +165,22 @@ namespace GlowUp.Scan
 
         public void Say(StatusMessage.Kind kind, string words, string link = null, Action onLink = null)
         {
-            if (status != null) status.Show(kind, words, link, onLink);
+            bool hasLink = !string.IsNullOrEmpty(link) && onLink != null && linkButton != null;
+            if (status != null) status.Show(kind, words, hasLink ? null : link, hasLink ? null : onLink);
+            if (!hasLink) { HideLink(); return; }
+            linkAction = onLink;
+            if (linkLabel != null) linkLabel.text = StatusMessage.Plain(link);
+            linkButton.gameObject.SetActive(true);
+        }
+
+        Button linkButton;
+        TextMeshProUGUI linkLabel;
+        Action linkAction;
+
+        void HideLink()
+        {
+            linkAction = null;
+            if (linkButton != null) linkButton.gameObject.SetActive(false);
         }
 
         /// <summary>A problem with this photo: said in the status line; "Use photo" goes away when the photo cannot be used.</summary>

@@ -108,6 +108,10 @@ namespace GlowUp.Scan
         [Tooltip("Said when the button is held (it has no words of its own)")]
         [SerializeField] private string photoModeName = "Take a photo";
         [SerializeField] private string liveModeName = "Back to live scan";
+        [Tooltip("The name under that button (phase 1B, 11 November 2026): it says what a tap does now. Empty = no name shown")]
+        [SerializeField] private TMPro.TextMeshProUGUI modeCaption;
+        [SerializeField] private string photoModeCaption = "Photo";
+        [SerializeField] private string liveModeCaption = "Live scan";
         [Tooltip("The photo button appears after the scan has run this many seconds without finishing")]
         [Min(1f)] [SerializeField] private float photoButtonAfterSeconds = 6f;
         [SerializeField] private string msgPhotoHint = "Slow or read wrong? Tap the camera button to take a photo of the product.";
@@ -616,6 +620,11 @@ namespace GlowUp.Scan
             if (cameraModeIcon != null && cameraModeIcon.activeSelf == photoMode) cameraModeIcon.SetActive(!photoMode);
             if (liveModeIcon != null && liveModeIcon.activeSelf != photoMode) liveModeIcon.SetActive(photoMode);
             if (modeHint != null) modeHint.words = photoMode ? liveModeName : photoModeName;
+            if (modeCaption != null)
+            {
+                string caption = photoMode ? liveModeCaption : photoModeCaption;
+                if (modeCaption.text != caption) modeCaption.text = caption;
+            }
             if (stage == Stage.Scanning && !photoMode && !photoHintSaid) { photoHintSaid = true; Say(msgPhotoHint); }
         }
 

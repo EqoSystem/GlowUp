@@ -32,7 +32,9 @@ namespace GlowUp.EditorTools
         public const float Pad = 40;                        // space between the card edge and its content
         public const float HeaderBottom = 160;              // first free unit under the back button / title row
         public const float BarBottom = 28, BarHeight = 176; // the bottom action bar
-        public const float BarIconY = 26, BarPill = 108;    // the line its icons stand on (above the bar's middle) and the size of the pink pill behind one of them
+        // the line its icons stand on (above the bar's middle) and the size of the pink pill behind one of them. Phase 1D (11 November 2026):
+        // the pill is 100 (was 108) and stands 8 units under the bar's top edge and 14 above the labels, at rest and while it moves.
+        public const float BarIconY = 30, BarPill = 100;
         public const float AboveBar = BarBottom + BarHeight + 20;
 
         public static readonly Vector2 TL = new Vector2(0, 1), TC = new Vector2(0.5f, 1), TR = new Vector2(1, 1),
@@ -538,6 +540,7 @@ namespace GlowUp.EditorTools
             Kit.SetArray(liquid, "slots", new Object[] { recent.transform, scan.transform, tryOn.transform });
             Kit.SetArray(liquid, "slotIcons", new Object[] { recent.targetGraphic, scan.targetGraphic, tryOn.targetGraphic });
             Set(liquid, "current", pillSlot);
+            Set(liquid, "restWidth", BarPill); Set(liquid, "restHeight", BarPill);
 
             var view = SceneBuilderCore.Ensure<BottomActionBar>(bar.gameObject);
             Set(view, "recentButton", recent); Set(view, "scanButton", scan); Set(view, "tryOnButton", tryOn);
@@ -556,7 +559,8 @@ namespace GlowUp.EditorTools
             var ic = Icon(go.transform, "Icon", icon, 60, underPill ? ThemeRole.ButtonText : ThemeRole.MainText);
             ic.rectTransform.anchoredPosition = new Vector2(0, BarIconY);
             var text = Label(go.transform, "Label", label, 26, isCurrent ? ThemeRole.Heading : ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.Center);
-            BottomStrip(text.transform, 12, 40, 0, 0);
+            BottomStrip(text.transform, 14, 40, 8, 8);
+            Shrink(text, 20);                                    // a longer word gets smaller, never runs into the next slot
             var b = go.GetComponent<Button>(); b.targetGraphic = ic;
             b.transition = Selectable.Transition.None;          // no tap animation on the bar: the screen simply changes
             return b;

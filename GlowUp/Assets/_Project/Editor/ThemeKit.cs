@@ -125,7 +125,9 @@ namespace GlowUp.EditorTools
                     if (b.TryGetComponent(out ButtonPressFeedback punch)) Object.DestroyImmediate(punch);
                     continue;
                 }
-                if (b.GetComponentInParent<BottomActionBar>(true) != null)  // the bottom bar: no tap animation at all (the brief of 11 October 2026)
+                bool scanControls = false;                                  // the scan screen's row of controls: colour only (phase 1B, 11 November 2026)
+                for (Transform t = b.transform.parent; t != null; t = t.parent) if (t.name == "ControlBar") { scanControls = true; break; }
+                if (b.GetComponentInParent<BottomActionBar>(true) != null || scanControls)  // the bottom bar: no tap animation at all (the brief of 11 October 2026)
                 {
                     if (b.TryGetComponent(out ButtonPressFeedback old)) Object.DestroyImmediate(old);
                     continue;

@@ -21,11 +21,14 @@ namespace GlowUp.Scan
 
         RectTransform photo, box;
         readonly List<Image> shapes = new List<Image>();
-        // New13 item 8: everything OUTSIDE the box is tinted blue (four pieces round the box = an even-odd cut-out), the box edge glows
+        // New13 item 8: everything OUTSIDE the box is veiled (four pieces round the box = an even-odd cut-out), the box edge glows.
+        // Phase 1C (11 November 2026): the app's own colours instead of blue: a cream veil outside, a gold edge on a deep rose rim
+        // (3:1 or more on light and dark photos), a soft rose glow and gold corner handles.
         readonly RectTransform[] outside = new RectTransform[4];
-        public static readonly Color OutsideTint = new Color(0.09f, 0.32f, 0.78f, 0.45f);
-        public static readonly Color EdgeLight = new Color(0.62f, 0.85f, 1f, 1f);       // light blue on a dark rim: 3:1 or more on any photo
-        public static readonly Color EdgeRim = new Color(0.02f, 0.08f, 0.2f, 0.85f);
+        public static Color OutsideTint { get { Color c = RuntimeTheme.Palette.background; c.a = 0.62f; return c; } }
+        public static Color EdgeLight { get { Color c = RuntimeTheme.Palette.gold; c.a = 1f; return c; } }
+        public static readonly Color EdgeRim = new Color32(74, 30, 46, 220);               // deep rose: the gold line reads on a light photo too
+        static Color EdgeGlowColor { get { Color c = RuntimeTheme.Palette.accent; c.a = 0.40f; return c; } }
         Rect area = new Rect(0.1f, 0.1f, 0.8f, 0.8f);
         Color line;
 
@@ -39,16 +42,18 @@ namespace GlowUp.Scan
             ThemeProfile.Palette p = RuntimeTheme.Palette;
             crop.line = p.buttonFill;
 
-            // the blue tint outside the box: under the box, over the photo; it takes no touches
+            // the cream veil outside the box: under the box, over the photo; it takes no touches
+            Color veil = OutsideTint;
             for (int i = 0; i < 4; i++)
             {
-                Image tint = RuntimeUiKit.Box(photoRect, "OutsideTint" + i, OutsideTint, false);
+                Image tint = RuntimeUiKit.Box(photoRect, "OutsideTint" + i, veil, false);
                 tint.raycastTarget = false;
                 crop.outside[i] = tint.rectTransform;
             }
             crop.box = RuntimeUiKit.Rect("CropBox", photoRect);
-            // a soft blue glow just outside the edge, then a dark rim and a light-blue line (readable on light and dark photos)
-            Image glow = RuntimeUiKit.Box(crop.box, "EdgeGlow", new Color(EdgeLight.r, EdgeLight.g, EdgeLight.b, 0.35f));
+            // a soft rose glow just outside the edge, then a deep rose rim and a gold line (readable on light and dark photos)
+            Color edge = EdgeLight;
+            Image glow = RuntimeUiKit.Box(crop.box, "EdgeGlow", EdgeGlowColor);
             glow.raycastTarget = false; glow.fillCenter = false;
             RuntimeUiKit.Stretch(glow.rectTransform, -10, -10, -10, -10);
             foreach (var (name, min, max, offMin, offMax) in new[]
@@ -60,7 +65,7 @@ namespace GlowUp.Scan
             })
             {
                 Edge(crop.box, name + "Rim", min, max, offMin * 2.5f, offMax * 2.5f, EdgeRim);
-                Edge(crop.box, name, min, max, offMin, offMax, EdgeLight);
+                Edge(crop.box, name, min, max, offMin, offMax, edge);
             }
             // the whole box can be moved
             var body = crop.box.gameObject.AddComponent<Image>();
@@ -77,7 +82,7 @@ namespace GlowUp.Scan
                 hit.color = new Color(1f, 1f, 1f, 0.001f);
                 Image rim = RuntimeUiKit.Icon(corner, "DotRim", RuntimeIcons.Circle, EdgeRim, 42);
                 rim.rectTransform.anchoredPosition = Vector2.zero;
-                Image dot = RuntimeUiKit.Icon(corner, "Dot", RuntimeIcons.Circle, crop.line, 34);
+                Image dot = RuntimeUiKit.Icon(corner, "Dot", RuntimeIcons.Circle, edge, 34);            // gold handles
                 dot.rectTransform.anchoredPosition = Vector2.zero;
                 corner.gameObject.AddComponent<CropDrag>().Init(crop, i);
             }

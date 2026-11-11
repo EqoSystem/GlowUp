@@ -24,8 +24,11 @@ namespace GlowUp.EditorTools
         // New13 items 1 and 2 (10 November 2026): under the camera, from the bottom up: the control bar (Type it in | scan | photo/live),
         // the row of Start over / Finish, the status line, and ONE row of four chips (product, brand, type, shade). 130 units more camera.
         const float BottomBlock = 600;          // space under the camera view
-        const float BarCentre = RingBottom + RingSize * 0.5f, SideButton = 132;          // 132 units = 44 dp
-        const float ActionRowY = 300, ActionRowH = 96, StatusY = 406, StatusH = 76, ChipRowY = 494, ChipRowH = 92;
+        // Brief of 11 November 2026 (phase 1B): from the top down under the camera: the status line, the four chips (two rows of two),
+        // then ONE row of controls: Start over | Type it in | SCAN (centred, the largest) | Photo | Finish. Nothing crowds or clips.
+        const float SideButton = 120;                                                       // the round part of a side control (40 dp)
+        const float ChipRowY = RingBottom + RingSize + 16, ChipRowH = 2 * 60 + 12;          // 304 .. 436
+        const float StatusY = ChipRowY + ChipRowH + 14, StatusH = BottomBlock - StatusY - 10; // 450 .. 590: two lines
         const float RingSize = 264, HoldSize = 190, RingBottom = 24;
         static readonly string[] ZoneNames = { "Brand", "ProductName", "CosmeticType", "Barcode", "Ingredients" };
 
@@ -204,12 +207,18 @@ namespace GlowUp.EditorTools
 
             // ---- what was found: ONE row of four chips (New13 item 2). A chip shows an empty ring until its thing is found, then a filled
             //      check and what was found. The row has a fixed height, so nothing under it moves. ----
+            //      Phase 1B: two rows of two (layout groups size them), so every name fits on one line at a readable size.
             GameObject chips = A.Node(card, "FoundChips");
             A.BottomStrip(chips.transform, ChipRowY, ChipRowH);
-            ScanCheckItem productCheck = Chip(chips.transform, "ProductNameCheck", "Product name", 0);
-            ScanCheckItem brandCheck = Chip(chips.transform, "BrandCheck", "Brand", 1);
-            ScanCheckItem typeCheck = Chip(chips.transform, "CosmeticTypeCheck", "Cosmetic type", 2);
-            ScanCheckItem shadeCheck = Chip(chips.transform, "ShadeCheck", "Shade & texture", 3);
+            A.VStack(chips, 12, 0, 0, 0, 0, TextAnchor.MiddleCenter).childForceExpandHeight = true;
+            GameObject chipRowTop = A.Node(chips.transform, "ChipRowTop");
+            A.HStack(chipRowTop, 12, 0, 0, 0, 0, TextAnchor.MiddleCenter, true).childForceExpandHeight = true;
+            GameObject chipRowBottom = A.Node(chips.transform, "ChipRowBottom");
+            A.HStack(chipRowBottom, 12, 0, 0, 0, 0, TextAnchor.MiddleCenter, true).childForceExpandHeight = true;
+            ScanCheckItem productCheck = Chip(chipRowTop.transform, "ProductNameCheck", "Product name");
+            ScanCheckItem brandCheck = Chip(chipRowTop.transform, "BrandCheck", "Brand");
+            ScanCheckItem typeCheck = Chip(chipRowBottom.transform, "CosmeticTypeCheck", "Cosmetic type");
+            ScanCheckItem shadeCheck = Chip(chipRowBottom.transform, "ShadeCheck", "Shade & texture");
             Image swatch = A.RawPanel(shadeCheck.transform, "ShadeSwatch", new Color32(194, 75, 98, 255), 26f);
             A.At(swatch.transform, A.TR, new Vector2(-8, -8), new Vector2(26, 26));
             A.Outline(swatch.transform, ThemeRole.Gold, 26f);
@@ -235,15 +244,24 @@ namespace GlowUp.EditorTools
             A.Shrink(A.LabelOf(lookUp), 22);
             listHelp.gameObject.SetActive(false);
 
-            // ---- the status line: its own row (two lines at most), above the buttons ----
+            // ---- the status line: its own row (two lines at most), the first thing under the camera ----
             TextMeshProUGUI status = A.Label(card, "StatusText", "Tap once to scan. Show one clear product view.", 30,
                                              ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.Center, true);
             A.BottomStrip(status.transform, StatusY, StatusH, 52, 52);
             A.ShrinkWrapped(status, 22);
 
-            // ---- TAP TO SCAN: the round button, and round it the ring of five segments that fills as the product is read ----
-            GameObject hold = A.Node(card, "HoldToScan");
-            A.At(hold.transform, A.BC, new Vector2(0, RingBottom), new Vector2(RingSize, RingSize));
+            // ---- ONE ROW OF CONTROLS (phase 1B). Layout groups share the width: the left and right halves each hold two slots, the
+            //      scan button sits in the middle at its full size. A slot stays in place while its button is hidden, so nothing shifts. ----
+            GameObject controlBar = A.Node(card, "ControlBar");
+            A.BottomStrip(controlBar.transform, RingBottom, RingSize);
+            A.HStack(controlBar, 0, 0, 0, 0, 0, TextAnchor.MiddleCenter).childForceExpandHeight = true;
+            GameObject leftSide = A.Node(controlBar.transform, "LeftControls");
+            A.Size(leftSide.transform, -1, -1, 1, 1);
+            A.HStack(leftSide, 6, 0, 6, 0, 0, TextAnchor.MiddleCenter, true).childForceExpandHeight = true;
+
+            // TAP TO SCAN: the round button, and round it the ring of five segments that fills as the product is read
+            GameObject hold = A.Node(controlBar.transform, "HoldToScan");
+            A.Size(hold.transform, RingSize, RingSize, 0, 0);
             GameObject ringObject = A.Node(hold.transform, "ScanRing", typeof(ScanRingView));
             A.Fill(ringObject.transform);
             var tracks = new Image[ScanZones.Count]; var fills = new Image[ScanZones.Count];
@@ -269,30 +287,21 @@ namespace GlowUp.EditorTools
             // a Canvas Group on the button, so the dimming while it is locked is an object you can see in the Hierarchy and Inspector
             A.Set(holdButton, "dimGroup", SceneBuilderCore.Ensure<CanvasGroup>(disc.gameObject));
 
-            // ---- the control bar (New13 item 1): three slots in one row, centred on the scan button.
-            //      LEFT: "Type it in" (a real button). CENTRE: the scan button (the capture button in photo mode). RIGHT: one round icon button
-            //      that switches mode: the camera (take a photo) in live mode, the live-scan frame in photo mode. Fixed sizes: nothing shifts. ----
-            float slot = (Kit.CardWidth - RingSize) * 0.5f - A.Pad - 24f;          // width of a side slot (from the card's padding to the ring's gap)
-            Button manualEntry = A.PillButton(card, "ManualEntryButton", "Type it in", 32, ThemeRole.Surface, ThemeRole.MainText, IconFactory.Pencil);
-            A.At(manualEntry.transform, A.BL, new Vector2(A.Pad, BarCentre - SideButton * 0.5f), new Vector2(slot, SideButton));
-            A.Outline(manualEntry.transform, ThemeRole.Accent, SideButton);
-            A.Shrink(A.LabelOf(manualEntry), 24);
-            Button photoFallback = A.IconButton(card, "ModeSwitchButton", IconFactory.CameraIcon, SideButton, 60, ThemeRole.MainText, ThemeRole.SurfaceAlt);
-            A.At(photoFallback.transform, A.BR, new Vector2(-(A.Pad + (slot - SideButton) * 0.5f), BarCentre - SideButton * 0.5f), new Vector2(SideButton, SideButton));
-            A.Outline(photoFallback.transform, ThemeRole.Accent, SideButton);
-            Image cameraModeIcon = photoFallback.transform.Find("Icon").GetComponent<Image>();
-            cameraModeIcon.name = "CameraIcon";
-            Image liveModeIcon = A.Icon(photoFallback.transform, "LiveScanIcon", IconFactory.ScanFrame, 60, ThemeRole.MainText);
-            liveModeIcon.gameObject.SetActive(false);        // shown in photo mode instead of the camera
-            SceneBuilderCore.Ensure<ButtonPressFeedback>(photoFallback.gameObject);
+            GameObject rightSide = A.Node(controlBar.transform, "RightControls");
+            A.Size(rightSide.transform, -1, -1, 1, 1);
+            A.HStack(rightSide, 6, 6, 0, 0, 0, TextAnchor.MiddleCenter, true).childForceExpandHeight = true;
 
-            // ---- Start over (left) and Finish (right): their own row above the bar; each appears when it can be used ----
-            Button startOver = A.PillButton(card, "StartOverButton", "Start over", 30, ThemeRole.SurfaceAlt, ThemeRole.MainText);
-            A.BottomStrip(startOver.transform, ActionRowY, ActionRowH, A.Pad, Kit.CardWidth * 0.5f + 10f);
-            A.Outline(startOver.transform, ThemeRole.Accent, ActionRowH);
-            Button finish = A.PillButton(card, "FinishButton", "Finish", 32, ThemeRole.ButtonFill, ThemeRole.ButtonText);
-            A.BottomStrip(finish.transform, ActionRowY, ActionRowH, Kit.CardWidth * 0.5f + 10f, A.Pad);
-            A.Shrink(A.LabelOf(finish), 22);
+            // LEFT: Start over (appears when it can be used), Type it in (always). RIGHT: the mode switch (camera = take a photo; in photo
+            // mode the live-scan frame), Finish (appears when the list is complete). Each is a round button with its name under it.
+            Button startOver = ControlButton(leftSide.transform, "StartOverButton", IconFactory.Sync, "Start over", ThemeRole.SurfaceAlt, ThemeRole.MainText, true, out _);
+            Button manualEntry = ControlButton(leftSide.transform, "ManualEntryButton", IconFactory.Pencil, "Type it in", ThemeRole.Surface, ThemeRole.MainText, true, out _);
+            Button photoFallback = ControlButton(rightSide.transform, "ModeSwitchButton", IconFactory.CameraIcon, "Photo", ThemeRole.SurfaceAlt, ThemeRole.MainText, true, out TextMeshProUGUI modeCaption);
+            Button finish = ControlButton(rightSide.transform, "FinishButton", IconFactory.Check, "Finish", ThemeRole.ButtonFill, ThemeRole.ButtonText, false, out _);
+            Transform modeDisc = photoFallback.transform.Find("Disc");
+            Image cameraModeIcon = modeDisc.Find("Icon").GetComponent<Image>();
+            cameraModeIcon.name = "CameraIcon";
+            Image liveModeIcon = A.Icon(modeDisc, "LiveScanIcon", IconFactory.ScanFrame, 54, ThemeRole.MainText);
+            liveModeIcon.gameObject.SetActive(false);        // shown in photo mode instead of the camera
 
             // ---- "Start over": the same product, or a different one? ----
             A.AppPopup startOverPopup = ScanAgainPopup(s, "StartOverPanel", "Keeps the product's name; the pictures are taken anew.",
@@ -514,6 +523,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "listHelp", listHelp.gameObject); A.Set(controller, "guideHint", (RectTransform)hintPill.transform);
             A.Set(controller, "questionBanner", (RectTransform)questionBanner.transform);
             A.Set(controller, "cameraModeIcon", cameraModeIcon.gameObject); A.Set(controller, "liveModeIcon", liveModeIcon.gameObject);
+            A.Set(controller, "modeCaption", modeCaption);
             SceneBuilderCore.ReplaceText(controller, "msgStalled", "Not getting further? Tap Start over, or tap Type it in.", "Not getting further? Tap Start over, or type the product in instead.");
             GlowUp.Scanning.GeminiApiConfig aiConfig = AppTiles.AiConfig();
             if (aiConfig != null) A.Set(controller, "aiConfig", aiConfig);
@@ -535,6 +545,8 @@ namespace GlowUp.EditorTools
             // (to the dashboard). The SwipeNavigation object is kept in the Hierarchy and does nothing on this screen.
             AppTiles.SwipeNavigation(s, null);
 
+            // Phase 1B: the side controls of the ControlBar answer a tap with their colour only (ThemeKit.AddPressFeedback leaves them out);
+            // the scan button keeps its own movement, which shows the scan state (held smaller while scanning, dimmed while locked).
             A.Finish(s);
             Debug.Log("[GlowUp] AiSmartAnalysisScene built. ScanGuide > Frame is the area that gets read; HoldToScan holds the round button (HoldToScanButton) and its ring of five segments " +
                       "(ScanRing: Fill_Front, Fill_Ingredients, Fill_Codes, Fill_Shade, Fill_OtherSides start empty and fill while scanning). ManualEntryPanel, StartOverPanel, ShortlistPanel, CameraViewport > ProductQuestion > QuestionBanner, " +
@@ -592,15 +604,12 @@ namespace GlowUp.EditorTools
         }
 
         /// <summary>One line of the checklist: an empty ring that becomes a glowing gold check mark, and the text.</summary>
-        /// <summary>One chip of the found row (index 0..3 of four equal chips): a soft rounded box, the ring / filled check on the left, the words beside it (two lines at most).</summary>
-        static ScanCheckItem Chip(Transform row, string name, string label, int index)
+        /// <summary>One chip of the found grid (two rows of two, sized by the rows' layout groups): a soft rounded box, the ring / filled check on the left, the words beside it.</summary>
+        static ScanCheckItem Chip(Transform row, string name, string label)
         {
-            const float gap = 12f;
             GameObject chip = A.Node(row, name, typeof(ScanCheckItem));
-            var rt = (RectTransform)chip.transform;
-            rt.anchorMin = new Vector2(index / 4f, 0f); rt.anchorMax = new Vector2((index + 1) / 4f, 1f); rt.pivot = A.MC;
-            rt.offsetMin = new Vector2(index == 0 ? 0f : gap * 0.5f, 0f); rt.offsetMax = new Vector2(index == 3 ? 0f : -gap * 0.5f, 0f);
-            Image back = A.Panel(chip.transform, "ChipBack", ThemeRole.SurfaceAlt, Kit.PanelAlpha, ChipRowH);
+            A.Size(chip.transform, -1, -1, 1, 1);           // the row's layout group shares the width evenly
+            Image back = A.Panel(chip.transform, "ChipBack", ThemeRole.SurfaceAlt, Kit.PanelAlpha, 60f);
             A.Fill(back.transform);
             back.raycastTarget = false;
             Image glow = A.RawIcon(chip.transform, "Glow", IconFactory.SoftDisc, 70, new Color32(184, 138, 59, 0));
@@ -611,15 +620,43 @@ namespace GlowUp.EditorTools
             A.At(mark.transform, A.ML, new Vector2(14, 0), new Vector2(34, 34));
             A.RawIcon(mark.transform, "Check", IconFactory.Check, 20, Color.white);
             mark.gameObject.SetActive(false);                // fills in when the thing is found
-            TextMeshProUGUI text = A.Label(chip.transform, "Text", label, 24, ThemeRole.SecondaryText, FontRole.Label, TextAlignmentOptions.MidlineLeft, true);
-            A.Fill(text.transform, 56, 4, 12, 4);
-            A.ShrinkWrapped(text, 18);
+            TextMeshProUGUI text = A.Label(chip.transform, "Text", label, 27, ThemeRole.SecondaryText, FontRole.Label, TextAlignmentOptions.MidlineLeft, true);
+            A.Fill(text.transform, 60, 2, 14, 2);
+            A.ShrinkWrapped(text, 19);
             text.overflowMode = TextOverflowModes.Ellipsis;
             Object.DestroyImmediate(text.GetComponent<ThemedGraphic>());       // ScanCheckItem paints the text itself
             var item = chip.GetComponent<ScanCheckItem>();
             A.Set(item, "ring", ring); A.Set(item, "mark", mark.rectTransform); A.Set(item, "markDisc", mark);
             A.Set(item, "glow", glow); A.Set(item, "text", text); A.Set(item, "label", label);
             return item;
+        }
+
+        /// <summary>
+        /// One control of the bottom row (phase 1B): the whole slot is the button; inside it a round disc with the icon, and the name under it
+        /// (it gets smaller, then wraps, never runs out). The caption is the button's only text, so LabelOf finds it.
+        /// </summary>
+        static Button ControlButton(Transform slotParent, string name, Sprite icon, string caption, ThemeRole fill, ThemeRole ink, bool outline,
+                                    out TextMeshProUGUI captionText)
+        {
+            GameObject slot = A.Node(slotParent, name.Replace("Button", "Slot"));
+            A.Size(slot.transform, -1, -1, 1, 1);
+            GameObject go = A.Node(slot.transform, name, typeof(Image), typeof(Button));
+            var hit = go.GetComponent<Image>();
+            Kit.StyleRounded(hit); hit.color = new Color(1, 1, 1, 0.004f);  // the whole slot takes the tap
+            A.Fill(go.transform);
+            Image disc = A.Panel(go.transform, "Disc", fill, 1f, SideButton);
+            A.At(disc.transform, A.MC, new Vector2(0, 34), new Vector2(SideButton, SideButton));
+            if (outline) A.Outline(disc.transform, ThemeRole.Accent, SideButton);
+            A.Icon(disc.transform, "Icon", icon, 54, ink);
+            captionText = A.Label(go.transform, "Label", caption, 26, ThemeRole.MainText, FontRole.Button, TextAlignmentOptions.Top, true);
+            var c = captionText.rectTransform;                // under the disc: from 8 units below it, 64 high (two short lines)
+            c.anchorMin = new Vector2(0f, 0.5f); c.anchorMax = new Vector2(1f, 0.5f); c.pivot = new Vector2(0.5f, 1f);
+            float top = 34f - SideButton * 0.5f - 8f;
+            c.offsetMin = new Vector2(0f, top - 64f); c.offsetMax = new Vector2(0f, top);
+            A.ShrinkWrapped(captionText, 18);
+            var b = go.GetComponent<Button>();
+            b.targetGraphic = disc;                          // the colour change on a tap shows on the disc
+            return b;
         }
 
         static ScanCheckItem CheckRow(Transform parent, string name, string label, int index)

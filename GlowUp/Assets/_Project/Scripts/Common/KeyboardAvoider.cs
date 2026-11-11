@@ -137,6 +137,7 @@ namespace GlowUp.Common
             if (field == null || registered.Contains(field)) return;
             registered.Add(field);
             if (hideAndroidTypingBar) field.shouldHideMobileInput = true;
+            if (field.GetComponent<InputCaretTouch>() == null) field.gameObject.AddComponent<InputCaretTouch>();   // tap places the caret, long press selects
             field.onSelect.AddListener(OnSelect);
             field.onDeselect.AddListener(OnDeselect);
         }
