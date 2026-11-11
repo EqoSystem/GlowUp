@@ -59,6 +59,40 @@ namespace GlowUp.Tests
             Assert.AreEqual(-1, BarcodeFuzzy.Distance("1111111111111", "4006381333931"));
         }
 
+        static float Gap(UnityEngine.Color a, UnityEngine.Color b) => UnityEngine.Mathf.Abs(a.r - b.r) + UnityEngine.Mathf.Abs(a.g - b.g) + UnityEngine.Mathf.Abs(a.b - b.b);
+
+        [Test]
+        public void PigmentBringsAPaleShadeOnDeepLipsCloserWithoutHidingTheSkin()
+        {
+            var lips = new UnityEngine.Color(0.30f, 0.15f, 0.15f);       // a pixel of deep lips
+            var lipsBase = new UnityEngine.Color(0.34f, 0.17f, 0.17f);
+            var nude = new UnityEngine.Color(0.86f, 0.62f, 0.55f);
+            float share = GlowUp.AR.GuidedPigment.Share(nude, lipsBase, 0.22f, 0.3f);
+            Assert.Greater(share, 0.4f);                                   // out of the tint's reach: more pigment
+            UnityEngine.Color tintOnly = GlowUp.AR.GuidedPigment.Result(lips, nude, lipsBase, 0.85f, 0f);
+            UnityEngine.Color withPigment = GlowUp.AR.GuidedPigment.Result(lips, nude, lipsBase, 0.85f, share);
+            Assert.Less(Gap(withPigment, nude), Gap(tintOnly, nude));
+            Assert.Greater(Gap(withPigment, nude), 0.05f);                 // still not a flat paint: some of the skin shows
+        }
+
+        [Test]
+        public void ADarkerShadeGetsOnlyTheThinBasePigment()
+        {
+            var skin = new UnityEngine.Color(0.80f, 0.60f, 0.52f);
+            var berry = new UnityEngine.Color(0.45f, 0.12f, 0.22f);
+            Assert.AreEqual(0.22f, GlowUp.AR.GuidedPigment.Share(berry, skin, 0.22f, 0.3f), 1e-4f);
+        }
+
+        [Test]
+        public void LowEndProcessorsGetTheLighterPipeline()
+        {
+            Assert.IsTrue(GlowUp.Performance.ArQualitySettings.LowEndProcessor(4, 2000, 4, 1800));
+            Assert.IsTrue(GlowUp.Performance.ArQualitySettings.LowEndProcessor(8, 1500, 4, 1800));
+            Assert.IsFalse(GlowUp.Performance.ArQualitySettings.LowEndProcessor(8, 2400, 4, 1800));
+            Assert.IsFalse(GlowUp.Performance.ArQualitySettings.LowEndProcessor(8, 0, 4, 1800));     // speed not reported: not judged by it
+            Assert.AreEqual(4500, UnityEngine.ScriptableObject.CreateInstance<GlowUp.Performance.PerformanceProfile>().arLowBelowMemoryMb);   // a 4 GB phone reports under 4500
+        }
+
         [Test]
         public void VolumeButtonDefaultsToDoNothingAndIsSaved()
         {

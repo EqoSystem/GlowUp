@@ -87,6 +87,14 @@ namespace GlowUp.AR
         bool browMaskReady;
         float sharpnessNow = 14f;
         Color skinBaseNow;                  // exponentially smoothed _SkinBase value pushed to the face/cheeks/eyes layers
+        static readonly int PigmentId = Shader.PropertyToID("_Pigment");
+
+        [Header("Pigment (phase 3A, 11 November 2026)")]
+        [Tooltip("On = a thin layer of the shade itself lies over the tint (FaceMakeupBlend's second pass), so pale and light shades show on darker skin")]
+        [SerializeField] private bool usePigment = true;
+        [Range(0f, 0.6f)] [SerializeField] private float pigmentFace = 0.18f;
+        [Range(0f, 0.6f)] [SerializeField] private float pigmentParts = 0.22f;
+        [Range(0f, 0.6f)] [SerializeField] private float pigmentForLighter = 0.3f;
         bool skinBaseInit;
 
         // ---- set by the other AR scripts (all of them optional) ----
@@ -100,6 +108,8 @@ namespace GlowUp.AR
         public float SkinAdapt { get; set; }
         /// <summary>True = the full pipeline's moving highlight (gloss) is drawn instead of the fixed one (set by ArFaceTrackingController).</summary>
         public bool UseGloss { get; set; }
+        /// <summary>Phase 3A: the thin layer of the shade itself (off in the lighter pipeline: its alpha is 0, so the pass costs only its fill).</summary>
+        public bool UsePigment { get => usePigment; set => usePigment = value; }
         /// <summary>The brightness (0 to 1) of the skin tone the layers assume.</summary>
         public float AssumedSkinBrightness => 0.299f * skinUnderneath.r + 0.587f * skinUnderneath.g + 0.114f * skinUnderneath.b;
         /// <summary>Changes whenever another part of the face is shown (ArFaceTrackingController redraws the face's materials then).</summary>
@@ -240,6 +250,9 @@ namespace GlowUp.AR
                 layer.SetColor(colourProperty, shown[i]);
                 // push the smoothed skin base (not for lips or brows: they have their own)
                 if (i < 3 && layer.HasProperty("_SkinBase")) layer.SetColor("_SkinBase", skinBaseNow);
+                // phase 3A: the thin layer of the shade itself (the shader's second pass); more for a shade the tint cannot lighten to
+                if (layer.HasProperty(PigmentId))
+                    layer.SetFloat(PigmentId, usePigment ? GuidedPigment.Share(shown[i], i < 3 ? skinBaseNow : SkinUnderFor(i), i == 0 ? pigmentFace : pigmentParts, pigmentForLighter) : 0f);
                 if (on) { active = i; activeShare = full > 0.001f ? Mathf.Clamp01(shown[i].a / full) : 0f; }
             }
 

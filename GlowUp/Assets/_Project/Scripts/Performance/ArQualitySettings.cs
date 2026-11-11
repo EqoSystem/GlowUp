@@ -67,9 +67,18 @@ namespace GlowUp.Performance
             int memory = SystemInfo.systemMemorySize;
             if (profile == null || memory <= 0) return ArTier.Full;                       // the phone does not say: the full pipeline, the frame-rate check will catch a slow one
             if (profile.arWeakGraphicsMemoryMb > 0 && SystemInfo.graphicsMemorySize > 0 && SystemInfo.graphicsMemorySize <= profile.arWeakGraphicsMemoryMb) return ArTier.Light;
+            // phase 3B: a low-end processor gets the lighter pipeline even with enough memory
+            if (LowEndProcessor(SystemInfo.processorCount, SystemInfo.processorFrequency, profile.arLowEndMaxCores, profile.arLowEndBelowMhz)) return ArTier.Light;
             if (memory >= profile.arHighMinMemoryMb) return ArTier.Full;
             if (memory < profile.arLowBelowMemoryMb) return ArTier.Light;
             return profile.arMidRangeGetsFullPipeline ? ArTier.Full : ArTier.Light;
+        }
+
+        /// <summary>True for a processor with few cores or a low top speed (0 or less = the phone does not say: not judged by it).</summary>
+        public static bool LowEndProcessor(int cores, int mhz, int maxLowCores, int belowMhz)
+        {
+            if (maxLowCores > 0 && cores > 0 && cores <= maxLowCores) return true;
+            return belowMhz > 0 && mhz > 0 && mhz < belowMhz;
         }
 
         /// <summary>The user picked a choice on the Settings page.</summary>

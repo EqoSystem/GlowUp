@@ -658,6 +658,7 @@ namespace GlowUp.AR
             if (wantBrow != usingBrow) { if (wantBrow) browMask.BeginSession(makeup); else browMask.EndSession(); usingBrow = wantBrow; }
             if (wantSmooth != usingSmooth) { if (wantSmooth) meshSmoother.BeginSession(); else meshSmoother.EndSession(); usingSmooth = wantSmooth; }
             if (makeup != null) makeup.UseGloss = makeup.HasGloss && (quality == null || quality.MovingHighlight);
+            if (makeup != null) makeup.UsePigment = quality == null || !quality.IsLight;     // phase 3A: the lighter pipeline skips the pigment pass's cost
         }
 
         void StopHelpers()
