@@ -125,7 +125,7 @@ function question(brandHint, productHint, ocrText) {
         "officialSite: the brand's own official website (https address of its home page), only when the search showed it; otherwise empty.",
         "minimumAge: the minimum age of use ONLY when the maker states one (e.g. \"not for children under 3\" = 3); otherwise null.",
         "highlights: what the pages you found say, one or two plain sentences each, in your own words, empty when no page says it:",
-        "  finish (finish and coverage, how it wears), shade (this shade: what skin tone and undertone it is made for), price (the usual price and where it is sold, in the Philippines when a page says so; say it is approximate; write a price as "PHP 699", never with a currency symbol),",
+        "  finish (finish and coverage, how it wears), shade (this shade: what skin tone and undertone it is made for), price (the usual price and where it is sold, in the Philippines when a page says so; say it is approximate; write a price as PHP 699, never with a currency symbol),",
         "  apply (how the maker says to apply it). No health, medical or safety claims, no links.",
         "Do NOT write any ingredient list: GlowUp takes ingredient lists only from product pages it opens itself.",
         "Write the brand as it is officially spelled (with its spaces and capitals, e.g. \"Maybelline New York\", not \"MAYBELLINE NEWYORK\").",
