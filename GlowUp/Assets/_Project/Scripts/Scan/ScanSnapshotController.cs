@@ -111,7 +111,11 @@ namespace GlowUp.Scan
         [SerializeField] private string msgDailyLimitV2 = "You've sent {0} photos today. Try again tomorrow, or type the product in.";
         [SerializeField] private string msgBusyV2 = "Photo look-up is busy today. Type the product in, or try again tomorrow.";
         [SerializeField] private string msgDownV2 = "The photo couldn't be looked up.";
-        [SerializeField] private string msgNothingV2 = "We couldn't recognise a product in this photo. Retake it showing the front of the pack, or type it in.";
+        [SerializeField] private string msgSendingForReview = "Sending it to GlowUp for review…";
+        [Tooltip("{0} = why (\"the database did not accept it\", \"the connection failed\" ...)")]
+        [SerializeField] private string msgNotSent = "We found it online, but couldn't send it for review: {0}. Try again later.";
+        [SerializeField] private string seeResultLabel = "See the result";
+        [SerializeField] private string msgNothingV2 ="We couldn't recognise a product in this photo. Retake it showing the front of the pack, or type it in.";
         [Tooltip("{0} = the product")]
         [SerializeField] private string msgNoListV2 = "Found {0}, but couldn't find an ingredient list. You can type it in.";
         [SerializeField] private string msgFromYouV2 = "You already sent this product. It is waiting for review.";
@@ -481,7 +485,24 @@ namespace GlowUp.Scan
                 if (web.secondary != null) record.secondarySourceUrl = web.secondary.url;
                 if (web.third != null) { record.thirdSourceUrl = web.third.url; record.thirdSourceKind = web.third.tier == "unverified" ? "other" : web.third.tier; }
                 ScanSession.WebResult = web;
-                PendingProductData made = record.name.Length > 0 ? PendingProductRepository.Submit(record, keepPhotoForAdmin ? jpeg : null, maximumPhotoBytes) : null;
+                // sent NOW, with the database's answer (the background queue dropped refused entries silently, 11 November 2026)
+                preview.Say(StatusMessage.Kind.Progress, msgSendingForReview);
+                PendingProductRepository.SubmitResult sent = record.name.Length > 0
+                    ? await PendingProductRepository.SubmitNowAsync(record, keepPhotoForAdmin ? jpeg : null, maximumPhotoBytes)
+                    : new PendingProductRepository.SubmitResult { problem = "no product name was found" };
+                if (this == null || mine != attempt) return;
+                PendingProductData made = sent.entry;
+                if (made == null && list.Count > 0)
+                {
+                    // not sent: said plainly, and the result can still be seen (it is then only on this phone)
+                    var local = new PendingProductData
+                    {
+                        id = "", name = record.name, brandName = record.brandName, cosmeticType = record.cosmeticType, shadeHex = record.shadeHex,
+                        model = record.model, ingredients = new List<string>(record.ingredients), sourceUrls = new List<string>(record.sourceUrls), ingredientsFrom = record.ingredientsFrom
+                    };
+                    preview.Problem(string.Format(msgNotSent, sent.problem), seeResultLabel, () => { Close(); Analysed?.Invoke(null, local); }, false);
+                    return;
+                }
 
                 if (list.Count == 0)
                 {
