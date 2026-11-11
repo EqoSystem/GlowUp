@@ -140,6 +140,8 @@ namespace GlowUp.Scan
         /// to photo mode (a capture button instead of the live-scan button, the camera fully visible). The scan screen then calls CaptureNow().
         /// </summary>
         public event Action CaptureModeRequested;
+        /// <summary>A barcode was read on the photo, no product has it and the text found none either: the scan screen opens its Barcode card with the number.</summary>
+        public event Action<string> BarcodeUnknown;
         /// <summary>The text read inside the user's box matched products in the catalogue: the scan screen shows them as a list to pick from.
         /// It answers with MatchesAnswered(true) when one was picked, MatchesAnswered(false) for "None of these" (the photo is then looked up online).</summary>
         public event Action<List<ScanShortlist.Entry>> CatalogMatches;
@@ -332,6 +334,16 @@ namespace GlowUp.Scan
             if (choice != null) { choice.TrySetResult(picked); }
         }
 
+        /// <summary>A barcode is on the photo and nothing else named the product: the card for it opens (true), the photo card closes.</summary>
+        bool HandOverBarcode()
+        {
+            if (barcodeSeen.Length == 0 || BarcodeUnknown == null) return false;
+            string key = barcodeSeen;
+            Close();
+            BarcodeUnknown.Invoke(key);
+            return true;
+        }
+
         string barcodeSeen = "";           // the barcode key read on the photo being looked up ("" = none)
         string NotInCatalogueWords() => barcodeSeen.Length > 0 ? string.Format(msgNotInCatalogueBarcode, barcodeSeen) : msgNotInCatalogue;
 
@@ -416,7 +428,7 @@ namespace GlowUp.Scan
                 if (catalogueText.Length == 0) { preview.Problem(msgNoTextRead, typeItInLabel, OpenTyping, false); return; }
                 preview.Say(StatusMessage.Kind.Progress, msgCatalog);
                 List<ScanShortlist.Entry> matches = CatalogMatches != null ? ScanShortlist.For(ProductRepository.Index, catalogueText, null, null, 6) : new List<ScanShortlist.Entry>();
-                if (matches.Count == 0) { preview.Problem(NotInCatalogueWords(), typeItInLabel, OpenTyping, false); return; }
+                if (matches.Count == 0) { if (HandOverBarcode()) return; preview.Problem(NotInCatalogueWords(), typeItInLabel, OpenTyping, false); return; }
                 await Task.Delay(350);                          // the outlines stay in view for a moment
                 if (this == null || mine != attempt) return;
                 choice = new TaskCompletionSource<bool>();
@@ -427,6 +439,7 @@ namespace GlowUp.Scan
                 choice = null;
                 if (this == null || mine != attempt) return;
                 if (picked) { Close(); return; }
+                if (HandOverBarcode()) return;                  // "None of these" with a barcode on the photo: the Barcode card takes over
                 preview.Show(keep, false);                      // "None of these": it is not in the catalogue yet
                 preview.Problem(NotInCatalogueWords(), typeItInLabel, OpenTyping, false);
             }

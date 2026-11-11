@@ -118,6 +118,10 @@ namespace GlowUp.Scan
         [Header("Recognising a product without the AI")]
         [Tooltip("The pop-up \"Is it one of these?\" with its search box")]
         [SerializeField] private ScanShortlistView shortlist;
+        [Tooltip("The optional Barcode card (11 November 2026): opens when the product could not be told from the pack but a barcode is there")]
+        [SerializeField] private ScanBarcodeCardView barcodeCard;
+        [Tooltip("In Type it in: opens the Barcode card")]
+        [SerializeField] private Button manualBarcodeButton;
         [SerializeField] private string shortlistTitle = "Is it one of these?";
         [SerializeField] private string shortlistMessage = "We are not sure which product this is. Tap it, or type its name.";
         [SerializeField] private string shortlistNoneLabel = "None of these";
@@ -440,6 +444,9 @@ namespace GlowUp.Scan
             if (listHelp != null) listHelp.SetActive(false);
             if (snapshot != null) { snapshot.Analysed += OnSnapshotAnalysed; snapshot.NameOnly += OnSnapshotNameOnly; snapshot.TypeItIn += OpenManual; snapshot.CaptureModeRequested += EnterPhotoMode; snapshot.CatalogMatches += ShowPhotoMatches; }
             if (manualAnalyseButton != null) manualAnalyseButton.onClick.AddListener(AnalyseManual);
+            if (manualBarcodeButton != null) manualBarcodeButton.onClick.AddListener(() => { if (manualPanel != null) manualPanel.Hide(); OpenBarcodeCard(""); });
+            if (barcodeCard != null) { barcodeCard.FindRequested += OnBarcodeFind; barcodeCard.PhotoRequested += OnBarcodePhoto; }
+            if (snapshot != null) snapshot.BarcodeUnknown += key => OpenBarcodeCard(key);
             if (lookUpButton != null) lookUpButton.onClick.AddListener(LookUp);
             if (backButton != null) backButton.onClick.AddListener(() => { StopCamera(); SceneNavigator.Go(backScene); });
             if (cameraFeed != null) cameraFeed.Started += OnCameraStarted;
@@ -741,6 +748,7 @@ namespace GlowUp.Scan
         void BackKey()
         {
             if (snapshot != null && snapshot.PreviewOpen) { snapshot.ClosePreviewByBack(); return; }
+            if (barcodeCard != null && barcodeCard.IsOpen) { barcodeCard.Hide(); return; }
             if (shortlist != null && shortlist.IsOpen) { shortlist.Hide(); if (snapshot != null) snapshot.MatchesAnswered(true); return; }
             if (manualPanel != null && manualPanel.IsOpen) { manualPanel.Hide(); return; }
             if (startOverPanel != null && startOverPanel.IsOpen) { startOverPanel.Hide(); return; }
@@ -2313,7 +2321,7 @@ namespace GlowUp.Scan
             Debug.Log("[SMART_SCAN_MATCH] Outcome=" + outcome + " Brand=" + brandStr + " Tokens=[" + tokensStr + "] Candidates=[" + candsStr + "]");
         }
 
-        bool PopupOpen => (shortlist != null && shortlist.IsOpen) || (startOverPanel != null && startOverPanel.IsOpen) || (manualPanel != null && manualPanel.IsOpen)
+        bool PopupOpen => (barcodeCard != null && barcodeCard.IsOpen) || (shortlist != null && shortlist.IsOpen) || (startOverPanel != null && startOverPanel.IsOpen) || (manualPanel != null && manualPanel.IsOpen)
                           || (snapshot != null && snapshot.IsOpen);
 
         /// <summary>
@@ -3152,11 +3160,86 @@ namespace GlowUp.Scan
         // ---------------------------------------------------------------------------------------
         //  Typing the product in
         // ---------------------------------------------------------------------------------------
+        // ---------------------------------------------------------------------------------------
+        //  The Barcode card (11 November 2026)
+        // ---------------------------------------------------------------------------------------
+        string barcodeCardShownFor = "";          // the live scan's barcode the card was already offered for (once per barcode)
+        string barcodeToLearn = "";               // the number the user is naming a product for
+
+        /// <summary>Opens the optional Barcode card (the number may be "" when the user types it).</summary>
+        void OpenBarcodeCard(string key)
+        {
+            if (barcodeCard == null || stage == Stage.Leaving || stage == Stage.Recognising) return;
+            ExitPhotoMode();
+            if (holdButton != null) holdButton.LetGo();
+            barcodeCard.Show(key);
+        }
+
+        [Tooltip("The Barcode card while Open Beauty Facts is asked")]
+        [SerializeField] private string msgBarcodeLookingUp = "Looking the barcode up on Open Beauty Facts…";
+
+        /// <summary>
+        /// "Find product": 1. the catalogue's Barcode field and what this phone learned; 2. Open Beauty Facts (a free public database,
+        /// no daily limit; only the number is sent): its name, brand and ingredient list go to the usual analysis, and the scan adds the
+        /// product to the catalogue as Pending with this barcode, so an admin reviews it on the website; 3. the user names the product.
+        /// </summary>
+        async void OnBarcodeFind(string key, string typedName)
+        {
+            ProductData found = PhotoBarcode.Find(key);
+            if (found != null) { barcodeCard.Hide(); barcode = key; OnSnapshotAnalysed(found, null); return; }
+            if (typedName.Length == 0 && OpenBeautyFacts.Enabled && ConnectivityMonitor.Online)
+            {
+                barcodeCard.Say(msgBarcodeLookingUp);
+                OpenBeautyFacts.Result there = await OpenBeautyFacts.Find(key);
+                if (this == null || barcodeCard == null || !barcodeCard.IsOpen || stage == Stage.Leaving) return;
+                IngredientTextParser.ParsedList list = there != null && there.found ? IngredientTextParser.Read(there.ingredientText) : null;
+                if (list != null && list.inOrder.Count >= 3)
+                {
+                    barcodeCard.Hide();
+                    barcode = key;                                   // the finished scan keeps the number (the catalogue's Pending entry gets it)
+                    if (identity.productName.Length == 0) identity.productName = there.productName ?? "";
+                    if (identity.brandName.Length == 0) identity.brandName = there.brandName ?? "";
+                    ShowIdentity();
+                    UseLookedUpList(new List<string>(list.inOrder), new List<string> { there.Source }, "web", true);
+                    return;
+                }
+            }
+            if (typedName.Length == 0) { barcodeCard.AskForName(); return; }
+            List<ScanShortlist.Entry> matches = ScanShortlist.Typed(ProductRepository.Index, typedName, "");
+            if (matches == null || matches.Count == 0) { barcodeCard.NameNotFound(); return; }
+            barcodeCard.Hide();
+            barcodeToLearn = key;
+            OpenShortlist(shortlistTitle, photoMatchesMessageCatalogue, shortlistNoneLabel,
+                () =>
+                {
+                    ExitPhotoMode();
+                    if (knownProduct != null && PhotoBarcodeMemory.Learn(barcodeToLearn, knownProduct)) Debug.Log("[PhotoBarcode] learned " + barcodeToLearn + " for " + knownProduct.name);
+                    barcodeToLearn = "";
+                },
+                () => { barcodeToLearn = ""; OpenManual(); },
+                matches);
+        }
+
+        /// <summary>"Photograph the barcode": photo mode, whose photo step reads the bars first.</summary>
+        void OnBarcodePhoto()
+        {
+            if (barcodeCard != null) barcodeCard.Hide();
+            if (stage == Stage.Scanning) EnterPhotoMode();
+        }
+
         void OpenManual()
         {
             ExitPhotoMode();
             if (stage == Stage.Leaving || stage == Stage.Recognising || manualPanel == null) return;
             if (holdButton != null) holdButton.LetGo();
+            // the live scan read a barcode but no product is known: the Barcode card is offered first (once for each barcode)
+            string liveKey = MlKitBarcodeReader.Key(barcode);
+            if (barcodeCard != null && liveKey.Length > 0 && knownProduct == null && barcodeCardShownFor != liveKey && !barcodeCard.IsOpen)
+            {
+                barcodeCardShownFor = liveKey;
+                OpenBarcodeCard(liveKey);
+                return;
+            }
             ManualStatus(StatusMessage.Kind.Info, "");
             // what the scan already found is filled in, so the user only types what is missing
             if (manualProductInput != null && string.IsNullOrWhiteSpace(manualProductInput.text)) manualProductInput.text = identity.productName;

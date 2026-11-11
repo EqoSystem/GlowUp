@@ -305,6 +305,11 @@
                                 <input type="url" id="productImageInput" maxlength="300" placeholder="https://... (the bottle, tube or compact)" autocomplete="off" inputmode="url">
                             </div>
                             <div class="field full">
+                                <div class="label-row"><label for="productBarcodeInput">Barcode</label></div>
+                                <input type="text" id="productBarcodeInput" maxlength="20" placeholder="The digits under the barcode, e.g. 3600531652300" autocomplete="off" spellcheck="false" inputmode="numeric" aria-describedby="productBarcodeHint">
+                                <div class="hint-row"><p class="field-hint" id="productBarcodeHint">Optional. The app finds this product by its barcode at once, from a photo or a live scan. 6 to 14 digits; spaces are ignored. <span id="productBarcodeCheck"></span></p></div>
+                            </div>
+                            <div class="field full">
                                 <div class="label-row"><label for="productFdaInput">FDA registration number</label></div>
                                 <input type="text" id="productFdaInput" maxlength="40" placeholder="The number the FDA Philippines gave this product" autocomplete="off" spellcheck="false" aria-describedby="productFdaHint">
                                 <div class="hint-row"><p class="field-hint" id="productFdaHint">The notification number shown on verification.fda.gov.ph for this product. Letters, digits and . , # ( ) _ - /.</p></div>

@@ -310,6 +310,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         openApply: (ask) => openApply(ask)
     });
     el("productBrandInput").addEventListener("change", () => sourceEditor.paint());
+    el("productBarcodeInput").addEventListener("input", showBarcodeCheck);
     el("productNameInput").addEventListener("input", showScopeHint);
     el("productTypeOtherInput").addEventListener("input", showScopeHint);
     el("addBrandForm").addEventListener("submit", saveBrand);
@@ -1314,6 +1315,14 @@ let lastFocus = "|";
 
 const pickBox = (label) => `<button type="button" class="pick" role="checkbox" aria-checked="false" aria-label="Select ${escapeHtml(label)}"></button>`;
 const pickAllBox = (what) => `<button type="button" class="pick" data-pick-all role="checkbox" aria-checked="false" aria-label="Select all shown" data-tip="Select every ${what} shown here."></button>`;
+
+/** The hint under the Barcode box: whether the digits are a valid barcode (check digit) and where its number was issued. */
+function showBarcodeCheck() {
+    const note = el("productBarcodeCheck");
+    if (!note) return;
+    const text = el("productBarcodeInput").value.trim();
+    note.textContent = text ? (barcodeKey(text) ? gs1Hint(text).text : "Not a barcode yet: 6 to 14 digits.") : "";
+}
 
 /** Under this width the list is drawn as cards whatever the switch says (the table needs about 640 px). */
 const NARROW_LIST_PX = 600;
@@ -2430,6 +2439,8 @@ function openProductForm(product, brandId) {
     el("productIngredientsInput").value = product ? product.ingredients.join(", ") : "";
     el("productImageInput").value = product ? product.imageUrl : "";
     el("productFdaInput").value = product ? product.fdaNumber : "";
+    el("productBarcodeInput").value = product ? product.barcode : "";
+    showBarcodeCheck();
     el("productIngredientSearch").value = "";
     if (ingredientPicker) ingredientPicker.setNotes(product ? product.ingredientNotes : []);
     el("productMinAgeInput").value = product && product.minAge > 0 ? product.minAge : "";
@@ -2716,9 +2727,13 @@ async function saveProduct(event) {
     const status = el("productStatusInput").value;
     const { shades, codes: shadeCodes } = pairShades(formShades, formShadeCodes, MAX_SHADES);
     const imageUrl = cleanLink(el("productImageInput").value), fdaNumber = cleanFdaNumber(el("productFdaInput").value);
+    const barcodeText = el("productBarcodeInput").value.trim(), barcode = barcodeText ? barcodeKey(barcodeText) : "";
 
     if (imageUrl === null) { setFormError(form, "The photo link must be a web address that starts with https://"); el("productImageInput").focus(); return; }
     if (fdaNumber === null) { setFormError(form, "The FDA registration number may have letters, digits and . , # ( ) _ - / only (at most 40 characters)."); el("productFdaInput").focus(); return; }
+    if (barcodeText && !barcode) { setFormError(form, "A barcode is 6 to 14 digits (the number under the bars). Leave it empty if you do not have it."); el("productBarcodeInput").focus(); return; }
+    const sameCode = barcode ? everyProduct.find((p) => p.id !== editingProductId && !p.binned && barcodeKey(p.barcode) === barcode) : null;
+    if (sameCode) { setFormError(form, `The barcode ${barcode} is already on "${sameCode.name}" of ${brandNameOf(sameCode)}. A barcode belongs to one product.`); el("productBarcodeInput").focus(); return; }
     if (!name) { setFormError(form, "Type the product name."); el("productNameInput").focus(); return; }
     if (!brand) { setFormError(form, "Choose the brand."); el("productBrandInput").focus(); return; }
     if (!cosmeticType) { setFormError(form, "Choose the cosmetic type."); el("productTypeInput").focus(); return; }
@@ -2736,7 +2751,7 @@ async function saveProduct(event) {
     const notes = ingredientPicker ? ingredientPicker.getNotes() : [];
     const data = {
         name, brandId: brand.id, brandName: brand.name, cosmeticType, description,
-        ingredients, shades, minAge, status, imageUrl, fdaNumber,
+        ingredients, shades, minAge, status, imageUrl, fdaNumber, barcode,
         // the codes printed on the pack, at the same places as the shades: the app reads a code on a scanned pack and finds the colour (ShadeCode.cs)
         shadeCodes: shadeCodes.some(Boolean) ? shadeCodes : [],
         // light summaries kept on the product so that nothing needs a join: the links to the library, how many, and the words a filter uses

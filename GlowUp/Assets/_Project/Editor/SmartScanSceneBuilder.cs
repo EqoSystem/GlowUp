@@ -387,14 +387,54 @@ namespace GlowUp.EditorTools
             var behaviour = SceneBuilderCore.Ensure<InputFieldBehaviour>(manualInput.gameObject);
             A.Set(behaviour, "characterLimit", 3000);
 
+            // the optional Barcode card from here: the user has the barcode but cannot type the name (11 November 2026)
+            Button manualBarcode = A.PillButton(manual.box, "UseBarcodeButton", "Use a barcode", 30, ThemeRole.InputBackground, ThemeRole.MainText, IconFactory.ScanFrame);
+            A.TopStrip(manualBarcode.transform, 896, 96, 48, 48);
+            A.Outline(manualBarcode.transform, ThemeRole.Accent, 96f);
             TextMeshProUGUI manualFeedback = A.Label(manual.box, "ManualFeedbackText", "", 28, ThemeRole.Warning, FontRole.Body, TextAlignmentOptions.Center, true);
-            A.TopStrip(manualFeedback.transform, 892, 176, 48, 48);       // room for a sentence that says what to do next
+            A.TopStrip(manualFeedback.transform, 1000, 76, 48, 48);       // one or two short lines that say what to do next
             A.ShrinkWrapped(manualFeedback, 22);
             Button manualCancel = A.PillButton(manual.box, "CancelButton", "Cancel", 38, ThemeRole.SurfaceAlt, ThemeRole.MainText);
             A.BottomStrip(manualCancel.transform, 44, 120, 48, 512);
             UnityEventTools.AddPersistentListener(manualCancel.onClick, manual.panel.Hide);
             Button manualAnalyse = A.PillButton(manual.box, "AnalyseButton", "Analyse", 38, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Sparkle);
             A.BottomStrip(manualAnalyse.transform, 44, 120, 512, 48);
+
+            // ---- the optional Barcode card (11 November 2026): only when the pack's name could not be read but a barcode is there,
+            //      or from "Use a barcode" in Type it in. The number is big and editable; Find product looks it up. ----
+            A.AppPopup bar = A.Overlay(s, "BarcodeCardPanel", "Barcode");
+            A.At(bar.box, A.MC, new Vector2(0, 120), new Vector2(940, 1060));
+            TMP_InputField barNumber = SceneBuilderCore.MakeInput(bar.box, "NumberField", "Barcode digits", A.TC, Vector2.zero, new Vector2(800, 128));
+            A.TopStrip(barNumber.transform, 132, 128, 48, 48);
+            Kit.StyleInput(barNumber, "Barcode digits", ThemeRole.InputBackground);
+            barNumber.contentType = TMP_InputField.ContentType.IntegerNumber;
+            barNumber.characterLimit = 20;
+            if (barNumber.textComponent != null) { barNumber.textComponent.fontSize = 46; barNumber.textComponent.alignment = TextAlignmentOptions.Center; barNumber.textComponent.characterSpacing = 6; }
+            barNumber.text = "3600531652300";                                   // a sample in the Editor only; the card fills it when it opens
+            TextMeshProUGUI barFeedback = A.Label(bar.box, "FeedbackText", "Type the digits under the barcode, or photograph it. GlowUp finds the product by that number.", 28,
+                                                  ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            A.TopStrip(barFeedback.transform, 284, 128, 52, 52);
+            A.ShrinkWrapped(barFeedback, 22);
+            GameObject barNameRow = A.Node(bar.box, "NameRow");
+            A.TopStrip(barNameRow.transform, 424, 104, 48, 48);
+            TMP_InputField barName = SceneBuilderCore.MakeInput(barNameRow.transform, "NameField", "Product name", A.TC, Vector2.zero, new Vector2(800, 104));
+            A.Fill(barName.transform);
+            Kit.StyleInput(barName, "Product name", ThemeRole.InputBackground);
+            A.Set(SceneBuilderCore.Ensure<InputFieldBehaviour>(barName.gameObject), "characterLimit", 80);
+            barNameRow.SetActive(false);                                         // asked only when no product has the barcode yet
+            Button barFind = A.PillButton(bar.box, "FindButton", "Find product", 36, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Check);
+            A.TopStrip(barFind.transform, 556, 120, 48, 48);
+            A.Glow(barFind, 120);
+            Button barPhoto = A.PillButton(bar.box, "PhotoButton", "Photograph the barcode", 32, ThemeRole.InputBackground, ThemeRole.MainText, IconFactory.CameraIcon);
+            A.TopStrip(barPhoto.transform, 696, 112, 48, 48);
+            A.Outline(barPhoto.transform, ThemeRole.Accent, 112f);
+            A.Shrink(A.LabelOf(barPhoto), 22);
+            Button barCancel = A.PillButton(bar.box, "CancelButton", "Cancel", 34, ThemeRole.SurfaceAlt, ThemeRole.MainText);
+            A.BottomStrip(barCancel.transform, 44, 112, 48, 48);
+            var barView = SceneBuilderCore.Ensure<ScanBarcodeCardView>(bar.root);
+            A.Set(barView, "panel", bar.panel); A.Set(barView, "numberInput", barNumber); A.Set(barView, "feedbackText", barFeedback);
+            A.Set(barView, "nameRow", barNameRow); A.Set(barView, "nameInput", barName);
+            A.Set(barView, "findButton", barFind); A.Set(barView, "photoButton", barPhoto); A.Set(barView, "cancelButton", barCancel);
 
             // ---- controller (kept across rebuilds: thresholds, messages and camera corrections live here) ----
             var controller = A.Controller<SmartScanFlowController>("SmartScanFlowController");
@@ -427,6 +467,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "manualPanel", manual.panel); A.Set(controller, "manualInput", manualInput);
             A.Set(controller, "manualProductInput", manualProduct); A.Set(controller, "manualBrandInput", manualBrand); A.Set(controller, "manualTypeDropdown", manualType);
             A.Set(controller, "manualAnalyseButton", manualAnalyse); A.Set(controller, "manualFeedbackText", manualFeedback);
+            A.Set(controller, "barcodeCard", barView); A.Set(controller, "manualBarcodeButton", manualBarcode);
 
             // ---- AI photo fallback: "Product not in catalog yet!" ----
             // The pop-up sits low on the screen so the camera picture above it stays visible while the user aims.
