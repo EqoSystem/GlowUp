@@ -100,20 +100,6 @@
                 <div class="import-flags" id="inventoryImportFlags" hidden></div>
             </section>
 
-            <!-- products app users sent as ONE photo: reviewed in a floating window over this page (photo left, the AI's reading right;
-                 Approve & Publish, Edit, Reject). Only a count is read (remembered 10 minutes, shared by both pages). -->
-            <section class="panel snapshots-panel" data-panel="snapshots" data-label="Pending snapshot reviews" data-w="4" data-right>
-                <div class="panel-head">
-                    <h3 class="panel-title">Pending snapshots</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Pending snapshot reviews" data-tip="When a scanned product is not in the catalogue, the app offers to take one photo. The AI reads the brand, name, kind, shade and ingredient list. Users see that reading marked PENDING APPROVAL until you approve it here." data-tip-preview="Opens a review window over this page: one snapshot at a time, photo next to the reading.">i</button>
-                </div>
-                <button type="button" class="snapshots-open" id="snapshotReviewBtn" aria-haspopup="dialog">
-                    <span class="snapshots-icon"><i data-icon="camera"></i></span>
-                    <span class="snapshots-text"><strong>Pending Snapshot Reviews</strong><small id="snapshotReviewHint">One at a time: the photo next to what the AI read.</small></span>
-                    <span class="snapshots-count skeleton" id="snapshotCount" aria-label="Snapshots waiting">00</span>
-                </button>
-            </section>
-
             <!-- the counts; a click on one filters the table -->
             <section class="panel bare" data-panel="counts" data-label="Counts" data-w="8">
                 <div class="stat-row">

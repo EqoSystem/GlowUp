@@ -184,8 +184,6 @@ namespace GlowUp.Scan
         {
             PendingProductRepository.RememberMissMinutes = rememberMissMinutes;
             PendingProductRepository.KeepHours = keepStagedHours;
-            ScanPhotoService.FunctionUrl = string.IsNullOrWhiteSpace(functionUrl) ? DefaultFunctionUrl : functionUrl.Trim();
-            ScanPhotoService.TimeoutSeconds = functionTimeoutSeconds;
         }
 
         /// <summary>Opens the pop-up (the scan screen calls this when the catalogue does not have the product).</summary>

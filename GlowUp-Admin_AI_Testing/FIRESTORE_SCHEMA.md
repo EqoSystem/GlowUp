@@ -11,7 +11,7 @@ The admin website and the mobile app use the same Firebase project (`glowup-admi
 | `productIngredientSuggestions` | App | Website (Brand & Product Inventory) | Web-found lists for existing products, pending admin review |
 | `ingredients` | Website (Ingredient Curator). The app adds ingredients its AI lookup finds, marked as not reviewed. | App, website | Ingredient explanations and safety details |
 | `config` (one document, `lists`) | Website (Ingredient Curator, "Edit list") | App, website | The editable Allergen Family, Highlights and Skin Conditions lists |
-| `pending_products`, `pending_product_images` | App (AI photo snapshot) | App users (entries only), website (Pending Snapshot Reviews) | Products the catalogue does not have, read by the AI from one photo, waiting for an admin |
+| `pending_products`, `pending_product_images`, `snapshot_quota` | Nobody since 11 November 2026 (feature removed) | Admins (read/delete old entries) | Old AI photo snapshots. Photos are now matched with the catalogue only; the rules refuse new entries |
 | `scanActivity` | App | Website (Dashboard) | One anonymous note per scan |
 | `allergenSuggestions`, `conditionSuggestions` | App | Website (Dashboard) | Items users typed in that were not on the app's lists |
 | `users/{uid}` and `users/{uid}/scans` | App | App (that user only) | A user's profile and scan history |
@@ -138,7 +138,9 @@ The allergen, skin type and condition ids must be spelled exactly. The website's
 - **Writes.** Public users and the app can read the catalogue; only admin accounts write it, and the app may only create Pending entries and add 1 to `scans`. The rules also refuse an admin write whose name is not text, whose lists are absurdly long, or whose `imageUrl` / `logoUrl` is not an https address.
 - **Not built:** image upload to Firebase Storage (Cloud Storage needs the Blaze plan on new projects, and no Storage rules exist), so pictures are stored as web addresses; a visual-similarity search (there is no vector search in Firestore: the metadata filters do that job).
 
-### `pending_products/{id}` (AI photo snapshots, waiting for an admin)
+### `pending_products/{id}` (AI photo snapshots) — REMOVED 11 November 2026
+
+The feature is gone: the app matches photos with the catalogue only, the website has no Pending Snapshot Reviews, `api/scan-snapshot.js` is deleted and the rules refuse new entries, photos and counters. What follows describes the old entries that may still exist (an admin can delete them in the Firebase console).
 
 **The app uses only the sender's own entry** (`createdByUid` = the signed-in account): anyone signed in can stage the first entry for a product, so another user's entry is unverified and is never used for a verdict on another phone. When a scanned product is not in `products`, the app offers to take ONE photo. The AI reads the brand, name, kind, shade and the printed ingredient list; the result is analysed at once and shown with a **PENDING APPROVAL** badge. The id is `snap_<brand>__<name>` (letters, digits and underscores), so every user who snaps the same product lands on the same entry. Kept apart from `products` so unverified user content never mixes with the curated catalogue.
 

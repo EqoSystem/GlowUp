@@ -50,7 +50,6 @@ function buttonReady(selector, action) {
     // the button is hidden or greyed out: the reason the admin can act on
     if (/selected/i.test(label)) return `${label}: tick at least one entry first.`;
     if (/approve/i.test(label)) return `${label}: tick at least one draft as reviewed first.`;
-    if (/snapshots/i.test(label)) return "Pending snapshots: show that panel first (Quick settings › Layout and style).";
     return !b || b.getClientRects().length === 0 ? `${label} isn't on the page right now.` : `${label} isn't available right now.`;
 }
 /** Can this action run here and now? true or the reason. */

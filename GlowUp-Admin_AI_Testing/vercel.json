@@ -43,9 +43,6 @@
     "api/assist-ingredient.js": {
       "maxDuration": 60
     },
-    "api/scan-snapshot.js": {
-      "maxDuration": 60
-    },
     "api/archive-purge.js": {
       "maxDuration": 60
     },

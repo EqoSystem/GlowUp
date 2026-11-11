@@ -43,7 +43,6 @@ export const CATALOG = [
     { id: "inventory.addProduct", scope: "inventory", label: "Add product", description: "Opens the Add product form.", keys: "Ctrl+Alt+KeyP" },
     { id: "inventory.import", scope: "inventory", label: "Import a file", description: "Opens the file chooser to import brands and products.", keys: "Ctrl+Alt+KeyI" },
     { id: "inventory.filters", scope: "inventory", label: "Filters", description: "Opens the Filters panel of the inventory list.", keys: "Ctrl+Alt+KeyF" },
-    { id: "inventory.snapshots", scope: "inventory", label: "Pending snapshots", description: "Opens the photos from the app that wait for review.", keys: "Ctrl+Alt+KeyV" },
     { id: "inventory.approveDrafts", scope: "inventory", label: "Approve reviewed drafts", description: "Asks first, then approves the drafts you ticked as reviewed.", keys: "Ctrl+Alt+KeyA" },
     { id: "inventory.sort", scope: "inventory", label: "Sort", description: "Opens the sort choices of the inventory list.", keys: "", paletteOnly: true },
 

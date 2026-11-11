@@ -210,62 +210,21 @@ await cannot("a user reads the proposals", () => getDoc(doc(user(), "productIngr
 await can("an admin reads the proposals", () => getDoc(doc(adminDoc(), "productIngredientSuggestions/s1")));
 
 // ---------------------------------------------------------------------------------------------
-// 6. Photo snapshots staged for an admin (pending_products)
+// 6. Photo snapshots: removed on 11 November 2026 (photos are matched with the catalogue only). Nobody stages any more; an admin
+//    may still read and delete what is left; the old daily counters are closed.
 // ---------------------------------------------------------------------------------------------
-const staged = (uid, brand, name) => {
-    const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-    const key = `${slug(brand)}__${slug(name)}__${uid}`;
-    return { id: "snap_" + key, data: { name, brandName: brand, cosmeticType: "Foundation", shadeHex: "#E0B090", ingredients: ["Mica", "Talc"], key, status: "pending", source: "snapshot", isApproved: false,
-        hasImage: false, confidence: 0.8, model: "test", createdByUid: uid, createdAtUnix: now } };
-};
-{
-    const mine = staged("u1", "Newbrand", "Glow Tint");
-    await can("a user stages a product under their own id", () => setDoc(doc(user(), "pending_products/" + mine.id), mine.data));
-    await cannot("a user stages a product that is already approved", () => setDoc(doc(user(), "pending_products/" + mine.id), { ...mine.data, isApproved: true }));
-    await cannot("a user stages a product under someone else's id", () => setDoc(doc(other(), "pending_products/" + mine.id), mine.data));
-    await cannot("a user stages a hair product", () => { const s = staged("u1", "Newbrand", "Silk Shampoo"); return setDoc(doc(user(), "pending_products/" + s.id), { ...s.data, cosmeticType: "Shampoo" }); });
-    await cannot("a user stages a product whose id does not follow its names", () => setDoc(doc(user(), "pending_products/snap_wrong__name__u1"), { ...mine.data, key: "wrong__name__u1" }));
-    await cannot("nobody signed in stages a product", () => setDoc(doc(anon(), "pending_products/" + mine.id), mine.data));
-}
-await can("a user reads their own staged product", () => getDoc(doc(user(), "pending_products/snap_examplebrand__thing__u1")));
-await cannot("a user reads another user's staged product", () => getDoc(doc(user(), "pending_products/snap_examplebrand__thing__u2")));
-await can("a user asks for a staged product that does not exist (the answer is 'not found')", () => getDoc(doc(user(), "pending_products/snap_nobody__nothing__u1")));
-await cannot("a user lists the staged products", () => getDocs(query(collection(user(), "pending_products"))));
-await cannot("nobody signed in reads a staged product", () => getDoc(doc(anon(), "pending_products/snap_examplebrand__thing__u1")));
-await can("an admin reads any staged product", () => getDoc(doc(adminDoc(), "pending_products/snap_examplebrand__thing__u2")));
-await can("an admin lists the staged products", () => getDocs(query(collection(adminClaim(), "pending_products"))));
-await can("an admin approves a staged product", () => updateDoc(doc(adminDoc(), "pending_products/snap_examplebrand__thing__u1"), { isApproved: true }));
-await cannot("a user changes their staged product", () => updateDoc(doc(user(), "pending_products/snap_examplebrand__thing__u1"), { isApproved: true }));
-await cannot("a user deletes their staged product", () => deleteDoc(doc(user(), "pending_products/snap_examplebrand__thing__u1")));
-await can("a user reads their OWN staged photo", () => getDoc(doc(user(), "pending_product_images/snap_examplebrand__thing__u1")));
-await cannot("another user reads someone's staged photo", () => getDoc(doc(other(), "pending_product_images/snap_examplebrand__thing__u1")));
-await cannot("a user deletes their staged photo", () => deleteDoc(doc(user(), "pending_product_images/snap_examplebrand__thing__u1")));
-{
-    const withFields = staged("u1", "Ocrbrand", "Matte Ink");
-    const extra = { ocrText: "MAYBELLINE NEW YORK SUPERSTAY", ocrBrand: "Maybelline New York", ingredientsFrom: "page", ingredientSourceUrl: "https://www.maybelline.com/p", ingredientSourceKind: "official" };
-    await can("a staged product carries the reader's text and its list's page", () => setDoc(doc(user(), "pending_products/" + withFields.id), { ...withFields.data, ...extra }));
-    const bad = staged("u1", "Ocrbrand", "Matte Ink Two");
-    await cannot("a list page kind outside official / retailer / other", () => setDoc(doc(user(), "pending_products/" + bad.id), { ...bad.data, ...extra, ingredientSourceKind: "ai" }));
-    await cannot("a list page that is not https", () => setDoc(doc(user(), "pending_products/" + bad.id), { ...bad.data, ...extra, ingredientSourceUrl: "http://x.example/p" }));
-}
-await can("an admin reads a staged photo", () => getDoc(doc(adminDoc(), "pending_product_images/snap_examplebrand__thing__u1")));
-
-// ---------------------------------------------------------------------------------------------
-// 7. Daily limits of the photo function (snapshot_quota)
-// ---------------------------------------------------------------------------------------------
-const mineToday = `u1_${day}`;
-await can("a user starts today's counter at 1", () => setDoc(doc(user(), "snapshot_quota/" + mineToday), { uid: "u1", day, count: 1, lastAt: serverTimestamp() }));
-await cannot("a counter that starts at 2", () => setDoc(doc(user(), "snapshot_quota/" + mineToday), { uid: "u1", day, count: 2, lastAt: serverTimestamp() }));
-await cannot("a counter of another user", () => setDoc(doc(other(), "snapshot_quota/" + mineToday), { uid: "u1", day, count: 1, lastAt: serverTimestamp() }));
-await cannot("a counter for another day", () => setDoc(doc(user(), "snapshot_quota/u1_20200101"), { uid: "u1", day: "20200101", count: 1, lastAt: serverTimestamp() }));
-await cannot("the shared counter on its own (it must move together with the user's own)", () => setDoc(doc(other(), "snapshot_quota/all_" + day), { day, count: 1 }));
-await can("both counters in one commit", async () => {
-    const db = other(), batch = writeBatch(db);
-    batch.set(doc(db, "snapshot_quota/u2_" + day), { uid: "u2", day, count: 1, lastAt: serverTimestamp() });
-    batch.set(doc(db, "snapshot_quota/all_" + day), { day, count: 1 });
-    await batch.commit();
-});
-await cannot("listing the counters", () => getDocs(query(collection(user(), "snapshot_quota"))));
+await cannot("a user stages a product (the feature is gone)", () => setDoc(doc(user(), "pending_products/snap_newbrand__glow_tint__u1"),
+    { name: "Glow Tint", brandName: "Newbrand", cosmeticType: "Foundation", ingredients: [], key: "newbrand__glow_tint__u1", status: "pending", source: "snapshot", isApproved: false, hasImage: false, createdByUid: "u1", createdAtUnix: now }));
+await can("a user asks for their own old entry (the live scan's look-up)", () => getDoc(doc(user(), "pending_products/snap_examplebrand__thing__u1")));
+await can("a user asks for an entry that does not exist (the answer is 'not found')", () => getDoc(doc(user(), "pending_products/snap_nobody__nothing__u1")));
+await cannot("a user reads another user's old entry", () => getDoc(doc(user(), "pending_products/snap_examplebrand__thing__u2")));
+await cannot("a user changes their old entry", () => updateDoc(doc(user(), "pending_products/snap_examplebrand__thing__u1"), { isApproved: true }));
+await can("an admin lists the old entries", () => getDocs(query(collection(adminClaim(), "pending_products"))));
+await can("an admin reads an old photo", () => getDoc(doc(adminDoc(), "pending_product_images/snap_examplebrand__thing__u1")));
+await cannot("a user reads their old photo", () => getDoc(doc(user(), "pending_product_images/snap_examplebrand__thing__u1")));
+await cannot("a user writes a photo", () => setDoc(doc(user(), "pending_product_images/snap_examplebrand__thing__u1"), { createdByUid: "u1", jpegBase64: "AAAA", bytes: 3, createdAtUnix: 1 }));
+await cannot("a user starts a daily photo counter", () => setDoc(doc(user(), "snapshot_quota/u1_20261111"), { uid: "u1", day: "20261111", count: 1, lastAt: serverTimestamp() }));
+await can("an admin deletes an old entry", () => deleteDoc(doc(adminDoc(), "pending_products/snap_examplebrand__thing__u2")));
 
 // ---------------------------------------------------------------------------------------------
 // 8. The Archive (added 29 October 2026, ARCHIVE_DESIGN.md): admins only, created once, never changed

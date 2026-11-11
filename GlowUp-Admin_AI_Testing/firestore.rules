@@ -366,102 +366,20 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
-    // ---- AI photo snapshots: products the catalogue does not have, read by the AI from one photo -------------
-    // Staged here, NOT in "products", so unverified user content never mixes with the curated catalogue. Signed-in app users
-    // may read their OWN entry and create one: always pending, never approved, their own id, make-up only, short lists. Only an admin approves, edits or deletes.
-    // The id is made from the brand and the name ("snap_<brand>__<name>"), so the same product is ONE entry for everybody.
-    // Read: the sender's own entry, or an admin. The app only ever reads the entry whose id ends with the user's own id, so another user's
-    // entry (a product name and the sender's id) is no longer readable by every signed-in account. A document that does not exist may be
-    // asked for (resource == null), so the app still gets "not found" instead of an error.
+    // ---- AI photo snapshots: REMOVED on 11 November 2026 (the app matches photos with the catalogue only; no web search) --------
+    // Nobody creates these any more. The app still asks for its own entry by id (the live scan's look-up), and an admin may
+    // still read and delete what is left from before.
     match /pending_products/{pendingId} {
       allow get: if signedIn() && (resource == null || resource.data.createdByUid == request.auth.uid || isAdmin());
-      allow list: if isAdmin();
-      allow create: if signedIn()
-        && pendingId.matches('snap_.+') && pendingId.size() <= 110
-        && request.resource.data.key is string && request.resource.data.name is string && request.resource.data.brandName is string
-        && idFitsNames(pendingId, request.resource.data, request.auth.uid)
-        && request.resource.data.keys().hasOnly(['name', 'brandName', 'cosmeticType', 'shadeHex', 'ingredients', 'key', 'status', 'source',
-             'isApproved', 'hasImage', 'confidence', 'model', 'createdByUid', 'createdAtUnix', 'variant', 'size', 'sourceUrls',
-             'ocrText', 'ocrBrand', 'ingredientsFrom', 'ingredientSourceUrl', 'ingredientSourceKind',
-             'market', 'description', 'shadeCode', 'minimumAge', 'brandWebsite', 'brandLogoUrl', 'brandImageUrl', 'productPhotoUrl', 'productPageUrl',
-             'primarySourceUrl', 'primarySourceKind', 'secondarySourceUrl', 'thirdSourceUrl', 'thirdSourceKind'])
-        && request.resource.data.createdByUid == request.auth.uid
-        && request.resource.data.isApproved == false
-        && request.resource.data.status == 'pending'
-        && request.resource.data.source == 'snapshot'
-        && request.resource.data.name is string && request.resource.data.name.size() >= 1 && request.resource.data.name.size() <= 100
-        && request.resource.data.brandName is string && request.resource.data.brandName.size() <= 60
-        && request.resource.data.cosmeticType is string
-        && faceProduct(request.resource.data.cosmeticType, request.resource.data.name)
-        && request.resource.data.ingredients is list && request.resource.data.ingredients.size() <= 80
-        && (!('variant' in request.resource.data) || (request.resource.data.variant is string && request.resource.data.variant.size() <= 60))
-        && (!('size' in request.resource.data) || (request.resource.data['size'] is string && request.resource.data['size'].size() <= 40))
-        && (!('sourceUrls' in request.resource.data) || (request.resource.data.sourceUrls is list && request.resource.data.sourceUrls.size() <= 5
-             && httpsLink(request.resource.data.sourceUrls, 0) && httpsLink(request.resource.data.sourceUrls, 1) && httpsLink(request.resource.data.sourceUrls, 2)
-             && httpsLink(request.resource.data.sourceUrls, 3) && httpsLink(request.resource.data.sourceUrls, 4)))
-        // what the phone's own text reader found (cleaned, confident lines only), and where the ingredient list came from (7 November 2026)
-        && (!('ocrText' in request.resource.data) || (request.resource.data.ocrText is string && request.resource.data.ocrText.size() <= 1500))
-        && (!('ocrBrand' in request.resource.data) || (request.resource.data.ocrBrand is string && request.resource.data.ocrBrand.size() <= 60))
-        && (!('ingredientsFrom' in request.resource.data) || request.resource.data.ingredientsFrom in ['page', 'printed', 'none'])
-        && (!('ingredientSourceUrl' in request.resource.data) || (request.resource.data.ingredientSourceUrl is string
-             && (request.resource.data.ingredientSourceUrl == '' || (request.resource.data.ingredientSourceUrl.matches('https://.+') && request.resource.data.ingredientSourceUrl.size() <= 300))))
-        && (!('ingredientSourceKind' in request.resource.data) || request.resource.data.ingredientSourceKind in ['', 'official', 'retailer', 'other'])
-        // the web search result's facts (11 November 2026): short text, a small age, https links or "" (an admin checks every one)
-        && (!('market' in request.resource.data) || request.resource.data.market in ['', 'Global'])
-        && (!('description' in request.resource.data) || (request.resource.data.description is string && request.resource.data.description.size() <= 300))
-        && (!('shadeCode' in request.resource.data) || (request.resource.data.shadeCode is string && request.resource.data.shadeCode.size() <= 30))
-        && (!('minimumAge' in request.resource.data) || (request.resource.data.minimumAge is number && request.resource.data.minimumAge >= 0 && request.resource.data.minimumAge <= 18))
-        && linkOrEmpty(request.resource.data, 'brandWebsite') && linkOrEmpty(request.resource.data, 'brandLogoUrl') && linkOrEmpty(request.resource.data, 'brandImageUrl')
-        && linkOrEmpty(request.resource.data, 'productPhotoUrl') && linkOrEmpty(request.resource.data, 'productPageUrl')
-        && linkOrEmpty(request.resource.data, 'primarySourceUrl') && linkOrEmpty(request.resource.data, 'secondarySourceUrl') && linkOrEmpty(request.resource.data, 'thirdSourceUrl')
-        && (!('primarySourceKind' in request.resource.data) || request.resource.data.primarySourceKind in ['', 'official', 'unverified'])
-        && (!('thirdSourceKind' in request.resource.data) || request.resource.data.thirdSourceKind in ['', 'official', 'retailer', 'other'])
-        && request.resource.data.createdAtUnix is number;
-      allow update, delete: if isAdmin();
+      allow list, delete: if isAdmin();
+      allow create, update: if false;
     }
-
-    // Daily limits of the photo function (api/scan-snapshot.js). The function writes these with the USER'S OWN token, so it needs no
-    // service account. A counter can only go up by exactly 1, the day is the server's day, and the cool-down is checked here.
-    // Keep 5, 150 and 30 equal to PER_UID_DAILY, GLOBAL_DAILY and COOLDOWN_SECONDS in that file.
-    //   <uid>_<day>  one account: count (at most 5), lastAt (at least 30 s after the previous one), uid, day
-    //   all_<day>    everybody: count (at most 150); only accepted in the same commit that moves the caller's own counter
     match /snapshot_quota/{quotaId} {
-      allow get: if signedIn() && quotaId == request.auth.uid + '_' + dayStamp(request.time);
-      allow list, delete: if false;
-      allow create, update: if signedIn() && (
-        (quotaId == request.auth.uid + '_' + dayStamp(request.time)
-          && request.resource.data.keys().hasOnly(['uid', 'day', 'count', 'lastAt'])
-          && request.resource.data.uid == request.auth.uid
-          && request.resource.data.day == dayStamp(request.time)
-          && request.resource.data.count == (resource == null ? 1 : resource.data.count + 1)
-          && request.resource.data.count <= 5
-          && request.resource.data.lastAt == request.time
-          && (resource == null || request.time >= resource.data.lastAt + duration.value(30, 's')))
-        || (quotaId == 'all_' + dayStamp(request.time)
-          && request.resource.data.keys().hasOnly(['day', 'count'])
-          && request.resource.data.day == dayStamp(request.time)
-          && request.resource.data.count == (resource == null ? 1 : resource.data.count + 1)
-          && request.resource.data.count <= 150
-          && getAfter(/databases/$(database)/documents/snapshot_quota/$(request.auth.uid + '_' + dayStamp(request.time))).data.lastAt == request.time));
+      allow read, write: if false;
     }
-
-    // The photo of a snapshot, in its own document so phones never download it: admins read it next to the AI's reading, and the
-    // person who sent it may read their own photo (7 November 2026). Only the crop around the product is ever sent (the app cuts it).
-    // It can only be created for an entry that exists (or is written in the same batch) and is the caller's own, with hasImage = true.
-    // About 80 KB as a JPG, at most 120,000 characters of base64. Deleted when the entry is approved or rejected.
     match /pending_product_images/{pendingId} {
-      allow read: if isAdmin() || (signedIn() && resource.data.createdByUid == request.auth.uid);
-      allow delete: if isAdmin();
-      allow create: if signedIn()
-        && pendingId.matches('snap_.+') && pendingId.size() <= 110
-        && request.resource.data.keys().hasOnly(['jpegBase64', 'bytes', 'createdByUid', 'createdAtUnix'])
-        && request.resource.data.createdByUid == request.auth.uid
-        && existsAfter(/databases/$(database)/documents/pending_products/$(pendingId))
-        && getAfter(/databases/$(database)/documents/pending_products/$(pendingId)).data.createdByUid == request.auth.uid
-        && getAfter(/databases/$(database)/documents/pending_products/$(pendingId)).data.hasImage == true
-        && request.resource.data.jpegBase64 is string && request.resource.data.jpegBase64.size() <= 120000
-        && request.resource.data.createdAtUnix is number;
-      allow update: if false;
+      allow read, delete: if isAdmin();
+      allow create, update: if false;
     }
 
     // ---- the editable lists (allergen families, highlights, skin conditions): ONE document, config/lists ----

@@ -58,7 +58,6 @@ import { setPageSettings } from "../_Shared/adminSettingsMenu.js";
 import { mountSourceEditor, openApplyWindow } from "./productSources.js";
 import { wireWindow } from "../_Shared/adminWindow.js";
 import { applyRole, brandPageOf, groupByType, bulkAllowed } from "../_Shared/sourceEdit.js";
-import { countPending, openSnapshotReview, finishSnapshot, APPROVED_DESCRIPTION } from "../_Shared/adminSnapshots.js";
 import { gs1Hint, VERIFIED_BY_GS1 } from "../_Shared/gs1Hint.js";
 
 const OTHER_TYPE = "__other__";
@@ -108,7 +107,6 @@ let binProducts = [];
 let curatedKeys = new Set();                // every name / technical name / alias in the Ingredient Curator
 let curatedList = [];                       // the same ingredients with their ids, for the picker of the product form: [{ id, name, techName, aliases }]
 let ingredientPicker = null;                // the picker of the product form (adminIngredientPicker.js)
-let snapshotsWaiting = null;                // products app users sent as a photo, waiting for review (null = not counted yet)
 let curatorKnown = false;
 let editingBrandId = null;
 let editingProductId = null;
@@ -234,7 +232,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     ]));
     // keyboard shortcuts (shortcuts.js): the same handlers and the same conditions as the buttons and the Add menu
     bindButtons({ "inventory.new": "#addMenuBtn", "inventory.import": "#chooseInventoryFileBtn", "inventory.filters": "#filterMenuBtn",
-        "inventory.snapshots": "#snapshotReviewBtn", "inventory.approveDrafts": "#inventoryApproveAllBtn", "inventory.sort": "#sortMenuBtn" });
+        "inventory.approveDrafts": "#inventoryApproveAllBtn", "inventory.sort": "#sortMenuBtn" });
     bindActions({
         "inventory.addBrand": { run: () => openBrandForm(null) },
         "inventory.addProduct": { run: () => openProductForm(null, brandFilterValue()), isAvailable: () => (brands.length === 0 ? "Add product: add a brand first. A product needs a listed brand." : true) }
@@ -356,12 +354,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     onListsRefreshed(() => { if (!dialogIsOpen()) loadInventory(); });
     const firstLoad = loadInventory();
 
-    // Pending snapshot reviews: one count for the badge now; the snapshots themselves only when the window is opened
-    el("snapshotReviewBtn").addEventListener("click", openSnapshots);
-    countPending().then((n) => { snapshotsWaiting = n; paintSnapshotCount(); })
-        .catch((error) => { console.warn("Could not count the pending snapshots:", error); snapshotsWaiting = null; paintSnapshotCount(true); });
-    // the Dashboard's tile opens this page with ?snapshots=open: the window opens once the lists are here
-    if (new URLSearchParams(location.search).get("snapshots") === "open") firstLoad.then(openSnapshots);
     // the Dashboard's "Add product" opens this page with ?add=product: the empty product form opens once the brands are here
     if (new URLSearchParams(location.search).get("add") === "product") firstLoad.then(() => openProductForm(null));
 });
@@ -1322,83 +1314,6 @@ let lastFocus = "|";
 
 const pickBox = (label) => `<button type="button" class="pick" role="checkbox" aria-checked="false" aria-label="Select ${escapeHtml(label)}"></button>`;
 const pickAllBox = (what) => `<button type="button" class="pick" data-pick-all role="checkbox" aria-checked="false" aria-label="Select all shown" data-tip="Select every ${what} shown here."></button>`;
-
-// ----- pending snapshot reviews -----
-/** The badge on the Pending Snapshot Reviews button. */
-function paintSnapshotCount(failed) {
-    const count = el("snapshotCount"), hint = el("snapshotReviewHint");
-    count.classList.remove("skeleton");
-    count.textContent = failed ? "–" : String(snapshotsWaiting || 0);
-    el("snapshotReviewBtn").classList.toggle("has-waiting", (snapshotsWaiting || 0) > 0);
-    hint.textContent = failed ? "The count could not be read. Open it to look anyway."
-        : snapshotsWaiting > 0 ? `${many(snapshotsWaiting, "snapshot waits", "snapshots wait")}. One at a time: the photo next to what the AI read.`
-        : "Nothing is waiting. New photos from the app arrive here.";
-}
-
-/** The lists the review window works with: the ones this page already holds (no extra read). */
-const snapshotContext = () => ({
-    brands: everyBrand.map((b) => ({ id: b.id, name: b.name, aliases: b.aliases, binned: b.binned === true })),
-    products: everyProduct.map((p) => ({ id: p.id, brandId: p.brandId, name: p.name, aliases: p.aliases, ingredients: p.ingredients, binned: p.binned === true })),
-    library: curatedList
-});
-let snapshotInForm = null;            // { entry } while the Add Product form is open on a snapshot's values
-
-/** Opens the review window over this page. */
-function openSnapshots() {
-    openSnapshotReview({
-        context: snapshotContext,
-        onOpenForm: openSnapshotInForm,
-        onLoaded: (n) => { if (snapshotsWaiting === null || n > snapshotsWaiting) { snapshotsWaiting = n; paintSnapshotCount(); } },
-        onProcessed: () => { snapshotsWaiting = Math.max(0, (snapshotsWaiting || 1) - 1); paintSnapshotCount(); },
-        onClose: async (approved) => { if (approved > 0) await loadInventory(); }
-    });
-}
-
-/**
- * "Open in Add Product form": the brand is added first when it is new (after a question), then the SAME form as for a product added by
- * hand opens with the snapshot's values in it. Saving the form saves the product and closes the snapshot (see saveProduct).
- */
-async function openSnapshotInForm(entry, v) {
-    const key = compactName(v.brand);
-    let brand = key ? everyBrand.find((b) => !b.binned && [b.name, ...b.aliases].some((n) => compactName(n) === key)) : null;
-    if (!brand) {
-        if (!(await sure(`"${v.brand}" is not a brand in the inventory yet.\n\nAdd it as an Active brand and open the product form?`, "Add brand", false))) return;
-        try {
-            const created = await addDoc(collection(db, "brands"), {
-                name: v.brand, category: "Makeup", market: "Global", status: "Active", scans: 0, source: "snapshot", reviewed: true,
-                reviewedAt: serverTimestamp(), createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-            });
-            await loadInventory();
-            brand = everyBrand.find((b) => b.id === created.id) || null;
-        } catch (error) {
-            console.error("Error adding the brand of a snapshot: ", error);
-            notify("The brand was not added. " + describeError(error), "error");
-            return;
-        }
-        if (!brand) { notify("The brand was added, but the list did not show it yet. Reload the page and open the snapshot again.", "error"); return; }
-    }
-    if (brand.binned) { notify(`The brand "${brand.name}" is in the Recycle bin. Restore it first.`, "error"); return; }
-    openProductForm(null, brand.id);
-    el("productNameInput").value = v.name;
-    const known = COSMETIC_TYPES.find((t) => sameKey(t) === sameKey(v.kind));
-    el("productTypeInput").value = known ? known : OTHER_TYPE;
-    el("productTypeOtherInput").value = known ? "" : v.kind;
-    el("productDescInput").value = v.description || APPROVED_DESCRIPTION;
-    el("productIngredientsInput").value = v.ingredients.join(", ");
-    // the app's web search (11 November 2026): photo link, minimum age, FDA number, status, shade code and the three sources, all to check
-    el("productImageInput").value = v.productPhotoUrl || "";
-    el("productMinAgeInput").value = v.minimumAge > 0 ? v.minimumAge : "";
-    el("productFdaInput").value = v.fdaNumber || "";
-    if (v.productStatus) el("productStatusInput").value = v.productStatus;
-    formShades = v.shade ? [v.shade] : [];
-    formShadeCodes = formShades.length && v.shadeCode ? [v.shadeCode.toUpperCase().slice(0, 16)] : formShades.map(() => "");
-    if (Array.isArray(v.sources) && v.sources.length) { assistedProductSources = v.sources.slice(0, 10); sourceEditor.paint(); }
-    showOtherTypeBox(); showIngredientSummary(); renderShadeEditor();
-    const note = el("productAiNote");
-    note.textContent = "From an app user's photo. Pending approval, unverified, AI-generated: compare every field with the packaging before you save.";
-    note.hidden = false;
-    snapshotInForm = { entry };
-}
 
 /** Under this width the list is drawn as cards whatever the switch says (the table needs about 640 px). */
 const NARROW_LIST_PX = 600;
@@ -2499,7 +2414,6 @@ function openProductForm(product, brandId) {
     el("productAiNote").hidden = true;
     el("productAiNote").textContent = "";
     editingProductId = product ? product.id : null;
-    snapshotInForm = null;
     assistedProductSources = product ? product.sources.slice() : [];
     el("productModalTitle").textContent = product ? "Edit Product" : "Add Product";
 
@@ -2845,18 +2759,6 @@ async function saveProduct(event) {
             const folder = org.view.kind === "folder" ? org.view.name : "";          // added while a folder is open: it goes into that folder
             const made = await addDoc(collection(db, "products"), { ...data, scans: 0, folder, createdAt: serverTimestamp() });
             notify(folder ? `Product added to "${folder}".` : "Product added.", "ok");
-            if (snapshotInForm) {
-                const waiting = snapshotInForm.entry;
-                snapshotInForm = null;
-                try {
-                    await finishSnapshot(waiting, made.id, { brand: brand.name, name, kind: cosmeticType, shade: shades[0] || "", ingredients }, snapshotContext());
-                    snapshotsWaiting = Math.max(0, (snapshotsWaiting || 1) - 1);
-                    paintSnapshotCount();
-                } catch (failure) {
-                    console.error("Closing the snapshot failed: ", failure);
-                    notify("The product was saved, but its snapshot was not closed. Open Pending Snapshot Reviews and reject it. " + describeError(failure), "error");
-                }
-            }
         }
         productModal.close();
         await loadInventory();
