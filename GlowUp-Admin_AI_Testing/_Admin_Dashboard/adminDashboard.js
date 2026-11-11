@@ -20,7 +20,7 @@ import {
 } from "../_Shared/adminCommon.js";
 import { mountShell, paginate, renderPager, icon, askConfirm } from "../_Shared/adminShell.js";
 import { bindButtons } from "../_Shared/shortcuts.js";
-import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
+import { registerDataset, registerTileDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
 import { setPanelQuiet, setPanelSummary } from "../_Shared/adminFold.js";
 import { openAuditLog } from "../_Shared/adminAuditLog.js";
@@ -32,9 +32,9 @@ const suggestionPage = { page: 1, size: PAGE_SIZE };
 // the support reports are shown in one panel for each kind (12 November 2026); an unknown kind goes with "Other". `prefix` names the panel's parts
 // (<prefix>List, <prefix>Pager, <prefix>Empty, <prefix>ClearAll ...); the Bug panel keeps the old id "support".
 const SUPPORT_KINDS = [
-    { prefix: "support", category: "Bug", title: "bug reports", none: "No new bug reports.", page: { page: 1, size: PAGE_SIZE } },
-    { prefix: "supportWrong", category: "Wrong scan result", title: "wrong scan results", none: "No new wrong scan results.", page: { page: 1, size: PAGE_SIZE } },
-    { prefix: "supportOther", category: "Other", title: "other reports", none: "No new reports.", page: { page: 1, size: PAGE_SIZE } }
+    { prefix: "support", dataset: "supportBug", label: "Bug reports", category: "Bug", title: "bug reports", none: "No new bug reports.", page: { page: 1, size: PAGE_SIZE } },
+    { prefix: "supportWrong", dataset: "supportWrong", label: "Wrong scan results", category: "Wrong scan result", title: "wrong scan results", none: "No new wrong scan results.", page: { page: 1, size: PAGE_SIZE } },
+    { prefix: "supportOther", dataset: "supportOther", label: "Other reports", category: "Other", title: "other reports", none: "No new reports.", page: { page: 1, size: PAGE_SIZE } }
 ];
 const kindOf = (category) => (SUPPORT_KINDS.find((k) => k.category === category) || SUPPORT_KINDS[2]);
 let supportReports = [];              // [{ id, category, message, uid, appVersion, device, createdAtUnix, lastScan }]
@@ -416,7 +416,7 @@ function renderSuggestions() {
             <div class="suggestion-main">
                 <span class="suggestion-text">${escapeHtml(s.text || "(empty)")}</span>
                 <span class="chip ${s.kind === "Allergen" ? "warn" : s.kind === "App suggestion" ? "good" : "pink"}">${escapeHtml(s.kind)}</span>
-                <span class="small muted">${escapeHtml(formatWhen(s.createdAtUnix))} · ${escapeHtml(timeAgo(s.createdAtUnix))}</span>
+                <span class="small muted">${s.from ? "<b>" + escapeHtml(s.from) + "</b> · " : ""}${escapeHtml(formatWhen(s.createdAtUnix))} · ${escapeHtml(timeAgo(s.createdAtUnix))}</span>
                 ${lastScanDetails(s.lastScan)}
             </div>
             <div class="suggestion-actions btn-group">
@@ -462,11 +462,11 @@ async function loadSupportReports() {
             const lastScan = data.lastScan && typeof data.lastScan === "object" ? data.lastScan : null;
             if (String(data.category || "") === "Suggestion") {
                 // the app's Suggestion kind belongs in the Suggestions panel (for review), not among the support reports
-                appSuggestions.push({ id: d.id, collection: "supportReports", kind: "App suggestion", text: String(data.message || ""), createdAtUnix: toWholeNumber(data.createdAtUnix), lastScan });
+                appSuggestions.push({ id: d.id, collection: "supportReports", kind: "App suggestion", text: String(data.message || ""), createdAtUnix: toWholeNumber(data.createdAtUnix), lastScan, from: String(data.userName || "").trim() || "account " + String(data.uid || "").slice(0, 8) });
                 return;
             }
             supportReports.push({
-                id: d.id, category: String(data.category || "Other"), message: String(data.message || ""), uid: String(data.uid || ""),
+                id: d.id, category: String(data.category || "Other"), message: String(data.message || ""), uid: String(data.uid || ""), userName: String(data.userName || "").trim(),
                 appVersion: String(data.appVersion || ""), device: String(data.device || ""), createdAtUnix: toWholeNumber(data.createdAtUnix),
                 lastScan
             });
@@ -489,6 +489,7 @@ function renderSupportReports() {
 
 function renderSupportKind(kind) {
     const mine = supportReports.filter((r) => kindOf(r.category) === kind);
+    datasetChanged(kind.dataset);
     el(kind.prefix + "ClearAll").hidden = mine.length === 0;
     setPanelQuiet(kind.prefix, mine.length === 0, mine.length === 0 ? "No new reports" : many(mine.length, "new report", "new reports"));
     if (mine.length === 0) { showEmpty(kind.prefix, kind.none, false); return; }
@@ -503,7 +504,7 @@ function renderSupportKind(kind) {
         return `<li class="suggestion-item support-item">
             <div class="suggestion-main">
                 <span class="chip ${tone(r.category)}">${escapeHtml(r.category)}</span>
-                <span class="small muted">${escapeHtml(formatWhen(r.createdAtUnix))} · ${escapeHtml(timeAgo(r.createdAtUnix))} · account ${escapeHtml(r.uid.slice(0, 8))}${r.appVersion ? " · app " + escapeHtml(r.appVersion) : ""}</span>
+                <span class="small muted">${escapeHtml(formatWhen(r.createdAtUnix))} · ${escapeHtml(timeAgo(r.createdAtUnix))} · ${r.userName ? "<b>" + escapeHtml(r.userName) + "</b>" : "account " + escapeHtml(r.uid.slice(0, 8))}${r.appVersion ? " · app " + escapeHtml(r.appVersion) : ""}</span>
                 <p class="support-message">${escapeHtml(r.message)}</p>
                 ${scan}
             </div>
@@ -719,6 +720,38 @@ function registerData() {
                 notify(`${rows.length} suggestion${rows.length === 1 ? "" : "s"} dismissed.`, "ok");
             } catch (error) { throw new Error(describeError(error)); }
         }
+    });
+
+    // the three kinds of support report, each a data set of its own, so each panel has "Show as" (12 November 2026)
+    SUPPORT_KINDS.forEach((kind) => registerDataset(kind.dataset, {
+        label: kind.label, noun: kind.title, nounOne: kind.title.replace(/s$/, ""),
+        items: () => supportReports.filter((r) => kindOf(r.category) === kind),
+        map: (r) => ({ id: r.id, title: r.message || "(empty)", subtitle: r.userName || "account " + r.uid.slice(0, 8), meta: timeAgo(r.createdAtUnix), tone: r.category === "Bug" ? "bad" : r.category === "Wrong scan result" ? "warn" : "pink" }),
+        dimensions: [
+            { id: "who", label: "Sender", of: (r) => r.userName || "account " + r.uid.slice(0, 8) },
+            { id: "version", label: "App version", of: (r) => r.appVersion || null, none: "Unknown" }
+        ],
+        removedWord: "dismissed", foreverLabel: "Dismiss for good", removeNote: "They leave this list for everyone who uses the admin site.",
+        remove: async (rows) => {
+            try {
+                await dismissAll(rows.map((r) => ({ id: r.id, collection: "supportReports" })), () => ({ status: "dismissed", handledAt: serverTimestamp() }));
+                supportReports = supportReports.filter((r) => !rows.includes(r));
+                renderSupportReports();
+                notify(`${rows.length} ${rows.length === 1 ? kind.title.replace(/s$/, "") : kind.title} dismissed.`, "ok");
+            } catch (error) { throw new Error(describeError(error)); }
+        }
+    }));
+
+    // the number tiles and the shortcut tiles (read from the page's own tiles)
+    registerTileDataset("numbers", {
+        label: "Numbers", noun: "numbers", nounOne: "number", valueNoun: "Number", selector: ".kpi-row .kpi", watch: ".kpi-row",
+        map: (tile) => ({ title: (tile.querySelector(".kpi-title") || {}).textContent || "", value: parseFloat(((tile.querySelector(".kpi-value") || {}).textContent || "0").replace(/[^\d.]/g, "")) || 0, valueLabel: "", tone: "info" }),
+        open: (tile) => tile.click()
+    });
+    registerTileDataset("quickActions", {
+        label: "Quick actions", noun: "shortcuts", nounOne: "shortcut", selector: ".tile-stack a.tile, .tile-stack button.tile", watch: ".tile-stack",
+        map: (tile) => ({ title: tile.getAttribute("data-tip-title") || tile.textContent.trim(), subtitle: tile.classList.contains("review") ? "waiting for review" : "", value: 1, tone: tile.classList.contains("review") ? "info" : "muted" }),
+        open: (tile) => tile.click()
     });
 
     registerDataset("topBrands", {

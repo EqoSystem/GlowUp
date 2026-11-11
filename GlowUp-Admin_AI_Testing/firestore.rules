@@ -359,10 +359,11 @@ service cloud.firestore {
     // kinds). Nobody but an admin may read, change or delete a report. "lastScan" is there only when the user switched it on.
     match /supportReports/{reportId} {
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['uid', 'category', 'message', 'status', 'appVersion', 'device', 'createdAtUnix', 'createdAt', 'lastScan'])
+        && request.resource.data.keys().hasOnly(['uid', 'userName', 'category', 'message', 'status', 'appVersion', 'device', 'createdAtUnix', 'createdAt', 'lastScan'])
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.status == 'new'
         && request.resource.data.category in ['Bug', 'Wrong scan result', 'Suggestion', 'Other']     // Suggestion: 11 November 2026 (app Settings > Contact support)
+        && request.resource.data.get('userName', '') is string && request.resource.data.get('userName', '').size() <= 100
         && request.resource.data.message is string
         && request.resource.data.message.size() >= 3
         && request.resource.data.message.size() <= 2000

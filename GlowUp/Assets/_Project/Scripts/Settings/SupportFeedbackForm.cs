@@ -59,7 +59,7 @@ namespace GlowUp.AppSettings
         [Tooltip("The Send button's words for a moment after a report was sent")]
         [SerializeField] private string msgSentButton = "Sent ✓";
         [Tooltip("How long the form shows that the report was sent before it closes (seconds)")]
-        [Min(0f)] [SerializeField] private float sentShowSeconds = 1.6f;
+        [Min(0f)] [SerializeField] private float sentShowSeconds = 2.4f;
         [SerializeField] private string tipsTitle = "Tips";
 
         bool sending;
@@ -128,6 +128,7 @@ namespace GlowUp.AppSettings
             var report = new Dictionary<string, object>
             {
                 { "uid", user.UserId },
+                { "userName", WhoSent(user) },                  // the sender's first and last name, so the team sees a person, not an id (12 November 2026)
                 { "category", category },
                 { "message", message },
                 { "status", "new" },
@@ -149,8 +150,8 @@ namespace GlowUp.AppSettings
                 if (messageInput != null) messageInput.text = "";
                 // 12 November 2026: the user SEES it was sent, in the form itself (the button and the line above it), before the form closes
                 if (sendLabel != null) sendLabel.text = msgSentButton;
-                if (tips != null) { tips.gameObject.SetActive(true); tips.text = "<b><color=#3E8E5A>" + StatusMessage.Plain(msgSent) + "</color></b>"; }
-                Toast()?.Show(FormalToast.Kind.Success, msgSent);
+                // a toast BELOW, low on the screen (the owner, 12 November 2026), not the top one
+                ScreenNotice.On(transform, sendLabel != null ? sendLabel : tips)?.ShowBottom(msgSent);
                 await Task.Delay(Mathf.RoundToInt(sentShowSeconds * 1000f));
                 if (this == null) return;
                 if (categoryTabs != null) categoryTabs.Select(0, true);             // the form is reset for the next report (the tips come back)
@@ -171,6 +172,15 @@ namespace GlowUp.AppSettings
                     if (sendLabel != null) sendLabel.text = "Send Report";
                 }
             }
+        }
+
+        /// <summary>First and last name from the saved profile (the Google name, then "" when there is none). At most 100 characters.</summary>
+        static string WhoSent(FirebaseUser user)
+        {
+            UserProfileData profile = UserProfileRepository.Current;
+            string name = profile != null ? ((profile.firstName ?? "").Trim() + " " + (profile.lastName ?? "").Trim()).Trim() : "";
+            if (name.Length == 0 && user != null) name = (user.DisplayName ?? "").Trim();
+            return name.Length > 100 ? name.Substring(0, 100) : name;
         }
 
         /// <summary>The last scan, only while "Include my last scan" is on; null otherwise.</summary>

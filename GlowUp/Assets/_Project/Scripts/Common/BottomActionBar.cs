@@ -50,8 +50,9 @@ namespace GlowUp.Common
         {
             if (this == null || !isActiveAndEnabled) return;
             if (pill != null) pill.Release();
-            FormalToast toast = FormalToast.OnScreen(transform, GetComponentInChildren<TMPro.TMP_Text>(true));
-            if (toast != null) toast.Show(FormalToast.Kind.Info, TryOnGate.Message, "Scan now", () => Open(scanScene, 1));
+            // big and in the middle of the screen, always on screen for at least 1.5 seconds (the owner, 12 November 2026)
+            ScreenNotice notice = ScreenNotice.On(transform, GetComponentInChildren<TMPro.TMP_Text>(true));
+            if (notice != null) notice.ShowCentre(TryOnGate.Message, "Scan now", () => Open(scanScene, 1));
         }
 
         /// <summary>

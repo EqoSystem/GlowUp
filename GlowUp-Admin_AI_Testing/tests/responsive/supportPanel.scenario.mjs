@@ -27,6 +27,8 @@ try {
         ok(/No new bug reports/.test(await page.textContent("[data-panel=support]")), `${width}px: marking it handled empties the Bug list`);
         // one panel for each kind (12 November 2026): Wrong scan results and Other reports have their own panels
         ok(/the scan said harmful/.test(await page.textContent("#supportWrongList")), `${width}px: the wrong scan result is in its own panel`);
+        ok(/Mark Azcueta/.test(await page.textContent("#supportWrongList")) && !/user3abc/.test(await page.textContent("#supportWrongList")), `${width}px: the report shows the sender's name, not the account id`);
+        ok(/user1abc/.test(await page.textContent("#supportList")), `${width}px: an older report without a name still shows its account`);
         ok(/how do I change my email/.test(await page.textContent("#supportOtherList")), `${width}px: the other report is in its own panel`);
         ok(!/how do I change/.test(await page.textContent("#supportList")), `${width}px: kinds are not mixed`);
         ok(await page.evaluate(() => ["support", "supportWrong", "supportOther"].every((id) => document.querySelector(`[data-panel=${id}] .panel-fold-btn`) && document.getElementById(id + "ClearAll"))), `${width}px: each panel has its fold arrow and Clear all`);

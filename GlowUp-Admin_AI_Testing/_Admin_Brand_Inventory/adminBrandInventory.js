@@ -42,7 +42,7 @@ import { matchesSearch, compactName, barcodeKey } from "../_Shared/glowupRules.j
 import { productVisibility, cleanupPlan, productDuplicates, brandDuplicates, mergeProducts, mergeBrands, nameWithoutBrand } from "../_Shared/glowupCatalog.js";
 import { openPlanDialog, openDuplicatesDialog } from "../_Shared/adminCleanup.js";
 import { mountShell, placeInHeader, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
-import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
+import { registerDataset, registerTileDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
 import { readAdminDocument, splitForAi } from "../_Shared/adminDocumentReader.js";
@@ -434,6 +434,7 @@ const madeAt = (data) => { const made = toDate(data.createdAt); return made ? Ma
 const binFields = (data) => { const since = toDate(data.binnedAt); return { binned: data.binned === true, binnedAt: since ? since.getTime() : 0, statusBeforeBin: String(data.statusBeforeBin || ""), binnedWith: String(data.binnedWith || ""), binnedReason: String(data.binnedReason || "") }; };
 
 function renderIngredientSuggestions() {
+    datasetChanged("ingredientSuggestions");
     const panel = el("ingredientSuggestionsPanel");
     const list = el("ingredientSuggestionsList");
     const items = ingredientSuggestions.slice().sort((a, b) => a.productName.localeCompare(b.productName, undefined, { sensitivity: "base" }));
@@ -3013,6 +3014,20 @@ function registerData() {
         el("brandFilterSelect").value = brand ? brand.id : "";
         if (org.view.kind === "bin") org.show({ kind: "all" }); else fromFirstPage();
     };
+
+    // "Show as" for the counts panel and the AI ingredient suggestions (12 November 2026)
+    registerTileDataset("inventoryCounts", {
+        label: "Counts", noun: "counts", nounOne: "count", valueNoun: "Number", selector: ".stat-row .stat", watch: ".stat-row",
+        map: (tile) => ({ title: ((tile.querySelector(".stat-title") || {}).textContent || tile.getAttribute("data-tip-title") || "").trim(), value: parseFloat(((tile.querySelector(".stat-value") || {}).textContent || "0").replace(/[^\d.]/g, "")) || 0, tone: "info" }),
+        open: (tile) => tile.click()
+    });
+    registerDataset("ingredientSuggestions", {
+        label: "AI ingredient suggestions", noun: "suggestions", nounOne: "suggestion",
+        items: () => ingredientSuggestions,
+        map: (s) => ({ id: s.id, title: s.productName || "Unnamed product", subtitle: s.brandName, meta: many(s.ingredients.length, "ingredient", "ingredients"), tone: "pink" }),
+        dimensions: [{ id: "brand", label: "Brand", of: (s) => s.brandName || null, none: "No brand" }],
+        measures: [{ id: "ingredients", label: "Ingredients found", noun: "ingredients", of: (s) => s.ingredients.length }]
+    });
 
     registerDataset("products", {
         label: "Products", noun: "products", nounOne: "product",

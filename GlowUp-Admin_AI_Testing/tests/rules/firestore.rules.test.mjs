@@ -307,6 +307,8 @@ await can("the owner still updates the profile on an old sign-in", () => setDoc(
 await can("the owner deletes a scan (Recent Scans: Delete forever)", () => deleteDoc(doc(stale(), "users/u1/scans/s1")));
 // support reports from the app (Settings > Contact support); "Suggestion" added 11 November 2026
 const report = (category) => ({ uid: "u1", category, message: "Please add a shade finder", status: "new", appVersion: "1.0", device: "Pixel", createdAtUnix: now });
+await can("a report carries the sender's name", () => setDoc(doc(user(), "supportReports/r5"), Object.assign(report("Bug"), { userName: "Mark Azcueta" })));
+await cannot("a report with a name that is not text", () => setDoc(doc(user(), "supportReports/r6"), Object.assign(report("Bug"), { userName: 12 })));
 await can("a user sends a Suggestion report", () => setDoc(doc(user(), "supportReports/r1"), report("Suggestion")));
 await can("a user sends a Bug report", () => setDoc(doc(user(), "supportReports/r2"), report("Bug")));
 await cannot("a user sends a report of an unknown kind", () => setDoc(doc(user(), "supportReports/r3"), report("Spam")));

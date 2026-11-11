@@ -43,7 +43,7 @@ import { startImport } from "../_Shared/importReview.js";
 import { parseImportText, inventoryNotHere } from "../_Shared/importFormat.js";
 import { loadLists, optionsOf, allOptions, openListManager, listsNow } from "../_Shared/adminLists.js";
 import { BUILT_IN_HIGHLIGHTS } from "../_Shared/listRules.js";
-import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
+import { registerDataset, registerTileDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
 import { setPageSettings } from "../_Shared/adminSettingsMenu.js";
@@ -1913,6 +1913,11 @@ function registerHelpers() {
 // The data this page offers to data panels (lists, rows, grids and graphs; see adminWidgets.js)
 // ---------------------------------------------------------------------------------------------
 function registerData() {
+    registerTileDataset("curatorCounts", {
+        label: "Counts", noun: "counts", nounOne: "count", valueNoun: "Number", selector: "#curatorStats .stat", watch: "#curatorStats",
+        map: (tile) => ({ title: ((tile.querySelector(".stat-title") || {}).textContent || "").trim(), value: parseFloat(((tile.querySelector(".stat-value") || {}).textContent || "0").replace(/[^\d.]/g, "")) || 0, tone: "info" }),
+        open: (tile) => tile.click()
+    });
     registerDataset("ingredients", {
         label: "Ingredients", noun: "ingredients", nounOne: "ingredient",
         items: () => ingredients,

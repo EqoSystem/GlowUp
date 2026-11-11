@@ -45,7 +45,7 @@
         <div class="board">
 
             <!-- the five numbers -->
-            <section class="panel bare" data-panel="numbers" data-label="Numbers" data-w="8">
+            <section class="panel bare" data-panel="numbers" data-label="Numbers" data-w="8" data-source="numbers">
                 <div class="kpi-row">
                     <!-- one tile = one number: its icon, the number and ONE label side by side. What a tile does on a click, and
                          what its number means, is in the tip of the tile itself (no extra badges). -->
@@ -73,7 +73,7 @@
             </section>
 
             <!-- what to do next -->
-            <section class="panel" data-panel="actions" data-label="Quick actions" data-w="4">
+            <section class="panel" data-panel="actions" data-label="Quick actions" data-w="4" data-source="quickActions">
                 <div class="panel-head">
                     <h3 class="panel-title">Quick actions</h3>
                     <button type="button" class="guide-badge" data-tip-title="Quick actions" data-tip="Shortcuts to tasks: what waits for review (a blue tile, only when something waits), adding, cleaning up and the Recycle bin. The pages themselves are in the menu on the left.">i</button>
@@ -160,7 +160,7 @@
 
             <!-- Contact support (12 November 2026): reports sent from the app's Settings > Contact support (Firestore "supportReports"), one panel for each kind.
                  "Suggestion" reports are in the Suggestions panel above. The id "support" is kept for the Bug panel, so saved layouts still find it. -->
-            <section class="panel" data-panel="support" data-label="Bug reports" data-w="8">
+            <section class="panel" data-panel="support" data-label="Bug reports" data-w="8" data-source="supportBug">
                 <div class="panel-head">
                     <h3 class="panel-title">Bug reports</h3>
                     <button type="button" class="guide-badge" data-tip-title="Bug reports" data-tip="Bugs that users reported from the app's Contact support." data-tip-preview="Mark one handled when you dealt with it, or dismiss it.">i</button>
@@ -175,7 +175,7 @@
                 </div>
             </section>
 
-            <section class="panel" data-panel="supportWrong" data-label="Wrong scan results" data-w="8">
+            <section class="panel" data-panel="supportWrong" data-label="Wrong scan results" data-w="8" data-source="supportWrong">
                 <div class="panel-head">
                     <h3 class="panel-title">Wrong scan results</h3>
                     <button type="button" class="guide-badge" data-tip-title="Wrong scan results" data-tip="Scan results that users said were wrong, with their last scan when they attached it." data-tip-preview="Mark one handled when you dealt with it, or dismiss it.">i</button>
@@ -190,7 +190,7 @@
                 </div>
             </section>
 
-            <section class="panel" data-panel="supportOther" data-label="Other reports" data-w="8">
+            <section class="panel" data-panel="supportOther" data-label="Other reports" data-w="8" data-source="supportOther">
                 <div class="panel-head">
                     <h3 class="panel-title">Other reports</h3>
                     <button type="button" class="guide-badge" data-tip-title="Other reports" data-tip="Any other message users sent from the app's Contact support." data-tip-preview="Mark one handled when you dealt with it, or dismiss it.">i</button>
