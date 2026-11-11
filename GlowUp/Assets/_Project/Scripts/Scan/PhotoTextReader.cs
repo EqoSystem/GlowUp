@@ -39,9 +39,13 @@ namespace GlowUp.Scan
             int knownSum = 0, wordSum = 0;
             string bestText = ""; PhotoTextQuality.Verdict best = null;
 
+            // the part inside the user's box is often a narrow strip: enlarged so its letters are big enough for the reader
+            Texture2D source = Enlarged(photo);
+            try
+            {
             foreach (int turn in new[] { 0, 90, 270 })
             {
-                Texture2D picture = turn == 0 ? photo : Turned(photo, turn == 90);
+                Texture2D picture = turn == 0 ? source : Turned(source, turn == 90);
                 try
                 {
                     OcrRead read = OcrService.Shared.Read(picture);
@@ -63,6 +67,8 @@ namespace GlowUp.Scan
                 }
                 finally { if (turn != 0 && picture != null) UnityEngine.Object.Destroy(picture); }
             }
+            }
+            finally { if (source != photo) UnityEngine.Object.Destroy(source); }
 
             if (best == null) return result;
             result.rawText = texts.ToString();
@@ -72,6 +78,28 @@ namespace GlowUp.Scan
             if (!whole.readable) whole = PhotoTextQuality.Judge(bestText, isKnownWord);       // the best single turn alone
             result.verdict = whole;
             return result;
+        }
+
+        /// <summary>Shorter side below this: the picture is enlarged (at most 2x, longer side at most 2400) before reading.</summary>
+        public const int SmallestReadSide = 900;
+
+        /// <summary>The picture itself when big enough, else a smooth enlarged copy (boxes are 0 to 1, so they need no change).</summary>
+        static Texture2D Enlarged(Texture2D src)
+        {
+            int shortSide = Mathf.Min(src.width, src.height), longSide = Mathf.Max(src.width, src.height);
+            float k = Mathf.Min(2f, SmallestReadSide / (float)shortSide, 2400f / longSide);
+            if (k <= 1.05f) return src;
+            int w = Mathf.RoundToInt(src.width * k), h = Mathf.RoundToInt(src.height * k);
+            var px = new Color32[w * h];
+            for (int y = 0; y < h; y++)
+            {
+                float v = (y + 0.5f) / h;
+                for (int x = 0; x < w; x++) px[y * w + x] = src.GetPixelBilinear((x + 0.5f) / w, v);
+            }
+            var big = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            big.SetPixels32(px);
+            big.Apply(false);
+            return big;
         }
 
         /// <summary>A copy of the picture turned a quarter: clockwise or counter-clockwise (y counts from the bottom).</summary>

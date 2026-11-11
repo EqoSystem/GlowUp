@@ -261,7 +261,7 @@ namespace GlowUp.Scan
             if (!ConnectivityMonitor.Online) { Say(StatusMessage.Kind.Error, msgOfflineV2, true); return; }
             if (SentToday() >= DailyLimit) { Say(StatusMessage.Kind.Error, string.Format(msgDailyLimitV2, DailyLimit), true); return; }
             DropPhoto();
-            photo = cameraFeed.CaptureUpright(null, readSide);                   // the whole picture, not only the scan frame
+            photo = cameraFeed.CaptureUpright(null, Mathf.Max(readSide, 1920));   // full camera resolution: small label letters stay readable                   // the whole picture, not only the scan frame
             if (photo == null) { Say(StatusMessage.Kind.Error, msgNoCameraV2, true); return; }
             // New13 item 8: a black, unready or very blurry picture is never shown as "Check your photo": the user retakes it
             PhotoCaptureCheck.Verdict quality = PhotoCaptureCheck.Judge(photo);
