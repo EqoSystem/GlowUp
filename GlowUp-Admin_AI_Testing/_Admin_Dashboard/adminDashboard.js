@@ -416,7 +416,7 @@ function renderSuggestions() {
             <div class="suggestion-main">
                 <span class="suggestion-text">${escapeHtml(s.text || "(empty)")}</span>
                 <span class="chip ${s.kind === "Allergen" ? "warn" : s.kind === "App suggestion" ? "good" : "pink"}">${escapeHtml(s.kind)}</span>
-                <span class="small muted">${s.from ? "<b>" + escapeHtml(s.from) + "</b> · " : ""}${escapeHtml(formatWhen(s.createdAtUnix))} · ${escapeHtml(timeAgo(s.createdAtUnix))}</span>
+                <span class="small muted">${s.from ? escapeHtml(s.from) + " · " : ""}${escapeHtml(formatWhen(s.createdAtUnix))} · ${escapeHtml(timeAgo(s.createdAtUnix))}</span>
                 ${lastScanDetails(s.lastScan)}
             </div>
             <div class="suggestion-actions btn-group">
@@ -462,7 +462,7 @@ async function loadSupportReports() {
             const lastScan = data.lastScan && typeof data.lastScan === "object" ? data.lastScan : null;
             if (String(data.category || "") === "Suggestion") {
                 // the app's Suggestion kind belongs in the Suggestions panel (for review), not among the support reports
-                appSuggestions.push({ id: d.id, collection: "supportReports", kind: "App suggestion", text: String(data.message || ""), createdAtUnix: toWholeNumber(data.createdAtUnix), lastScan, from: String(data.userName || "").trim() || "account " + String(data.uid || "").slice(0, 8) });
+                appSuggestions.push({ id: d.id, collection: "supportReports", kind: "App suggestion", text: String(data.message || ""), createdAtUnix: toWholeNumber(data.createdAtUnix), lastScan, from: senderText({ userName: String(data.userName || "").trim(), uid: String(data.uid || "") }) });
                 return;
             }
             supportReports.push({
@@ -504,7 +504,7 @@ function renderSupportKind(kind) {
         return `<li class="suggestion-item support-item">
             <div class="suggestion-main">
                 <span class="chip ${tone(r.category)}">${escapeHtml(r.category)}</span>
-                <span class="small muted">${escapeHtml(formatWhen(r.createdAtUnix))} · ${escapeHtml(timeAgo(r.createdAtUnix))} · ${r.userName ? "<b>" + escapeHtml(r.userName) + "</b>" : "account " + escapeHtml(r.uid.slice(0, 8))}${r.appVersion ? " · app " + escapeHtml(r.appVersion) : ""}</span>
+                <span class="small muted">${escapeHtml(formatWhen(r.createdAtUnix))} · ${escapeHtml(timeAgo(r.createdAtUnix))} · ${senderHtml(r)}${r.appVersion ? " · app " + escapeHtml(r.appVersion) : ""}</span>
                 <p class="support-message">${escapeHtml(r.message)}</p>
                 ${scan}
             </div>
@@ -514,6 +514,19 @@ function renderSupportKind(kind) {
             </div>
         </li>`;
     }).join("");
+}
+
+/**
+ * WHO SENT IT. The name is written by the sender's own app, so it is shown only as "name given by the sender" NEXT TO the account id, which
+ * the database checks (the rules make the id the sender's own). Never the name alone, and groups are made by account, not by name.
+ */
+function senderText(r) {
+    const account = "account " + String(r.uid || "").slice(0, 8);
+    return r.userName ? `${r.userName} (${account})` : account;
+}
+function senderHtml(r) {
+    const account = "account " + escapeHtml(String(r.uid || "").slice(0, 8));
+    return r.userName ? `<b title="Name given by the sender">${escapeHtml(r.userName)}</b> <span class="muted">(${account})</span>` : account;
 }
 
 /** The optional last scan a report or app suggestion carries, folded (empty when there is none). */
@@ -726,9 +739,9 @@ function registerData() {
     SUPPORT_KINDS.forEach((kind) => registerDataset(kind.dataset, {
         label: kind.label, noun: kind.title, nounOne: kind.title.replace(/s$/, ""),
         items: () => supportReports.filter((r) => kindOf(r.category) === kind),
-        map: (r) => ({ id: r.id, title: r.message || "(empty)", subtitle: r.userName || "account " + r.uid.slice(0, 8), meta: timeAgo(r.createdAtUnix), tone: r.category === "Bug" ? "bad" : r.category === "Wrong scan result" ? "warn" : "pink" }),
+        map: (r) => ({ id: r.id, title: r.message || "(empty)", subtitle: senderText(r), meta: timeAgo(r.createdAtUnix), tone: r.category === "Bug" ? "bad" : r.category === "Wrong scan result" ? "warn" : "pink" }),
         dimensions: [
-            { id: "who", label: "Sender", of: (r) => r.userName || "account " + r.uid.slice(0, 8) },
+            { id: "who", label: "Sender (by account)", of: (r) => r.uid ? "account " + r.uid.slice(0, 8) : "unknown" },
             { id: "version", label: "App version", of: (r) => r.appVersion || null, none: "Unknown" }
         ],
         removedWord: "dismissed", foreverLabel: "Dismiss for good", removeNote: "They leave this list for everyone who uses the admin site.",
