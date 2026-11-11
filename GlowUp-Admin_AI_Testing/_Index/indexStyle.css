@@ -30,11 +30,7 @@ body.login-page::before {
     transition: border-color .25s, box-shadow .25s;
 }
 .login-card:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
-.icon-box {
-    width: 52px; height: 52px; margin: 0 auto 14px; border-radius: 16px; display: grid; place-items: center; font-size: 24px;
-    color: var(--accent-text); background: color-mix(in srgb, var(--accent) 15%, transparent);
-}
-.login-card h1 { font-size: var(--fs-lg); font-weight: 700; }
+.login-card h1 { font-size: var(--fs-lg); font-weight: 700; margin: 0; line-height: 1.25; }   /* the lock icon above it was removed (12 November 2026): the title is the card's first line */
 .subtitle { font-size: var(--fs-sm); color: var(--muted); margin: 2px 0 22px; }
 #login-form { display: flex; flex-direction: column; gap: 14px; text-align: left; }
 .login-message { margin: 0; }
