@@ -30,8 +30,8 @@ namespace GlowUp.Common
         void Awake()
         {
             pill = GetComponent<LiquidTabBar>();
-            // phase 1D: the screen's card (the bar's parent) keeps clear of the phone's notch and gesture bar
-            if (transform.parent is RectTransform card && card.anchorMin == Vector2.zero && card.anchorMax == Vector2.one) SafeAreaFitter.On(card);
+            // the screen's card keeps clear of the camera hole through the ONE safe-area system (Assets/SafeAreaFix, 12 November 2026);
+            // the earlier SafeAreaFitter on this card only is no longer added (it would apply the inset twice)
             if (recentButton != null) recentButton.onClick.AddListener(() => { if (current != Tab.Recent) Open(recentScene, 0); });
             if (scanButton != null) scanButton.onClick.AddListener(() => { if (current != Tab.Scan) Open(scanScene, 1); });
             if (tryOnButton != null) tryOnButton.onClick.AddListener(() =>

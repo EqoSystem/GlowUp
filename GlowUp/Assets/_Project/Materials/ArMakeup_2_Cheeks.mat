@@ -64,6 +64,7 @@ Material:
     - _DstBlendAlpha: 10
     - _Feather: 0.6
     - _MouthOpen: 0
+    - _Pigment: 0
     - _QueueOffset: 0
     - _SampleGI: 0
     - _SrcBlend: 5

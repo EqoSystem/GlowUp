@@ -305,7 +305,8 @@ namespace GlowUp.Common
         {
             if (shiftTarget != null && field.transform.IsChildOf(shiftTarget)) return shiftTarget;
             Transform t = field.transform;
-            while (t.parent != null && t.parent != canvasRect) t = t.parent;
+            // the canvas child, or the child of the safe-area root (the root itself is placed by the safe area, never slid)
+            while (t.parent != null && t.parent != canvasRect && t.parent.GetComponent<GlowUp.SafeAreaFix.SafeAreaRoot>() == null) t = t.parent;
             return t as RectTransform;
         }
 

@@ -40,6 +40,9 @@ namespace GlowUp.EditorTools
             AddPressFeedback();
             AssignTypography();
             ThemePreview.Apply(false);
+            // the ONE safe-area structure (Assets/SafeAreaFix, 12 November 2026): background on the canvas, the card inside SafeAreaRoot
+            foreach (GameObject go in UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects())
+                if (go.TryGetComponent(out Canvas canvas)) GlowUp.SafeAreaFix.SafeAreaStructure.Convert(canvas, false, null, null);
         }
 
         /// <summary>Canvas width is fixed at 1080 and the height follows the phone (1920 to 2400+).</summary>

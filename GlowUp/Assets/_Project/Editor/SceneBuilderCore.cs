@@ -33,11 +33,14 @@ namespace GlowUp.EditorTools
             }
             // already open: build on what is there, so unsaved edits are not thrown away by a reload
             Scene active = SceneManager.GetActiveScene();
-            if (active.IsValid() && active.isLoaded && active.path == path) return active;
+            if (active.IsValid() && active.isLoaded && active.path == path) { GlowUp.SafeAreaFix.SafeAreaStructure.Unwrap(active); return active; }
             // another scene with unsaved edits is open: ask before it is replaced
             if (active.IsValid() && active.isDirty && !EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
                 throw new System.OperationCanceledException("Scene build cancelled: the open scene has unsaved changes.");
-            return EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+            Scene opened = EditorSceneManager.OpenScene(path, OpenSceneMode.Single);
+            // the builders find a screen's card directly under its canvas: the safe-area root is taken away first (ThemeKit.FinishScene puts it back)
+            GlowUp.SafeAreaFix.SafeAreaStructure.Unwrap(opened);
+            return opened;
         }
 
         public static void Save(Scene s)
