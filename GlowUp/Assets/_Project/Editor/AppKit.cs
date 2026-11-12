@@ -32,7 +32,7 @@ namespace GlowUp.EditorTools
         public const float Pad = 40;                        // space between the card edge and its content
         public const float HeaderBottom = 160;              // first free unit under the back button / title row
         public const float BarBottom = 28, BarHeight = 176; // the bottom action bar
-        public const float BarIconY = 26, BarPill = 108;    // the line its icons stand on (above the bar's middle) and the size of the pink pill behind one of them
+        public const float BarIconY = 30, BarPill = 100;
         public const float AboveBar = BarBottom + BarHeight + 20;
 
         public static readonly Vector2 TL = new Vector2(0, 1), TC = new Vector2(0.5f, 1), TR = new Vector2(1, 1),
@@ -513,7 +513,7 @@ namespace GlowUp.EditorTools
         /// pill slides along, stretches like liquid and snaps to the icon of the screen that opens (LiquidTabBar).
         /// </summary>
         /// <param name="current">0 = none (the dashboard), 1 = Recent, 2 = Scan, 3 = Try On (the screen this bar is on)</param>
-        public static BottomActionBar BottomBar(AppScreen s, int current)
+        public static BottomActionBar BottomBar(AppScreen s, int current, float pill = BarPill)
         {
             var bar = Panel(s.card, "BottomActionBar", ThemeRole.SurfaceAlt, 0.94f, BarHeight);
             bar.raycastTarget = true;
@@ -525,9 +525,9 @@ namespace GlowUp.EditorTools
 
             // the pink pill: created before the buttons, so it is drawn BEHIND their icons. In Edit mode it stands where it
             // rests; LiquidTabBar moves and stretches it while the app runs.
-            Image drop = Panel(bar.transform, "LiquidDrop", ThemeRole.ButtonFill, 1f, BarPill);
+            Image drop = Panel(bar.transform, "LiquidDrop", ThemeRole.ButtonFill, 1f, pill);
             float third = (Kit.CardWidth - 56f) / 3f;
-            At(drop.transform, MC, new Vector2((pillSlot - 1) * third, BarIconY), new Vector2(BarPill, BarPill));
+            At(drop.transform, MC, new Vector2((pillSlot - 1) * third, BarIconY), new Vector2(pill, pill));
 
             Button recent = BarButton(bar.transform, "RecentScansButton", "Recent", IconFactory.History, 0f, 1f / 3f, current == 1, pillSlot == 0);
             Button scan = BarButton(bar.transform, "StartScanButton", "Start Scan", IconFactory.Scan, 1f / 3f, 2f / 3f, current == 2, pillSlot == 1);

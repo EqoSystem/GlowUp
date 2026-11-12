@@ -75,9 +75,26 @@ namespace GlowUp.EditorTools
                                                       ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             A.TopStrip(recommendedNote.transform, listTop + 56, 62, 48, 48);
             A.ShrinkWrapped(recommendedNote, 20);
+            recommendedNote.gameObject.SetActive(false);        // 12 November 2026: the line is inside the "i" after the heading (HelpBadge), not printed under it
+            // the small "i" right after "Recommended for you": its bubble holds the note (tap it; it closes by itself)
+            recommendedHeader.ForceMeshUpdate();
+            HelpBadge recommendedBadge = OnboardingKit.InfoBadge(card, recommendedHeader, null, "No ingredients flagged for your profile. This is not medical advice.");
+            var badgeRect = (RectTransform)recommendedBadge.transform;
+            badgeRect.anchorMin = badgeRect.anchorMax = new Vector2(0f, 0.5f); badgeRect.pivot = new Vector2(0f, 0.5f);
+            badgeRect.anchoredPosition = new Vector2(recommendedHeader.preferredWidth + 18f, 0f);        // a first guess; TextEndFollower corrects it from the real font
+            var bubbleRect = (RectTransform)recommendedBadge.transform.Find("HelpBubble");
+            if (bubbleRect != null)
+            {
+                bubbleRect.anchorMin = bubbleRect.anchorMax = new Vector2(0f, 0f); bubbleRect.pivot = new Vector2(0f, 1f);
+                bubbleRect.anchoredPosition = new Vector2(0f, -10f);      // TextEndFollower puts its left edge on the heading's left edge
+                bubbleRect.sizeDelta = new Vector2(880f, 96f);
+            }
+            var follower = SceneBuilderCore.Ensure<TextEndFollower>(recommendedBadge.gameObject);
+            A.Set(follower, "text", recommendedHeader); A.Set(follower, "bubble", bubbleRect);
+            follower.Apply();
 
             GameObject listArea = A.Node(card, "RecommendationsArea");
-            A.Between(listArea.transform, listTop + 122, A.AboveBar);
+            A.Between(listArea.transform, listTop + 70, A.AboveBar);        // the note line is gone from under the heading: the list starts higher
             // long rows, one product each: closed they show the kind's icon, the name and the brand; a tap makes the row
             // longer and shows Save / Try On / AI (the user's choice of 12 October 2026: a long list must not overwhelm)
             AppTiles.ListScroll(listArea.transform, "RecommendationsScrollView", out RectTransform content);
@@ -113,7 +130,7 @@ namespace GlowUp.EditorTools
             A.Set(notice, "notice", noticeGroup); A.Set(notice, "messageText", noticeText); A.Set(notice, "closeButton", noticeClose);
             noticePill.gameObject.SetActive(false);
 
-            BottomActionBar bar = A.BottomBar(s, 0);
+            BottomActionBar bar = A.BottomBar(s, 0, 85f);      // the liquid drop is 85 x 85 on Recent Scans and the dashboard (owner, 11 November 2026)
             AppTiles.SwipeNavigation(s, bar);       // drag the dashboard right: Recent Scans comes in; left: AR Try-On (the scanner is opened with its button only)
 
             // ---- account pop-up (opens from the avatar) ----
@@ -162,7 +179,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "allergensValue", allergens);
             A.Set(controller, "recommendationsContent", content); A.Set(controller, "recommendationTemplate", template);
             A.Set(controller, "recommendationsEmptyText", empty); A.Set(controller, "typeIcons", A.TypeIcons());
-            A.Set(controller, "recommendationsNoteText", recommendedNote);
+            A.Set(controller, "recommendationsNoteText", recommendedNote); A.Set(controller, "recommendationsBadge", recommendedBadge);
             // reworded for "make-up only" (wording changed in the Inspector is kept)
             SceneBuilderCore.ReplaceText(controller, "msgNone", "No make-up products matched your profile yet. Scan a product to check it.",
                 "No recommendations yet. Products that are safe for your skin will appear here as the catalogue grows.");
