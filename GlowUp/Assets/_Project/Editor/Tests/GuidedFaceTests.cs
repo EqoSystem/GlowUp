@@ -123,5 +123,19 @@ namespace GlowUp.Tests
             Assert.AreEqual(320, pace.MaxSide, "and never goes above its cap");
             Assert.IsFalse(pace.Report(0f), "a time of 0 is ignored");
         }
+
+        [Test]
+        public void ManualInferenceResolutionStaysFixedUntilReturnedToAutomatic()
+        {
+            var pace = new GuidedFacePace();
+            pace.Begin(false);
+            pace.SetManualIndex(1);
+            for (int i = 0; i < 32; i++) pace.Report(80f);
+            Assert.AreEqual(256, pace.MaxSide);
+
+            pace.SetManualIndex(-1);
+            for (int i = 0; i < 32; i++) pace.Report(80f);
+            Assert.AreEqual(192, pace.MaxSide);
+        }
     }
 }
