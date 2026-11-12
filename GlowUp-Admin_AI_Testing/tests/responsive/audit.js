@@ -82,18 +82,18 @@ window.__audit = function () {
             if (!deliberate && !scroller && (visibleW < q.width - 3 || visibleH < q.height - 3))
                 out.clipped.push(name(el) + ' "' + t.nodeValue.trim().slice(0, 40) + '" ' + Math.round(visibleW) + "/" + Math.round(q.width));
             if (!scroller && (v.right > vw + 1 || v.left < -1)) out.offscreen.push(name(el) + ' "' + t.nodeValue.trim().slice(0, 40) + '" x ' + Math.round(v.left) + "-" + Math.round(v.right));
-            items.push({ el, text: t.nodeValue.trim().slice(0, 30), r: v, fixed: !!el.closest(".topbar, .sidebar, #sidebarToggle, .settings-window, .modal-overlay") });
+            items.push({ el, text: t.nodeValue.trim().slice(0, 30), r: v, fixed: !!el.closest(".topbar, .sidebar, .settings-window, .modal-overlay") });
         });
     }
     // two pieces of text drawn on top of each other
     const fixedLayer = (el) => el.closest(".topbar, .sidebar, .settings-window, .modal-overlay, .login-tools, .sw-head");
-    // layers that cover the page ON PURPOSE: the menu opened over the page (sb-peek, or any open menu under 1024 px), the Quick
+    // layers that cover the page ON PURPOSE: the desktop hover menu, the mobile drawer, the Quick
     // settings sheet under 1024 px (with its backdrop) and dialogs. Text under them is hidden by design, not overlapping.
     const root = document.documentElement, narrow = innerWidth < 1024;
     const overlayOf = (el) => {
         if (el.closest(".modal-overlay, dialog[open]")) return "modal";
         if (narrow && root.classList.contains("qs-open") && el.closest(".settings-window")) return "qs-sheet";
-        if (root.classList.contains("sb-peek") && el.closest(".sidebar, #sidebarToggle")) return "menu";
+        if ((root.classList.contains("sb-hover") || root.classList.contains("sb-mobile-open")) && el.closest(".sidebar")) return "menu";
         return null;
     };
     for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {
@@ -108,7 +108,7 @@ window.__audit = function () {
             out.textOverlap.push(name(a.el) + ' "' + a.text + '" x ' + name(b.el) + ' "' + b.text + '"');
         }
     }
-    if ((narrow && root.classList.contains("qs-open")) || (innerWidth < 768 && root.classList.contains("sb-peek"))) out.clipped = [];
+    if ((narrow && root.classList.contains("qs-open")) || root.classList.contains("sb-mobile-open")) out.clipped = [];
     for (const k in out) out[k] = Array.from(new Set(out[k])).slice(0, 12);
     return out;
 };

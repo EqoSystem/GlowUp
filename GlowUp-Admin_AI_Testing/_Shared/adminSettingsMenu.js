@@ -121,9 +121,13 @@ function openWindow() {
     win.classList.add("is-shown");                // its start place (off to the right) is @starting-style in adminSettingsMenu.css: no forced reflow
     win.classList.add("is-open");
     // one layer over the page at a time: the menu opened over the page (narrow windows) closes first
-    if (document.documentElement.classList.contains("sb-peek")) {
-        document.documentElement.classList.remove("sb-peek");
-        document.querySelectorAll("#sidebarToggle, #menuBtn").forEach((b) => b.setAttribute("aria-expanded", "false"));
+    if (document.documentElement.classList.contains("sb-mobile-open") || document.documentElement.classList.contains("sb-hover")) {
+        document.documentElement.classList.remove("sb-mobile-open", "sb-hover");
+        const menuButton = document.getElementById("menuBtn");
+        if (menuButton) {
+            menuButton.setAttribute("aria-expanded", "false");
+            menuButton.setAttribute("aria-label", "Open menu");
+        }
     }
     document.documentElement.classList.add("qs-open");
     button.setAttribute("aria-expanded", "true");

@@ -1,42 +1,58 @@
-// Browser check (12 November 2026): the menu is the icon rail by default, opens OVER the page on hover and closes when the pointer leaves;
-// the menu button left of the logo pins it open / folds it back.   Run: node tests/responsive/sidebarGmail.scenario.mjs
+// Browser check for the header-led navigation. Run: node tests/responsive/sidebarGmail.scenario.mjs
 import { launch, openPage } from "./harness.mjs";
 let checks = 0, failed = 0;
 const ok = (good, what) => { checks++; if (!good) { failed++; console.log("FAILED: " + what); } };
 const browser = await launch();
 try {
-    for (const [width, height] of [[1440, 900], [1100, 800], [900, 800]]) {
+    for (const [width, height] of [[1440, 900], [1024, 800], [768, 900]]) {
         const { page, errors, settle } = await openPage(browser, "dash", { width, height });
-        await settle(800);
-        const w = () => page.evaluate(() => Math.round(document.querySelector("aside.sidebar").getBoundingClientRect().width));
+        await settle(300);
+        const mobile = width <= 768;
+        const sidebarWidth = () => page.evaluate(() => Math.round(document.querySelector("aside.sidebar").getBoundingClientRect().width));
+        const sidebarLeft = () => page.evaluate(() => Math.round(document.querySelector("aside.sidebar").getBoundingClientRect().left));
         const mainLeft = () => page.evaluate(() => Math.round(document.querySelector(".main-content").getBoundingClientRect().left));
-        const visible = (sel) => page.evaluate((s) => { const e = document.querySelector(s); return !!e && getComputedStyle(e).display !== "none" && e.getBoundingClientRect().width > 0; }, sel);
-        const rail = await w(), left0 = await mainLeft();
-        ok(rail <= 80, `${width}px: the menu starts as the icon rail (${rail}px)`);
-        ok(await visible("#sbMenuBtn"), `${width}px: the menu button shows`);
-        ok(!(await visible(".sidebar-brand .brand-home")), `${width}px: the rail shows only the menu button, not the logo`);
-        const logoBox = await page.evaluate(() => { const b = document.querySelector("#sbMenuBtn").getBoundingClientRect(); return b.left; });
-        await page.mouse.move(30, 300);
-        await page.waitForTimeout(300);
-        ok(await w() >= 220, `${width}px: hovering the rail opens the menu (${await w()}px)`);
-        ok(await mainLeft() === left0, `${width}px: the page does not move while the menu is open over it`);
-        ok(await visible(".sidebar-brand .brand-home"), `${width}px: the logo shows beside the menu button when open`);
-        const order = await page.evaluate(() => { const m = document.querySelector("#sbMenuBtn").getBoundingClientRect().left, l = document.querySelector(".brand-home").getBoundingClientRect().left; return m < l; });
-        ok(order, `${width}px: the menu button is LEFT of the logo`);
-        await page.mouse.move(width - 40, 400);
-        await page.waitForTimeout(450);
-        ok(await w() <= 80, `${width}px: leaving the menu closes it again (${await w()}px)`);
-        // the menu button pins it open, and again folds it
-        await page.click("#sbMenuBtn"); await page.waitForTimeout(450);
-        await page.mouse.move(width - 40, 400); await page.waitForTimeout(450);
-        ok(await w() >= 220, `${width}px: the menu button keeps the menu open after the pointer leaves (${await w()}px)`);
-        await page.click("#sbMenuBtn"); await page.mouse.move(width - 40, 400); await page.waitForTimeout(450);
-        ok(await w() <= 80, `${width}px: the menu button folds it back (${await w()}px)`);
-        ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `${width}px: no sideways scroll`);
-        if (process.env.SHOT_DIR && width === 1440) {
-            await page.mouse.move(30, 300); await page.waitForTimeout(300);
-            await page.screenshot({ path: `${process.env.SHOT_DIR}/menu_hover_1440.png` });
+        const header = () => page.evaluate(() => {
+            const r = document.querySelector(".topbar").getBoundingClientRect();
+            return { left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom), height: Math.round(r.height) };
+        });
+        const bar = await header();
+        ok(bar.left === 0 && bar.right === width && bar.top === 0 && bar.height >= 64, `${width}px: full-width sticky header ${JSON.stringify(bar)}`);
+        ok(await page.locator(".topbar #menuBtn").count() === 1 && await page.locator(".topbar .brand-home").count() === 1, `${width}px: menu and brand are in the header`);
+        ok(await page.locator(".sidebar .brand-home, .sidebar-brand, #sidebarToggle, #sbMenuBtn").count() === 0, `${width}px: no old sidebar header or edge toggle remains`);
+        ok(await page.locator("#menuBtn").getAttribute("aria-controls") === "sidebarNav", `${width}px: menu control points at the nav`);
+
+        if (mobile) {
+            ok(await sidebarLeft() < 0 && await mainLeft() === 0, `${width}px: nav starts off-canvas and content uses full width`);
+            await page.click("#menuBtn");
+            await settle(250);
+            ok(await sidebarLeft() === 0 && await page.locator("#menuBtn").getAttribute("aria-expanded") === "true", `${width}px: hamburger opens off-canvas nav`);
+            ok(await page.evaluate(() => getComputedStyle(document.body, "::after").content !== "none"), `${width}px: backdrop is present`);
+            await page.keyboard.press("Escape");
+            await settle(250);
+            ok(await sidebarLeft() < 0 && await page.locator("#menuBtn").getAttribute("aria-expanded") === "false", `${width}px: Escape closes nav`);
+        } else {
+            const rail = await sidebarWidth(), left = await mainLeft();
+            ok(rail === 72 && left === 72, `${width}px: collapsed 72px rail and matching content offset`);
+            await page.mouse.move(30, bar.bottom + 50);
+            await settle(240);
+            ok(await sidebarWidth() >= 250 && await mainLeft() === left, `${width}px: hover expands over content without shifting it`);
+            await page.keyboard.press("Escape");
+            await settle(100);
+            ok(await sidebarWidth() === 72, `${width}px: Escape closes the hover overlay`);
+            await page.click("#menuBtn");
+            await settle(250);
+            ok(await sidebarWidth() === 256 && await mainLeft() === 256, `${width}px: hamburger pins the nav and offsets content`);
+            ok(await page.locator("#menuBtn").getAttribute("aria-expanded") === "true", `${width}px: pinned state is reflected accessibly`);
+            ok(await page.evaluate(() => localStorage.getItem("glowup.sidebar.folded")) === "0", `${width}px: pin state persists`);
+            await page.mouse.move(width - 30, height - 20);
+            await settle(240);
+            ok(await sidebarWidth() === 256, `${width}px: pinned nav remains open after pointer leaves`);
+            await page.click("#menuBtn");
+            await settle(250);
+            ok(await sidebarWidth() === 72 && await mainLeft() === 72, `${width}px: second click unpins and returns to the rail`);
         }
+        const faults = await page.evaluate(() => window.__audit());
+        ok(Object.values(faults).every((list) => list.length === 0), `${width}px: no layout audit faults`);
         ok(errors.length === 0, `${width}px: no page errors ${errors.join("; ")}`);
         await page.context().close();
     }

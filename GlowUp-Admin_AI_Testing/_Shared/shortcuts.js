@@ -278,7 +278,8 @@ export function layerOpen() {
     return !!document.querySelector(".modal-overlay[style*='flex'], .kb-layer, .menu.show, .import-check, .style-overlay, .facet-panel, .snapx-open")
         || document.body.classList.contains("snapx-open")
         || (document.documentElement.classList.contains("qs-open") && window.matchMedia("(max-width: 1023px)").matches)
-        || document.documentElement.classList.contains("sb-peek");
+        || document.documentElement.classList.contains("sb-mobile-open")
+        || document.documentElement.classList.contains("sb-hover");
 }
 
 function onKey(event) {

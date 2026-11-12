@@ -72,8 +72,9 @@ export async function check(page) {
         const faults = [];
         const vw = document.documentElement.clientWidth;
         if (document.documentElement.scrollWidth > vw) faults.push(`document scrollWidth ${document.documentElement.scrollWidth} > ${vw}`);
-        const brandTitle = document.querySelector(".sidebar-brand .brand-title");
-        if (brandTitle && getComputedStyle(brandTitle).display === "none") faults.push("sidebar brand name is hidden");
+        const menuButton = document.querySelector(".topbar > #menuBtn"), nav = document.getElementById("sidebarNav");
+        if (!menuButton || menuButton.getAttribute("aria-controls") !== "sidebarNav" || !nav) faults.push("header menu button is not connected to the navigation");
+        if (document.querySelector("#sidebarToggle, #sbMenuBtn")) faults.push("legacy sidebar control is still present");
         const a = window.__audit();
         for (const [kind, list] of Object.entries(a)) list.forEach((item) => faults.push(kind + ": " + item));
         // every element of the page content: its right edge inside the window (or inside a box that scrolls on purpose)
@@ -104,15 +105,15 @@ export async function setQuickSettings(page, open) {
 }
 
 /**
- * The menu at the left: "expanded" or "collapsed". From 1024 px the edge tab folds it to icons (kept); under 1024 px it is
- * icons only and the tab (or the menu button on a phone) opens the whole menu over the page.
+ * The menu at the left: "expanded" pins the rail open; "collapsed" restores the icon rail and hover behavior.
  */
 export async function setSidebar(page, state) {
     await page.evaluate((state) => {
-        const root = document.documentElement, wide = innerWidth >= 1024;
-        const open = wide ? !root.classList.contains("sb-collapsed") : root.classList.contains("sb-peek");
+        const root = document.documentElement;
+        const mobile = innerWidth <= 768 || matchMedia("(hover: none)").matches;
+        const open = mobile ? root.classList.contains("sb-mobile-open") : root.classList.contains("sb-pinned");
         if (open === (state === "expanded")) return;
-        const button = innerWidth < 768 ? document.querySelector(".topbar > .menu-btn") : document.getElementById("sbMenuBtn");
+        const button = document.querySelector(".topbar > #menuBtn");
         if (button) button.click();
     }, state);
 }
