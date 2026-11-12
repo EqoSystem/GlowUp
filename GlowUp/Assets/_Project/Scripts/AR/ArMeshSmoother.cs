@@ -1,6 +1,7 @@
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.XR.ARFoundation;
+using Stopwatch = System.Diagnostics.Stopwatch;
 
 namespace GlowUp.AR
 {
@@ -33,6 +34,17 @@ namespace GlowUp.AR
 
         /// <summary>True while it smooths a face.</summary>
         public bool Active => running && smooth && face != null;
+        public bool SmoothingEnabled => smooth;
+        public float MinCutoff => minCutoff;
+        public float Beta => beta;
+        public float LastUpdateMilliseconds { get; private set; }
+
+        public void SetSmoothingEnabled(bool value)
+        {
+            if (smooth == value) return;
+            smooth = value;
+            filter.Reset();
+        }
 
         /// <summary>Live tracking started.</summary>
         public void BeginSession() { running = true; face = null; meshFilter = null; filter.Reset(); }
@@ -52,6 +64,7 @@ namespace GlowUp.AR
         void LateUpdate()
         {
             if (!running || !smooth || face == null) return;
+            long start = Stopwatch.GetTimestamp();
             if (meshFilter == null && !face.TryGetComponent(out meshFilter)) return;
             Mesh mesh = meshFilter.sharedMesh;
             NativeArray<Vector3> vertices = face.vertices;
@@ -64,6 +77,7 @@ namespace GlowUp.AR
             filter.minCutoff = minCutoff; filter.beta = beta; filter.derivativeCutoff = derivativeCutoff;
             filter.Step(raw, n, Time.unscaledDeltaTime);
             mesh.SetVertices(filter.Values, 0, n);
+            LastUpdateMilliseconds = (Stopwatch.GetTimestamp() - start) * 1000f / Stopwatch.Frequency;
         }
     }
 }

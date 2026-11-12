@@ -38,6 +38,9 @@ namespace GlowUp.AR
 
         /// <summary>True while the face is lost and the make-up is still shown (held or fading).</summary>
         public bool IsHolding { get; private set; }
+        public bool PredictionEnabled => predictMovement;
+
+        public void SetPredictionEnabled(bool value) { predictMovement = value; }
 
         ARFaceManager manager;
         ArFaceMakeup makeup;

@@ -78,6 +78,9 @@ namespace GlowUp.Scan
         public bool IsPlaying => cam != null && cam.isPlaying && cam.width > 32;
         /// <summary>The size of the picture the camera really gives, in its own pixels (it may differ from the size that was asked for). 0 x 0 while it is off.</summary>
         public Vector2Int PictureSize => IsPlaying ? new Vector2Int(cam.width, cam.height) : Vector2Int.zero;
+        public int FrameSequence { get; private set; }
+        public float LastFrameTimestamp { get; private set; }
+        public float FrameRateEstimate { get; private set; }
         public bool IsFrontCamera { get; private set; }
         /// <summary>The view the picture fills (UprightArgb with no frame gives exactly what is inside it).</summary>
         public RectTransform Viewport => viewport;
@@ -93,6 +96,7 @@ namespace GlowUp.Scan
         int lastW, lastH, lastAngle = -1;
         bool lastMirrored;
         float[] steadyPrevious;
+        float priorFrameTimestamp;
 
         // ---------------------------------------------------------------------------------------
         public void StartCamera()
@@ -213,6 +217,7 @@ namespace GlowUp.Scan
             if (cam != null) { if (cam.isPlaying) cam.Stop(); Destroy(cam); cam = null; }
             if (display != null) display.texture = null;
             lastAngle = -1; steadyPrevious = null; refocusUntil = 0f;
+            priorFrameTimestamp = 0f; FrameRateEstimate = 0f; FrameSequence = 0; LastFrameTimestamp = 0f;
             // a camera that is opened again focuses by itself again: the lock ends with the camera
             if (FocusLocked) { FocusLocked = false; FocusLockChanged?.Invoke(false, false); }
             if (wasOpen)
@@ -227,6 +232,17 @@ namespace GlowUp.Scan
         void Update()
         {
             if (!IsPlaying) return;
+            if (cam.didUpdateThisFrame)
+            {
+                FrameSequence++;
+                LastFrameTimestamp = Time.realtimeSinceStartup;
+                if (priorFrameTimestamp > 0f)
+                {
+                    float interval = LastFrameTimestamp - priorFrameTimestamp;
+                    if (interval > 0f) FrameRateEstimate = FrameRateEstimate <= 0f ? 1f / interval : Mathf.Lerp(FrameRateEstimate, 1f / interval, 0.15f);
+                }
+                priorFrameTimestamp = LastFrameTimestamp;
+            }
             Layout(false);
             Stabilise();
 

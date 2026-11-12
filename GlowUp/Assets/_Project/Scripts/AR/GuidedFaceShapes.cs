@@ -255,9 +255,9 @@ namespace GlowUp.AR
         /// <summary>Looks per second at most on the smallest picture, or in the light pipeline (0 = every camera picture).</summary>
         public float SlowestRate = 15f;
 
-        int index, maxIndex, sinceChange;
+        int index, maxIndex, sinceChange, manualIndex = -1;
         float average;
-        bool light;
+        bool light, adaptiveEnabled = true;
 
         /// <summary>A new visit: the light pipeline starts on the second size and never goes above the third; the full one starts on the largest.</summary>
         public void Begin(bool lightPipeline)
@@ -265,6 +265,7 @@ namespace GlowUp.AR
             light = lightPipeline;
             maxIndex = light ? Mathf.Min(2, Sizes.Length - 1) : Sizes.Length - 1;
             index = light ? Mathf.Min(1, maxIndex) : maxIndex;
+            if (manualIndex >= 0) index = Mathf.Min(manualIndex, maxIndex);
             sinceChange = 0; average = 0f;
         }
 
@@ -274,13 +275,23 @@ namespace GlowUp.AR
             if (milliseconds <= 0f) return false;
             average = sinceChange == 0 ? milliseconds : Mathf.Lerp(average, milliseconds, 0.25f);
             sinceChange++;
+            if (!adaptiveEnabled || manualIndex >= 0) return false;
             if (sinceChange < Patience) return false;
             if (average > SlowMs && index > 0) { index--; sinceChange = 0; return true; }
             if (average < FastMs && index < maxIndex) { index++; sinceChange = 0; return true; }
             return false;
         }
 
+        public void SetAdaptiveEnabled(bool value) { adaptiveEnabled = value; }
+        public void SetManualIndex(int value)
+        {
+            manualIndex = value < 0 ? -1 : Mathf.Clamp(value, 0, Sizes.Length - 1);
+            index = manualIndex < 0 ? Mathf.Min(light ? 1 : Sizes.Length - 1, maxIndex) : Mathf.Min(manualIndex, maxIndex);
+            sinceChange = 0;
+        }
+
         public int MaxSide => Sizes[index];
+        public string ResolutionLabel => MaxSide + "px";
         /// <summary>Seconds to wait between two looks (0 = look at every new camera picture as soon as the finder is free).</summary>
         public float MinInterval => (light || index == 0) && SlowestRate > 0f ? 1f / SlowestRate : 0f;
         public float AverageMs => average;

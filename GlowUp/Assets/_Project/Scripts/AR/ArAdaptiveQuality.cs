@@ -79,6 +79,7 @@ namespace GlowUp.AR
         public bool MeshSmoothing => IsLight ? lightMeshSmoothing : fullMeshSmoothing;
         public bool MovingHighlight => IsLight ? lightMovingHighlight : fullMovingHighlight;
         public bool DrawOnlyShownLayer => IsLight && lightDrawsOnlyShownLayer;
+        public bool AdaptiveEnabled => checkFrameRate || debugAdaptiveEnabled;
         /// <summary>True when this phone should not use live tracking at all.</summary>
         public bool PreferGuidedPreview => IsLight && lightUsesGuidedPreview;
         /// <summary>The numbers of the last finished window (for the debug overlay).</summary>
@@ -91,8 +92,11 @@ namespace GlowUp.AR
         readonly float[] frameTimes = new float[MaxFrames];
         readonly float[] sorted = new float[MaxFrames];
         bool running;
+        bool debugAdaptiveEnabled;
         float sinceStart, windowTime; int frames;
         int earlierFrameRate = -2;
+
+        public void SetDebugAdaptiveEnabled(bool value) { checkFrameRate = value; debugAdaptiveEnabled = value; }
 
         /// <summary>Live tracking is about to start: the pipeline is chosen and the frame-rate cap is set.</summary>
         public void BeginSession()
@@ -142,9 +146,9 @@ namespace GlowUp.AR
             };
             LastWindow = window;
             windowTime = 0f; frames = 0;
-            if (!checkFrameRate) return;
+            if (!checkFrameRate && !debugAdaptiveEnabled) return;
 
-            bool automatic = ArQualitySettings.Choice == ArQualityChoice.Automatic;
+            bool automatic = debugAdaptiveEnabled || ArQualitySettings.Choice == ArQualityChoice.Automatic;
             ArTierPolicy.Verdict verdict = policy.Observe(window, automatic, lightFrameRate);
             switch (verdict)
             {

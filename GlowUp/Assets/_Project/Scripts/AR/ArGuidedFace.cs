@@ -2,6 +2,7 @@ using System;
 using GlowUp.Scan;
 using UnityEngine;
 using UnityEngine.UI;
+using Stopwatch = System.Diagnostics.Stopwatch;
 
 namespace GlowUp.AR
 {
@@ -33,8 +34,6 @@ namespace GlowUp.AR
         [Range(0.2f, 5f)] [SerializeField] private float steadiness = 1.2f;
         [Tooltip("How quickly the points follow a fast movement (higher = quicker)")]
         [Range(0f, 40f)] [SerializeField] private float quickness = 8f;
-        [Tooltip("How quickly the drawn face catches up with the newest answer between two looks of the finder")]
-        [Range(5f, 60f)] [SerializeField] private float catchUp = 30f;
         [Tooltip("Seconds a lost face stays on screen while it fades out")]
         [Range(0.05f, 1.5f)] [SerializeField] private float fadeSeconds = 0.35f;
         [Tooltip("A face narrower than this share of the view counts as too far away")]
@@ -75,14 +74,24 @@ namespace GlowUp.AR
         ArFaceMakeup makeup;
         FallbackMakeupOverlay choices;
         ArAdaptiveQuality quality;
+        ArOneEuroSettings filterSettings;
         Transform layerParent;
         CanvasGroup[] oldVisuals;
         Action<string> say;
 
         FaceLandmarkReader reader;
         bool running, prepared, failed;
+        bool smoothingEnabled = true, predictionEnabled = true, adaptiveQualityEnabled = true;
+        int frameSkip, adaptiveFrameSkip, lastSubmittedFrame, lastObservedFrame, resolutionPreset = -1;
+        bool adaptiveReduceHighlights;
+        float frameTimeAverage, slowBudgetSeconds, fastBudgetSeconds;
         readonly GuidedFacePace pace = new GuidedFacePace();
         float nextLook;
+        float submittedFrameTimestamp, resultFrameTimestamp;
+        float lastInferenceMilliseconds, meshUpdateMilliseconds;
+        readonly Vector3[] previousFiltered = new Vector3[Points];
+        readonly Vector3[] velocity = new Vector3[Points];
+        bool havePreviousFiltered;
         int[] pixels;
         int pictureW, pictureH;
 
@@ -105,15 +114,56 @@ namespace GlowUp.AR
         Color skinNow = Color.white, skinTarget = Color.white;
         string lastSaid = "";
 
+        public bool SmoothingEnabled => smoothingEnabled;
+        public bool PredictionEnabled => predictionEnabled;
+        public bool AdaptiveQualityEnabled => adaptiveQualityEnabled;
+        public int FrameSkip => Mathf.Max(frameSkip, adaptiveFrameSkip);
+        public int ManualFrameSkip => frameSkip;
+        public int InferenceSide => pace.MaxSide;
+        public string ResolutionLabel => resolutionPreset < 0 ? "Auto " + pace.ResolutionLabel :
+            (resolutionPreset == 0 ? "Low " : resolutionPreset == 1 ? "Medium " : "High ") + pace.ResolutionLabel;
+        public int CameraWidth => feed != null ? feed.PictureSize.x : 0;
+        public int CameraHeight => feed != null ? feed.PictureSize.y : 0;
+        public float CameraTimestampMs => feed != null ? feed.LastFrameTimestamp * 1000f : 0f;
+        public float CameraFpsEstimate => feed != null ? feed.FrameRateEstimate : 0f;
+        public float LandmarkTimestampMs => resultFrameTimestamp * 1000f;
+        public float LandmarkAgeMs => resultFrameTimestamp > 0f ? Mathf.Max(0f, (Time.realtimeSinceStartup - resultFrameTimestamp) * 1000f) : 0f;
+        public int LagFrames => Mathf.RoundToInt(LandmarkAgeMs * CameraFpsEstimate / 1000f);
+        public float InferenceMilliseconds => lastInferenceMilliseconds;
+        public float MeshUpdateMilliseconds => meshUpdateMilliseconds;
+        public float MinCutoff => filterSettings != null ? filterSettings.minCutoff : steadiness;
+        public float Beta => filterSettings != null ? filterSettings.beta : quickness;
+
+        public void SetSmoothingEnabled(bool value) { smoothingEnabled = value; filter.Reset(); havePreviousFiltered = false; }
+        public void SetPredictionEnabled(bool value) { predictionEnabled = value; }
+        public void SetFrameSkip(int value) { frameSkip = Mathf.Clamp(value, 0, 2); }
+        public void SetAdaptiveQualityEnabled(bool value)
+        {
+            adaptiveQualityEnabled = value;
+            pace.SetAdaptiveEnabled(value);
+            if (!value)
+            {
+                adaptiveFrameSkip = 0;
+                adaptiveReduceHighlights = false;
+                slowBudgetSeconds = fastBudgetSeconds = 0f;
+            }
+        }
+        public void CycleResolutionPreset()
+        {
+            resolutionPreset = (resolutionPreset + 1) % 3;
+            pace.SetManualIndex(resolutionPreset);
+        }
+
         // ---------------------------------------------------------------------------------------
         /// <summary>
         /// Starts following the face in the guided preview. `feed` = the guided camera; `parent` = where the layers go (inside the before/after
         /// clip); `hide` = the old guide's outline and shapes, hidden while the face is followed; `sayLine` = the status line.
         /// </summary>
-        public void Begin(CameraFeedController feedCamera, ArFaceMakeup targetMakeup, ArAdaptiveQuality pipeline, Transform parent, GameObject[] hide, Action<string> sayLine)
+        public void Begin(CameraFeedController feedCamera, ArFaceMakeup targetMakeup, ArAdaptiveQuality pipeline, Transform parent,
+            GameObject[] hide, Action<string> sayLine, ArOneEuroSettings oneEuroSettings)
         {
             End();
-            feed = feedCamera; makeup = targetMakeup; quality = pipeline; layerParent = parent; say = sayLine;
+            feed = feedCamera; makeup = targetMakeup; quality = pipeline; layerParent = parent; say = sayLine; filterSettings = oneEuroSettings;
             choices = makeup != null ? makeup.Choices : null;
             if (feed == null || makeup == null || choices == null || layerParent == null) { Debug.Log("[GuidedFace] not started: an object is missing."); return; }
             oldVisuals = new CanvasGroup[hide != null ? hide.Length : 0];
@@ -124,8 +174,13 @@ namespace GlowUp.AR
                 oldVisuals[i] = group;
             }
             pace.Begin(quality != null && quality.IsLight);
+            pace.SetAdaptiveEnabled(adaptiveQualityEnabled);
+            if (resolutionPreset >= 0) pace.SetManualIndex(resolutionPreset);
             running = true; prepared = false; failed = false; haveFace = false; everSeen = false;
             presence = 0f; lostFor = 0f; tooSmallFor = 0f; darkFor = 0f; nextLook = 0f; lastSaid = "";
+            lastSubmittedFrame = 0; lastObservedFrame = 0; submittedFrameTimestamp = resultFrameTimestamp = 0f;
+            lastInferenceMilliseconds = meshUpdateMilliseconds = 0f; havePreviousFiltered = false;
+            frameTimeAverage = 0f; slowBudgetSeconds = fastBudgetSeconds = 0f; adaptiveFrameSkip = 0; adaptiveReduceHighlights = false;
             gainNow = 1f; skinAmount = 0f;
             _ = makeup.Layers;                     // ArFaceMakeup only works out the colours once its layers exist
             makeup.UseGloss = false;
@@ -148,6 +203,9 @@ namespace GlowUp.AR
             ShowOldGuide(true);
             if (makeup != null) { makeup.Presence = 1f; makeup.SkinAdapt = 0f; makeup.ShineGain = 1f; if (prepared) makeup.SetBrowMask(null); }
             prepared = false;
+            submittedFrameTimestamp = resultFrameTimestamp = 0f;
+            lastInferenceMilliseconds = meshUpdateMilliseconds = 0f;
+            filterSettings = null;
             SetFollowing(false);
             if (was) Debug.Log("[GuidedFace] stopped.");
         }
@@ -166,25 +224,46 @@ namespace GlowUp.AR
             if (!prepared) Prepare();
 
             float now = Time.unscaledTime, dt = Time.unscaledDeltaTime;
+            frameTimeAverage = frameTimeAverage <= 0f ? dt : Mathf.Lerp(frameTimeAverage, dt, 0.08f);
+            AdaptToFrameTime(dt);
             if (reader.TryTake(out float[] answer))
             {
+                lastInferenceMilliseconds = reader.LastMilliseconds;
+                resultFrameTimestamp = submittedFrameTimestamp;
                 pace.Report(reader.LastMilliseconds);
                 if (GuidedFaceShapes.IsFace(answer)) OnFace(answer, now);
                 else OnNoFace();
             }
-            if (feed != null && feed.IsPlaying && now >= nextLook && !reader.Busy && feed.Grab()
+            bool newCameraFrame = feed != null && feed.FrameSequence > lastObservedFrame;
+            if (newCameraFrame) lastObservedFrame = feed.FrameSequence;
+            bool skipFrame = feed != null && feed.FrameSequence - lastSubmittedFrame <= FrameSkip;
+            if (feed != null && feed.IsPlaying && newCameraFrame && !skipFrame && now >= nextLook && !reader.Busy && feed.Grab()
                 && feed.UprightArgb(null, pace.MaxSide, ref pixels, out pictureW, out pictureH) && reader.Look(pixels, pictureW, pictureH))
             {
                 nextLook = now + pace.MinInterval;
+                lastSubmittedFrame = feed.FrameSequence;
+                submittedFrameTimestamp = feed.LastFrameTimestamp;
                 MeasureRoom();
             }
 
-            // the drawn face: it catches up with the newest answer, and fades in or out
+            if (haveFace && LandmarkAgeMs > 120f)
+            {
+                haveFace = false;
+                presence = 0f;
+                makeup.Presence = 0f;
+            }
+
+            // Prediction advances the filtered result from its source camera frame to the currently displayed frame.
             if (haveFace)
             {
-                float t = 1f - Mathf.Exp(-catchUp * dt);
                 Vector3[] target = filter.Values;
-                for (int i = 0; i < Points; i++) shown[i] = Vector3.Lerp(shown[i], target[i], t);
+                float predictionTime = predictionEnabled ? Mathf.Clamp(LandmarkAgeMs * 0.001f, 0f, 0.1f) : 0f;
+                for (int i = 0; i < Points; i++)
+                {
+                    Vector3 delta = velocity[i] * predictionTime;
+                    if (delta.sqrMagnitude > 0.0009f) delta = delta.normalized * 0.03f;
+                    shown[i] = target[i] + delta;
+                }
             }
             else lostFor += dt;
             bool showFace = everSeen && (haveFace || lostFor < fadeSeconds);
@@ -266,10 +345,25 @@ namespace GlowUp.AR
             tooSmallFor = 0f;
 
             for (int i = 0; i < Points; i++) raw[i] = new Vector3(answer[i * 3], answer[i * 3 + 1], 0f);
-            filter.minCutoff = steadiness; filter.beta = quickness; filter.derivativeCutoff = 1f;
+            filter.minCutoff = filterSettings != null ? filterSettings.minCutoff : steadiness;
+            filter.beta = filterSettings != null ? filterSettings.beta : quickness;
+            filter.derivativeCutoff = filterSettings != null ? filterSettings.derivativeCutoff : 1f;
             float dt = haveFace && lastAnswerAt > 0f ? Mathf.Clamp(now - lastAnswerAt, 0.005f, 0.5f) : 1f / 30f;
-            if (!haveFace) filter.Reset();
+            if (!haveFace)
+            {
+                filter.Reset();
+                havePreviousFiltered = false;
+            }
+            if (!smoothingEnabled) filter.Reset();
             filter.Step(raw, Points, dt);
+            if (havePreviousFiltered)
+            {
+                for (int i = 0; i < Points; i++)
+                    velocity[i] = (filter.Values[i] - previousFiltered[i]) / dt;
+            }
+            else Array.Clear(velocity, 0, velocity.Length);
+            Array.Copy(filter.Values, previousFiltered, Points);
+            havePreviousFiltered = true;
             if (!haveFace && presence <= 0.001f) Array.Copy(filter.Values, shown, Points);      // a face that comes back starts where it is, not where it was
             haveFace = true; everSeen = true; lostFor = 0f;
             lastAnswerAt = now;
@@ -285,6 +379,7 @@ namespace GlowUp.AR
         {
             RectTransform view = feed.Viewport;
             if (view == null || layers == null) return;
+            long start = Stopwatch.GetTimestamp();
             Rect rect = view.rect;
             bool mirrored = feed.ShowsMirrored;
             for (int l = 0; l <= GuidedFaceShapes.LayerCount; l++)
@@ -300,6 +395,7 @@ namespace GlowUp.AR
                 }
                 layer.SetPoints(points);
             }
+            meshUpdateMilliseconds = (Stopwatch.GetTimestamp() - start) * 1000f / Stopwatch.Frequency;
         }
 
         /// <summary>Each layer takes the colour ArFaceMakeup works out (part, shade, strength, finish, presence); the highlight the finish's shine.</summary>
@@ -328,12 +424,42 @@ namespace GlowUp.AR
             if (active >= 0 && active < GuidedFaceShapes.LayerCount && active != GuidedFaceShapes.Brows && highlightMasks[active] != null)
             {
                 float twinkle = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * choices.TwinkleSpeed);
-                strength = Mathf.Clamp01(makeup.LayerColour(active).a * 1.2f) * (choices.FinishShine + choices.FinishGlitter * 0.6f * twinkle) * gainNow;
+                strength = adaptiveReduceHighlights ? 0f :
+                    Mathf.Clamp01(makeup.LayerColour(active).a * 1.2f) * (choices.FinishShine + choices.FinishGlitter * 0.6f * twinkle) * gainNow;
                 highlight.SetMask(highlightMasks[active]);
             }
+
             bool shineOn = strength > 0.004f && presence > 0.001f;
             if (highlight.enabled != shineOn) { highlight.enabled = shineOn; if (shineOn) DrawPoints(); }
             if (shineOn) highlight.color = new Color(1f, 1f, 1f, Mathf.Clamp01(strength * 0.55f));
+        }
+
+        void AdaptToFrameTime(float dt)
+        {
+            if (!adaptiveQualityEnabled) return;
+            if (frameTimeAverage > 0.04f)
+            {
+                slowBudgetSeconds += dt;
+                fastBudgetSeconds = 0f;
+                if (slowBudgetSeconds >= 0.75f)
+                {
+                    adaptiveReduceHighlights = true;
+                    adaptiveFrameSkip = Mathf.Min(2, adaptiveFrameSkip + 1);
+                    slowBudgetSeconds = 0f;
+                }
+            }
+            else if (frameTimeAverage < 0.03f)
+            {
+                fastBudgetSeconds += dt;
+                slowBudgetSeconds = 0f;
+                if (fastBudgetSeconds >= 3f)
+                {
+                    adaptiveFrameSkip = Mathf.Max(0, adaptiveFrameSkip - 1);
+                    if (adaptiveFrameSkip == 0) adaptiveReduceHighlights = false;
+                    fastBudgetSeconds = 0f;
+                }
+            }
+            else slowBudgetSeconds = fastBudgetSeconds = 0f;
         }
 
         // ---------------------------------------------------------------------------------------

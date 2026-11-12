@@ -76,6 +76,7 @@ namespace GlowUp.AR
         [SerializeField] private CameraFeedController guidedCamera;
         [Tooltip("On = the guided preview finds the face in the camera picture with the phone's own face finder (MediaPipe, ArGuidedFace) and draws the make-up on it, so the colour follows the face on every phone. Off = the fixed face outline.")]
         [SerializeField] private bool followFaceInGuidedPreview = true;
+        [SerializeField] private ArOneEuroSettings oneEuroSettings;
 
         [Header("Behaviour")]
         [Tooltip("Off = always use the guided preview")]
@@ -127,9 +128,16 @@ namespace GlowUp.AR
         public event Action<bool> ModeDecided;
         /// <summary>True while the make-up is drawn on the real face: live tracking, or the guided preview that follows the face (ArGuidedFace).</summary>
         public bool FollowsFace => IsLive || (guidedFace != null && guidedFace.Following);
+        public ArMeshSmoother DebugMeshSmoother => meshSmoother;
+        public ArFaceHold DebugFaceHold => faceHold;
+        public float CameraTimestampMs => lastCameraFrameAt * 1000f;
+        public float FaceResultTimestampMs => lastFaceUpdateAt * 1000f;
+        public float FaceResultAgeMs => lastFaceUpdateAt > 0f ? Mathf.Max(0f, (Time.realtimeSinceStartup - lastFaceUpdateAt) * 1000f) : 0f;
+        public int FaceFrameLag => Mathf.RoundToInt(FaceResultAgeMs * estimatedCameraFps / 1000f);
         /// <summary>Raised when the guided preview starts or stops following the face.</summary>
         public event Action FollowsFaceChanged;
         ArGuidedFace guidedFace;
+        float lastCameraFrameAt, lastFaceUpdateAt, previousCameraFrameAt, estimatedCameraFps;
 
         const string GuardName = "ar-live-tracking";
         static bool reloadedAfterPermission;
@@ -158,6 +166,7 @@ namespace GlowUp.AR
         {
             if (routine != null || IsLive) return;
             recoveries = 0;
+            lastCameraFrameAt = lastFaceUpdateAt = previousCameraFrameAt = estimatedCameraFps = 0f;
             routine = StartCoroutine(Run());
         }
 
@@ -462,12 +471,18 @@ namespace GlowUp.AR
             var hide = new List<GameObject>(2);
             foreach (Transform child in faceGuide.GetComponentsInChildren<Transform>(true))
                 if (child.name == "FaceGuide" || child.name == "GuideOutline") hide.Add(child.gameObject);
-            guidedFace.Begin(guidedCamera, makeup, quality, parent, hide.ToArray(), Say);
+            guidedFace.Begin(guidedCamera, makeup, quality, parent, hide.ToArray(), Say, oneEuroSettings);
+            if (ArDebugOverlay.Allowed)
+            {
+                if (overlay == null && !TryGetComponent(out overlay)) overlay = gameObject.AddComponent<ArDebugOverlay>();
+                overlay.Begin(quality, lightAdapter, this, makeup, guidedFace, ArDebugOverlay.FlagOn(debugOverlay));
+            }
         }
 
         void StopGuidedFace()
         {
             if (guidedFace != null) guidedFace.End();
+            if (!IsLive && overlay != null) overlay.End();
         }
 
         // shown once the guided camera is running (its own start-up message comes first)
@@ -516,6 +531,14 @@ namespace GlowUp.AR
         void OnFrame(ARCameraFrameEventArgs args)
         {
             frames++;
+            float now = Time.realtimeSinceStartup;
+            lastCameraFrameAt = now;
+            if (previousCameraFrameAt > 0f && now > previousCameraFrameAt)
+            {
+                float currentFps = 1f / (now - previousCameraFrameAt);
+                estimatedCameraFps = estimatedCameraFps <= 0f ? currentFps : Mathf.Lerp(estimatedCameraFps, currentFps, 0.15f);
+            }
+            previousCameraFrameAt = now;
             if (frames == 3 && sharpestCameraMode && !cameraModeChosen) ChooseCameraMode();
         }
 
@@ -605,6 +628,8 @@ namespace GlowUp.AR
         // ---------------------------------------------------------------------------------------
         void OnFacesChanged(ARFacesChangedEventArgs args)
         {
+            if ((args.added != null && args.added.Count > 0) || (args.updated != null && args.updated.Count > 0))
+                lastFaceUpdateAt = Time.realtimeSinceStartup;
             if (usingHold && faceHold != null) faceHold.Observe(args);
             if (args.added == null) return;
             foreach (ARFace face in args.added) Dress(face);
@@ -623,7 +648,7 @@ namespace GlowUp.AR
             if (ArDebugOverlay.Allowed)
             {
                 if (overlay == null && !TryGetComponent(out overlay)) overlay = gameObject.AddComponent<ArDebugOverlay>();
-                overlay.Begin(quality, lightAdapter, this, makeup, ArDebugOverlay.FlagOn(debugOverlay));
+                overlay.Begin(quality, lightAdapter, this, makeup, null, ArDebugOverlay.FlagOn(debugOverlay));
             }
         }
 
