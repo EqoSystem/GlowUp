@@ -49,6 +49,20 @@ namespace GlowUp.Data
 
         static void Changed() { byId = null; ProductRepository.BrandsChanged(); }
 
+        /// <summary>The brand document referenced by a product, including inactive or archived brands.</summary>
+        public static BrandData FindById(string brandId)
+        {
+            if (string.IsNullOrEmpty(brandId)) return null;
+            FromPhone();
+            if (holder == null) return null;
+            if (byId == null)
+            {
+                byId = new Dictionary<string, BrandData>();
+                foreach (BrandData b in holder.items) if (b != null && !string.IsNullOrEmpty(b.id)) byId[b.id] = b;
+            }
+            return byId.TryGetValue(brandId, out BrandData brand) ? brand : null;
+        }
+
         static async Task Refresh(bool everything)
         {
             if (!everything && holder != null && CatalogSync.IsFresh(lastCheck)) return;
@@ -110,15 +124,8 @@ namespace GlowUp.Data
         /// </summary>
         public static bool IsSwitchedOff(string brandId)
         {
-            if (string.IsNullOrEmpty(brandId)) return false;
-            FromPhone();
-            if (holder == null) return false;
-            if (byId == null)
-            {
-                byId = new Dictionary<string, BrandData>();
-                foreach (BrandData b in holder.items) if (b != null && !string.IsNullOrEmpty(b.id)) byId[b.id] = b;
-            }
-            return byId.TryGetValue(brandId, out BrandData brand) && (brand.binned || !IsActive(brand.status));
+            BrandData brand = FindById(brandId);
+            return brand != null && (brand.binned || !IsActive(brand.status));
         }
 
         /// <summary>

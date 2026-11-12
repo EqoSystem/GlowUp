@@ -96,6 +96,7 @@ namespace GlowUp.Data
     public class ProductData
     {
         public string id, name, brandId, brandName, cosmeticType, description, status;
+        public bool recommendable;
         public string officialIngredientSource, shadeColor;
         public int minAge;
         public long scans;                       // how many times app users scanned this product (shown on the website)

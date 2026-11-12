@@ -25,10 +25,6 @@ namespace GlowUp.Scan
         [Tooltip("The longest text that can still be one ingredient name (longer pieces of label text are thrown away)")]
         [Range(40, 120)] public int longestIngredientName = 70;
 
-        [Header("Recommendations for a user with a skin condition")]
-        [Tooltip("A product is recommended to such a user only when the app knows every one of its ingredients. This many unknown ingredients are tolerated (0 = none).")]
-        [Min(0)] public int unknownIngredientsAllowed = 0;
-
         [Header("Keeping the product, brand and ingredient lists up to date")]
         [Tooltip("A list that was checked less than this many minutes ago is used as it is, without asking the database again")]
         [Min(0f)] public float refreshMinutes = 10f;
@@ -106,7 +102,6 @@ namespace GlowUp.Scan
             IngredientKnowledge.FuzzyThreshold = Mathf.Clamp(fuzzyMatchThreshold, 0.5f, 1f);
             ProductAnalysisEngine.MinimumCheckedShare = Mathf.Clamp01(minimumCheckedShare);
             IngredientStoplist.MaximumLength = Mathf.Max(20, longestIngredientName);
-            ProductRecommender.UnknownAllowedWithCondition = Mathf.Max(0, unknownIngredientsAllowed);
             CatalogSync.RefreshMinutes = Mathf.Max(0f, refreshMinutes);
             CatalogSync.FullDownloadEveryHours = Mathf.Max(1f, fullDownloadEveryHours);
             AiBudget.RecognitionsPerSession = Mathf.Max(0, aiRecognitionsPerScanSession);

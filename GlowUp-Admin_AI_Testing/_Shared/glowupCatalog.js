@@ -575,3 +575,92 @@ export function productVisibility(product, brand) {
     }
     return { live: true, reason: "live" };
 }
+
+export const RECOMMENDABILITY_REASON_TEXT = {
+    "product-missing": "Product record is missing.",
+    "product-name-missing": "Product name is missing.",
+    "product-archived": "Product is in the Recycle bin.",
+    "product-not-active": "Product is not Active.",
+    "brand-missing": "A valid brand record is missing.",
+    "brand-archived": "Brand is in the Recycle bin.",
+    "brand-inactive": "Brand is not Active.",
+    "brand-name-missing": "Brand name is missing.",
+    "brand-category-missing": "Brand category is missing.",
+    "brand-category-not-makeup": "Brand category is not Makeup.",
+    "brand-name-mismatch": "Product brand does not match its linked brand.",
+    "category-missing": "Product category is missing.",
+    "not-makeup": "Product is not makeup.",
+    "ingredients-missing": "Ingredient list is empty.",
+    "ingredient-unresolved": "One or more ingredients are not in the Ingredient Curator.",
+    "ingredient-not-evaluable": "One or more ingredients are not yet evaluable."
+};
+
+function ingredientNameForms(value) {
+    const raw = text(value).trim();
+    const forms = [raw, raw.replace(/\s*\([^)]*\)/g, " ").trim()];
+    const bracketed = raw.match(/\(([^)]*)\)/g) || [];
+    bracketed.forEach((part) => forms.push(part.slice(1, -1)));
+    return Array.from(new Set(forms.map(normalizeName).filter(Boolean)));
+}
+
+export function createRecommendabilityChecker(ingredients) {
+    const knownByName = new Map();
+    live(ingredients).forEach((ingredient) => {
+        const keys = [ingredient.name, ingredient.techName, ...list(ingredient.aliases)].flatMap(ingredientNameForms);
+        const usable = ingredient.generic !== true && !(text(ingredient.source).trim().toLowerCase() === "ai" && ingredient.reviewed !== true);
+        keys.forEach((key) => {
+            const previous = knownByName.get(key);
+            if (!previous || (!previous.usable && usable)) knownByName.set(key, { usable });
+        });
+    });
+    const knownNames = Array.from(knownByName.keys());
+
+    const findMatches = (forms) => {
+        const exact = forms.map((form) => knownByName.get(form)).filter(Boolean);
+        if (exact.length > 0) return exact;
+        const close = [];
+        forms.forEach((form) => {
+            knownNames.forEach((known) => {
+                const longest = Math.max(form.length, known.length);
+                if (longest < 4 || Math.abs(form.length - known.length) / longest > 0.15) return;
+                if (editDistance(form, known) / longest <= 0.15) close.push(knownByName.get(known));
+            });
+        });
+        return close;
+    };
+
+    return function recommendationEligibility(product, brand) {
+        const reasonCodes = [];
+        const add = (code) => { if (!reasonCodes.includes(code)) reasonCodes.push(code); };
+        const statusOf = (item) => text(item && (item.rawStatus !== undefined ? item.rawStatus : item.status)).trim().toLowerCase();
+
+        if (!product) return { recommendable: false, reasonCodes: ["product-missing"] };
+        if (!text(product.name).trim()) add("product-name-missing");
+        if (product.binned === true) add("product-archived");
+        if (statusOf(product) !== "active") add("product-not-active");
+
+        if (!brand || !text(product.brandId).trim() || product.brandId !== brand.id || brand.binned === true) {
+            add(brand && brand.binned === true ? "brand-archived" : "brand-missing");
+        } else {
+            if (statusOf(brand) !== "active") add("brand-inactive");
+            if (!text(brand.name).trim()) add("brand-name-missing");
+            if (!text(brand.category).trim()) add("brand-category-missing");
+            else if (normalizeName(brand.category) !== "makeup") add("brand-category-not-makeup");
+            const brandNames = [brand.name, ...list(brand.aliases)].map(normalizeName).filter(Boolean);
+            if (!text(product.brandName).trim() || !brandNames.includes(normalizeName(product.brandName))) add("brand-name-mismatch");
+        }
+
+        if (!text(product.cosmeticType).trim()) add("category-missing");
+        else if (judgeProduct(product.cosmeticType, product.name).kind !== "makeup") add("not-makeup");
+
+        const productIngredients = list(product.ingredients);
+        if (productIngredients.length === 0) add("ingredients-missing");
+        else productIngredients.forEach((ingredient) => {
+            const matches = findMatches(ingredientNameForms(ingredient));
+            if (matches.length === 0) add("ingredient-unresolved");
+            else if (!matches.some((match) => match.usable)) add("ingredient-not-evaluable");
+        });
+
+        return { recommendable: reasonCodes.length === 0, reasonCodes };
+    };
+}

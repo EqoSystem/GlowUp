@@ -79,6 +79,48 @@ namespace GlowUp.Data
             return usable = list;
         }
 
+        /// <summary>Fetches a bounded candidate buffer using the shared Firestore recommendation flag.</summary>
+        public static async Task<List<ProductData>> LoadRecommendable(int limit)
+        {
+            if (limit <= 0) return new List<ProductData>();
+            if (!ConnectivityMonitor.Reachable || !await FirebaseBootstrap.Ready)
+                return CachedRecommendable(limit);
+
+            try
+            {
+                QuerySnapshot snapshot = await FirebaseFirestore.DefaultInstance.Collection("products")
+                    .WhereEqualTo("recommendable", true)
+                    .Limit(limit)
+                    .GetSnapshotAsync(Source.Server)
+                    .OrTimeout(12f, "Loading recommendation candidates");
+                ReadCounter.AddQuery("recommendable products", snapshot.Count);
+                var products = new List<ProductData>(snapshot.Count);
+                foreach (DocumentSnapshot document in snapshot.Documents)
+                {
+                    ProductData product = Read(document);
+                    if (product != null) products.Add(product);
+                }
+                return products;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("Recommendation query failed; using cached recommendable products: " + e.Message);
+                return CachedRecommendable(limit);
+            }
+        }
+
+        static List<ProductData> CachedRecommendable(int limit)
+        {
+            var products = new List<ProductData>();
+            foreach (ProductData product in Usable())
+            {
+                if (!product.recommendable) continue;
+                products.Add(product);
+                if (products.Count >= limit) break;
+            }
+            return products;
+        }
+
         /// <summary>The look-up table of the products the app may use: by barcode, by name, by alias, by word.</summary>
         public static ProductIndex Index => usableIndex ?? (usableIndex = ProductIndex.Build(Usable(), LocalAliases.All()));
 
@@ -281,6 +323,7 @@ namespace GlowUp.Data
                 cosmeticType = type, description = f.Str("description"),
                 status = f.Str("status", "Active"), shadeColor = shade, minAge = f.Int("minAge"), scans = f.Long("scans"),
                 source = f.Str("source"), officialIngredientSource = ingredientsSource, reviewed = f.Bool("reviewed"), barcode = f.Str("barcode"),
+                recommendable = f.Bool("recommendable"),
                 ingredients = ingredients,
                 skinCareActiveIngredients = f.NestedList("key_ingredient_breakdown", "skin_care_active_ingredients"),
                 baseTextureFormulators = f.NestedList("key_ingredient_breakdown", "base_texture_formulators"),

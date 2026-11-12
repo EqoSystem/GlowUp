@@ -50,8 +50,8 @@ namespace GlowUp.Dashboard
         [SerializeField] private int maximumRecommendations = 8;
         [SerializeField] private CosmeticTypeIcons typeIcons;
         [SerializeField] private string msgLoading = "Looking for make-up that matches your profile...";
-        [Tooltip("Shown when no product passes the check. The app never falls back to showing a product that did not pass.")]
-        [SerializeField] private string msgNone = "No make-up products matched your profile yet. Scan a product to check it.";
+        [SerializeField] private string msgProfileIncomplete = "Complete your skin profile to see personalized recommendations.";
+        [SerializeField] private string msgNoneComplete = "We're still building recommendations for you.";
         [Tooltip("The small line under the heading that says what a recommendation means. Optional.")]
         [SerializeField] private TextMeshProUGUI recommendationsNoteText;
         [SerializeField] private string noteStandard = "No ingredients flagged for your profile. This is not medical advice.";
@@ -121,7 +121,11 @@ namespace GlowUp.Dashboard
             catch (Exception e)
             {
                 Debug.LogWarning("Dashboard: recommendations not loaded: " + e.Message);
-                if (this != null && recommendationsEmptyText != null) { recommendationsEmptyText.gameObject.SetActive(true); recommendationsEmptyText.text = msgNone; }
+                if (this != null && recommendationsEmptyText != null)
+                {
+                    recommendationsEmptyText.gameObject.SetActive(true);
+                    recommendationsEmptyText.text = ProductRecommender.IsProfileComplete(profile) ? msgNoneComplete : msgProfileIncomplete;
+                }
             }
             if (this != null && recommendationsSkeleton != null) recommendationsSkeleton.SetActive(false);
         }
@@ -167,18 +171,27 @@ namespace GlowUp.Dashboard
         // ---------------------------------------------------------------------------------------
         async System.Threading.Tasks.Task ShowRecommendations()
         {
-            List<ProductData> products = await ProductRepository.LoadActive();
-            await IngredientRepository.LoadAll();
-            if (this == null) return;
-
             foreach (var c in cards) if (c != null) Destroy(c);
             cards.Clear(); tiles.Clear();
 
-            // Only MAKE-UP whose ingredients are not flagged for this user. For a user who saved a skin condition the check is
-            // stricter: the ingredient list must have a source and every ingredient must be known (see ProductRecommender).
-            // All of it is worked out on the phone. (How strict it is: Assets/_Project/Resources/ScanRules.asset)
             var who = profile ?? new UserProfileData();
-            foreach (ProductRecommender.Pick pick in ProductRecommender.For(who, products, maximumRecommendations))
+            if (!ProductRecommender.IsProfileComplete(who))
+            {
+                if (recommendationsEmptyText != null)
+                {
+                    recommendationsEmptyText.gameObject.SetActive(true);
+                    recommendationsEmptyText.text = msgProfileIncomplete;
+                }
+                if (recommendationsNoteText != null) recommendationsNoteText.gameObject.SetActive(false);
+                return;
+            }
+
+            await ProductRepository.LoadActive();
+            await IngredientRepository.LoadAll();
+            if (this == null) return;
+            int rowLimit = Math.Max(0, maximumRecommendations);
+            List<ProductData> products = await ProductRepository.LoadRecommendable(rowLimit + 4);
+            foreach (ProductRecommender.Pick pick in ProductRecommender.For(who, products, BrandRepository.All(), rowLimit))
             {
                 ProductData product = pick.product;
                 ScanRecord record = pick.record;
@@ -201,7 +214,7 @@ namespace GlowUp.Dashboard
             if (recommendationsEmptyText != null)
             {
                 recommendationsEmptyText.gameObject.SetActive(cards.Count == 0);
-                recommendationsEmptyText.text = msgNone;
+                recommendationsEmptyText.text = msgNoneComplete;
             }
             // what a recommendation means, and does not mean: said under the heading when there is something to show
             if (recommendationsNoteText != null)

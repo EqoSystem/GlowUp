@@ -96,7 +96,8 @@ namespace GlowUp.Data
                         aliases = f.List("aliases"), allergenTags = f.List("allergenTags"), highlights = f.List("highlights"),
                         avoidForSkinTypes = f.List("avoidForSkinTypes"), avoidForConditions = f.List("avoidForConditions"),
                         goodForSkinTypes = f.List("goodForSkinTypes"), goodForConditions = f.List("goodForConditions"),
-                        source = f.Str("source"), reviewed = f.Bool("reviewed"), sources = f.List("sources"), fdaUnii = f.Str("fdaUnii")
+                        source = f.Str("source"), reviewed = f.Bool("reviewed"), sources = f.List("sources"),
+                        fdaUnii = f.Str("fdaUnii"), generic = f.Bool("generic")
                     });
                 }
                 // entries this phone's AI lookup found that are still on their way to the cloud stay available

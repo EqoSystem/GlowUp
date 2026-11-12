@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using GlowUp.Data;
+using UnityEngine;
 
 namespace GlowUp.Scan
 {
@@ -13,27 +14,29 @@ namespace GlowUp.Scan
     ///   2. it has an ingredient list;
     ///   3. the user is old enough for it (the product's minimum age, when the website gives one);
     ///   4. not one of its ingredients is flagged for this user (allergens, skin type, skin conditions, age).
-    /// For a user who saved a SKIN CONDITION the check is stricter, because "we do not know" is not good enough for them:
-    ///   5. the ingredient list must come from a source (an admin typed or reviewed it, or pages are on file);
-    ///   6. every ingredient must be one the app knows (at most <see cref="UnknownAllowedWithCondition"/> unknown ones).
+    /// A valid recommendation also requires a complete catalog record and every ingredient to be evaluable by the
+    /// analysis engine. Users with a skin condition additionally need a sourced ingredient list.
     ///
     /// What a suggestion means: "no ingredients flagged for your profile". It never means "safe" or "good for your
     /// condition", and the app says so next to the list.
     /// </summary>
     public static class ProductRecommender
     {
-        /// <summary>For a user with a skin condition: how many ingredients of a product the app may not know and still suggest it. 0 = none.</summary>
-        public static int UnknownAllowedWithCondition = 0;
-
         public enum Refusal
         {
             None,               // it may be suggested
+            NotRecommendable,
+            NotMarkedRecommendable,
+            MissingProductName,
+            InvalidBrand,
+            InactiveProduct,
+            MissingCategory,
             NotMakeup,
             NoIngredientList,
             TooYoung,
             Flagged,            // an ingredient is flagged for this user
             Unsourced,          // skin condition: nobody vouches for the ingredient list
-            NotFullyChecked     // skin condition: some ingredients are unknown to the app
+            NotFullyChecked     // at least one ingredient cannot be evaluated
         }
 
         /// <summary>One product that passed, with the analysis made for this user.</summary>
@@ -43,27 +46,131 @@ namespace GlowUp.Scan
             public ScanRecord record;
         }
 
-        /// <summary>May this product be suggested to this user? `record` is the analysis that was made for the decision (null when it never got that far).</summary>
+        /// <summary>The minimum profile needed for a personalized recommendation.</summary>
+        public static bool IsProfileComplete(UserProfileData profile)
+        {
+            if (profile == null || string.IsNullOrWhiteSpace(profile.skinType) || string.IsNullOrWhiteSpace(profile.skinTone)
+                || profile.knownAllergens == null) return false;
+            foreach (string answer in profile.knownAllergens) if (!string.IsNullOrWhiteSpace(answer)) return true;
+            return false;
+        }
+
+        /// <summary>Whether the catalog record is complete enough to appear on either recommendation surface.</summary>
+        public static bool IsRecommendable(ProductData product, BrandData brand, out string reasonCode)
+        {
+            reasonCode = "";
+            if (product == null) { reasonCode = "product-missing"; return false; }
+            if (!product.recommendable) { reasonCode = "recommendable-flag-false"; return false; }
+            if (string.IsNullOrWhiteSpace(product.name)) { reasonCode = "product-name-missing"; return false; }
+            if (product.binned) { reasonCode = "product-archived"; return false; }
+            if (!string.Equals((product.status ?? "").Trim(), "Active", StringComparison.OrdinalIgnoreCase))
+            {
+                reasonCode = "product-not-active";
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(product.brandId) || brand == null || brand.id != product.brandId)
+            {
+                reasonCode = "brand-missing";
+                return false;
+            }
+            if (brand.binned) { reasonCode = "brand-archived"; return false; }
+            if (!string.Equals((brand.status ?? "").Trim(), "Active", StringComparison.OrdinalIgnoreCase))
+            {
+                reasonCode = "brand-inactive";
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(brand.name)) { reasonCode = "brand-name-missing"; return false; }
+            if (string.IsNullOrWhiteSpace(brand.category)) { reasonCode = "brand-category-missing"; return false; }
+            if (!string.Equals(brand.category.Trim(), "Makeup", StringComparison.OrdinalIgnoreCase))
+            {
+                reasonCode = "brand-category-not-makeup";
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(product.brandName) || !BrandNameMatches(product.brandName, brand))
+            {
+                reasonCode = "brand-name-mismatch";
+                return false;
+            }
+            if (string.IsNullOrWhiteSpace(product.cosmeticType)) { reasonCode = "category-missing"; return false; }
+            if (!ProductScope.IsMakeup(product.cosmeticType, product.name)) { reasonCode = "not-makeup"; return false; }
+            if (product.ingredients == null || product.ingredients.Count == 0) { reasonCode = "ingredients-missing"; return false; }
+
+            foreach (string ingredient in product.ingredients)
+            {
+                IngredientKnowledge.Match match = IngredientTextParser.MatchEntry(ingredient);
+                if (!match.Found || match.data == null) { reasonCode = "ingredient-unresolved"; return false; }
+                if (match.kind == IngredientKnowledge.MatchKind.Family || match.data.generic || match.data.IsUnreviewedAi())
+                {
+                    reasonCode = "ingredient-not-evaluable";
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        static bool BrandNameMatches(string productBrandName, BrandData brand)
+        {
+            if (TextKey.Same(productBrandName, brand.name)) return true;
+            if (brand.aliases != null)
+                foreach (string alias in brand.aliases) if (TextKey.Same(productBrandName, alias)) return true;
+            return false;
+        }
+
+        /// <summary>May this product be suggested to this user? `record` is the analysis made for the decision.</summary>
         public static Refusal Check(ProductData product, UserProfileData who, out ScanRecord record)
+        {
+            return Check(product, BrandRepository.FindById(product != null ? product.brandId : null), who, out record, out _);
+        }
+
+        public static Refusal Check(ProductData product, BrandData brand, UserProfileData who, out ScanRecord record)
+        {
+            return Check(product, brand, who, out record, out _);
+        }
+
+        static Refusal Check(ProductData product, BrandData brand, UserProfileData who, out ScanRecord record, out string reasonCode)
         {
             record = null;
             who = who ?? new UserProfileData();
-            if (product == null || !ProductScope.IsMakeup(product.cosmeticType, product.name)) return Refusal.NotMakeup;
-            if (product.ingredients == null || product.ingredients.Count == 0) return Refusal.NoIngredientList;
-            if (product.minAge > 0 && who.age > 0 && who.age < product.minAge) return Refusal.TooYoung;
+            if (!IsRecommendable(product, brand, out reasonCode)) return RefusalFor(reasonCode);
+            if (product.minAge > 0 && who.age > 0 && who.age < product.minAge) { reasonCode = "too-young"; return Refusal.TooYoung; }
 
             bool condition = ProductScope.HasSkinCondition(who);
-            if (condition && !HasSource(product)) return Refusal.Unsourced;
+            if (condition && !HasSource(product)) { reasonCode = "ingredient-list-unsourced"; return Refusal.Unsourced; }
 
             record = ProductAnalysisEngine.Analyse(product.ingredients, "", who, null, product.name, product.brandName, product.cosmeticType);
-            if (record.status != "safe") return Refusal.Flagged;
-            if (condition && CountUnknown(record) > Math.Max(0, UnknownAllowedWithCondition)) return Refusal.NotFullyChecked;
+            if (record.status != "safe") { reasonCode = "analysis-flagged"; return Refusal.Flagged; }
+            if (CountUnknown(record) > 0) { reasonCode = "analysis-incomplete"; return Refusal.NotFullyChecked; }
 
             record.source = "recommendation";
             record.brandId = product.brandId;
             record.productId = product.id;
             record.productShades = new List<string>(product.shades ?? new List<string>());
+            reasonCode = "";
             return Refusal.None;
+        }
+
+        static Refusal RefusalFor(string reasonCode)
+        {
+            switch (reasonCode)
+            {
+                case "recommendable-flag-false": return Refusal.NotMarkedRecommendable;
+                case "product-name-missing": return Refusal.MissingProductName;
+                case "product-not-active":
+                case "product-archived": return Refusal.InactiveProduct;
+                case "brand-missing":
+                case "brand-archived":
+                case "brand-inactive":
+                case "brand-name-missing":
+                case "brand-category-missing":
+                case "brand-category-not-makeup":
+                case "brand-name-mismatch": return Refusal.InvalidBrand;
+                case "category-missing": return Refusal.MissingCategory;
+                case "not-makeup": return Refusal.NotMakeup;
+                case "ingredients-missing": return Refusal.NoIngredientList;
+                case "ingredient-unresolved":
+                case "ingredient-not-evaluable": return Refusal.NotFullyChecked;
+                default: return Refusal.NotRecommendable;
+            }
         }
 
         /// <summary>
@@ -72,13 +179,26 @@ namespace GlowUp.Scan
         /// </summary>
         public static List<Pick> For(UserProfileData who, IEnumerable<ProductData> products, int maximum, Func<ProductData, bool> alsoRequire = null)
         {
+            return For(who, products, BrandRepository.All(), maximum, alsoRequire);
+        }
+
+        public static List<Pick> For(UserProfileData who, IEnumerable<ProductData> products, IEnumerable<BrandData> brands, int maximum, Func<ProductData, bool> alsoRequire = null)
+        {
             var picks = new List<Pick>();
             if (products == null) return picks;
+            var brandById = new Dictionary<string, BrandData>(StringComparer.Ordinal);
+            if (brands != null)
+                foreach (BrandData brand in brands)
+                    if (brand != null && !string.IsNullOrEmpty(brand.id)) brandById[brand.id] = brand;
             foreach (ProductData product in products)
             {
                 if (picks.Count >= maximum) break;
                 if (product == null || (alsoRequire != null && !alsoRequire(product))) continue;
-                if (Check(product, who, out ScanRecord record) == Refusal.None) picks.Add(new Pick { product = product, record = record });
+                brandById.TryGetValue(product.brandId ?? "", out BrandData brand);
+                Refusal refusal = Check(product, brand, who, out ScanRecord record, out string reasonCode);
+                if (refusal == Refusal.None) picks.Add(new Pick { product = product, record = record });
+                else if (product.recommendable && refusal != Refusal.NotMarkedRecommendable)
+                    Debug.LogWarning($"[RecFilter] productId={product.id} reason={reasonCode}");
             }
             return picks;
         }

@@ -20,6 +20,7 @@
 // A card shows the ingredient's name and its scientific name only. A click on it shows everything else.
 import { db } from "../_Database/firebase-console.js";
 import { collection, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { refreshRecommendabilityFlags } from "../_Shared/recommendabilityAdmin.js";
 // reading and writing go through the site's own copy of its lists: a list is downloaded once and kept between pages,
 // and after a change only the documents that were written are read again (see adminStore.js)
 import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed } from "../_Shared/adminStore.js";
@@ -285,6 +286,7 @@ async function loadIngredients() {
                 goodForConditions: asArray(data.goodForConditions),
                 source: String(data.source || "").trim().toLowerCase(),
                 reviewed: data.reviewed === true,
+                generic: data.generic === true,
                 sources: Array.isArray(data.sources) ? data.sources.map((s) => String(s)) : [],
                 fdaUnii: String(data.fdaUnii || "").trim(),
                 via: String(data.via || "").trim().toLowerCase(),
@@ -352,6 +354,12 @@ async function loadIngredients() {
     } catch (error) {
         console.warn("Could not read the products: ", error);
         productUseKnown = false;
+    }
+    try {
+        await refreshRecommendabilityFlags({ ingredients: everyIngredient });
+    } catch (error) {
+        console.error("Could not refresh recommendation eligibility after ingredient curation: ", error);
+        notify("Recommendation eligibility could not be refreshed. " + describeError(error), "error");
     }
     afterChange();
 }

@@ -600,7 +600,7 @@ namespace GlowUp.Result
                 return string.Equals(p.cosmeticType, record.cosmeticType, StringComparison.OrdinalIgnoreCase)
                     || (ShadeAdvisor.IsColourCosmetic(p.cosmeticType) && ShadeAdvisor.IsColourCosmetic(record.cosmeticType) && ShadeAdvisor.AreaFor(p.cosmeticType) == area);
             }
-            foreach (ProductRecommender.Pick pick in ProductRecommender.For(who, products, maximumAlternatives, SameKind))
+            foreach (ProductRecommender.Pick pick in ProductRecommender.For(who, products, BrandRepository.All(), maximumAlternatives, SameKind))
             {
                 ProductData p = pick.product;
                 ScanRecord alt = pick.record;

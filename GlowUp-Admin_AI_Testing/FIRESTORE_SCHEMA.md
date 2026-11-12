@@ -60,9 +60,16 @@ The admin website and the mobile app use the same Firebase project (`glowup-admi
 | `tags` | list of text | Words a product can be found by (kind, brand, `has-shades`, `no-ingredient-list`, `fda-listed`), at most 20. Lets a filter use one query on the product alone. |
 | `minAge` | number | 0 means no limit. A younger user who scans the product is warned. |
 | `status` | text | `Active`, `Pending` or `Inactive`. |
+| `recommendable` | yes/no | Admin-calculated shared completeness flag for Alternatives and Recommended for you. The app still rechecks the product, brand and ingredient records at display time. |
 | `scans` | number | The app adds 1 each time a scan is recognised as this product. |
 | `source`, `reviewed` | text, yes/no | File imports use `document-import` and `false`; they are saved as Pending until checked. |
 | `aiAssistModel` | text | Model used for an admin-reviewed ingredient-list suggestion. Existing ingredient lists are not overwritten. |
+
+### Recommendation eligibility
+
+The admin website maintains one `products/{id}.recommendable` boolean. Its backfill also removes the retired `alternativeEligible` field if it exists. The shared rule requires an active, unbinned product with a name, makeup category, an active, unbinned Makeup brand linked by id and matching name, a non-empty ingredient list, and every ingredient resolving to a record the app's analysis engine can evaluate. The app applies the same completeness gate to Alternatives and Recommended for you, then runs the user's profile analysis before display.
+
+The home query is `products.where("recommendable", "==", true).limit(...)`; it adds no order-by, so Firestore's automatic single-field index is sufficient and no composite index is required. Profile-fit filtering and ordering remain on-device. The admin Dashboard, Brand & Product Inventory, and Ingredient Curator run the same admin-side backfill after opening or editing the catalog so ingredient corrections can make products eligible without an app redeploy.
 | `createdAt`, `updatedAt` | time | Set by the website. |
 
 Brand & Product Inventory can extract text from PDF, Excel (`.xlsx`/`.xls`), and Word (`.docx`) files and create new matching entries. Only extracted text is sent to the admin-only AI endpoint; imported records are never activated or used to overwrite a matching existing product. A scanned PDF (no text layer) is read with text recognition (tesseract.js) in the browser, at most 10 pages, one after the other; nothing is uploaded. Legacy `.doc` files are not supported.
