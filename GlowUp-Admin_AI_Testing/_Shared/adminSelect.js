@@ -1,14 +1,14 @@
-// A drop-down that looks like the site (dark panel, pink hover and selected row) and works from an ordinary <select>.
-// The <select> stays in the page, hidden, as the one source of truth: its options are what is offered and its value is what is read, so
-// any code that fills it or reads it keeps working. After changing its options by code, call refresh().
-//
-// Option conventions (on the <option>):
-//   value ""        the placeholder: shown on the button while nothing is chosen, greyed in the list, never selectable
-//   disabled        a line that is shown but cannot be chosen (the thin separator above "+ Add ..." is an option with data-sep)
-//   data-add        an action row ("+ Add new classification"): stays at the bottom whatever is typed in the filter
-// More than FILTER_FROM choices: a box to type in filters the list. The open list scrolls when it is long.
-//
-// Keys: Enter, Space or the arrows open it; the arrows move; Enter chooses; Esc closes it (and only it); Tab leaves.
+
+
+
+
+
+
+
+
+
+
+
 import { matchesSearch } from "./glowupRules.js";
 
 const FILTER_FROM = 10;
@@ -50,9 +50,9 @@ export function makeCombo(select) {
     select.after(box);
     const nativeLabel = document.querySelector(`label[for="${select.id}"]`);
     if (nativeLabel) nativeLabel.htmlFor = button.id;
-    select.focus = () => button.focus();            // code that sends the person to this field lands on the visible button
+    select.focus = () => button.focus();
 
-    let at = -1;                                    // the highlighted row among the rows that can be chosen
+    let at = -1;
     const rows = () => Array.from(list.querySelectorAll("[role=option]:not([aria-disabled=true])"));
     const isOpen = () => !pop.hidden;
 
@@ -80,7 +80,7 @@ export function makeCombo(select) {
             row.setAttribute("aria-disabled", String(off));
             row.setAttribute("aria-selected", String(!placeholder && option.value === select.value));
             if (!off) {
-                row.addEventListener("mousedown", (event) => event.preventDefault());       // the filter box keeps the focus
+                row.addEventListener("mousedown", (event) => event.preventDefault());
                 row.addEventListener("click", () => choose(option.value));
                 row.addEventListener("mousemove", () => { at = rows().indexOf(row); paintActive(false); });
             }
@@ -112,7 +112,7 @@ export function makeCombo(select) {
 
     function open() {
         if (isOpen()) return;
-        document.body.appendChild(pop);               // out of the window's scroll area (and of its blurred layer, which would hold a fixed box inside it)
+        document.body.appendChild(pop);
         const choices = Array.from(select.options).filter((o) => o.value !== "" && !o.disabled && !o.hasAttribute("data-add")).length;
         filter.hidden = choices <= FILTER_FROM;
         filter.value = "";

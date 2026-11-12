@@ -1,15 +1,15 @@
-// The editable lists an ingredient can point at: Allergen Family, Highlights and Skin Conditions.
-//
-// They live in ONE document, config/lists (see listRules.js for its shape and the rules about ids). The website reads it
-// once per page (1 read, counted by the [reads] counter) and the phone app reads it about once per list check.
-// While the document does not exist, the built-in lists are used (the same as the app's own), so nothing breaks before the
-// first save. Only an admin can write it (firestore.rules).
-//
-//   loadLists()            - the three lists (built-in when the document is missing or cannot be read)
-//   optionsOf(kind, keep)  - [{ value: id, label }] for a picker: not retired, plus the retired ones in `keep`
-//   openListManager(kind)  - the "Edit list" window: add, rename, reorder, retire / restore, delete, with look-alike checks
-//
-// Everything typed is put on the page with textContent or .value, never as HTML.
+
+
+
+
+
+
+
+
+
+
+
+
 import { db } from "../_Database/firebase-console.js";
 import { doc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { noteReads, setDoc } from "./adminStore.js";
@@ -22,11 +22,11 @@ export const KINDS = {
     highlights: { title: "Highlights", one: "highlight", words: false, intro: "A highlighted ingredient shows up among the chips of a scan result, even when it is safe. Key active and Umbrella term are built in." }
 };
 
-let current = null;                                   // { version, exists, allergens, conditions, highlights }
+let current = null;
 
 const copyLists = (lists) => ({ version: lists.version, exists: lists.exists, allergens: lists.allergens.map((i) => cleanItem(i)), conditions: lists.conditions.map((i) => cleanItem(i)), highlights: lists.highlights.map((i) => cleanItem(i)) });
 
-/** The lists. Read from the database once (and again with `force`); the built-in ones when that is not possible. */
+
 export async function loadLists(force) {
     if (current && !force) return copyLists(current);
     try {
@@ -40,21 +40,21 @@ export async function loadLists(force) {
     return copyLists(current);
 }
 
-/** The lists as last loaded (built-in ones before the first load). */
+
 export const listsNow = () => copyLists(current || Object.assign(normalizeLists(null), { exists: false }));
 
-/** The label of an id ("fragrance" -> "Fragrance / Parfum"); the id itself when it is not in the list. */
+
 export function labelOf(kind, id) {
     const found = (current ? current[kind] : BUILT_IN[kind] || []).find((item) => item.id.toLowerCase() === String(id).toLowerCase());
     return found ? found.label : String(id);
 }
 
-/** Every item of a list as [{ value, label }], retired ones too: to name what is already saved on an ingredient. */
+
 export function allOptions(kind) {
     return (current ? current[kind] : normalizeLists(null)[kind]).map((item) => ({ value: item.id, label: item.label }));
 }
 
-/** Options for a picker: [{ value, label }]. A retired item is offered only when `keep` (ids already on the ingredient) holds it. */
+
 export function optionsOf(kind, keep) {
     const kept = new Set((keep || []).map((id) => String(id).toLowerCase()));
     return (current ? current[kind] : normalizeLists(null)[kind])
@@ -62,7 +62,7 @@ export function optionsOf(kind, keep) {
         .map((item) => ({ value: item.id, label: item.retired ? item.label + " (retired)" : item.label }));
 }
 
-/** Saves the three lists. Stops when somebody else saved in between (the version moved on). */
+
 async function saveLists(next) {
     const ref = doc(db, "config", "lists");
     const latest = await getDoc(ref);
@@ -75,9 +75,9 @@ async function saveLists(next) {
     current = Object.assign(normalizeLists({ version, allergens: next.allergens, conditions: next.conditions, highlights: next.highlights }), { exists: true });
 }
 
-// ---------------------------------------------------------------------------------------------
-// The "Edit list" window
-// ---------------------------------------------------------------------------------------------
+
+
+
 const make = (tag, className, content) => {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -94,17 +94,17 @@ const iconButton = (name, label, onClick) => {
     return button;
 };
 
-/**
- * Opens the window for one list. `context.ingredients()` gives the website's ingredients (to count who uses an item);
- * `context.onSaved(kind)` is called after a save so the page can draw its pickers again. Resolves when the window closes.
- */
+
+
+
+
 export function openListManager(kind, context) {
     const spec = KINDS[kind];
     return new Promise((resolve) => {
         const work = current[kind].map((item) => Object.assign({}, item, { keywords: item.keywords.slice() }));
         const firstLabels = new Map(work.map((item) => [item.id, item.label]));
         let dirty = false;
-        let pendingWarning = "";                        // the add form: a look-alike was shown once; the same name again means "add anyway"
+        let pendingWarning = "";
 
         const finish = () => { frame.close(); resolve(); };
         const tryClose = async () => {
@@ -215,7 +215,7 @@ export function openListManager(kind, context) {
 
         cancel.addEventListener("click", () => { tryClose(); });
         save.addEventListener("click", async () => {
-            // every name must pass: nothing empty, nothing the same as another
+
             for (const item of work) {
                 const verdict = checkItem(work, item.label, item.keywords, item.id);
                 if (verdict.error) { note.textContent = verdict.error; return; }

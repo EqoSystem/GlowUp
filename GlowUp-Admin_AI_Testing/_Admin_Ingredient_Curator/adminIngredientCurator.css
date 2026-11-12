@@ -1,6 +1,6 @@
-/* Ingredient Curator: only where things sit. Colours, buttons and panels come from ../_Shared/adminCommon.css. */
 
-/* a card shows the name and the scientific name; clicked, it opens across the row and shows the rest */
+
+
 .ingredients-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; align-items: start; }
 .ingredients-list > .empty-state { grid-column: 1 / -1; }
 .ingredient-card {
@@ -18,7 +18,7 @@
 .card-head .spacer { flex: 1; }
 .ingredient-tech { font-size: var(--fs-sm); color: var(--muted); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 45px; }
 .ingredient-card.open .ingredient-tech { white-space: normal; overflow-wrap: anywhere; }
-/* the card's second line: the scientific name, and at its right end the badges (waiting for review, how the app judges it) */
+
 .card-sub { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .card-sub .ingredient-tech { flex: 1; min-width: 0; }
 .card-sub .status-badge { flex: none; }
@@ -36,10 +36,10 @@
 .suggestion-card .field textarea { width: 100%; }
 .suggestion-card [data-draft-reviewed] { margin-right: 6px; }
 
-/* ---- the list as rows (the default): name | scientific name and badges | actions, one ingredient per line ---- */
+
 .ingredients-list.as-rows { grid-template-columns: 1fr; gap: 6px; }
-/* the rows follow the LIST's width (container query, 7 November 2026), not the window's: Quick settings or a snapped window can
-   leave a wide window with a narrow list */
+
+
 .ingredients-list { container: inglist / inline-size; }
 .as-rows .ingredient-card:not(.open) { flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 14px; padding: 7px 14px; }
 .as-rows .ingredient-card:not(.open) > .card-head { display: contents; }
@@ -54,11 +54,11 @@
     .as-rows .ingredient-card:not(.open) .ingredient-name { flex: 1 1 60%; }
     .as-rows .ingredient-card:not(.open) .card-sub { flex: 1 1 100%; order: 3; }
     .as-rows .ingredient-card:not(.open) .row-actions { order: 2; }
-    /* the second line (scientific name, classification, badges) wraps instead of running past the card */
+
     .as-rows .ingredient-card:not(.open) .card-sub { flex-wrap: wrap; row-gap: 4px; }
 }
 
-/* ---- the one toolbar row of the list (5 November 2026): a little tighter, so the pager fits beside New folder and the bin at the far right ---- */
+
 [data-panel="list"] > .panel-inner > .panel-head.wraps { column-gap: 6px; }
 #ingredientQuick:empty { display: none; }
 [data-panel="list"] .panel-head .table-tools .btn { padding-inline: 9px; }
@@ -66,31 +66,31 @@
 #ingredientPagerTop .icon-btn { width: 26px; height: 26px; }
 #ingredientPagerTop .page-now { min-width: 0; }
 #ingredientPagerTop .pager-range { display: none; }
-/* the row stays one line: the "..." appears over the free space beside the pager and takes no room of its own; the sort's word goes first */
+
 [data-panel="list"] > .panel-inner > .panel-head > .head-end { position: relative; }
 [data-panel="list"] > .panel-inner > .panel-head > .head-end > .panel-menu-btn { position: absolute; right: 100%; margin-right: 4px; z-index: 2; }
 @media (max-width: 1400px) { [data-panel="list"] #sortNow { display: none; } }
-/* the sidebar open beside a narrow panel: New folder keeps only its icon. Up to 1100 px the panel has the whole width again */
+
 @media (min-width: 1024px) and (max-width: 1279px) { html:not(.sb-collapsed) #ingredientShelfAdd .folder-chip { font-size: 0; gap: 0; } }
 
-/* the classification column of the list, and the rows of "Manage classifications" (the look of the Edit list window) */
+
 .class-cell { flex: none; display: inline-flex; }
 .as-rows .ingredient-card:not(.open) .class-cell { flex: 0 0 190px; }
 .lists-row.class-row { grid-template-columns: minmax(0, 1fr) auto; }
 .class-row-name { min-width: min(7ch, 100%); overflow-wrap: anywhere; font-size: var(--fs-base); }
 .migration-lines { margin: 0 0 10px; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-base); }
 
-/* shown on any address that is not the live site */
-.test-banner { margin: 12px var(--page-x) 0; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--warn, #d9a441); background: color-mix(in srgb, var(--warn, #d9a441) 16%, var(--surface)); color: var(--text); font-size: var(--fs-sm); }
 
-/* the scan window and the bar inside the duplicates window (Clean up, Find duplicates) */
+.test-banner { margin: 12px var(--gutter) 0; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--warn, #d9a441); background: color-mix(in srgb, var(--warn, #d9a441) 16%, var(--surface)); color: var(--text); font-size: var(--fs-sm); }
+
+
 .scan-status { margin: 4px 0 10px; color: var(--text); }
 .scan-track { height: 8px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
 .scan-fill { height: 100%; width: 100%; border-radius: 999px; background: var(--accent); transform: scaleX(0); transform-origin: left center; transition: transform .12s linear; }
 .scan-inline { padding: 18px 8px; }
-/* on a phone the classification column gives up its fixed width, so the line can wrap (after its 190 px rule above) */
+
 @container inglist (max-width: 620px) { .as-rows .ingredient-card:not(.open) .class-cell { flex: 0 1 auto; max-width: 100%; } }
 
-/* the source the User-Friendly Definition rests on, with its own words (Assist with AI, 9 November 2026) */
+
 .definition-basis q { font-style: italic; color: var(--text-2); }
 .definition-basis .warn-text { color: var(--warn); }

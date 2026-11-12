@@ -1,23 +1,23 @@
-// Turns the EU CosIng ingredient file into files the Ingredient Curator can import (its CSV import), so the master list can be filled from a
-// published source instead of from memory.
-//
-//   Get the file yourself: the European Commission's CosIng database (cosmetic ingredient database) offers a download of the ingredient and
-//   fragrance inventory. Save it as a .csv file. This script never downloads anything and never writes to the database.
-//
-//   node tools/cosingToImport.mjs <cosing.csv> --only names.txt [--out folder] [--chunk 200] [--source-url https://...]
-//   node tools/cosingToImport.mjs <cosing.csv> --max 300     (the first 300 rows; for a trial)
-//
-//   --only   a text file with one INCI name per line: only those ingredients are written (for example the names that products use and the
-//            Curator does not explain yet). The whole inventory is about 30,000 entries and must NOT be imported wholesale.
-//   --out    where the files go (default: ./cosing-import next to where you run it)
-//   --chunk  rows per file (default 200; the Curator saves in groups of 60)
-//
-// What is written: INCI name, other names (INN, Pharmacopoeia name), CAS number, the chemical name and the cosmetic FUNCTION as CosIng states them,
-// and a source line that names the CosIng reference number. What is NEVER written: a risk level, a caution note, a minimum age. CosIng is a
-// reference database (tier 3 in docs/DATA_SOURCE_POLICY.md): it says what a substance is, not how risky it is. Entries that CosIng lists with a
-// restriction are written to a separate review file, with the restriction text, for a person to check against the regulation's annex.
-//
-// The column names are matched by name, not by position; the script stops and prints the headers it found when "INCI name" is missing.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -31,7 +31,7 @@ const pick = (record, names) => { for (const n of names) if (record[n]) return r
 const nameKey = (text) => String(text || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 const unique = (list) => list.filter((x, i) => x && list.findIndex((y) => nameKey(y) === nameKey(x)) === i);
 
-/** { import: [rows], review: [rows], skipped: n } from CosIng records. `only` = a Set of nameKey()s or null for every record. */
+
 export function cosingToImport(records, { only = null, max = Infinity, sourceUrl = DEFAULT_SOURCE_URL } = {}) {
     const out = { import: [], review: [], skipped: 0 };
     const seen = new Set();

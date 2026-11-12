@@ -1,49 +1,49 @@
-// Folders, the Recycle bin, and picking several entries to move them together.
-// Shared by the Brand & Product Inventory and the Ingredient Curator.
-//
-//   pick         - the small box at the start of a row or card. Ctrl+click on the row does the same;
-//                  Shift+click picks everything from the last pick to here.
-//   drag         - a row, a card, or everything that is picked. A drop bar comes up from the bottom of the
-//                  window with the folders, "New folder" and the Recycle bin. The folder chips above the
-//                  list take drops too.
-//   folders      - an entry is in one folder at most. The folder's name is saved ON the entry (its
-//                  "folder" field), so everyone who uses the admin site sees the same arrangement.
-//                  A folder that is still empty is only remembered in this browser.
-//   Recycle bin  - an entry in the bin is switched off for the app and can be restored. Only
-//                  "Delete forever" removes it from the database.
-//
-// This file handles the pointer, the keyboard and what is drawn. The page does the saving:
-//
-//   createOrganizer({
-//       kind: "products", noun: "products", nounOne: "product", allLabel: "All",
-//       panel,                    // the panel element (the "select all shown" box may sit anywhere in it)
-//       host,                     // the element that holds the entries: each one has data-key, a .pick box
-//                                 // when it can be picked, and data-drag when it can be dragged
-//       shelf, bar,               // where the folder chips and the "3 selected" bar are drawn
-//       shelfAdd, shelfEnd,       // optional: "New folder" (and Restore all / Empty bin) go into shelfAdd, the Recycle bin chip into
-//                                 // shelfEnd; the "All" and folder chips stay in `shelf`. Without them everything is drawn in `shelf`.
-//       folderNames: () => [...],                 // the folder names found in the data
-//       folderOf: (key) => "name" | "",
-//       titleOf: (key) => "name of the entry",
-//       count: (view) => number,                  // view = { kind: "all" | "folder" | "bin", name }
-//       binKeys: () => [...],                     // everything in the Recycle bin
-//       move: async (keys, folder) => ({ text, undo }),      // folder "" = out of its folder
-//       bin: async (keys) => ({ text, undo }),
-//       restore: async (keys, folder) => ({ text }),
-//       purge: async (keys) => true | false,      // the page asks first and says what happened
-//       renameFolder: async (from, to) => {}, deleteFolder: async (name) => {},
-//       onView: () => {}                          // another folder (or the bin) is shown: draw the entries again
-//   })
-//
-// Everything a person typed (folder names, entry names) is written with textContent, never as HTML.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import { icon, BIN_ICON, toast, openMenu, closeMenu, askText, askConfirm, calmMotion, hideTip, playSweep } from "./adminShell.js";
 
 const FOLDERS_KEY = "glowup.folders.v1";
-const HOLD_MS = 350;                  // on a touch screen: press this long, then drag
-const START_PX = 6;                   // the pointer moves this far before a press becomes a drag
+const HOLD_MS = 350;
+const START_PX = 6;
 export const MAX_FOLDERS = 20;
 
-/** A folder name as it is saved: single spaces, 30 characters at most. */
+
 export const cleanFolder = (text) => String(text === null || text === undefined ? "" : text).replace(/\s+/g, " ").trim().slice(0, 30);
 const same = (a, b) => cleanFolder(a).toLowerCase() === cleanFolder(b).toLowerCase();
 
@@ -58,22 +58,22 @@ function remember(kind, names) {
         const all = JSON.parse(localStorage.getItem(FOLDERS_KEY) || "{}");
         all[kind] = names.slice(0, MAX_FOLDERS);
         localStorage.setItem(FOLDERS_KEY, JSON.stringify(all));
-    } catch (error) { /* private window: an empty folder is then forgotten when the page is left */ }
+    } catch (error) {                                                                               }
 }
 
-/** A mistake the person can read ("That brand has no products to move."), not a failure of the database. */
+
 export function friendly(message) { const error = new Error(message); error.friendly = true; return error; }
 
 export function createOrganizer(spec) {
     const selected = new Set();
     let view = { kind: "all", name: "" };
-    let anchor = null;                        // where a Shift+click range starts
+    let anchor = null;
     let press = null, drag = null, justDragged = false;
     const many = (n) => `${n} ${n === 1 ? spec.nounOne : spec.noun}`;
 
-    // ---------------------------------------------------------------------------------------------
-    // Folders
-    // ---------------------------------------------------------------------------------------------
+
+
+
     const folders = () => {
         const out = [];
         const add = (name) => { const clean = cleanFolder(name); if (clean && !out.some((have) => same(have, clean))) out.push(clean); };
@@ -83,16 +83,16 @@ export function createOrganizer(spec) {
     };
     const keep = (name) => { const list = remembered(spec.kind); if (!list.some((have) => same(have, name))) { list.push(cleanFolder(name)); remember(spec.kind, list); } };
     const forget = (name) => remember(spec.kind, remembered(spec.kind).filter((have) => !same(have, name)));
-    /** What is shown now. A folder that no longer exists falls back to everything. */
+
     const currentView = () => {
         if (view.kind === "folder" && !folders().some((name) => same(name, view.name))) view = { kind: "all", name: "" };
         return view;
     };
-    /**
-     * Shows a view. The Recycle bin and a folder are places of their own (docs/NAVIGATION_RULES.md, 9 November 2026): going
-     * there from the whole list adds a step to the browser's history, so the browser's Back (and the Back button the shelf
-     * shows there) returns to the whole list. `fromHistory` = it is the browser's Back itself: nothing is added.
-     */
+
+
+
+
+
     const show = (next, fromHistory) => {
         const was = view.kind;
         view = next && next.kind === "bin" ? { kind: "bin", name: "" }
@@ -103,7 +103,7 @@ export function createOrganizer(spec) {
             try {
                 if (was === "all" && view.kind !== "all") history.pushState({ glowupView: spec.kind }, "");
                 else if (was !== "all" && view.kind === "all" && ours) history.back();
-            } catch (error) { /* history not available: the Back button still works */ }
+            } catch (error) {                                                          }
         }
         selected.clear();
         anchor = null;
@@ -111,9 +111,9 @@ export function createOrganizer(spec) {
     };
     window.addEventListener("popstate", () => { if (view.kind !== "all") show({ kind: "all" }, true); });
 
-    // ---------------------------------------------------------------------------------------------
-    // What happens to entries (the page saves; this says what happened and offers Undo)
-    // ---------------------------------------------------------------------------------------------
+
+
+
     const fail = (error, what) => {
         if (error && error.friendly) toast(error.message, "info");
         else { console.error(what + " failed: ", error); toast(`${what} did not work. ${error && error.message ? error.message : ""}`, "error"); }
@@ -131,11 +131,11 @@ export function createOrganizer(spec) {
         } catch (error) { fail(error, "Moving"); refresh(); }
     }
 
-    /**
-     * Every removal asks first (9 November 2026): from a row's button, the selection bar, the Delete key, a drag onto the
-     * bin or a data panel. `asked` = the caller has already asked with its own, more exact question.
-     * Escape, the backdrop or Cancel mean: keep them.
-     */
+
+
+
+
+
     async function toBin(keys, asked) {
         if (!keys || keys.length === 0) return;
         if (!asked) {
@@ -172,7 +172,7 @@ export function createOrganizer(spec) {
         refresh();
     }
 
-    /** Asks for a name, makes the folder, and (when keys are given) puts those entries into it. */
+
     async function newFolder(keys, fromBin) {
         const all = folders();
         if (all.length >= MAX_FOLDERS) { toast(`${MAX_FOLDERS} folders are the most. Delete one first.`, "error"); return; }
@@ -187,7 +187,7 @@ export function createOrganizer(spec) {
         refresh();
     }
 
-    /** A menu with every folder: where should these entries go? */
+
     function chooseFolder(anchorEl, keys) {
         const names = folders();
         const items = names.map((name) => ({ label: name, icon: "folder", checked: keys.length > 0 && keys.every((key) => same(spec.folderOf(key), name)), run: () => moveTo(keys, name) }));
@@ -229,14 +229,14 @@ export function createOrganizer(spec) {
         ]);
     }
 
-    // ---------------------------------------------------------------------------------------------
-    // Picking
-    // ---------------------------------------------------------------------------------------------
+
+
+
     const entries = () => Array.from(spec.host.querySelectorAll("[data-key]"));
     const pickable = (el) => !!el.querySelector(".pick");
     const pickAllBox = () => (spec.panel || spec.host).querySelector("[data-pick-all]");
 
-    /** Every key "select all" covers: what the page says (also rows on other pages), else the rows on screen. */
+
     const allKeys = () => (spec.pickScope && spec.pickScope()) || entries().filter(pickable).map((el) => el.dataset.key);
 
     function decorate() {
@@ -278,7 +278,7 @@ export function createOrganizer(spec) {
     }
     const clear = () => { selected.clear(); anchor = null; decorate(); paintBar(); };
 
-    // a click on a pick box (or Ctrl+click on a row) picks it; the page's own click handler never sees that click
+
     (spec.panel || spec.host).addEventListener("click", (event) => {
         if (event.target.closest("[data-pick-all]")) { event.stopPropagation(); pickAll(); return; }
         if (!spec.host.contains(event.target)) return;
@@ -300,9 +300,9 @@ export function createOrganizer(spec) {
         else if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a" && item) { event.preventDefault(); pickAll(); }
     });
 
-    // ---------------------------------------------------------------------------------------------
-    // The shelf (folder chips, the bin) and the bar that shows while something is picked
-    // ---------------------------------------------------------------------------------------------
+
+
+
     function chip(className, attrs, iconHtml, label, count) {
         const button = document.createElement("button");
         button.type = "button";
@@ -318,7 +318,7 @@ export function createOrganizer(spec) {
         const shelf = spec.shelf;
         if (!shelf) return;
         const now = currentView(), names = folders(), inBin = spec.count({ kind: "bin" });
-        // a part goes to "lead" (All, the folders) unless put() says "add" (New folder, Restore all, Empty bin) or "end" (the bin)
+
         const kids = [], slot = new Map();
         const put = (node, where) => { kids.push(node); slot.set(node, where); return node; };
         kids.push(chip(now.kind === "all" ? "on" : "", { "data-view": "all", "data-drop": "all", "data-tip-title": spec.allLabel || "All", "data-tip": `Every ${spec.nounOne}, whatever folder it is in.`, "data-tip-preview": "Drop entries here to take them out of their folder." },
@@ -336,7 +336,7 @@ export function createOrganizer(spec) {
         }
         const spacer = document.createElement("span");
         spacer.className = "spacer";
-        if (!spec.shelfAdd) put(spacer, "lead");                         // one row: the bin goes to the far end
+        if (!spec.shelfAdd) put(spacer, "lead");
         if (now.kind === "bin" && inBin > 0) {
             const act = (label, name, cls, tip) => { const button = document.createElement("button"); button.type = "button"; button.className = "row-btn " + cls; button.dataset.act = name; button.textContent = label; button.dataset.tip = tip; return button; };
             put(act("Restore all", "restoreAll", "", "Everything in the Recycle bin goes back to the list."), "add");
@@ -344,9 +344,9 @@ export function createOrganizer(spec) {
         }
         put(chip("bin-chip" + (now.kind === "bin" ? " on" : ""), { "data-view": "bin", "data-drop": "bin", "data-tip-title": "Recycle bin", "data-tip": "What was removed. The app does not use it, and it can be restored.", "data-tip-preview": "Drop entries here to remove them. Only Delete forever is final." },
             BIN_ICON, now.kind === "bin" ? "Recycle bin" : "", inBin > 0 ? inBin : null), "end");
-        // low-key on purpose: only the small bin (and a number when something is in it) until it is opened, pointed at, or something is dragged
+
         kids[kids.length - 1].setAttribute("aria-label", "Recycle bin" + (inBin > 0 ? ", " + inBin + " inside" : ", empty"));
-        // inside the Recycle bin or a folder: a Back icon right after the bin, so the way out is plain (the browser's Back does the same)
+
         if (now.kind !== "all") {
             const back = document.createElement("button");
             back.type = "button"; back.className = "icon-btn shelf-back"; back.dataset.view = "all";
@@ -408,18 +408,18 @@ export function createOrganizer(spec) {
         bar.replaceChildren(...kids);
     }
 
-    /** Call after the page has drawn its entries: the picks, the folder chips and the bar follow. */
+
     function refresh() { decorate(); paintShelf(); paintBar(); }
 
-    /** Call after the data was loaded again: what no longer exists is no longer picked. */
+
     function sync(validKeys) {
         const valid = validKeys instanceof Set ? validKeys : new Set(validKeys);
         Array.from(selected).forEach((key) => { if (!valid.has(key)) selected.delete(key); });
     }
 
-    // ---------------------------------------------------------------------------------------------
-    // Dragging
-    // ---------------------------------------------------------------------------------------------
+
+
+
     let ghost = null, dock = null, over = null;
 
     function buildGhost(keys) {
@@ -485,13 +485,13 @@ export function createOrganizer(spec) {
         if (ghost) ghost.classList.toggle("over-bin", !!over && over.dataset.drop === "bin");
     }
 
-    /** What the pointer is over, when that takes a drop of what is dragged. */
+
     function targetAt(x, y) {
         const under = document.elementFromPoint(x, y);
         const target = under && under.closest ? under.closest("[data-drop]") : null;
         if (!target) return null;
         const drop = target.dataset.drop;
-        if (view.kind === "bin" && drop === "bin") return null;                                       // it is in the bin already
+        if (view.kind === "bin" && drop === "bin") return null;
         if (view.kind === "folder" && drop.startsWith("folder:") && same(drop.slice(7), view.name)) return null;
         return target;
     }
@@ -501,7 +501,7 @@ export function createOrganizer(spec) {
         const x = event.clientX, y = event.clientY;
         if (!drag) {
             if (Math.hypot(x - press.x, y - press.y) < START_PX) return;
-            if (!press.ready) { cancelPress(); return; }                 // a finger that moves before the hold is over is scrolling
+            if (!press.ready) { cancelPress(); return; }
             begin();
         }
         placeGhost(x, y);
@@ -550,7 +550,7 @@ export function createOrganizer(spec) {
         const keys = drag.keys, oldGhost = ghost, oldDock = dock, from = drag, inBin = view.kind === "bin";
         ghost = null; dock = null;
         justDragged = true;
-        window.setTimeout(() => { justDragged = false; }, 0);          // the click that follows a drag is not a click on the row
+        window.setTimeout(() => { justDragged = false; }, 0);
         cleanup();
         if (!target) {
             dropLifting();
@@ -558,7 +558,7 @@ export function createOrganizer(spec) {
             leave(oldGhost, oldDock, "back");
             return;
         }
-        // what was dragged flies into what it was dropped on
+
         const drop = target.dataset.drop, box = target.getBoundingClientRect();
         if (oldGhost) oldGhost.style.translate = `${box.left + box.width / 2 - oldGhost.offsetWidth / 2}px ${box.top + box.height / 2 - oldGhost.offsetHeight / 2}px`;
         target.classList.remove("gulp"); void target.offsetWidth; target.classList.add("gulp");
@@ -584,9 +584,9 @@ export function createOrganizer(spec) {
         window.addEventListener("pointerup", up);
         window.addEventListener("pointercancel", cancel);
     });
-    // on a touch screen the page must not scroll under an entry that is held or dragged
+
     spec.host.addEventListener("touchmove", (event) => { if (drag || (press && press.ready)) event.preventDefault(); }, { passive: false });
-    spec.host.addEventListener("contextmenu", (event) => { if (drag || (press && press.timer)) event.preventDefault(); });      // a long press must not open the browser's own menu
+    spec.host.addEventListener("contextmenu", (event) => { if (drag || (press && press.timer)) event.preventDefault(); });
 
     return {
         selected,

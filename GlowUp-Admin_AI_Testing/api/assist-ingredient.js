@@ -1,38 +1,38 @@
-// Admin-only AI drafts for ingredient descriptions, product ingredient lists, and file-based catalogue imports.
-//
-// It runs on the server (a Vercel function), so the AI key never reaches the browser:
-//   - the key is the environment variable GEMINI_API_KEY (Vercel > Project > Settings > Environment Variables);
-//     it is in no file of this project;
-//   - only a signed-in ADMIN gets an answer: the caller's Firebase sign-in is checked with Google, and then the
-//     database is asked, as that account, for its own entry in "admins" (the database rules allow exactly that);
-//   - the AI receives only an ingredient name, a product and brand name, or text extracted from an admin-selected file.
-//     No account/profile data is involved.
-//
-// AI assistance returns a DRAFT. Only the document import creates entries, and those are saved as Pending for review.
-//
-// Optional environment variables: GEMINI_MODELS (comma-separated, tried in order), and BACKUP services used only when Gemini
-// cannot answer (a free quota used up). The order is fixed: Gemini, then Groq (GROQ_API_KEY), then Mistral (MISTRAL_API_KEY);
-// OpenRouter (OPENROUTER_API_KEY) comes last and only when a key for it is ever added. GROQ_MODEL, MISTRAL_MODEL and
-// OPENROUTER_MODEL change the model. A backup cannot search the web, so its draft has no sources.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 const PROJECT = "glowup-admin-portal";
-const FIREBASE_WEB_KEY = "AIzaSyAkb23xQ69a2Q4tpucGty9yDEoH0ab1JDM";      // the website's public Firebase key (it is in every page); NOT the AI key
-// The key only works from the website's own addresses (an HTTP-referrer restriction in Google Cloud, set on 28 October 2026). A server call has
-// no page behind it, so it names the production address itself. If the website moves to another address, add it to the key's list first.
+const FIREBASE_WEB_KEY = "AIzaSyAkb23xQ69a2Q4tpucGty9yDEoH0ab1JDM";
+
+
 const KEY_REFERER = "https://glowup-admin-snowy.vercel.app/";
-const AI_SECONDS = 40;              // the longest ONE call to an AI may take
-const TOTAL_SECONDS = 50;           // all the calls together: Vercel stops this function at 60 seconds, the answer must be out before that
-const BACKUP_SECONDS = 10;          // kept back for each service that is still to come, so a slow Gemini cannot use up the time of Groq and Mistral
-const LEAST_SECONDS = 3;            // with less time than this left for it, a call is not started
+const AI_SECONDS = 40;
+const TOTAL_SECONDS = 50;
+const BACKUP_SECONDS = 10;
+const LEAST_SECONDS = 3;
 
 const RISK = ["safe", "caution", "harmful"];
 const ALLERGENS = ["fragrance", "paraben", "sulfate", "formaldehyde", "lanolin", "essentialoil", "nut"];
 const SKIN_TYPES = ["Oily", "Normal", "Dry", "Mix"];
 const CONDITIONS = ["acne", "eczema", "psoriasis", "rosacea", "seborrheic", "melasma", "contact"];
 
-// Pages that count as credible for WHAT AN INGREDIENT IS AND DOES (regulators, scientific bodies, medical references)
-// are the "regulator", "medical" and "reference" kinds of sourceKind below (isCredible). A page of another site is
-// still shown with its label, so the admin can judge it.
+
+
+
 
 function send(res, status, body) {
     res.statusCode = status;
@@ -47,7 +47,7 @@ async function withTimeout(url, options, seconds) {
     try { return await fetch(url, { ...options, signal: stop.signal }); } finally { clearTimeout(timer); }
 }
 
-/** The caller's account id when the sign-in is real and the account is an admin; otherwise "". */
+
 async function adminUid(idToken) {
     if (!idToken) return "";
     const who = await withTimeout("https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" + FIREBASE_WEB_KEY,
@@ -55,36 +55,36 @@ async function adminUid(idToken) {
     if (!who.ok) return "";
     const user = ((await who.json()).users || [])[0];
     if (!user || !user.localId) return "";
-    // asked AS THAT ACCOUNT: the rules let an account read only its own entry in "admins"
+
     const entry = await withTimeout(`https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents/admins/${encodeURIComponent(user.localId)}`,
         { headers: { Authorization: "Bearer " + idToken } }, 10);
     return entry.ok ? user.localId : "";
 }
 
-// ---------------------------------------------------------------------------------------------
-// COSMILE Europe (cosmileeurope.eu/inci): the cosmetics industry's ingredient database (built on EU CosIng).
-// Asked ONCE per admin click: one search and one record page, no crawling (its robots.txt asks for a 10 second delay
-// between requests of a crawler; two requests for a click an admin made is not one). An ingredient is used only when its
-// name matches EXACTLY (the site's own search is fuzzy: "2-Hexanediol" also finds "1,2-Hexanediol", a different substance).
-// Its text goes to the AI as untrusted DATA, and the record page is listed as a source.
-// ---------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
 const COSMILE = "https://cosmileeurope.eu";
 const COSMILE_AGENT = "GlowUpAdmin/1.0 (admin-started ingredient look-up)";
-const COSMILE_SECONDS = 6;           // all of the look-up together: the AI needs the rest of Vercel's 60 seconds
+const COSMILE_SECONDS = 6;
 const plainKey = (value) => String(value == null ? "" : value).toLowerCase().replace(/[^a-z0-9]+/g, "");
 
-/** The hits of a Cosmile search page: { url, name, sub[] } (sub = the other names the site prints under the hit). */
+
 function cosmileResults(html) {
     const hits = [];
     const pattern = /<a class='inci_box_link-link' href='(https:\/\/cosmileeurope\.eu\/inci\/detail\/[^']+)'>([^<]*)<\/a>((?:(?!<a class='inci_box_link-link')[\s\S])*)/g;
     for (const m of String(html || "").matchAll(pattern)) {
         const sub = (m[3].match(/<div class='inci_box_link-sub'>([^<]*)<\/div>/) || [])[1];
-        hits.push({ url: m[1], name: htmlText(m[2]), sub: htmlText(sub || "").split(/;\s*/).filter(Boolean) });       // not on commas: "1,2-Hexanediol" is ONE name
+        hits.push({ url: m[1], name: htmlText(m[2]), sub: htmlText(sub || "").split(/;\s*/).filter(Boolean) });
     }
     return hits;
 }
 
-/** A Cosmile record page as plain fields (null when it is not a record page). Every text is short and free of markup. */
+
 function parseCosmile(html, url) {
     const page = String(html || "");
     const start = page.indexOf("class='inci_db'");
@@ -110,7 +110,7 @@ function parseCosmile(html, url) {
     };
 }
 
-/** The Cosmile record for an ingredient name, or null (not found, no exact match, or the site did not answer). Never throws. */
+
 async function cosmileLookup(name) {
     const wanted = plainKey(name);
     if (wanted.length < 2) return null;
@@ -128,12 +128,12 @@ async function cosmileLookup(name) {
     } catch (error) { return null; }
 }
 
-// ---------------------------------------------------------------------------------------------
-// PubChem (NIH): what the SUBSTANCE is. Its name search matches a name exactly (a made-up "2-Hexanediol" finds nothing), and
-// its description comes with the name and address of the body that wrote it (ChEBI, MeSH ...). The text is copied as it is
-// (never rewritten by an AI) into "What the chemical is", with those two links beside the box.
-// ---------------------------------------------------------------------------------------------
-/** { cid, url, description, from, fromUrl } for an ingredient name, or null. Never throws. */
+
+
+
+
+
+
 async function pubchemLookup(name) {
     const q = text(name, 120);
     if (plainKey(q).length < 2) return null;
@@ -154,10 +154,10 @@ async function pubchemLookup(name) {
     } catch (error) { return null; }
 }
 
-/**
- * The page(s) each box of the ingredient form came from, as source pages ({ title, url, site, credible }); a box with no
- * page of its own has none. The page then shows the admin's own look-up links for that box.
- */
+
+
+
+
 function fieldSourcesOf(record, chem, aiPages) {
     const cosmile = record ? [{ title: "COSMILE Europe: " + record.inci, url: record.url, site: "cosmileeurope.eu", credible: true }] : [];
     const compound = chem ? [{ title: "PubChem compound " + chem.cid, url: chem.url, site: "pubchem.ncbi.nlm.nih.gov", credible: true }] : [];
@@ -173,7 +173,7 @@ function fieldSourcesOf(record, chem, aiPages) {
     };
 }
 
-/** The record as data for the AI's question ("" when there is none). */
+
 function cosmileBlock(record) {
     if (!record) return "";
     const { inci, names, functions, origin, occurrence, background, safeUse, groups } = record;
@@ -184,7 +184,7 @@ function cosmileBlock(record) {
     ].join("\n");
 }
 
-/** What the form can be filled with from the record ALONE (used when no AI answered): plain statements of what the record says. */
+
 function cosmileDraft(record) {
     const functions = record.functions.map((f) => (f.what ? `${f.name} (${f.what.charAt(0).toLowerCase()}${f.what.slice(1)})` : f.name));
     return {
@@ -195,14 +195,14 @@ function cosmileDraft(record) {
     };
 }
 
-// ---------------------------------------------------------------------------------------------
-// THE USER-FRIENDLY DEFINITION IS GROUNDED (9 November 2026). COSMILE Europe (Cosmetics Europe; it covers the INCI names of the EU's
-// CosIng list) is the ONE source every ingredient is looked up in first. When it has a record, the definition may only say what that
-// record (or PubChem's description) supports: an AI text that names a use the sources do not give (for example "preservation" for an
-// ingredient whose only function is skin conditioning) is replaced by a plain sentence made from the record itself. The answer
-// says which source the definition rests on, with its address and the words it was based on (the "basis").
-// ---------------------------------------------------------------------------------------------
-/** Uses a text may claim, and the record functions (or words of the sources) that support each. */
+
+
+
+
+
+
+
+
 const CLAIMS = [
     { label: "preservation", said: /preserv|antimicrob|anti-microb|bacteri|microb|mou?ld|fung/i, by: /preserv|antimicrob|antibacter|antifung|deodorant/i },
     { label: "fragrance", said: /fragran|scent|perfum|odou?r/i, by: /perfum|fragran|mask|deodorant|odou?r/i },
@@ -215,20 +215,20 @@ const CLAIMS = [
     { label: "exfoliating", said: /exfoliat|peel/i, by: /exfoliat|keratolytic|abrasive/i },
     { label: "solvent", said: /solvent|dissolv/i, by: /solvent/i }
 ];
-/** The source text the definition may rest on: the record's functions and background, and PubChem's description. */
+
 function groundText(record, chem) {
     const parts = [];
     if (record) parts.push(record.functions.map((f) => `${f.name} ${f.what}`).join(" "), record.background, record.occurrence, record.groups.join(" "));
     if (chem && chem.description) parts.push(chem.description);
     return parts.join(" ");
 }
-/** The uses a text claims that the sources do not support ([] when every claim is supported). */
+
 function unsupportedClaims(description, record, chem) {
     const ground = groundText(record, chem);
     return CLAIMS.filter((c) => c.said.test(String(description || "")) && !c.by.test(ground) && !c.said.test(ground))
         .map((c) => c.label);
 }
-/** A plain definition made from the record alone: "A synthetic ingredient that maintains the skin in good condition (skin conditioning)." */
+
 function recordDefinition(record) {
     if (!record || record.functions.length === 0) return "";
     const lower = (t) => String(t || "").trim().replace(/\.$/, "").replace(/^./, (c) => c.toLowerCase());
@@ -240,7 +240,7 @@ function recordDefinition(record) {
     const lead = what.length ? `${article} ${origin}ingredient that ${what.slice(0, 2).join(" and ")}` : `${article} ${origin}ingredient used in cosmetics`;
     return text(`${lead} (${names.slice(0, 3).join(", ")}).`, 300);
 }
-/** Which source the definition rests on, with the words it was based on (null when nothing credible was found). */
+
 function definitionBasis(record, chem, replaced, aiPages) {
     if (record) {
         const quote = record.functions.map((f) => (f.what ? `${f.name}: ${f.what}` : f.name)).concat(record.background ? [text(record.background, 220)] : []).join(" · ");
@@ -251,7 +251,7 @@ function definitionBasis(record, chem, replaced, aiPages) {
     return page ? { source: page.site || hostOf(page.url), title: page.title || page.url, url: page.url, quote: "", how: "from a page the AI found", replaced: [] } : null;
 }
 
-/** The form's fields from an AI answer (and the record). Only text the form can hold. */
+
 function tidyDescriptionDraft(raw, record, chem) {
     const aliases = (Array.isArray(raw && raw.aliases) ? raw.aliases : []).concat(record ? record.names : [])
         .map((a) => text(a, 80)).filter((a, i, all) => a && all.findIndex((k) => plainKey(k) === plainKey(a)) === i).slice(0, 6);
@@ -344,7 +344,7 @@ function importQuestion(documentText) {
     ].join("\n");
 }
 
-/** Ingredient import: ONLY ingredient data is wanted. Brand and product records in the document are ignored. */
+
 function ingredientImportQuestion(documentText) {
     return [
         "You extract INGREDIENT records (cosmetic ingredient names with their explanation) for an administrator of a make-up safety app.",
@@ -363,7 +363,7 @@ function ingredientImportQuestion(documentText) {
     ].join("\n");
 }
 
-/** The first complete { ... } in the AI's text, as an object (null when there is none). */
+
 function firstObject(text) {
     const start = text.indexOf("{");
     if (start < 0) return null;
@@ -428,7 +428,7 @@ async function webSearch(query, notes, confirmedWebsite, purpose) {
                 credible: isCredible(site)
             };
         }).filter((result, index, all) => result && all.findIndex((item) => item.url === result.url) === index);
-        // Only the kinds of page that fit this task (SEARCH_KINDS) go on to the backup AI and the sources list.
+
         const allowed = SEARCH_KINDS[purpose] || SEARCH_KINDS.ingredient;
         const credible = results.map((result) => describeSource(result, confirmedWebsite)).filter((result) => allowed.includes(result.kind));
         if (credible.length) notes.push(`Web search: found ${credible.length} credible result(s)`);
@@ -451,7 +451,7 @@ function chatContent(message) {
 const text = (value, most) => String(value === null || value === undefined ? "" : value).replace(/\s+/g, " ").trim().slice(0, most);
 const pick = (value, allowed) => (Array.isArray(value) ? value : []).map((v) => allowed.find((a) => a.toLowerCase() === String(v).trim().toLowerCase())).filter((v, i, all) => v && all.indexOf(v) === i);
 
-/** Only what the form can hold, and only the values it knows. */
+
 function tidy(raw, asked) {
     const avoidTypes = pick(raw.avoidForSkinTypes, SKIN_TYPES), avoidConditions = pick(raw.avoidForConditions, CONDITIONS);
     return {
@@ -466,7 +466,7 @@ function tidy(raw, asked) {
         umbrella: raw.umbrella === true,
         allergenTags: pick(raw.allergenTags, ALLERGENS),
         avoidForSkinTypes: avoidTypes,
-        goodForSkinTypes: pick(raw.goodForSkinTypes, SKIN_TYPES).filter((t) => !avoidTypes.includes(t)),          // "avoid" wins over "good"
+        goodForSkinTypes: pick(raw.goodForSkinTypes, SKIN_TYPES).filter((t) => !avoidTypes.includes(t)),
         avoidForConditions: avoidConditions,
         goodForConditions: pick(raw.goodForConditions, CONDITIONS).filter((t) => !avoidConditions.includes(t)),
         minAge: Number.isInteger(raw.minAge) && raw.minAge > 0 && raw.minAge < 100 ? raw.minAge : 0,
@@ -487,7 +487,7 @@ const fdaPhilippinesUrl = (value) => {
     } catch (error) { return ""; }
 };
 
-/** Only product-list fields the inventory can safely store; web evidence remains separately cited. */
+
 function tidyProduct(raw, asked, groundedSources) {
     const ingredients = (Array.isArray(raw.ingredients) ? raw.ingredients : [])
         .map((item) => text(item, 100)).filter(Boolean).filter((item, index, all) => all.findIndex((known) => known.toLowerCase() === item.toLowerCase()) === index).slice(0, 80);
@@ -510,41 +510,41 @@ function tidyBrand(raw, asked, groundedSources) {
     const markets = ["Global", "Local", "Asia", "Europe", "North America"];
     const market = markets.find((value) => value.toLowerCase() === String(raw.market || "").trim().toLowerCase()) || "";
     const sources = (groundedSources || []).map((source) => httpsUrl(source.url)).filter((url, index, all) => url && all.indexOf(url) === index).slice(0, 10);
-    // a SUGGESTION only: an admin confirms it on the Brand form. "seenInSources" = one of the pages the AI used is on it.
+
     const website = suggestedWebsite(raw.officialWebsite);
     const site = makerHost(website);
     const seenInSources = !!site && (groundedSources || []).some((source) => onSite(sourceHost(`${source.site || ""} | ${source.url || ""}`), [site]));
     return { name: asked, aliases, market, sources, websiteSuggested: website, websiteSeenInSources: seenInSources, confidence: ["high", "medium", "low"].includes(raw.confidence) ? raw.confidence : "low" };
 }
 
-/** A suggested official website: a plain https address (see STRICT_ADDRESS), reduced to its home page; "" otherwise. */
+
 function suggestedWebsite(value) {
     const url = text(value, 300);
     const plain = /^https:/i.test(url) ? plainAddress(url) : null;
     return plain && !isRedirect(plain) && plain.host.includes(".") ? "https://" + plain.host + "/" : "";
 }
 
-/**
- * "#C24B62", "c24b62", "#C46" and "rgb(194, 75, 98)" become "#C24B62"; anything else is "". A SHADE NUMBER is never
- * taken for a colour: "#128", "128" and "120" are shade numbers (three digits, or a code without "#" and without a letter).
- * The same rule as cleanShade in Brand & Product Inventory.
- */
+
+
+
+
+
 function normalShade(value) {
     let color = text(value, 24).toUpperCase();
     const rgb = color.match(/^RGB\(\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*\)$/);
     if (rgb) return [1, 2, 3].every((i) => Number(rgb[i]) <= 255) ? "#" + [1, 2, 3].map((i) => Number(rgb[i]).toString(16).padStart(2, "0")).join("").toUpperCase() : "";
     if (color && color[0] !== "#") {
-        if (!/^[0-9A-F]{6}$/.test(color) || !/[A-F]/.test(color)) return "";       // a bare code must be six characters with a letter
+        if (!/^[0-9A-F]{6}$/.test(color) || !/[A-F]/.test(color)) return "";
         color = "#" + color;
     }
     if (/^#[0-9A-F]{3}$/.test(color)) {
-        if (/^#[0-9]{3}$/.test(color)) return "";                                     // "#128" is a shade number
+        if (/^#[0-9]{3}$/.test(color)) return "";
         color = "#" + color[1] + color[1] + color[2] + color[2] + color[3] + color[3];
     }
     return /^#[0-9A-F]{6}$/.test(color) ? color : "";
 }
 
-/** Import output is limited to new catalogue rows; it never changes an existing entry. */
+
 function tidyImport(raw, searchedSources, documentText) {
     const documentUrls = (String(documentText || "").match(/https:\/\/[^\s<>"']+/gi) || [])
         .map((url) => httpsUrl(url.replace(/[),.;]+$/, ""))).filter(Boolean);
@@ -580,7 +580,7 @@ function tidyImport(raw, searchedSources, documentText) {
             brandImageUrl: knownLink(item.brandImageUrl, allowedSources)
         };
     }).filter((item) => item.brandName.length >= 2 && item.productName.length >= 1);
-    // records about a brand only: new brands at most, never a change to one that exists (the page decides)
+
     const brands = (Array.isArray(raw.brands) ? raw.brands : []).slice(0, 40).map((item) => ({
         name: text(item && item.name, 60),
         aliases: shortList(item && item.aliases, 60, 6),
@@ -592,16 +592,16 @@ function tidyImport(raw, searchedSources, documentText) {
     return { products, brands };
 }
 
-/** Up to `most` different texts of at most `length` letters. */
+
 const shortList = (value, length, most) => (Array.isArray(value) ? value : []).map((v) => text(v, length)).filter(Boolean)
     .filter((v, index, all) => all.findIndex((known) => known.toLowerCase() === v.toLowerCase()) === index).slice(0, most);
-/** A whole age from 1 to 99, else 0 (= no limit). */
+
 const wholeAge = (value) => { const n = Number(value); return Number.isInteger(n) && n > 0 && n < 100 ? n : 0; };
 const marketOf = (value) => ["Global", "Local", "Asia", "Europe", "North America"].find((m) => m.toLowerCase() === String(value || "").trim().toLowerCase()) || "";
-/** An https link that is printed in the document or was opened by the web search (never one the AI made up), else "". */
+
 const knownLink = (value, allowed) => { const url = httpsUrl(value); return url && allowed.has(url) && plainAddress(url) ? url : ""; };
 
-/** Ingredient import output: ingredient fields only. A brand or product field in the answer is never copied. */
+
 function tidyIngredientImport(raw, documentText) {
     const seen = new Set();
     const documentUrls = new Set((String(documentText || "").match(/https:\/\/[^\s<>"']+/gi) || []).map((url) => httpsUrl(url.replace(/[),.;]+$/, ""))).filter(Boolean));
@@ -618,7 +618,7 @@ function tidyIngredientImport(raw, documentText) {
             chemicalDescription: text(row.chemicalDescription, 400),
             commonUses: text(row.commonUses, 120),
             minAge: wholeAge(row.minAge),
-            // names, as the document writes them: the Curator matches them to its own lists (unknown names are left out)
+
             allergens: shortList(row.allergens, 40, 8),
             avoidConditions: shortList(row.avoidConditions, 40, 8),
             goodConditions: shortList(row.goodConditions, 40, 8),
@@ -638,18 +638,18 @@ function tidyIngredientImport(raw, documentText) {
 
 const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, "").toLowerCase(); } catch (error) { return ""; } };
 
-// ---------------------------------------------------------------------------------------------
-// What KIND of page a source is, in words a dermatologist or pharmacist can check.
-// A COPY of sourceKind in _Shared/glowupRules.js and of ListSources.SourceKind in the app: all three are checked against
-// the "sourcekind" / "sourcelabel" lines of the app's Editor/Tests/SharedRuleCases.txt (tests/assist.test.mjs,
-// tests/rules.test.mjs, SharedRuleCasesTests.cs). Change all three together.
-// ---------------------------------------------------------------------------------------------
+
+
+
+
+
+
 const SOURCE_REGULATORS = ["europa.eu", "fda.gov", "fda.gov.ph", "nih.gov", "who.int", "aseancosmetics.org", "asean.org", "health.gov.au", "tga.gov.au", "canada.ca", "gov.uk", "echa.europa.eu"];
 const SOURCE_MEDICAL = ["cir-safety.org", "cir-reports.cir-safety.org", "aad.org", "dermnetnz.org", "contactderm.org", "sciencedirect.com", "wiley.com", "springer.com",
     "nature.com", "jamanetwork.com", "bmj.com", "mayoclinic.org", "clevelandclinic.org"];
 const SOURCE_REFERENCES = ["personalcarecouncil.org", "incibeauty.com", "incidecoder.com", "paulaschoice.com", "ewg.org", "cosmeticsinfo.org", "cosmileeurope.eu"];
 const SOURCE_PUBLIC_LISTS = ["openbeautyfacts.org"];
-// whole web addresses of large shops (matched like the lists above, never as a piece of a name)
+
 const SOURCE_RETAILERS = ["watsons.com.ph", "watsons.com.my", "watsons.com.sg", "watsons.co.th", "watsons.com.hk", "watsons.com.tw", "watsons.co.id", "watsons.vn",
     "lazada.com.ph", "lazada.com.my", "lazada.sg", "lazada.co.th", "lazada.co.id", "lazada.vn",
     "shopee.ph", "shopee.com.my", "shopee.sg", "shopee.co.th", "shopee.co.id", "shopee.vn", "shopee.tw",
@@ -659,9 +659,9 @@ const SOURCE_RETAILERS = ["watsons.com.ph", "watsons.com.my", "watsons.com.sg", 
     "superdrug.com", "cultbeauty.com", "cultbeauty.co.uk", "nykaa.com", "yesstyle.com", "stylevana.com", "sasa.com", "sasa.com.hk",
     "guardian.com.sg", "guardian.com.my", "oliveyoung.com", "oliveyoung.co.kr", "feelunique.com", "beautybay.com", "notino.com", "notino.co.uk",
     "douglas.de", "priceline.com.au", "chemistwarehouse.com.au", "mercurydrug.com", "southstardrug.com.ph", "landers.ph", "smmarkets.ph"];
-// the maker's own site is never guessed from a name: it is the brand's confirmed `website`, sent by the admin page
+
 const BACKSLASH = String.fromCharCode(92);
-// only a PLAIN address is labelled (no user name, no backslash, a-z 0-9 . - in the host, printable ASCII after it)
+
 const STRICT_ADDRESS = /^https?:\/\/([a-z0-9.-]+)(?::[0-9]{1,5})?([/?#][!-~]*)?$/i;
 const SOURCE_KINDS = {
     regulator: { label: "Regulator / government", advice: "An official body. The strongest kind of source here.", tone: "good" },
@@ -672,9 +672,9 @@ const SOURCE_KINDS = {
     retailer: { label: "Retailer listing", advice: "A shop's copy of the pack's list. It can be out of date: compare it with your pack.", tone: "" },
     other: { label: "Other website", advice: "Not on GlowUp's list of known sources. Compare it with the pack or another source before relying on it.", tone: "warn" }
 };
-// Which kinds of page the backup AI may be shown, per task. An ingredient's description rests on regulators, medical
-// bodies and ingredient references; ONE product's list rests on the maker, a retailer or a public list (an ingredient
-// database never proves what one product contains: the app's ListSources says the same).
+
+
+
 const SEARCH_KINDS = {
     ingredient: ["regulator", "medical", "reference"],
     product: ["regulator", "maker", "retailer", "public"],
@@ -704,7 +704,7 @@ function plainAddress(address) {
     if (!m || address.includes(BACKSLASH)) return null;
     return { host: m[1].toLowerCase().replace(/\.+$/, ""), path: (m[2] || "").split(/[?#]/)[0] };
 }
-/** A search engine's pass-through address: decided by its HOST (and path), never by words elsewhere in the address. */
+
 function isRedirect(plain) {
     const host = withoutWww(plain.host);
     return host === "vertexaisearch.cloud.google.com" || (host === "google.com" && plain.path.startsWith("/url")) || (host === "bing.com" && plain.path.startsWith("/ck"));
@@ -720,15 +720,15 @@ function sourceHost(source) {
     return withoutWww(host);
 }
 const onSite = (host, sites) => sites.some((site) => host === site || host.endsWith("." + site));
-/** The site of a brand's CONFIRMED website (set only by an admin); "" when there is none or it is not a plain address. */
+
 function makerHost(confirmedWebsite) {
     const plain = plainAddress(sourceAddress(confirmedWebsite));
     return plain && !isRedirect(plain) ? withoutWww(plain.host) : "";
 }
-/**
- * regulator, medical, maker, reference, public, retailer or other, for a source line ("page title | https://address").
- * `confirmedWebsite` = the brand's confirmed website; empty = no page is the maker's (a name match is never enough).
- */
+
+
+
+
 function sourceKind(source, confirmedWebsite) {
     const host = sourceHost(source);
     if (host.length === 0) return "other";
@@ -741,16 +741,16 @@ function sourceKind(source, confirmedWebsite) {
     if (onSite(host, SOURCE_RETAILERS)) return "retailer";
     return "other";
 }
-/** A source page plus its kind, label, advice and tone (the page's own fields are kept). An unresolved search link is named by its site. */
+
 const describeSource = (page, confirmedWebsite) => {
     const kind = sourceKind(`${page.site || page.title || ""} | ${page.url || ""}`, confirmedWebsite);
     return { ...page, kind, label: SOURCE_KINDS[kind].label, advice: SOURCE_KINDS[kind].advice, tone: SOURCE_KINDS[kind].tone };
 };
 
-/** Credible for WHAT AN INGREDIENT IS AND DOES: a regulator, a medical or scientific body, or an ingredient reference. */
+
 const isCredible = (host) => SEARCH_KINDS.ingredient.includes(sourceKind("https://" + String(host || ""), ""));
 
-/** The search links come as Google redirect addresses: this follows one to the real page (its own address when that fails). */
+
 async function realAddress(url) {
     if (!/vertexaisearch\.cloud\.google\.com/i.test(url)) return url;
     try {
@@ -760,7 +760,7 @@ async function realAddress(url) {
     } catch (error) { return url; }
 }
 
-/** The pages the AI's search really used: real addresses, credible ones first, each once. */
+
 async function sourcesOf(candidate) {
     const chunks = (candidate.groundingMetadata && candidate.groundingMetadata.groundingChunks) || [];
     const found = chunks.map((c) => c && c.web).filter((w) => w && /^https?:\/\//i.test(w.uri || "")).slice(0, 10);
@@ -768,16 +768,16 @@ async function sourcesOf(candidate) {
         const url = await realAddress(w.uri);
         const host = hostOf(url);
         const resolved = !/vertexaisearch\.cloud\.google\.com/i.test(url);
-        const site = resolved ? host : text(w.title, 80).toLowerCase();          // the title of an unresolved link is the site's name
+        const site = resolved ? host : text(w.title, 80).toLowerCase();
         return { title: resolved ? (text(w.title, 80) && text(w.title, 80).toLowerCase() !== host ? text(w.title, 80) : host) : site, url, site, credible: isCredible(site) };
     }));
     const seen = new Set();
     return pages.filter((p) => p.url && !seen.has(p.url) && seen.add(p.url)).sort((a, b) => Number(b.credible) - Number(a.credible)).slice(0, 8);
 }
 
-// ---- the AI services, in the order they are tried -----------------------------------------------------------------
-// Gemini uses its native search first. On failure, search results from DuckDuckGo are passed as untrusted context to
-// chat-completion backups. A service without a key is passed over; only real URLs returned by search are shown.
+
+
+
 const BACKUPS = [
     { id: "groq", label: "Groq", key: "GROQ_API_KEY", url: "https://api.groq.com/openai/v1/chat/completions",
         models: () => Array.from(new Set([process.env.GROQ_MODEL, "openai/gpt-oss-120b", "qwen/qwen3.8-27b"].filter(Boolean))) },
@@ -785,7 +785,7 @@ const BACKUPS = [
     { id: "openrouter", label: "OpenRouter", key: "OPENROUTER_API_KEY", url: "https://openrouter.ai/api/v1/chat/completions", model: () => process.env.OPENROUTER_MODEL || "meta-llama/llama-3.3-70b-instruct:free" }
 ];
 
-/** How many seconds the next call may take: what is left of the whole time, less what is kept back for each service still to come. */
+
 function share(secondsLeft, stillToCome) {
     return Math.min(AI_SECONDS, secondsLeft - stillToCome * BACKUP_SECONDS);
 }
@@ -859,7 +859,7 @@ async function askBackup(service, prompt, notes, seconds, searchResults) {
     return null;
 }
 
-/** Search links the admin can open to check an entry. They are NOT pages the AI used: they only start a search on a credible site. */
+
 function lookupLinks(name) {
     const q = encodeURIComponent(name);
     return [
@@ -869,7 +869,7 @@ function lookupLinks(name) {
     ];
 }
 
-/** `purpose` = "ingredient", "product" or "brand": which kinds of page a backup AI may be shown (SEARCH_KINDS). */
+
 async function ask(key, prompt, searchQuery, confirmedWebsite, purpose) {
     const answer = await askAny(key, prompt, searchQuery, confirmedWebsite, purpose);
     return { ...answer, sources: (answer.sources || []).map((page) => describeSource(page, confirmedWebsite)) };
@@ -879,12 +879,12 @@ async function askAny(key, prompt, searchQuery, confirmedWebsite, purpose) {
     const notes = [];
     const until = Date.now() + TOTAL_SECONDS * 1000;
     const left = () => (until - Date.now()) / 1000;
-    const backups = BACKUPS.filter((b) => process.env[b.key]);                 // in their fixed order: Groq, Mistral, (OpenRouter)
+    const backups = BACKUPS.filter((b) => process.env[b.key]);
     if (key) {
         const time = () => share(left(), backups.length + 1);
         const withSearch = await askGemini(key, prompt, true, notes, time);
         if (withSearch) return { ...withSearch, notes };
-        // A quota response means Gemini is exhausted for this request; do not spend time retrying it without search.
+
         if (!notes.some((note) => /free quota used up/i.test(note))) {
             const plain = await askGemini(key, prompt, false, notes, time);
             if (plain) return { ...plain, notes };
@@ -899,7 +899,7 @@ async function askAny(key, prompt, searchQuery, confirmedWebsite, purpose) {
     throw error;
 }
 
-/** The notes as one short reason per service, in the order they were asked: "Gemini: free quota used up; Groq: error 401". */
+
 function brief(notes) {
     const by = new Map();
     notes.forEach((note) => {
@@ -922,15 +922,15 @@ module.exports = async (req, res) => {
 
         const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
         const mode = text(body.mode || "ingredient", 20);
-        // the brand's CONFIRMED website (the admin page sends it): only its pages are labelled as the maker's
+
         const brandWebsite = makerHost(body.brandWebsite) ? text(body.brandWebsite, 300) : "";
         if (mode === "description") {
             const name = text(body.name, 120);
             if (name.length < 2 || !/[a-z0-9]/i.test(name)) return send(res, 400, { error: "No ingredient name was sent." });
-            // the label name first, then the other names the admin already listed: COSMILE is the central source, PubChem names the substance
+
             const others = (Array.isArray(body.aliases) ? body.aliases : []).map((a) => text(a, 120)).filter((a) => a.length >= 2 && plainKey(a) !== plainKey(name)).slice(0, 3);
             const firstFound = async (look, names) => { for (const n of names) { const hit = await look(n); if (hit) return hit; } return null; };
-            let [record, chem] = await Promise.all([firstFound(cosmileLookup, [name].concat(others)), pubchemLookup(name)]);       // each null when there is no exact match or the site did not answer
+            let [record, chem] = await Promise.all([firstFound(cosmileLookup, [name].concat(others)), pubchemLookup(name)]);
             if (!chem) chem = await firstFound(pubchemLookup, (record ? record.names : []).concat(others).slice(0, 3));
             const cosmile = record ? { found: true, url: record.url, inci: record.inci } : { found: false };
             const page = record ? [describeSource({ title: "COSMILE Europe: " + record.inci, url: record.url, site: "cosmileeurope.eu", credible: true }, "")] : [];
@@ -938,7 +938,7 @@ module.exports = async (req, res) => {
             try {
                 result = await ask(key, descriptionQuestion(name, record), `${name} cosmetic ingredient description official sources PubChem CIR`, "", "ingredient");
             } catch (error) {
-                // no AI could answer: the record alone still fills what it states
+
                 if (!record) throw error;
                 const draft = tidyDescriptionDraft(cosmileDraft(record), record, chem);
                 draft.description = recordDefinition(record) || draft.description;
@@ -946,7 +946,7 @@ module.exports = async (req, res) => {
                     message: draft.description ? "" : "The record names no function, and no AI answered." });
             }
             const draft = tidyDescriptionDraft(result.object, record, chem);
-            // a use the sources do not give: the AI's definition is not kept; the record's own words are used instead
+
             const replaced = record ? unsupportedClaims(draft.description, record, chem) : [];
             if (record && (replaced.length > 0 || !draft.description)) draft.description = recordDefinition(record) || draft.description;
             const sources = page.concat((result.sources || []).filter((s) => !record || s.url !== record.url));
@@ -1006,5 +1006,5 @@ module.exports = async (req, res) => {
     }
 };
 
-// for the checks in tests/ (pure helpers; no network)
+
 module.exports.helpers = { adminUid, unsupportedClaims, recordDefinition, definitionBasis, fieldSourcesOf, cosmileResults, parseCosmile, cosmileBlock, cosmileDraft, tidyDescriptionDraft, plainKey, sourceKind, describeSource, makerHost, suggestedWebsite, SOURCE_KINDS, SEARCH_KINDS, normalShade, ingredientImportQuestion, tidyIngredientImport, firstObject, tidy, tidyProduct, tidyBrand, tidyImport, isCredible, hostOf, question, descriptionQuestion, productQuestion, brandQuestion, importQuestion, lookupLinks, searchResultUrl, chatContent, share, PROJECT, KEY_REFERER, FIREBASE_WEB_KEY, text, httpsUrl, plainAddress, isRedirect, sourcesOf, withTimeout, order: () => ["Gemini"].concat(BACKUPS.map((b) => b.label)) };

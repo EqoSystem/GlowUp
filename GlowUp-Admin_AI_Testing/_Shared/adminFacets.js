@@ -1,16 +1,16 @@
-// A small filter panel ("Apply filters") that opens under a button: several choices at once, one press to apply.
-// It only collects the choices; the page decides what they filter (nothing here reads the database).
-//
-//   openFacets(anchor, {
-//       title: "Filters",
-//       fields: [
-//           { id: "type",   label: "Kind",  kind: "select", options: [{ value, label }], value: "", anyLabel: "Any" },
-//           { id: "facts",  label: "Only",  kind: "checks", options: [{ value, label }], value: ["has-shades"] }
-//       ],
-//       onApply(values)    // { type: "Lipstick", facts: ["has-shades"] }
-//   })
-//
-// Esc and a click outside close it; the choices are put on the page with textContent only.
+
+
+
+
+
+
+
+
+
+
+
+
+
 let open = null;
 
 const make = (tag, className, text) => {

@@ -6,14 +6,12 @@
     <title>GlowUp Admin - Archive</title>
     <link rel="icon" type="image/png" sizes="32x32" href="../_Shared/assets/glowup-icon-32.png">
     <script>
-        // dark or light before anything is drawn: the person's choice, else the computer's own setting
         (function () {
             var t = null;
             try { t = localStorage.getItem("glowup.theme"); } catch (e) { }
             if (t !== "light" && t !== "dark") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
             document.documentElement.dataset.theme = t;
         })();
-        // if the sign-in check never answers (no internet), say so instead of leaving a blank page
         setTimeout(function () {
             if (document.documentElement.classList.contains("auth-pending")) document.documentElement.classList.add("auth-stuck");
         }, 10000);
@@ -36,9 +34,9 @@
 <body>
 
     <main class="main-content" data-title="Archive" data-subtitle="What left the Recycle bin: kept 30 days, then deleted">
-        <!-- draws the menu and the top bar with the first picture: see pageFrame.js -->
+
         <script src="../_Shared/pageFrame.js"></script>
-        <!-- the shared header controls: see placeHeaderParts in adminShell.js -->
+
         <div data-header-parts hidden>
                     <div class="segmented header-tabs" id="archiveTabs" role="tablist" aria-label="What to show">
                         <button type="button" class="seg" role="tab" data-kind="ingredients"><i data-icon="flask"></i>Ingredients <span class="tab-count" id="countIngredients"></span></button>
@@ -57,7 +55,7 @@
         </div>
         <div class="board">
 
-            <!-- the archived entries -->
+
             <section class="panel" data-panel="list" data-label="Archived entries" data-w="12" data-source="archive">
                 <div class="panel-head">
                     <button type="button" class="pick" id="archivePickAll" role="checkbox" aria-checked="false" aria-label="Select all shown" data-tip="Select every entry shown here."></button>
@@ -66,7 +64,7 @@
                     <span class="spacer"></span>
                     <div class="pager" id="archivePagerTop"></div>
                 </div>
-                <!-- shows while entries are picked -->
+
                 <div class="w-bar sel-bar" id="archiveBar" hidden>
                     <b id="archiveBarCount">0 selected</b>
                     <span class="spacer"></span>

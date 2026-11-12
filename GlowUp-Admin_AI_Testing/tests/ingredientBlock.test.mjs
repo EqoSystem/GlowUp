@@ -1,13 +1,13 @@
-// Checks of the local ingredient reader (_Shared/ingredientBlock.js): lists are read out of free text WITHOUT any AI or network.
-//   Run: node tests/ingredientBlock.test.mjs
-// The label texts below are made up for the test (generic INCI names in the usual label layouts); they are not data about real products.
+
+
+
 import { ingredientBlockOf, splitIngredients, parseLabeledProducts, suggestMatches, similarity, SUGGESTION_THRESHOLD } from "../_Shared/ingredientBlock.js";
 
 let checks = 0, failed = 0;
 const check = (ok, what) => { checks++; if (!ok) { failed++; console.log("FAILED: " + what); } };
 const equal = (a, b, what) => check(JSON.stringify(a) === JSON.stringify(b), `${what}\n      got      ${JSON.stringify(a)}\n      expected ${JSON.stringify(b)}`);
 
-// ---- finding the block ----
+
 equal(ingredientBlockOf("Directions: apply.\nIngredients: Talc, Mica, Silica.\nNet wt 8 g"), "Talc, Mica, Silica.", "the block stops at the next label part");
 equal(ingredientBlockOf("INGREDIENTS: Talc, Mica"), "Talc, Mica", "capitals");
 equal(ingredientBlockOf("ingredient: Talc, Mica"), "Talc, Mica", "singular, lower case");
@@ -23,7 +23,7 @@ equal(ingredientBlockOf(""), "", "empty text");
 equal(ingredientBlockOf(null), "", "null");
 equal(ingredientBlockOf("Brand: X Ingredients: Talc, Mica FDA Notification No.: 123 Product: Y"), "Talc, Mica", "the next field of a product sheet ends it");
 
-// ---- splitting ----
+
 equal(splitIngredients("Aqua, Glycerin, Mica").ingredients, ["Aqua", "Glycerin", "Mica"], "commas");
 equal(splitIngredients("Aqua; Glycerin; Mica").ingredients, ["Aqua", "Glycerin", "Mica"], "semicolons");
 equal(splitIngredients("• Aqua • Glycerin • Mica").ingredients, ["Aqua", "Glycerin", "Mica"], "bullets");
@@ -42,10 +42,10 @@ equal(splitIngredients("Aqua,, ,Mica,").ingredients, ["Aqua", "Mica"], "empty pi
 equal(splitIngredients("").ingredients, [], "empty");
 equal(splitIngredients(null).ingredients, [], "null");
 
-// colour index numbers
+
 equal(splitIngredients("Mica, C.I. 77891, CI77491, Colour Index No. 77492, CI 15850:1").ingredients, ["Mica", "CI 77891", "CI 77491", "CI 77492", "CI 15850:1"], "colour index numbers are written CI nnnnn");
 
-// the "may contain" tail
+
 {
     const a = splitIngredients("Talc, Mica, Silica. May contain: CI 77491, CI 77492, CI 77891");
     equal(a.ingredients, ["Talc", "Mica", "Silica"], "may contain: the main list");
@@ -59,10 +59,10 @@ equal(splitIngredients("Mica, C.I. 77891, CI77491, Colour Index No. 77492, CI 15
     equal(splitIngredients("Talc, Mica, Peut contenir : CI 77491").mayContain, ["CI 77491"], "French tail");
 }
 
-// label text glued to the end
+
 equal(splitIngredients("Talc, Mica, Phenoxyethanol EXP 01/2028").ingredients, ["Talc", "Mica", "Phenoxyethanol"], "expiry text glued to the last name is cut off");
 
-// ---- documents that label each product ----
+
 {
     const doc = `Brand: Examplebrand
 Product: Velvet Matte Lipstick
@@ -96,7 +96,7 @@ equal(parseLabeledProducts("Brand: A\nProduct: B\nIngredients: Talc, Mica").kind
 equal(parseLabeledProducts("Brand: Examplebrand\nProduct: Plain Thing\nIngredients: Talc, Mica, Silica").draft.products[0].cosmeticType, "", "a kind that cannot be told stays empty (nothing is guessed)");
 equal(parseLabeledProducts("Brand: Examplebrand Product: One Lipstick Ingredients: Talc, Mica, Silica Product: Two Powder Ingredients: Kaolin, Mica, Silica").draft.products.length, 2, "labels on one line, as a PDF reader may give them");
 
-// ---- suggestions ----
+
 const known = ["Glycerin", "Tocopherol", "Phenoxyethanol", "Titanium Dioxide", "Dimethicone", "Sodium Hyaluronate"];
 equal(suggestMatches("Glycerine", known).map((s) => s.name), ["Glycerin"], "a spelling variant is suggested");
 equal(suggestMatches("Phenoxyethanoll", known).map((s) => s.name), ["Phenoxyethanol"], "a typo is suggested");

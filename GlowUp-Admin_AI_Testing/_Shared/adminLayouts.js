@@ -1,23 +1,23 @@
-// Display layouts: how the panels of a page are shown, per person.
-//
-// One admin sign-in is shared by a few people, so each of them keeps a layout under their own name
-// (up to 4). "Default layout" is the fixed starting point and can never be changed.
-// A layout remembers, for every page:
-//   - where each panel sits and how big it is (drag a panel by its title to move it; while "Arranging"
-//     the whole panel can be grabbed and its right and bottom edges resize it)
-//   - what a panel is shown as: its standard look, a list, a row, a grid or a graph (the panel's "..." menu)
-//   - data panels that were added, panels that were hidden, and panels that were combined into one
-//     (as tabs, stacked, or side by side)
-//   - whether the gaps between panels are closed ("Auto resize": on unless the person switches it off)
-// and for the whole site: font, text size, spacing, colours (kept per theme) and how round the corners are.
-//
-// Auto resize: a short panel beside a tall one used to leave a hole under it. With it on, the board is a grid of very
-// low rows; each panel takes the rows its own height needs and the browser slots it into the first free place, so the
-// next panel moves up into the hole. It is worked out again whenever a panel's content, the window or the layout changes.
-// Folding (adminFold.js): every panel with a title can be folded to that title; an empty panel folds by itself.
-//
-// Layouts are kept in this browser (localStorage). Export / Import carries one to another computer.
-// What a panel CONTAINS is never changed here: that is the pages' own code and the database.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import { icon, esc, hydrate, currentTheme, toast, openMenu, closeMenu, flip, askText, askConfirm, guideBadge, hideTip, playSweep } from "./adminShell.js";
 import { datasetList, datasetSpec, measuresOf, mountWidget, unmountWidget, normalizeConfig, defaultTitle, VIEWS, CHARTS } from "./adminWidgets.js";
 import { hasAssist, assistHidden, setAssistHidden, anyAssistHidden, showAllAssists } from "./adminAssist.js";
@@ -27,11 +27,11 @@ import { ANIMATIONS, ANIMATION_FRAMES, TRANSITIONS, EDGES, BUTTON_FX, SHADOWS, O
 import { SHARED_PAGES, cachedShared, readShared, writeShared, clearShared } from "./sharedLayouts.js";
 
 const LAYOUT_KEY = "glowup.layouts.v1";
-// Version of the DEFAULT panel positions. A saved page older than this loses its saved order and sizes (names, fonts,
-// colours, views, added panels and groups stay) so the new default positions show. Raise it whenever a page's default order or widths change.
+
+
 const POSITIONS_VERSION = 7;
 const MAX_PROFILES = 4;
-const MAX_ADDED = 12;                             // data panels one page of a layout can hold
+const MAX_ADDED = 12;
 const FONTS = [
     { id: "", label: "System (default)", stack: "" },
     { id: "poppins", label: "Poppins (the app's font)", stack: '"Poppins", "Segoe UI", sans-serif', web: "Poppins:wght@400;500;600;700" },
@@ -49,18 +49,18 @@ const GROUP_MODES = [
 
 let store = { active: "default", profiles: [] };
 let pageId = "";
-let defaults = null;                              // the fixed layout, read from the page itself
+let defaults = null;
 let editing = false;
 
-// ---------------------------------------------------------------------------------------------
-// The saved layouts
-// ---------------------------------------------------------------------------------------------
+
+
+
 const ID = /^[a-z0-9_-]{1,40}$/i;
 const cleanName = (text, length = 24) => String(text || "").replace(/\s+/g, " ").trim().slice(0, length);
 const idList = (list, most = 40) => (Array.isArray(list) ? list.map(String).filter((id) => ID.test(id)).slice(0, most) : []);
 const shortId = (value) => (ID.test(String(value || "")) ? String(value) : "");
 
-/** Only known settings, as plain numbers and short texts: a saved or imported layout can never carry anything else. */
+
 function cleanView(view) {
     const v = view || {};
     return { source: shortId(v.source), view: shortId(v.view), graph: shortId(v.graph), by: shortId(v.by), measure: shortId(v.measure) };
@@ -73,13 +73,13 @@ function cleanPage(raw) {
     Object.keys(page.views || {}).slice(0, 30).forEach((id) => { if (ID.test(id)) views[id] = cleanView(page.views[id]); });
     return {
         ver: Math.max(0, Math.min(1000, Number(page.ver) || 0)),
-        fit: page.fit !== false,                      // Auto resize: on unless it was switched off
+        fit: page.fit !== false,
         order: idList(page.order, 60), size, hidden: idList(page.hidden, 60), views,
         widgets: (Array.isArray(page.widgets) ? page.widgets : []).slice(0, MAX_ADDED).filter((w) => w && ID.test(String(w.id)))
             .map((w) => Object.assign({ id: String(w.id), title: cleanName(w.title, 40) }, cleanView(w))),
         groups: (Array.isArray(page.groups) ? page.groups : []).slice(0, MAX_ADDED).filter((g) => g && ID.test(String(g.id)))
             .map((g) => ({ id: String(g.id), title: cleanName(g.title, 40), mode: GROUP_MODES.some((m) => m.id === g.mode) ? g.mode : "tabs", members: idList(g.members, 8), active: Math.max(0, Math.min(7, Number(g.active) || 0)) })),
-        // "Style and text" of single panels (componentStyle.js)
+
         styles: cleanPanelMap(page.styles, (raw) => cleanStyle(raw, FONT_IDS())),
         texts: cleanPanelMap(page.texts, cleanTexts)
     };
@@ -98,7 +98,7 @@ function cleanProfile(raw, id) {
     return profile;
 }
 
-/** A whole store (saved, from a checkpoint or from Undo) with only known settings. */
+
 function cleanStore(saved) {
     const clean = { active: "default", profiles: [] };
     if (saved && Array.isArray(saved.profiles))
@@ -117,11 +117,11 @@ function loadStore() {
     lastSaved = JSON.stringify(store);
 }
 
-// ---------------------------------------------------------------------------------------------
-// Undo, Redo and checkpoints (9 November 2026): every change of a layout can be taken back
-// ---------------------------------------------------------------------------------------------
-// Each save remembers the layouts as they were before it. Changes that follow each other within UNDO_MERGE_MS (a slider
-// being dragged, a panel being resized) are ONE step. Undo is kept for this visit of the page; checkpoints are kept in this browser.
+
+
+
+
+
 const UNDO_MOST = 50, UNDO_MERGE_MS = 700;
 const CHECKPOINT_KEY = "glowup.layouts.checkpoints.v1", CHECKPOINTS_MOST = 10;
 const undoStack = [], redoStack = [];
@@ -137,13 +137,13 @@ function saveStore() {
     try { localStorage.setItem(LAYOUT_KEY, now); } catch (error) { console.warn("The layout could not be saved: ", error); }
     paintUndo();
 }
-/** Puts `json` (a whole store) on the page as the layouts now. */
+
 function restoreStore(json, message) {
     if (editing) { editing = false; document.body.classList.remove("layout-editing"); }
     store = cleanStore(JSON.parse(json));
     lastSaved = JSON.stringify(store);
     lastStep = 0;
-    try { localStorage.setItem(LAYOUT_KEY, lastSaved); } catch (error) { /* full or blocked */ }
+    try { localStorage.setItem(LAYOUT_KEY, lastSaved); } catch (error) {                       }
     applyLayout();
     paintUndo();
     if (message) toast(message, "ok");
@@ -198,7 +198,7 @@ function openCheckpointMenu(anchor) {
     });
     openMenu(anchor, items);
 }
-// Ctrl+Z / Ctrl+Y (Ctrl+Shift+Z): not while typing and not while a form is open (the form has its own Cancel)
+
 document.addEventListener("keydown", (event) => {
     if (!(event.ctrlKey || event.metaKey) || event.altKey || !board() || !defaults) return;
     const key = String(event.key || "").toLowerCase();
@@ -209,10 +209,10 @@ document.addEventListener("keydown", (event) => {
     if (key === "y" || event.shiftKey) redoLayout(); else undoLayout();
 });
 
-// ---------------------------------------------------------------------------------------------
-// The shared default (sharedLayouts.js): what "Default layout" shows for every admin
-// ---------------------------------------------------------------------------------------------
-let shared = null;                                // { appearance, page } of this page, cleaned; null = the page's built-in arrangement
+
+
+
+let shared = null;
 function setShared(data) {
     shared = data ? { appearance: cleanProfile({ appearance: data.appearance }, "shared").appearance, page: cleanPage(Object.assign({}, data.layout, { ver: POSITIONS_VERSION })) } : null;
 }
@@ -224,7 +224,7 @@ const panelOf = (id) => document.querySelector(`.board .panel[data-panel="${CSS.
 const labelOf = (id) => { const panel = panelOf(id); return panel ? panel.dataset.label || id : id; };
 const byId = (id) => document.getElementById(id);
 
-/** This page's part of the active layout (made when `create` is on). On the default layout: the shared default's page, or null. */
+
 function pageData(create) {
     const profile = activeProfile();
     if (!profile) return create ? null : (shared ? shared.page : null);
@@ -233,7 +233,7 @@ function pageData(create) {
     return profile.pages[pageId];
 }
 
-/** The default layout is fixed: before anything is changed the person gets a layout of their own. Resolves false when they cancel. */
+
 async function ensureProfile() {
     if (activeProfile()) return true;
     return newProfile();
@@ -243,7 +243,7 @@ async function newProfile() {
     if (store.profiles.length >= MAX_PROFILES) { toast(`${MAX_PROFILES} layouts are saved already. Delete one to make room.`, "error"); return false; }
     const name = await askText({ title: "Your own layout", label: "Your name (the layout is saved under it)", placeholder: "For example Maria", confirmLabel: "Create" });
     if (!name) return false;
-    // a copy of what is on screen: the active layout, or the shared default of this page
+
     const from = activeProfile() || (shared ? { appearance: shared.appearance, pages: { [pageId]: shared.page } } : null);
     const profile = cleanProfile(JSON.parse(JSON.stringify({ name, appearance: from ? from.appearance : {}, pages: from ? from.pages : {} })), "p" + Date.now().toString(36));
     store.profiles.push(profile);
@@ -253,9 +253,9 @@ async function newProfile() {
     return true;
 }
 
-// ---------------------------------------------------------------------------------------------
-// Start
-// ---------------------------------------------------------------------------------------------
+
+
+
 export function initLayouts(page) {
     pageId = page;
     setFoldPage(page);
@@ -273,9 +273,9 @@ export function initLayouts(page) {
     setShared(kept.data);
     buildDrawer();
     applyLayout();
-    // the board is shown only once it stands in its final arrangement (html.board-ready, adminCommon.css): before that the page's
-    // panels would sit in their plain order, full width and without their inner spacing, and then jump (9 November 2026).
-    // When the shared default must still be read, the board waits for it, at most 1.5 seconds.
+
+
+
     const ready = () => document.documentElement.classList.add("board-ready");
     const waitsForShared = !kept.fresh && !activeProfile();
     if (!waitsForShared) ready(); else window.setTimeout(ready, 1500);
@@ -288,10 +288,10 @@ export function initLayouts(page) {
     byId("doneArrangingBtn").addEventListener("click", () => setEditing(false));
     wireBoard();
     watchForFit();
-    window.setTimeout(() => board().classList.add("settled"), 900);          // the panels' entrance is over: moving them must not replay it
+    window.setTimeout(() => board().classList.add("settled"), 900);
 }
 
-/** Gives a panel what every panel has: an inner box for its content, the gold label and the edges for arranging, and its "..." menu. */
+
 function decorate(panel) {
     if (panel.dataset.decorated) return;
     panel.dataset.decorated = "1";
@@ -304,16 +304,16 @@ function decorate(panel) {
     const menu = `<button type="button" class="icon-btn small panel-menu-btn" aria-label="Panel options" aria-haspopup="menu">${icon("more")}</button>`;
     const head = inner.querySelector(":scope > .panel-head");
     if (head) {
-        // the short line a folded panel shows beside its title goes right after the title and its "i"; the arrow that folds
-        // the panel and the "..." menu close the bar
+
+
         const after = head.querySelector(":scope > .guide-badge") || head.querySelector(":scope > .panel-title");
         if (after) after.insertAdjacentHTML("afterend", FOLD_PARTS); else head.insertAdjacentHTML("afterbegin", FOLD_PARTS);
-        // the arrow and the "..." menu close the bar, except for a part that asks to stay at the very end (data-head-end: the bin)
-        // data-no-fold: the list a page is for has no arrow, and so can never be folded away
+
+
         const closers = (panel.hasAttribute("data-no-fold") ? "" : foldButton()) + menu;
         const tail = head.querySelector("[data-head-end]");
-        // without such a part they get a group of their own, so on a narrow panel they wrap together (the "..." is invisible until
-        // the pointer is over the panel: alone on a second line it would leave an empty band)
+
+
         if (tail) tail.insertAdjacentHTML("beforebegin", closers); else head.insertAdjacentHTML("beforeend", `<span class="head-end">${closers}</span>`);
     } else panel.querySelector(".panel-tools").insertAdjacentHTML("beforeend", menu);
     panel.querySelector(".tools-name").textContent = panel.dataset.label || panel.dataset.panel;
@@ -345,7 +345,7 @@ function makeGroupPanel(group) {
     return panel;
 }
 
-/** The tabs (or the title) of a combined panel, and which of its panels shows. */
+
 function paintGroup(panel, group) {
     const members = Array.from(panel.querySelectorAll(":scope > .panel-inner > .group-body > .panel"));
     const mode = GROUP_MODES.some((m) => m.id === group.mode) ? group.mode : "tabs";
@@ -366,20 +366,20 @@ function paintGroup(panel, group) {
     panel.querySelector(".group-body").style.setProperty("--n", String(Math.max(1, members.length)));
 }
 
-// ---------------------------------------------------------------------------------------------
-// Putting the active layout on the page
-// ---------------------------------------------------------------------------------------------
+
+
+
 function applyLayout() {
     if (!defaults) return;
     const page = pageData(false);
     const b = board();
 
-    // 1. every combined panel is taken apart again ...
+
     b.querySelectorAll(".panel.group").forEach((group) => {
         group.querySelectorAll(":scope > .panel-inner > .group-body > .panel").forEach((member) => { member.classList.remove("member", "active-member"); b.appendChild(member); });
         group.remove();
     });
-    // 2. ... data panels the layout does not have go, the ones it has are made
+
     const wanted = new Map((page ? page.widgets : []).map((widget) => [widget.id, widget]));
     b.querySelectorAll(".panel[data-custom]").forEach((panel) => { if (!wanted.has(panel.dataset.panel)) { unmountWidget(panel); panel.remove(); } });
     wanted.forEach((widget) => {
@@ -388,13 +388,13 @@ function applyLayout() {
         setTitle(panel, widget.title || defaultTitle(normalizeConfig(widget)));
         mountWidget(panel, widget);
     });
-    // 3. a built-in panel shown as a list, a row, a grid or a graph
+
     defaults.order.forEach((id) => {
         const panel = panelOf(id), view = page && page.views[id];
         if (view && view.view && defaults.source[id]) { panel.classList.add("alt-view"); mountWidget(panel, Object.assign({}, view, { source: defaults.source[id] })); }
         else { panel.classList.remove("alt-view"); unmountWidget(panel); }
     });
-    // 4. the combined panels of this layout
+
     (page ? page.groups : []).forEach((group) => {
         const members = group.members.map(panelOf).filter((panel) => panel && !panel.classList.contains("member"));
         if (members.length === 0) return;
@@ -405,11 +405,11 @@ function applyLayout() {
         setTitle(panel, group.title || members.map((m) => m.dataset.label).join(" + "));
         paintGroup(panel, group);
     });
-    // 5. order, sizes, hidden
+
     const tops = new Map(topPanels().map((panel) => [panel.dataset.panel, panel]));
     const order = (page ? page.order : []).filter((id) => tops.has(id));
     defaults.order.forEach((id) => { if (tops.has(id) && !order.includes(id)) order.push(id); });
-    tops.forEach((panel, id) => { if (!order.includes(id)) order.push(id); });          // something new goes to the end
+    tops.forEach((panel, id) => { if (!order.includes(id)) order.push(id); });
     order.forEach((id) => b.appendChild(tops.get(id)));
     tops.forEach((panel, id) => {
         const size = (page && page.size[id]) || defaults.size[id] || { w: 6 };
@@ -419,21 +419,21 @@ function applyLayout() {
         labelSize(panel);
     });
 
-    // the default places: a panel marked data-right sits in the right-hand column whatever the packing would do
+
     b.classList.toggle("pinned", !page || page.order.length === 0);
 
     const profile = activeProfile();
-    document.body.classList.toggle("own-layout", !!profile);          // with a layout of your own, panels move by their title bar
+    document.body.classList.toggle("own-layout", !!profile);
     applyAppearance();
     paintFold();
     paintDrawer();
     fitNow();
 }
 
-// ---------------------------------------------------------------------------------------------
-// Auto resize: the panels are packed without gaps
-// ---------------------------------------------------------------------------------------------
-/** True when the active layout closes the gaps on this page. The default layout always does. */
+
+
+
+
 function fitOn() {
     const page = pageData(false);
     return !page || page.fit !== false;
@@ -441,7 +441,7 @@ function fitOn() {
 
 let fitWatcher = null, fitQueued = 0;
 
-/** Measures every panel's own height and gives it that many rows of the packing grid (see layoutRules.js). */
+
 function fitNow() {
     const b = board();
     if (!b) return;
@@ -451,7 +451,7 @@ function fitNow() {
     if (on) {
         b.style.setProperty("--row-unit", ROW_UNIT + "px");
         const gap = parseFloat(getComputedStyle(b).columnGap) || 16;
-        b.classList.add("measuring");                 // for one moment every panel has its own height again
+        b.classList.add("measuring");
         const heights = panels.map((panel) => panel.offsetHeight);
         b.classList.remove("measuring");
         panels.forEach((panel, index) => {
@@ -459,7 +459,7 @@ function fitNow() {
             if (panel.style.getPropertyValue("--rows") !== rows) panel.style.setProperty("--rows", rows);
         });
     } else panels.forEach((panel) => panel.style.removeProperty("--rows"));
-    if (fitWatcher) fitWatcher.takeRecords();         // what was just written here is not a reason to measure again
+    if (fitWatcher) fitWatcher.takeRecords();
 }
 
 function queueFit() {
@@ -467,18 +467,18 @@ function queueFit() {
     fitQueued = window.requestAnimationFrame(() => { fitQueued = 0; fitNow(); });
 }
 
-/** Whatever changes a panel's height (a list that loaded, a row that opened, a helper line, the window) packs the page again. */
+
 function watchForFit() {
     const b = board();
     fitWatcher = new MutationObserver(() => {
-        // while a panel is carried around its place is not final, and measuring on every step would make it stutter
+
         if (document.body.classList.contains("is-dragging") && b.querySelector(":scope > .panel.floating")) return;
         queueFit();
     });
     fitWatcher.observe(b, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class", "style", "hidden"] });
     window.addEventListener("resize", queueFit, { passive: true });
-    // the board can get narrower or wider without the window changing (the sidebar folds, the settings panel opens): its text
-    // wraps onto more or fewer lines, so every panel is measured again or it would run over the panel under it
+
+
     if (window.ResizeObserver) {
         let lastWidth = b.clientWidth;
         new ResizeObserver(() => { if (b.clientWidth !== lastWidth) { lastWidth = b.clientWidth; queueFit(); } }).observe(b);
@@ -488,11 +488,11 @@ function watchForFit() {
     watchForSettingsGrow();
 }
 
-// ---------------------------------------------------------------------------------------------
-// While Quick settings pushes the page (7 November 2026): a panel left with empty room at the right of its row (Quick actions
-// beside nothing) widens into that room. When Quick settings closes, every panel has its own saved width again. The saved
-// layout (--w) is never touched: the extra width is only data-qs-grow + --qs-span, cleared on close.
-// ---------------------------------------------------------------------------------------------
+
+
+
+
+
 function clearSettingsGrow() {
     document.querySelectorAll(".board > .panel[data-qs-grow]").forEach((panel) => { panel.removeAttribute("data-qs-grow"); panel.style.removeProperty("--qs-span"); });
 }
@@ -511,7 +511,7 @@ function settingsGrowNow() {
     const rects = topPanels().filter((panel) => panel.offsetParent !== null).map((panel) => ({ panel, r: panel.getBoundingClientRect() }));
     const grows = [];
     rects.forEach(({ panel, r }) => {
-        // the nearest panel to its right that shares any of its height; none means the room runs to the board's edge
+
         let edge = right;
         rects.forEach((other) => {
             if (other.panel === panel || other.r.bottom <= r.top + 1 || other.r.top >= r.bottom - 1 || other.r.left < r.right - 1) return;
@@ -528,15 +528,15 @@ function settingsGrowNow() {
 function watchForSettingsGrow() {
     const b = board();
     if (!b) return;
-    // at once: the page width snaps when Quick settings opens (no animated margin), so the room is already final. A
-    // MutationObserver and a ResizeObserver both answer before the next picture is drawn: the panel is never seen at its old width.
+
+
     const later = settingsGrowNow;
     let wasOpen = document.documentElement.classList.contains("qs-open");
     new MutationObserver(() => {
         const open = document.documentElement.classList.contains("qs-open");
         if (open === wasOpen) return;
         wasOpen = open;
-        // opening: the board gets narrower, and its ResizeObserver below does the work after layout. Under 1024 px nothing is pushed.
+
         if (!open) clearSettingsGrow();
     }).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
     new MutationObserver(() => { if (document.body.classList.contains("layout-editing")) clearSettingsGrow(); else if (wasOpen) later(); })
@@ -547,7 +547,7 @@ function watchForSettingsGrow() {
     }
 }
 
-/** The switch in Layout & Style: gaps closed, or every panel on its own line of the grid as before. */
+
 async function setFit(on) {
     if (!(await ensureProfile())) { paintDrawer(); return; }
     capture();
@@ -555,10 +555,10 @@ async function setFit(on) {
     commit(on ? "Gaps closed: panels move up into free space." : "Auto resize is off for this page: panels keep their own rows.");
 }
 
-/**
- * The "Auto resize" button: every panel gets the height of its content again (a height set by hand is dropped) and
- * the gaps are closed. "Undo" in the message puts the sizes back.
- */
+
+
+
+
 async function autoResize() {
     if (!activeProfile()) {
         toast("The default layout is resized already: its panels are packed without gaps. Make your own layout to change sizes.", "info", { label: "Make mine", run: () => newProfile() });
@@ -580,7 +580,7 @@ function labelSize(panel) {
     if (label) label.textContent = `${getComputedStyle(panel).getPropertyValue("--w").trim() || 12}/12` + (panel.style.height ? " · " + panel.style.height : "");
 }
 
-/** The font, sizes and colours of the active layout. Colours are kept per theme, so a dark choice never spoils the light look. */
+
 export function applyAppearance() {
     const root = document.documentElement, style = root.style;
     const profile = activeProfile();
@@ -605,7 +605,7 @@ export function applyAppearance() {
     paintPanelStyles();
 }
 
-/** The font list of a font id, loading a web font the first time it is used ("" for none). */
+
 function fontStackOf(id) {
     const font = FONTS.find((f) => f.id === (id || ""));
     if (!font || !font.id) return "";
@@ -617,7 +617,7 @@ function fontStackOf(id) {
     return font.stack;
 }
 
-/** "Style and text" of every panel on the page (again after a change of light / dark mode: colours are kept per mode). */
+
 function paintPanelStyles() {
     const b = board();
     if (!b || !defaults) return;
@@ -627,7 +627,7 @@ function paintPanelStyles() {
         const style = (page && page.styles && page.styles[id]) || {};
         applyPanelStyle(panel, style, theme, fontStackOf(style.font));
         let texts = (page && page.texts && page.texts[id]) || {};
-        // an added or combined panel has its own name (Rename): its title is not one of the fixed texts
+
         if (panel.dataset.custom || panel.classList.contains("group")) {
             const heading = panel.querySelector(":scope > .panel-inner > .panel-head .panel-title");
             if (heading) heading.dataset.ownText = heading.textContent = panel.dataset.label || heading.textContent;
@@ -637,7 +637,7 @@ function paintPanelStyles() {
     });
 }
 
-/** Writes where the panels are and how big they are into the active layout. */
+
 function capture() {
     const page = pageData(true);
     if (!page) return;
@@ -646,7 +646,7 @@ function capture() {
     saveStore();
 }
 
-/** Saves a change of what the page is made of and draws the page again. */
+
 function commit(message) {
     saveStore();
     applyLayout();
@@ -664,14 +664,14 @@ async function setEditing(on) {
     paintDrawer();
 }
 
-// ---------------------------------------------------------------------------------------------
-// What a panel is shown as, hiding, removing, combining
-// ---------------------------------------------------------------------------------------------
+
+
+
 const widgetOf = (page, id) => (page ? page.widgets.find((widget) => widget.id === id) : null);
 const groupOf = (page, id) => (page ? page.groups.find((group) => group.id === id) : null);
 const groupHolding = (page, id) => (page ? page.groups.find((group) => group.members.includes(id)) : null);
 
-/** What a panel shows now: { source, view, graph, by, measure }, or null for a built-in panel in its standard look. */
+
 function viewOf(id) {
     const page = pageData(false);
     const widget = widgetOf(page, id);
@@ -699,7 +699,7 @@ async function hidePanel(id, hidden) {
     commit(hidden ? `"${labelOf(id)}" is hidden. Bring it back with Layout & Style > Panel.` : null);
 }
 
-/** A combined panel with fewer than two panels left is no combined panel: its last one goes back to the page. */
+
 function tidyGroups(page) {
     page.groups.slice().forEach((group) => {
         if (group.members.length >= 2) return;
@@ -735,7 +735,7 @@ async function renamePanel(id) {
     commit();
 }
 
-/** Puts panel `id` together with panel `targetId` in one combined panel (a new one, or the one `targetId` already is). */
+
 async function combine(id, targetId) {
     if (!(await ensureProfile())) return;
     capture();
@@ -753,7 +753,7 @@ async function combine(id, targetId) {
     } else {
         const group = { id: "g" + Date.now().toString(36), title: cleanName(`${labelOf(targetId)} + ${labelOf(id)}`, 40), mode: "tabs", members: [targetId, id], active: 1 };
         page.groups.push(group);
-        page.order = page.order.map((x) => (x === targetId ? group.id : x)).filter((x) => x !== id);     // it takes the place and the size of the panel it was dropped on
+        page.order = page.order.map((x) => (x === targetId ? group.id : x)).filter((x) => x !== id);
         page.size[group.id] = Object.assign({}, page.size[targetId] || defaults.size[targetId] || { w: 6 }, { h: 0 });
     }
     page.hidden = page.hidden.filter((x) => x !== id && x !== targetId);
@@ -828,10 +828,10 @@ function openPanelMenu(panel, anchor) {
     openMenu(anchor, items);
 }
 
-// ---------------------------------------------------------------------------------------------
-// "Add a panel" and "Graph settings": one small form with a live preview
-// ---------------------------------------------------------------------------------------------
-/** editId = null: a new data panel. Otherwise the settings of that panel. */
+
+
+
+
 async function openPanelDialog(editId) {
     const sets = datasetList();
     if (sets.length === 0) { toast("This page has no data to show in a panel.", "info"); return; }
@@ -946,11 +946,11 @@ async function openPanelDialog(editId) {
     paint();
 }
 
-// ---------------------------------------------------------------------------------------------
-// "Style and text" of ONE panel (9 November 2026): size, the cards inside, the fixed texts, font, colours, corners, motion.
-// Every change shows at once on the real panel (the form sits at the side, so the panel stays in view). Cancel puts back
-// what was there; Save keeps it in the layout, and Undo (Layout & Style, or Ctrl+Z) takes it back again.
-// ---------------------------------------------------------------------------------------------
+
+
+
+
+
 const COLOUR_FIELDS = [
     { key: "bg", label: "Panel", token: "--surface" },
     { key: "card", label: "Cards inside", token: "--surface-2" },
@@ -971,7 +971,7 @@ async function openStyleDialog(id) {
     const theme = currentTheme();
     const before = { style: JSON.parse(JSON.stringify(page.styles[id] || {})), texts: JSON.parse(JSON.stringify(page.texts[id] || {})), w: getComputedStyle(panel).getPropertyValue("--w").trim(), h: panel.style.height };
     let style = JSON.parse(JSON.stringify(before.style)), texts = JSON.parse(JSON.stringify(before.texts));
-    const named = !!panel.dataset.custom || panel.classList.contains("group");          // its title is its own name (Rename)
+    const named = !!panel.dataset.custom || panel.classList.contains("group");
     const own = ownTexts(panel);
     const hasCards = !!panel.querySelector(".kpi-row, .stat-row");
     const isMember = panel.classList.contains("member");
@@ -1093,7 +1093,7 @@ async function openStyleDialog(id) {
         paintColours();
         queueFit();
     };
-    // colours: an empty one follows the page; the swatch shows what is on screen now
+
     const paintColours = () => {
         const mine = (style.colors && style.colors[theme]) || {};
         const css = getComputedStyle(panel);
@@ -1117,8 +1117,8 @@ async function openStyleDialog(id) {
     };
 
     let saved = false, dirty = false, asking = false;
-    // unsaved changes: leaving the page asks the browser's own question; Escape, the backdrop and Cancel ask "Discard changes?"
-    // (Escape, the backdrop or "Keep editing" in that question all mean: keep editing)
+
+
     const onLeave = (event) => { if (dirty && !saved) { event.preventDefault(); event.returnValue = ""; } };
     window.addEventListener("beforeunload", onLeave);
     overlay.addEventListener("input", () => { dirty = true; });
@@ -1139,7 +1139,7 @@ async function openStyleDialog(id) {
         panel.classList.remove("style-target");
         overlay.remove();
         if (saved) return;
-        // Cancel: what was there before comes back
+
         if (!isMember) {
             panel.style.setProperty("--w", before.w || "12");
             if (before.h) { panel.style.height = before.h; panel.setAttribute("data-fixed-h", "1"); } else { panel.style.height = ""; panel.removeAttribute("data-fixed-h"); }
@@ -1215,8 +1215,8 @@ async function openStyleDialog(id) {
             const target = widgetOf(page, id) || groupOf(page, id), name = cleanName(q("#sdTitleText").value, 40);
             if (target && name) target.title = name;
         }
-        // only THIS panel's size is kept: the order of the panels is not touched. (capture() would write the order too, and a
-        // page without a saved order keeps its default right-hand column; with one, that column falls into the flow.)
+
+
         if (!isMember) {
             const h = Number(q("#sdHeight").value);
             page.size[id] = { w: Math.min(12, Math.max(2, Number(q("#sdWidth").value) || 12)), h: h >= 120 && h <= 1400 ? Math.round(h) : 0 };
@@ -1230,10 +1230,10 @@ async function openStyleDialog(id) {
     q("#sdTitleText").focus();
 }
 
-// ---------------------------------------------------------------------------------------------
-// The shared default: "Make this the default for everyone" and "Back to the built-in default"
-// ---------------------------------------------------------------------------------------------
-/** clear = false: the active layout becomes the default of the chosen pages; true: those pages get their built-in default back. */
+
+
+
+
 async function openSharedDialog(clear) {
     const profile = activeProfile();
     if (!clear && !profile) { toast("Choose or make your own layout first: the default is made from it.", "info"); return; }
@@ -1258,7 +1258,7 @@ async function openSharedDialog(clear) {
         </div>`;
     document.body.appendChild(overlay);
     const q = (selector) => overlay.querySelector(selector);
-    let saving = false;                           // while the database is written, Escape and the backdrop do nothing
+    let saving = false;
     const close = () => { document.removeEventListener("keydown", onKey, true); overlay.remove(); };
     const onKey = (event) => { if (event.key === "Escape") { event.stopPropagation(); if (!saving) close(); } };
     document.addEventListener("keydown", onKey, true);
@@ -1276,7 +1276,7 @@ async function openSharedDialog(clear) {
             if (clear) await clearShared(pages);
             else {
                 if (editing) capture();
-                // through JSON: the database takes no "undefined" (a colour that was never set)
+
                 const layoutOf = (p) => JSON.parse(JSON.stringify(cleanPage(Object.assign({}, profile.pages[p] || {}, { ver: POSITIONS_VERSION }))));
                 await writeShared(pages, layoutOf, JSON.parse(JSON.stringify(profile.appearance || {})));
             }
@@ -1296,10 +1296,10 @@ async function openSharedDialog(clear) {
     hydrate(overlay);
 }
 
-// ---------------------------------------------------------------------------------------------
-// Moving and resizing panels
-// A held panel floats above the page and sends out rings like a beacon; the others glide out of its way.
-// ---------------------------------------------------------------------------------------------
+
+
+
+
 function wireBoard() {
     const b = board();
     const scroller = document.querySelector("main.main-content");
@@ -1343,7 +1343,7 @@ function wireBoard() {
         drag.px = event.clientX; drag.py = event.clientY;
         if (!drag.started) {
             if (Math.hypot(drag.px - drag.x, drag.py - drag.y) < 6) return;
-            if (!activeProfile()) {                                  // the default layout does not move
+            if (!activeProfile()) {
                 release();
                 toast("The default layout is fixed. Make your own to move, resize or change panels.", "info", { label: "Make mine", run: () => newProfile() });
                 return;
@@ -1377,12 +1377,12 @@ function wireBoard() {
             return;
         }
         place();
-        if (Date.now() - drag.swapped < 300) return;                 // let the others finish gliding before the next change of place
+        if (Date.now() - drag.swapped < 300) return;
         const under = document.elementsFromPoint(drag.px, drag.py).map((el) => (el.closest ? el.closest(".board > .panel") : null)).find((other) => other && other !== panel);
         if (!under) return;
         const box = under.getBoundingClientRect();
         const before = box.width > b.clientWidth * 0.7 ? drag.py < box.top + box.height / 2 : drag.px < box.left + box.width / 2;
-        if (before ? under.previousElementSibling === panel : under.nextElementSibling === panel) return;      // it is there already
+        if (before ? under.previousElementSibling === panel : under.nextElementSibling === panel) return;
         flip(topPanels().filter((other) => other !== panel), () => b.insertBefore(panel, before ? under : under.nextElementSibling));
         drag.swapped = Date.now();
         place(); placeSlot();
@@ -1400,9 +1400,9 @@ function wireBoard() {
         document.body.classList.remove("is-dragging");
         if (slot) { slot.remove(); slot = null; }
         if (!done.started) return;
-        queueFit();                                   // packing waited while the panel was carried
+        queueFit();
         if (done.mode === "move") {
-            // the panel settles into its place
+
             const panel = done.panel;
             panel.style.transition = "translate .3s cubic-bezier(.3, 1.3, .5, 1)";
             panel.style.translate = "0px 0px";
@@ -1418,7 +1418,7 @@ function wireBoard() {
         let mode;
         if (editing) mode = event.target.closest(".resize-x") ? "x" : event.target.closest(".resize-y") ? "y" : "move";
         else {
-            // outside "Arranging" a panel is moved by the free part of its title bar
+
             const head = event.target.closest(".panel-head");
             if (!head || head.closest(".panel") !== panel || event.target.closest("button, a, input, select, textarea, .pager")) return;
             mode = "move";
@@ -1432,21 +1432,21 @@ function wireBoard() {
     });
 }
 
-// ---------------------------------------------------------------------------------------------
-// The Layout & Style view
-// ---------------------------------------------------------------------------------------------
-// Since 31 October 2026 these controls are not a window of their own: adminSettingsMenu.js owns the ONE floating window (fixed
-// place and width) and shows this view in it when "Layout and style" is chosen, with a back arrow. Here only
-// the controls are built (into #layoutHost) and kept painted. Arranging, "Panel" and Esc hide the window with "glowup:settings-close".
-let colourTheme = "";                             // the theme whose colours the view edits ("" = the one on screen)
+
+
+
+
+
+
+let colourTheme = "";
 const closeWindow = () => document.dispatchEvent(new CustomEvent("glowup:settings-close"));
 
-/** The value of a colour token for `theme`, read from the site's own style sheet (for the theme that is not on screen). */
+
 function themeToken(theme, name) {
     try {
         for (const sheet of Array.from(document.styleSheets)) {
             let rules;
-            try { rules = sheet.cssRules; } catch (error) { continue; }      // a sheet from another address (fonts)
+            try { rules = sheet.cssRules; } catch (error) { continue; }
             for (const rule of Array.from(rules || [])) {
                 if (rule.selectorText && rule.selectorText.includes(`[data-theme="${theme}"]`)) {
                     const value = rule.style.getPropertyValue(name).trim();
@@ -1454,7 +1454,7 @@ function themeToken(theme, name) {
                 }
             }
         }
-    } catch (error) { /* no style sheet to read */ }
+    } catch (error) {                              }
     return "";
 }
 
@@ -1513,7 +1513,7 @@ function buildDrawer() {
 
         <input type="file" id="importFile" accept="application/json,.json" hidden>`;
     hydrate(host);
-    // the window shows this view: paint it with the current look, starting on the colours of the mode on screen
+
     document.addEventListener("glowup:layout-view", () => { colourTheme = currentTheme(); paintDrawer(); });
 
     byId("lookThemeTabs").addEventListener("click", (event) => {
@@ -1549,7 +1549,7 @@ function buildDrawer() {
         saveStore();
         applyAppearance();
     };
-    // the colours of the mode chosen with the Light mode / Dark mode tabs (at first the one on screen)
+
     const colour = (key) => (event) => { const value = event.target.value, theme = colourTheme || currentTheme(); look((a) => { a.colors = a.colors || {}; a.colors[theme] = a.colors[theme] || {}; a.colors[theme][key] = value; }); };
     byId("lookFont").addEventListener("change", (event) => { const value = event.target.value; look((a) => { a.font = value; }); });
     byId("lookScale").addEventListener("input", (event) => { const value = Number(event.target.value); look((a) => { a.scale = value; }); });
@@ -1635,7 +1635,7 @@ function paintDrawer() {
     byId("lookScale").value = look.scale || 1;
     byId("lookDensity").value = look.density || "";
     byId("lookRadius").value = look.radius !== undefined && look.radius !== "" ? look.radius : 14;
-    // the colours of the tab that is chosen: the one on screen reads the page, the other one its kept choice or the site's own value
+
     const theme = colourTheme || currentTheme();
     const kept = (look.colors && look.colors[theme]) || {};
     const valueOf = (key, token) => theme === currentTheme() ? toHex(css.getPropertyValue(token)) : toHex(kept[key] || themeToken(theme, token));

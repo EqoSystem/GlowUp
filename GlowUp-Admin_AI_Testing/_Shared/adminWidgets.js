@@ -1,20 +1,20 @@
-// Data panels: the same data shown as a list, a row of cards, a grid of tiles or a graph.
-//
-// A page tells this module what data it has (registerDataset) and says when that data was loaded or
-// changed (datasetChanged). adminLayouts.js then puts data panels on the page (mountWidget).
-//
-//   list   - one item under the other
-//   row    - cards side by side that scroll sideways (drag them, or use the mouse wheel)
-//   grid   - tiles. Where the data can be removed, the tiles work like the tiles of the mobile app:
-//              click a tile            -> it is selected (glowing outline, pixel sweep); "Remove" takes the selected ones
-//              press and hold a tile   -> all tiles shake and the left side of the panel turns into the remove area
-//              drag a tile to the left -> it pops and is gone
-//            Where the page has a Recycle bin (products, brands, ingredients) a removed tile goes there.
-//            For other data the removed items wait in the bar at the bottom: "Restore" brings them back;
-//            only "Delete forever" (which asks first) really deletes them from the database.
-//   graph  - bars, a line, a donut or a table of the numbers, counted per group ("products by type").
-//
-// Everything a person typed (names, brands ...) is written with textContent, never as HTML.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import { icon, BIN_ICON, paginate, renderPager, toast, askConfirm, playSweep, calmMotion, hideTip } from "./adminShell.js";
 
 export const VIEWS = [
@@ -31,42 +31,42 @@ export const CHARTS = [
 ];
 
 const LIST_SIZE = 8, GRID_SIZE = 12, ROW_LIMIT = 40;
-// a row of the list that is still loading, in GlowUp's look (see "skeleton loading" in adminCommon.css)
+
 const SKELETON_ROW = '<div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div>';
-const HOLD_MS = 450;                       // press this long on a tile and the tiles start to shake
-const BAR_LIMIT = 8;                       // a bar graph shows this many groups; the rest become "Other"
-const DONUT_LIMIT = 6;                     // a donut is only readable with a few slices
+const HOLD_MS = 450;
+const BAR_LIMIT = 8;
+const DONUT_LIMIT = 6;
 
-const datasets = new Map();                // id -> what the page registered (+ ready)
-const mounted = new Map();                 // panel element -> widget
-const trash = new Map();                   // dataset id -> Map(item id -> row): removed, not yet deleted
+const datasets = new Map();
+const mounted = new Map();
+const trash = new Map();
 
-// ---------------------------------------------------------------------------------------------
-// Data
-// ---------------------------------------------------------------------------------------------
-/**
- * registerDataset("products", {
- *     label: "Products", noun: "products", nounOne: "product",
- *     items: () => rows,                                     // the rows as the page holds them
- *     map: (row) => ({ id, title, subtitle, meta, tone, value, valueLabel, swatches }),
- *     dimensions: [{ id, label, of: (row) => key | [keys], tone: (key) => tone, keys: [...], ordered, labelOf, fill, pick: (key) => {} }],
- *     measures: [{ id, label, noun, of: (row) => number }],  // besides "how many"
- *     open: (row) => {},                                      // a click on an item
- *     bin: (rows) => {},                                      // move to the page's Recycle bin (the page says what happened)
- *     remove: async (rows) => {},                             // or: really delete (the page reloads its data afterwards)
- *     removedWord: "removed", foreverLabel: "Delete forever", removeNote: "..."
- * })
- * tone = "ok" | "warn" | "bad" | "info" | "pink" | "muted"
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 export function registerDataset(id, spec) {
     datasets.set(id, Object.assign({ id, ready: false, label: id, noun: "items", nounOne: "item" }, spec));
 }
 
-/**
- * A data set made from TILES ALREADY ON THE PAGE (numbers, shortcuts, counts), so every panel can offer "Show as" (12 November 2026).
- * registerTileDataset("numbers", { label, noun, nounOne, selector: ".kpi", watch: ".kpi-row", map: (tile) => ({ title, value, valueLabel, subtitle, tone }), open: (tile) => tile.click() })
- * The tiles are read when the panel is drawn; a change inside `watch` (a number counting up, a tile that appears) draws it again.
- */
+
+
+
+
+
 export function registerTileDataset(id, spec) {
     const shown = (el) => !el.hidden && el.style.display !== "none" && !el.closest("[hidden]") && !el.classList.contains("sk");
     const tiles = () => Array.from(document.querySelectorAll(spec.selector)).filter(shown);
@@ -94,12 +94,12 @@ export function registerTileDataset(id, spec) {
     setTimeout(() => datasetChanged(id), 0);
 }
 
-/** Call after the data of a set was loaded or changed: every panel that shows it is drawn again. */
+
 export function datasetChanged(id) {
     const d = datasets.get(id);
     if (!d) return;
     d.ready = true;
-    // something that was waiting in the remove bar and is gone from the data needs no bar any more
+
     const waiting = trash.get(id);
     if (waiting && waiting.size > 0) {
         const alive = new Set(d.items().map((row) => String(d.map(row).id)));
@@ -110,7 +110,7 @@ export function datasetChanged(id) {
 
 export const datasetList = () => Array.from(datasets.values()).map((d) => ({ id: d.id, label: d.label }));
 export const datasetSpec = (id) => datasets.get(id) || null;
-/** What can be counted: how many rows there are, plus the data's own numbers (countRows: false leaves the first one out). */
+
 export const measuresOf = (d) => (d && d.countRows === false ? [] : [{ id: "count", label: "How many " + (d ? d.noun : "items"), noun: d ? d.noun : "items" }]).concat((d && d.measures) || []);
 
 const trashOf = (id) => { if (!trash.has(id)) trash.set(id, new Map()); return trash.get(id); };
@@ -118,9 +118,9 @@ const toItem = (d, row) => { const item = d.map(row); item.id = String(item.id);
 const visibleRows = (d) => { const gone = trashOf(d.id); return gone.size === 0 ? d.items() : d.items().filter((row) => !gone.has(String(d.map(row).id))); };
 const number = (n) => (Math.round(n * 10) / 10).toLocaleString();
 
-/** Fills in what is missing in a panel's settings and drops what its data does not have. */
+
 export function normalizeConfig(config) {
-    // the data a panel was made for stays its data, also while the page has not registered it yet
+
     const asked = (config && config.source) || "";
     const d = datasets.get(asked) || (asked ? null : Array.from(datasets.values())[0] || null);
     const out = { source: asked || (d ? d.id : ""), view: VIEWS.some((v) => v.id === (config && config.view)) ? config.view : "list" };
@@ -131,12 +131,12 @@ export function normalizeConfig(config) {
         out.measure = measures.some((m) => m.id === config.measure) ? config.measure : (measures[0] ? measures[0].id : "count");
         out.graph = CHARTS.some((c) => c.id === config.graph) ? config.graph : "bars";
         const dim = dims.find((x) => x.id === out.by);
-        if (out.graph === "line" && dim && !dim.ordered) { const timed = dims.find((x) => x.ordered); if (timed) out.by = timed.id; else out.graph = "bars"; }   // a line needs an order (time)
+        if (out.graph === "line" && dim && !dim.ordered) { const timed = dims.find((x) => x.ordered); if (timed) out.by = timed.id; else out.graph = "bars"; }
     }
     return out;
 }
 
-/** "Products by type", "Recent scans" ... */
+
 export function defaultTitle(config) {
     const d = datasets.get(config.source);
     if (!d) return "Data panel";
@@ -145,9 +145,9 @@ export function defaultTitle(config) {
     return dim ? `${d.label} by ${dim.label.toLowerCase()}` : d.label;
 }
 
-// ---------------------------------------------------------------------------------------------
-// Small builders (text always goes in as text)
-// ---------------------------------------------------------------------------------------------
+
+
+
 function h(tag, attrs, ...kids) {
     const el = document.createElement(tag);
     setAttrs(el, attrs);
@@ -166,7 +166,7 @@ function setAttrs(el, attrs) {
         const value = attrs[key];
         if (value === null || value === undefined || value === false) return;
         if (key === "text") el.textContent = value;
-        else if (key === "markup") el.innerHTML = value;                 // only for this file's own icons
+        else if (key === "markup") el.innerHTML = value;
         else if (key === "class") el.setAttribute("class", value);
         else if (key.startsWith("on")) el.addEventListener(key.slice(2), value);
         else el.setAttribute(key, value === true ? "" : value);
@@ -181,10 +181,10 @@ function addKids(el, kids) {
 const TONE_VAR = { ok: "var(--ok)", warn: "var(--warn)", bad: "var(--bad)", info: "var(--info)", pink: "var(--accent)", muted: "var(--viz-other)" };
 const emptyBox = (message, hint) => h("div", { class: "empty-state" }, h("p", { class: "empty-message", text: message }), hint ? h("span", { class: "empty-hint", text: hint }) : null);
 
-// ---------------------------------------------------------------------------------------------
-// Putting a data panel on the page
-// ---------------------------------------------------------------------------------------------
-/** Shows `config` ({ source, view, graph, by, measure }) inside a panel. Call again to change it. */
+
+
+
+
 export function mountWidget(panel, config) {
     let w = mounted.get(panel);
     if (!w) {
@@ -193,21 +193,21 @@ export function mountWidget(panel, config) {
         inner.appendChild(body);
         const head = inner.querySelector(":scope > .panel-head");
         const pager = h("div", { class: "pager widget-pager" });
-        const menu = head ? head.querySelector(".panel-menu-btn") : null;        // it may sit in a .head-end group
+        const menu = head ? head.querySelector(".panel-menu-btn") : null;
         if (menu) menu.parentNode.insertBefore(pager, menu); else if (head) head.appendChild(pager);
         w = { panel, body, pager, wanted: null, config: null, page: { page: 1, size: LIST_SIZE }, selected: new Set(), shaking: false, width: 0 };
-        // a graph is drawn for the width it has: draw it again when the panel is resized
+
         w.watcher = new ResizeObserver((entries) => {
             const width = Math.round(entries[entries.length - 1].contentRect.width);
             if (!w.config || Math.abs(width - w.width) < 12 || w.config.view !== "graph") { w.width = width; return; }
-            clearTimeout(w.redraw);                // 100 ms after the last change: a drag of the window draws it once, not per pixel
+            clearTimeout(w.redraw);
             w.redraw = setTimeout(() => { w.width = Math.round(body.clientWidth); render(w, true); }, 100);
         });
         w.watcher.observe(body);
         mounted.set(panel, w);
     }
     const before = w.config;
-    w.wanted = Object.assign({}, config);          // as it was asked for: the data may only be registered later
+    w.wanted = Object.assign({}, config);
     w.config = normalizeConfig(w.wanted);
     if (!before || before.source !== w.config.source || before.view !== w.config.view) { w.page.page = 1; w.selected.clear(); w.shaking = false; }
     render(w);
@@ -245,9 +245,9 @@ function render(w, calm) {
 
 const repaintAll = (id) => mounted.forEach((w) => { if (w.config.source === id) render(w); });
 
-// ---------------------------------------------------------------------------------------------
-// List, row
-// ---------------------------------------------------------------------------------------------
+
+
+
 function valueNode(item) {
     if (item.swatches && item.swatches.length > 0)
         return h("span", { class: "w-swatches" }, item.swatches.slice(0, 4).map((colour) => h("span", { class: "swatch", style: /^#[0-9a-f]{6}$/i.test(colour) ? "background:" + colour : null })));
@@ -288,12 +288,12 @@ function renderRow(w, d, rows) {
     wireStrip(strip);
 }
 
-/** A sideways list: the wheel moves it sideways, and it can be dragged with the mouse like on a touch screen. */
+
 function wireStrip(strip) {
     strip.addEventListener("wheel", (event) => {
         if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
         const room = strip.scrollWidth - strip.clientWidth;
-        if (room <= 0 || (event.deltaY < 0 && strip.scrollLeft <= 0) || (event.deltaY > 0 && strip.scrollLeft >= room - 1)) return;       // at an end: the page scrolls
+        if (room <= 0 || (event.deltaY < 0 && strip.scrollLeft <= 0) || (event.deltaY > 0 && strip.scrollLeft >= room - 1)) return;
         event.preventDefault();
         strip.scrollLeft += event.deltaY;
     }, { passive: false });
@@ -313,18 +313,18 @@ function wireStrip(strip) {
         from = null;
     };
     strip.addEventListener("pointerdown", (event) => {
-        if (event.pointerType !== "mouse" || event.button !== 0) return;       // a finger scrolls it by itself
+        if (event.pointerType !== "mouse" || event.button !== 0) return;
         from = { x: event.clientX, left: strip.scrollLeft, moved: false };
         window.addEventListener("pointermove", move);
         window.addEventListener("pointerup", up);
     });
-    // a drag must not count as a click on the card it started on
+
     strip.addEventListener("click", (event) => { if (strip.dataset.justDragged) { event.stopPropagation(); event.preventDefault(); } }, true);
 }
 
-// ---------------------------------------------------------------------------------------------
-// Grid: tiles that are selected, shaken, dragged and popped like the tiles of the mobile app
-// ---------------------------------------------------------------------------------------------
+
+
+
 function renderGrid(w, d, rows) {
     w.page.size = GRID_SIZE;
     const items = paginate(rows, w.page).map((row) => toItem(d, row));
@@ -366,7 +366,7 @@ function wireGrid(w, d, grid) {
         const tile = event.target.closest(".w-tile");
         if (swallowClick) { swallowClick = false; return; }
         if (!tile) { if (w.shaking) setShaking(w, d, false); return; }
-        if (w.shaking) return;                                   // while the tiles shake a tap does nothing, as on the phone
+        if (w.shaking) return;
         if (can) setSelected(tile, !w.selected.has(tile.dataset.id));
         else if (d.open) d.open(rowOf(tile.dataset.id));
     });
@@ -384,13 +384,13 @@ function wireGrid(w, d, grid) {
     });
     if (!can) return;
 
-    const threshold = () => Math.min(170, w.body.clientWidth * 0.34);       // drag a tile this far to the left and it is removed
+    const threshold = () => Math.min(170, w.body.clientWidth * 0.34);
     const move = (event) => {
         if (!press) return;
         const dx = event.clientX - press.x, dy = event.clientY - press.y;
         if (!press.dragging) {
             if (Math.hypot(dx, dy) < 6) return;
-            if (!w.shaking) { window.clearTimeout(press.timer); return; }        // moved before the hold was over: not a drag
+            if (!w.shaking) { window.clearTimeout(press.timer); return; }
             press.dragging = true;
             press.tile.classList.add("dragging");
             document.body.classList.add("is-dragging");
@@ -414,7 +414,7 @@ function wireGrid(w, d, grid) {
         if (done.held || done.dragging) swallowClick = true;
         if (!done.dragging) return;
         if (done.k >= 1) { sendToTrash(w, d, [done.id], done.tile); return; }
-        // not far enough: the tile springs back
+
         done.tile.style.transition = "translate .32s cubic-bezier(.3, 1.4, .5, 1)";
         done.tile.style.translate = "0px 0px";
         window.setTimeout(() => { done.tile.classList.remove("dragging"); done.tile.style.transition = ""; done.tile.style.translate = ""; }, 330);
@@ -431,7 +431,7 @@ function wireGrid(w, d, grid) {
     });
 }
 
-/** The tiles start (or stop) shaking and the remove area on the left shows (or hides). */
+
 function setShaking(w, d, on) {
     if (w.shaking === on) return;
     w.shaking = on;
@@ -453,13 +453,13 @@ function setShaking(w, d, on) {
     paintActionBar(w, d);
 }
 
-/** The tiles pop (swell, then burst) and wait in the remove bar. Nothing is deleted from the database yet. */
+
 function sendToTrash(w, d, ids, draggedTile) {
     const tiles = ids.map((id) => w.body.querySelector(`.w-tile[data-id="${CSS.escape(id)}"]`)).filter((tile) => tile);
     const finish = () => {
         const rows = ids.map((id) => d.items().find((r) => String(d.map(r).id) === id)).filter((row) => row);
         ids.forEach((id) => w.selected.delete(id));
-        if (d.bin) { d.bin(rows); return; }                       // the page moves them to its Recycle bin and draws everything again
+        if (d.bin) { d.bin(rows); return; }
         const gone = trashOf(d.id);
         rows.forEach((row) => gone.set(String(d.map(row).id), row));
         glideTiles(w, () => repaintAll(d.id));
@@ -473,7 +473,7 @@ function sendToTrash(w, d, ids, draggedTile) {
     window.setTimeout(finish, 250 + tiles.length * 50);
 }
 
-/** Draws the panel again and lets the tiles that stay glide to their new places. */
+
 function glideTiles(w, redraw) {
     const before = new Map(Array.from(w.body.querySelectorAll(".w-tile")).map((tile) => [tile.dataset.id, tile.getBoundingClientRect()]));
     redraw();
@@ -486,14 +486,14 @@ function glideTiles(w, redraw) {
     });
 }
 
-/** The bar at the bottom of a data panel: what is selected, what was removed, and "Done" while the tiles shake. */
+
 function paintActionBar(w, d) {
     const old = w.body.querySelector(":scope > .w-bar");
     if (old) old.remove();
     if (!d.remove && !d.bin) return;
     const selected = w.config.view === "grid" ? w.selected.size : 0, removed = d.bin ? 0 : trashOf(d.id).size;
     if (!selected && !removed && !w.shaking) return;
-    // a graph leaves the bar to a list, row or grid of the same data when one is on the page: one bar is enough
+
     if (w.config.view === "graph" && Array.from(mounted.values()).some((other) => other !== w && other.config.source === d.id && other.config.view !== "graph" && other.panel.isConnected)) return;
     const word = d.removedWord || "removed", forever = d.foreverLabel || "Delete forever";
     const button = (label, cls, run, tip) => h("button", { type: "button", class: "row-btn " + cls, onclick: run, "data-tip": tip || null }, label);
@@ -531,10 +531,10 @@ async function purge(w, d) {
     repaintAll(d.id);
 }
 
-// ---------------------------------------------------------------------------------------------
-// Graphs
-// ---------------------------------------------------------------------------------------------
-/** Counts (or adds up) the rows per group. Returns [{ key, label, value, tone }] in the order to draw them. */
+
+
+
+
 function aggregate(d, rows, dim, measure) {
     const sums = new Map();
     rows.forEach((row) => {
@@ -553,10 +553,10 @@ function aggregate(d, rows, dim, measure) {
     return out;
 }
 
-/**
- * A bar graph stays readable with a handful of bars: the biggest groups are drawn, and the rest is told in words
- * under the graph (one long "Other" bar would dwarf the bars that matter).
- */
+
+
+
+
 function topGroups(groups, limit, noun) {
     if (groups.length <= limit) return { shown: groups, rest: "" };
     const rest = groups.slice(limit);
@@ -596,7 +596,7 @@ function renderGraph(w, d, rows) {
     if (reading) w.body.appendChild(h("div", { class: "chart-insight" }, h("span", { markup: icon("sparkle") }), h("span", { text: reading })));
 }
 
-/** One sentence that reads a graph: the biggest group, or for days and hours the peak and the latest. */
+
 function insightOf(groups, total, dim, noun) {
     const real = groups.filter((g) => g.value > 0);
     if (real.length === 0) return "";
@@ -611,13 +611,13 @@ function insightOf(groups, total, dim, noun) {
 }
 
 const share = (value, total) => (total > 0 ? Math.round(value * 100 / total) + "%" : "0%");
-/** What a mark tells on hover and on keyboard focus: the number first, then what it is. */
+
 const tipOf = (group, total, noun) => ({ "data-tip-title": `${number(group.value)} ${noun}`, "data-tip": `${group.label} · ${share(group.value, total)} of the total` });
 const pickable = (pick, group) => (pick && !group.other
     ? { tabindex: 0, role: "button", onclick: () => pick(group), onkeydown: (event) => { if (event.key === "Enter") pick(group); } }
     : { tabindex: 0 });
 
-/** Horizontal bars: one group per line, the value at the tip of its bar. One colour, because the groups are one series. */
+
 function barsOf(groups, total, noun, pick) {
     const max = Math.max(1, ...groups.map((g) => g.value));
     return h("div", { class: "chart bars" }, groups.map((group, index) => h("div", Object.assign({ class: "bar-row" + (pick && !group.other ? " can-pick" : "") }, tipOf(group, total, noun), pickable(pick, group)),
@@ -633,14 +633,14 @@ function tableOf(groups, total, dim, noun) {
         h("tbody", null, groups.map((group) => h("tr", null, h("td", { text: group.label }), h("td", { class: "text-right num", text: number(group.value) }), h("td", { class: "text-right num", text: share(group.value, total) })))));
 }
 
-/** A step that reads cleanly on an axis: 1, 2, 5, 10, 20, 50 ... */
+
 function niceStep(raw) {
     const power = Math.pow(10, Math.floor(Math.log10(Math.max(raw, 1e-9))));
     const unit = raw / power;
     return Math.max(1, (unit <= 1 ? 1 : unit <= 2 ? 2 : unit <= 5 ? 5 : 10) * power);
 }
 
-/** Columns (or a line) over an ordered scale, such as days: thin marks, hairline grid, one direct label, a hover band per position. */
+
 function plotOf(w, groups, noun, pick, asLine) {
     const width = Math.max(260, Math.round(w.body.clientWidth || 480)), height = 200;
     const m = { left: 34, right: 16, top: 16, bottom: 26 };
@@ -652,7 +652,7 @@ function plotOf(w, groups, noun, pick, asLine) {
     const total = groups.reduce((sum, g) => sum + g.value, 0);
     const svg = s("svg", { class: "chart plot", viewBox: `0 0 ${width} ${height}`, width, height, role: "img", "aria-label": `${noun} per group` });
 
-    for (let tick = 0; tick <= top + 1e-9; tick += step) {                                   // grid and its numbers: quiet
+    for (let tick = 0; tick <= top + 1e-9; tick += step) {
         svg.appendChild(s("line", { class: tick === 0 ? "axis-base" : "axis-grid", x1: m.left, x2: width - m.right, y1: y(tick), y2: y(tick) }));
         svg.appendChild(s("text", { class: "axis-text", x: m.left - 8, y: y(tick) + 4, "text-anchor": "end" }, number(tick)));
     }
@@ -660,7 +660,7 @@ function plotOf(w, groups, noun, pick, asLine) {
     groups.forEach((group, i) => { if (i % every === 0 || i === groups.length - 1 && (groups.length - 1) % every >= every / 2) svg.appendChild(s("text", { class: "axis-text", x: x(i), y: height - 8, "text-anchor": "middle" }, group.label)); });
 
     const peak = groups.reduce((best, g, i) => (g.value > groups[best].value ? i : best), 0);
-    const labelAt = asLine ? groups.length - 1 : peak;                                      // one direct label: the end of a line, the tallest column
+    const labelAt = asLine ? groups.length - 1 : peak;
     if (asLine) {
         const points = groups.map((g, i) => `${x(i)},${y(g.value)}`);
         svg.appendChild(s("path", { class: "line-area", d: `M${x(0)},${y(0)} L${points.join(" L")} L${x(groups.length - 1)},${y(0)} Z` }));
@@ -676,7 +676,7 @@ function plotOf(w, groups, noun, pick, asLine) {
     }
     svg.appendChild(s("text", { class: "mark-label", x: x(labelAt), y: y(groups[labelAt].value) - 9, "text-anchor": labelAt === groups.length - 1 && asLine ? "end" : "middle" }, number(groups[labelAt].value)));
 
-    // hover and keyboard: one band per position, as tall as the plot, so nobody has to hit a thin mark
+
     const cross = s("line", { class: "crosshair", y1: m.top, y2: y(0) });
     const dot = s("circle", { class: "line-dot hover", r: 4.5 });
     svg.append(cross, dot);
@@ -697,10 +697,10 @@ function plotOf(w, groups, noun, pick, asLine) {
     return svg;
 }
 
-/** A donut for a few parts of a whole, with a legend that carries the names and numbers (never colour alone). */
+
 function donutOf(groups, total, dim, noun, pick) {
     const R = 52, STROKE = 17, C = 2 * Math.PI * R, GAP = 2.5;
-    // a colour belongs to a group, not to its rank: the groups take the slots in a fixed order
+
     const fixed = dim.keys ? dim.keys.slice() : groups.map((g) => g.key).sort();
     const colourOf = (group) => (group.tone ? TONE_VAR[group.tone] : `var(--viz-${(Math.max(0, fixed.indexOf(group.key)) % DONUT_LIMIT) + 1})`);
     const svg = s("svg", { class: "chart donut", viewBox: "0 0 140 140", width: 150, height: 150, role: "img", "aria-label": `${noun} by ${dim.label.toLowerCase()}` });

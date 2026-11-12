@@ -1,5 +1,5 @@
-// Checks of the data tools (tools/csvTools.mjs, tools/cosingToImport.mjs, tools/t1ToImport.mjs). Run: node tests/tools.test.mjs
-// Every ingredient name below is invented ("Example Substance ...") so that no test line can be mistaken for a fact about an ingredient or a regulation.
+
+
 import { parseCsv, recordsOf, toCsv } from "../tools/csvTools.mjs";
 import { cosingToImport, IMPORT_KEYS as COSING_KEYS } from "../tools/cosingToImport.mjs";
 import { t1ToImport, TEMPLATE_HEADERS } from "../tools/t1ToImport.mjs";
@@ -10,7 +10,7 @@ let checks = 0, failed = 0;
 const check = (ok, what) => { checks++; if (!ok) { failed++; console.log("FAILED: " + what); } };
 const equal = (a, b, what) => check(JSON.stringify(a) === JSON.stringify(b), `${what} (got ${JSON.stringify(a)})`);
 
-// ---- csv ----
+
 equal(parseCsv('a,b\r\n1,"x, ""y"""\r\n\r\n2,\r\n'), [["a", "b"], ["1", 'x, "y"'], ["2", ""]], "quotes, a doubled quote, a blank line, a trailing empty cell");
 equal(parseCsv("﻿a;b\n1;2\n"), [["a", "b"], ["1", "2"]], "a byte-order mark and ; as the separator");
 equal(parseCsv('a\n"line one\nline two"\n'), [["a"], ["line one\nline two"]], "a line break inside quotes");
@@ -18,7 +18,7 @@ equal(recordsOf(parseCsv(" Name ,Other\nx,y\n")).records, [{ name: "x", other: "
 equal(toCsv(["a", "b"], [{ a: "x,y", b: 'say "hi"' }, { a: "1" }]), 'a,b\r\n"x,y","say ""hi"""\r\n1,\r\n', "writing quotes what needs it");
 equal(parseCsv(toCsv(["a"], [{ a: "p\nq" }, { a: '"' }])), [["a"], ["p\nq"], ['"']], "what is written can be read back");
 
-// ---- CosIng ----
+
 const COSING = `COSING Ref No,INCI name,INN name,Ph. Eur. Name,CAS No,EC No,Chem/IUPAC Name / Description,Restriction,Function,Update Date
 900001,Example Substance One,Exampleine,,111-11-1,200-000-1,An invented chemical name,,"EMOLLIENT, SKIN CONDITIONING",2020-01-01
 900002,Example Substance Two,,Example substance two,222-22-2,200-000-2,,III/99,PRESERVATIVE,2020-01-01
@@ -42,14 +42,14 @@ const COSING = `COSING Ref No,INCI name,INN name,Ph. Eur. Name,CAS No,EC No,Chem
     equal(all.review.map((r) => r.INCI_NAME + "|" + r.RESTRICTION_TEXT), ["Example Substance Two|III/99"], "a restriction goes to the review file, not into a rating");
     equal(cosingToImport(records, { only: new Set(["example substance three"]) }).import.map((r) => r.NAME), ["Example Substance Three"], "--only keeps the listed names");
     equal(cosingToImport(records, { max: 1 }).import.length, 1, "--max");
-    // the file can be imported by the Ingredient Curator
+
     const csv = toCsv(COSING_KEYS, all.import);
     const parsed = parseImportText(csv);
     equal(parsed.kind + "|" + parsed.draft.ingredients.length, "ingredients|3", "the written CSV is read by the website's import as 3 ingredients");
     check(parsed.draft.ingredients.every((i) => i.riskLevel === ""), "none of them has a risk level after import");
 }
 
-// ---- T1 template ----
+
 equal(readFileSync(new URL("../tools/templates/t1_restricted_template.csv", import.meta.url), "utf8").trim().split(",").join(","), TEMPLATE_HEADERS.join(","), "the shipped template has the headers and no row");
 const EU = "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32009R1223", CIR = "https://cir-reports.cir-safety.org/example", DB = "https://www.incidecoder.com/example";
 {

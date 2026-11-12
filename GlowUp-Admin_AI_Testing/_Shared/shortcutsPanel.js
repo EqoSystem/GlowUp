@@ -1,10 +1,10 @@
-// KEYBOARD SHORTCUTS in Quick settings (9 November 2026): the list (grouped by page) and the Add / Edit dialog.
-//
-// The dialog, top to bottom: page, action, the "Press keys…" field, what is wrong or risky with the combo (right under the field,
-// with the choices it needs), the Test, the description (required, 120 characters), and Cancel / Save in the footer.
-// Save stays off until the combo is allowed, every warning has an answer, and the Test was passed (or "Save anyway" was chosen,
-// which puts ⚠ on the row). Escape while recording only stops the recording; Escape, the X or the dark area otherwise close the
-// dialog, after "Discard changes?" when something was changed. Focus goes back to the button that opened the dialog.
+
+
+
+
+
+
+
 import { icon, toast, askConfirm } from "./adminShell.js";
 import { CATALOG, PAGES, PAGE_ORDER, catalogById } from "./shortcutCatalog.js";
 import { comboFromEvent, comboText, comboLabels, checkCombo, detectBrowser, isMac, REASONS, testVerdict } from "./shortcutKeys.js";
@@ -19,10 +19,10 @@ const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls)
 const labelOf = (id) => (catalogById.get(id) || {}).label || id;
 const offline = () => typeof navigator !== "undefined" && navigator.onLine === false;
 
-// ---------------------------------------------------------------------------------------------
-// The list
-// ---------------------------------------------------------------------------------------------
-/** Draws the Keyboard shortcuts view into `into` (the settings window calls it each time the view is shown). */
+
+
+
+
 export function paintShortcutsView(into) {
     host = into;
     if (!watching) {
@@ -65,7 +65,7 @@ function paint() {
         const group = el("section", "kb-group");
         group.setAttribute("aria-label", PAGES[page]);
         group.appendChild(el("div", "menu-heading", PAGES[page]));
-        if (!state.loaded) {                                  // only the data is grey: the page names are not data
+        if (!state.loaded) {
             for (let i = 0; i < (page === "inventory" ? 3 : 1); i++) group.appendChild(skeletonRow());
             nodes.push(group);
             return;
@@ -111,7 +111,7 @@ function row(s, locked) {
     head.appendChild(keyChips(s.keys));
     main.appendChild(head);
     main.appendChild(el("p", "kb-desc", s.description));
-    if (s.conflictFlag) {                                   // said in words on the row (the site shows no hover labels)
+    if (s.conflictFlag) {
         const warn = el("p", "kb-flag");
         warn.innerHTML = icon("alert");
         warn.appendChild(el("span", "", "May not work in every browser: a browser, the computer or an extension may use this combo."));
@@ -169,17 +169,17 @@ async function confirmReset() {
 }
 function focusIn(key) { requestAnimationFrame(() => { const b = host && host.querySelector(`[data-kb-focus="${CSS.escape(key)}"]`); if (b) b.focus({ preventScroll: true }); }); }
 
-// ---------------------------------------------------------------------------------------------
-// The Add / Edit dialog
-// ---------------------------------------------------------------------------------------------
-/** opts = { existing } to edit a shortcut, or { scope } to add one (scope "" = let the admin choose). */
+
+
+
+
 export function openEditor({ existing = null, scope = "" } = {}) {
     const browser = detectBrowser(), mac = isMac();
     const returnKey = existing ? existing.actionId + "-edit" : scope ? "add-" + scope : "add";
     const first = existing ? { scope: existing.pageScope, actionId: existing.actionId, keys: existing.keys, description: existing.description }
         : { scope: scope || "inventory", actionId: "", keys: "", description: "" };
     const f = { ...first, answers: {}, test: existing ? "kept" : "", conflictFlag: existing ? existing.conflictFlag : false };
-    // f.test: "" (not yet) | "waiting" | "ok" | "missed" | "anyway" | "kept" (an existing combo that was not changed)
+
 
     const overlay = el("div", "modal-overlay kb-layer");
     overlay.style.display = "flex";
@@ -233,7 +233,7 @@ export function openEditor({ existing = null, scope = "" } = {}) {
             o.value = a.id; return o;
         }));
         if (!CATALOG.some((a) => a.id === f.actionId && a.scope === pageSel.value)) {
-            // a new action: its first one without a shortcut, else the first one
+
             const free = CATALOG.find((a) => a.scope === pageSel.value && !list.some((s) => s.actionId === a.id));
             f.actionId = (free || CATALOG.find((a) => a.scope === pageSel.value) || {}).id || "";
         }
@@ -245,7 +245,7 @@ export function openEditor({ existing = null, scope = "" } = {}) {
     const paintCount = () => { count.textContent = `${desc.value.length} / ${DESCRIPTION_MAX}`; };
     paintCount();
 
-    // ---- recording ----
+
     let recording = false, partial = "";
     const paintRecord = () => {
         rec.replaceChildren();
@@ -256,7 +256,7 @@ export function openEditor({ existing = null, scope = "" } = {}) {
         else rec.appendChild(el("span", "kb-placeholder", "Press keys…"));
         rec.setAttribute("aria-label", recording ? "Recording: press the keys now" : f.keys ? "Keys: " + comboText(f.keys, { mac }) + ". Press Enter to record again." : "Keys: none. Press Enter to record.");
     };
-    // the live chips for modifiers only ("Ctrl+Alt+") use the same formatter, without the last key
+
     const partialChips = (mods) => { const box2 = el("span", "kb-combo is-partial"); comboLabels(mods + "+KeyA", { mac }).slice(0, -1).forEach((l) => box2.appendChild(el("kbd", "kb-key", l))); box2.appendChild(el("span", "kb-dots", "…")); return box2; };
     const startRecording = () => { if (recording) return; stopTest(); recording = true; partial = ""; setRecording(true); paintRecord(); rec.focus(); };
     const stopRecording = () => { if (!recording) return; recording = false; partial = ""; setRecording(testing()); paintRecord(); };
@@ -264,7 +264,7 @@ export function openEditor({ existing = null, scope = "" } = {}) {
     rec.addEventListener("keydown", (event) => { if (!recording && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); startRecording(); } });
     rec.addEventListener("blur", () => stopRecording());
 
-    // ---- checks, warnings, test ----
+
     const others = () => shortcutState().list.filter((s) => !existing || s.actionId !== existing.actionId);
     const evaluate = () => {
         msgs.replaceChildren();
@@ -304,7 +304,7 @@ export function openEditor({ existing = null, scope = "" } = {}) {
         f.test = "waiting";
         setRecording(true);
         testListener = (event) => {
-            if (event.key === "Escape") return;                 // the dialog's own Esc handling below
+            if (event.key === "Escape") return;
             const { keys } = comboFromEvent(event);
             if (!keys) return;
             event.preventDefault(); event.stopPropagation();
@@ -363,14 +363,14 @@ export function openEditor({ existing = null, scope = "" } = {}) {
     const paintSave = () => { save.disabled = !ready() || saving; };
     const refresh = () => { currentChecks = evaluate(); paintRecord(); paintTest(); paintSave(); };
 
-    // ---- keys while the dialog is on top ----
+
     const onKey = (event) => {
         const top = Array.from(document.querySelectorAll(".modal-overlay")).filter((o) => getComputedStyle(o).display !== "none").pop();
         if (top !== overlay) return;
         if (recording) {
             if (event.key === "Tab" && !event.ctrlKey && !event.altKey && !event.metaKey) { stopRecording(); return; }
             event.preventDefault(); event.stopPropagation();
-            if (event.key === "Escape") { stopRecording(); heard.textContent = "Recording stopped."; return; }       // the FIRST Esc only stops recording
+            if (event.key === "Escape") { stopRecording(); heard.textContent = "Recording stopped."; return; }
             if (event.key === "Backspace" && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) { f.keys = ""; f.answers = {}; f.test = ""; partial = ""; refresh(); heard.textContent = "Cleared."; return; }
             if (event.repeat) return;
             const { keys, partial: mods } = comboFromEvent(event);
@@ -387,12 +387,12 @@ export function openEditor({ existing = null, scope = "" } = {}) {
     };
     document.addEventListener("keydown", onKey, true);
 
-    // ---- changes in the boxes ----
+
     pageSel.addEventListener("change", () => { f.scope = pageSel.value; fillActions(); if (!descTouched) desc.value = (catalogById.get(f.actionId) || {}).description || ""; paintCount(); refresh(); });
     actionSel.addEventListener("change", () => { f.actionId = actionSel.value; if (!descTouched) desc.value = (catalogById.get(f.actionId) || {}).description || ""; paintCount(); f.answers = {}; refresh(); });
     desc.addEventListener("input", () => { descTouched = true; paintCount(); paintSave(); });
 
-    // ---- closing ----
+
     const dirty = () => pageSel.value !== first.scope || actionSel.value !== first.actionId || f.keys !== first.keys || desc.value !== (first.description || desc.defaultValue || desc.value);
     let closing = false;
     const close = () => {
@@ -413,7 +413,7 @@ export function openEditor({ existing = null, scope = "" } = {}) {
     q("[data-cancel]").addEventListener("click", tryClose);
     overlay.addEventListener("mousedown", (event) => { if (event.target === overlay) tryClose(); });
 
-    // ---- saving ----
+
     let saving = false;
     const doSave = async () => {
         if (!ready() || saving) return;
@@ -424,7 +424,7 @@ export function openEditor({ existing = null, scope = "" } = {}) {
         let list = shortcutState().list.filter((s) => s.actionId !== f.actionId && (!existing || s.actionId !== existing.actionId));
         if (f.answers[REASONS.IN_USE_SAME_PAGE] === "replace") {
             const owner = currentChecks.find((m) => m.code === REASONS.IN_USE_SAME_PAGE && m.level === "warn");
-            if (owner) list = list.filter((s) => s.actionId !== owner.owner);          // the other action loses the combo
+            if (owner) list = list.filter((s) => s.actionId !== owner.owner);
         }
         const text = desc.value.replace(/\s+/g, " ").trim().slice(0, DESCRIPTION_MAX);
         list.push({

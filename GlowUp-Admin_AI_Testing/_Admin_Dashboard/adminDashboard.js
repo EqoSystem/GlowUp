@@ -1,18 +1,18 @@
-// Operations Dashboard: live numbers from the same database the mobile app uses.
-//   brands / products / ingredients  - how many there are
-//   scanActivity                     - one small anonymous note per scan made in the app
-//                                      { productName, brandId, brandName, cosmeticType, status, source, scannedAtUnix,
-//                                        ingredientCount, harmfulCount, cautionCount, allergenFlagged, flaggedIngredients[] }
-//   allergenSuggestions / conditionSuggestions - items users typed in because they were not on the app's lists
-//                                      { text, uid, status: "pending", createdAtUnix }
-//   reviewed == false                - on a brand / product: the app (from a scan) or an import added it, nobody checked it yet
-//                                      on an ingredient with source "ai": found by the app's AI lookup, not checked yet
+
+
+
+
+
+
+
+
+
 import { db } from "../_Database/firebase-console.js";
 import {
     collection, query, where, orderBy, limit, doc, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-// the brand list comes from the site's own copy when another page has read it already (see adminStore.js);
-// getCountFromServer and onSnapshot come from there too, so that every read is counted in the console
+
+
 import { getDocs, updateDoc, writeBatch, onListsRefreshed, getCountFromServer, onSnapshot } from "../_Shared/adminStore.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, escapeHtml, asArray, toWholeNumber, timeAgo, formatWhen, startOfTodayUnix,
@@ -25,41 +25,41 @@ import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAs
 import { setPanelQuiet, setPanelSummary } from "../_Shared/adminFold.js";
 import { openAuditLog } from "../_Shared/adminAuditLog.js";
 
-const RECENT_ITEMS = 120;             // how many recent scans are fetched (the list, the grid and the graphs all use them)
-const PAGE_SIZE = 8;                  // how many rows a panel shows at a time
+const RECENT_ITEMS = 120;
+const PAGE_SIZE = 8;
 const activityPage = { page: 1, size: PAGE_SIZE };
 const suggestionPage = { page: 1, size: PAGE_SIZE };
-// the support reports are shown in one panel for each kind (12 November 2026); an unknown kind goes with "Other". `prefix` names the panel's parts
-// (<prefix>List, <prefix>Pager, <prefix>Empty, <prefix>ClearAll ...); the Bug panel keeps the old id "support".
+
+
 const SUPPORT_KINDS = [
     { prefix: "support", dataset: "supportBug", label: "Bug reports", category: "Bug", title: "bug reports", none: "No new bug reports.", page: { page: 1, size: PAGE_SIZE } },
     { prefix: "supportWrong", dataset: "supportWrong", label: "Wrong scan results", category: "Wrong scan result", title: "wrong scan results", none: "No new wrong scan results.", page: { page: 1, size: PAGE_SIZE } },
     { prefix: "supportOther", dataset: "supportOther", label: "Other reports", category: "Other", title: "other reports", none: "No new reports.", page: { page: 1, size: PAGE_SIZE } }
 ];
 const kindOf = (category) => (SUPPORT_KINDS.find((k) => k.category === category) || SUPPORT_KINDS[2]);
-let supportReports = [];              // [{ id, category, message, uid, appVersion, device, createdAtUnix, lastScan }]
+let supportReports = [];
 let recentScans = [];
 const TOP_BRANDS = 5;
-const TODAY_LIMIT = 200;              // the live "today" listener reads at most this many scans; the exact total comes from one count
-const COUNT_EVERY_MS = 60 * 1000;     // that count is asked for at most once a minute
-let lastCountAt = 0;                  // when it was last asked for
-let exactToday = null;                // its answer (null = not asked yet, or the day has fewer scans than the limit)
+const TODAY_LIMIT = 200;
+const COUNT_EVERY_MS = 60 * 1000;
+let lastCountAt = 0;
+let exactToday = null;
 
 const el = (id) => document.getElementById(id);
-let stopToday = null;                 // switches the "today" listener off (it is restarted when the date changes)
+let stopToday = null;
 let todayStart = 0;
-let suggestions = [];                 // [{ id, collection, kind, text, createdAtUnix, lastScan }]
-let appSuggestions = [];              // "Suggestion" reports from the app's Contact support (11 November 2026): shown in Suggestions, not in Support reports
-let typedSuggestions = [];            // allergen / skin condition suggestions
-let allBrands = [];                   // [{ id, name, category, status, scans }]
+let suggestions = [];
+let appSuggestions = [];
+let typedSuggestions = [];
+let allBrands = [];
 let todayResults = { safe: 0, caution: 0, harmful: 0 };
-let activityFilter = "";              // "" | "safe" | "caution" | "harmful" | "flagged": what the activity list is narrowed to
-let openScanId = "";                  // the scan whose details are open in the activity list
-// what the helper lines read (null = not loaded yet)
+let activityFilter = "";
+let openScanId = "";
+
 let scansToday = null, flaggedToday = 0;
 let waitingInventory = null, waitingIngredients = null;
 let suggestionsLoaded = false;
-// which helper lines have their data (or know it failed): until then a helper answers null and shows a loading shape
+
 let todayAnswered = false, activityAnswered = false, brandsAnswered = false;
 const many = (n, one, more) => `${n} ${n === 1 ? one : more}`;
 
@@ -69,9 +69,9 @@ const toneOf = (status) => ({ safe: "ok", caution: "warn", harmful: "bad" }[stat
 const INVENTORY_PAGE = "../_Admin_Brand_Inventory/adminBrandInventory.html";
 
 document.addEventListener("DOMContentLoaded", async () => {
-    registerData();                   // before the page frame: a saved layout may hold panels that show this data
+    registerData();
     mountShell("dashboard");
-    bindButtons({ "dashboard.activityLog": "#auditLogTile", "dashboard.addProduct": 'a.tile[href*="add=product"]' });      // keyboard shortcuts (shortcuts.js)
+    bindButtons({ "dashboard.activityLog": "#auditLogTile", "dashboard.addProduct": 'a.tile[href*="add=product"]' });
     const auditTile = document.getElementById("auditLogTile");
     if (auditTile) auditTile.addEventListener("click", openAuditLog);
     setAssistPage("dashboard");
@@ -81,7 +81,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await requireAdmin();
 
     loadCatalogueCounts();
-    onListsRefreshed((name) => { if (name === "brands") loadCatalogueCounts(); });      // the kept brand list was behind the database
+    onListsRefreshed((name) => { if (name === "brands") loadCatalogueCounts(); });
     watchScansToday();
     watchRecentActivity();
     loadSuggestions();
@@ -94,7 +94,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         el(kind.prefix + "List").addEventListener("click", onSupportClick);
     });
 
-    // things that answer a click
+
     const press = (node, run) => { node.addEventListener("click", (event) => { if (!event.target.closest(".guide-badge")) run(event); }); node.addEventListener("keydown", (event) => { if (event.key === "Enter" && event.target === node) run(event); }); };
     press(el("kpiScans"), () => setActivityFilter(""));
     press(el("kpiAllergens"), () => setActivityFilter("flagged", true));
@@ -109,7 +109,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     el("topBrandsList").addEventListener("click", (event) => { const row = event.target.closest("[data-brand]"); if (row) window.location.href = INVENTORY_PAGE + "?brand=" + encodeURIComponent(row.dataset.brand); });
 
-    // a dashboard left open overnight starts counting the new day
+
     window.setInterval(() => { if (startOfTodayUnix() !== todayStart) watchScansToday(); }, 60000);
 });
 
@@ -120,14 +120,14 @@ function setMetric(id, value, title) {
     box.textContent = value;
 }
 
-// ---------------------------------------------------------------------------------------------
-// Brands, products, ingredients
-// ---------------------------------------------------------------------------------------------
+
+
+
 async function loadCatalogueCounts() {
-    // brands: the documents themselves, because the "Most Scanned Brands" panel needs their scan counters
+
     try {
         const snapshot = await getDocs(collection(db, "brands"));
-        // a brand in the Recycle bin is not counted and not ranked
+
         allBrands = snapshot.docs.filter((d) => d.data().binned !== true).map((d) => ({ id: d.id, name: d.data().name || "Unnamed Brand", category: d.data().category || "", status: String(d.data().status || "Active"), scans: toWholeNumber(d.data().scans) }));
         setMetric("totalBrandsCount", allBrands.length);
         allBrands.sort((a, b) => b.scans - a.scans || a.name.localeCompare(b.name));
@@ -148,7 +148,7 @@ async function loadCatalogueCounts() {
 
 async function countInto(collectionName, elementId) {
     try {
-        // everything, less what waits in the Recycle bin
+
         const [all, binned] = await Promise.all([
             getCountFromServer(collection(db, collectionName)),
             getCountFromServer(query(collection(db, collectionName), where("binned", "==", true)))
@@ -162,7 +162,7 @@ async function countInto(collectionName, elementId) {
 
 function renderTopBrands(brands) {
     const ranked = brands.filter((b) => b.scans > 0).sort((a, b) => b.scans - a.scans).slice(0, TOP_BRANDS);
-    // nothing to rank: the panel folds to one line until a brand is scanned (the admin can open it all the same)
+
     setPanelQuiet("brands", ranked.length === 0, ranked.length === 0 ? "No brand scanned yet" : `${ranked[0].name} leads with ${many(ranked[0].scans, "scan", "scans")}`);
     if (ranked.length === 0) { showEmpty("topBrands", "No scans recorded for any brand yet.", false); return; }
     el("topBrandsEmpty").style.display = "none";
@@ -176,7 +176,7 @@ function renderTopBrands(brands) {
         </li>`).join("");
 }
 
-/** Shows a panel's empty box (and hides its list). prefix = "activity" | "suggestion" | "topBrands". */
+
 function showEmpty(prefix, message, isError) {
     const list = el(prefix === "topBrands" ? "topBrandsList" : prefix + "List");
     if (list) list.style.display = "none";
@@ -186,11 +186,11 @@ function showEmpty(prefix, message, isError) {
     if (text) { text.textContent = message; text.classList.toggle("error-text", !!isError); }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Waiting for review: what the app added by itself, or what was imported
-// ---------------------------------------------------------------------------------------------
+
+
+
 async function loadReviewQueue() {
-    // not reviewed yet, less what was moved to the Recycle bin
+
     const waiting = async (collectionName, ...conditions) => {
         const [all, binned] = await Promise.all([
             getCountFromServer(query(collection(db, collectionName), ...conditions, where("reviewed", "==", false))),
@@ -199,7 +199,7 @@ async function loadReviewQueue() {
         return Math.max(0, all.data().count - binned.data().count);
     };
 
-    // the loading shape at the top of Quick actions holds the place of the first tile; it goes when a tile shows or all counts answered
+
     const shapeGone = () => { const shape = el("reviewTilesLoading"); if (shape) shape.remove(); };
     try {
         const [brandCount, productCount] = await Promise.all([waiting("brands"), waiting("products")]);
@@ -213,7 +213,7 @@ async function loadReviewQueue() {
             el("reviewInventoryTile").style.display = "";
         }
     } catch (error) {
-        console.warn("Could not count the inventory entries waiting for review: ", error);        // the tile simply stays hidden
+        console.warn("Could not count the inventory entries waiting for review: ", error);
     }
     try {
         const ingredientCount = await waiting("ingredients", where("source", "==", "ai"));
@@ -227,14 +227,14 @@ async function loadReviewQueue() {
         console.warn("Could not count the ingredients waiting for review: ", error);
     }
     shapeGone();
-    // with nothing waiting, only the two shortcuts are left (the menu on the left has them too): the panel folds to one line
+
     const waitingNow = (waitingInventory || 0) + (waitingIngredients || 0);
     setPanelQuiet("actions", waitingNow === 0, waitingNow === 0 ? "Nothing is waiting for review" : `${many(waitingNow, "entry waits", "entries wait")} for review`);
 }
 
-// ---------------------------------------------------------------------------------------------
-// Scans made in the app
-// ---------------------------------------------------------------------------------------------
+
+
+
 function watchScansToday() {
     if (stopToday) stopToday();
     todayStart = startOfTodayUnix();
@@ -277,10 +277,10 @@ function watchScansToday() {
     });
 }
 
-/** The bar and the three counts of the "results of today" panel. */
+
 function renderResults(results) {
     const total = results.safe + results.caution + results.harmful;
-    // no scan yet today: three zeros say nothing, so the panel folds to one line until the first scan comes in
+
     setPanelQuiet("results", total === 0, total === 0 ? "No scans yet today" : `${many(total, "scan", "scans")} today: ${results.harmful} harmful, ${results.caution} with care, ${results.safe} safe`);
     const names = { safe: "Safe", caution: "Use with care", harmful: "Harmful" };
     el("resultBar").innerHTML = total === 0 ? "" : Object.keys(names).filter((k) => results[k] > 0)
@@ -289,7 +289,7 @@ function renderResults(results) {
         `<li data-status="${k}" class="${activityFilter === k ? "on" : ""}"><span class="legend-name ${k}">${names[k]}</span><span class="num">${results[k]}${total > 0 ? ` <span class="muted small">${Math.round(results[k] * 100 / total)}%</span>` : ""}</span></li>`).join("");
 }
 
-/** Narrows the activity list to one result (or to scans with an allergen match). The same choice again shows everything. */
+
 function setActivityFilter(value, keep) {
     activityFilter = activityFilter === value && !keep ? "" : value;
     activityPage.page = 1;
@@ -341,12 +341,12 @@ function activityRow(a) {
     const flagged = asArray(a.flaggedIngredients);
     const harmful = toWholeNumber(a.harmfulCount), caution = toWholeNumber(a.cautionCount);
 
-    // how the scan was judged for the person who made it: ONE badge (dot and word). An allergen match stands beside it,
-    // because it is a different fact. Everything else (kind, counts, the flagged names) waits until the scan is clicked:
-    // a line that repeated it under every scan made the list twice as long.
+
+
+
     const verdict = toneBadge(STATUS_NAMES[status], toneOf(status), status === "safe" ? "Nothing in it was flagged for this user." : status === "harmful" ? "Something in it is flagged for this user." : "Something in it is worth watching for this user.");
 
-    // the details of the scan that was clicked
+
     let more = "";
     if (a.id === openScanId) {
         const lines = [`<b>Scanned</b> ${escapeHtml(formatWhen(a.scannedAtUnix))}${a.source === "manual" ? " · typed in by the user" : ""}`];
@@ -366,9 +366,9 @@ function activityRow(a) {
         </li>`;
 }
 
-// ---------------------------------------------------------------------------------------------
-// Suggestions typed in by app users
-// ---------------------------------------------------------------------------------------------
+
+
+
 async function loadSuggestions() {
     const sources = [
         { name: "allergenSuggestions", kind: "Allergen" },
@@ -434,7 +434,7 @@ async function onSuggestionClick(event) {
     const status = button.getAttribute("data-action");
     button.disabled = true;
     try {
-        // an app suggestion is a support report: it closes the way reports do (handled / dismissed, handledAt)
+
         if (collectionName === "supportReports") await updateDoc(doc(db, collectionName, id), { status: status === "reviewed" ? "handled" : status, handledAt: serverTimestamp() });
         else await updateDoc(doc(db, collectionName, id), { status, reviewedAt: serverTimestamp() });
         suggestions = suggestions.filter((s) => !(s.id === id && s.collection === collectionName));
@@ -449,9 +449,9 @@ async function onSuggestionClick(event) {
     }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Support reports sent from the app (Settings > Contact support). Only admins can read them (firestore.rules: supportReports).
-// ---------------------------------------------------------------------------------------------
+
+
+
 async function loadSupportReports() {
     try {
         const snapshot = await getDocs(query(collection(db, "supportReports"), where("status", "==", "new")));
@@ -461,7 +461,7 @@ async function loadSupportReports() {
             const data = d.data();
             const lastScan = data.lastScan && typeof data.lastScan === "object" ? data.lastScan : null;
             if (String(data.category || "") === "Suggestion") {
-                // the app's Suggestion kind belongs in the Suggestions panel (for review), not among the support reports
+
                 appSuggestions.push({ id: d.id, collection: "supportReports", kind: "App suggestion", text: String(data.message || ""), createdAtUnix: toWholeNumber(data.createdAtUnix), lastScan, from: senderText({ userName: String(data.userName || "").trim(), uid: String(data.uid || "") }) });
                 return;
             }
@@ -516,10 +516,10 @@ function renderSupportKind(kind) {
     }).join("");
 }
 
-/**
- * WHO SENT IT. The name is written by the sender's own app, so it is shown only as "name given by the sender" NEXT TO the account id, which
- * the database checks (the rules make the id the sender's own). Never the name alone, and groups are made by account, not by name.
- */
+
+
+
+
 function senderText(r) {
     const account = "account " + String(r.uid || "").slice(0, 8);
     return r.userName ? `${r.userName} (${account})` : account;
@@ -529,7 +529,7 @@ function senderHtml(r) {
     return r.userName ? `<b title="Name given by the sender">${escapeHtml(r.userName)}</b> <span class="muted">(${account})</span>` : account;
 }
 
-/** The optional last scan a report or app suggestion carries, folded (empty when there is none). */
+
 function lastScanDetails(scan) {
     if (!scan) return "";
     return `<details class="support-scan"><summary>Last scan: ${escapeHtml([scan.product, scan.brand].filter(Boolean).join(" · ") || "(no name)")}</summary>
@@ -537,10 +537,10 @@ function lastScanDetails(scan) {
             <p class="small muted">Ingredients read: ${escapeHtml(scan.ingredients || "-")}</p></details>`;
 }
 
-// ---------------------------------------------------------------------------------------------
-// Clear all (12 November 2026): beside the fold arrow of Suggestions and of Support reports. Nothing is deleted: every item waiting in
-// the list is marked dismissed (the same as its own X), in batches of at most 400 writes, after a confirmation that defaults to Cancel.
-// ---------------------------------------------------------------------------------------------
+
+
+
+
 async function dismissAll(items, fields) {
     for (let i = 0; i < items.length; i += 400) {
         const batch = writeBatch(db);
@@ -610,9 +610,9 @@ async function onSupportClick(event) {
     }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Helpers: the line in each panel that reads its numbers and says what to do next (see adminAssist.js)
-// ---------------------------------------------------------------------------------------------
+
+
+
 function registerHelpers() {
     const percent = (part, whole) => (whole > 0 ? Math.round(part * 100 / whole) : 0);
     const hourName = (hour) => new Date(2000, 0, 1, hour).toLocaleTimeString(undefined, { hour: "numeric" });
@@ -620,7 +620,7 @@ function registerHelpers() {
     registerAssist("numbers", () => {
         if (!todayAnswered) return null;
         if (scansToday === null) return [];
-        // (a helper only speaks when it adds something: "no scans yet" beside a tile that says 0 was the same thing twice)
+
         const lines = [];
         if (scansToday > 0) {
             const hours = new Map();
@@ -629,7 +629,7 @@ function registerHelpers() {
             if (busiest) lines.push({ tone: "info", text: `Busiest hour today so far: ${hourName(busiest[0])}, with ${many(busiest[1], "scan", "scans")}.` });
             if (flaggedToday > 0) lines.push({ tone: "warn", text: `${flaggedToday} of today's ${many(scansToday, "scan", "scans")} matched one of the user's own allergens.`, label: "Show them", run: () => setActivityFilter("flagged", true) });
         }
-        // yesterday, when the scans that were fetched reach back that far
+
         const yesterday = todayStart - 86400;
         const oldest = recentScans.length > 0 ? toWholeNumber(recentScans[recentScans.length - 1].scannedAtUnix) : 0;
         if (recentScans.length > 0 && (recentScans.length < RECENT_ITEMS || oldest < yesterday)) {
@@ -655,8 +655,8 @@ function registerHelpers() {
         return lines;
     });
 
-    // "Quick actions" and "Today's results" have no helper line: it only repeated what their tiles and their legend say
-    // (the sum of what waits, the share of each result). Their folded line carries the short version instead.
+
+
 
     registerAssist("suggestions", () => {
         if (!suggestionsLoaded) return null;
@@ -669,18 +669,18 @@ function registerHelpers() {
         return [{ tone: "info", text: `${parts.join(" and ")} suggested by app users.` + (Number.isFinite(oldest) ? ` Oldest: ${timeAgo(oldest)}.` : ""), label: "Curator", run: () => { window.location.href = "../_Admin_Ingredient_Curator/adminIngredientCurator.html"; }, tip: "Add what is useful to the Ingredient Curator, then mark the suggestion reviewed." }];
     });
 
-    // "Most scanned brands" has no helper line (removed 7 November 2026 at the owner's request): its list already shows
-    // each brand's scans, and brands never scanned show 0.
+
+
 }
 
-// ---------------------------------------------------------------------------------------------
-// The data this page offers to data panels (lists, rows, grids and graphs; see adminWidgets.js)
-// ---------------------------------------------------------------------------------------------
+
+
+
 function registerData() {
     const two = (n) => String(n).padStart(2, "0");
     const dayKey = (unix) => { const d = new Date(unix * 1000); return `${d.getFullYear()}-${two(d.getMonth() + 1)}-${two(d.getDate())}`; };
     const dayLabel = (key) => { const p = key.split("-").map(Number); return p.length === 3 && !p.some(isNaN) ? new Date(p[0], p[1] - 1, p[2]).toLocaleDateString(undefined, { day: "numeric", month: "short" }) : key; };
-    /** Every day from the first to the last one that has a scan (at most a month), so a quiet day shows as zero. */
+
     const fillDays = (keys) => {
         const real = keys.filter((k) => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
         if (real.length === 0) return [];
@@ -735,7 +735,7 @@ function registerData() {
         }
     });
 
-    // the three kinds of support report, each a data set of its own, so each panel has "Show as" (12 November 2026)
+
     SUPPORT_KINDS.forEach((kind) => registerDataset(kind.dataset, {
         label: kind.label, noun: kind.title, nounOne: kind.title.replace(/s$/, ""),
         items: () => supportReports.filter((r) => kindOf(r.category) === kind),
@@ -755,7 +755,7 @@ function registerData() {
         }
     }));
 
-    // the number tiles and the shortcut tiles (read from the page's own tiles)
+
     registerTileDataset("numbers", {
         label: "Numbers", noun: "numbers", nounOne: "number", valueNoun: "Number", selector: ".kpi-row .kpi", watch: ".kpi-row",
         map: (tile) => ({ title: (tile.querySelector(".kpi-title") || {}).textContent || "", value: parseFloat(((tile.querySelector(".kpi-value") || {}).textContent || "0").replace(/[^\d.]/g, "")) || 0, valueLabel: "", tone: "info" }),

@@ -1,12 +1,12 @@
-// Fills the Firestore EMULATOR with a few invented documents, so the website and the rules can be tried without real data.
-//
-//   1. start the emulator:      npm run emulators              (from the repository root; needs Java 11 or newer)
-//   2. look at what would be written, nothing is sent:     node GlowUp-Admin_AI_Testing/tools/seedDev.mjs
-//   3. write it (emulator only):  set FIRESTORE_EMULATOR_HOST=127.0.0.1:8085   then   node GlowUp-Admin_AI_Testing/tools/seedDev.mjs --write
-//
-// Safety: it is a DRY RUN unless you pass --write, and --write is refused unless FIRESTORE_EMULATOR_HOST is set. There is no option to point it at the real
-// project. It only creates documents (it never overwrites: a document that exists is left alone) and it writes no risk level and no regulatory claim:
-// everything below is invented sample data ("Examplebrand"), marked source "seed-dev".
+
+
+
+
+
+
+
+
+
 const PROJECT = "demo-glowup";
 const write = process.argv.includes("--write");
 const host = process.env.FIRESTORE_EMULATOR_HOST || "";
@@ -25,7 +25,7 @@ const DOCUMENTS = {
     "ingredients/seed_silica": { name: "Silica", techName: "Silica", description: "Sample entry for development. Replace with a reviewed description.", riskLevel: "", sources: [], source: "seed-dev", reviewed: false }
 };
 
-/** A JavaScript value in Firestore's REST form. */
+
 function typed(value) {
     if (typeof value === "string") return { stringValue: value };
     if (typeof value === "boolean") return { booleanValue: value };
@@ -49,7 +49,7 @@ for (const [path, data] of Object.entries(DOCUMENTS)) {
     const url = `http://${host}/v1/projects/${PROJECT}/databases/(default)/documents/${path.slice(0, slash)}?documentId=${encodeURIComponent(path.slice(slash + 1))}`;
     const response = await fetch(url, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: "Bearer owner" },      // "owner" = the emulator's way past the rules; it means nothing outside it
+        headers: { "Content-Type": "application/json", Authorization: "Bearer owner" },
         body: JSON.stringify({ fields: typed(data).mapValue.fields })
     });
     if (response.status === 409) existed++;

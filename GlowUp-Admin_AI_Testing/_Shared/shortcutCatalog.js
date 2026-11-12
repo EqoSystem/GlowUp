@@ -1,14 +1,14 @@
-// KEYBOARD SHORTCUTS, the catalogue (9 November 2026): every action an admin may give a combo, on every page.
-//
-// The site is several pages, so the list in Quick settings must know the actions of pages that are not open: they are
-// written down here once. A page gives an action its HANDLER at run time (shortcuts.js bindActions); an action whose page is
-// not open is shown in the list and in the command palette, but runs only on its own page.
-//
-// Rules of the defaults (approved 9 November 2026):
-//   Ctrl+Alt + a letter for a page's actions; the same letter keeps its meaning across pages (N = new, I = import, A = approve).
-//   Ctrl+Alt+1..5 = go to a page (sidebar order, then the Recycle bin and the Archive).
-//   Destructive actions have NO default combo; they are in the palette and still ask first.
-//   ?, Ctrl/Cmd+K, Esc and / are built in and cannot be changed.
+
+
+
+
+
+
+
+
+
+
+
 export const PAGES = {
     all: "Every page",
     dashboard: "Dashboard",
@@ -26,7 +26,7 @@ export const PAGE_URLS = {
     archive: "../_Admin_Archive/adminArchive.html"
 };
 
-/** { id, scope, label, description (≤ 120), keys (default or ""), destructive?, paletteOnly? } */
+
 export const CATALOG = [
     { id: "nav.dashboard", scope: "all", label: "Go to Dashboard", description: "Opens the Dashboard.", keys: "Ctrl+Alt+Digit1" },
     { id: "nav.inventory", scope: "all", label: "Go to Brand & Product Inventory", description: "Opens Brand & Product Inventory.", keys: "Ctrl+Alt+Digit2" },
@@ -60,7 +60,7 @@ export const CATALOG = [
     { id: "archive.delete", scope: "archive", label: "Delete selected now", description: "Asks first, then deletes the ticked entries for good.", keys: "", destructive: true, paletteOnly: true }
 ];
 
-/** The keys every page has and nobody can change (shown in the "?" help). */
+
 export const BUILT_IN = [
     { keys: "?", label: "Shortcut help", description: "Shows the shortcuts of this page." },
     { keys: "Ctrl+KeyK", label: "Command palette", description: "Search every page and action." },
@@ -69,5 +69,5 @@ export const BUILT_IN = [
 ];
 
 export const catalogById = new Map(CATALOG.map((a) => [a.id, a]));
-/** The actions that can be given a combo (palette-only ones too: an admin may bind them; destructive ones still ask first). */
+
 export const bindable = (scope) => CATALOG.filter((a) => !scope || a.scope === scope);

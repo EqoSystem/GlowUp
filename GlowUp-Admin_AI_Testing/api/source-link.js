@@ -1,14 +1,14 @@
-// Admin-only help with the SOURCE LINK beside a box of the Ingredient form (10 November 2026). Two things, one request per admin click:
-//
-//   mode "check"  { url, inci, cas }  Is the page there, and does it name the ingredient?  -> { result: "checked" | "unconfirmed" | "dead" | "cantcheck", message }
-//                 SSRF-safe: https only; only the trusted sources' sites (sourceLinkRules.mjs); every host is resolved and refused when it is a
-//                 private, loopback or link-local address; redirects are followed by hand (at most 3), each one checked again; 5 seconds;
-//                 at most 1.5 MB read. The page text is only searched for the name, never stored or sent back.
-//   mode "cosing" { name }            The CosIng Checker index (cosingchecker.com/api/v1, public, no key, 120 requests a minute): up to 5
-//                 ingredients, the exact INCI name first, each with a statement to review and its own page. Answers are kept 24 hours; a 429
-//                 answer is passed on with its Retry-After. "Unofficial index of EU CosIng data" (CC BY 4.0): the admin verifies at CosIng.
-//
-// Only a signed-in admin is answered (the same check as Assist with AI). Each admin may make 20 requests a minute (counted per server instance).
+
+
+
+
+
+
+
+
+
+
+
 
 const dns = require("dns").promises;
 const { adminUid } = require("./assist-ingredient.js").helpers;
@@ -31,7 +31,7 @@ function send(res, status, body) {
     res.end(JSON.stringify(body));
 }
 
-// ---- a small per-admin limit (each server instance keeps its own count; enough to stop a runaway page)
+
 const recent = new Map();
 function allowed(uid, now = Date.now()) {
     const list = (recent.get(uid) || []).filter((t) => now - t < 60000);
@@ -40,7 +40,7 @@ function allowed(uid, now = Date.now()) {
     return true;
 }
 
-/** Every address of `host` is public (resolved now, so a name that points inside a network is refused). */
+
 async function publicHost(host, lookup = dns.lookup) {
     const r = await loadRules();
     try {
@@ -49,7 +49,7 @@ async function publicHost(host, lookup = dns.lookup) {
     } catch (error) { return false; }
 }
 
-/** Reads at most MAX_BYTES of a response's text. */
+
 async function readSome(response) {
     if (!response.body || !response.body.getReader) return (await response.text()).slice(0, MAX_BYTES);
     const reader = response.body.getReader();
@@ -59,11 +59,11 @@ async function readSome(response) {
         if (done) break;
         chunks.push(value); size += value.length;
     }
-    try { await reader.cancel(); } catch (error) { /* already finished */ }
+    try { await reader.cancel(); } catch (error) {                        }
     return Buffer.concat(chunks.map((c) => Buffer.from(c))).toString("utf8").slice(0, MAX_BYTES);
 }
 
-/** The check of one link. `fetcher` and `lookup` are replaceable for the tests. */
+
 async function checkLink(url, inci, cas, fetcher = fetch, lookup = dns.lookup) {
     const r = await loadRules();
     let verdict = r.checkSourceUrl(url);
@@ -95,7 +95,7 @@ async function checkLink(url, inci, cas, fetcher = fetch, lookup = dns.lookup) {
     } finally { clearTimeout(timer); }
 }
 
-// ---- CosIng Checker, kept 24 hours per name
+
 const cosingCache = new Map();
 async function cosingSearch(name, fetcher = fetch, now = Date.now()) {
     const r = await loadRules();

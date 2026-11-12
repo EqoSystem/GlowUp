@@ -1,23 +1,23 @@
-// The small rules behind the editable lists (allergen families, highlights, skin conditions) and the shade checks.
-// No page, no database: kept apart so they can be checked (tests/lists.test.mjs).
-//
-// One document, config/lists, holds the three lists:
-//   { version, updatedAt, allergens: [item], conditions: [item], highlights: [item] }
-//   item = { id, label, keywords: [text], retired: bool }
-// The ID NEVER CHANGES. Ingredients keep the ids (allergenTags, avoidForConditions, goodForConditions, highlights), so a
-// rename touches only the label. A user's saved profile keeps the label text it was ticked with; the app finds the item
-// again through its keywords, and a rename keeps the old label as a keyword, so saved profiles keep working.
-// A retired item is hidden from the pickers (the website's and the app's) but still matches what is already saved.
+
+
+
+
+
+
+
+
+
+
 import { similarity } from "./glowupCatalog.js";
 import { compactName } from "./glowupRules.js";
 
 export const MAX_ITEMS = 40;
 export const MAX_LABEL = 40;
 export const MAX_KEYWORDS = 8;
-/** The two highlights the app has always had: ingredient fields keyActive and umbrella. They cannot be removed. */
+
 export const BUILT_IN_HIGHLIGHTS = ["keyActive", "umbrella"];
 
-/** The lists the website and the app start with (also used while the document does not exist yet). */
+
 export const BUILT_IN = {
     allergens: [
         { id: "fragrance", label: "Fragrance / Parfum", keywords: ["fragrance", "parfum", "perfume"] },
@@ -45,7 +45,7 @@ export const BUILT_IN = {
 
 const text = (value, most) => String(value === null || value === undefined ? "" : value).replace(/\s+/g, " ").trim().slice(0, most);
 
-/** One item, with only what is allowed in it. Null when it has no usable id or label. */
+
 export function cleanItem(raw) {
     const row = raw && typeof raw === "object" ? raw : {};
     const id = text(row.id, 24);
@@ -63,7 +63,7 @@ function cleanList(raw, fallback) {
     return source.map(cleanItem).filter((item) => item && !ids.has(item.id.toLowerCase()) && ids.add(item.id.toLowerCase())).slice(0, MAX_ITEMS);
 }
 
-/** What a stored document (or nothing) means: three clean lists, the built-in highlights always first. */
+
 export function normalizeLists(raw) {
     const data = raw && typeof raw === "object" ? raw : {};
     const highlights = cleanList(data.highlights, BUILT_IN.highlights);
@@ -81,7 +81,7 @@ export function normalizeLists(raw) {
     };
 }
 
-/** A new id from a label: letters and digits only, lower case, never one that is taken or reserved. */
+
 export function slugId(label, taken) {
     const used = new Set((taken || []).map((id) => String(id).toLowerCase()));
     BUILT_IN_HIGHLIGHTS.forEach((id) => used.add(id.toLowerCase()));
@@ -92,11 +92,11 @@ export function slugId(label, taken) {
     return id;
 }
 
-/**
- * Whether `label` may join `items` (or, with exceptId, stay in it under a new name).
- *   error    - not allowed: empty, or the same name (or id) as another item
- *   warnings - allowed after a look: a very similar name, or a keyword that another item already uses
- */
+
+
+
+
+
 export function checkItem(items, label, keywords, exceptId) {
     const name = text(label, 200);
     const key = compactName(name);
@@ -116,7 +116,7 @@ export function checkItem(items, label, keywords, exceptId) {
     return { error: "", warnings: warnings.filter((line, index, all) => all.indexOf(line) === index) };
 }
 
-/** A renamed item keeps its old label as a keyword, so what users saved under the old name is still found. */
+
 export function keepOldName(item, oldLabel) {
     const old = text(oldLabel, 30).toLowerCase();
     if (!old || item.keywords === undefined) return item;
@@ -124,7 +124,7 @@ export function keepOldName(item, oldLabel) {
     return item;
 }
 
-/** How many ingredients point at an item. `ingredients` = the website's ingredient objects. */
+
 export function usageCount(kind, id, ingredients) {
     const same = (list) => (Array.isArray(list) ? list : []).some((value) => String(value).toLowerCase() === String(id).toLowerCase());
     return (ingredients || []).filter((ingredient) => {
@@ -135,17 +135,17 @@ export function usageCount(kind, id, ingredients) {
     }).length;
 }
 
-// ---- shades -----------------------------------------------------------------------------------------------------
+
 
 const channels = (hex) => [1, 3, 5].map((at) => parseInt(String(hex).slice(at, at + 2), 16));
 
-/** How far apart two "#RRGGBB" colours are (straight line through red, green, blue: 0 = the same, about 441 = black and white). */
+
 export function colourDistance(a, b) {
     const x = channels(a), y = channels(b);
     return Math.round(Math.sqrt((x[0] - y[0]) ** 2 + (x[1] - y[1]) ** 2 + (x[2] - y[2]) ** 2));
 }
 
-/** The shade in `shades` that is almost, but not exactly, this colour (within `limit`), or "". */
+
 export function nearShade(shades, hex, limit = 18) {
     let best = "", bestDistance = Infinity;
     (shades || []).forEach((other) => {

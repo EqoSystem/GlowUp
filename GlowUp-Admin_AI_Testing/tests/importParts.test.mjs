@@ -1,5 +1,5 @@
-// Checks of the unlimited import (9 November 2026): a long file is cut into parts for the AI with nothing lost, and a file
-// that mixes brands/products with ingredient details is refused with the reason.   Run: node tests/importParts.test.mjs
+
+
 import { splitForAi, AI_PART_CHARACTERS, AI_TEXT_CHARACTERS } from "../_Shared/adminDocumentReader.js";
 import { parseImportText, ingredientsNotHere, inventoryNotHere } from "../_Shared/importFormat.js";
 

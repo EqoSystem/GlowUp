@@ -1,5 +1,5 @@
-// Browser check of the import drop box (9 November 2026): cover over the drop box only, "ready" toast, the check window
-// (edit, untick, Later keeps, Discard asks), and only the checked records are saved.   Run: node tests/responsive/importCheck.scenario.mjs
+
+
 import { launch, openPage } from "./harness.mjs";
 
 let checks = 0, failed = 0;
@@ -25,17 +25,17 @@ try {
         await page.waitForSelector(".import-check");
         ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `${width}px: no sideways scroll with the check window open`);
         ok(await page.evaluate(() => { const b = document.querySelector(".import-check").getBoundingClientRect(); return b.left >= -1 && b.right <= window.innerWidth + 1; }), `${width}px: the check window fits the screen`);
-        // Later (Escape) keeps everything waiting
+
         await page.keyboard.press("Escape");
         ok(await page.locator(".import-check").count() === 0 && await page.locator(".import-cover.ready").count() === 1, `${width}px: Escape closes the window and keeps the records waiting`);
         await page.click(".import-cover .btn.primary");
         await page.waitForSelector(".import-check");
-        // edit the first product, untick the second
+
         const name = page.locator(".ic-row").nth(0).locator("input[type=text]").nth(1);
         await name.fill("Velvet Tint Edited");
         await page.locator(".ic-row").nth(1).locator(".ic-row-head input[type=checkbox]").uncheck();
         ok(/Save 1 as Pending|Save 2 as Pending/.test(await page.textContent(".import-check [data-save]")), `${width}px: the Save button counts the ticked records`);
-        // the text tab shows the file's text
+
         await page.locator(".ic-tabs .seg", { hasText: "Text from the file" }).click();
         ok((await page.inputValue(".ic-text")).includes("Velvet Tint"), `${width}px: the text read from the file is shown`);
         await page.locator(".ic-tabs .seg").first().click();

@@ -1,4 +1,4 @@
-// Auth stand-in. window.__SIGNED_IN decides whether an admin is signed in; window.__LAT.auth delays the answer.
+
 const LAT = () => (window.__LAT && window.__LAT.auth) || 0;
 const USER = { uid: "admin1", email: "admin@example.test", getIdToken: async () => "test-token", getIdTokenResult: async () => ({ claims: { admin: true } }) };
 const auth = { currentUser: null };

@@ -1,5 +1,5 @@
-// Browser check (9 November 2026): every move to the Recycle bin asks first; a file mixing brands with ingredient details
-// is refused in Brand & Product Inventory with the reason.   Run: node tests/responsive/deleteImport.scenario.mjs
+
+
 import { launch, openPage } from "./harness.mjs";
 
 let checks = 0, failed = 0;
@@ -31,7 +31,7 @@ try {
     await inv.page.waitForFunction(() => /cannot be extracted here/.test(document.getElementById("inventoryImportStatus").textContent), null, { timeout: 8000 }).catch(() => {});
     const text = await inv.page.textContent("#inventoryImportStatus");
     ok(/nothing was imported/.test(text) && /1 ingredient record/.test(text) && /Ingredient Curator/.test(text), "a mixed file is refused with the reason: " + text.slice(0, 160));
-    // the Recycle bin inside the list has a way out: a Back button, and the browser's Back
+
     await inv.page.click(".bin-chip");
     await inv.settle(400);
     ok(await inv.page.locator(".shelf-back").count() === 1, "the Recycle bin view shows a Back button");

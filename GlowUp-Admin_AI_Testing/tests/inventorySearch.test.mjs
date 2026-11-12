@@ -1,7 +1,7 @@
-// Checks of the Brand & Product Inventory search: the matching rule it uses (_Shared/glowupRules.js matchesSearch) on products with
-// ingredients, and source checks of the drop-down, the results line, ?q= and the "/" key. No browser and no network: the DOM part is
-// read as text and is covered by the browser checklist.
-//   Run: node tests/inventorySearch.test.mjs
+
+
+
+
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -12,7 +12,7 @@ const read = (file) => readFileSync(path.join(root, file), "utf8");
 let checks = 0, failed = 0;
 const check = (ok, what) => { checks++; if (!ok) { failed++; console.log("FAILED: " + what); } };
 
-// the same texts the page searches (productTexts + ingredients)
+
 const product = (name, brand, type, ingredients) => [name, [], type, "", "", brand, ...ingredients];
 const items = [
     product("Superstay Matte Ink", "Maybelline", "Lipstick", ["Alcohol Denat.", "Isododecane"]),
@@ -29,7 +29,7 @@ check(find("niacin").length === 2, "a part of an ingredient is found");
 check(find("zzz").length === 0, "nothing matching gives an empty list");
 check(find("maybelline niacinamide").join() === "Fit Me Foundation", "words from the brand and an ingredient work together");
 
-// ---- the page
+
 const js = read("_Admin_Brand_Inventory/adminBrandInventory.js");
 const html = read("_Admin_Brand_Inventory/adminBrandInventory.html");
 const css = read("_Admin_Brand_Inventory/adminBrandInventory.css");
@@ -44,7 +44,8 @@ check(/contains: \$\{escapeHtml\(found\)\}/.test(js), 'a row found by an ingredi
 check(/searchParams\.set\("q"/.test(js) && /pushState/.test(js) && /popstate/.test(js) && /get\("q"\)/.test(js), "?q= is written, read, and followed by Back");
 check(/event\.key !== "\/"/.test(js) && /input, textarea, select/.test(js), 'the "/" key focuses the box except inside another field');
 check(/inventorySuggest/.test(html) && /inventorySearchStatus/.test(html) && /search-suggest/.test(css), "the markup and the style for the drop-down and the results line exist");
-check(!/getDocs|getCountFromServer|onSnapshot/.test(js.split("// Search (Gmail style)")[1].split("function renderList")[0]), "the search block makes no database call");
+const searchBlock = js.slice(js.indexOf("function openSuggest()"), js.indexOf("function renderList("));
+check(searchBlock.length > 0 && !/getDocs|getCountFromServer|onSnapshot/.test(searchBlock), "the search block makes no database call");
 
 console.log(`\ninventorySearch: ${checks} checks made`);
 console.log(failed === 0 ? "ALL PASSED" : `${failed} FAILED`);

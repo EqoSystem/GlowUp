@@ -1,6 +1,6 @@
-// Browser check of the Brand and Product windows, add and edit (10 November 2026): the same window and field pattern as the Ingredient window,
-// and that nothing overlaps, clips or hides under the header or the footer, with long names, long addresses, many shades and a long ingredient list.
-//   Run:  node tests/responsive/inventoryModals.scenario.mjs            (set SHOTS=<folder> to also save screenshots)
+
+
+
 import { launch, openPage } from "./harness.mjs";
 import fs from "node:fs";
 import path from "node:path";
@@ -10,7 +10,7 @@ const ok = (good, what) => { checks++; if (!good) { failed++; console.log("FAILE
 const SHOTS = process.env.SHOTS || "";
 if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
 
-/** Every interactive thing in the open window: overlaps, what covers what after scrolling into view, and anything poking out sideways. */
+
 async function layoutProblems(page, overlayId) {
     return page.evaluate((id) => {
         const overlay = document.getElementById(id);
@@ -146,12 +146,12 @@ try {
         await page.context().close();
     }
 
-    // ---------------------------------------------------------------- behaviour
+
     {
         const { page, errors, settle } = await openPage(browser, "inv", { width: 1100, height: 800 });
         await settle(500);
         await openAdd(page, "Product");
-        // the section bar: the four sections, jump and mark
+
         ok(await page.evaluate(() => Array.from(document.querySelectorAll("#productModal .ing-section-title")).map((h) => h.textContent).join("|") === "Product|Sources|Ingredients and shades|Listing"), "the product window has four sections");
         await page.click('#productModal .ing-nav-btn[data-jump="productSecListing"]');
         await page.waitForTimeout(700);
@@ -160,7 +160,7 @@ try {
         await page.evaluate(() => { document.querySelector("#productModal .ing-body").scrollTop = 0; });
         await page.waitForTimeout(200);
         ok(await page.locator('#productModal .ing-nav-btn[data-jump="productSecBasics"][aria-current="true"]').count() === 1, "scrolling back moves the mark back");
-        // the ingredient search list opens inside the window and does not cover its own box
+
         await page.click('#productModal .ing-nav-btn[data-jump="productSecContents"]');
         await page.waitForTimeout(600);
         await page.fill("#productIngredientSearch", "a");
@@ -169,7 +169,7 @@ try {
         ok(list === null || list.below, "the ingredient list opens below its box, never over it");
         await page.keyboard.press("Escape");
         await page.waitForTimeout(200);
-        // a failed save: the box is marked and in view
+
         if (await page.evaluate(() => document.getElementById("productModal").style.display !== "none")) {
             await page.fill("#productNameInput", "");
             await page.evaluate(() => { const line = document.querySelector("#productForm .form-error"); document.getElementById("productNameInput").focus(); line.textContent = "Please enter the product name."; line.style.display = "block"; });
@@ -178,7 +178,7 @@ try {
             ok(await page.evaluate(() => { const r = document.activeElement.getBoundingClientRect(), b = document.querySelector("#productModal .ing-body").getBoundingClientRect(); return r.top >= b.top - 1 && r.bottom <= b.bottom + 1; }), "and it is in view inside the body");
             await page.fill("#productNameInput", "Velvet");
             ok(await page.locator("#productForm [aria-invalid=true]").count() === 0, "typing clears the mark");
-            // keyboard: Tab stays inside the window; Esc closes
+
             await page.evaluate(() => document.querySelector("#productModal .ing-close").focus());
             let inside = true, reachedFoot = false;
             for (let i = 0; i < 80 && inside; i++) {
@@ -191,7 +191,7 @@ try {
             await closeWindow(page);
         }
         ok(await page.evaluate(() => getComputedStyle(document.getElementById("productModal")).display === "none"), "Esc closes the window");
-        // the brand window: two sections
+
         await openAdd(page, "Brand");
         ok(await page.evaluate(() => Array.from(document.querySelectorAll("#addBrandModal .ing-section-title")).map((h) => h.textContent).join("|") === "Brand|Pictures and website"), "the brand window has two sections");
         ok(await page.locator("#brandWebsiteConfirm").isVisible() && await page.evaluate(() => { const c = document.getElementById("brandWebsiteConfirm").getBoundingClientRect(); return c.width >= 14 && c.width <= 24; }), "the confirm tick box is an ordinary tick box (not stretched)");

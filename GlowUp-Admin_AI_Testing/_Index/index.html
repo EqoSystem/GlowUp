@@ -6,7 +6,6 @@
     <title>GlowUp Admin Portal</title>
     <link rel="icon" type="image/png" sizes="32x32" href="../_Shared/assets/glowup-icon-32.png">
     <script>
-        // dark or light before anything is drawn: the person's choice, else the computer's own setting
         (function () {
             var t = null;
             try { t = localStorage.getItem("glowup.theme"); } catch (e) { }
@@ -20,9 +19,9 @@
 <body class="login-page">
     <script src="../_Shared/pageSkeleton.js"></script>
 
-    <!-- the logo and the name are one link, as on the admin pages. Signed out it can only lead back to this login page
-         (never past the sign-in); a signed-in admin is sent on to the dashboard by indexApp.js as before. -->
-    <!-- the same header as every admin page (.topbar in adminCommon.css): same height, padding, border and background -->
+
+
+
     <header class="topbar login-top">
         <a class="brand-home login-brand" href="../_Index/index.html" aria-label="GlowUp – admin login page">
             <span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"></span>
@@ -44,7 +43,7 @@
 
             <div class="field">
                 <label for="password">Password</label>
-                <!-- the eye at the right shows the password while it is typed, and hides it again -->
+
                 <div class="password-box">
                     <input type="password" id="password" placeholder="********" autocomplete="current-password">
                     <button type="button" id="passwordEye" class="password-eye" aria-label="Show the password" aria-pressed="false">
@@ -56,17 +55,17 @@
 
             <p id="loginMessage" class="login-message form-error" role="alert"></p>
 
-            <!-- the button is exactly as wide as the Email and Password boxes (the same column) -->
+
             <button type="submit" id="loginBtn" class="login-btn" disabled>Log in</button>
         </form>
 
-        <!-- the old note about recorded sign-ins that stood here is now section 7 (Monitoring) of the Terms -->
+
         <p class="footer-note">By logging in, you agree to the <button type="button" class="text-link" id="termsLink" aria-haspopup="dialog" aria-controls="termsDialog">Terms and Conditions</button>.</p>
     </div>
     </main>
 
-    <!-- THE TERMS AND CONDITIONS, in a window over the page (termsDialog.js opens and closes it).
-         Esc, the Close button or a click outside closes it, and the keyboard goes back to the link. -->
+
+
     <dialog id="termsDialog" class="terms-dialog" aria-labelledby="termsTitle">
         <div class="terms-box">
             <header class="terms-head">

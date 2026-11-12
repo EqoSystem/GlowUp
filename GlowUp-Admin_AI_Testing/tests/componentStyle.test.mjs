@@ -1,5 +1,5 @@
-// Checks of "Style and text" (_Shared/componentStyle.js): only known settings are kept, texts stay in their limits.
-//   Run: node tests/componentStyle.test.mjs
+
+
 import { cleanStyle, cleanTexts, cleanPanelMap, contrast, plainText, LIMITS, ANIMATIONS, ANIMATION_FRAMES } from "../_Shared/componentStyle.js";
 
 let checks = 0, failed = 0;

@@ -1,5 +1,5 @@
-// Checks the barcode hints of _Shared/gs1Hint.js (pure logic; nothing is sent anywhere).
-//   Run it from the website folder:   node tests/gs1.test.mjs
+
+
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";

@@ -1,6 +1,6 @@
-// Browser check (12 November 2026): the "..." menu of every panel that shows records or numbers offers "Show as".
-// The panels that are forms or instructions (notes, tools, import, AI drafts) have nothing to show as a list or a graph and are listed, not counted.
-//   Run: node tests/responsive/showAs.scenario.mjs
+
+
+
 import { launch, openPage } from "./harness.mjs";
 let checks = 0, failed = 0;
 const ok = (good, what) => { checks++; if (!good) { failed++; console.log("FAILED: " + what); } };

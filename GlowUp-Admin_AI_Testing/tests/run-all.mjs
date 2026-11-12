@@ -1,6 +1,6 @@
-// Runs every check in this folder (tests/*.test.mjs) and prints one line each. Exit code 1 if any of them fails.
-//   node tests/run-all.mjs
-// The emulator checks of the security rules are separate (they need Java): npm run test:rules
+
+
+
 import { readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";

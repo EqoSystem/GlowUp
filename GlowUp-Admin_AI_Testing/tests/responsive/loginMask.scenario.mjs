@@ -1,5 +1,5 @@
-// Browser check: the dots in the password box become a long row when the form is sent (2026-11-10).
-//   Run: node tests/responsive/loginMask.scenario.mjs
+
+
 import { launch, openPage } from "./harness.mjs";
 
 let checks = 0, failed = 0;

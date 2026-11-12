@@ -1,5 +1,5 @@
-// Checks of the plain import (_Shared/importFormat.js): the file format of the GlowUp prompt is read WITHOUT any AI or network.
-//   Run: node tests/importFormat.test.mjs
+
+
 import { parseImportText, hexOf, shadeCodeOf, pairShades } from "../_Shared/importFormat.js";
 
 let checks = 0, failed = 0;
@@ -67,13 +67,13 @@ equal([p.fdaVerifiedLink, p.imageUrl], ["https://verification.fda.gov.ph/product
 equal(p.sources, ["https://www.maybelline.com/fit-me", "https://retailer.example/p", "https://verification.fda.gov.ph/products/123"], "sources: https only, the FDA page added");
 equal([p.brandMarket, p.brandWebsiteSuggested], ["Global", "https://www.maybelline.com/"], "a product takes its brand's details from the BRAND block");
 
-// ---- a PDF that lost its line breaks
+
 const FLAT = FILE.replace(/\n+/g, " ");
 const flat = parseImportText(FLAT);
 equal(flat.draft.products[0].ingredients, ["Aqua", "Talc", "Glycerin"], "the same file with every line break lost reads the same");
 equal(flat.draft.brands[0].aliases, ["Maybelline", "Maybelline NY"], "also for brands");
 
-// ---- ingredients
+
 const INGREDIENTS = `=== INGREDIENT ===
 NAME: Methylparaben
 LABEL_NAME: Methylparaben
@@ -106,7 +106,7 @@ equal([m.riskLevel, m.cautionNote, m.aliases, m.chemicalDescription, m.avoidSkin
     "the risk level, the caution note without 'It', skin types only from the four, lists, https sources");
 equal(r.draft.ingredients[1].riskLevel, "", "a risk level that is not safe, caution or harmful is empty (the Curator's 'app decides')");
 
-// ---- Excel (the reader gives SHEET: name, then CSV)
+
 const SHEET = `SHEET: Ingredients
 NAME,LABEL_NAME,OTHER_NAMES,DESCRIPTION,RISK_LEVEL,SOURCES
 Glycerin,Glycerin,N/A,"Keeps skin soft, holds water",safe,https://cosing.example/glycerin
@@ -121,13 +121,13 @@ Revlon,ColorStay,Foundation,Aqua | Talc
 `);
 equal([r.kind, r.draft.products.length, r.draft.products[0].ingredients], ["inventory", 1, ["Aqua", "Talc"]], "a product sheet");
 
-// ---- what is not this format, or mixed
+
 equal(parseImportText("Brand: Revlon\nProduct: ColorStay\nIngredients: Aqua, Talc").kind, "", "free text is left to the AI");
 equal(parseImportText("").kind, "", "empty text");
 equal(parseImportText(FILE + "\n=== INGREDIENT ===\nNAME: Aqua").kind, "mixed", "brands and ingredients in one file are refused");
 equal([hexOf("#128"), hexOf("128"), hexOf("120"), hexOf("#abc"), hexOf("Nude")], ["", "", "", "#AABBCC", ""], "shade numbers and names are never colours");
 
-// ---- shade codes: what is printed on the pack, kept next to the colour
+
 equal([shadeCodeOf("119"), shadeCodeOf(" n20 "), shadeCodeOf("No. 12A"), shadeCodeOf("Shade 130"), shadeCodeOf("#02"), shadeCodeOf("NOIR")],
     ["119", "N20", "12A", "130", "02", "NOIR"], "codes as printed on packs");
 equal([shadeCodeOf(""), shadeCodeOf("N/A"), shadeCodeOf("a code that is far too long to be one"), shadeCodeOf("<b>1</b>"), shadeCodeOf(null)],
@@ -139,7 +139,7 @@ equal(pairShades(["#E8C9A5"], undefined), { shades: ["#E8C9A5"], codes: [""] }, 
 equal(pairShades("nothing", 5), { shades: [], codes: [] }, "not lists");
 equal(pairShades(["#111111", "#222222", "#333333"], ["1", "2", "3"], 2), { shades: ["#111111", "#222222"], codes: ["1", "2"] }, "at most as many as allowed");
 
-// a plain .csv file (the reader gives its text as it is, without a "SHEET:" line): row 1 holds the keys
+
 {
     const csv = "NAME,LABEL_NAME,OTHER_NAMES,RISK_LEVEL,SOURCES\nGlycerin,Glycerin,Glycerine | Glycerol,,\n\"Alcohol Denat., test\",Alcohol Denat.,,caution,https://eur-lex.europa.eu/x\n";
     const out = parseImportText(csv);

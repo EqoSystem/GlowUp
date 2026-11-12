@@ -1,14 +1,14 @@
-// READ-ONLY report and DRY RUN of the data clean-up, made from a saved copy of the catalogue.
-//
-//   1. Save a copy first:   node tools/downloadCatalogue.mjs
-//   2. Make the report:     node tools/cleanupReport.mjs <the backup folder>
-//
-// It writes two files INTO THE BACKUP FOLDER and changes nothing anywhere else:
-//   cleanup-report.html   the report to read (open it in a browser)
-//   cleanup-dry-run.json  every single change the clean-up would make, in order
-//
-// The rules are the website's own (_Shared/glowupRules.js and _Shared/glowupCatalog.js), so the "Clean up" tool on
-// the Brand & Product Inventory page proposes exactly the same changes for the same data.
+
+
+
+
+
+
+
+
+
+
+
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
@@ -24,11 +24,11 @@ if (!folder || !existsSync(path.join(folder, "products.json"))) {
     console.error("Give the backup folder, for example:  node tools/cleanupReport.mjs ../GlowUp-Data_Backup_2026-10-12");
     process.exit(1);
 }
-const threshold = process.argv[3] ? Number(process.argv[3]) : 0.85;        // how alike two names must be to be listed as "possibly the same"
+const threshold = process.argv[3] ? Number(process.argv[3]) : 0.85;
 
-// ---------------------------------------------------------------------------------------------
-// The saved documents, in the shape the website's pages use
-// ---------------------------------------------------------------------------------------------
+
+
+
 const read = (name) => JSON.parse(readFileSync(path.join(folder, name + ".json"), "utf8"));
 const array = (value) => (Array.isArray(value) ? value.map((v) => String(v).trim()).filter((v) => v.length > 0) : []);
 const seconds = (entry) => { const time = entry.createdAt && entry.createdAt["@time"] ? Date.parse(entry.createdAt["@time"]) / 1000 : Number(entry.addedAtUnix) || Date.parse(entry["@created"] || "") / 1000; return Number.isFinite(time) ? Math.floor(time) : 0; };
@@ -48,9 +48,9 @@ const ingredients = read("ingredients").map((d) => ({
     reviewed: d.reviewed === true, autoApproved: d.autoApproved === true, binned: d.binned === true, addedAt: seconds(d)
 }));
 
-// ---------------------------------------------------------------------------------------------
-// The plan, and a few facts that are worth knowing but are not changed
-// ---------------------------------------------------------------------------------------------
+
+
+
 const plan = catalog.cleanupPlan(brands, products, ingredients, { threshold });
 const totals = catalog.planTotals(plan);
 const listed = { brands: brands.filter((b) => !b.binned).length, products: products.filter((p) => !p.binned).length, ingredients: ingredients.filter((i) => !i.binned).length };
@@ -72,7 +72,7 @@ products.filter((p) => !p.binned).forEach((p) => p.ingredients.forEach((name) =>
     if (hit !== null || rules.wrongIngredientShape(name)) facts.listItemsThatAreNotIngredients.push({ id: p.id, product: p.name, brand: brandOf(p), item: name, why: hit !== null ? `holds "${hit}"` : "not the shape of an ingredient name" });
 }));
 
-// the unclear products, grouped by the word that made them unclear
+
 const unclearGroups = new Map();
 plan.forReview.unclear.forEach((entry) => {
     const word = entry.judged.word || "(nothing recognised in the name or the kind)";
@@ -80,9 +80,9 @@ plan.forReview.unclear.forEach((entry) => {
     unclearGroups.get(word).push(entry.product);
 });
 
-// ---------------------------------------------------------------------------------------------
-// The dry run as data
-// ---------------------------------------------------------------------------------------------
+
+
+
 const dryRun = {
     madeAt: new Date().toISOString(), from: folder, note: "A DRY RUN: nothing was changed. Each change is what the clean-up would write, in this order.",
     before: listed, after: plan.after, totals,
@@ -96,9 +96,9 @@ const dryRun = {
 };
 writeFileSync(path.join(folder, "cleanup-dry-run.json"), JSON.stringify(dryRun, null, 1), "utf8");
 
-// ---------------------------------------------------------------------------------------------
-// The report as a page
-// ---------------------------------------------------------------------------------------------
+
+
+
 const esc = (value) => String(value === null || value === undefined ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const many = (n, one, more) => `${n} ${n === 1 ? one : more}`;
 const WHAT = { bin: "to the Recycle bin", update: "changed" };
@@ -210,9 +210,9 @@ ${fold("Show the groups", possibleHtml, false)}
 </main></body></html>`;
 writeFileSync(path.join(folder, "cleanup-report.html"), page, "utf8");
 
-// ---------------------------------------------------------------------------------------------
-// A short summary on the screen
-// ---------------------------------------------------------------------------------------------
+
+
+
 console.log(`From ${folder}`);
 console.log(`Listed now:   ${listed.brands} brands, ${listed.products} products, ${listed.ingredients} ingredient entries`);
 console.log(`After:        ${plan.after.brands} brands, ${plan.after.products} products (${plan.after.makeup} make-up), ${plan.after.ingredients} ingredient entries`);

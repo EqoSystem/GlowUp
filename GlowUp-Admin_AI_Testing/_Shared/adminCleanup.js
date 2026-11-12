@@ -1,13 +1,13 @@
-// Two dialogs the Brand & Product Inventory and the Ingredient Curator share:
-//
-//   openPlanDialog       - "Clean up": the steps of a clean-up (see glowupCatalog.js, cleanupPlan), each with the list of
-//                          changes it would make. The admin ticks rows and presses "Apply" on one step at a time.
-//   openDuplicatesDialog - "Find duplicates": groups of entries that are (or may be) the same thing. Per group the admin
-//                          chooses which entry to keep and merges the others into it, or says they are not the same.
-//
-// Nothing here reads or writes the database: the page gives the lists and does the saving. Nothing is ever deleted by
-// these dialogs: an entry that is removed goes to the Recycle bin. Every change is shown first and asked about.
-// Everything a person typed (names of products, brands, ingredients) is written with textContent, never as HTML.
+
+
+
+
+
+
+
+
+
+
 import { icon, toast, askConfirm } from "./adminShell.js";
 
 const many = (n, one, more) => `${n} ${n === 1 ? one : more}`;
@@ -21,11 +21,11 @@ function make(tag, className, textContent) {
     return node;
 }
 
-/** The frame of a big dialog. Esc, the X and a click on the dark area close it (not while something is being saved). */
-/**
- * A small window that says a scan is running, with a bar and a Cancel button. Shown at once: the work behind it is cut into slices (see
- * ingredientLookalikesAsync), so the bar really moves. update(done, total) moves it; close() removes it; `cancelled()` is true after Cancel.
- */
+
+
+
+
+
 export function showScan(title, text, onCancel) {
     const overlay = make("div", "modal-overlay");
     overlay.style.display = "flex";
@@ -86,7 +86,7 @@ function bigDialog(title, intro, onClose) {
     return { box, body, foot, close, setBusy: (value) => { busy = value; box.classList.toggle("is-busy", value); } };
 }
 
-/** A tick box that looks like the page's own (the .pick style). */
+
 function tickBox(label, on) {
     const box = make("button", "pick");
     box.type = "button";
@@ -97,34 +97,34 @@ function tickBox(label, on) {
 }
 const isTicked = (box) => box.getAttribute("aria-checked") === "true";
 
-/** What a change writes, in a few plain words ("kind: Lipstick; other names: A, B"). */
+
 function fieldsInWords(fields) {
     return Object.entries(fields || {}).filter(([key]) => key !== "binnedWith" && key !== "brandId").map(([key, value]) =>
         `${FIELD[key] || key}: ${Array.isArray(value) ? (value.length > 4 ? value.slice(0, 4).join(", ") + ` and ${value.length - 4} more` : value.join(", ")) : value}`).join("; ");
 }
 
-// =============================================================================================
-//  Clean up
-// =============================================================================================
-/**
- * options = {
- *   title, intro,
- *   makePlan: () => plan,                          // glowupCatalog.cleanupPlan(...) on the page's data as it is NOW
- *   apply: async (changes, step) => {},            // the page writes these changes and loads its data again
- *   notes: (plan) => [{ title, text, items[] }],   // things a person must decide; shown under the steps (optional)
- *   onClose
- * }
- */
+
+
+
+
+
+
+
+
+
+
+
+
 export function openPlanDialog(options) {
     const dialog = bigDialog(options.title || "Clean up", options.intro || "", options.onClose);
     const done = { bin: 0, update: 0, steps: 0 };
-    const open = new Set();                       // the steps whose list is shown
-    const unticked = new Map();                   // step id -> Set of "collection/id" the admin took the tick off (or, for a careful step, put it ON)
+    const open = new Set();
+    const unticked = new Map();
 
     const keyOf = (change) => change.collection + "/" + change.docId;
     const wantedOf = (step) => {
         const flipped = unticked.get(step.id) || new Set();
-        // a careful step starts with nothing ticked: there the set holds what WAS ticked
+
         return step.changes.filter((change) => (step.careful ? flipped.has(keyOf(change)) : !flipped.has(keyOf(change))));
     };
     const flip = (step, change) => {
@@ -241,7 +241,7 @@ export function openPlanDialog(options) {
             dialog.body.append(section);
         });
 
-        // what the clean-up leaves for a person
+
         const notes = options.notes ? options.notes(plan) : [];
         notes.filter((note) => note && note.items && note.items.length > 0).forEach((note) => {
             const section = make("section", "plan-step note");
@@ -266,30 +266,30 @@ export function openPlanDialog(options) {
     return dialog;
 }
 
-// =============================================================================================
-//  Find duplicates
-// =============================================================================================
-/**
- * options = {
- *   title, intro, threshold (0 to 1, where to start),
- *   sections: [{
- *       id, label,                                              // "Products", "Brands"
- *       find: (threshold) => ({ sure: [group], possible: [group] }),   // group = { reason, items[], keep, alike }
- *       describe: (item) => ({ title, lines: [text], badges: [{ text, tone }] }),
- *       explainMerge: (keep, others) => [text],                 // what the merge will change, line by line
- *       merge: async (keep, others) => {},                      // the page writes and loads its data again
- *       remove: async (others, keep) => {},                     // the others go to the Recycle bin, nothing is taken over (optional)
- *       whyNotRemove: (item) => "" | "why this one cannot simply be removed"
- *   }],
- *   onClose
- * }
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 export function openDuplicatesDialog(options) {
     const dialog = bigDialog(options.title || "Find duplicates", options.intro || "", options.onClose);
     const state = { section: options.sections[0].id, threshold: typeof options.threshold === "number" ? options.threshold : 0.85 };
     const tally = { found: 0, merged: 0, removed: 0, skipped: 0 };
-    const skipped = new Set();                    // groups the admin said are not the same (until the dialog closes)
-    const keepOf = new Map();                     // group signature -> the id chosen to keep
+    const skipped = new Set();
+    const keepOf = new Map();
     const signature = (group) => group.items.map((item) => item.id).sort().join("|");
 
     const bar = make("div", "dup-bar");
@@ -307,7 +307,7 @@ export function openDuplicatesDialog(options) {
     const sliderText = make("span", "");
     sliderLabel.append(sliderText, slider);
     let sliderTimer = 0;
-    slider.addEventListener("input", () => {                       // the number follows the slider at once; the search starts when it rests
+    slider.addEventListener("input", () => {
         state.threshold = Number(slider.value) / 100;
         sliderText.textContent = `Also list names at least ${Math.round(state.threshold * 100)}% alike`;
         window.clearTimeout(sliderTimer);
@@ -324,15 +324,15 @@ export function openDuplicatesDialog(options) {
     closeButton.addEventListener("click", () => dialog.close());
     dialog.foot.append(summary, make("span", "spacer"), closeButton);
 
-    let drawing = 0;                                               // the number of the newest search; an older one that comes back late is dropped
-    let lastFound = null, lastSection = null;                      // the newest search result: choosing which entry to keep, or "Not the same", only redraws it
+    let drawing = 0;
+    let lastFound = null, lastSection = null;
     async function draw() {
         const mine = ++drawing;
         const section = options.sections.find((s) => s.id === state.section) || options.sections[0];
         tabs.querySelectorAll(".seg").forEach((tab) => tab.classList.toggle("on", tab.dataset.section === section.id));
         sliderText.textContent = `Also list names at least ${Math.round(state.threshold * 100)}% alike`;
         let found;
-        // while the search runs: a bar in the list (real progress), and the controls that would start another one wait
+
         const waiting = make("div", "scan-inline");
         const waitText = make("p", "scan-status", "Checking the names...");
         waitText.setAttribute("role", "status");
@@ -347,18 +347,18 @@ export function openDuplicatesDialog(options) {
             console.error("Looking for duplicates failed: ", error);
             if (mine !== drawing) return;
             list.removeAttribute("aria-busy"); tabs.querySelectorAll(".seg").forEach((tab) => { tab.disabled = false; });
-            list.replaceChildren(make("p", "table-message error", "The search for duplicates did not work. Close this window and try again."));    // the real error is in the console
+            list.replaceChildren(make("p", "table-message error", "The search for duplicates did not work. Close this window and try again."));
             return;
         }
-        if (mine !== drawing || found === null) return;             // a newer search took over (or the window closed): this one is dropped
+        if (mine !== drawing || found === null) return;
         list.removeAttribute("aria-busy");
         tabs.querySelectorAll(".seg").forEach((tab) => { tab.disabled = false; });
         lastFound = found; lastSection = section;
         render(false);
     }
 
-    // shows the newest search result. `keepPlace` = the admin changed something in the list (a choice, "Not the same"): no new search, and
-    // the list stays where it was scrolled to
+
+
     function render(keepPlace) {
         const found = lastFound, section = lastSection;
         if (!found || !section) return;

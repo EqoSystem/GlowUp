@@ -1,5 +1,5 @@
-// Browser check of "Style and text" (Layout & Style, 9 November 2026), in the rig of harness.mjs (pretend Firebase).
-//   Run: node tests/responsive/styleEditor.scenario.mjs    (screenshots go to tests/screenshots/style-*.png)
+
+
 import { launch, openPage, check } from "./harness.mjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,7 +12,7 @@ const browser = await launch();
 try {
     const { page, errors, settle } = await openPage(browser, "dash", { width: 1440, height: 900 });
     await settle();
-    // a layout of your own first (Style asks for one): answer the name question
+
     await page.evaluate(() => document.querySelector('.board .panel[data-panel="activity"] .panel-menu-btn').click());
     await page.locator(".menu .menu-item", { hasText: "Style and text" }).click();
     const ask = page.locator(".modal-overlay input[type=text]").first();
@@ -39,11 +39,11 @@ try {
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("glowup.layouts.v1")).profiles[0].pages.dashboard);
     ok(saved.texts.activity.title === "Latest scans" && saved.styles.activity.anim === "zoom", "the style is kept in the layout");
 
-    // the page after a reload still has it
+
     await page.reload(); await settle();
     ok(await page.evaluate(() => document.querySelector('.panel[data-panel="activity"] .panel-title').textContent) === "Latest scans", "it is there after a reload");
 
-    // Undo puts the page's own title back (a fresh visit has no undo, so change once more and undo that)
+
     await page.evaluate(() => document.querySelector('.board .panel[data-panel="activity"] .panel-menu-btn').click());
     await page.locator(".menu .menu-item", { hasText: "Style and text" }).click();
     await page.fill("#sdTitleText", "");
@@ -56,12 +56,12 @@ try {
     await page.keyboard.press("Control+y");
     ok(await page.evaluate(() => document.querySelector('.panel[data-panel="activity"] .panel-title').textContent) === own, "Ctrl+Y does it again");
 
-    // Cancel puts back what was there
+
     await page.evaluate(() => document.querySelector('.board .panel[data-panel="activity"] .panel-menu-btn').click());
     await page.locator(".menu .menu-item", { hasText: "Style and text" }).click();
     await page.fill("#sdTitleText", "Will be cancelled");
     await page.click(".style-dialog [data-close]");
-    // unsaved changes: "Discard changes?"; Escape there means Keep editing, never Discard
+
     ok(await page.locator(".modal-content", { hasText: "Discard changes?" }).count() === 1, "Cancel with unsaved changes asks Discard changes?");
     await page.keyboard.press("Escape");
     ok(await page.locator(".style-dialog").count() === 1 && await page.inputValue("#sdTitleText") === "Will be cancelled", "Escape on that question keeps editing");
@@ -70,7 +70,7 @@ try {
     await page.waitForSelector(".style-dialog", { state: "detached" });
     ok(await page.evaluate(() => document.querySelector('.panel[data-panel="activity"] .panel-title').textContent) === own, "Cancel leaves the panel as it was");
 
-    // the Numbers tiles one under the other, and the sizes of the window: no overlap, no sideways scroll
+
     await page.evaluate(() => {
         const store = JSON.parse(localStorage.getItem("glowup.layouts.v1"));
         const d = store.profiles[0].pages.dashboard;

@@ -1,5 +1,5 @@
-// Checks of the CSV export (_Shared/adminExport.js): quoting, formula-injection guard, the row cap.
-// No browser and no network.   Run: node tests/export.test.mjs
+
+
 import { csvCell, toCsv, EXPORT_MAX_ROWS } from "../_Shared/adminExport.js";
 
 let checks = 0, failed = 0;

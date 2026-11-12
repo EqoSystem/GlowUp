@@ -1,9 +1,9 @@
-// Checks the catalogue checks (_Shared/glowupCatalog.js): duplicates, what is not make-up, ingredient entries that
-// are not ingredients, what a merge writes, and the clean-up plan. It works on a small made-up catalogue: nothing
-// here talks to Firebase.
-//
-//   Run it from the website folder:   node tests/catalog.test.mjs      (Node 22.7 or newer)
-//   The last line says "ALL PASSED" or how many checks failed (exit code 1).
+
+
+
+
+
+
 import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 
@@ -18,9 +18,9 @@ const check = (condition, message) => { checks++; if (!condition) failures.push(
 const equal = (got, expected, what) => check(JSON.stringify(got) === JSON.stringify(expected), `${what}\n      expected ${JSON.stringify(expected)}\n      got      ${JSON.stringify(got)}`);
 const ids = (items) => items.map((item) => item.id).sort();
 
-// ---------------------------------------------------------------------------------------------
-// A small catalogue with one of every problem
-// ---------------------------------------------------------------------------------------------
+
+
+
 const brand = (id, name, category, more) => Object.assign({ id, name, category, status: "Active", scans: 0, source: "", reviewed: false, binned: false, aliases: [] }, more);
 const product = (id, brandId, brandName, name, cosmeticType, more) => Object.assign({ id, brandId, brandName, name, cosmeticType, ingredients: [], shades: [], status: "Active", scans: 0, source: "", reviewed: false, binned: false, barcode: "", aliases: [], addedAt: 100 }, more);
 const ingredient = (id, name, techName, more) => Object.assign({ id, name, techName, aliases: [], source: "", reviewed: true, binned: false }, more);
@@ -65,9 +65,9 @@ const ingredients = [
     ingredient("i6", "Water", "Aqua", { aliases: ["Water (Aqua)", "Eau"] })
 ];
 
-// ---------------------------------------------------------------------------------------------
-// 1. How alike two names are
-// ---------------------------------------------------------------------------------------------
+
+
+
 equal(c.editDistance("kitten", "sitting"), 3, "edit distance");
 equal(c.similarity("Super Stay", "SuperStay"), 1, "spaces do not matter");
 equal(c.similarity("L'Oréal", "loreal"), 1, "accents and punctuation do not matter");
@@ -75,9 +75,9 @@ check(c.similarity("Complexion Blur Translucent Powder", "Complexion Blur Transl
 check(c.similarity("Hoola Matte Bronzer", "Hoola Lite Light Matte Bronzer") < 0.85, "two extra words are not");
 equal(c.similarity("", "Lipstick"), 0, "nothing is like nothing");
 
-// ---------------------------------------------------------------------------------------------
-// 2. The brand at the front of a name
-// ---------------------------------------------------------------------------------------------
+
+
+
 equal(c.nameWithoutBrand("Maybelline SuperStay Matte Ink", "Maybelline"), "SuperStay Matte Ink", "brand taken off");
 equal(c.nameWithoutBrand("L’oreal Paris Infallible Lipstick 420", "L'Oreal Paris"), "Infallible Lipstick 420", "brand written another way");
 equal(c.nameWithoutBrand("Fit Me Foundation", "Maybelline"), "Fit Me Foundation", "no brand in front: unchanged");
@@ -85,9 +85,9 @@ equal(c.nameWithoutBrand("Maybelline", "Maybelline"), "Maybelline", "nothing wou
 equal(c.nameWithoutBrand("Happy Hour Lip Tint", "Happy Skin"), "Happy Hour Lip Tint", "only part of the brand in front: unchanged");
 equal(c.nameWithoutBrand("Clinique - Pop Lip Colour", "Clinique"), "Pop Lip Colour", "a dash after the brand goes too");
 
-// ---------------------------------------------------------------------------------------------
-// 3. Make-up only
-// ---------------------------------------------------------------------------------------------
+
+
+
 const scope = c.scopeReport(products);
 equal(ids(scope.out.map((e) => e.product)), ["p8"], "the shampoo is out");
 equal(ids(scope.skincare.map((e) => e.product)), ["p10", "p11", "p9"], "skin care");
@@ -112,9 +112,9 @@ equal(brandPlan.get("b_test").action, "bin", "an empty brand that is not a make-
 equal(brandPlan.get("b_balm").action, "review", "a brand with only undecided kinds waits for a person");
 check(!brandPlan.has("b_gone"), "a brand in the Recycle bin is left out");
 
-// ---------------------------------------------------------------------------------------------
-// 4. The same thing twice
-// ---------------------------------------------------------------------------------------------
+
+
+
 equal(c.brandDuplicates(brands).map((g) => ids(g.items)), [["b_lor", "b_lor2"]], "the two L'Oreal entries are one brand");
 equal(c.brandDuplicates(brands)[0].keep.id, "b_lor", "the entry typed on the website is kept, not the import");
 
@@ -137,9 +137,9 @@ equal(mergedBrand.keepChanges.scans, 3, "the kept brand takes the scans");
 equal(mergedBrand.moveProducts.map((m) => [m.product.id, m.brandId]), [["p8", "b_lor"]], "the other entry's products move to the kept brand");
 check(!("aliases" in mergedBrand.keepChanges) || mergedBrand.keepChanges.aliases.length === 1, "the other spelling is kept as an alias");
 
-// ---------------------------------------------------------------------------------------------
-// 5. Ingredient entries
-// ---------------------------------------------------------------------------------------------
+
+
+
 equal(ids(c.ingredientIssues(ingredients).map((e) => e.ingredient)), ["ai_2", "ai_3", "ai_4"], "a note, joined names and label text are not ingredients");
 for (const id of ["i3", "i4", "i5", "i6"]) equal(c.ingredientProblem(ingredients.find((i) => i.id === id)), "", `"${ingredients.find((i) => i.id === id).name}" is a real ingredient entry`);
 const twice = c.ingredientDuplicates(ingredients);
@@ -147,7 +147,7 @@ equal(twice.map((g) => ids(g.items)), [["ai_1", "i1"]], "the AI made an entry fo
 equal(twice[0].keep.id, "i1", "the admin's entry is kept");
 check(twice[0].aiCopy === true, "and it is marked as an AI copy");
 equal(c.mergeIngredients(ingredients[0], [ingredients[1]]).keepChanges, {}, "its names were known already: nothing to add");
-// the order of trust decides which entry is kept
+
 const trusted = (source, more) => ingredient("x", "Glycerin", "Glycerin", Object.assign({ source, reviewed: false }, more));
 equal([trusted(""), trusted("starter"), trusted("ai", { reviewed: true }), trusted("ai", { reviewed: true, autoApproved: true }), trusted("ai")].map(c.trustOf), [8, 6, 5, 2, 0], "typed here, starter, approved by a person, approved by itself, not checked");
 equal(c.pickKeeper([ingredient("ai_g", "Glycerine", "Glycerin", { source: "ai", reviewed: true, autoApproved: true }), ingredient("starter_g", "Glycerin", "Glycerin", { source: "starter", reviewed: false })]).id, "starter_g", "the app's own starter entry is kept, not an AI entry that approved itself");
@@ -155,9 +155,9 @@ equal(c.ingredientLookalikes([ingredient("a", "Niacinamide", "Niacinamide"), ing
 const use = c.ingredientUse(ingredients, products);
 equal([use.get("i2"), use.get("i6"), use.get("i1")], [1, 1, undefined], "how many product lists use an entry");
 
-// ---------------------------------------------------------------------------------------------
-// 6. The clean-up plan
-// ---------------------------------------------------------------------------------------------
+
+
+
 const before = JSON.stringify([brands, products, ingredients]);
 const plan = c.cleanupPlan(brands, products, ingredients, { threshold: 0.85 });
 equal(JSON.stringify([brands, products, ingredients]), before, "making a plan changes nothing in the lists it was given");
@@ -179,23 +179,23 @@ equal(plan.forReview.brands.map((e) => e.brand.id), ["b_balm"], "and so does its
 equal(plan.after, { brands: 4, products: 8, ingredients: 6, makeup: 7 }, "what is left afterwards");
 equal(c.planTotals(plan).bin, 13, "entries to the Recycle bin in all");
 
-// a later step sees what an earlier one changed: the kept product is renamed AND keeps the alias it got from the merge
+
 const twoSteps = c.cleanupPlan(
     [brand("b", "Clinique", "Makeup")],
     [product("a", "b", "Clinique", "Clinique Pop Lip Colour", "Lipstick", { reviewed: true, barcode: "20714739485" }), product("z", "b", "Clinique", "Pop Tint Stick", "Lipstick", { source: "scan", barcode: "020714739485" })],
     [], {});
 const renamed = twoSteps.steps.find((s) => s.id === "names").changes[0];
 equal([renamed.docId, renamed.fields.name, renamed.fields.aliases], ["a", "Pop Lip Colour", ["Pop Tint Stick", "Clinique Pop Lip Colour"]], "the rename keeps the alias from the merge");
-// an alias that is the new name itself is dropped
+
 const sameName = c.cleanupPlan([brand("b", "Clinique", "Makeup")],
     [product("a", "b", "Clinique", "Clinique Pop Lip Colour", "Lipstick", { reviewed: true }), product("z", "b", "Clinique", "Pop  Lip Colour", "Lipstick", { source: "scan" })], [], {});
 equal(sameName.steps.find((s) => s.id === "names").changes[0].fields.aliases, ["Clinique Pop Lip Colour"], "an alias that is now the name itself is not kept twice");
 
 equal(c.cleanupPlan(brands, products, ingredients, { only: ["ingredients"] }).steps.map((s) => s.id), ["ingredients"], "a plan can be limited to some steps");
 
-// ---------------------------------------------------------------------------------------------
-// productVisibility: the same rule as the app (ProductRepository.Usable / BrandRepository.IsSwitchedOff)
-// ---------------------------------------------------------------------------------------------
+
+
+
 const seen = (p, b) => c.productVisibility(p, b).reason;
 const lip = (more) => product("pv", "b_pv", "Brand", "Matte Lipstick", "Lipstick", more);
 const okBrand = (more) => brand("b_pv", "Brand", "Makeup", more);
@@ -213,7 +213,7 @@ equal(seen(lip({ binned: true }), okBrand()), "binned", "a product in the Recycl
 equal(seen(product("pv2", "b_pv", "Brand", "Face Wash Gel", "Cleanser"), okBrand({ status: "Pending" })), "not-makeup", "a non-make-up product says so, even under a Pending brand");
 equal(c.productVisibility(product("pv3", "b_pv", "Brand", "Face Wash Gel", "Cleanser"), okBrand()).live, false, "a non-make-up product is not live");
 
-// ---------------------------------------------------------------------------------------------
+
 console.log(`checks made: ${checks}`);
 if (failures.length > 0) {
     console.log("\nFAILED: " + failures.length + " check(s)\n");

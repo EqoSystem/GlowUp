@@ -1,5 +1,5 @@
-// Checks _Shared/sourceLinkRules.mjs (the source-link rules shared by the page and the server) and the server's check / CosIng helpers
-// in api/source-link.js with pretend network answers (nothing is sent anywhere).   Run from the website folder: node tests/sourceLinkRules.test.mjs
+
+
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -13,7 +13,7 @@ let checks = 0, failed = 0;
 const check = (ok, what) => { checks++; if (!ok) { failed++; console.log("FAILED: " + what); } };
 const equal = (got, expected, what) => check(JSON.stringify(got) === JSON.stringify(expected), `${what} (got ${JSON.stringify(got)})`);
 
-// ---- the validator
+
 check(r.checkSourceUrl("").ok && r.checkSourceUrl("  ").empty, "an empty box is fine (optional)");
 for (const bad of ["javascript:alert(1)", "data:text/html,x", "file:///etc/passwd", "http://www.cir-safety.org/x", "ftp://x.org/a", "www.cir-safety.org/x", "https://cir-safety.org@evil.com/", "https://x.org/a b", "https://localhost/x"])
     check(!r.checkSourceUrl(bad).ok, `blocked: ${bad}`);
@@ -28,7 +28,7 @@ check(r.checkSourceUrl("https://cosmileeurope.eu/inci/results/?q=Glycerin").warn
 check(r.checkSourceUrl("https://ec.europa.eu/growth/tools-databases/cosing/").warnings.some((w) => w.code === "general"), "CosIng's start page: general-page warning");
 const other = r.checkSourceUrl("https://example-blog.com/glycerin-guide");
 check(other.ok && other.tier.key === "other" && other.warnings.some((w) => w.code === "untrusted"), "another site: allowed with the untrusted warning");
-// ---- the host map
+
 equal(r.tierOf("echa.europa.eu").label, "Official", "ECHA is Official");
 equal(r.tierOf("chem.echa.europa.eu").label, "Official", "a sub-site of ECHA is Official");
 equal(r.tierOf("ec.europa.eu").label, "Official", "CosIng (ec.europa.eu) is Official");
@@ -37,18 +37,18 @@ equal(r.tierOf("www.cir-safety.org").label, "Industry/reference", "CIR is Indust
 equal(r.tierOf("pubchem.ncbi.nlm.nih.gov").label, "Industry/reference", "PubChem is Industry/reference");
 equal(r.tierOf("cosingchecker.com").label, "Unofficial", "CosIng Checker is Unofficial");
 equal(r.tierOf("cir-safety.org.evil.com").label, "Other", "a look-alike is Other");
-// ---- SSRF guard
+
 for (const ip of ["127.0.0.1", "10.1.2.3", "172.16.0.1", "172.31.255.255", "192.168.1.1", "169.254.169.254", "100.64.0.1", "0.0.0.0", "224.0.0.1", "::1", "fd00::1", "fe80::1", "::ffff:127.0.0.1", ""])
     check(r.isPrivateAddress(ip), `private refused: ${ip || "(empty)"}`);
 for (const ip of ["8.8.8.8", "151.101.1.69", "172.32.0.1", "2a00:1450:4001::200e"]) check(!r.isPrivateAddress(ip), `public allowed: ${ip}`);
-// ---- statements and pages
+
 equal(r.cosingCheckerPage("/ingredients/34040-glycerin/"), "https://cosingchecker.com/ingredients/34040-glycerin/", "a CosIng Checker page");
 equal(r.cosingCheckerPage("https://evil.com/x"), "", "an absolute address from the API is not trusted");
 equal(r.cosingCheckerPage("/ingredients/../../x/"), "", "no path tricks");
 equal(r.statementOf({ functions: ["HUMECTANT", "SOLVENT"], cas_number: "56-81-5", ec_number: "200-289-5", restriction: null }), "Function: humectant, solvent. CAS: 56-81-5. EC: 200-289-5. EU restriction: none listed.", "statement");
 check(r.pageMentions("<h1>GLYCERIN</h1>", "Glycerin", "") && r.pageMentions("CAS 60-27-5", "x", "60-27-5") && !r.pageMentions("nothing here", "Glycerin", ""), "page mentions by name or CAS");
 
-// ---- the server's link check (pretend network)
+
 const page = (status, body, headers = {}) => ({ ok: status >= 200 && status < 300, status, headers: { get: (k) => headers[k.toLowerCase()] || null }, text: async () => body, body: null });
 const publicDns = async () => [{ address: "93.184.216.34" }];
 const privateDns = async () => [{ address: "10.0.0.5" }];
@@ -72,7 +72,7 @@ equal(res.result, "dead", "endless redirects end as not working");
 res = await api.checkLink("javascript:alert(1)", "x", "", async () => page(200, ""), publicDns);
 equal(res.result, "cantcheck", "a blocked address is never fetched");
 
-// ---- CosIng Checker search: exact first, cache, 429
+
 let calls = 0;
 const json = (status, data, headers = {}) => ({ ok: status === 200, status, headers: { get: (k) => headers[k.toLowerCase()] || null }, json: async () => data });
 const data = { results: [
@@ -93,7 +93,7 @@ api.cosingCache.clear();
 answer = await api.cosingSearch("Niacinamide", async () => json(429, {}, { "retry-after": "42" }), 5000);
 check(answer.status === 429 && answer.body.retryAfter === 42, "429 passes on Retry-After");
 check(!api.cosingCache.has("niacinamide"), "a 429 is not cached");
-// ---- per-admin limit
+
 api.recent.clear();
 let allowedCount = 0;
 for (let i = 0; i < 25; i++) if (api.allowed("admin1", 10000 + i)) allowedCount++;

@@ -1,26 +1,26 @@
-// The parts every admin page is built from (no database code in here; the Refresh data button only calls adminStore.js):
-//   icons            - one set of thin-line icons, drawn as SVG (no emoji, no picture files)
-//   theme            - light / dark / system, remembered on this computer; "system" follows the computer's setting
-//   mountShell       - the sidebar (with its flowing highlight) and the top bar (branding and page controls)
-//   guides           - the small "i" badges and the pop-up that explains a control
-//   tile animation   - the lift, pixel sweep and glowing outline of the mobile app's tiles, on every button and tile
-//   menus, dialogs   - one small pop-up menu and two dialogs (confirm, type a name) used by every page
-//   pager, flip      - "10 per page" for long lists; smooth movement when things change place
-//
-// The display layouts (arranging panels, panel kinds, fonts and colours) live in adminLayouts.js;
-// the data panels (lists, grids, graphs) in adminWidgets.js.
-import { catchFailures } from "./quietConsole.js";      // first: no debug output on the live site, failures become a toast
+
+
+
+
+
+
+
+
+
+
+
+import { catchFailures } from "./quietConsole.js";
 import { initLayouts, applyAppearance } from "./adminLayouts.js";
-import { refreshData, refreshWait } from "./adminStore.js";   // only for the "Refresh data" button
+import { refreshData, refreshWait } from "./adminStore.js";
 import { mountSettingsMenu } from "./adminSettingsMenu.js";
 import { startShortcuts, keyChips } from "./shortcuts.js";
 import { ariaKeys } from "./shortcutKeys.js";
 
 catchFailures((text) => toast(text, "error"));
 
-// ---------------------------------------------------------------------------------------------
-// Icons
-// ---------------------------------------------------------------------------------------------
+
+
+
 const ICONS = {
     logo: '<path d="M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"/>',
     dashboard: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
@@ -88,58 +88,58 @@ const ICONS = {
     minus: '<path d="M5 12h14"/>',
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'
 };
-/** The Recycle bin: its lid is drawn apart from its body so it can open when something is held over it. */
+
 export const BIN_ICON = '<svg class="ic bin-ic" viewBox="0 0 24 24" aria-hidden="true"><g class="bin-lid"><path d="M4 7h16"/><path d="M9 7V4h6v3"/></g><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg>';
 
-/**
- * A page has (re)loaded part of the Recycle bin: the Quick settings panel (when open) counts the whole bin again, from the
- * lists this browser keeps (adminSettingsMenu.js). The page's own number is not needed: it holds only its own part.
- */
+
+
+
+
 export function setBinCount() {
     document.dispatchEvent(new CustomEvent("glowup:bin-count"));
 }
 
-/** The SVG of one icon, as text to put into HTML. */
+
 export function icon(name, extraClass) {
     return `<svg class="ic${extraClass ? " " + extraClass : ""}" viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.logo}</svg>`;
 }
 
-/** Turns every <i data-icon="name"></i> inside `root` into its icon. */
+
 export function hydrateIcons(root = document) {
     root.querySelectorAll("i[data-icon]").forEach((holder) => { holder.outerHTML = icon(holder.getAttribute("data-icon")); });
 }
 
-/** Makes any text safe to place inside HTML (also inside an attribute). */
+
 export const esc = (value) => String(value === null || value === undefined ? "" : value)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 
-/** True when the person asked their computer for less movement on screen. */
+
 export const calmMotion = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-// ---------------------------------------------------------------------------------------------
-// Theme
-// ---------------------------------------------------------------------------------------------
+
+
+
 const THEME_KEY = "glowup.theme";
 
 export function currentTheme() { return document.documentElement.dataset.theme === "light" ? "light" : "dark"; }
 
 const systemTheme = () => (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
 
-/** What the person chose: "light", "dark", or "system" (nothing kept: the page follows the computer's setting). */
+
 export function themeChoice() {
     let chosen = null;
-    try { chosen = localStorage.getItem(THEME_KEY); } catch (error) { /* private window */ }
+    try { chosen = localStorage.getItem(THEME_KEY); } catch (error) {                      }
     return chosen === "light" || chosen === "dark" ? chosen : "system";
 }
 
-/** Light, Dark or System, for every page of this browser. */
+
 export function setThemeChoice(choice) {
     if (choice === "light" || choice === "dark") { setTheme(choice); return; }
-    try { localStorage.removeItem(THEME_KEY); } catch (error) { /* private window */ }
+    try { localStorage.removeItem(THEME_KEY); } catch (error) {                      }
     setTheme(systemTheme(), false);
 }
 
-/** Until the person chooses Light or Dark, a change of the computer's own setting changes the page too. */
+
 let followingSystem = false;
 function followSystemTheme() {
     if (followingSystem || !window.matchMedia) return;
@@ -150,10 +150,10 @@ function followSystemTheme() {
 
 export function setTheme(theme, remember = true) {
     document.documentElement.dataset.theme = theme === "light" ? "light" : "dark";
-    if (remember) { try { localStorage.setItem(THEME_KEY, document.documentElement.dataset.theme); } catch (error) { /* private window */ } }
+    if (remember) { try { localStorage.setItem(THEME_KEY, document.documentElement.dataset.theme); } catch (error) {                      } }
     document.querySelectorAll(".theme-toggle").forEach(paintThemeButton);
     applyAppearance();
-    document.dispatchEvent(new CustomEvent("glowup:theme"));        // graphs redraw in the new colours
+    document.dispatchEvent(new CustomEvent("glowup:theme"));
 }
 
 function paintThemeButton(button) {
@@ -164,7 +164,7 @@ function paintThemeButton(button) {
     button.dataset.tip = dark ? "Switch every page to the light look." : "Switch every page to the dark look.";
 }
 
-/** A dark / light button. `host` = where to put it. */
+
 export function mountThemeToggle(host) {
     const button = document.createElement("button");
     button.type = "button";
@@ -172,20 +172,20 @@ export function mountThemeToggle(host) {
     paintThemeButton(button);
     button.addEventListener("click", () => setTheme(currentTheme() === "dark" ? "light" : "dark"));
     host.appendChild(button);
-    // until the person chooses, the page follows the computer's own setting
+
     followSystemTheme();
     return button;
 }
 
-// ---------------------------------------------------------------------------------------------
-// The page frame
-// ---------------------------------------------------------------------------------------------
-/**
- * The "Refresh data" button: an icon only. It downloads brands, products and ingredients again in full
- * (about 700 reads), so adminStore.js limits it (a pause after each use, and a number of uses per hour). While it is
- * blocked its tooltip says how long to wait. `host` = the element it goes into (first); skipped without an error when there is none.
- * Since 29 October 2026 it is no longer in the top bar: only the Recycle Bin page shows it, in its search row.
- */
+
+
+
+
+
+
+
+
+
 export function addRefreshDataButton(host) {
     try {
         const tools = host && host.classList.contains("topbar") ? host.querySelector(".topbar-tools") : host;
@@ -228,14 +228,14 @@ export function addRefreshDataButton(host) {
     }
 }
 
-/**
- * Builds the sidebar and the top bar round the page's <main class="main-content" data-title data-subtitle>.
- * Call it first on every admin page. page = "dashboard" | "inventory" | "curator".
- */
-/**
- * Moves a page's search box and action buttons (Add, More) into the shared header control group.
- * Call it right after mountShell (which draws the header buttons).
- */
+
+
+
+
+
+
+
+
 export function placeInHeader(searchSelector, actionsId) {
     const bar = document.querySelector(".topbar");
     if (!bar) return;
@@ -247,10 +247,10 @@ export function placeInHeader(searchSelector, actionsId) {
     if (actions && tools) tools.insertBefore(actions, tools.firstChild);
 }
 
-/**
- * The header of the Recycle Bin and the Archive: tabs, search and page actions in the shared control group.
- * The parts wait in the page's <div data-header-parts hidden>. Call it right after mountShell. Returns the header.
- */
+
+
+
+
 export function placeHeaderParts() {
     const bar = document.querySelector("main.main-content > header.topbar");
     const holder = document.querySelector("[data-header-parts]");
@@ -260,7 +260,7 @@ export function placeHeaderParts() {
     bar.classList.add("has-search", "has-tabs");
     holder.querySelectorAll(":scope > .header-tabs, :scope > .search-container").forEach((part) => controls.insertBefore(part, tools));
     const end = holder.querySelector(":scope > [data-header-end]");
-    if (end) {                                  // the page's buttons go before the Quick settings gear, which stays at the far right
+    if (end) {
         const gear = tools.querySelector(".quick-gear");
         if (gear) gear.before(...end.childNodes); else tools.append(...end.childNodes);
     }
@@ -272,15 +272,15 @@ export function mountShell(page) {
     const main = document.querySelector("main.main-content");
     document.body.classList.add("app");
 
-    // the sidebar and the top bar were drawn by pageFrame.js with the page's first picture (or are drawn now, for
-    // somebody who had to wait for the sign-in check): here they get their tools and their movement
+
+
     if (!window.GlowUpFrame) throw new Error("pageFrame.js must be the first thing inside <main> of an admin page.");
     window.GlowUpFrame.build();
     const sidebar = document.querySelector("aside.sidebar");
     const topbar = main.querySelector("header.topbar");
     wireNavDrop(sidebar.querySelector(".nav-links"));
-    // the top bar keeps the page's own tools (search, Add: placeInHeader) and, at the far right, the Quick settings gear. Layout and
-    // style, the Recycle bin and light / dark / system are in the panel it opens (adminSettingsMenu.js).
+
+
     const tools = topbar.querySelector(".topbar-tools");
     tools.innerHTML = "";
     followSystemTheme();
@@ -293,28 +293,28 @@ export function mountShell(page) {
     topbar.insertAdjacentElement("afterend", bar);
 
     hydrate(document);
-    mountSettingsMenu(tools);                   // the gear first (the panel itself is built on its first open): initLayouts puts the Layout & Style controls into its holder
+    mountSettingsMenu(tools);
     initLayouts(page);
     watchForNewControls();
-    startShortcuts(page);                       // keyboard shortcuts of this page (shortcuts.js)
+    startShortcuts(page);
 }
 
-/**
- * TWO STATES, KEPT APART. The page you are on carries its own highlight on its link (class "active", set from the
- * address by pageFrame.js): it stays whatever the pointer does. The pointer gets a lighter drop that flows to the link
- * under it (its front edge first, its back edge a moment later) and fades when the pointer leaves the menu. The drop
- * never rests on, replaces or removes the highlight of the selected page.
- */
+
+
+
+
+
+
 function wireNavDrop(list) {
     const drop = list.querySelector(".nav-drop");
     const links = Array.from(list.querySelectorAll("a"));
-    const home = null;                          // the drop has no resting place: nothing under the pointer = no drop
+    const home = null;
     let at = null;
     const place = (link, instant) => {
         if (!link) { drop.style.opacity = "0"; return; }
         const top = link.offsetTop, bottom = list.clientHeight - (link.offsetTop + link.offsetHeight);
         const goingDown = at !== null && top > at;
-        // the edge that leads the move is quick, the edge that follows is slow and overshoots a little
+
         const lead = "0.2s cubic-bezier(.2, .8, .2, 1)", follow = "0.46s cubic-bezier(.3, 1.45, .5, 1)";
         drop.style.transition = instant ? "none" : `top ${goingDown ? follow : lead}, bottom ${goingDown ? lead : follow}, opacity .2s, background-color .3s, border-color .3s`;
         drop.style.top = top + "px"; drop.style.bottom = bottom + "px"; drop.style.opacity = "1";
@@ -322,7 +322,7 @@ function wireNavDrop(list) {
     };
     place(home, true);
     links.forEach((link) => {
-        // the selected page needs no hover drop: it is highlighted already
+
         const over = () => place(link.classList.contains("active") ? null : link);
         link.addEventListener("mouseenter", over);
         link.addEventListener("focus", over);
@@ -333,7 +333,7 @@ function wireNavDrop(list) {
     window.addEventListener("resize", () => { if (!placeQueued) placeQueued = requestAnimationFrame(() => { placeQueued = 0; place(home, true); }); }, { passive: true });
 }
 
-/** Icons, guide badges and the tile animation for everything inside `root` (call it after filling a list). */
+
 export function hydrate(root = document) {
     hydrateIcons(root);
     hydrateGuides(root);
@@ -341,15 +341,15 @@ export function hydrate(root = document) {
     tagFx(root);
 }
 
-// ---------------------------------------------------------------------------------------------
-// Guide badges and the pop-up that explains a control
-// ---------------------------------------------------------------------------------------------
-/** HTML of a guide badge. `preview` = one line that shows what will happen (optional). */
+
+
+
+
 export function guideBadge(title, text, preview) {
     return `<button type="button" class="guide-badge" aria-label="What is this?" data-tip-title="${esc(title)}" data-tip="${esc(text)}"${preview ? ` data-tip-preview="${esc(preview)}"` : ""}>i</button>`;
 }
 
-/** Every element with data-guide="short instruction" gets a badge right after it. */
+
 function hydrateGuides(root) {
     root.querySelectorAll("[data-guide]:not([data-guide-done])").forEach((control) => {
         control.setAttribute("data-guide-done", "1");
@@ -358,10 +358,10 @@ function hydrateGuides(root) {
     });
 }
 
-// ---------------------------------------------------------------------------------------------
-// Info badges: a small "i" whose text opens in a pop-over on hover, focus or click. Esc closes it. Text is set with textContent.
-// An element with data-info="text" (and data-info-label) gets one appended.
-// ---------------------------------------------------------------------------------------------
+
+
+
+
 let infoPop = null, infoOwner = null, infoPinned = false, infoTimer = 0;
 
 function infoElement() {
@@ -423,10 +423,10 @@ function closeInfoSoon() {
     infoTimer = setTimeout(() => closeInfo(false), 160);
 }
 
-/**
- * One info badge. `text` = the sentence; or `lines` = [{ text, tone, label, run }] (a line can offer one button).
- * `label` is what a screen reader says for the badge.
- */
+
+
+
+
 export function infoBadge({ label, text, lines, window: asWindow, title, key }) {
     const badge = document.createElement("button");
     badge.type = "button";
@@ -437,7 +437,7 @@ export function infoBadge({ label, text, lines, window: asWindow, title, key }) 
     badge.setAttribute("aria-expanded", "false");
     badge._info = Array.isArray(lines) && lines.length ? lines : [{ text: String(text || "") }];
     if (asWindow) {
-        // a click opens a floating, draggable window (rows, serious matters first); there is no hover pop-over
+
         badge.setAttribute("aria-haspopup", "dialog");
         badge.setAttribute("aria-expanded", String(!!(infoWin && infoWinKey === key)));
         badge.addEventListener("click", () => { if (infoWin && infoWinKey === key) closeInfoWindow(true); else openInfoWindow(badge, { key, title, lines: badge._info }); });
@@ -451,7 +451,7 @@ export function infoBadge({ label, text, lines, window: asWindow, title, key }) 
     return badge;
 }
 
-// ---- the floating notes window: opened by a click on a notes badge, draggable, one row per note ----
+
 let infoWin = null, infoWinKey = "", infoWinOpener = null;
 const TONE_ORDER = { bad: 0, warn: 1, info: 2 };
 const TONE_TAG = { bad: "Important", warn: "Check", info: "Info", ok: "OK" };
@@ -459,7 +459,7 @@ const TONE_TAG = { bad: "Important", warn: "Check", info: "Info", ok: "OK" };
 function fillInfoWindow(lines) {
     const list = infoWin.querySelector(".iw-list");
     list.replaceChildren();
-    // serious matters first, then the rest in the order the page gave them
+
     const rows = (lines || []).map((line, index) => ({ line, index })).sort((a, b) => ((TONE_ORDER[a.line.tone] ?? 3) - (TONE_ORDER[b.line.tone] ?? 3)) || a.index - b.index);
     rows.forEach(({ line }) => {
         const item = document.createElement("li");
@@ -528,7 +528,7 @@ function buildInfoWindow() {
     return win;
 }
 
-/** Opens (or re-uses) the notes window. `opts` = { key, title, lines }. */
+
 export function openInfoWindow(opener, opts) {
     closeInfo(false);
     if (!infoWin) infoWin = buildInfoWindow();
@@ -541,7 +541,7 @@ export function openInfoWindow(opener, opts) {
     infoWin.classList.add("open");
     if (opener) opener.setAttribute("aria-expanded", "true");
     if (fresh) {
-        // first near the badge (its right edge lines up with the badge), later wherever it was dragged to
+
         const at = opener ? opener.getBoundingClientRect() : { right: window.innerWidth - 24, bottom: 80 };
         const width = infoWin.getBoundingClientRect().width;
         placeInfoWindow(at.right - width, at.bottom + 8);
@@ -549,7 +549,7 @@ export function openInfoWindow(opener, opts) {
     }
 }
 
-/** The page's lines changed: an open notes window shows the new ones (and closes when there are none). */
+
 export function refreshInfoWindow(key, lines) {
     if (!infoWin || !infoWin.classList.contains("open") || infoWinKey !== key) return;
     if (!lines || lines.length === 0) { closeInfoWindow(false); return; }
@@ -575,7 +575,7 @@ function hydrateInfos(root) {
     });
 }
 
-// Esc closes an open pop-over before anything else (a dialog behind it stays open); a press outside closes it too
+
 document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
     if (infoOwner) { event.preventDefault(); event.stopImmediatePropagation(); closeInfo(true); }
@@ -601,7 +601,7 @@ function showTip(target) {
     pop.style.top = Math.max(8, top) + "px";
 }
 export function hideTip() { if (pop) pop.classList.remove("show"); }
-// A control with a label or an icon gets no hover label (5 November 2026): its aria-label is for screen readers. The "i" badges keep theirs: it is all they do.
+
 const CONTROL = "button, a, select, input, textarea, label, [role=button]";
 const tipOf = (node) => {
     const t = node.closest && node.closest("[data-tip]");
@@ -614,32 +614,32 @@ document.addEventListener("focusout", hideTip);
 document.addEventListener("scroll", hideTip, { capture: true, passive: true });
 document.addEventListener("pointerdown", hideTip, true);
 
-// ---------------------------------------------------------------------------------------------
-// The tile animation of the mobile app
-// ---------------------------------------------------------------------------------------------
+
+
+
 const FX = "button:not(.guide-badge):not(.menu-item):not(.group-tab):not(.brand-toggle):not(.pick):not(.assist-next):not(.assist-x), a.btn, .tile, .nav-links a, .kpi, .ingredient-card, .sign-out, .w-tile, .w-card";
 
 function tagFx(root) {
     if (root.matches && root.matches(FX)) root.classList.add("fx");
     if (root.querySelectorAll) root.querySelectorAll(FX).forEach((control) => control.classList.add("fx"));
 }
-/** Plays the pixel sweep and the glowing outline on one control (a press does it by itself). */
+
 export function playSweep(control) {
     if (!control || control.disabled) return;
     control.classList.remove("fx-run");
-    void control.offsetWidth;                    // lets the animation start again on a quick second press
+    void control.offsetWidth;
     control.classList.add("fx-run");
 }
-/** Only what answers a click gets the pixel sweep (9 November 2026): a control, or a card the page made clickable (its pointer is a hand). */
+
 const answersClick = (control) => !!control && (control.matches("button, a[href], [role=button], input, select, summary, label") || getComputedStyle(control).cursor === "pointer");
 document.addEventListener("pointerdown", (event) => { const control = event.target.closest && event.target.closest(".fx"); if (answersClick(control)) playSweep(control); });
 document.addEventListener("animationend", (event) => { if (event.animationName === "fx-glow") event.target.classList.remove("fx-run"); });
 
-// Moving to another page: this page stays as it is until the next one is there (no loading cover in between). The
-// next page draws its frame and fixed text with its first picture, and the browser blends the two (adminCommon.css,
-// "@view-transition"), so the menu and the top bar seem to stay where they are.
 
-/** Lists are filled after the page has loaded: new buttons get their icons, badges and animation too. */
+
+
+
+
 function watchForNewControls() {
     new MutationObserver((changes) => {
         changes.forEach((change) => change.addedNodes.forEach((node) => { if (node.nodeType === 1 && !node.classList.contains("guide-pop")) hydrate(node); }));
@@ -647,10 +647,10 @@ function watchForNewControls() {
 }
 if (document.body) tagFx(document.body);
 
-// ---------------------------------------------------------------------------------------------
-// Smooth movement: things that change place glide there instead of jumping
-// ---------------------------------------------------------------------------------------------
-/** Runs `change` (which moves, adds or removes elements) and lets each of `elements` glide from its old place to its new one. */
+
+
+
+
 export function flip(elements, change, duration = 280) {
     const list = Array.from(elements);
     const before = new Map(list.map((el) => [el, el.getBoundingClientRect()]));
@@ -665,14 +665,14 @@ export function flip(elements, change, duration = 280) {
     });
 }
 
-// ---------------------------------------------------------------------------------------------
-// Messages, a pop-up menu and two small dialogs
-// ---------------------------------------------------------------------------------------------
-/** A small message in the corner. kind: "ok" | "error" | "info". action = { label, run } adds one button to it. */
+
+
+
+
 export function toast(message, kind = "info", action) {
     let host = document.getElementById("toastHost");
     if (!host) { host = document.createElement("div"); host.id = "toastHost"; host.className = "toast-host"; host.setAttribute("aria-live", "polite"); document.body.appendChild(host); }
-    // the same message already on screen is not shown twice: it stays a little longer instead (no pile of equal toasts)
+
     const same = Array.from(host.children).find((t) => t.dataset.text === message && t.dataset.kind === kind && !action);
     if (same) { clearTimeout(Number(same.dataset.timer)); same.dataset.timer = String(window.setTimeout(() => same.remove(), kind === "error" ? 8000 : 3500)); return; }
     const box = document.createElement("div");
@@ -694,10 +694,10 @@ export function toast(message, kind = "info", action) {
 let openMenuEl = null, closeOpenMenu = null;
 export function closeMenu() { if (closeOpenMenu) closeOpenMenu(); }
 
-/**
- * A small menu under `anchor`. items = [{ label, description, icon, danger, checked, disabled, run }, { heading }, { separator }].
- * A second click on the anchor, a click elsewhere or Esc closes it.
- */
+
+
+
+
 export function openMenu(anchor, items) {
     const wasMine = openMenuEl && openMenuEl.anchor === anchor;
     closeMenu();
@@ -723,7 +723,7 @@ export function openMenu(anchor, items) {
         text.appendChild(label);
         if (item.description) { const more = document.createElement("small"); more.textContent = item.description; text.appendChild(more); }
         button.appendChild(text);
-        if (item.keys) { button.appendChild(keyChips(item.keys, "kb-hint")); button.setAttribute("aria-keyshortcuts", ariaKeys(item.keys)); }   // its keyboard shortcut, as chips (no hover label)
+        if (item.keys) { button.appendChild(keyChips(item.keys, "kb-hint")); button.setAttribute("aria-keyshortcuts", ariaKeys(item.keys)); }
         if (item.checked) button.insertAdjacentHTML("beforeend", icon("check", "menu-check"));
         button.addEventListener("click", () => { closeMenu(); if (item.run) item.run(); });
         menu.appendChild(button);
@@ -764,7 +764,7 @@ export function openMenu(anchor, items) {
     };
 }
 
-/** The frame of a small dialog. Returns { overlay, box, close }. Esc and a click on the dark area call onDismiss. */
+
 export function dialogFrame(title, onDismiss) {
     const overlay = document.createElement("div");
     overlay.className = "modal-overlay";
@@ -784,11 +784,11 @@ export function dialogFrame(title, onDismiss) {
     return { overlay, box, close: () => { document.removeEventListener("keydown", onKey, true); overlay.remove(); } };
 }
 
-/**
- * "Are you sure?" as a proper dialog. Resolves true when confirmed.
- * options = { title, message, items: [names], confirmLabel, danger, inline }
- * inline = true: the question and its buttons stand on ONE row (title left, Cancel and the answer right), for a question with no more words (Sign out?).
- */
+
+
+
+
+
 export function askConfirm(options) {
     return new Promise((resolve) => {
         const done = (answer) => { frame.close(); resolve(answer); };
@@ -817,7 +817,7 @@ export function askConfirm(options) {
     });
 }
 
-/** Asks for one short text (a name). Resolves the text, or null when cancelled. options = { title, label, value, placeholder, confirmLabel, maxLength } */
+
 export function askText(options) {
     return new Promise((resolve) => {
         const done = (answer) => { frame.close(); resolve(answer); };
@@ -847,10 +847,10 @@ export function askText(options) {
     });
 }
 
-// ---------------------------------------------------------------------------------------------
-// Pager: long lists are shown some at a time
-// ---------------------------------------------------------------------------------------------
-/** The items of the current page. state = { page, size }; the page is kept inside what exists. */
+
+
+
+
 export function paginate(items, state) {
     const pages = Math.max(1, Math.ceil(items.length / state.size));
     state.page = Math.min(Math.max(1, state.page || 1), pages);
@@ -858,7 +858,7 @@ export function paginate(items, state) {
     return items.slice(start, start + state.size);
 }
 
-/** Draws "1-10 of 126  < Page 1 of 13 >" into `host` (nothing when everything fits on one page). */
+
 export function renderPager(host, state, total, onChange, noun = "items") {
     if (!host) return;
     const pages = Math.max(1, Math.ceil(total / state.size));

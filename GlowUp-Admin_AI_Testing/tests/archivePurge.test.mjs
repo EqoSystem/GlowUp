@@ -1,6 +1,6 @@
-// Checks of the archive purge job (api/archive-purge.js) WITHOUT any network: Google's answers are pretend, and the
-// service account is a throwaway key made here (it opens nothing). Run: node tests/archivePurge.test.mjs
-// With "--show" it also prints the dry-run answer.
+
+
+
 import { createRequire } from "node:module";
 import crypto from "node:crypto";
 const require = createRequire(import.meta.url);
@@ -17,7 +17,7 @@ const now = new Date("2026-11-30T03:00:00Z");
 const day = 86400000;
 const archived = (id, daysAgoExpired) => ({ name: `${ROOT}/archive/${id}`, updateTime: "2026-10-30T10:00:00.000000Z", fields: { expires_at: { timestampValue: new Date(now.getTime() - daysAgoExpired * day).toISOString() } } });
 
-/** A pretend Google: records every call; the query answers `rows`. */
+
 function google(rows) {
     const calls = [];
     const fetchFn = async (url, options = {}) => {
@@ -34,22 +34,22 @@ function google(rows) {
 const env = (more = {}) => Object.assign({ CRON_SECRET: "s3cret-for-test", FIREBASE_SERVICE_ACCOUNT: account }, more);
 const auth = "Bearer s3cret-for-test";
 
-// ---- protection
+
 check((await purge({ env: {}, fetchFn: google([]).fetchFn, now, authorization: auth })).status === 503, "without CRON_SECRET nothing runs (503)");
 check((await purge({ env: env(), fetchFn: google([]).fetchFn, now, authorization: "Bearer wrong" })).status === 401, "a wrong secret is refused (401)");
 check((await purge({ env: env(), fetchFn: google([]).fetchFn, now, authorization: "" })).status === 401, "no secret is refused (401)");
 check((await purge({ env: env({ FIREBASE_SERVICE_ACCOUNT: "" }), fetchFn: google([]).fetchFn, now, authorization: auth })).status === 503, "without a service account nothing runs (503)");
 check((await purge({ env: env({ FIREBASE_SERVICE_ACCOUNT: account.replace("glowup-admin-portal", "another-project") }), fetchFn: google([]).fetchFn, now, authorization: auth })).status === 503, "a service account of another project is refused");
 
-// ---- settings
+
 check(settingsOf({}).live === false && settingsOf({ ARCHIVE_PURGE_LIVE: "true" }).live === false && settingsOf({ ARCHIVE_PURGE_LIVE: "1" }).live === true, "dry run unless ARCHIVE_PURGE_LIVE is exactly 1");
 check(settingsOf({}).max === 50 && settingsOf({ ARCHIVE_PURGE_MAX: "5000" }).max === 200 && settingsOf({ ARCHIVE_PURGE_MAX: "0" }).max === 1, "cap: default 50, never above 200, at least 1");
 
-// ---- only archive documents
+
 check(isArchiveDocument(`${ROOT}/archive/products__p1`), "an archive document is accepted");
 check(!isArchiveDocument(`${ROOT}/products/p1`) && !isArchiveDocument(`${ROOT}/archive/x/sub/y`) && !isArchiveDocument(`${ROOT}/archive_purge_log/x`) && !isArchiveDocument("projects/other/databases/(default)/documents/archive/x"), "anything else is refused");
 
-// ---- dry run (the default): finds, deletes nothing, logs
+
 const rows = [archived("products__p3", 2), archived("brands__b2", 1), { name: `${ROOT}/products/p1`, updateTime: "x", fields: { expires_at: { timestampValue: "2026-01-01T00:00:00Z" } } }, archived("ingredients__i9", -3)];
 const dry = google(rows);
 const dryRun = await purge({ env: env(), fetchFn: dry.fetchFn, now, authorization: auth });
@@ -62,14 +62,14 @@ const query = JSON.parse(dry.calls.find((c) => c.url.endsWith(":runQuery")).body
 check(query.from[0].collectionId === "archive" && query.where.fieldFilter.op === "LESS_THAN_OR_EQUAL" && query.limit === 51, "the query: archive, expires_at <= now, cap + 1");
 if (process.argv.includes("--show")) console.log("DRY-RUN ANSWER:\n" + JSON.stringify(dryRun.body, null, 2));
 
-// ---- live: deletes exactly the expired archive documents, with the update-time precondition
+
 const wet = google(rows);
 const liveRun = await purge({ env: env({ ARCHIVE_PURGE_LIVE: "1" }), fetchFn: wet.fetchFn, now, authorization: auth });
 const deletes = wet.calls.filter((c) => c.method === "DELETE");
 check(liveRun.body.mode === "live" && liveRun.body.deleted === 2 && deletes.length === 2, "live deletes the two expired entries only");
 check(deletes.every((c) => c.url.includes("/documents/archive/") && c.url.includes("currentDocument.updateTime=")), "every delete is in archive and has the precondition");
 
-// ---- cap
+
 const many = Array.from({ length: 8 }, (_, i) => archived("products__m" + i, 1));
 const capped = google(many);
 const cappedRun = await purge({ env: env({ ARCHIVE_PURGE_LIVE: "1", ARCHIVE_PURGE_MAX: "5" }), fetchFn: capped.fetchFn, now, authorization: auth });

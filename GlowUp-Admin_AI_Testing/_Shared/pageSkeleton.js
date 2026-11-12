@@ -1,10 +1,10 @@
-// Skeleton loading in GlowUp's own look. This small script is the first thing inside <body> of every page, so the
-// outline of the page that is coming is on screen before anything else has loaded: the GlowUp sparkle, the menu,
-// and soft blush shapes where that page's numbers, tools and lists will be, with a rose-to-gold shine moving across.
-// adminCommon.css shows it while the page is checking the sign-in (html.auth-pending) and from the moment a link to
-// another page is pressed (body.leaving); otherwise it is not displayed.
-// html.resizing while the window edge moves (until 150 ms after the last resize event): adminCommon.css stops every transition
-// and animation then, so the page follows the edge at once. pageFrame.js does the same on admin pages; the flag keeps it single.
+
+
+
+
+
+
+
 (function () {
     if (window.__glowupResizing) return;
     window.__glowupResizing = true;

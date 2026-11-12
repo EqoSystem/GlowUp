@@ -1,20 +1,20 @@
-// THE PAGE FRAME, DRAWN AT ONCE.
-//
-// This small script (no imports, nothing to wait for) is the first thing inside <main> of every admin page. It builds
-// the real sidebar and the real top bar straight away, so the menu, branding and fixed text of the
-// page are on screen with the first picture. Nothing fixed waits for the sign-in check or for data any more: only the
-// places where real data will appear show a loading shape (they are part of each page's own HTML).
-//
-//   - EVERY visit gets the frame at once (html.frame-first): the static shell (menu, branding, panel headings, fixed
-//     labels) never waits for the sign-in check or for data. Only the data containers (counts, lists, tables) show a
-//     loading shape. The page cannot be used until the sign-in check has passed, and no data is asked for before that:
-//     the check itself is unchanged, and somebody who is not an admin is sent to the login page as before (the frame
-//     holds no data, only fixed text).
-//   - When the check does not answer within 10 seconds, a message with a "Try again" button shows instead of an
-//     endless loading screen.
-//   - Resting the pointer on a menu link fetches that page ahead, so it opens without a wait.
-//
-// adminShell.js (mountShell) takes this frame over: it adds the tools of the top bar and the movement of the menu.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 (function () {
     var script = document.currentScript;
     var main = script && script.parentElement && script.parentElement.tagName === "MAIN" ? script.parentElement : document.querySelector("main.main-content");
@@ -22,7 +22,7 @@
     var path = location.pathname;
     var page = path.indexOf("Inventory") >= 0 ? "inventory" : path.indexOf("Curator") >= 0 ? "curator" : path.indexOf("Recycle") >= 0 ? "bin" : path.indexOf("_Admin_Archive") >= 0 ? "archive" : "dashboard";
 
-    // the same drawings as in adminShell.js (ICONS): the frame cannot wait for that file
+
     var ICON = {
         logo: '<path d="M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"/>',
         dashboard: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
@@ -38,21 +38,21 @@
         { id: "dashboard", label: "Dashboard", icon: "dashboard", href: "../_Admin_Dashboard/adminDashboard.html" },
         { id: "inventory", label: "Brand & Product Inventory", icon: "box", href: "../_Admin_Brand_Inventory/adminBrandInventory.html" },
         { id: "curator", label: "Ingredient Curator", icon: "flask", href: "../_Admin_Ingredient_Curator/adminIngredientCurator.html" }
-        // (Pending Snapshot Reviews is a window inside Brand & Product Inventory since 22 October 2026, not a page of its own)
-        // (no menu entry for the Recycle Bin since 12 October 2026: the bin is opened INSIDE Brand & Product Inventory and
-        //  inside Ingredient Curator, each with its own "Recycle bin" chip; both read the same database)
+
+
+
     ];
-    // The pinned state is kept in this browser (and applied before the menu is drawn).
+
     var FOLD_KEY = "glowup.sidebar.folded";
     var pinnedOpen = false;
-    try { pinnedOpen = localStorage.getItem(FOLD_KEY) === "0"; } catch (error) { /* a private window */ }
+    try { pinnedOpen = localStorage.getItem(FOLD_KEY) === "0"; } catch (error) {                        }
     root.classList.toggle("sb-pinned", pinnedOpen);
     root.classList.toggle("sb-collapsed", !pinnedOpen);
     requestAnimationFrame(function () { requestAnimationFrame(function () { root.classList.add("sb-ready"); }); });
     var esc = function (value) { return String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); };
     var svg = function (name) { return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + (ICON[name] || ICON.logo) + "</svg>"; };
 
-    /** Builds the navigation rail and full-width page header (once). */
+
     function build() {
         if (!main || document.querySelector("aside.sidebar")) return;
         document.body.classList.add("app");
@@ -62,7 +62,7 @@
             '<ul class="nav-links" id="sidebarNav" aria-label="Pages"><li class="nav-drop" aria-hidden="true"></li>' +
             NAV.map(function (n) {
                 var here = n.id === page;
-                // the page you are on is marked on the link itself (and for screen readers), not by where the pointer is
+
                 return '<li><a href="' + n.href + '"' + (here ? ' class="active" aria-current="page"' : "") + ' aria-label="' + esc(n.label) + '"><span class="nav-icon">' + svg(n.icon) + '</span><span class="label">' + esc(n.label) + "</span></a></li>";
             }).join("") +
             "</ul>" +
@@ -99,7 +99,7 @@
             if (focusBack) menuBtn.focus({ preventScroll: true });
         };
         var updateHeaderLayout = function () {
-            root.style.setProperty("--header-height", Math.ceil(topbar.getBoundingClientRect().height) + "px");
+            root.style.setProperty("--header-h", Math.ceil(topbar.getBoundingClientRect().height) + "px");
             root.style.setProperty("--brand-right", brand.getBoundingClientRect().right + "px");
         };
         updateHeaderLayout();
@@ -122,7 +122,7 @@
             root.classList.toggle("sb-pinned", pinnedOpen);
             root.classList.toggle("sb-collapsed", !pinnedOpen);
             root.classList.remove("sb-hover");
-            try { localStorage.setItem(FOLD_KEY, pinnedOpen ? "0" : "1"); } catch (error) { /* not kept */ }
+            try { localStorage.setItem(FOLD_KEY, pinnedOpen ? "0" : "1"); } catch (error) {                }
             paintMenuBtn();
         });
         var hoverOpen = function (event) {
@@ -165,7 +165,7 @@
             paintMenuBtn();
         });
 
-        // a page the pointer rests on is fetched ahead (its HTML and its script), so opening it does not wait for them
+
         var fetched = {};
         var ahead = function (link) {
             var href = link.getAttribute("href");
@@ -184,7 +184,7 @@
         });
     }
 
-    /** GlowUp's own loading mark, for the sign-in check of somebody this browser does not know yet. */
+
     function brandLoader() {
         var holder = document.createElement("div");
         holder.className = "brand-loader";
@@ -193,7 +193,7 @@
         document.body.insertBefore(holder, document.body.firstChild);
     }
 
-    /** The sign-in check did not answer: say so, and offer to try again (never an endless loading screen). */
+
     function stuck() {
         if (!root.classList.contains("auth-pending") || document.querySelector(".auth-stuck-box")) return;
         root.classList.add("auth-stuck");
@@ -208,10 +208,10 @@
         document.body.appendChild(box);
     }
 
-    // the static shell is drawn at once on every visit; only a page without a <main> (none today) falls back to the loading mark
+
     if (main) { root.classList.add("frame-first"); build(); }
     else brandLoader();
-    // never a page that stays empty: if the board was not arranged in 8 seconds (a script failed), it is shown as it is
+
     setTimeout(function () { root.classList.add("board-ready"); }, 8000);
     setTimeout(stuck, 10000);
 

@@ -1,17 +1,17 @@
-// The look and the fixed texts of ONE panel (and the cards inside it), chosen by an admin in "Style and text" (adminLayouts.js).
-//
-// Kept in the layout, per page and per panel: page.styles[panelId] and page.texts[panelId]. Everything goes through clean...
-// below first, so a saved, imported or shared layout can only ever hold these known settings.
-//
-// Rules that keep every page working on every screen (9 November 2026, the user's brief):
-//   - nothing is placed freely: a panel keeps its place in the board's grid (the packing closes the gaps, nothing overlaps),
-//     text goes only into FIXED slots (title, subtitle line under the title, one note at the top or the bottom), and the
-//     labels that are already there (number tiles) can be renamed, not moved;
-//   - a panel is never turned by degrees (a turned box covers its neighbours): "orientation" sets whether the cards inside
-//     sit side by side or one under the other, and a narrow panel (phone) always falls back to what fits;
-//   - text sizes stay between 85 % and 125 % and never under 12 px (the site's own rule), colours are checked for contrast;
-//   - entrance animations play once when the page opens, never while working, and are skipped for "reduce motion".
-// Pure functions, no network. Checked by tests/componentStyle.test.mjs.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 export const ANIMATIONS = [
     { id: "", label: "Rise (default)", hint: "Comes up a little and fades in." },
@@ -25,7 +25,7 @@ export const ANIMATIONS = [
     { id: "flip", label: "Flip", hint: "Tilts forward into place." },
     { id: "blur", label: "Focus", hint: "Comes into focus from a blur." }
 ];
-/** The keyframes of each entrance (Web Animations format), so "Play" can show one without reloading the page. */
+
 export const ANIMATION_FRAMES = {
     "": [{ opacity: 0, transform: "translateY(10px)" }, { opacity: 1, transform: "none" }],
     fade: [{ opacity: 0 }, { opacity: 1 }],
@@ -49,13 +49,13 @@ export const EDGES = [
     { id: "always", label: "Always, moving", hint: "A light travels round the edge all the time." },
     { id: "off", label: "Off", hint: "No edge light." }
 ];
-/** What a press does to a button inside the panel. The pixel sweep is a choice now: no button has it unless an admin picks it here. */
+
 export const BUTTON_FX = [
     { id: "", label: "Glow ring (default)", hint: "A pressed button sends out one soft ring of light." },
     { id: "pixel", label: "Pixel sweep", hint: "A pressed button gets a band of small squares across it, with the ring." },
     { id: "none", label: "Plain", hint: "A pressed button only moves a little: no ring, no squares." }
 ];
-/** How much shadow a panel, or the cards inside it, casts. Its colour is the "Shadow" colour of the colour list (black when not set). */
+
 export const SHADOWS = [
     { id: "", label: "Page default", hint: "The page's own shadow." },
     { id: "none", label: "None", hint: "No shadow." },
@@ -64,7 +64,7 @@ export const SHADOWS = [
     { id: "strong", label: "Strong", hint: "A deep, wide shadow." },
     { id: "glow", label: "Glow", hint: "A shadow that spreads evenly on all sides, like a glow (the accent colour unless a shadow colour is set)." }
 ];
-/** The box-shadow of one preset; `colour` = #rrggbb or "" (black; the accent for "glow"). */
+
 export function shadowCss(id, colour) {
     const c = hex(colour);
     const mix = (pct, base) => `color-mix(in srgb, ${c || base} ${pct}%, transparent)`;
@@ -91,7 +91,7 @@ export const LIMITS = { title: 40, subtitle: 120, note: 300, label: 40, labels: 
 const ids = (list) => list.map((item) => item.id);
 const oneOf = (value, list) => (ids(list).includes(String(value == null ? "" : value)) ? String(value == null ? "" : value) : "");
 const hex = (value) => (/^#[0-9a-f]{6}$/i.test(String(value || "")) ? String(value).toLowerCase() : "");
-/** Plain text of at most `most` characters, on one line (a note keeps its line breaks, at most 4 of them). */
+
 export function plainText(value, most, lines = false) {
     let text = String(value == null ? "" : value).replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, " ");
     text = lines ? text.split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean).slice(0, 5).join("\n")
@@ -100,7 +100,7 @@ export function plainText(value, most, lines = false) {
 }
 const COLOUR_KEYS = ["bg", "card", "text", "accent", "border", "shadow"];
 
-/** Only the known settings of a panel's look; {} when nothing is set. `fonts` = the ids of the site's fonts. */
+
 export function cleanStyle(raw, fonts = []) {
     const s = raw && typeof raw === "object" ? raw : {};
     const out = {};
@@ -128,7 +128,7 @@ export function cleanStyle(raw, fonts = []) {
     return out;
 }
 
-/** Only the fixed text slots of a panel; {} when nothing is set. */
+
 export function cleanTexts(raw) {
     const t = raw && typeof raw === "object" ? raw : {};
     const out = {};
@@ -145,7 +145,7 @@ export function cleanTexts(raw) {
     return out;
 }
 
-/** The styles and texts of a page, each cleaned; panels with nothing set are left out. At most 60 panels. */
+
 export function cleanPanelMap(raw, clean) {
     const out = {};
     Object.keys(raw && typeof raw === "object" ? raw : {}).slice(0, 60).forEach((id) => {
@@ -156,25 +156,25 @@ export function cleanPanelMap(raw, clean) {
     return out;
 }
 
-// ---- contrast (WCAG 2): a colour pair the site would not pass is pointed out in the form ----
+
 function luminance(colour) {
     const v = hex(colour);
     if (!v) return null;
     const channel = (i) => { const c = parseInt(v.slice(i, i + 2), 16) / 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
     return 0.2126 * channel(1) + 0.7152 * channel(3) + 0.0722 * channel(5);
 }
-/** The contrast ratio of two #rrggbb colours (1 to 21), or 0 when one of them is not a colour. */
+
 export function contrast(a, b) {
     const x = luminance(a), y = luminance(b);
     if (x === null || y === null) return 0;
     return Math.round(((Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)) * 100) / 100;
 }
 
-// ---- on the page --------------------------------------------------------------------------------------------------
+
 const DATA = { anim: "anim", trans: "trans", edge: "edge", orient: "orient", btn: "btn", shadow: "pshadow", cardShadow: "cshadow" };
 const PROPS = { bg: "--panel-bg", card: "--card-bg", text: "--text", accent: "--accent", border: "--border" };
 
-/** Puts a panel's look on it (and takes off what is no longer set). `fontStack` = the CSS font list of style.font ("" = none). */
+
 export function applyPanelStyle(panel, style, theme, fontStack) {
     if (!panel || !panel.style) return;
     const s = style || {};
@@ -198,11 +198,11 @@ export function applyPanelStyle(panel, style, theme, fontStack) {
     if (any) panel.dataset.styled = "1"; else delete panel.dataset.styled;
 }
 
-/** The labels of a panel that may be renamed: the titles of its number tiles, in page order. */
+
 export const LABEL_SELECTOR = ".kpi-title, .stat-title";
 const own = (panel, selector) => Array.from(panel.querySelectorAll(selector)).filter((node) => node.closest(".panel") === panel);
 
-/** Puts a panel's fixed texts in their slots (made when needed) and gives back the page's own words where nothing is set. */
+
 export function applyPanelTexts(panel, texts) {
     if (!panel || !panel.querySelector) return;
     const t = texts || {};
@@ -220,7 +220,7 @@ export function applyPanelTexts(panel, texts) {
         node.textContent = text;
         if (place === "bottom") inner.appendChild(node);
         else {
-            // top: right under the title bar, after the subtitle when there is one
+
             const after = cls === "panel-note" ? inner.querySelector(":scope > .panel-subtitle-text") || head : head;
             if (after) after.insertAdjacentElement("afterend", node); else inner.insertBefore(node, inner.firstChild);
         }
@@ -234,7 +234,7 @@ export function applyPanelTexts(panel, texts) {
     });
 }
 
-/** The page's own words of a panel (before any change): its title and its tile labels. */
+
 export function ownTexts(panel) {
     const inner = panel.querySelector(":scope > .panel-inner") || panel;
     const heading = inner.querySelector(":scope > .panel-head .panel-title");

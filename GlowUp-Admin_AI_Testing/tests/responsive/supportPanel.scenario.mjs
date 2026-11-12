@@ -1,4 +1,4 @@
-// Browser check: the Dashboard lists support reports sent from the app (10 November 2026).   Run: node tests/responsive/supportPanel.scenario.mjs
+
 import { launch, openPage } from "./harness.mjs";
 let checks = 0, failed = 0;
 const ok = (good, what) => { checks++; if (!good) { failed++; console.log("FAILED: " + what); } };
@@ -13,7 +13,7 @@ try {
         ok(/Bug/.test(text), `${width}px: its kind shows`);
         ok(/Superstay Matte Ink/.test(text), `${width}px: the last scan shows`);
         ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `${width}px: no sideways scroll`);
-        // the app's Suggestion kind (11 November 2026) is in the Suggestions panel, not among the support reports
+
         ok(!/shade finder/.test(text), `${width}px: an app suggestion is not listed as a support report`);
         await page.waitForSelector("#suggestionList li", { timeout: 6000 });
         const ideas = await page.textContent("#suggestionList");
@@ -25,7 +25,7 @@ try {
         await page.click('#supportList button[data-action="handled"]');
         await page.waitForTimeout(500);
         ok(/No new bug reports/.test(await page.textContent("[data-panel=support]")), `${width}px: marking it handled empties the Bug list`);
-        // one panel for each kind (12 November 2026): Wrong scan results and Other reports have their own panels
+
         ok(/the scan said harmful/.test(await page.textContent("#supportWrongList")), `${width}px: the wrong scan result is in its own panel`);
         ok(/Mark Azcueta/.test(await page.textContent("#supportWrongList")) && /account user3abc/.test(await page.textContent("#supportWrongList")), `${width}px: the report shows the sender's name WITH the account id (the name is self-given)`);
         ok(/user1abc/.test(await page.textContent("#supportList")), `${width}px: an older report without a name still shows its account`);
@@ -37,7 +37,7 @@ try {
         await page.click('#suggestionList button[data-collection="supportReports"][data-action="reviewed"]');
         await page.waitForTimeout(500);
         ok(!/shade finder/.test(await page.textContent("[data-panel=suggestions]")), `${width}px: marking the app suggestion reviewed takes it off the list`);
-        // Clear all (12 November 2026): beside the fold arrow, asks first, then empties the list
+
         await page.reload(); await settle(800);
         await page.waitForSelector("#suggestionList li", { timeout: 6000 });
         const order = await page.evaluate(() => { const head = document.querySelector("[data-panel=suggestions] .panel-head"); const b = [...head.querySelectorAll("button")].map((x) => x.id || x.className); return b.join(","); });

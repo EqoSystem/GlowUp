@@ -1,11 +1,11 @@
-// No size limit (9 November 2026, the user's wish: "unlimited"). A file is read whole in this browser; the AI is then asked
-// about it in PARTS of AI_PART_CHARACTERS, one after the other (splitForAi), so a long file is never cut off.
-export const AI_TEXT_CHARACTERS = 30000;       // the most the server takes in one question
-export const AI_PART_CHARACTERS = 12000;       // one part: small enough that the AI's answer for it is never cut short
-// A scanned PDF (pictures of pages, no text layer) is read with text recognition (OCR) in this browser: tesseract.js, in its own worker, one page
-// after the other so the page stays usable. Nothing is uploaded; the OCR program and its English data are downloaded from the CDN the first time.
-const OCR_MAX_PAGES = Infinity;           // every page (each one takes a few seconds; progress is shown)
-const OCR_SCALE = 2;                      // pages are drawn at twice their size: small label print is read far better
+
+
+export const AI_TEXT_CHARACTERS = 30000;
+export const AI_PART_CHARACTERS = 12000;
+
+
+const OCR_MAX_PAGES = Infinity;
+const OCR_SCALE = 2;
 const TESSERACT = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
 
 function loadScript(src) {
@@ -59,7 +59,7 @@ async function readPdf(file, onProgress) {
     return readScannedPdf(pdf, onProgress);
 }
 
-/** The text of a PDF that has no text layer, by OCR of each page (at most OCR_MAX_PAGES). */
+
 async function readScannedPdf(pdf, onProgress) {
     const total = Math.min(pdf.numPages, OCR_MAX_PAGES);
     onProgress(`This PDF has no selectable text. Loading text recognition (OCR) for ${total} page${total === 1 ? "" : "s"}...`);
@@ -81,7 +81,7 @@ async function readScannedPdf(pdf, onProgress) {
             await pdfPage.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
             const { data } = await worker.recognize(canvas);
             texts.push((data && data.text) || "");
-            canvas.width = canvas.height = 0;               // let the browser free the picture before the next page
+            canvas.width = canvas.height = 0;
         }
         if (pdf.numPages > total) texts.push(`[Only the first ${total} pages were read by text recognition.]`);
         return texts.join("\n");
@@ -106,10 +106,10 @@ async function readWord(file) {
     return result.value;
 }
 
-/**
- * Reads supported office/PDF/text formats in this browser; only extracted text is sent to the admin AI endpoint.
- * onProgress(message) is told what is happening during a long read (OCR of a scanned PDF).
- */
+
+
+
+
 export async function readAdminDocument(file, onProgress = () => {}) {
     if (!file) throw new Error("Choose a PDF, Excel, Word, CSV or text file.");
     const extension = (file.name.split(".").pop() || "").toLowerCase();
@@ -118,7 +118,7 @@ export async function readAdminDocument(file, onProgress = () => {}) {
     if (isPdf) text = await readPdf(file, onProgress);
     else if (["xlsx", "xls"].includes(extension)) text = await readSpreadsheet(file);
     else if (extension === "docx") text = await readWord(file);
-    else if (["csv", "txt"].includes(extension) || file.type === "text/csv" || file.type === "text/plain") text = await file.text();      // plain text: no library, nothing leaves the browser
+    else if (["csv", "txt"].includes(extension) || file.type === "text/csv" || file.type === "text/plain") text = await file.text();
     else throw new Error("Use a PDF, .xlsx/.xls Excel workbook, .docx Word document, .csv or .txt file.");
     const clean = String(text || "").replace(/\u0000/g, "").trim();
     if (clean.length < 20) {
@@ -128,10 +128,10 @@ export async function readAdminDocument(file, onProgress = () => {}) {
     return clean;
 }
 
-/**
- * The text cut into parts of at most `size` characters for the AI, each ending at a line break where one is near
- * (a record is then rarely cut in two). Every character is in exactly one part, in order.
- */
+
+
+
+
 export function splitForAi(text, size = AI_PART_CHARACTERS) {
     const source = String(text || "");
     const parts = [];

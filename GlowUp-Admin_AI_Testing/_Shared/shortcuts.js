@@ -1,36 +1,36 @@
-// KEYBOARD SHORTCUTS, at run time (9 November 2026): the one key listener, the "?" help and the command palette (Ctrl/Cmd+K).
-//
-// startShortcuts(scope) is called once per admin page (adminShell.mountShell). A page gives its actions their handlers with
-// bindActions({ actionId: { run, isAvailable } }) or bindButtons({ actionId: "#buttonId" }); a bound BUTTON is the one source of
-// truth: the shortcut clicks it, and only when it is there, shown and not disabled - the same conditions as for the mouse.
-//
-// The listener does nothing when: the device has no fine pointer (touch only), focus is in a box you type in, a dialog / menu /
-// panel / the palette is open, a combo is being recorded or tested, the key is held down (event.repeat), or the account was
-// refused as an admin. preventDefault() is called ONLY when a shortcut matches and runs. An action that cannot run now shows ONE
-// short toast that says why (toast() in adminShell.js does not repeat a message that is already shown).
+
+
+
+
+
+
+
+
+
+
 import { toast, icon, closeMenu } from "./adminShell.js";
 import { CATALOG, BUILT_IN, PAGES, PAGE_ORDER, PAGE_URLS, catalogById } from "./shortcutCatalog.js";
 import { comboFromEvent, comboLabels, comboText, ariaKeys, findShortcut, learnLayout, isMac, availabilityOf } from "./shortcutKeys.js";
 import { loadShortcuts, onShortcuts, shortcutState } from "./shortcutStore.js";
 
 let scope = "", started = false, recording = false;
-const handlers = new Map();               // actionId -> { run, isAvailable }
-const buttons = new Map();                // actionId -> selector of its on-screen button
+const handlers = new Map();
+const buttons = new Map();
 
 export const shortcutsActive = () => started && !shortcutState().denied && desktop();
 const desktop = () => !window.matchMedia || window.matchMedia("(hover: hover) and (pointer: fine)").matches;
-/** While true (recording or testing a combo in Quick settings) no shortcut runs. */
+
 export function setRecording(on) { recording = !!on; }
 
-// ---------------------------------------------------------------------------------------------
-// Actions of the page
-// ---------------------------------------------------------------------------------------------
-/** Gives actions of this page their handler. isAvailable() returns true, or the reason (a sentence) why it cannot run now. */
+
+
+
+
 export function bindActions(map) {
     Object.keys(map).forEach((id) => handlers.set(id, map[id]));
     markButtons();
 }
-/** Binds actions to on-screen buttons: the shortcut presses the button, only when the button could be pressed. */
+
 export function bindButtons(map) {
     Object.keys(map).forEach((id) => {
         const selector = map[id];
@@ -47,16 +47,16 @@ function buttonReady(selector, action) {
     const label = action ? action.label : "This action";
     const off = !b || b.getClientRects().length === 0 || b.disabled || b.getAttribute("aria-disabled") === "true";
     if (!off) return true;
-    // the button is hidden or greyed out: the reason the admin can act on
+
     if (/selected/i.test(label)) return `${label}: tick at least one entry first.`;
     if (/approve/i.test(label)) return `${label}: tick at least one draft as reviewed first.`;
     return !b || b.getClientRects().length === 0 ? `${label} isn't on the page right now.` : `${label} isn't available right now.`;
 }
-/** Can this action run here and now? true or the reason. */
+
 export function availability(actionId) {
     return availabilityOf(catalogById.get(actionId), scope, handlers.get(actionId), (p) => PAGES[p] || p);
 }
-/** Runs an action through the same handler as its button. Returns true when it ran. */
+
 export function runAction(actionId) {
     const ok = availability(actionId);
     if (ok !== true) { toast(String(ok), "info"); return false; }
@@ -64,13 +64,13 @@ export function runAction(actionId) {
     handlers.get(actionId).run();
     return true;
 }
-/** The admin's combo for an action (enabled ones only), or "". */
+
 export function comboFor(actionId) {
     const s = shortcutState().list.find((x) => x.actionId === actionId && x.enabled);
     return s ? s.keys : "";
 }
 
-/** aria-keyshortcuts on every bound button (no hover label: the site shows none on controls). */
+
 function markButtons() {
     buttons.forEach((selector, id) => {
         const b = document.querySelector(selector);
@@ -80,10 +80,10 @@ function markButtons() {
     });
 }
 
-// ---------------------------------------------------------------------------------------------
-// Key chips (ONE look everywhere: list, dialog, help, palette, menus)
-// ---------------------------------------------------------------------------------------------
-/** <span class="kb-combo"><kbd>Ctrl</kbd><kbd>Alt</kbd><kbd>B</kbd></span>; the text for screen readers is the same formatter's. */
+
+
+
+
 export function keyChips(keys, extraClass = "") {
     const box = document.createElement("span");
     box.className = "kb-combo" + (extraClass ? " " + extraClass : "");
@@ -93,7 +93,7 @@ export function keyChips(keys, extraClass = "") {
     return box;
 }
 
-/** A message with every combo in it ("Ctrl+Alt+B", "⌘⌥B", "F5") drawn as key chips; the rest stays plain text. */
+
 export function textWithChips(text) {
     const out = document.createDocumentFragment();
     const pattern = /((?:Ctrl|Alt|Shift)\+)+[^\s,.'()]+|[⌘⌥⇧]+[^\s,.'()]+|\bF\d{1,2}\b/g;
@@ -112,10 +112,10 @@ export function textWithChips(text) {
     return out;
 }
 
-// ---------------------------------------------------------------------------------------------
-// A layer (the help and the palette): focus moves in and is kept inside, Esc / the X / the dark area close it, focus goes back
-// ---------------------------------------------------------------------------------------------
-/** opts = { title, className, onClose, labelledBy }. Returns { overlay, box, body, close }. */
+
+
+
+
 export function openLayer({ title, className = "", onClose }) {
     const opener = document.activeElement;
     const overlay = document.createElement("div");
@@ -151,7 +151,7 @@ export function openLayer({ title, className = "", onClose }) {
     box.querySelector("[data-x]").addEventListener("click", close);
     return { overlay, box, body: box.querySelector(".xl-body"), close };
 }
-/** Keeps Tab inside `box`. */
+
 export function trapTab(event, box) {
     const all = Array.from(box.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')).filter((n) => !n.disabled && n.getClientRects().length > 0);
     if (all.length === 0) return;
@@ -161,9 +161,9 @@ export function trapTab(event, box) {
     else if (!box.contains(document.activeElement)) { event.preventDefault(); first.focus(); }
 }
 
-// ---------------------------------------------------------------------------------------------
-// "?": the shortcuts of this page
-// ---------------------------------------------------------------------------------------------
+
+
+
 let helpOpen = null;
 export function openHelp() {
     if (helpOpen) return;
@@ -194,9 +194,9 @@ export function openHelp() {
     layer.box.querySelector("[data-x]").focus();
 }
 
-// ---------------------------------------------------------------------------------------------
-// Ctrl/Cmd+K: the command palette
-// ---------------------------------------------------------------------------------------------
+
+
+
 let paletteOpen = null;
 export function openPalette() {
     if (paletteOpen) return;
@@ -221,7 +221,7 @@ export function openPalette() {
     const paint = () => {
         const words = search.value.toLowerCase().split(/\s+/).filter(Boolean);
         shown = entries.filter((e) => words.every((w) => (e.label + " " + e.hint).toLowerCase().includes(w)));
-        // this page's actions first, then pages, then other pages' actions
+
         const rank = (e) => (e.kind === "action" && (e.action.scope === scope || e.action.scope === "all") ? 0 : e.kind === "page" ? 1 : 2);
         shown.sort((a, b) => rank(a) - rank(b));
         at = Math.min(at, Math.max(0, shown.length - 1));
@@ -269,11 +269,11 @@ export function openPalette() {
     search.focus();
 }
 
-// ---------------------------------------------------------------------------------------------
-// The one listener
-// ---------------------------------------------------------------------------------------------
+
+
+
 const TYPING = "input, textarea, select, [contenteditable]:not([contenteditable=false])";
-/** True while something sits over the page (a dialog, a menu, the palette, an open panel of the page). */
+
 export function layerOpen() {
     return !!document.querySelector(".modal-overlay[style*='flex'], .kb-layer, .menu.show, .import-check, .style-overlay, .facet-panel, .snapx-open")
         || document.body.classList.contains("snapx-open")
@@ -287,11 +287,11 @@ function onKey(event) {
     const target = event.target;
     if (target && target.closest && target.closest(TYPING)) return;
     if (layerOpen()) return;
-    // ? : the help (event.key, so it works on every keyboard layout)
+
     if (event.key === "?" && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); openHelp(); return; }
-    // Ctrl/Cmd+K : the palette
+
     if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.code === "KeyK") { event.preventDefault(); openPalette(); return; }
-    // / : this page's search box, where the page has not taken it already
+
     if (event.key === "/" && !event.ctrlKey && !event.metaKey && !event.altKey && !event.defaultPrevented) {
         const box = document.querySelector(".topbar .search-container input, .topbar input[type=search], header input[type=search]");
         if (box && box.getClientRects().length > 0) { event.preventDefault(); box.focus(); box.select(); }
@@ -305,13 +305,13 @@ function onKey(event) {
     runAction(hit.actionId);
 }
 
-/** Once per admin page, after the sign-in check. `page` = "dashboard" | "inventory" | "curator" | "bin" | "archive". */
+
 export function startShortcuts(page) {
     if (started) return;
     started = true;
     scope = page;
     learnLayout().then(markButtons);
-    // going to another page: the same way as the sidebar link (the page's own leave-guard runs on the way out)
+
     const go = (p) => () => { if (p === scope) return; window.location.href = PAGE_URLS[p]; };
     bindActions({
         "nav.dashboard": { run: go("dashboard") }, "nav.inventory": { run: go("inventory") }, "nav.curator": { run: go("curator") },
@@ -323,7 +323,7 @@ export function startShortcuts(page) {
     loadShortcuts().then(runAskedAction);
 }
 
-/** ?do=<actionId> (from the palette on another page): run it once its page is ready (at most 8 seconds), then drop it from the address. */
+
 function runAskedAction() {
     const params = new URLSearchParams(location.search);
     const id = params.get("do");
@@ -335,7 +335,7 @@ function runAskedAction() {
     const until = Date.now() + 8000;
     const tryIt = () => {
         if (availability(id) === true && !layerOpen()) { runAction(id); return; }
-        if (Date.now() < until) setTimeout(tryIt, 250); else runAction(id);       // the last try says why it could not run
+        if (Date.now() < until) setTimeout(tryIt, 250); else runAction(id);
     };
     tryIt();
 }

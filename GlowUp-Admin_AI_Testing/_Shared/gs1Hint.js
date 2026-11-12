@@ -1,19 +1,19 @@
-// Barcode hints for an admin who checks which company is behind a brand or a product. PURE logic: no page, no network,
-// so it runs in the browser and in the tests (tests/gs1.test.mjs).
-//
-//   gtinCheck(barcode)  the digits, and whether the last digit is the right GS1 check digit (a misread or mistyped
-//                       barcode fails it)
-//   gs1Office(barcode)  which national GS1 office issued the company number at the start of the barcode
-//   gs1Hint(barcode)    both, in words for the page
-//   VERIFIED_BY_GS1     GS1's free search page "Verified by GS1": it names the company that licenses a barcode (about 30
-//                       searches a day per person; GS1 offers no free API, so the page opens it for the admin)
-//
-// A HINT ONLY. The office says where the company number was issued, not where the product was made, and nothing here
-// proves who owns a website: the admin still confirms a brand's website by hand.
+
+
+
+
+
+
+
+
+
+
+
+
 
 export const VERIFIED_BY_GS1 = "https://gepir.gs1.org/";
 
-// [first, last, office] for the first three digits of a 13-digit barcode; office null = not a company number (note says what it is)
+
 const RANGES = [
     [0, 19, "GS1 US (United States and Canada)"], [20, 29, null, "a shop's own in-store number"], [30, 39, "GS1 US (United States and Canada)"],
     [40, 49, null, "a shop's own in-store number"], [50, 59, null, "a coupon number"], [60, 139, "GS1 US (United States and Canada)"],
@@ -31,7 +31,7 @@ const RANGES = [
     [978, 979, null, "a book number (ISBN)"], [980, 980, null, "a refund receipt number"], [981, 984, null, "a coupon number"], [990, 999, null, "a coupon number"]
 ];
 
-/** { digits, valid }: valid = 8, 12, 13 or 14 digits whose last digit is the GS1 check digit. */
+
 export function gtinCheck(barcode) {
     const digits = String(barcode == null ? "" : barcode).replace(/[^0-9]/g, "");
     if (![8, 12, 13, 14].includes(digits.length)) return { digits, valid: false };
@@ -40,7 +40,7 @@ export function gtinCheck(barcode) {
     return { digits, valid: (10 - (sum % 10)) % 10 === Number(digits[digits.length - 1]) };
 }
 
-/** { office, note }: the GS1 office that issued the company number ("" when not known), or what the number is instead. */
+
 export function gs1Office(barcode) {
     const digits = String(barcode == null ? "" : barcode).replace(/[^0-9]/g, "");
     if (digits.length === 8) return { office: "", note: "an 8-digit barcode (its office is not shown)" };
@@ -52,7 +52,7 @@ export function gs1Office(barcode) {
     return range[2] ? { office: range[2], note: "" } : { office: "", note: range[3] };
 }
 
-/** In words: "Valid barcode. Its company number was issued by GS1 Philippines." (and what that does not prove). */
+
 export function gs1Hint(barcode) {
     const check = gtinCheck(barcode);
     if (check.digits.length === 0) return { valid: false, office: "", text: "" };

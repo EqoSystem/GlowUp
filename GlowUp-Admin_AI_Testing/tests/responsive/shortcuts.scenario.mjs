@@ -1,21 +1,21 @@
-// Browser check of the keyboard shortcuts (9 November 2026): page scope, no firing while typing / with a window open / on key
-// repeat, the same conditions as the buttons, the "?" help, the command palette, focus coming back, and the Quick settings list
-// with the Add / Edit dialog (record, reason codes in the dialog, Test, Save, SAVE_FAILED, Discard changes?, delete, switch).
-// Headless Chrome only: Edge, Firefox and Safari must be checked by hand.   Run: node tests/responsive/shortcuts.scenario.mjs
+
+
+
+
 import { launch, openPage } from "./harness.mjs";
 
 let checks = 0, failed = 0;
 const ok = (good, what) => { checks++; if (!good) { failed++; console.log("FAILED: " + what); } };
 const openModals = (page) => page.locator(".modal-overlay[style*='flex']").count();
-// a key press sent to the focused element (for combos the real browser would keep for itself, like Ctrl+T)
+
 const synth = (page, init) => page.evaluate((init) => (document.activeElement || document.body).dispatchEvent(new KeyboardEvent("keydown", Object.assign({ bubbles: true, cancelable: true }, init))), init);
 
 const browser = await launch();
 try {
-    // ---------------------------------------------------------------- Inventory: running shortcuts
+
     const { page, errors, settle } = await openPage(browser, "inv", { width: 1440, height: 900 });
     await settle(1200);
-    await page.mouse.click(700, 880);                       // focus on the page, not in a box
+    await page.mouse.click(700, 880);
 
     await page.keyboard.press("?");
     await settle(200);
@@ -60,7 +60,7 @@ try {
     ok(await page.getAttribute("#chooseInventoryFileBtn", "aria-keyshortcuts") === "Control+Alt+I", "a bound button carries aria-keyshortcuts");
     ok(await page.getAttribute("#chooseInventoryFileBtn", "title") === null, "no hover label is added");
 
-    // command palette: opens, filters, keyboard, focus comes back
+
     await page.focus("#addMenuBtn");
     await page.keyboard.press("Control+KeyK");
     await settle(200);
@@ -79,14 +79,14 @@ try {
     await page.keyboard.press("Escape");
     await settle(300);
 
-    // ---------------------------------------------------------------- Quick settings › Keyboard shortcuts
+
     await page.click("#quickSettingsBtn");
     await settle(500);
     await page.locator(".settings-window .menu-item", { hasText: "Keyboard shortcuts" }).click();
     await settle(500);
     ok(await page.locator(".kb-group").count() === 6 && await page.locator(".kb-row").count() >= 15, "the list is grouped by page");
 
-    // switch Add brand off: the shortcut does nothing, it is kept in this browser
+
     const brandRow = page.locator(".kb-row", { hasText: "Add brand" });
     await brandRow.locator(".switch").click();
     await settle(400);
@@ -105,7 +105,7 @@ try {
     await page.locator(".kb-row", { hasText: "Add brand" }).locator(".switch").click();
     await settle(300);
 
-    // the Add dialog
+
     await page.locator(".kb-actions .btn.primary").click();
     await settle(300);
     ok(await page.locator(".kb-editor").count() === 1, "Add shortcut opens the dialog");
@@ -135,7 +135,7 @@ try {
     r = await reason({ code: "KeyR", key: "r", ctrlKey: true, altKey: true });
     ok(r.length >= 1 && r.every((m) => m.startsWith("IN_USE_SAME_PAGE:info")), "another page's combo is only a note: " + r[0]);
 
-    // the Test step: received, then saved
+
     await page.click("#kbRecord");
     await page.keyboard.press("Control+Alt+KeyJ");
     await settle(200);
@@ -146,7 +146,7 @@ try {
     ok(/Works in/.test(await page.textContent("#kbTest")), "G: received -> works");
     ok(!(await page.locator(".kb-editor [data-save]").isDisabled()), "Save is on after the Test");
 
-    // H: the save fails, the values stay, Retry saves
+
     await page.evaluate(() => { window.__FAIL_WRITES = "internal"; });
     await page.click(".kb-editor [data-save]");
     await settle(400);
@@ -158,7 +158,7 @@ try {
     ok(await page.locator(".kb-editor").count() === 0 && await page.locator(".kb-row", { hasText: "Sort" }).count() === 1, "Retry saves; the new shortcut is in the list");
     ok(await page.evaluate(() => document.activeElement && document.activeElement.dataset.kbFocus === "add"), "focus is back on Add shortcut");
 
-    // G: not received
+
     await page.locator(".kb-actions .btn.primary").click();
     await settle(300);
     await page.selectOption("#kbPage", "curator");
@@ -169,7 +169,7 @@ try {
     ok(/GlowUp didn't receive/.test(await page.textContent("#kbTest")) && await page.locator("#kbTest [data-code='TEST_NOT_RECEIVED']").count() === 1, "G: not received after 5 seconds");
     await page.locator("#kbTest button", { hasText: "Save anyway" }).click();
     ok(!(await page.locator(".kb-editor [data-save]").isDisabled()), "Save anyway allows saving");
-    // Discard changes?
+
     await page.keyboard.press("Escape");
     await settle(200);
     ok(await page.locator(".modal-content h3", { hasText: "Discard changes?" }).count() === 1, "closing a changed dialog asks Discard changes?");
@@ -180,7 +180,7 @@ try {
     await settle(500);
     ok(await page.locator(".kb-row", { hasText: "Sort" }).filter({ hasText: "May not work" }).count() === 1, "a shortcut saved anyway carries the warning in the list");
 
-    // delete: asks first, Esc keeps it
+
     const sortRow = page.locator(".kb-group[aria-label='Brand & Product Inventory'] .kb-row", { hasText: "Sort" });
     await sortRow.locator(".icon-btn.danger").click();
     await settle(200);
@@ -188,7 +188,7 @@ try {
     await page.keyboard.press("Escape");
     await settle(200);
     ok(await sortRow.count() === 1, "Esc on the question keeps the shortcut");
-    // offline: said once at the top, every change is locked (nothing is lost silently)
+
     await page.context().setOffline(true);
     await settle(300);
     ok(/You're offline/.test(await page.textContent(".keys-view")) && await page.locator(".kb-actions .btn.primary").isDisabled() && await page.locator(".kb-row .switch").first().isDisabled(), "offline: the list says so and locks the changes");
@@ -198,7 +198,7 @@ try {
     ok(errors.length === 0, "no page errors on Inventory: " + errors.slice(0, 3).join(" | "));
     await page.context().close();
 
-    // ---------------------------------------------------------------- page scope and unavailable actions
+
     const bin = await openPage(browser, "bin", { width: 1280, height: 720 });
     await bin.settle(1200);
     await bin.page.mouse.click(640, 700);

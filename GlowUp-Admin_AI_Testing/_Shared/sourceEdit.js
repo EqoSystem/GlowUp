@@ -1,20 +1,20 @@
-// What the Edit Product form and "apply to other products" do to a product's sources[]. PURE logic: no page, no network,
-// so tests/sourceEdit.test.mjs can check it.
-//
-// A source stays one line of text, "page title | https://address" (FIRESTORE_SCHEMA.md). Nothing new is stored; the roles are
-// worked out from the list each time:
-//   official   the line titled "Official website" (always first)
-//   primary    the first other line with a web address that can be edited
-//   secondary  every line after it (retailers and the like)
-//   locked     an FDA Philippines page, or a line with no web address ("Imported document: x.pdf"). Kept as it is, never edited.
+
+
+
+
+
+
+
+
+
 
 export const OFFICIAL_TITLE = "Official website";
 export const ROLES = { official: "Official website", primary: "Primary source", secondary: "Secondary source" };
-export const MAX_SOURCES = 10;                    // what the product form keeps
-export const MAX_SOURCES_RULE = 40;               // what firestore.rules accepts on a product
-export const BATCH_SIZE = 400;                    // Firestore takes at most 500 writes in one batch
+export const MAX_SOURCES = 10;
+export const MAX_SOURCES_RULE = 40;
+export const BATCH_SIZE = 400;
 
-// Bulk apply is ON ONLY for these brands until the first brand has been tried and reported. [] = every brand.
+
 export const BULK_PILOT_BRANDS = ["Maybelline New York"];
 const brandKey = (name) => String(name || "").trim().toLowerCase();
 export function bulkAllowed(brandName, pilot = BULK_PILOT_BRANDS) {
@@ -41,7 +41,7 @@ export function hostOf(url) {
     try { return new URL(url).hostname.replace(/^www\./, ""); } catch (error) { return ""; }
 }
 
-/** What an admin typed: { url } when it can be saved, { error } when it cannot. An empty box gives { url: "" }. */
+
 export function checkUrl(text) {
     const value = String(text == null ? "" : text).trim();
     if (!value) return { url: "" };
@@ -53,7 +53,7 @@ export function checkUrl(text) {
     return { url: value };
 }
 
-/** Where the official and the primary line are: an index, or -1. */
+
 export function rolesOf(list) {
     const lines = Array.isArray(list) ? list : [];
     return {
@@ -63,13 +63,13 @@ export function rolesOf(list) {
 }
 export const officialOf = (list) => { const at = rolesOf(list).official; return at >= 0 ? sourceUrl(list[at]) : ""; };
 
-/** Puts the official website first. The other lines stay, except one that holds the same address. An empty url removes the line. */
+
 export function withOfficial(list, url) {
     const rest = (list || []).filter((line) => !isOfficial(line) && !sameUrl(sourceUrl(line), url));
     return url ? [`${OFFICIAL_TITLE} | ${url}`, ...rest] : rest;
 }
 
-/** Replaces the primary line, or adds one right after the official line. Another line with the same address goes. */
+
 export function withPrimary(list, url) {
     const rest = (list || []).filter((line, at) => at === rolesOf(list).primary || !sameUrl(sourceUrl(line), url));
     const { primary, official } = rolesOf(rest);
@@ -82,7 +82,7 @@ export function withPrimary(list, url) {
     return [...rest.slice(0, where), line, ...rest.slice(where)];
 }
 
-/** Adds a line at the end, unless the product has that address already. */
+
 export function withSecondary(list, url) {
     const lines = (list || []).slice();
     return lines.some((line) => sameUrl(sourceUrl(line), url)) ? lines : [...lines, `${hostOf(url)} | ${url}`];
@@ -90,7 +90,7 @@ export function withSecondary(list, url) {
 
 export const applyRole = (list, role, url) => (role === "official" ? withOfficial(list, url) : role === "primary" ? withPrimary(list, url) : withSecondary(list, url));
 
-/** One row of the form was edited. An empty url removes the row. A new site gets its own name as the title; the same site keeps its title. */
+
 export function setRow(list, index, url) {
     const lines = (list || []).slice();
     if (!url) { lines.splice(index, 1); return lines; }
@@ -101,10 +101,10 @@ export function setRow(list, index, url) {
     return lines;
 }
 
-/**
- * What applying `url` as `role` would do to the chosen products: `change` will be written, `same` has it already, `full` cannot
- * take one more line. Products that were not chosen are not looked at. Each entry of change: { id, name, before, after }.
- */
+
+
+
+
 export function planApply(products, chosenIds, role, url) {
     const chosen = chosenIds instanceof Set ? chosenIds : new Set(chosenIds);
     const plan = { change: [], same: [], full: [] };
@@ -119,14 +119,14 @@ export function planApply(products, chosenIds, role, url) {
     return plan;
 }
 
-/** The list in pieces of at most `size`, for Firestore's batches. */
+
 export function chunks(list, size = BATCH_SIZE) {
     const out = [];
     for (let at = 0; at < list.length; at += size) out.push(list.slice(at, at + size));
     return out;
 }
 
-/** The products in A to Z order and the slice for one page: the whole list is sorted first, then cut. */
+
 export function brandPageOf(products, page, size) {
     const sorted = (products || []).slice().sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" }));
     const pages = Math.max(1, Math.ceil(sorted.length / size));
@@ -134,7 +134,7 @@ export function brandPageOf(products, page, size) {
     return { rows: sorted.slice((now - 1) * size, now * size), page: now, pages, total: sorted.length, showPager: sorted.length > size, showSizes: sorted.length > 10 };
 }
 
-/** Products grouped by cosmetic type: groups A to Z (no type last), products A to Z inside each. Nothing is paged. */
+
 export function groupByType(products) {
     const groups = new Map();
     (products || []).forEach((p) => {

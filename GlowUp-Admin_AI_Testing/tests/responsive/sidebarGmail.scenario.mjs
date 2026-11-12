@@ -1,4 +1,4 @@
-// Browser check for the header-led navigation. Run: node tests/responsive/sidebarGmail.scenario.mjs
+
 import { launch, openPage } from "./harness.mjs";
 let checks = 0, failed = 0;
 const ok = (good, what) => { checks++; if (!good) { failed++; console.log("FAILED: " + what); } };

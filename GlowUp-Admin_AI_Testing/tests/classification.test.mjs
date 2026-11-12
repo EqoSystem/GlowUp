@@ -1,6 +1,6 @@
-// Checks of ingredient classifications and of the one-time field change (_Shared/classificationRules.js), plus source checks of the Curator
-// and of the rules file. No browser and no network: the windows themselves are not clicked here.
-//   Run: node tests/classification.test.mjs
+
+
+
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -12,7 +12,7 @@ let checks = 0, failed = 0;
 const check = (ok, what) => { checks++; if (!ok) { failed++; console.log("FAILED: " + what); } };
 const equal = (a, b, what) => check(JSON.stringify(a) === JSON.stringify(b), `${what} (got ${JSON.stringify(a)})`);
 
-// ---- the list
+
 const list = startingList();
 equal(list.length, 23, "the starting list has 23 classifications");
 equal(new Set(list.map((c) => c.id)).size, 23, "every classification has its own id");
@@ -21,7 +21,7 @@ equal(startingList(), list, "the ids are the same every time, so seeding twice c
 equal(STARTING_NAMES.includes("Filler / Bulking agent"), true, "a name with a slash is in the list");
 equal(STARTING_NAMES.length, new Set(STARTING_NAMES.map(nameKey)).size, "no starting name is there twice");
 equal(STARTING_NAMES[STARTING_NAMES.length - 1], "Other", '"Other" is last');
-// seeding again: only what is missing, nothing duplicated, nothing removed or renamed
+
 equal(missingStarting(list).length, 0, "a full list has nothing missing: running it twice adds nothing");
 const partial = [{ id: "mine", name: "  preservative " }, { id: "other", name: "Everything else" }, { id: "custom", name: "My own" }];
 const added = missingStarting(partial);
@@ -39,7 +39,7 @@ check(/CLASSIFICATION_REQUIRED_ON_EXISTING \|\| !lacksClass\(existing\)/.test(js
 check(/if \(TEST_MODE\) \{ setFormError/.test(js2) && /if \(TEST_MODE\) \{ toast/.test(shared), "on a test address saving an ingredient and the field change are switched off");
 
 
-// ---- names
+
 equal(checkName(list, "preservative", null), "This classification already exists", "capital letters do not make a new name");
 equal(checkName(list, "  Preservative  ", null), "This classification already exists", "extra spaces do not make a new name");
 equal(checkName(list, "Chelating   agent", null), "This classification already exists", "extra spaces inside do not make a new name");
@@ -51,12 +51,12 @@ equal(nameKey(" A   b "), "a b", "the key ignores capitals and spaces");
 equal(canRemove("other"), false, '"Other" cannot be removed');
 equal(canRemove("preservative"), true, "the others can be removed");
 
-// ---- usage
+
 const items = [{ id: "a", classificationId: "binder" }, { id: "b", classificationId: "binder", binned: true }, { id: "c", classificationId: "" }, { id: "d", classificationId: "gone" }];
 equal(usersOf(items, "binder").length, 2, "an ingredient in the Recycle bin counts too: restoring it must not point at a deleted classification");
 equal(items.map((i) => needsClassification(i, list)), [false, false, true, true], "empty, or pointing at a deleted one, needs a classification");
 
-// ---- the move of an old INCI value
+
 equal(aliasesWithInci("Salt", "Sodium Chloride", []), ["Sodium Chloride"], "a different value becomes an alias");
 equal(aliasesWithInci("PHENOXYETHANOL", "Phenoxyethanol", []), [], "only capitals differ: no alias");
 equal(aliasesWithInci("Salt", "sodium  chloride", ["Sodium Chloride"]), ["Sodium Chloride"], "no duplicates");
@@ -65,7 +65,7 @@ equal(aliasesWithInci("Salt", "", ["NaCl"]), ["NaCl"], "no old value, nothing ch
 equal(firstAlias({ aliases: ["NaCl", "x"] }), "NaCl", "the first alias is the common name");
 equal(firstAlias({ aliases: [] }), "", "no alias, no common name");
 
-// ---- the plan
+
 const documents = [
     { id: "moves", name: "Salt", techName: "Sodium Chloride", aliases: [] },
     { id: "same", name: "Water", techName: "WATER", aliases: [] },
@@ -86,7 +86,7 @@ equal(migrationPlan([{ id: "x", name: "Y", techName: "Z", classificationId: "bin
 equal(migrationWaits(documents.slice(4), []), true, "without the list the change still waits");
 equal(migrationWaits(documents.slice(4), list), false, "with the list and nothing to move it is finished");
 
-// ---- the test copy: only the live site writes the real list
+
 equal(collectionFor("glowup-admin-snowy.vercel.app"), "ingredientClassifications", "the live site uses the real list");
 equal(collectionFor("glowup-admin-test.vercel.app"), "ingredientClassificationsTest", "a preview uses the test list");
 equal(collectionFor("localhost"), "ingredientClassificationsTest", "localhost uses the test list");
@@ -97,9 +97,9 @@ equal([CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING], [fals
 check(/const users = TEST_MODE \? \[\] : usersOf/.test(shared), "on a test address removing a classification writes no live ingredient");
 check(/AUTO_APPROVE_AI && !TEST_MODE/.test(js2), "on a test address the automatic approval writes no live ingredient");
 
-// ---- the page
+
 const js = read("_Admin_Ingredient_Curator/adminIngredientCurator.js"), html = read("_Admin_Ingredient_Curator/adminIngredientCurator.html");
-// (shared is read above)
+
 check(/<label for="ingredientNameInput">INCI name/.test(html), 'the name box is called "INCI name"');
 check(!/ingredientTechInput/.test(html + js), "the old INCI box is gone");
 check(/<select id="ingredientClassInput"[^>]*>/.test(html), "the classification is a drop-down, not free text");
@@ -115,7 +115,7 @@ check(migration.indexOf("downloadBackup(documents);") < migration.indexOf("batch
 check(/classifications\(\)\.length === 0/.test(js) && /addStartingClassifications\(\)/.test(js), "an empty database gets the starting list once, when the Curator opens");
 check(/makeCombo\(select\)/.test(js) && /data-add/.test(js) && /placeholder\.disabled = true/.test(js), "the dropdown is the site's own: placeholder not selectable, + Add under a line");
 
-// ---- the rules
+
 const rules = read("firestore.rules");
 const block = rules.split("match /ingredientClassifications/")[1].split("match /")[0];
 check(/allow read: if true/.test(block), "everyone reads the classifications (the app shows them)");

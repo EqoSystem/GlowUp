@@ -6,19 +6,17 @@
     <title>GlowUp Admin - Recycle Bin</title>
     <link rel="icon" type="image/png" sizes="32x32" href="../_Shared/assets/glowup-icon-32.png">
     <script>
-        // dark or light before anything is drawn: the person's choice, else the computer's own setting
         (function () {
             var t = null;
             try { t = localStorage.getItem("glowup.theme"); } catch (e) { }
             if (t !== "light" && t !== "dark") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
             document.documentElement.dataset.theme = t;
         })();
-        // if the sign-in check never answers (no internet), say so instead of leaving a blank page
         setTimeout(function () {
             if (document.documentElement.classList.contains("auth-pending")) document.documentElement.classList.add("auth-stuck");
         }, 10000);
     </script>
-    <!-- the files this page needs are fetched side by side, not one after the other as each one names the next -->
+
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js">
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js">
@@ -38,9 +36,9 @@
 <body>
 
     <main class="main-content" data-title="Recycle Bin" data-subtitle="What was removed: bring it back, or delete it for good">
-        <!-- draws the menu and the top bar with the first picture: see pageFrame.js -->
+
         <script src="../_Shared/pageFrame.js"></script>
-        <!-- the shared header controls: see placeHeaderParts in adminShell.js -->
+
         <div data-header-parts hidden>
                     <div class="segmented header-tabs" id="binTabs" role="tablist" aria-label="What to show">
                         <button type="button" class="seg" role="tab" data-kind="ingredients"><i data-icon="flask"></i>Ingredients <span class="tab-count" id="countIngredients"></span></button>
@@ -58,17 +56,17 @@
         </div>
         <div class="board">
 
-            <!-- the removed entries -->
+
             <section class="panel" data-source="bin" data-panel="list" data-label="Removed entries" data-w="12" data-no-fold>
                 <div class="panel-head">
                     <button type="button" class="pick" id="binPickAll" role="checkbox" aria-checked="false" aria-label="Select all shown" data-tip="Select every entry shown here."></button>
                     <h3 class="panel-title" id="binTitle">Removed ingredients</h3>
                     <span class="panel-count" id="binCountLine"></span>
                     <span class="spacer"></span>
-                    <!-- data-head-end: the "..." of the panel goes in front of the pager -->
+
                     <div class="pager" id="binPagerTop" data-head-end></div>
                 </div>
-                <!-- shows while entries are picked -->
+
                 <div class="w-bar sel-bar" id="binBar" hidden>
                     <b id="binBarCount">0 selected</b>
                     <span class="spacer"></span>

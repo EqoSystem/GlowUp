@@ -1,4 +1,4 @@
-// In-memory Firestore stand-in for layout tests. Data comes from window.__SEED; latency from window.__LAT.read (ms).
+
 const LAT = () => (window.__LAT && window.__LAT.read) || 0;
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -24,7 +24,7 @@ function revive(v) {
     }
     return v;
 }
-const store = new Map();       // path -> data
+const store = new Map();
 (function seed() {
     const s = window.__SEED || {};
     for (const col in s) for (const id in s[col]) store.set(col + "/" + id, revive(s[col][id]));
