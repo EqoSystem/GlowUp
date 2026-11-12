@@ -1,5 +1,8 @@
 using System;
-using System.Text;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Firebase.Auth;
+using Firebase.Firestore;
 using GlowUp.Common;
 using GlowUp.Data;
 using GlowUp.Scan;
@@ -11,92 +14,359 @@ using UnityEngine.UI;
 namespace GlowUp.AppSettings
 {
     /// <summary>
-    /// Contact Support / Feedback: a short form (what it is about, a message, and optionally the last
-    /// scan) that opens the phone's email app with the report already written, addressed to the support
-    /// email typed here in the Inspector. The report is also copied, so it can be pasted anywhere if the
-    /// phone has no email app.
-    ///
-    /// SET "Support Email" in the Inspector. While it is empty the form can only copy the report.
+    /// Contact Support / Feedback Form (Firebase Firestore free tier).
+    /// Sends reports directly to the "supportReports" collection in Firestore.
+    /// Every submission outcome displays a centered modal popup (via CenteredFeedbackPopup)
+    /// to ensure no code path ends silently.
     /// </summary>
     public class SupportFeedbackForm : MonoBehaviour
     {
+        public const string Collection = "supportReports";
+
         [SerializeField] private OverlayPanel panel;
-        [Tooltip("Tab 0, 1, 2 = the three kinds of report, named in Category Names")]
+        [Tooltip("Tab 0, 1, 2, 3 = the categories of report, named in Category Names")]
         [SerializeField] private ChoiceTabs categoryTabs;
         [SerializeField] private TMP_InputField messageInput;
         [SerializeField] private Toggle includeLastScanToggle;
         [SerializeField] private Button sendButton;
         [SerializeField] private TextMeshProUGUI feedbackText;
 
-        [Header("Where reports go")]
-        [Tooltip("The address reports are sent to, e.g. support@yourdomain.com")]
-        [SerializeField] private string supportEmail = "";
-        [Tooltip("{0} = the kind of report")]
-        [SerializeField] private string subjectFormat = "GlowUp feedback: {0}";
-        [SerializeField] private string[] categoryNames = { "Bug", "Wrong scan result", "Other" };
-        [Tooltip("The shortest message that is accepted")]
-        [SerializeField] private int minimumCharacters = 10;
+        [Header("Report Settings")]
+        [SerializeField] private string[] categoryNames = { "Bug", "Wrong scan result", "Suggestion", "Other" };
+        [SerializeField] private int minimumCharacters = 3;
+        [SerializeField] private int maximumCharacters = 2000;
         [Tooltip("The scan's ingredient list is cut after this many characters")]
         [SerializeField] private int maximumScanCharacters = 1200;
+        [Tooltip("Timeout in seconds before treating Firestore write as queued offline")]
+        [SerializeField] private float sendTimeoutSeconds = 8f;
+        [Tooltip("How long the success popup remains visible before auto-closing (seconds)")]
+        [SerializeField] private float autoCloseSuccessSeconds = 2.5f;
 
-        [Header("Wording")]
-        [SerializeField] private string msgTooShort = "Please describe the problem in a sentence or two.";
-        [SerializeField] private string msgOpened = "Your email app is opening with the report. It was also copied, in case the email app does not open.";
-        [SerializeField] private string msgCopiedOnly = "The report was copied. Paste it into a message to the GlowUp team.";
+        [Header("Outcome Messages")]
+        [SerializeField] private string msgSuccess = "Report sent. Thank you for helping us improve GlowUp.";
+        [SerializeField] private string msgValidation = "Please choose a category and describe what happened.";
+        [SerializeField] private string msgFailure = "We couldn't send your report. Please try again.";
+        [SerializeField] private string msgTimeout = "No connection right now. Your report will be sent when you're back online.";
+        [SerializeField] private string msgSending = "Sending...";
+        [SerializeField] private string defaultSendButtonText = "Send Report";
+
+        // State tracking
+        private string currentReportDocId;
+        private bool sending;
+        private TextMeshProUGUI sendLabel;
+        private CenteredFeedbackPopup popup;
+        private string pendingPopupMessage;
+        private string pendingPopupTitle;
+        private Action pendingPopupAction;
+        private float pendingPopupAutoClose;
 
         void Awake()
         {
-            if (sendButton != null) sendButton.onClick.AddListener(Send);
-            if (panel != null) panel.Closed += () => Say("");          // the next time the form opens it starts clean
-        }
-
-        void Start() { Say(""); }
-
-        void Send()
-        {
-            string message = messageInput != null ? (messageInput.text ?? "").Trim() : "";
-            if (message.Length < Mathf.Max(1, minimumCharacters)) { Say(msgTooShort); return; }
-
-            int index = categoryTabs != null ? categoryTabs.SelectedIndex : 0;
-            string category = categoryNames != null && index >= 0 && index < categoryNames.Length ? categoryNames[index] : "Feedback";
-            string subject = string.Format(subjectFormat, category);
-            string body = Compose(category, message);
-
-            GUIUtility.systemCopyBuffer = subject + "\n\n" + body;
-            if (string.IsNullOrWhiteSpace(supportEmail)) { Say(msgCopiedOnly); return; }
-
-            Application.OpenURL("mailto:" + supportEmail.Trim() + "?subject=" + Uri.EscapeDataString(subject) + "&body=" + Uri.EscapeDataString(body));
-            Say(msgOpened);
-            if (messageInput != null) messageInput.text = "";
-        }
-
-        string Compose(string category, string message)
-        {
-            var body = new StringBuilder();
-            body.Append(message).Append("\n\n----\n");
-            body.Append("About: ").Append(category).Append('\n');
-            body.Append("App version: ").Append(Application.version).Append('\n');
-            body.Append("Phone: ").Append(SystemInfo.deviceModel).Append(", ").Append(SystemInfo.operatingSystem).Append('\n');
-            string uid = UserProfileRepository.ActiveUid;
-            if (!string.IsNullOrEmpty(uid)) body.Append("Account ID: ").Append(uid).Append('\n');
-
-            if (includeLastScanToggle != null && includeLastScanToggle.isOn)
+            if (sendButton != null)
             {
-                ScanRecord scan = ScanSession.Current;
-                if (scan == null) { var saved = ScanHistoryRepository.Active(); if (saved.Count > 0) scan = saved[0]; }
-                if (scan != null)
+                sendButton.onClick.AddListener(() => _ = SendReportAsync());
+                sendLabel = sendButton.GetComponentInChildren<TextMeshProUGUI>(true);
+            }
+
+            if (panel != null)
+            {
+                panel.Closed += OnPanelClosed;
+            }
+
+            EnsureReportDocId();
+        }
+
+        void OnEnable()
+        {
+            EnsureReportDocId();
+            CheckPendingPopup();
+        }
+
+        void OnApplicationFocus(bool hasFocus)
+        {
+            if (hasFocus) CheckPendingPopup();
+        }
+
+        void OnApplicationPause(bool pauseStatus)
+        {
+            if (!pauseStatus) CheckPendingPopup();
+        }
+
+        /// <summary>
+        /// Generates a unique document ID for this report session if one does not exist.
+        /// Reusing this ID makes retries safe and avoids duplicate documents in Firestore.
+        /// </summary>
+        private void EnsureReportDocId()
+        {
+            if (string.IsNullOrEmpty(currentReportDocId))
+            {
+                currentReportDocId = Guid.NewGuid().ToString("N");
+                Debug.Log($"[SupportReport] Generated report session docId={currentReportDocId}");
+            }
+        }
+
+        private CenteredFeedbackPopup Popup
+        {
+            get
+            {
+                if (popup == null) popup = CenteredFeedbackPopup.Get(transform);
+                return popup;
+            }
+        }
+
+        private void ShowCenteredPopup(string title, string message, string okText = "OK", float autoCloseSeconds = 0f, Action onClosed = null)
+        {
+            if (!Application.isPlaying) return;
+
+            // If app is not in foreground or popup cannot be shown immediately, store as pending
+            if (!Application.isFocused)
+            {
+                pendingPopupTitle = title;
+                pendingPopupMessage = message;
+                pendingPopupAutoClose = autoCloseSeconds;
+                pendingPopupAction = onClosed;
+                return;
+            }
+
+            var p = Popup;
+            if (p != null)
+            {
+                p.Show(title, message, okText, autoCloseSeconds, onClosed);
+            }
+            else
+            {
+                Debug.LogWarning($"[SupportReport] CenteredFeedbackPopup unavailable on root canvas. Message: {message}");
+            }
+        }
+
+        private void CheckPendingPopup()
+        {
+            if (!string.IsNullOrEmpty(pendingPopupMessage))
+            {
+                string t = pendingPopupTitle;
+                string m = pendingPopupMessage;
+                float ac = pendingPopupAutoClose;
+                Action a = pendingPopupAction;
+
+                pendingPopupTitle = null;
+                pendingPopupMessage = null;
+                pendingPopupAutoClose = 0f;
+                pendingPopupAction = null;
+
+                ShowCenteredPopup(t, m, "OK", ac, a);
+            }
+        }
+
+        private void OnPanelClosed()
+        {
+            // If the user closed the panel during an active send, do not discard fields yet;
+            // the centered popup is on the root canvas and will still notify them of the result.
+            if (!sending && string.IsNullOrEmpty(currentReportDocId))
+            {
+                EnsureReportDocId();
+            }
+        }
+
+        /// <summary>
+        /// Main handler for sending the support report to Firebase Firestore.
+        /// Enforces validation, single-ID idempotency, timeout detection, and centered UI feedback.
+        /// </summary>
+        public async Task SendReportAsync()
+        {
+            // Prevent double taps
+            if (sending) return;
+
+            string message = messageInput != null ? (messageInput.text ?? "").Trim() : "";
+            int selectedCategoryIndex = categoryTabs != null ? categoryTabs.SelectedIndex : -1;
+
+            // 1. VALIDATION: Check category and message
+            bool categoryValid = selectedCategoryIndex >= 0 && categoryNames != null && selectedCategoryIndex < categoryNames.Length;
+            bool descriptionValid = !string.IsNullOrEmpty(message) && message.Length >= Mathf.Max(1, minimumCharacters);
+
+            if (!categoryValid || !descriptionValid)
+            {
+                Debug.Log("[SupportReport] Validation failed: Category unselected or description empty.");
+                ShowCenteredPopup("Incomplete Report", msgValidation, "OK");
+                return; // Keep form open, keep existing input intact
+            }
+
+            if (message.Length > maximumCharacters)
+            {
+                message = message.Substring(0, maximumCharacters);
+            }
+
+            string category = categoryNames[selectedCategoryIndex];
+
+            // 2. PREPARE SENDING STATE
+            sending = true;
+            if (sendButton != null) sendButton.interactable = false;
+            if (sendLabel != null) sendLabel.text = msgSending;
+
+            EnsureReportDocId();
+            string docId = currentReportDocId;
+
+            try
+            {
+                // Retrieve authenticated user info if available
+                string uid = "anonymous";
+                string userName = "GlowUp User";
+                try
                 {
-                    body.Append("\nLast scan: ").Append(scan.Title);
-                    if (!string.IsNullOrWhiteSpace(scan.brandName)) body.Append(" (").Append(scan.brandName).Append(')');
-                    body.Append("\nResult shown: ").Append(scan.status).Append(". ").Append(scan.summary).Append('\n');
-                    string ingredients = scan.ingredients != null ? string.Join(", ", scan.ingredients) : "";
-                    if (ingredients.Length > maximumScanCharacters) ingredients = ingredients.Substring(0, Mathf.Max(0, maximumScanCharacters)) + "...";
-                    body.Append("Ingredients read: ").Append(ingredients).Append('\n');
+                    if (await FirebaseBootstrap.Ready && FirebaseAuth.DefaultInstance != null && FirebaseAuth.DefaultInstance.CurrentUser != null)
+                    {
+                        var user = FirebaseAuth.DefaultInstance.CurrentUser;
+                        uid = user.UserId;
+                        userName = WhoSent(user);
+                    }
+                }
+                catch (Exception authEx)
+                {
+                    Debug.LogWarning("[SupportReport] Auth check warning: " + authEx.Message);
+                }
+
+                // Build report data dictionary
+                var reportData = new Dictionary<string, object>
+                {
+                    { "reportId", docId },
+                    { "uid", uid },
+                    { "userName", userName },
+                    { "category", category },
+                    { "message", message },
+                    { "status", "new" },
+                    { "appVersion", Application.version ?? "1.0" },
+                    { "device", $"{SystemInfo.deviceModel}, {SystemInfo.operatingSystem}".Trim() },
+                    { "createdAtUnix", DateTimeOffset.UtcNow.ToUnixTimeSeconds() },
+                    { "createdAt", FieldValue.ServerTimestamp }
+                };
+
+                // Requirement 7: Include last scan if requested; if attaching fails, still proceed
+                try
+                {
+                    Dictionary<string, object> scanData = LastScan();
+                    if (scanData != null)
+                    {
+                        reportData["lastScan"] = scanData;
+                    }
+                }
+                catch (Exception scanEx)
+                {
+                    Debug.LogWarning("[SupportReport] Error extracting last scan details (continuing anyway): " + scanEx.Message);
+                }
+
+                Debug.Log($"[SupportReport] Initiating Firestore write docId={docId}, category={category}, length={message.Length}");
+
+                // 3. EXECUTE FIRESTORE WRITE WITH 8-SECOND TIMEOUT WATCHDOG
+                var firestore = FirebaseFirestore.DefaultInstance;
+                var docRef = firestore.Collection(Collection).Document(docId);
+                Task writeTask = docRef.SetAsync(reportData);
+
+                Task timeoutTask = Task.Delay(TimeSpan.FromSeconds(sendTimeoutSeconds));
+                Task completedTask = await Task.WhenAny(writeTask, timeoutTask);
+
+                if (completedTask == timeoutTask)
+                {
+                    // TIMEOUT: Firestore queues offline writes and will sync when back online
+                    Debug.Log($"[SupportReport] Network timeout after {sendTimeoutSeconds}s. Offline sync queued for docId={docId}");
+                    ShowCenteredPopup(
+                        "Offline Mode",
+                        msgTimeout,
+                        "OK"
+                    );
+                    // Do not clear fields and do not reset doc ID so retry will target the same document
+                }
+                else
+                {
+                    // Await writeTask to capture any genuine exception (e.g., permission denied)
+                    await writeTask;
+
+                    Debug.Log($"[SupportReport] Success: Document written to {Collection}/{docId}");
+
+                    // SUCCESS OUTCOME
+                    ShowCenteredPopup(
+                        "Success",
+                        msgSuccess,
+                        "OK",
+                        autoCloseSuccessSeconds,
+                        onClosed: () =>
+                        {
+                            // Clear form fields
+                            if (messageInput != null) messageInput.text = "";
+                            if (categoryTabs != null) categoryTabs.Select(0, false);
+                            currentReportDocId = null; // Generate a fresh ID for the next report
+                            if (panel != null && panel.IsOpen) panel.Hide();
+                        }
+                    );
                 }
             }
-            return body.ToString();
+            catch (Exception ex)
+            {
+                // FAILURE OUTCOME (permission-denied, server exception, etc.)
+                Debug.Log($"[SupportReport] Failure writing report docId={docId}. Exception: {ex.Message}");
+                ShowCenteredPopup(
+                    "Send Error",
+                    msgFailure,
+                    "OK"
+                );
+                // Keep the form open, KEEP currentReportDocId and user input intact for retry
+            }
+            finally
+            {
+                // Reset button state
+                sending = false;
+                if (sendButton != null) sendButton.interactable = true;
+                if (sendLabel != null) sendLabel.text = defaultSendButtonText;
+            }
         }
 
-        void Say(string message) { if (feedbackText != null) feedbackText.text = message; }
+        /// <summary>
+        /// Gathers display name from UserProfileRepository or Firebase User.
+        /// </summary>
+        private static string WhoSent(FirebaseUser user)
+        {
+            try
+            {
+                UserProfileData profile = UserProfileRepository.Current;
+                string name = profile != null ? ($"{profile.firstName ?? ""} {profile.lastName ?? ""}".Trim()) : "";
+                if (string.IsNullOrEmpty(name) && user != null) name = (user.DisplayName ?? "").Trim();
+                if (string.IsNullOrEmpty(name) && user != null) name = (user.Email ?? "").Trim();
+                return string.IsNullOrEmpty(name) ? "GlowUp User" : (name.Length > 100 ? name.Substring(0, 100) : name);
+            }
+            catch
+            {
+                return "GlowUp User";
+            }
+        }
+
+        /// <summary>
+        /// Reads the user's most recent scan record if "Include my last scan" toggle is active.
+        /// </summary>
+        private Dictionary<string, object> LastScan()
+        {
+            if (includeLastScanToggle == null || !includeLastScanToggle.isOn) return null;
+
+            ScanRecord scan = ScanSession.Current;
+            if (scan == null)
+            {
+                var saved = ScanHistoryRepository.Active();
+                if (saved != null && saved.Count > 0) scan = saved[0];
+            }
+
+            if (scan == null) return null;
+
+            string ingredients = scan.ingredients != null ? string.Join(", ", scan.ingredients) : "";
+            if (ingredients.Length > maximumScanCharacters)
+            {
+                ingredients = ingredients.Substring(0, Mathf.Max(0, maximumScanCharacters)) + "...";
+            }
+
+            return new Dictionary<string, object>
+            {
+                { "product", scan.Title ?? "" },
+                { "brand", scan.brandName ?? "" },
+                { "result", scan.status ?? "" },
+                { "summary", scan.summary ?? "" },
+                { "ingredients", ingredients }
+            };
+        }
     }
 }
