@@ -73,6 +73,7 @@ namespace GlowUp.AR
         [SerializeField] private bool flipBeforePicture = false;
 
         [Header("Guided preview (used whenever live tracking is not possible)")]
+        [Tooltip("The guided preview temporarily requests 960 x 540 from this feed, then restores its prior request when tracking stops.")]
         [SerializeField] private CameraFeedController guidedCamera;
         [Tooltip("On = the guided preview finds the face in the camera picture with the phone's own face finder (MediaPipe, ArGuidedFace) and draws the make-up on it, so the colour follows the face on every phone. Off = the fixed face outline.")]
         [SerializeField] private bool followFaceInGuidedPreview = true;
@@ -138,6 +139,9 @@ namespace GlowUp.AR
         public event Action FollowsFaceChanged;
         ArGuidedFace guidedFace;
         float lastCameraFrameAt, lastFaceUpdateAt, previousCameraFrameAt, estimatedCameraFps;
+        Vector2Int originalGuidedCameraSize;
+        bool hasOriginalGuidedCameraSize;
+        const int GuidedCameraWidth = 960, GuidedCameraHeight = 540;
 
         const string GuardName = "ar-live-tracking";
         static bool reloadedAfterPermission;
@@ -245,6 +249,7 @@ namespace GlowUp.AR
                     return wide != null && wide.Length > 0;
                 }
             }
+
             catch (Exception e) { Debug.LogWarning("AR Try-On: could not read the phone's processor type: " + e.Message); return true; }
 #else
             return false;
@@ -448,7 +453,16 @@ namespace GlowUp.AR
             if (quality != null) quality.EndSession();
             Debug.Log("[GlowUp] AR Try-On uses the guided preview: " + reason + ".");
             if (faceGuide != null) faceGuide.SetActive(true);
-            if (guidedCamera != null) guidedCamera.StartCamera();
+            if (guidedCamera != null)
+            {
+                if (!hasOriginalGuidedCameraSize)
+                {
+                    originalGuidedCameraSize = guidedCamera.RequestedSize;
+                    hasOriginalGuidedCameraSize = true;
+                }
+                guidedCamera.SetRequestedSize(GuidedCameraWidth, GuidedCameraHeight);
+                guidedCamera.StartCamera();
+            }
             StartGuidedFace();
             ModeDecided?.Invoke(false);
             if (!string.IsNullOrEmpty(noteForTheUser) && isActiveAndEnabled) StartCoroutine(ShowNote(noteForTheUser));
@@ -482,7 +496,15 @@ namespace GlowUp.AR
         void StopGuidedFace()
         {
             if (guidedFace != null) guidedFace.End();
+            RestoreGuidedCameraSize();
             if (!IsLive && overlay != null) overlay.End();
+        }
+
+        void RestoreGuidedCameraSize()
+        {
+            if (!hasOriginalGuidedCameraSize || guidedCamera == null) return;
+            guidedCamera.SetRequestedSize(originalGuidedCameraSize.x, originalGuidedCameraSize.y);
+            hasOriginalGuidedCameraSize = false;
         }
 
         // shown once the guided camera is running (its own start-up message comes first)

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using GlowUp.AR;
+using GlowUp.Scan;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -136,6 +137,24 @@ namespace GlowUp.Tests
             pace.SetManualIndex(-1);
             for (int i = 0; i < 32; i++) pace.Report(80f);
             Assert.AreEqual(192, pace.MaxSide);
+        }
+
+        [Test]
+        public void GuidedCameraRequestCanBeReducedAndRestored()
+        {
+            var cameraObject = new GameObject("Camera feed request test");
+            try
+            {
+                CameraFeedController feed = cameraObject.AddComponent<CameraFeedController>();
+                Assert.AreEqual(new Vector2Int(1280, 720), feed.RequestedSize);
+
+                feed.SetRequestedSize(960, 540);
+                Assert.AreEqual(new Vector2Int(960, 540), feed.RequestedSize);
+
+                feed.SetRequestedSize(1280, 720);
+                Assert.AreEqual(new Vector2Int(1280, 720), feed.RequestedSize);
+            }
+            finally { Object.DestroyImmediate(cameraObject); }
         }
     }
 }

@@ -85,6 +85,8 @@ namespace GlowUp.AR
         int frameSkip, adaptiveFrameSkip, lastSubmittedFrame, lastObservedFrame, resolutionPreset = -1;
         bool adaptiveReduceHighlights;
         float frameTimeAverage, slowBudgetSeconds, fastBudgetSeconds;
+        float readerBusySince = -1f, nextReaderRestartAt;
+        int readerRecoveries;
         readonly GuidedFacePace pace = new GuidedFacePace();
         float nextLook;
         float submittedFrameTimestamp, resultFrameTimestamp;
@@ -124,6 +126,8 @@ namespace GlowUp.AR
             (resolutionPreset == 0 ? "Low " : resolutionPreset == 1 ? "Medium " : "High ") + pace.ResolutionLabel;
         public int CameraWidth => feed != null ? feed.PictureSize.x : 0;
         public int CameraHeight => feed != null ? feed.PictureSize.y : 0;
+        public int CameraRequestedWidth => feed != null ? feed.RequestedSize.x : 0;
+        public int CameraRequestedHeight => feed != null ? feed.RequestedSize.y : 0;
         public float CameraTimestampMs => feed != null ? feed.LastFrameTimestamp * 1000f : 0f;
         public float CameraFpsEstimate => feed != null ? feed.FrameRateEstimate : 0f;
         public float LandmarkTimestampMs => resultFrameTimestamp * 1000f;
@@ -131,6 +135,7 @@ namespace GlowUp.AR
         public int LagFrames => Mathf.RoundToInt(LandmarkAgeMs * CameraFpsEstimate / 1000f);
         public float InferenceMilliseconds => lastInferenceMilliseconds;
         public float MeshUpdateMilliseconds => meshUpdateMilliseconds;
+        public int ReaderRecoveries => readerRecoveries;
         public float MinCutoff => filterSettings != null ? filterSettings.minCutoff : steadiness;
         public float Beta => filterSettings != null ? filterSettings.beta : quickness;
 
@@ -181,6 +186,7 @@ namespace GlowUp.AR
             lastSubmittedFrame = 0; lastObservedFrame = 0; submittedFrameTimestamp = resultFrameTimestamp = 0f;
             lastInferenceMilliseconds = meshUpdateMilliseconds = 0f; havePreviousFiltered = false;
             frameTimeAverage = 0f; slowBudgetSeconds = fastBudgetSeconds = 0f; adaptiveFrameSkip = 0; adaptiveReduceHighlights = false;
+            readerBusySince = -1f; nextReaderRestartAt = 0f; readerRecoveries = 0;
             gainNow = 1f; skinAmount = 0f;
             _ = makeup.Layers;                     // ArFaceMakeup only works out the colours once its layers exist
             makeup.UseGloss = false;
@@ -228,16 +234,28 @@ namespace GlowUp.AR
             AdaptToFrameTime(dt);
             if (reader.TryTake(out float[] answer))
             {
+                readerBusySince = -1f;
                 lastInferenceMilliseconds = reader.LastMilliseconds;
                 resultFrameTimestamp = submittedFrameTimestamp;
                 pace.Report(reader.LastMilliseconds);
                 if (GuidedFaceShapes.IsFace(answer)) OnFace(answer, now);
                 else OnNoFace();
             }
+            bool readerBusy = reader.Busy;
+            if (readerBusy)
+            {
+                if (readerBusySince < 0f) readerBusySince = now;
+                else if (now - readerBusySince >= 2f && now >= nextReaderRestartAt)
+                {
+                    RecoverStuckReader(now);
+                    return;
+                }
+            }
+            else readerBusySince = -1f;
             bool newCameraFrame = feed != null && feed.FrameSequence > lastObservedFrame;
             if (newCameraFrame) lastObservedFrame = feed.FrameSequence;
             bool skipFrame = feed != null && feed.FrameSequence - lastSubmittedFrame <= FrameSkip;
-            if (feed != null && feed.IsPlaying && newCameraFrame && !skipFrame && now >= nextLook && !reader.Busy && feed.Grab()
+            if (feed != null && feed.IsPlaying && newCameraFrame && !skipFrame && now >= nextLook && !readerBusy && feed.Grab()
                 && feed.UprightArgb(null, pace.MaxSide, ref pixels, out pictureW, out pictureH) && reader.Look(pixels, pictureW, pictureH))
             {
                 nextLook = now + pace.MinInterval;
@@ -462,6 +480,33 @@ namespace GlowUp.AR
             else slowBudgetSeconds = fastBudgetSeconds = 0f;
         }
 
+        void RecoverStuckReader(float now)
+        {
+            if (readerRecoveries >= 2)
+            {
+                Fail("face finding stopped responding after two restart attempts");
+                return;
+            }
+
+            readerRecoveries++;
+            reader.Close();
+            reader = FaceLandmarkReader.Begin(out string problem);
+            if (reader == null)
+            {
+                Fail(problem);
+                return;
+            }
+
+            readerBusySince = -1f;
+            nextReaderRestartAt = now + 5f;
+            nextLook = now + 0.25f;
+            submittedFrameTimestamp = resultFrameTimestamp = 0f;
+            haveFace = false;
+            presence = 0f;
+            makeup.Presence = 0f;
+            Debug.LogWarning("[GuidedFace] restarted a face inference that was busy for over 2 seconds (attempt " + readerRecoveries + ").");
+        }
+
         // ---------------------------------------------------------------------------------------
         //  The room: brightness and skin colour, measured on the picture the finder was just given
         // ---------------------------------------------------------------------------------------
@@ -527,6 +572,7 @@ namespace GlowUp.AR
             Debug.Log("[GuidedFace] the face cannot be followed on this phone, the guide stays: " + problem);
             if (reader != null) { reader.Close(); reader = null; }
             ShowOldGuide(true);
+            Say(problem);
             SetFollowing(false);
         }
 

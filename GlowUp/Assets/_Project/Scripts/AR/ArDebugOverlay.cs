@@ -254,12 +254,13 @@ namespace GlowUp.AR
             if (guided != null)
             {
                 text.Append("\nPath: MediaPipe guided  camera ").Append(guided.CameraWidth).Append("x").Append(guided.CameraHeight)
-                    .Append("  input ").Append(guided.InferenceSide).Append("px");
+                    .Append(" (requested ").Append(guided.CameraRequestedWidth).Append("x").Append(guided.CameraRequestedHeight).Append(")  input ")
+                    .Append(guided.InferenceSide).Append("px");
                 text.Append("\nCamera ts ").Append(guided.CameraTimestampMs.ToString("0.0")).Append("ms  landmark ts ")
                     .Append(guided.LandmarkTimestampMs.ToString("0.0")).Append("ms  age ").Append(guided.LandmarkAgeMs.ToString("0.0"))
                     .Append("ms  lag ").Append(guided.LagFrames).Append(" frames at ").Append(guided.CameraFpsEstimate.ToString("0")).Append(" fps");
-                text.Append("\nInference ").Append(guided.InferenceMilliseconds.ToString("0.0")).Append("ms  mesh update ")
-                    .Append(guided.MeshUpdateMilliseconds.ToString("0.00")).Append("ms");
+                text.Append("\nInference ").Append(guided.InferenceMilliseconds.ToString("0.0")).Append("ms  restarts ")
+                    .Append(guided.ReaderRecoveries).Append("  mesh update ").Append(guided.MeshUpdateMilliseconds.ToString("0.00")).Append("ms");
                 text.Append("\nSmoothing ").Append(guided.SmoothingEnabled ? "ON" : "OFF").Append("  One Euro minCutoff ")
                     .Append(guided.MinCutoff.ToString("0.00")).Append("  beta ").Append(guided.Beta.ToString("0.00"))
                     .Append("  prediction ").Append(guided.PredictionEnabled ? "ON" : "OFF").Append("  skip ").Append(guided.FrameSkip);

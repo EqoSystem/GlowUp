@@ -78,6 +78,7 @@ namespace GlowUp.Scan
         public bool IsPlaying => cam != null && cam.isPlaying && cam.width > 32;
         /// <summary>The size of the picture the camera really gives, in its own pixels (it may differ from the size that was asked for). 0 x 0 while it is off.</summary>
         public Vector2Int PictureSize => IsPlaying ? new Vector2Int(cam.width, cam.height) : Vector2Int.zero;
+        public Vector2Int RequestedSize => new Vector2Int(requestedWidth, requestedHeight);
         public int FrameSequence { get; private set; }
         public float LastFrameTimestamp { get; private set; }
         public float FrameRateEstimate { get; private set; }
@@ -90,6 +91,12 @@ namespace GlowUp.Scan
         public event Action<bool, string> Started;
         /// <summary>Raised when the camera was running and is closed (its flashlight goes out with it).</summary>
         public event Action Stopped;
+
+        public void SetRequestedSize(int width, int height)
+        {
+            requestedWidth = Mathf.Clamp(width, 320, 1920);
+            requestedHeight = Mathf.Clamp(height, 240, 1080);
+        }
 
         WebCamTexture cam;
         Color32[] buffer;
