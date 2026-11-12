@@ -576,25 +576,6 @@ export function productVisibility(product, brand) {
     return { live: true, reason: "live" };
 }
 
-export const RECOMMENDABILITY_REASON_TEXT = {
-    "product-missing": "Product record is missing.",
-    "product-name-missing": "Product name is missing.",
-    "product-archived": "Product is in the Recycle bin.",
-    "product-not-active": "Product is not Active.",
-    "brand-missing": "A valid brand record is missing.",
-    "brand-archived": "Brand is in the Recycle bin.",
-    "brand-inactive": "Brand is not Active.",
-    "brand-name-missing": "Brand name is missing.",
-    "brand-category-missing": "Brand category is missing.",
-    "brand-category-not-makeup": "Brand category is not Makeup.",
-    "brand-name-mismatch": "Product brand does not match its linked brand.",
-    "category-missing": "Product category is missing.",
-    "not-makeup": "Product is not makeup.",
-    "ingredients-missing": "Ingredient list is empty.",
-    "ingredient-unresolved": "One or more ingredients are not in the Ingredient Curator.",
-    "ingredient-not-evaluable": "One or more ingredients are not yet evaluable."
-};
-
 function ingredientNameForms(value) {
     const raw = text(value).trim();
     const forms = [raw, raw.replace(/\s*\([^)]*\)/g, " ").trim()];

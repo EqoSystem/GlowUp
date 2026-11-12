@@ -40,7 +40,7 @@ import {
 } from "../_Shared/adminCommon.js";
 import { matchesSearch, compactName, barcodeKey } from "../_Shared/glowupRules.js";
 import {
-    productVisibility, RECOMMENDABILITY_REASON_TEXT, cleanupPlan, productDuplicates, brandDuplicates, mergeProducts, mergeBrands, nameWithoutBrand
+    productVisibility, cleanupPlan, productDuplicates, brandDuplicates, mergeProducts, mergeBrands, nameWithoutBrand
 } from "../_Shared/glowupCatalog.js";
 import { refreshRecommendabilityFlags } from "../_Shared/recommendabilityAdmin.js";
 import { openPlanDialog, openDuplicatesDialog } from "../_Shared/adminCleanup.js";
@@ -107,8 +107,7 @@ let brandModal = null;
 let productModal = null;
 let org = null;                             // folders, the Recycle bin, picking and dragging
 let openId = "";                            // the product whose details are open
-let quick = new URLSearchParams(window.location.search).get("show") === "recommendability" ? "recommendationIncomplete" : "";
-let recommendationChecks = new Map();
+let quick = "";                             // a filter a helper switched on: "" | a key of QUICK
 // The Filters button: several choices at once. Looked up in the products already loaded (no database read).
 const FACTS = [
     { value: "has-shades", label: "Has shades" },
@@ -148,13 +147,6 @@ const QUICK = {
     noIngredients: { label: "No ingredient list", test: (p) => p.ingredients.length === 0 },
     noShades: { label: "Make-up without shades", test: (p) => p.shades.length === 0 && productScope(p.cosmeticType, p.name) === "makeup" },
     notCurated: { label: "Ingredients not in the Curator", test: (p) => notCurated(p.ingredients).length > 0 },
-    recommendationIncomplete: {
-        label: "Hidden from Alternatives and Recommendations (incomplete)",
-        test: (p) => {
-            const result = recommendationChecks.get(p.id);
-            return !!result && !result.recommendable && productVisibility(p, brandOf(p)).live;
-        }
-    },
     fda: { label: "On the FDA Philippines list", test: (p) => p.source === "fdaph" || /FDA Philippines: notified as/i.test(p.description) }
 };
 
@@ -467,7 +459,6 @@ async function loadInventory() {
                 ingredientNotes: Array.isArray(data.ingredientNotes) ? data.ingredientNotes : [],     // per-product caution and share of an ingredient
                 aliases: asArray(data.aliases),
                 folder: cleanFolder(data.folder),
-                recommendable: data.recommendable === true,
                 addedAt: madeAt(data)
             }, binFields(data));
         });
@@ -567,20 +558,11 @@ async function loadInventory() {
 
     if (curatorKnown) {
         try {
-            const eligibility = await refreshRecommendabilityFlags({ brands: everyBrand, products: everyProduct, ingredients: curatedList });
-            recommendationChecks = eligibility.byId;
-            everyProduct.forEach((product) => {
-                const result = recommendationChecks.get(product.id);
-                product.recommendable = !!(result && result.recommendable);
-            });
-            afterChange();
+            await refreshRecommendabilityFlags({ brands: everyBrand, products: everyProduct, ingredients: curatedList });
         } catch (error) {
             console.error("Could not refresh recommendation eligibility: ", error);
-            recommendationChecks = new Map();
             notify("Recommendation eligibility could not be refreshed. " + describeError(error), "error");
         }
-    } else {
-        recommendationChecks = new Map();
     }
 
     // the FDA Philippines catalogue is applied by itself, once per visit (what is listed already is left alone)
@@ -1440,17 +1422,7 @@ function productRow(p, brand, flat) {
  */
 function productStatusCell(p, brand) {
     const { live, reason } = productVisibility(p, brand);
-    if (live) {
-        const eligibility = recommendationChecks.get(p.id);
-        if (eligibility && !eligibility.recommendable) {
-            const details = eligibility.reasonCodes.map((code) => RECOMMENDABILITY_REASON_TEXT[code] || code).join(" ");
-            const needsCurator = eligibility.reasonCodes.includes("ingredient-unresolved") || eligibility.reasonCodes.includes("ingredient-not-evaluable");
-            const link = needsCurator ? ` <a href="../_Admin_Ingredient_Curator/adminIngredientCurator.html">Open Ingredient Curator</a>` : "";
-            return toneBadge("Hidden from Alternatives and Recommendations (incomplete)", "warn", details)
-                + `<div class="field-hint warn">${escapeHtml(details)}${link}</div>`;
-        }
-        return toneBadge("Live", "ok", "The app shows this product.");
-    }
+    if (live) return toneBadge("Live", "ok", "The app shows this product.");
     if (reason === "not-makeup") return toneBadge("Hidden (not make-up)", "bad", "The app lists make-up only, so it hides this product.");
     if (reason === "brand-pending") return toneBadge("Approved · Hidden (brand pending)", "warn", "The product is approved, but its brand is not, so the app hides it.") + `<div class="field-hint warn">${BRAND_HINT}</div>`;
     if (reason === "brand-not-active" || reason === "brand-binned") return toneBadge("Approved · Hidden (brand " + (reason === "brand-binned" ? "in the Recycle bin" : "not active") + ")", "warn", "The product is approved, but its brand is switched off, so the app hides it.");
@@ -2674,8 +2646,7 @@ function registerHelpers() {
         const lines = [];
         const all = listed();
         const count = (name) => all.filter(QUICK[name].test).length;
-        const none = count("noIngredients"), noShades = count("noShades"), missing = count("notCurated"),
-            incomplete = count("recommendationIncomplete"), inBin = binEntries().length, review = reviewCount();
+        const none = count("noIngredients"), noShades = count("noShades"), missing = count("notCurated"), inBin = binEntries().length, review = reviewCount();
         if (org.view.kind === "bin") {
             lines.push(inBin > 0 ? { tone: "info", text: `${many(inBin, "entry", "entries")} in the Recycle bin. The app does not use them. Restore brings one back as it was; Delete forever is final.` }
                 : { tone: "ok", text: "The Recycle bin is empty." });
@@ -2685,12 +2656,6 @@ function registerHelpers() {
         if (review > 0) lines.push({ tone: "info", text: `${many(review, "entry waits", "entries wait")} for review.`, label: showLabel(reviewing()), run: () => reviewing() ? resetAllFilters() : showOnly("review") });
         if (noShades > 0) lines.push({ tone: "warn", text: `${many(noShades, "make-up product has", "make-up products have")} no shades: AR Try-On has nothing to show for ${noShades === 1 ? "it" : "them"}.`, label: showLabel(quick === "noShades"), run: () => setQuick("noShades") });
         if (missing > 0) lines.push({ tone: "info", text: `${many(missing, "product lists", "products list")} ingredients the Curator does not explain yet.`, label: showLabel(quick === "notCurated"), run: () => setQuick("notCurated") });
-        if (incomplete > 0) lines.push({
-            tone: "warn",
-            text: `${many(incomplete, "product is", "products are")} hidden from Alternatives and Recommendations (incomplete). Ingredient fixes update this list automatically.`,
-            label: showLabel(quick === "recommendationIncomplete"),
-            run: () => setQuick("recommendationIncomplete")
-        });
         if (inBin > 0) lines.push({ text: `${many(inBin, "entry is", "entries are")} in the Recycle bin.`, label: "Open the bin", run: () => org.show({ kind: "bin" }) });
         lines.push({ text: "Click a product for its details. Double-click it to edit. Drag rows onto a folder or the bin." });
         return lines;

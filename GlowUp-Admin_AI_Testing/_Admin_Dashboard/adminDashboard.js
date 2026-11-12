@@ -22,7 +22,6 @@ import { mountShell, paginate, renderPager, icon } from "../_Shared/adminShell.j
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
 import { setPanelQuiet, setPanelSummary } from "../_Shared/adminFold.js";
-import { refreshRecommendabilityFlags } from "../_Shared/recommendabilityAdmin.js";
 
 const RECENT_ITEMS = 120;             // how many recent scans are fetched (the list, the grid and the graphs all use them)
 const PAGE_SIZE = 8;                  // how many rows a panel shows at a time
@@ -64,7 +63,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     await requireAdmin();
 
     loadCatalogueCounts();
-    onListsRefreshed((name) => { if (["brands", "products", "ingredients"].includes(name)) loadCatalogueCounts(); });
+    onListsRefreshed((name) => { if (name === "brands") loadCatalogueCounts(); });      // the kept brand list was behind the database
     watchScansToday();
     watchRecentActivity();
     loadSuggestions();
@@ -119,20 +118,6 @@ async function loadCatalogueCounts() {
     }
     countInto("products", "totalProductsCount");
     countInto("ingredients", "totalIngredientsCount");
-    try {
-        const eligibility = await refreshRecommendabilityFlags();
-        setMetric("recommendableCount", eligibility.eligibleCount, "Products currently complete and eligible for recommendations.");
-        setMetric("recommendabilityHiddenCount", eligibility.hiddenCount,
-            "Active inventory products that are incomplete for recommendation. Click to open the filtered inventory list.");
-        el("recommendabilityHiddenLabel").textContent = eligibility.hiddenCount === 1
-            ? "product hidden from Alternatives and Recommendations (incomplete)"
-            : "products hidden from Alternatives and Recommendations (incomplete)";
-    } catch (error) {
-        console.error("Could not calculate recommendation eligibility: ", error);
-        setMetric("recommendableCount", "–", describeError(error));
-        setMetric("recommendabilityHiddenCount", "Recommendation eligibility unavailable", describeError(error));
-        el("recommendabilityHiddenLabel").textContent = "";
-    }
 }
 
 async function countInto(collectionName, elementId) {
