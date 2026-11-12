@@ -23,7 +23,8 @@
     --fs-md: max(12px, calc(var(--t-md) * var(--scale)));          /* panel titles */
     --fs-lg: calc(clamp(17px, 0.9vw + 11px, 20px) * var(--scale));       /* page title: a little smaller on narrow windows */
     --fs-kpi: calc(clamp(24px, 1.6vw + 14px, 30px) * var(--scale));      /* big numbers */
-    --page-x: clamp(16px, 2.2vw, 26px);       /* the page's side margin: 26 px on wide windows, down to 16 px on a phone */
+    --content-gutter: clamp(16px, 2.2vw, 26px); /* shared outer gutter for content and header controls */
+    --page-x: var(--content-gutter);
     --radius: 14px;
     --radius-sm: 9px;
     --gap: 16px;
@@ -297,7 +298,6 @@ body.app { display: grid; grid-template-columns: var(--sidebar-w) 1fr; overflow:
     padding: 14px var(--page-x); background: color-mix(in srgb, var(--bg) 95%, transparent);
     border-bottom: 1px solid var(--border);
 }
-.topbar-titles { flex: 1; min-width: 0; }
 /* the Recycle Bin button of the header, with its optional count */
 .bin-link { position: relative; display: inline-grid; place-items: center; color: var(--text-2); text-decoration: none; }
 .bin-link:hover { color: var(--text); }
@@ -307,8 +307,6 @@ body.app { display: grid; grid-template-columns: var(--sidebar-w) 1fr; overflow:
     font-size: 12px; font-weight: 700; line-height: 1; color: #fff; background: var(--accent); border: 2px solid var(--bg);
 }
 .bin-badge[hidden] { display: none; }
-.header-title { font-size: var(--fs-lg); font-weight: 700; letter-spacing: -.1px; }
-.header-subtitle { font-size: var(--fs-sm); color: var(--muted); }
 .topbar-tools { display: flex; align-items: center; gap: 8px; }
 .operator-chip {
     display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 999px; font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
@@ -1530,11 +1528,10 @@ body.snapx-open { overflow: hidden; }
 body.snapx-open .modal-overlay { z-index: 3000; }
 
 /* ---- New4.pdf: Inventory and Curator ---- */
-/* the search box lives in the page header, beside the title; Add / More sit at the right end next to the layout button */
-.topbar.has-search .topbar-titles { flex: 0 0 auto; }
-.topbar > .search-container { flex: 1 1 260px; max-width: 520px; min-width: min(160px, 100%); margin: 0 auto 0 8px; }
+/* the search box and page actions share the aligned header control group */
+.topbar-controls > .search-container { height: 36px; flex: 1 1 260px; max-width: 520px; min-width: min(160px, 100%); margin: 0; }
+.topbar-controls > .search-container .search-input { height: 36px; }
 .topbar-tools .tool-group.end { margin-left: 0; flex-wrap: nowrap; }
-@media (max-width: 800px) { .topbar { flex-wrap: wrap; } .topbar > .search-container { order: 3; flex-basis: 100%; max-width: none; margin: 0; } }
 /* the filter bar: ONE row of dropdowns (the buttons moved to the header and to the table's bar) */
 .toolbar.inv-tools { flex-wrap: nowrap; }
 .inv-tools .toolbar-select { flex: 1 1 200px; max-width: 320px; min-width: 120px; }
@@ -1564,26 +1561,13 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 .note-row[data-tone=""] .note-text { color: var(--muted); }
 @container panel (max-width: 700px) { .note-row { flex-wrap: wrap; } .note-text { flex-basis: 100%; order: 3; } }
 
-/* ---- the header of the Recycle Bin and the Archive (placeHeaderParts in adminShell.js): one line, the search gives way first ---- */
-.topbar.has-tabs { flex-wrap: nowrap; flex: none; }
-.topbar.has-tabs .topbar-titles { flex: none; }
-.topbar.has-tabs > .topbar-tools { flex: none; margin-left: auto; }
-.topbar.has-tabs > .topbar-tools .btn { white-space: nowrap; }
-.topbar > .header-tabs { flex: none; padding-block: 0; height: 36px; }
-.topbar > .header-tabs .seg { padding-block: 0; height: 30px; align-self: center; }
-.topbar.has-tabs > .search-container { order: 0; flex: 0 1 300px; max-width: none; min-width: 0; margin: 0; overflow: hidden; }
-.topbar.has-tabs > .search-container .search-input { height: 36px; padding-block: 0; }
+/* ---- the header of the Recycle Bin and the Archive: the search gives way first ---- */
+.topbar-controls > .header-tabs { flex: none; padding-block: 0; height: 36px; }
+.topbar-controls > .header-tabs .seg { padding-block: 0; height: 30px; align-self: center; }
+.topbar.has-tabs .topbar-controls > .search-container { order: 0; flex: 0 1 300px; max-width: none; min-width: 0; margin: 0; overflow: hidden; }
+.topbar.has-tabs .topbar-controls > .search-container .search-input { height: 36px; padding-block: 0; }
 /* less room: the tabs keep their words and lose their icons and counts */
-@media (max-width: 900px) { .topbar > .header-tabs .seg svg.ic, .topbar > .header-tabs .tab-count { display: none; } }
-/* FLUID (7 November 2026): no sideways scroll in the header. With little room it wraps: the menu, title and buttons first,
-   then the tabs across the whole width, then the search across the whole width. */
-@media (max-width: 760px) {
-    .topbar.has-tabs { flex-wrap: wrap; overflow-x: visible; row-gap: 10px; }
-    .topbar.has-tabs > .topbar-tools { order: 1; }
-    .topbar.has-tabs > .header-tabs { order: 2; flex: 1 1 100%; display: flex; }
-    .topbar.has-tabs > .header-tabs .seg { flex: 1 1 0; min-width: 0; justify-content: center; }
-    .topbar.has-tabs > .search-container { order: 3; flex: 1 1 100%; }
-}
+@media (max-width: 900px) { .topbar-controls > .header-tabs .seg svg.ic, .topbar-controls > .header-tabs .tab-count { display: none; } }
 
 /* ---- the site's own drop-down (adminSelect.js): dark panel, light text, pink hover and selected row ---- */
 .combo { position: relative; }
@@ -2156,7 +2140,10 @@ body:has(> :is(#addIngredientModal, #addBrandModal, #productModal)[style*="flex"
 .modal-content.confirm-inline > .modal-actions { margin: 0; flex: 0 0 auto; }
 
 /* Header-led navigation: the header never moves; only a pinned rail reserves content space. */
-:root { --header-height: 64px; --sidebar-rail: 72px; --sidebar-open: 256px; --content-offset: var(--sidebar-rail); }
+:root {
+    --header-height: 64px; --sidebar-rail: 72px; --sidebar-open: 256px; --content-offset: var(--sidebar-rail);
+    --nav-icon-column-center: calc(var(--sidebar-rail) / 2); --nav-icon-box-size: 36px;
+}
 html.sb-pinned { --content-offset: var(--sidebar-open); }
 html.sb-mobile-open { --content-offset: 0px; }
 body.app { display: block; min-height: 100%; overflow-x: hidden; overflow-y: visible; }
@@ -2169,14 +2156,18 @@ body.app { display: block; min-height: 100%; overflow-x: hidden; overflow-y: vis
 .sidebar > * { width: 100%; min-width: 0; flex-shrink: 0; }
 .sidebar > .nav-links { flex: 1; min-height: 0; flex-shrink: 1; }
 html.sb-pinned .sidebar > * { width: 100%; }
+.nav-icon { width: var(--nav-icon-box-size); height: var(--nav-icon-box-size); flex: 0 0 var(--nav-icon-box-size); display: grid; place-items: center; border-radius: var(--radius-sm); }
+.sidebar .nav-links a { height: 38px; gap: 10px; padding: 0 12px 0 calc(var(--nav-icon-column-center) - var(--nav-icon-box-size) / 2 - 11px); }
 .sidebar .label { display: inline-block; flex: 1; min-width: 0; overflow: hidden; text-overflow: clip; white-space: nowrap; }
 html.sb-collapsed .sidebar .label { display: none; }
 html.sb-pinned .sidebar { width: var(--sidebar-open); }
 html.sb-pinned .sidebar .label, html.sb-hover .sidebar .label { display: inline-block; }
 html.sb-collapsed:not(.sb-hover) .sidebar .nav-links a,
-html.sb-collapsed:not(.sb-hover) .sidebar .sign-out { justify-content: center; padding-left: 0; padding-right: 0; }
+html.sb-collapsed:not(.sb-hover) .sidebar .sign-out { justify-content: center; padding: 0; }
 html.sb-collapsed.sb-hover .sidebar { width: var(--sidebar-open); box-shadow: var(--shadow); }
+.sidebar .sign-out { height: 38px; gap: 10px; padding: 0 12px 0 calc(var(--nav-icon-column-center) - var(--nav-icon-box-size) / 2 - 10px); }
 .brand-home { display: flex; align-items: center; gap: 10px; flex: none; min-width: 0; color: inherit; text-decoration: none; cursor: pointer; border-radius: 12px; }
+.topbar > .brand-home { height: 100%; margin-left: 16px; }
 .brand-home:hover .brand-title { color: var(--accent-text); }
 .brand-home:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .brand-logo { width: 34px; height: 34px; border-radius: 10px; flex: none; overflow: hidden; display: block; }
@@ -2188,12 +2179,20 @@ html.sb-collapsed.sb-hover .sidebar { width: var(--sidebar-open); box-shadow: va
 }
 .main-content > .topbar {
     position: fixed; z-index: 950; top: 0; left: 0; right: 0; min-height: 64px;
-    display: flex; align-items: center; gap: 12px; padding: 10px var(--page-x);
+    display: flex; align-items: center; gap: 0; padding: 0;
     background: color-mix(in srgb, var(--bg) 95%, transparent); border-bottom: 1px solid var(--border);
 }
-.topbar-titles { flex: 1; min-width: 0; }
-.topbar-tools { display: flex; align-items: center; gap: 8px; }
-.menu-btn { display: inline-flex; flex: none; }
+.topbar-leading { width: var(--sidebar-rail); height: 100%; flex: 0 0 var(--sidebar-rail); display: grid; place-items: center; }
+.topbar .menu-btn { width: var(--nav-icon-box-size); height: var(--nav-icon-box-size); padding: 0; flex: none; display: grid; place-items: center; border-radius: var(--radius-sm); }
+.topbar-controls {
+    position: absolute; top: 0; bottom: 0;
+    left: max(calc(var(--content-offset) + var(--content-gutter)), calc(var(--brand-right, 0px) + 16px));
+    right: var(--content-gutter); min-width: 0; display: flex; align-items: center; gap: 12px; overflow-x: auto; overflow-y: hidden;
+    scrollbar-width: none; transition: left .2s var(--ease);
+}
+.topbar-controls::-webkit-scrollbar { display: none; }
+.topbar-controls > .search-container { flex: 1 1 260px; max-width: 520px; min-width: min(160px, 100%); margin: 0; }
+.topbar-tools { display: flex; align-items: center; gap: 8px; flex: none; }
 html.sb-ready .main-content { transition: margin-left .2s var(--ease); }
 html.sb-mobile-open body::after { content: ""; position: fixed; z-index: 899; inset: var(--header-height) 0 0; background: var(--overlay); }
 .editing-bar { top: var(--header-height); }
@@ -2203,8 +2202,8 @@ html.sb-mobile-open body::after { content: ""; position: fixed; z-index: 899; in
     html.sb-mobile-open .sidebar { translate: 0 0; visibility: visible; transition: translate .2s var(--ease); box-shadow: var(--shadow); }
     .sidebar .label { display: inline-block !important; }
     .main-content { margin-left: 0; }
-    .topbar > .menu-btn { display: inline-flex; }
+    .topbar-controls { gap: 8px; }
 }
 @media (prefers-reduced-motion: reduce) {
-    html.sb-ready .main-content, .sidebar, html.sb-mobile-open .sidebar { transition: none !important; }
+    html.sb-ready .main-content, .sidebar, html.sb-mobile-open .sidebar, .topbar-controls { transition: none !important; }
 }

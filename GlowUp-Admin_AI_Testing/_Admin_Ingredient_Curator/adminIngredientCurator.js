@@ -166,7 +166,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // keyboard shortcuts (shortcuts.js): they press the same buttons, only when the buttons could be pressed
     bindButtons({ "curator.addIngredient": "#addIngredientBtn", "curator.import": "#chooseIngredientFileBtn", "curator.classifications": "#manageClassBtn",
         "curator.approveDrafts": "#ingredientApproveAllBtn", "curator.sort": "#sortMenuBtn" });
-    placeInHeader(".search-container", "headerActions");      // search beside the title, + Ingredient and More beside the layout button
+    placeInHeader(".search-container", "headerActions");      // search and ingredient actions in the shared header controls
     wireSignOut();
     setupNavigationGuard();
     await requireAdmin();

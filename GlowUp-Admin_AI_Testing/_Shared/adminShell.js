@@ -1,7 +1,7 @@
 // The parts every admin page is built from (no database code in here; the Refresh data button only calls adminStore.js):
 //   icons            - one set of thin-line icons, drawn as SVG (no emoji, no picture files)
 //   theme            - light / dark / system, remembered on this computer; "system" follows the computer's setting
-//   mountShell       - the sidebar (with its flowing highlight; the logo is a plain badge) and the top bar (title)
+//   mountShell       - the sidebar (with its flowing highlight) and the top bar (branding and page controls)
 //   guides           - the small "i" badges and the pop-up that explains a control
 //   tile animation   - the lift, pixel sweep and glowing outline of the mobile app's tiles, on every button and tile
 //   menus, dialogs   - one small pop-up menu and two dialogs (confirm, type a name) used by every page
@@ -233,30 +233,32 @@ export function addRefreshDataButton(host) {
  * Call it first on every admin page. page = "dashboard" | "inventory" | "curator".
  */
 /**
- * Moves a page's search box into the header, beside the title, and its action buttons (Add, More) to the right end of the header,
- * next to the layout button. Call it right after mountShell (which draws the header buttons).
+ * Moves a page's search box and action buttons (Add, More) into the shared header control group.
+ * Call it right after mountShell (which draws the header buttons).
  */
 export function placeInHeader(searchSelector, actionsId) {
     const bar = document.querySelector(".topbar");
     if (!bar) return;
     const search = document.querySelector(".board " + searchSelector);
+    const controls = bar.querySelector(".topbar-controls");
     const tools = bar.querySelector(".topbar-tools");
     const actions = document.getElementById(actionsId);
-    if (search) { bar.classList.add("has-search"); bar.insertBefore(search, tools); }
+    if (search && controls) { bar.classList.add("has-search"); controls.insertBefore(search, tools); }
     if (actions && tools) tools.insertBefore(actions, tools.firstChild);
 }
 
 /**
- * The header of the Recycle Bin and the Archive: the tabs and the search beside the title, and the page's buttons at the far right.
+ * The header of the Recycle Bin and the Archive: tabs, search and page actions in the shared control group.
  * The parts wait in the page's <div data-header-parts hidden>. Call it right after mountShell. Returns the header.
  */
 export function placeHeaderParts() {
     const bar = document.querySelector("main.main-content > header.topbar");
     const holder = document.querySelector("[data-header-parts]");
     if (!bar || !holder) return bar;
+    const controls = bar.querySelector(".topbar-controls");
     const tools = bar.querySelector(".topbar-tools");
     bar.classList.add("has-search", "has-tabs");
-    holder.querySelectorAll(":scope > .header-tabs, :scope > .search-container").forEach((part) => bar.insertBefore(part, tools));
+    holder.querySelectorAll(":scope > .header-tabs, :scope > .search-container").forEach((part) => controls.insertBefore(part, tools));
     const end = holder.querySelector(":scope > [data-header-end]");
     if (end) {                                  // the page's buttons go before the Quick settings gear, which stays at the far right
         const gear = tools.querySelector(".quick-gear");

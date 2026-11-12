@@ -1,11 +1,11 @@
 // THE PAGE FRAME, DRAWN AT ONCE.
 //
 // This small script (no imports, nothing to wait for) is the first thing inside <main> of every admin page. It builds
-// the real sidebar and the real top bar straight away, so the menu, the page's title and every fixed text of the
+// the real sidebar and the real top bar straight away, so the menu, branding and fixed text of the
 // page are on screen with the first picture. Nothing fixed waits for the sign-in check or for data any more: only the
 // places where real data will appear show a loading shape (they are part of each page's own HTML).
 //
-//   - EVERY visit gets the frame at once (html.frame-first): the static shell (menu, title, panel headings, fixed
+//   - EVERY visit gets the frame at once (html.frame-first): the static shell (menu, branding, panel headings, fixed
 //     labels) never waits for the sign-in check or for data. Only the data containers (counts, lists, tables) show a
 //     loading shape. The page cannot be used until the sign-in check has passed, and no data is asked for before that:
 //     the check itself is unchanged, and somebody who is not an admin is sent to the login page as before (the frame
@@ -63,22 +63,25 @@
             NAV.map(function (n) {
                 var here = n.id === page;
                 // the page you are on is marked on the link itself (and for screen readers), not by where the pointer is
-                return '<li><a href="' + n.href + '"' + (here ? ' class="active" aria-current="page"' : "") + ' aria-label="' + esc(n.label) + '">' + svg(n.icon) + '<span class="label">' + esc(n.label) + "</span></a></li>";
+                return '<li><a href="' + n.href + '"' + (here ? ' class="active" aria-current="page"' : "") + ' aria-label="' + esc(n.label) + '"><span class="nav-icon">' + svg(n.icon) + '</span><span class="label">' + esc(n.label) + "</span></a></li>";
             }).join("") +
             "</ul>" +
-            '<div class="sidebar-footer"><button type="button" class="sign-out" aria-label="Sign Out">' + svg("logout") + '<span class="label">Sign Out</span></button></div>';
+            '<div class="sidebar-footer"><button type="button" class="sign-out" aria-label="Sign Out"><span class="nav-icon">' + svg("logout") + '</span><span class="label">Sign Out</span></button></div>';
         document.body.insertBefore(sidebar, main);
 
         var links = sidebar.querySelectorAll(".nav-links a");
+        var heading = document.createElement("h1");
+        heading.className = "sr-only";
+        heading.textContent = main.getAttribute("data-title") || "";
+        main.insertBefore(heading, main.firstChild);
         var topbar = document.createElement("header");
         topbar.className = "topbar";
         topbar.innerHTML =
-            '<button type="button" class="icon-btn menu-btn" id="menuBtn" aria-controls="sidebarNav" aria-expanded="' + (pinnedOpen ? "true" : "false") + '" aria-label="' + (pinnedOpen ? "Close menu" : "Open menu") + '">' + svg("menu") + "</button>" +
+            '<div class="topbar-leading"><button type="button" class="icon-btn menu-btn" id="menuBtn" aria-controls="sidebarNav" aria-expanded="' + (pinnedOpen ? "true" : "false") + '" aria-label="' + (pinnedOpen ? "Close menu" : "Open menu") + '">' + svg("menu") + "</button></div>" +
             '<a class="brand-home" href="' + NAV[0].href + '" aria-label="GlowUp – go to dashboard"><span class="brand-mark"><span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"></span></span><span class="brand-title">Glow Up</span></a>' +
-            '<div class="topbar-titles"><h2 class="header-title">' + esc(main.getAttribute("data-title") || "") + "</h2></div>" +
-            '<div class="topbar-tools"></div>';
+            '<div class="topbar-controls"><div class="topbar-tools"></div></div>';
         main.insertBefore(topbar, main.firstChild);
-        var menuBtn = topbar.querySelector("#menuBtn"), hoverTimer = 0;
+        var menuBtn = topbar.querySelector("#menuBtn"), brand = topbar.querySelector(".brand-home"), hoverTimer = 0;
         var mobileMenu = window.matchMedia("(max-width: 768px), (hover: none)");
         var expanded = function () {
             return mobileMenu.matches ? root.classList.contains("sb-mobile-open") : root.classList.contains("sb-pinned") || root.classList.contains("sb-hover");
@@ -95,12 +98,16 @@
             paintMenuBtn();
             if (focusBack) menuBtn.focus({ preventScroll: true });
         };
-        var updateHeaderHeight = function () {
+        var updateHeaderLayout = function () {
             root.style.setProperty("--header-height", Math.ceil(topbar.getBoundingClientRect().height) + "px");
+            root.style.setProperty("--brand-right", brand.getBoundingClientRect().right + "px");
         };
-        updateHeaderHeight();
-        if (window.ResizeObserver) new ResizeObserver(updateHeaderHeight).observe(topbar);
-        else window.addEventListener("resize", updateHeaderHeight);
+        updateHeaderLayout();
+        if (window.ResizeObserver) {
+            var headerObserver = new ResizeObserver(updateHeaderLayout);
+            headerObserver.observe(topbar);
+            headerObserver.observe(brand);
+        } else window.addEventListener("resize", updateHeaderLayout);
         menuBtn.addEventListener("click", function () {
             if (mobileMenu.matches) {
                 root.classList.toggle("sb-mobile-open");

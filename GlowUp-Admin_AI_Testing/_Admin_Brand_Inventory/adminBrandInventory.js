@@ -166,7 +166,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try { const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || "{}"); if (saved.mode === "all") view.mode = "all"; if (SORTS.some((s) => s.id === saved.sort)) view.sort = saved.sort; } catch (error) { /* first visit */ }
     registerData();                   // before the page frame: a saved layout may hold panels that show this data
     mountShell("inventory");
-    placeInHeader(".search-container", "headerActions");      // search beside the title, Add and More beside the layout button
+    placeInHeader(".search-container", "headerActions");      // search and Add / More in the shared header controls
     wireSignOut();
     wireWebsiteAndGs1Buttons();
     setupNavigationGuard();
