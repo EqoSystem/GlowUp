@@ -1,36 +1,36 @@
-// The rules for a SOURCE LINK beside a box of the Ingredient form (10 November 2026): the one page that supports what the box says.
-// PURE logic, used by the page (adminIngredientCurator.js) AND the server (api/source-link.js, which loads it with import()), so the
-// browser and the server judge a link the same way. tests/sourceLinkRules.test.mjs checks it.
-//
-//   blocked (cannot be saved): not https (javascript:, data:, file:, http: ...), a user name in the address, a search engine's page
-//   warned (can be saved):     a site that is not one of the trusted sources; a site's home page or its own search/landing page
-//   chip:                      Official / Industry/reference / Unofficial / Other
+
+
+
+
+
+
+
 
 export const MAX_SOURCE_LINK = 600;
 
-/** The trusted sources, by kind (the chip). A sub-site counts as its site (www.cir-safety.org, chem.echa.europa.eu). */
+
 export const HOST_TIERS = {
     official: { label: "Official", hosts: ["ec.europa.eu", "echa.europa.eu", "eur-lex.europa.eu"] },
     industry: { label: "Industry/reference", hosts: ["cosmileeurope.eu", "cir-safety.org", "incipedia.personalcarecouncil.org", "cosmeticsinfo.org", "pubchem.ncbi.nlm.nih.gov"] },
     unofficial: { label: "Unofficial", hosts: ["cosingchecker.com"] }
 };
 
-/** Search engines: a link to one of their result pages is never a source. */
+
 export const SEARCH_ENGINE_HOSTS = ["google.", "bing.com", "duckduckgo.com", "yahoo.", "search.brave.com", "yandex.", "baidu.com", "ecosia.org", "startpage.com", "search.aol.com", "ask.com"];
 
-/** Pages of the trusted sites that are only a door into the site (a home page, a search form or its results), not a page about one ingredient. */
+
 const GENERAL_PAGES = [
-    /^\/?$/,                                                     // any site's home page
-    /^\/growth\/tools-databases\/cosing\/?$/i,                   // CosIng's start page (its details pages need scripts: see fieldSources.js)
-    /^\/ingredients\/?$/i,                                       // CIR's ingredient search
-    /^\/inci\/results\/?$/i,                                     // COSMILE search results
+    /^\/?$/,
+    /^\/growth\/tools-databases\/cosing\/?$/i,
+    /^\/ingredients\/?$/i,
+    /^\/inci\/results\/?$/i,
     /^\/search\/?$/i, /^\/inci\/?$/i
 ];
 const GENERAL_QUERY = /(^|&)(q|s|query|search)=/i;
 
 const hostMatches = (host, list) => list.some((h) => host === h || host.endsWith("." + h));
 
-/** { key, label } of a host: "official" | "industry" | "unofficial" | "other". */
+
 export function tierOf(host) {
     const h = String(host || "").toLowerCase().replace(/^www\./, "");
     for (const [key, tier] of Object.entries(HOST_TIERS)) if (hostMatches(h, tier.hosts)) return { key, label: tier.label };
@@ -39,11 +39,11 @@ export function tierOf(host) {
 
 export const isSearchEngine = (host) => { const h = String(host || "").toLowerCase(); return SEARCH_ENGINE_HOSTS.some((e) => e.endsWith(".") ? h.startsWith(e) || h.includes("." + e) : h === e || h.endsWith("." + e)); };
 
-/**
- * Judges what was typed in a source-link box. Returns
- *   { value, empty, ok, error, warnings: [{ code, text }], tier: { key, label }, host }
- * `ok` = it may be saved (warnings do not stop it). An empty box is ok (the link is optional).
- */
+
+
+
+
+
 export function checkSourceUrl(raw) {
     const value = String(raw == null ? "" : raw).trim();
     const result = { value, empty: value.length === 0, ok: true, error: "", warnings: [], tier: null, host: "" };
@@ -69,7 +69,7 @@ export function checkSourceUrl(raw) {
     return result;
 }
 
-/** True for an IP address the server must never fetch: private, loopback, link-local, carrier-grade NAT, multicast, unspecified (IPv4 and IPv6). */
+
 export function isPrivateAddress(ip) {
     const a = String(ip || "").toLowerCase().replace(/^\[|\]$/g, "");
     if (!a) return true;
@@ -86,10 +86,10 @@ export function isPrivateAddress(ip) {
         || (x === 100 && y >= 64 && y <= 127) || (x === 192 && y === 0 && p[2] === 0) || (x === 198 && (y === 18 || y === 19)) || x >= 224;
 }
 
-/** The server checks only pages of the trusted sources (anything else: "can't check"). */
+
 export const checkable = (host) => tierOf(host).key !== "other";
 
-/** Does the page text name the ingredient (its INCI name, letters and digits only) or its CAS number? */
+
 export function pageMentions(text, inci, cas) {
     const squash = (v) => String(v || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
     const page = squash(text);
@@ -99,13 +99,13 @@ export function pageMentions(text, inci, cas) {
     return /^\d{2,7}-\d{2}-\d$/.test(c) && String(text || "").includes(c);
 }
 
-/** A CosIng Checker result's own web page: only a relative "/ingredients/<slug>/" path is trusted. */
+
 export function cosingCheckerPage(relative) {
     const path = String(relative || "");
     return /^\/ingredients\/[a-z0-9][a-z0-9-]{0,300}\/$/i.test(path) ? "https://cosingchecker.com" + path : "";
 }
 
-/** One line a person can check against the official source: "Function: ... CAS: ... EC: ... EU restriction: ...". */
+
 export function statementOf(r) {
     const parts = [];
     const fn = Array.isArray(r.functions) && r.functions.length ? r.functions.join(", ") : r.function;

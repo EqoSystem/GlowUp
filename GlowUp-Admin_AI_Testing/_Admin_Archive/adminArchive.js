@@ -1,9 +1,9 @@
-// Archive page: what left the Recycle bin, under three tabs. Kept 30 days from the day it was archived, then the
-// server job (api/archive-purge.js) deletes it. The data side is in _Shared/adminArchive.js; the design in ARCHIVE_DESIGN.md.
-//   Restore     - back to the Recycle bin, exactly as it was (never over an entry that uses the same id again).
-//                 A brand brings back the products archived with it; a product whose brand is archived brings the brand back.
-//   Delete now  - always asks, saves a copy to the admin's computer first, then deletes the archive document.
-// "X days left" on each row; from 3 days left the row is marked. An entry whose time is up waits for the next daily run.
+
+
+
+
+
+
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, escapeHtml, asArray, timeAgo, formatWhen, notify, describeError, wireSearch, dialogIsOpen
 } from "../_Shared/adminCommon.js";
@@ -28,7 +28,7 @@ let loaded = false;
 const picked = new Set();
 const pager = { page: 1, size: 10 };
 
-// "Show as" for the list of archived entries (12 November 2026): what the tab shows, as a list, row, grid or graph
+
 registerDataset("archive", {
     label: "Archived entries", noun: "entries", nounOne: "entry",
     items: () => (loaded ? shownEntries() : []),
@@ -38,11 +38,11 @@ registerDataset("archive", {
 
 document.addEventListener("DOMContentLoaded", async () => {
     mountShell("archive");
-    bindButtons({ "archive.restore": "#archiveRestoreSelectedBtn", "archive.delete": "#archiveDeleteSelectedBtn" });      // keyboard shortcuts (shortcuts.js)
-    placeHeaderParts();                 // the same header as the Recycle Bin (New8.pdf)
+    bindButtons({ "archive.restore": "#archiveRestoreSelectedBtn", "archive.delete": "#archiveDeleteSelectedBtn" });
+    placeHeaderParts();
     wireSignOut();
     setupNavigationGuard();
-    try { const wanted = new URLSearchParams(location.search).get("show"); if (KINDS[wanted]) kind = wanted; } catch (error) { /* keep the first tab */ }
+    try { const wanted = new URLSearchParams(location.search).get("show"); if (KINDS[wanted]) kind = wanted; } catch (error) {                          }
     paintTabs();
     await requireAdmin();
 
@@ -63,7 +63,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("archiveRestoreSelectedBtn").addEventListener("click", () => restore(ofKind().filter((x) => picked.has(x.id))));
     el("archiveDeleteSelectedBtn").addEventListener("click", () => removeNow(ofKind().filter((x) => picked.has(x.id))));
     el("archiveClearSelectedBtn").addEventListener("click", () => { picked.clear(); render(); });
-    // "X days left" moves on while the page stays open
+
     window.setInterval(() => { if (loaded && !dialogIsOpen()) render(); }, 60 * 60 * 1000);
     load();
 });
@@ -89,7 +89,7 @@ function shownEntries() {
     const data = (x) => x.data || {};
     return ofKind()
         .filter((x) => matchesSearch(typed, [nameOf(x), data(x).techName, data(x).brandName, data(x).cosmeticType, x.deleted_by_email].concat(asArray(data(x).aliases))))
-        .sort((a, b) => daysLeft(a) - daysLeft(b) || archivedAt(b) - archivedAt(a) || nameOf(a).localeCompare(nameOf(b)));      // the soonest to go first
+        .sort((a, b) => daysLeft(a) - daysLeft(b) || archivedAt(b) - archivedAt(a) || nameOf(a).localeCompare(nameOf(b)));
 }
 
 function paintTabs() {
@@ -173,7 +173,7 @@ function onRowClick(event) {
     else if (button.dataset.act === "delete") removeNow([entry]);
 }
 
-/** RESTORE: back to the Recycle bin. A brand brings its products archived with it; a product brings its archived brand. */
+
 async function restore(chosen) {
     if (chosen.length === 0) return;
     const going = new Map();
@@ -198,7 +198,7 @@ async function restore(chosen) {
     await load();
 }
 
-/** A copy of what is about to be deleted, saved to the admin's computer (a JSON file), as the Recycle bin does. */
+
 function saveCopy(chosen) {
     try {
         const stamp = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 19);
@@ -213,7 +213,7 @@ function saveCopy(chosen) {
     } catch (error) { console.warn("The copy could not be saved: ", error); return false; }
 }
 
-/** DELETE NOW: asks first, with the names. A brand takes the products archived with it. */
+
 async function removeNow(chosen) {
     if (chosen.length === 0) return;
     const going = new Map(), names = [];

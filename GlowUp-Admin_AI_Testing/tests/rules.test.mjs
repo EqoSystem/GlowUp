@@ -1,11 +1,11 @@
-// Checks the website's copy of the shared rules (_Shared/glowupRules.js) against the same lists of examples the
-// mobile app is tested against, so the website and the app always decide the same way.
-//
-//   Run it from the website folder:   node tests/rules.test.mjs
-//   It prints what was checked. The last line says "ALL PASSED" or how many checks failed (exit code 1).
-//
-// The examples live with the app: GlowUp/Assets/_Project/Editor/Tests/MakeupScopeCases.txt and SharedRuleCases.txt.
-// Nothing here talks to Firebase and nothing is uploaded: the "tests" folder is listed in .vercelignore.
+
+
+
+
+
+
+
+
 import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -14,7 +14,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const rulesFile = path.join(here, "..", "_Shared", "glowupRules.js");
 const casesFolder = path.join(here, "..", "..", "GlowUp", "Assets", "_Project", "Editor", "Tests");
 
-// the rules file is a browser module; loading its text this way works with every version of Node
+
 const rules = await import("data:text/javascript;base64," + Buffer.from(readFileSync(rulesFile, "utf8"), "utf8").toString("base64"));
 
 let checks = 0;
@@ -31,13 +31,13 @@ function readCases(fileName) {
     return readFileSync(file, "utf8").split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0 && !line.startsWith("#"));
 }
 
-// in the lists a special character is written as a backslash, the letter u and its code (four digits)
+
 const decode = (text) => text.replace(/\\u([0-9a-fA-F]{4})/g, (whole, code) => String.fromCharCode(parseInt(code, 16)));
 const yesNo = (value) => (value ? "yes" : "no");
 
-// ---------------------------------------------------------------------------------------------
-// 1. The make-up rule: every example in MakeupScopeCases.txt
-// ---------------------------------------------------------------------------------------------
+
+
+
 const scopeLines = readCases("MakeupScopeCases.txt");
 for (const line of scopeLines) {
     const parts = line.split("|").map((part) => part.trim());
@@ -54,9 +54,9 @@ for (const line of scopeLines) {
 }
 check(scopeLines.length > 80, "MakeupScopeCases.txt looks cut short (" + scopeLines.length + " examples).");
 
-// ---------------------------------------------------------------------------------------------
-// 2. The name key, barcodes and ids: every example in SharedRuleCases.txt
-// ---------------------------------------------------------------------------------------------
+
+
+
 const sharedLines = readCases("SharedRuleCases.txt");
 for (const line of sharedLines) {
     const parts = line.split("|").map((part) => decode(part.trim()));
@@ -90,9 +90,9 @@ for (const line of sharedLines) {
 }
 check(sharedLines.length > 60, "SharedRuleCases.txt looks cut short (" + sharedLines.length + " examples).");
 
-// ---------------------------------------------------------------------------------------------
-// 3. The same extra checks the app's MakeupScopeTests.cs makes
-// ---------------------------------------------------------------------------------------------
+
+
+
 for (const name of ["Hydrating Face Cream", "Vitamin C Serum", "Gentle Cleanser", "Anti-Dandruff Shampoo", "Body Lotion", "Nail Polish", "Eau De Parfum", "Sunscreen SPF 50"])
     check(rules.isNotMakeup("", name), name + " must not count as make-up");
 
@@ -100,13 +100,13 @@ equal(rules.productScope("", ""), "unclear", "a product without a name and a kin
 equal(rules.productScope(null, undefined), "unclear", "a product with nothing at all");
 check(!rules.isMakeup("", "Absidy Beauty Base"), "a name without any make-up word is not make-up");
 
-// the edge cases, decided on 12 October 2026 by how they are sold ("if sources consider them skin care, they are out")
+
 for (const name of ["Tinted Moisturizer", "BB Cream", "CC Cream", "Skin Tint"]) {
     equal(rules.productScope("", name), "makeup", name + " is face make-up");
     equal(rules.makeupType("", name), "Foundation", name + " is filed with the foundations");
 }
 for (const name of ["Lip Balm", "Lip Oil", "Tinted Sunscreen"]) equal(rules.productScope("", name), "skincare", name + " is care, not make-up");
-// care and colour at once: no source places it clearly, so an admin decides per product
+
 for (const name of ["Tinted Lip Balm", "Tinted Lip Oil"]) equal(rules.productScope("", name), "unclear", name);
 
 check(rules.isMakeup("", "All Nighter Setting Spray"), "a setting spray is make-up");
@@ -129,10 +129,10 @@ equal(rules.notMakeupWords(rules.judgeProduct("", "Anti-Dandruff Shampoo")), "a 
 equal(rules.notMakeupWords(rules.judgeProduct("", "Vitamin C Serum")), "a skin care product", "the words for a serum");
 equal(rules.notMakeupWords(rules.judgeProduct("", "Matte Lipstick")), "", "make-up needs no such words");
 
-// ---------------------------------------------------------------------------------------------
-// 4. The search boxes of the admin pages
-// ---------------------------------------------------------------------------------------------
-const vitaminE = ["Vitamin E", "Tocopherol", "Tocopheryl Acetate"];             // a name, its label name, another spelling
+
+
+
+const vitaminE = ["Vitamin E", "Tocopherol", "Tocopheryl Acetate"];
 for (const typed of ["VITAMIN E", "vitamin e", "Vitamin E", "  vitamin   e  ", "Vitamin-E", "e vitamin"])
     check(rules.matchesSearch(typed, vitaminE), `"${typed}" finds Vitamin E`);
 check(rules.matchesSearch("tocoph", vitaminE), "the first letters of another spelling find it");
@@ -151,10 +151,10 @@ check(rules.matchesSearch("", ["Anything"]) && rules.matchesSearch("   ", ["Anyt
 check(!rules.matchesSearch("lipstick", []) && !rules.matchesSearch("lipstick", [""]), "an entry without any text is never found");
 check(rules.matchesSearch("maybelline lipstick", ["Superstay Matte Ink", "Maybelline", "Lipstick"]), "words may be found in different fields (name, brand, kind)");
 
-// ---------------------------------------------------------------------------------------------
-// ---------------------------------------------------------------------------------------------
-// Evidence tiers: which risk level a source may support (docs/DATA_SOURCE_POLICY.md)
-// ---------------------------------------------------------------------------------------------
+
+
+
+
 equal(rules.evidenceTier("Annex II | https://eur-lex.europa.eu/eli/reg/2009/1223/oj", ""), 1, "an EU regulation page is tier 1");
 equal(rules.evidenceTier("FDA PH | https://verification.fda.gov.ph/x", ""), 1, "FDA Philippines is tier 1");
 equal(rules.evidenceTier("US FDA | https://www.fda.gov/cosmetics/cosmetic-ingredients", ""), 1, "US FDA is tier 1");

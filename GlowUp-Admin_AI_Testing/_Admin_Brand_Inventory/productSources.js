@@ -1,10 +1,10 @@
-// The sources of a product: the box in the Edit Product form, and the window that applies a website or source to other products.
-// The rules of what happens to the list are in ../_Shared/sourceEdit.js. This file only draws and saves.
-//
-// Applying is careful on purpose: the admin chooses the products (a checklist with "select all in brand" and a count, all products
-// of the brand, never one page of them), sees how many change and confirms, and only products that really change are written. Each
-// write sets `sources` and `updatedAt`, nothing else, in batches of at most 400. A brand that is not switched on yet
-// (BULK_PILOT_BRANDS) cannot be applied to.
+
+
+
+
+
+
+
 import { db } from "../_Database/firebase-console.js";
 import { doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { writeBatch } from "../_Shared/adminStore.js";
@@ -18,11 +18,11 @@ import {
 const many = (n, one, more) => `${n} ${n === 1 ? one : more}`;
 const PILOT_NOTE = `Applying to other products is switched on for ${BULK_PILOT_BRANDS.join(", ")} only while it is being tried out.`;
 
-/**
- * The box in the product form. opts = {
- *   host, sources(), setSources(list), brand() (the brand chosen in the form), setError(text), openApply({ role, url, brandId }) }.
- * paint() draws it again from the form's list.
- */
+
+
+
+
+
 export function mountSourceEditor(opts) {
     let adding = false;
     const host = opts.host;
@@ -62,7 +62,7 @@ export function mountSourceEditor(opts) {
             <span class="field-hint">Web addresses only (https). Saving the form saves this product's sources. The buttons change other products, after you confirm.</span>`;
     }
 
-    /** What was typed, or null after saying what is wrong and putting the box back. */
+
     const typed = (input) => {
         const checked = checkUrl(input.value);
         if (checked.error) { opts.setError(checked.error); paint(); return null; }
@@ -108,10 +108,10 @@ export function mountSourceEditor(opts) {
     return { paint, reset: () => { adding = false; } };
 }
 
-/**
- * The window. opts = { role, url, brandId, chosen (ids already picked, or null), brands(), productsOf(brandId), website(brandId),
- *   confirmWebsite(url) -> the fields that record who confirmed a brand's website, onSaved({ role, url, written, brand }) }.
- */
+
+
+
+
 export function openApplyWindow(opts) {
     const chosen = new Set(opts.chosen || []);
     const fixedBrand = opts.role === "official";
@@ -175,7 +175,7 @@ export function openApplyWindow(opts) {
         const error = body.querySelector("#applyError");
         const checked = checkUrl(body.querySelector("#applyUrl").value);
         if (checked.error || !checked.url) { error.textContent = checked.error || "Type the web address."; return; }
-        // every product of every brand this window can reach, on purpose: never only what is on a page
+
         const reachable = (fixedBrand ? opts.brands().filter((b) => b.id === brandId) : offered()).flatMap((b) => opts.productsOf(b.id));
         const plan = planApply(reachable, chosen, role, checked.url);
         const confirmSite = role === "official" && !!(body.querySelector("#applyConfirmSite") || {}).checked;

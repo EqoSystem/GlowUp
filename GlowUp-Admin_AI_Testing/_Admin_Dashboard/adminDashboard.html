@@ -6,19 +6,17 @@
     <title>GlowUp Admin - Operations Dashboard</title>
     <link rel="icon" type="image/png" sizes="32x32" href="../_Shared/assets/glowup-icon-32.png">
     <script>
-        // dark or light before anything is drawn: the person's choice, else the computer's own setting
         (function () {
             var t = null;
             try { t = localStorage.getItem("glowup.theme"); } catch (e) { }
-            if (t !== "light" && t !== "dark") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+            if (t !== "light" && t !== "dark") t = "light";
             document.documentElement.dataset.theme = t;
         })();
-        // if the sign-in check never answers (no internet), say so instead of leaving a blank page
         setTimeout(function () {
             if (document.documentElement.classList.contains("auth-pending")) document.documentElement.classList.add("auth-stuck");
         }, 10000);
     </script>
-    <!-- the files this page needs are fetched side by side, not one after the other as each one names the next -->
+
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js">
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js">
@@ -40,15 +38,15 @@
 <body>
 
     <main class="main-content" data-title="Operations Dashboard" data-subtitle="Live numbers from the app and what needs your attention">
-        <!-- draws the menu and the top bar with the first picture: see pageFrame.js -->
+
         <script src="../_Shared/pageFrame.js"></script>
         <div class="board">
 
-            <!-- the five numbers -->
+
             <section class="panel bare" data-panel="numbers" data-label="Numbers" data-w="8" data-source="numbers">
                 <div class="kpi-row">
-                    <!-- one tile = one number: its icon, the number and ONE label side by side. What a tile does on a click, and
-                         what its number means, is in the tip of the tile itself (no extra badges). -->
+
+
                     <div class="kpi" id="kpiScans" role="button" tabindex="0" data-tip-title="Scans today" data-tip="Scans made in the app since midnight. It counts up while you watch." data-tip-preview="Click: the list below shows every scan again.">
                         <span class="kpi-icon"><i data-icon="activity"></i></span>
                         <span class="kpi-text"><span class="kpi-value skeleton" id="totalScansCount">00</span><span class="kpi-title">Scans today</span></span>
@@ -72,19 +70,19 @@
                 </div>
             </section>
 
-            <!-- what to do next -->
+
             <section class="panel" data-panel="actions" data-label="Quick actions" data-w="4" data-source="quickActions">
                 <div class="panel-head">
                     <h3 class="panel-title">Quick actions</h3>
                     <button type="button" class="guide-badge" data-tip-title="Quick actions" data-tip="Shortcuts to tasks: what waits for review (a blue tile, only when something waits), adding, cleaning up and the Recycle bin. The pages themselves are in the menu on the left.">i</button>
                 </div>
-                <!-- only what WAITS gets a full tile. The two shortcuts stand side by side as small buttons: the menu on the
-                     left has them too. What a tile opens is in its own tip (no badge beside every tile). -->
+
+
                 <div class="tile-stack">
                     <div class="sk sk-review-tile" id="reviewTilesLoading" aria-hidden="true"></div>
                     <a id="reviewInventoryTile" style="display: none;" href="../_Admin_Brand_Inventory/adminBrandInventory.html?show=review" class="tile review" data-tip-title="Inventory waiting for review" data-tip="Products and brands the app added from scans, or that were imported. The app does not use them until you approve them." data-tip-preview="Opens the inventory showing only these entries."><i data-icon="inbox"></i><span class="tile-title" id="reviewInventoryTitle">Waiting for review</span><i data-icon="right"></i></a>
                     <a id="reviewIngredientsTile" style="display: none;" href="../_Admin_Ingredient_Curator/adminIngredientCurator.html?show=review" class="tile review" data-tip-title="Ingredients waiting for review" data-tip="Ingredients the app's AI lookup found. Until you approve one, the app uses its warnings but never counts it as proof of safety." data-tip-preview="Opens the Ingredient Curator showing only these entries."><i data-icon="inbox"></i><span class="tile-title" id="reviewIngredientsTitle">Waiting for review</span><i data-icon="right"></i></a>
-                    <!-- tasks, not pages: the menu on the left already opens the pages themselves -->
+
                     <div class="tile-pair">
                         <a href="../_Admin_Brand_Inventory/adminBrandInventory.html?add=product" class="tile small" data-tip-title="Add product" data-tip="Opens the empty product form straight away." data-tip-preview="In Brand &amp; Product Inventory."><i data-icon="plus"></i><span class="tile-title">Add product</span></a>
                         <a href="../_Admin_Ingredient_Curator/adminIngredientCurator.html?add=1" class="tile small" data-tip-title="Add ingredient" data-tip="Opens the empty ingredient form straight away." data-tip-preview="In the Ingredient Curator."><i data-icon="plus"></i><span class="tile-title">Add ingredient</span></a>
@@ -103,7 +101,7 @@
                 </div>
             </section>
 
-            <!-- recent scans -->
+
             <section class="panel" data-panel="activity" data-label="Recent activity" data-w="8" data-source="activity">
                 <div class="panel-head">
                     <h3 class="panel-title">Recent activity</h3>
@@ -119,7 +117,7 @@
                 </div>
             </section>
 
-            <!-- today's results -->
+
             <section class="panel" data-panel="results" data-label="Today's results" data-w="4" data-source="results">
                 <div class="panel-head">
                     <h3 class="panel-title">Today's results</h3>
@@ -129,7 +127,7 @@
                 <ul class="result-legend" id="resultLegend"><li class="sk-legend" aria-hidden="true"><i class="sk sk-dot"></i><i class="sk sk-text w45"></i><i class="sk sk-time"></i></li><li class="sk-legend" aria-hidden="true"><i class="sk sk-dot"></i><i class="sk sk-text w45"></i><i class="sk sk-time"></i></li><li class="sk-legend" aria-hidden="true"><i class="sk sk-dot"></i><i class="sk sk-text w45"></i><i class="sk sk-time"></i></li></ul>
             </section>
 
-            <!-- most scanned brands -->
+
             <section class="panel" data-panel="brands" data-label="Most scanned brands" data-w="4" data-source="topBrands">
                 <div class="panel-head">
                     <h3 class="panel-title">Most scanned brands</h3>
@@ -141,8 +139,8 @@
                 </div>
             </section>
 
-            <!-- suggestions: a list that can get long, so it is wide and stands under the activity list. The three narrow
-                 panels (quick actions, results, brands) stack beside them, and no hole is left between panels. -->
+
+
             <section class="panel" data-panel="suggestions" data-label="Suggestions" data-w="8" data-source="suggestions">
                 <div class="panel-head">
                     <h3 class="panel-title">Suggestions</h3>
@@ -158,8 +156,8 @@
                 </div>
             </section>
 
-            <!-- Contact support (12 November 2026): reports sent from the app's Settings > Contact support (Firestore "supportReports"), one panel for each kind.
-                 "Suggestion" reports are in the Suggestions panel above. The id "support" is kept for the Bug panel, so saved layouts still find it. -->
+
+
             <section class="panel" data-panel="support" data-label="Bug reports" data-w="8" data-source="supportBug">
                 <div class="panel-head">
                     <h3 class="panel-title">Bug reports</h3>

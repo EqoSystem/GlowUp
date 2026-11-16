@@ -1,6 +1,6 @@
-// Browser check of the Add / Edit Ingredient window (10 November 2026): the section bar, the one field pattern, the Sources (N) rows and what
-// their links do, the paste and label helpers, and that nothing overlaps, clips or hides under the header or the footer.
-//   Run:  node tests/responsive/ingredientModal.scenario.mjs            (set SHOTS=<folder> to also save screenshots of every size)
+
+
+
 import { launch, openPage } from "./harness.mjs";
 import fs from "node:fs";
 import path from "node:path";
@@ -10,13 +10,13 @@ const ok = (good, what) => { checks++; if (!good) { failed++; console.log("FAILE
 const SHOTS = process.env.SHOTS || "";
 if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
 
-/** Every interactive thing in the open window: its box, and what is in front of its middle after it is scrolled into view. */
+
 async function layoutProblems(page) {
     return page.evaluate(() => {
         const modal = document.querySelector("#addIngredientModal .ing-modal");
         const body = document.getElementById("ingBody");
         const visible = (node) => { const r = node.getBoundingClientRect(); return r.width > 1 && r.height > 1 && node.checkVisibility({ contentVisibilityAuto: true, visibilityProperty: true, opacityProperty: false }); };
-        // the part of a box that can be seen: a box in the scrolling body is cut off by the body's edges
+
         const shown = (node) => {
             const r = node.getBoundingClientRect();
             if (!node.closest("#ingBody")) return r;
@@ -49,7 +49,7 @@ async function layoutProblems(page) {
             if (!node.closest(".ing-head, .ing-nav") && r2.top < head.bottom - 1 && r2.bottom > head.top) problems.push(`under the header: ${node.id || node.className}`);
         }
         body.scrollTop = 0;
-        // nothing wider than its box: no text or box pokes out sideways
+
         const mb = modal.getBoundingClientRect();
         modal.querySelectorAll("*").forEach((node) => {
             if (!visible(node) || node.closest(".ing-nav")) return;
@@ -86,7 +86,7 @@ try {
         await page.waitForSelector("#addIngredientForm", { state: "visible" });
         const tag = `${theme} ${label}`;
 
-        // --- structure
+
         ok(await page.locator(".ing-modal > .ing-head, .ing-modal > .ing-nav, .ing-modal > .ing-form").count() === 3, `${tag}: header, section bar and form are the three parts of the window`);
         ok(await page.evaluate(() => { const m = document.querySelector(".ing-modal"); const f = document.querySelector(".ing-foot"); return getComputedStyle(f).position === "static" && f.parentElement.classList.contains("ing-form") && m.contains(f); }), `${tag}: the footer is a flex part, not laid over the body`);
         ok(await page.locator("#addIngredientModal .modal-actions").evaluate((n) => { const r = n.getBoundingClientRect(); return Math.abs(r.right - n.closest(".ing-modal").getBoundingClientRect().right) < 40; }), `${tag}: Cancel and Save are at the bottom right`);
@@ -94,17 +94,17 @@ try {
         ok(order[0] === "Cancel" && order[1] === "Save Ingredient", `${tag}: Cancel is left of Save`);
         ok(await page.locator(".ing-nav-btn").count() === 3, `${tag}: three sections in the bar`);
         ok(await page.evaluate(() => Array.from(document.querySelectorAll(".ing-section-title")).map((h) => h.textContent).join("|") === "What app users read|Other names and sources|How the app judges it"), `${tag}: the three section names are kept`);
-        // field pattern: every labelled control has label-for, label row first
+
         ok(await page.evaluate(() => Array.from(document.querySelectorAll(".ing-modal .field")).every((f) => f.firstElementChild && f.firstElementChild.classList.contains("label-row"))), `${tag}: every field starts with a label row`);
         ok(await page.evaluate(() => Array.from(document.querySelectorAll(".ing-modal .label-row > label[for]")).every((l) => document.getElementById(l.htmlFor))), `${tag}: every label points at its box`);
-        // order: allergy with Allergen Family; Risk, Age and Caution together
+
         const sequence = await page.evaluate(() => Array.from(document.querySelectorAll("#secJudge .label-row > label, #secJudge .label-row > .label-text")).map((l) => l.textContent.replace(/\(optional\)/, "").trim()));
         ok(sequence.join("|") === "Risk Level|Minimum Age|Caution Note|Commonly Used In|Highlights|Allergen Family|Skin Types|Skin Conditions", `${tag}: order in the last section (got ${sequence.join("|")})`);
-        // columns: two only for short boxes, one below 768
+
         const halves = await page.evaluate(() => Array.from(document.querySelectorAll(".ing-grid > .half")).map((n) => n.querySelector("label").textContent.trim().replace(/\s*\*$/, "")));
         ok(halves.join("|") === "INCI name|Ingredient classification|Risk Level|Minimum Age", `${tag}: only the short boxes share a row`);
         if (width < 768) ok(await page.evaluate(() => { const a = document.getElementById("ingredientNameInput").getBoundingClientRect(), b = document.getElementById("ingredientClassInputCombo") ? document.getElementById("ingredientClassInputCombo").getBoundingClientRect() : document.getElementById("ingredientClassInput").getBoundingClientRect(); return b.top >= a.bottom - 1; }), `${tag}: one column on a narrow screen`);
-        // sizes
+
         ok(await page.evaluate(() => { const r = document.getElementById("ingredientNameInput").getBoundingClientRect(); return Math.abs(r.height - 40) < 1.5; }), `${tag}: a text box is 40 px high`);
         ok(await page.evaluate(() => document.getElementById("ingredientDescInput").getBoundingClientRect().height >= 95), `${tag}: a text area is at least 96 px high`);
         ok(await page.evaluate(() => Array.from(document.querySelectorAll(".label-actions .icon-btn")).every((b) => { const r = b.getBoundingClientRect(); return r.width >= 31.5 && Math.abs(r.width - r.height) < 0.6; })), `${tag}: icon buttons are square and at least 32 px`);
@@ -112,7 +112,7 @@ try {
         ok(await page.evaluate(() => Array.from(document.querySelectorAll(".fit-row")).every((r) => r.tagName === "FIELDSET" && r.querySelector("legend"))), `${tag}: each skin row is a fieldset with a legend`);
         ok(await page.evaluate(() => Array.from(document.querySelectorAll("#skinTypesFit .fit-choice span")).slice(0, 3).map((s) => s.textContent).join("|") === "Avoid|Neutral|Good"), `${tag}: Avoid | Neutral | Good (no bare dash)`);
         ok(await page.evaluate(() => { const rows = Array.from(document.querySelectorAll(".fit-row")).map((r) => Math.round(r.getBoundingClientRect().height)); return Math.max(...rows) - Math.min(...rows) <= 2 || window.innerWidth < 768; }), `${tag}: the skin rows have one height`);
-        // sources start closed, then one row per box
+
         ok(await page.locator('[data-field-sources="purpose"]:visible').count() === 0, `${tag}: no sources before a name is typed`);
         ok(await page.locator('[data-field-sources="name"], [data-field-sources="classification"], [data-field-sources="allergens"]').count() === 0, `${tag}: no Sources row for the INCI name, the classification and the allergen family`);
         await page.fill("#ingredientNameInput", "Sodium Hyaluronate");
@@ -123,7 +123,7 @@ try {
         ok(/^Sources \(\d+\)$/.test((await page.textContent('[data-field-sources="purpose"] summary')).trim()), `${tag}: the row reads Sources (N)`);
         ok(await page.locator('[data-field-sources="judgment"]:visible').count() === 1, `${tag}: the admin-judgment line is shown once`);
 
-        // --- layout in the plain state, then in the worst state
+
         let result = await layoutProblems(page);
         ok(result.problems.length === 0, `${tag}: no overlap, nothing covered, nothing under the header or footer (${result.count} controls) ${result.problems.join(" ; ")}`);
         if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `${theme}-${label}-plain.png`) });
@@ -140,7 +140,7 @@ try {
         await page.context().close();
     }
 
-    // ---------------------------------------------------------------- behaviour (one size)
+
     {
         const { page, errors, settle } = await openPage(browser, "cur", { width: 1100, height: 800 });
         await settle(400);
@@ -151,7 +151,7 @@ try {
         await page.waitForSelector("#addIngredientForm", { state: "visible" });
         await page.fill("#ingredientNameInput", "Glycerin");
 
-        // section bar: clicking goes there and marks it; scrolling moves the mark
+
         await page.click('.ing-nav-btn[data-jump="secJudge"]');
         await page.waitForTimeout(700);
         ok(await page.locator('.ing-nav-btn[data-jump="secJudge"][aria-current="true"]').count() === 1, "clicking a section in the bar marks it");
@@ -160,26 +160,26 @@ try {
         await page.waitForTimeout(200);
         ok(await page.locator('.ing-nav-btn[data-jump="secUsers"][aria-current="true"]').count() === 1, "scrolling back up moves the mark back");
 
-        // sources: closed by default, the state is remembered while the name changes
+
         const purpose = '[data-field-sources="purpose"]';
         await page.click(`${purpose} summary`);
         await page.type("#ingredientNameInput", "x");
         ok(await page.locator(`${purpose} details[open]`).count() === 1, "an open Sources row stays open while the name changes");
         await page.fill("#ingredientNameInput", "Glycerin");
-        // rows: link | what to look for | + ref
+
         const rows = await page.evaluate((sel) => Array.from(document.querySelectorAll(sel + " .lookup-row")).map((r) => ({ name: r.querySelector(".source-link").textContent, look: r.querySelector(".lookup-text").textContent.length > 15, ref: r.querySelector(".ref-add").disabled })), purpose);
         ok(rows.length === 2 && rows.every((r) => r.look), "each row has the source and what to look for");
         ok(rows.find((r) => r.name === "EU CosIng").ref === true && rows.find((r) => r.name === "COSMILE Europe").ref === true, "+ ref is off for a landing or a search page");
-        // every link of every box goes to an allowed site, never a search engine, and opens in a new tab safely
+
         const hrefs = await page.evaluate(() => Array.from(document.querySelectorAll("#addIngredientForm a.source-link")).map((a) => ({ href: a.href, rel: a.rel, target: a.target })));
         ok(hrefs.length > 10 && hrefs.every((h) => /^https:\/\//.test(h.href) && !/google|bing|duckduckgo/.test(h.href) && h.target === "_blank" && /noopener/.test(h.rel)), "all links: https, no search engine, new tab, noopener");
         ok(hrefs.some((h) => h.href === "https://cosmileeurope.eu/inci/results/?q=Glycerin"), "COSMILE opens its own results for the name");
-        // landing: copies the name and says so
+
         await page.evaluate(() => { window.__copied = ""; Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: (t) => { window.__copied = t; return Promise.resolve(); } } }); document.querySelectorAll('a.source-link[data-source]').forEach((a) => a.addEventListener("click", (e) => e.preventDefault())); });
         await page.click(`${purpose} a[data-source="cosing"]`);
         ok(await page.evaluate(() => window.__copied) === "Glycerin", "a landing page copies the INCI name");
         ok(await page.locator(".toast", { hasText: "INCI name copied. Paste it in the site's search box." }).count() >= 1, "and the toast says so");
-        // click limit: tapping the same source again and again opens it once and copies once
+
         const toastsBefore = await page.locator(".toast").count();
         await page.evaluate(() => { window.__copied = ""; });
         for (let i = 0; i < 5; i++) await page.click(`${purpose} a[data-source="cosing"]`);
@@ -189,7 +189,7 @@ try {
         await page.evaluate(() => { window.__copied = ""; });
         await page.click(`${purpose} a[data-source="cosmile"]`);
         ok(await page.evaluate(() => window.__copied) === "", "a search link copies nothing");
-        // + ref only for PubChem's page of this ingredient
+
         const chem = '[data-field-sources="chemicalDescription"]';
         await page.click(`${chem} summary`);
         await page.locator(`${chem} [data-add-ref="pubchem"]`).click();
@@ -198,24 +198,24 @@ try {
         await page.locator(`${chem} [data-add-ref="pubchem"]`).click();
         await page.waitForTimeout(400);
         ok((await page.inputValue("#ingredientSourcesInput")).split("\n").length === 1, "the same page is not added twice");
-        await page.waitForTimeout(2100);                       // past the click limit
+        await page.waitForTimeout(2100);
         await page.fill("#ingredientNameInput", "Nonsensename");
         await page.locator(`${chem} [data-add-ref="pubchem"]`).click();
         await page.waitForTimeout(500);
         ok((await page.inputValue("#ingredientSourcesInput")).split("\n").length === 1, "a name PubChem does not know adds nothing");
         ok(await page.locator(".toast", { hasText: "no page for this exact name" }).count() >= 1, "and says so");
         await page.fill("#ingredientNameInput", "Glycerin");
-        // Reference links list
+
         const refs = '[data-field-sources="sources"]';
         await page.click(`${refs} summary`);
         ok(await page.locator(`${refs} .lookup-row`).count() >= 8, "Reference links lists each source once");
         ok(/Used for:/.test(await page.textContent(`${refs} .lookup-text`)), "with what it is used for");
-        // bare address gets its label on blur
+
         await page.fill("#ingredientSourcesInput", "https://www.cir-safety.org/ingredients\nMy note | https://example.com/x\nhttps://unknown.example/y");
         await page.focus("#ingredientAliasesInput");
         ok(await page.inputValue("#ingredientSourcesInput") === "Cosmetic Ingredient Review | https://www.cir-safety.org/ingredients\nMy note | https://example.com/x\nhttps://unknown.example/y", "a bare address gets its label when the box is left");
 
-        // errors: a failed save focuses the box, marks it, and keeps it clear of the header and footer
+
         await page.fill("#ingredientNameInput", "");
         await page.evaluate(() => { const line = document.querySelector("#addIngredientForm .form-error"); document.getElementById("ingredientNameInput").focus(); line.textContent = "Please enter the ingredient name."; line.style.display = "block"; });
         await page.waitForTimeout(300);
@@ -225,7 +225,7 @@ try {
         await page.fill("#ingredientNameInput", "Glycerin");
         ok(await page.locator("#addIngredientForm [aria-invalid=true]").count() === 0, "typing clears the mark");
 
-        // keyboard: Tab goes top to bottom, stays inside the window, Esc closes
+
         await page.click(".ing-head h3");
         await page.evaluate(() => { document.getElementById("ingBody").scrollTop = 0; document.querySelector(".ing-close").focus(); });
         const trail = [];
@@ -244,7 +244,7 @@ try {
         await page.keyboard.press("Escape");
         await page.waitForTimeout(200);
         ok(await page.evaluate(() => getComputedStyle(document.getElementById("addIngredientModal")).display === "none"), "Esc closes the window");
-        ok(errors.filter((e) => !/404/.test(e)).length === 0, "no page errors in the behaviour checks " + errors.join("; "));       // (the one 404 is PubChem not knowing a made-up name, on purpose)
+        ok(errors.filter((e) => !/404/.test(e)).length === 0, "no page errors in the behaviour checks " + errors.join("; "));
         await page.context().close();
     }
 } finally { await browser.close(); }

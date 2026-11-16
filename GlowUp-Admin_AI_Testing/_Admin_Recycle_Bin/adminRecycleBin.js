@@ -1,17 +1,17 @@
-// Recycle Bin: every ingredient, brand and product that was removed, in one place.
-//
-// Removing an entry on the other pages does not delete it: it gets binned == true (with binnedAt, and for brands and
-// products statusBeforeBin, binnedWith and binnedReason). The app stops using it at once. This page lists those entries
-// under three tabs and offers two things:
-//   Restore             - the entry comes back with the status it had. A brand brings back the products that were
-//                         removed WITH it; a product never comes back without its brand (the brand is restored too).
-//   Delete permanently  - always asks first, with the names and what is lost. It cannot be undone, so a copy of what is
-//                         deleted is saved to the admin's computer first (a JSON file in the Downloads folder).
-//                         Before an ingredient is deleted the page says how many products still list it.
-// Several entries can be selected and restored or deleted together ("Delete selected permanently" asks as well).
-// Nothing here is new in the database: the page reads and writes the same fields the Inventory and the Curator use.
-// Since 29 October 2026 a third action, Move to Archive, hands entries to the Archive (adminArchive.js): kept 30 days,
-// then deleted by the server job. Restore and Delete permanently above work exactly as before.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import { db } from "../_Database/firebase-console.js";
 import { collection, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getDocs, writeBatch, onListsRefreshed } from "../_Shared/adminStore.js";
@@ -27,20 +27,20 @@ import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 
 const el = (id) => document.getElementById(id);
 const many = (n, one, more) => `${n} ${n === 1 ? one : more}`;
-const BATCH_LIMIT = 400;               // Firestore takes at most 500 writes in one batch
+const BATCH_LIMIT = 400;
 const KINDS = {
     ingredients: { title: "Removed ingredients", one: "ingredient", more: "ingredients" },
     brands: { title: "Removed brands", one: "brand", more: "brands" },
     products: { title: "Removed products", one: "product", more: "products" }
 };
 
-const all = { ingredients: [], brands: [], products: [] };     // every entry of each list, removed or not
+const all = { ingredients: [], brands: [], products: [] };
 let kind = "ingredients";
 let loaded = false;
-const picked = new Set();              // ids picked on the tab that is shown
+const picked = new Set();
 const pager = { page: 1, size: 10 };
 
-// "Show as" for the list of removed entries (12 November 2026): what the tab shows, as a list, row, grid or graph
+
 registerDataset("bin", {
     label: "Removed entries", noun: "entries", nounOne: "entry",
     items: () => (loaded ? shownEntries() : []),
@@ -50,13 +50,13 @@ registerDataset("bin", {
 
 document.addEventListener("DOMContentLoaded", async () => {
     mountShell("bin");
-    bindButtons({ "bin.restore": "#restoreSelectedBtn", "bin.archive": "#archiveSelectedBtn", "bin.delete": "#deleteSelectedBtn" });      // keyboard shortcuts (shortcuts.js)
-    // the one Refresh data button of the site goes in front of the Archive button, in the header (New8.pdf)
+    bindButtons({ "bin.restore": "#restoreSelectedBtn", "bin.archive": "#archiveSelectedBtn", "bin.delete": "#deleteSelectedBtn" });
+
     addRefreshDataButton(placeHeaderParts());
     wireSignOut();
     setupNavigationGuard();
     el("binStatusGuide").innerHTML = statusGuide();
-    try { const wanted = new URLSearchParams(location.search).get("show"); if (KINDS[wanted]) kind = wanted; } catch (error) { /* keep the first tab */ }
+    try { const wanted = new URLSearchParams(location.search).get("show"); if (KINDS[wanted]) kind = wanted; } catch (error) {                          }
     paintTabs();
     await requireAdmin();
 
@@ -83,9 +83,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     load();
 });
 
-// ---------------------------------------------------------------------------------------------
-// Loading
-// ---------------------------------------------------------------------------------------------
+
+
+
 async function load() {
     try {
         const [ingredients, brands, products] = await Promise.all([
@@ -105,23 +105,23 @@ async function load() {
     }
 }
 
-// ---------------------------------------------------------------------------------------------
-// What is shown
-// ---------------------------------------------------------------------------------------------
+
+
+
 const binned = (of = kind) => all[of].filter((x) => x.binned);
 const brandOf = (product) => all.brands.find((b) => b.id === product.brandId) || null;
 const nameOf = (x, of = kind) => String(x.name || (of === "products" ? x.productName : "") || `Unnamed ${KINDS[of].one}`);
-/** The products that went to the bin together with a brand. */
+
 const ridersOf = (brand) => all.products.filter((p) => p.binned && p.binnedWith === brand.id);
 
 function shownEntries() {
     const typed = el("binSearchInput").value;
     return binned()
         .filter((x) => matchesSearch(typed, [nameOf(x), x.techName, x.brandName, x.cosmeticType, x.binnedReason].concat(asArray(x.aliases))))
-        .sort((a, b) => (b.binnedAt || 0) - (a.binnedAt || 0) || nameOf(a).localeCompare(nameOf(b)));        // the latest removal first
+        .sort((a, b) => (b.binnedAt || 0) - (a.binnedAt || 0) || nameOf(a).localeCompare(nameOf(b)));
 }
 
-/** Why an entry is in the bin, in words (what was written down when it was removed). */
+
 function whyOf(x) {
     if (x.binnedReason) return String(x.binnedReason);
     if (kind === "products" && x.binnedWith) { const brand = all.brands.find((b) => b.id === x.binnedWith); return `Removed together with its brand${brand ? " " + nameOf(brand, "brands") : ""}.`; }
@@ -144,7 +144,7 @@ function render() {
     el("countIngredients").textContent = binned("ingredients").length || "";
     el("countBrands").textContent = binned("brands").length || "";
     el("countProducts").textContent = binned("products").length || "";
-    setBinCount();                         // the count on the logo's settings menu follows what this page shows
+    setBinCount();
 
     const inBin = binned(), shown = shownEntries();
     Array.from(picked).forEach((id) => { if (!inBin.some((x) => x.id === id)) picked.delete(id); });
@@ -207,10 +207,10 @@ function onRowClick(event) {
     else if (button.dataset.act === "archive") archive([entry]);
 }
 
-/**
- * MOVE TO ARCHIVE. Asks first. A brand takes the products that are in the bin under it (as Delete permanently does);
- * each entry is checked again just before the move (adminArchive.js), and the move and the removal from here are one batch.
- */
+
+
+
+
 async function archive(entries) {
     if (entries.length === 0) return;
     const moving = [], names = [], seen = new Set();
@@ -246,10 +246,10 @@ async function archive(entries) {
     await load();
 }
 
-// ---------------------------------------------------------------------------------------------
-// Writing
-// ---------------------------------------------------------------------------------------------
-/** Writes in batches; `ops` = [{ ref, data }] to change a document, [{ ref }] to delete it. Throws on the first batch that fails. */
+
+
+
+
 async function runBatches(ops) {
     for (let i = 0; i < ops.length; i += BATCH_LIMIT) {
         const batch = writeBatch(db);
@@ -258,11 +258,11 @@ async function runBatches(ops) {
     }
 }
 
-/**
- * RESTORE. Each entry gets back the status it had before it was removed. A brand brings back the products that were
- * removed with it (binnedWith); a product whose brand is still in the bin brings its brand back too, because the app
- * never shows a product without its brand.
- */
+
+
+
+
+
 async function restore(entries) {
     if (entries.length === 0) return;
     const ops = [], seen = new Set();
@@ -296,13 +296,13 @@ async function restore(entries) {
     await load();
 }
 
-/** How many listed products still name this ingredient in their ingredient list. */
+
 function productsUsing(ingredient) {
     const keys = new Set([ingredient.name, ingredient.techName].concat(asArray(ingredient.aliases)).map(sameKey).filter((key) => key));
     return all.products.filter((p) => !p.binned && asArray(p.ingredients).some((name) => keys.has(sameKey(name)))).length;
 }
 
-/** A copy of what is about to be deleted, saved to the admin's computer (a JSON file), so a mistake can still be put right by hand. */
+
 function saveCopy(documents) {
     try {
         const stamp = new Date().toISOString().replace(/[:T]/g, "-").slice(0, 19);
@@ -316,10 +316,10 @@ function saveCopy(documents) {
     } catch (error) { console.warn("The copy could not be saved: ", error); return false; }
 }
 
-/**
- * DELETE PERMANENTLY. Always asks, with the names and what is lost. A brand is deleted together with the products that
- * are in the bin under it. For ingredients the question says how many listed products still name them.
- */
+
+
+
+
 async function purge(entries) {
     if (entries.length === 0) return;
     const refs = new Map(), copies = [], names = [];
@@ -339,7 +339,7 @@ async function purge(entries) {
         } else if (kind === "products") names.push((x.brandName ? x.brandName + ": " : "") + nameOf(x));
         else { const used = productsUsing(x); if (used > 0) stillUsed++; names.push(nameOf(x) + (used > 0 ? ` (still listed by ${many(used, "product", "products")})` : "")); }
     });
-    entries.forEach((x) => take(x, kind));                 // the entries themselves go last (a brand after its products)
+    entries.forEach((x) => take(x, kind));
     if (kind === "ingredients") lost = (stillUsed > 0 ? `${many(stillUsed, "of them is", "of them are")} still in the ingredient list of products. ` : "")
         + "What you wrote about them is lost; the app falls back to its own built-in knowledge, or treats them as unknown.";
     else if (kind === "brands") lost = entries.length === 1 ? "The brand and the removed products under it are taken out of the database, with their scan counts."

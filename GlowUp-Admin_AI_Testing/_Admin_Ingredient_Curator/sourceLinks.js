@@ -1,10 +1,10 @@
-// The SOURCE LINK beside the boxes of the Ingredient form, and the one Source Finder (10 November 2026).
-//
-// Each box named in SOURCE_LINK_FIELDS (fieldSources.js) gets, beside it on a wide window and under it on a narrow one:
-//   "Source link (optional)" - one https address - an Open button - a status line (kind of site, warnings, "No source", the check)
-//   - "Check link" (the server opens the page once: api/source-link.js) - "Find source" (the Source Finder, in the page under that box).
-// The rules for an address are in _Shared/sourceLinkRules.mjs (the server uses the same file). Nothing here fills a box's VALUE: the admin
-// writes it; a source only proves it.
+
+
+
+
+
+
+
 
 import { escapeHtml, notify } from "../_Shared/adminCommon.js";
 import { SOURCE_LINK_FIELDS, SOURCES, COSING_INDEX_ENABLED, finderWhat } from "../_Shared/fieldSources.js";
@@ -15,16 +15,16 @@ const WARN_ICON = '<span class="src-glyph" aria-hidden="true">!</span>';
 const OK_ICON = '<span class="src-glyph ok" aria-hidden="true">&#10003;</span>';
 const NONE_ICON = '<span class="src-glyph none" aria-hidden="true">&#8211;</span>';
 
-/**
- * Builds the source-link parts of the form once. `getName` = the INCI name typed in the form; `getCas` = a CAS number found in the form
- * (or ""); `getToken` = the admin's sign-in token for the server; `onChange` = called after any change (the header chip).
- */
+
+
+
+
 export function mountSourceLinks({ getName, getCas, getToken, onChange }) {
     const fields = SOURCE_LINK_FIELDS.filter((f) => f.enabled && document.getElementById(f.input));
-    const rows = new Map();          // key -> { field, input, box, status, open, check, find, valueBox, checked }
+    const rows = new Map();
     const finder = buildFinder();
     let openFor = null;
-    const cosingAnswers = new Map();  // INCI name -> answer (the same name is not asked twice while the page is open)
+    const cosingAnswers = new Map();
 
     for (const f of fields) {
         const valueBox = document.getElementById(f.input);
@@ -40,7 +40,7 @@ export function mountSourceLinks({ getName, getCas, getToken, onChange }) {
             + `<a class="icon-btn src-open" target="_blank" rel="noopener noreferrer" aria-label="Open source for ${escapeHtml(f.label)} in new tab" aria-disabled="true">${OPEN_ICON}</a></div>`
             + `<p class="src-status" id="${id}Status" role="status"></p>`
             + `<div class="src-actions"><button type="button" class="row-btn src-check">Check link</button><button type="button" class="link-btn src-find" aria-expanded="false">Find source</button><span class="src-find-hint"></span></div>`;
-        // keyboard order: label - the box - the source link - Open - Check link - Find source (the hint and the Sources row come after)
+
         valueBox.insertAdjacentElement("afterend", body);
         valueBox.insertAdjacentElement("afterend", label);
         const r = {
@@ -55,7 +55,7 @@ export function mountSourceLinks({ getName, getCas, getToken, onChange }) {
         r.find.addEventListener("click", () => (openFor === r ? closeFinder(true) : openFinder(r)));
     }
 
-    /** The status line, the Open button and the Find source button of one row. */
+
     function paint(r) {
         const v = checkSourceUrl(r.input.value);
         const hasValue = r.valueBox.value.trim().length > 0;
@@ -97,9 +97,9 @@ export function mountSourceLinks({ getName, getCas, getToken, onChange }) {
         paint(r);
     }
 
-    // ---------------------------------------------------------------------------------------------
-    // The Source Finder: in the page flow, under the box whose "Find source" was pressed; one at a time
-    // ---------------------------------------------------------------------------------------------
+
+
+
     function buildFinder() {
         const box = document.createElement("section");
         box.className = "src-finder";
@@ -203,22 +203,22 @@ export function mountSourceLinks({ getName, getCas, getToken, onChange }) {
     }
 
     return {
-        /** Fills the boxes from an ingredient (or empties them). */
+
         fill(item) {
             closeFinder(false);
             for (const r of rows.values()) { r.input.value = item && item.sourceLinks ? item.sourceLinks[r.field.key] || "" : ""; r.checked = null; paint(r); }
             onChange();
         },
-        /** Repaints every row (after the name or a value changed by code). */
+
         refresh() { for (const r of rows.values()) paint(r); },
-        /** The first row whose address cannot be saved: { input, message } or null. */
+
         firstError() {
             for (const r of rows.values()) { const v = checkSourceUrl(r.input.value); if (!v.ok) return { input: r.input, message: `${r.field.label} source link: ${v.error}` }; }
             return null;
         },
-        /** { dataField: address } for saving ("" = empty). */
+
         values() { const out = {}; for (const r of rows.values()) out[r.field.data] = checkSourceUrl(r.input.value).value; return out; },
-        /** "Sources: n of N fields": N = enabled boxes that have a value, n = those that also have a source link. */
+
         count() {
             let n = 0, total = 0;
             for (const r of rows.values()) if (r.valueBox.value.trim()) { total++; if (checkSourceUrl(r.input.value).value && checkSourceUrl(r.input.value).ok) n++; }
@@ -228,7 +228,7 @@ export function mountSourceLinks({ getName, getCas, getToken, onChange }) {
     };
 }
 
-/** The same count for a saved ingredient (the list's detail view). */
+
 export function countSaved(item) {
     let n = 0, total = 0;
     const values = { purpose: item.purpose, description: item.description, chemicalDescription: item.chemicalDescription, aliases: (item.aliases || []).join(", "), cautionNote: item.cautionNote, commonUses: item.commonUses };

@@ -1,6 +1,6 @@
-// Checks of the slow search behind "Clean up" and "Find duplicates" (glowupCatalog.js): the sliced version gives the same answer as the
-// whole one, reports progress, can be cancelled and hands the page back between slices; and source checks of the guards in the Curator.
-// No browser and no network.   Run: node tests/scan.test.mjs
+
+
+
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -40,7 +40,7 @@ let stop = false, seen = 0;
 const cancelled = await ingredientLookalikesAsync(many, 0.93, { sliceMs: 1, onProgress: () => { if (++seen === 2) stop = true; }, cancelled: () => stop });
 check(cancelled === null, "a cancelled search answers null and stops");
 
-// ---- the Curator: shown at once, one scan at a time, lifted again afterwards, no raw error
+
 const js = read("_Admin_Ingredient_Curator/adminIngredientCurator.js");
 const cleanup = read("_Shared/adminCleanup.js");
 check(/let scanning = false;/.test(js) && /if \(scanning\) \{ notify\("A scan is running already\./.test(js), "a second click while a scan runs is refused");

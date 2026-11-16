@@ -1,11 +1,25 @@
-// Browser check: the dots in the password box become a long row when the form is sent (2026-11-10).
-//   Run: node tests/responsive/loginMask.scenario.mjs
+
+
 import { launch, openPage } from "./harness.mjs";
 
 let checks = 0, failed = 0;
 const ok = (good, what) => { checks++; if (!good) { failed++; console.log("FAILED: " + what); } };
 const browser = await launch();
 try {
+    {
+        // no saved choice and a DARK system: the site still opens light; clearing the email clears the password
+        const { page, settle } = await openPage(browser, "login", { theme: null, width: 1024, height: 800 });
+        await settle(500);
+        ok(await page.evaluate(() => document.documentElement.dataset.theme) === "light", "the default theme is light (even on a dark system)");
+        await page.fill("#username", "someone@example.com");
+        await page.fill("#password", "secret123");
+        await page.fill("#username", "");
+        ok(await page.inputValue("#password") === "", "clearing the email clears the password");
+        await page.fill("#username", "a@b.co");
+        await page.fill("#password", "x1");
+        await page.fill("#username", "a@b.c");
+        ok(await page.inputValue("#password") === "x1", "editing the email (not clearing it) keeps the password");
+    }
     for (const width of [1440, 390]) {
         const { page, errors, settle } = await openPage(browser, "login", { width, height: 800 });
         await settle(500);

@@ -1,14 +1,14 @@
-// The plain import: reads the import file format of the GlowUp prompt WITHOUT any AI.
-//
-//   === BRAND ===  /  === PRODUCT ===  /  === INGREDIENT ===     one block per record, "KEY: value" lines, lists with " | "
-//   or an Excel sheet whose first row holds the KEYS, one record per row.
-//
-// The answer has the same shape the AI import gives the pages (see tidyImport / tidyIngredientImport in api/assist-ingredient.js):
-//   { kind: "inventory", draft: { products: [...], brands: [...] }, notes: [] }
-//   { kind: "ingredients", draft: { ingredients: [...] }, notes: [] }
-//   { kind: "" }                                  the text is not in this format: the pages ask the AI instead
-//   { kind: "mixed" }                             brands/products AND ingredients in one file: the pages ask for two files
-// Nothing here guesses: a value that is missing, "N/A" or "None" stays empty. Pure code, no network (checked by tests/importFormat.test.mjs).
+
+
+
+
+
+
+
+
+
+
+
 import { MAKEUP_TYPES } from "./glowupRules.js";
 
 export const KEYS = {
@@ -24,9 +24,9 @@ const RISKS = ["safe", "caution", "harmful"];
 const NOTHING = new Set(["", "n/a", "na", "none", "null", "-", "--", "unknown", "not found", "not available", "not stated"]);
 
 const squeeze = (value) => String(value == null ? "" : value).replace(/\s+/g, " ").trim();
-/** A value, or "" when the file says there is none. */
+
 const value = (raw, most) => { const t = squeeze(raw); return NOTHING.has(t.toLowerCase()) ? "" : t.slice(0, most); };
-/** " | " list (a newline or ";" also separates when no bar is there); each item cleaned, no repeats, at most `most` items. */
+
 const listOf = (raw, length, most) => {
     const t = squeeze(raw);
     if (NOTHING.has(t.toLowerCase())) return [];
@@ -40,10 +40,10 @@ const httpsUrl = (raw) => {
 const httpsLinks = (raw, most) => listOf(raw, 500, most * 2).map(httpsUrl).filter((u, i, all) => u && all.indexOf(u) === i).slice(0, most);
 const age = (raw) => { const n = Number(squeeze(raw)); return Number.isInteger(n) && n > 0 && n < 100 ? n : 0; };
 
-/** The FDA registration number as the website keeps it (letters, digits and . , # ( ) _ - /; at most 40), or "". */
+
 const fdaNumberOf = (raw) => { const t = value(raw, 40); return /^[A-Za-z0-9][A-Za-z0-9 .,#()_\-\/]{0,39}$/.test(t) ? t : ""; };
 
-/** "#C24B62", "c24b62", "#C46", "rgb(194, 75, 98)" -> "#C24B62"; a shade NUMBER ("#128", "128") or a name -> "". The rule of cleanShade / normalShade. */
+
 export function hexOf(raw) {
     let color = squeeze(raw).toUpperCase();
     const rgb = color.match(/^RGB\(\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*\)$/);
@@ -59,22 +59,22 @@ export function hexOf(raw) {
     return /^#[0-9A-F]{6}$/.test(color) ? color : "";
 }
 
-/**
- * A shade CODE as it is printed on a pack ("119", "N20", "12A", "02"): capitals, letters and digits with . - / and spaces, at most 16
- * characters, or "" when there is none. A leading "#", "No." or "Shade" is dropped (the app ignores them too, see ShadeCode.cs).
- * Make-up brands label shades with codes, never with colours, so the website keeps the code next to the colour (hexOf above never
- * accepts "119" as a colour).
- */
+
+
+
+
+
+
 export function shadeCodeOf(raw) {
     const code = squeeze(raw).toUpperCase().replace(/^(?:SHADE\s+|NO\.\s*|NO\s+|#\s*)/, "").trim();
     return NOTHING.has(code.toLowerCase()) || !/^[A-Z0-9][A-Z0-9 .\-\/]{0,15}$/.test(code) ? "" : code;
 }
 
-/**
- * Shades as the website keeps them: colours ("#RRGGBB", in the order AR Try-On shows them) and, at the same place, the shade code
- * printed on the pack ("" = not known). Something that is not a colour is dropped together with its code; a colour listed twice keeps
- * its first place (and takes the second one's code when the first has none).
- */
+
+
+
+
+
 export function pairShades(rawShades, rawCodes, most = 24) {
     const shades = [], codes = [];
     const list = Array.isArray(rawShades) ? rawShades : [], codeList = Array.isArray(rawCodes) ? rawCodes : [];
@@ -89,7 +89,7 @@ export function pairShades(rawShades, rawCodes, most = 24) {
     return { shades, codes };
 }
 
-/** The address of a brand's own home page ("https://host/"), or "". The page still asks an admin to confirm it. */
+
 function homePage(raw) {
     const url = httpsUrl(raw);
     if (!url) return "";
@@ -97,7 +97,7 @@ function homePage(raw) {
     return host === "vertexaisearch.cloud.google.com" || host.endsWith("duckduckgo.com") ? "" : "https://" + new URL(url).host + "/";
 }
 
-// ---- reading the text into records: [{ type, fields: { KEY: "text" } }] ---------------------------------------------------
+
 function splitBlocks(text) {
     const records = [];
     const marks = [...text.matchAll(/={2,}\s*(BRAND|PRODUCT|INGREDIENT)\s*={2,}/gi)];
@@ -108,7 +108,7 @@ function splitBlocks(text) {
     return records;
 }
 
-/** "KEY: value" pairs. A key is only a key when it is one of the block's own keys at a word start, so a line break lost by a PDF cannot join two fields. */
+
 function fieldsOf(body, keys) {
     const fields = {};
     const found = [...body.matchAll(new RegExp("(?:^|\\s)(" + keys.join("|") + ")\\s*:", "g"))];
@@ -135,7 +135,7 @@ function csvRows(csv) {
     return rows.filter((r) => r.some((x) => squeeze(x)));
 }
 
-/** Excel: the reader gives "SHEET: name" then the sheet as CSV. Row 1 = the KEYS; the sheet's kind follows from them. */
+
 function sheetRecords(text) {
     const records = [];
     text.split(/^SHEET:[^\n]*\n/m).forEach((csv) => {
@@ -154,7 +154,7 @@ function sheetRecords(text) {
     return records;
 }
 
-// ---- records -> what the pages save ---------------------------------------------------------------------------------------
+
 function product(f) {
     const kind = value(f.COSMETIC_TYPE, 60);
     const fda = httpsLinks(f.FDA_PH_LINK, 1).find((u) => /(^|\.)fda\.gov\.ph$/i.test(new URL(u).hostname)) || "";
@@ -195,10 +195,10 @@ function ingredient(f) {
     };
 }
 
-/**
- * Reads the text of an import file. Answers { kind, draft, notes } (see the top of this file); notes say which records were left out and why.
- * The text is in the format when it has at least one "=== X ===" block, or a sheet whose first row holds the keys.
- */
+
+
+
+
 export function parseImportText(text) {
     const source = String(text || "");
     const records = /={2,}\s*(BRAND|PRODUCT|INGREDIENT)\s*={2,}/i.test(source) ? splitBlocks(source) : sheetRecords(source);
@@ -233,7 +233,7 @@ export function parseImportText(text) {
             seenProducts.add(key); products.push(item);
         }
     });
-    // a product knows its brand's details from the BRAND block of the same file
+
     products.forEach((p) => {
         const b = brands.find((x) => x.name.toLowerCase() === p.brandName.toLowerCase());
         if (b) { p.brandMarket = b.market; p.brandAliases = b.aliases; p.brandWebsiteSuggested = b.websiteSuggested; p.brandLogoUrl = b.logoUrl; p.brandImageUrl = b.imageUrl; }
@@ -241,10 +241,10 @@ export function parseImportText(text) {
     return { kind: "inventory", draft: { products, brands }, notes };
 }
 
-/**
- * Why Brand & Product Inventory does not read ingredient details (9 November 2026). `count` = how many were found
- * (0 or less = not counted). Said whenever a file there has them: the GlowUp import format, or found by the AI.
- */
+
+
+
+
 export function ingredientsNotHere(count) {
     const what = count > 0 ? `${count} ingredient record${count === 1 ? "" : "s"}` : "Ingredient records";
     return `${what} (what an ingredient is, its risk, classification or which skin it suits) cannot be extracted here. `
@@ -253,7 +253,7 @@ export function ingredientsNotHere(count) {
         + "Put the ingredient part in a file of its own and import it in the Ingredient Curator.";
 }
 
-/** Why the Ingredient Curator does not read brands or products (the same rule, the other way round). */
+
 export function inventoryNotHere(count) {
     const what = count > 0 ? `${count} brand or product record${count === 1 ? "" : "s"}` : "Brand and product records";
     return `${what} cannot be extracted here. The Ingredient Curator only reads ingredients; brands and products are checked for duplicates, make-up only and FDA links in Brand & Product Inventory. `

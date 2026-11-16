@@ -1,10 +1,10 @@
-// Browser check (9 November 2026): no text may be squeezed into a one-letter-wide column (the "Waiting for review" card list
-// once showed a product name letter by letter).   Run: node tests/responsive/textCollapse.scenario.mjs
+
+
 import { launch, openPage } from "./harness.mjs";
 
 let checks = 0, failed = 0;
 const ok = (good, what) => { checks++; if (!good) { failed++; console.log("FAILED: " + what); } };
-// an element that holds words (6+ letters), is narrower than 5 letters across, and is at least 4 lines tall
+
 const squeezed = () => {
     const bad = [];
     for (const node of document.querySelectorAll("body *")) {

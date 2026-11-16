@@ -6,19 +6,17 @@
     <title>GlowUp Admin - Brand &amp; Product Inventory</title>
     <link rel="icon" type="image/png" sizes="32x32" href="../_Shared/assets/glowup-icon-32.png">
     <script>
-        // dark or light before anything is drawn: the person's choice, else the computer's own setting
         (function () {
             var t = null;
             try { t = localStorage.getItem("glowup.theme"); } catch (e) { }
-            if (t !== "light" && t !== "dark") t = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+            if (t !== "light" && t !== "dark") t = "light";
             document.documentElement.dataset.theme = t;
         })();
-        // if the sign-in check never answers (no internet), say so instead of leaving a blank page
         setTimeout(function () {
             if (document.documentElement.classList.contains("auth-pending")) document.documentElement.classList.add("auth-stuck");
         }, 10000);
     </script>
-    <!-- the files this page needs are fetched side by side, not one after the other as each one names the next -->
+
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js">
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js">
@@ -41,12 +39,12 @@
 <body>
 
     <main class="main-content" data-title="Brand &amp; Product Inventory" data-subtitle="Make-up only: what the app knows, arranged your way">
-        <!-- draws the menu and the top bar with the first picture: see pageFrame.js -->
+
         <script src="../_Shared/pageFrame.js"></script>
         <div class="board">
 
-            <!-- everything that needs you, in ONE list, most important first (Urgent red, Check amber, Next blue, Good green, Tip grey).
-                 Folds like every panel; the arrow remembers the choice. -->
+
+
             <section class="panel notes-panel" data-panel="notes" data-label="Needs your attention" data-w="12">
                 <div class="panel-head">
                     <h3 class="panel-title">Needs your attention</h3>
@@ -57,11 +55,11 @@
             </section>
 
 
-            <!-- find and add -->
-            <!-- hidden since 29 October 2026: everything in it lives elsewhere (search, Add and More in the page header; the brand
-                 choice in the Filters pop-up). The controls stay here, hidden, because the page's code keeps its choices in them. -->
+
+
+
             <section class="panel" data-panel="tools" data-label="Brand filter" data-w="8" hidden>
-                <!-- ONE row. The search box and Add / More sit in the page header (they move there when the page opens); Sort and Filters sit in the table's bar. -->
+
                 <div class="toolbar inv-tools">
                     <div class="search-container">
                         <i data-icon="search"></i>
@@ -69,11 +67,11 @@
                         <button type="button" class="search-clear" id="inventorySearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
                         <div class="search-suggest" id="inventorySuggest" role="listbox" aria-label="Suggestions" hidden></div>
                     </div>
-                    <!-- one brand, or every brand grouped, or every product in one list: chosen in Filters ("Show"), kept here -->
+
                     <select id="brandFilterSelect" class="toolbar-select" aria-label="Which brand, and how the list is drawn" hidden>
                         <option value="">All brands, grouped</option>
                     </select>
-                    <!-- what to show is chosen with the count tiles below; this box only keeps the choice -->
+
                     <select id="reviewFilterSelect" aria-label="What to show" hidden>
                         <option value="">Everything</option>
                     </select>
@@ -96,11 +94,11 @@
                 </button>
                 <p class="import-types">Accepted: PDF (.pdf), Excel (.xlsx, .xls), Word (.docx), CSV (.csv), text (.txt). Any size: a long file is read in parts.</p>
                 <p class="field-hint import-status" id="inventoryImportStatus" role="status" aria-live="polite"></p>
-                <!-- what the last import FLAGGED: skin care and other non-make-up records (not saved), and make-up whose kind is unclear (saved, to check) -->
+
                 <div class="import-flags" id="inventoryImportFlags" hidden></div>
             </section>
 
-            <!-- the counts; a click on one filters the table -->
+
             <section class="panel bare" data-panel="counts" data-label="Counts" data-w="8" data-source="inventoryCounts">
                 <div class="stat-row">
                     <button type="button" class="stat" data-drill="brands" data-tip-title="Brands" data-tip="Show the list of brands only." data-tip-preview="Click a brand to see its products."><span class="stat-icon"><i data-icon="tag"></i></span><span><span class="stat-value skeleton" id="statBrands">00</span><span class="stat-title">Brands</span></span></button>
@@ -130,10 +128,10 @@
                 <div class="suggestion-list" id="inventoryAiDraftList"></div>
             </section>
 
-            <!-- the inventory -->
+
             <section class="panel" data-panel="table" data-label="Inventory table" data-w="8" data-source="products">
-                <!-- ONE row (31 October 2026): Inventory (i) | Sort | Filters | All | New folder | pager | fold arrow | Recycle bin.
-                     The shelf's parts (All, New folder, the bin) are drawn into the three marked places by adminOrganizer.js. -->
+
+
                 <div class="panel-head wraps">
                     <h3 class="panel-title">Inventory</h3>
                     <button type="button" class="guide-badge" data-tip-title="How to use this list" data-tip="Click a product to see everything about it; double-click to edit it. Click a brand to open or close it. The app only uses Active products of Active brands." data-tip-preview="Drag rows onto a folder or the Recycle bin. The small box in front of a name picks it; Ctrl+click picks several.">i</button>
@@ -144,14 +142,14 @@
                     <span class="shelf" id="inventoryShelfAdd"></span>
                     <span id="inventoryQuick"></span>
                     <span class="spacer"></span>
-                    <!-- the same line as the Ingredient Curator's list: how it is shown, how many, which page -->
+
                     <div class="segmented" hidden id="inventoryLayoutSwitch" role="group" aria-label="How the inventory is shown">
                         <button type="button" class="seg" data-layout="rows" aria-pressed="true" data-tip-title="Rows" data-tip="One product per line, in a table."><i data-icon="list"></i>Rows</button>
                         <button type="button" class="seg" data-layout="cards" aria-pressed="false" data-tip-title="Cards" data-tip="Products as cards, several side by side. Brands stay as headings."><i data-icon="layers"></i>Cards</button>
                     </div>
-                    <!-- the pager, the fold arrow and the bin stay together at the right end, also when the row wraps -->
+
                     <div class="head-end">
-                        <!-- one brand's products: how many on a page. Never changes what is selected or what a bulk action covers -->
+
                         <select id="brandPageSize" class="toolbar-select head-select" aria-label="Products per page" data-tip="Products per page. What you selected stays selected." hidden>
                             <option value="10">10 per page</option>
                             <option value="25">25 per page</option>
@@ -171,15 +169,15 @@
                         </tbody>
                     </table>
                 </div>
-                <!-- shows while rows are picked -->
+
                 <div class="w-bar sel-bar" id="inventoryBar" hidden></div>
                 <div class="table-foot"><span class="spacer"></span><div class="pager" id="inventoryPager"></div></div>
             </section>
         </div>
     </main>
 
-    <!-- ===================== brand form (add and edit) =====================
-         The same window as the Ingredient form: header, section bar, scrolling body, footer; the same field pattern (label row, box, hint line). -->
+
+
     <div id="addBrandModal" class="modal-overlay">
         <div class="modal-content ing-modal" role="dialog" aria-modal="true" aria-labelledby="brandModalTitle">
             <header class="ing-head">
@@ -237,7 +235,7 @@
                             </div>
                             <p class="field-hint full" id="brandPicturesHint">Only the web address is saved (https). Nothing is uploaded.</p>
 
-                            <!-- the brand's own website: only a CONFIRMED address makes its pages "Manufacturer's own site" (here and in the app) -->
+
                             <div class="field full website-box">
                                 <div class="label-row"><label for="brandWebsiteInput">Official website</label></div>
                                 <input type="url" id="brandWebsiteInput" maxlength="300" placeholder="https://... (the brand owner's own site, not a shop)" autocomplete="off" inputmode="url">
@@ -261,7 +259,7 @@
         </div>
     </div>
 
-    <!-- ===================== product form (add and edit) ===================== -->
+
     <div id="productModal" class="modal-overlay">
         <div class="modal-content wide ing-modal" role="dialog" aria-modal="true" aria-labelledby="productModalTitle">
             <header class="ing-head">
@@ -319,7 +317,7 @@
 
                     <section class="ing-section" id="productSecSources" aria-labelledby="productSecSourcesTitle">
                         <h4 class="ing-section-title" id="productSecSourcesTitle">Sources</h4>
-                        <!-- official website, primary and secondary sources: drawn by productSources.js -->
+
                         <div class="field sources-box" id="productSourcesBox"></div>
                     </section>
 

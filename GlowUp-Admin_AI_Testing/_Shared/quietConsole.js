@@ -1,10 +1,10 @@
-// No debug output on the live website (9 November 2026, the user's wish): the browser's console stays empty there, and a
-// failure the page did not handle itself becomes ONE plain message in the corner (the site's own toast), saying why the
-// action did not work. On a computer of a developer (localhost, the test rig) the console works as normal.
-const LOCAL = /^(localhost|127\.0\.0\.1|glowup\.test)$/i.test(location.hostname);
-if (!LOCAL) ["log", "info", "debug", "warn", "error", "trace", "table", "group", "groupCollapsed", "groupEnd", "dir"].forEach((name) => { try { console[name] = () => {}; } catch (error) { /* read-only console */ } });
 
-/** Why an action did not work, in plain words (the same wording as describeError in adminCommon.js). */
+
+
+const LOCAL = /^(localhost|127\.0\.0\.1|glowup\.test)$/i.test(location.hostname);
+if (!LOCAL) ["log", "info", "debug", "warn", "error", "trace", "table", "group", "groupCollapsed", "groupEnd", "dir"].forEach((name) => { try { console[name] = () => {}; } catch (error) {                         } });
+
+
 export function whyItFailed(reason) {
     const code = reason && reason.code ? String(reason.code) : "";
     if (code.includes("permission-denied")) return "You are not allowed to do this: the database refused it. Your account may not be in the admins list, or the change breaks a database rule.";
@@ -19,7 +19,7 @@ export function whyItFailed(reason) {
 }
 
 let lastText = "", lastAt = 0;
-/** Shows `text` as an error toast (the same message twice within 4 seconds is shown once). `show(text)` = the page's toast. */
+
 export function catchFailures(show) {
     const say = (text) => {
         if (text === lastText && Date.now() - lastAt < 4000) return;
@@ -28,8 +28,8 @@ export function catchFailures(show) {
     };
     window.addEventListener("unhandledrejection", (event) => { if (!LOCAL) event.preventDefault(); say(whyItFailed(event.reason)); });
     window.addEventListener("error", (event) => {
-        if (!event.error && !event.message) return;                  // a picture or script that did not load: not an action of the admin
-        // the browser's harmless note that a resize took two frames (zoom, a panel opening): nothing failed, nothing to tell the admin
+        if (!event.error && !event.message) return;
+
         if (/ResizeObserver loop/.test(String(event.message || ""))) { event.stopImmediatePropagation(); return; }
         if (!LOCAL) event.preventDefault();
         say(whyItFailed(event.error || { message: event.message }));

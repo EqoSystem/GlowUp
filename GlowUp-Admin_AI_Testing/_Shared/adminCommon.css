@@ -1,29 +1,36 @@
-/* GlowUp Admin: the design system shared by every page.
-   1. Tokens (colours, type scale, spacing) for the dark and the light theme
-   2. Page frame: sidebar, top bar, the board of panels
-   3. Components: buttons and button groups, inputs, tables, pills, chips, pop-ups, messages,
-      guide badges, pagers, loading skeletons
-   4. The tile animation copied from the mobile app (lift, pixel sweep, glowing outline)
-   5. Panels that float and send out a beacon while they are moved; combined panels; the Customise drawer
-   6. Menus, and the data panels: lists, rows, grids (with the app's shake, drag and pop) and graphs
-   7. Folders and the Recycle bin, picking and dragging entries, details on click, helper lines
-   A page's own style sheet only places that page's content; it never sets colours. */
 
-/* ============================================================== 1. tokens */
+
+
+
+
+
+
+
+
+
+
+
 :root {
     --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    --scale: 1;                               /* text size chosen in Customise */
-    /* TEXT SIZES (7 November 2026): never under 12 px. They step at the layout's own breakpoints (768, 1024) by half a pixel
-       instead of following the window width with vw: measured, vw sizes made the browser lay ALL text out again at every pixel
-       of a window drag (52 slow frames against 11 on the dashboard). --t-* are the steps, set below for each width. */
+    --scale: 1;
+
+
+
     --t-sm: 12.5px; --t-base: 14px; --t-md: 15.5px;
-    --fs-xs: max(12px, calc(12px * var(--scale)));                 /* captions, badges */
-    --fs-sm: max(12px, calc(var(--t-sm) * var(--scale)));          /* secondary text, table cells */
-    --fs-base: max(12px, calc(var(--t-base) * var(--scale)));      /* body, inputs, buttons */
-    --fs-md: max(12px, calc(var(--t-md) * var(--scale)));          /* panel titles */
-    --fs-lg: calc(clamp(17px, 0.9vw + 11px, 20px) * var(--scale));       /* page title: a little smaller on narrow windows */
-    --fs-kpi: calc(clamp(24px, 1.6vw + 14px, 30px) * var(--scale));      /* big numbers */
-    --page-x: clamp(16px, 2.2vw, 26px);       /* the page's side margin: 26 px on wide windows, down to 16 px on a phone */
+    --fs-xs: max(12px, calc(12px * var(--scale)));
+    --fs-sm: max(12px, calc(var(--t-sm) * var(--scale)));
+    --fs-base: max(12px, calc(var(--t-base) * var(--scale)));
+    --fs-md: max(12px, calc(var(--t-md) * var(--scale)));
+    --fs-lg: calc(clamp(17px, 0.9vw + 11px, 20px) * var(--scale));
+    --fs-kpi: calc(clamp(24px, 1.6vw + 14px, 30px) * var(--scale));
+    --gutter: clamp(16px, 2.2vw, 26px);
+    --rail-w: 72px;
+    --nav-w: 284px;
+    --icon-box: 36px;
+    --icon-center-x: calc(var(--rail-w) / 2);
+    --label-start-x: 88px;
+    --header-h: 64px;
+    --content-left: var(--rail-w);
     --radius: 14px;
     --radius-sm: 9px;
     --gap: 16px;
@@ -43,17 +50,17 @@
     --text-2: #b9b6c0;
     --muted: #8b8894;
     --accent: #e0668a;
-    --accent-ink: #1a0d12;                    /* text on the accent colour */
-    --accent-text: #f08fab;                   /* accent used as text on a surface */
+    --accent-ink: #1a0d12;
+    --accent-text: #f08fab;
     --gold: #cfa862;
     --ok: #4ccf9a;
     --warn: #f0b545;
     --bad: #f27272;
     --info: #86b7f7;
-    --shadow: 0 4px 14px rgba(0, 0, 0, .28);     /* 9 November 2026: lighter shadows on every container */
+    --shadow: 0 4px 14px rgba(0, 0, 0, .28);
     --overlay: rgba(0, 0, 0, .62);
-    /* graph colours: fixed order (the order is what keeps neighbours apart for colour-blind readers); never cycled */
-    --zone: rgba(150, 44, 58, .78);             /* the "drag here to remove" shadow: a red glow on the dark theme ... */
+
+    --zone: rgba(150, 44, 58, .78);
     --viz-1: #d55181; --viz-2: #008300; --viz-3: #3987e5; --viz-4: #c98500; --viz-5: #199e70; --viz-6: #d95926;
     --viz-other: #5d5a66;
 }
@@ -77,7 +84,7 @@
     --info: #2f6fbe;
     --shadow: 0 3px 10px rgba(80, 40, 50, .08);
     --overlay: rgba(40, 25, 30, .42);
-    --zone: rgba(38, 26, 31, .9);               /* ... the app's dark shadow on the light one */
+    --zone: rgba(38, 26, 31, .9);
     --viz-1: #e87ba4; --viz-2: #008300; --viz-3: #2a78d6; --viz-4: #eda100; --viz-5: #1baf7a; --viz-6: #eb6834;
     --viz-other: #b9b3b5;
 }
@@ -99,16 +106,16 @@ button, input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 svg.ic { width: 1.15em; height: 1.15em; flex: none; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.18em; transition: transform .2s var(--ease); }
 
-/* WHILE THE SIGN-IN CHECK RUNS (see pageFrame.js and adminCommon.js).
-   An admin this browser knows (html.frame-first) sees the page's frame and every fixed text at once: only the places
-   where data comes show a loading shape. No data is asked for until the check has passed. Since 7 November 2026 the page's
-   controls (fold arrows, pagers, the (i) guides, links) answer during the check too: only the data waits, not the controls.
-   Anybody else sees GlowUp's own loading mark and nothing of the page. */
+
+
+
+
+
 html.auth-pending:not(.frame-first) body > :not(.brand-loader):not(.auth-stuck-box):not(.page-skeleton) { visibility: hidden; }
-/* the panels show only in their final arrangement: until adminLayouts.js has arranged the board (html.board-ready) the page area
-   stays empty under the real menu and title bar, so nothing is drawn in a plain order first and then jumps (9 November 2026) */
+
+
 html:not(.board-ready) main .board { visibility: hidden; }
-.topbar-tools { min-height: 36px; }                       /* its buttons arrive a moment after the frame: the bar keeps its height */
+.topbar-tools { min-height: 36px; }
 .signed-in-as { min-height: 1.3em; }
 .brand-loader { display: none; }
 html.auth-pending:not(.frame-first) .brand-loader {
@@ -121,7 +128,7 @@ html.auth-pending:not(.frame-first) .brand-loader {
 .brand-loader-name { font-size: var(--fs-lg); font-weight: 700; letter-spacing: .2px; }
 .brand-loader-text { font-size: var(--fs-sm); color: var(--muted); }
 @keyframes brand-breathe { 0%, 100% { transform: scale(.94); box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 0%, transparent); } 50% { transform: scale(1.04); box-shadow: 0 0 0 10px color-mix(in srgb, var(--gold) 16%, transparent); } }
-/* the check did not answer in ten seconds: a message and a way on, never an endless loading screen */
+
 .auth-stuck-box {
     position: fixed; z-index: 5200; left: 50%; top: 22px; translate: -50% 0; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; max-width: min(640px, calc(100vw - 32px));
     padding: 12px 14px 12px 18px; border-radius: var(--radius); background: var(--surface); color: var(--text); font-size: var(--fs-sm);
@@ -129,7 +136,7 @@ html.auth-pending:not(.frame-first) .brand-loader {
 }
 .auth-stuck-box b { color: var(--bad); }
 html.auth-stuck .brand-loader-mark { animation: none; }
-/* moving between pages: the browser blends the old page into the new one, and the menu and top bar stay put */
+
 @view-transition { navigation: auto; }
 .sidebar { view-transition-name: glowup-sidebar; }
 .topbar { view-transition-name: glowup-topbar; }
@@ -138,17 +145,17 @@ html.auth-stuck .brand-loader-mark { animation: none; }
     @view-transition { navigation: none; }
     .brand-loader-mark { animation: none; }
 }
-/* ---- skeleton loading, in GlowUp's look ----
-   While a page is on its way (the sign-in check of a page that just opened, or the moment after a link to another page
-   was pressed) the outline of THAT page shows: the GlowUp sparkle, the menu, and soft blush shapes where its numbers,
-   tools and lists will be, with a rose-to-gold shine moving across. The shapes are built by pageSkeleton.js. */
+
+
+
+
 .page-skeleton { display: none; }
 html.auth-pending .page-skeleton, body.leaving .page-skeleton {
     display: grid; grid-template-columns: 232px 1fr; visibility: visible; position: fixed; inset: 0; z-index: 5000; background: var(--bg);
     --sk-a: color-mix(in srgb, var(--accent) 11%, var(--surface-2)); --sk-b: color-mix(in srgb, var(--gold) 26%, var(--surface-2));
 }
 html.auth-pending .page-skeleton.login, body.leaving .page-skeleton.login { grid-template-columns: 1fr; place-items: center; }
-/* one shape: a blush base with the shine passing over it */
+
 .sk, .skeleton {
     display: block; border-radius: var(--radius-sm); color: transparent !important; user-select: none;
     background: linear-gradient(100deg, var(--sk-a, color-mix(in srgb, var(--accent) 11%, var(--surface-2))) 30%, var(--sk-b, color-mix(in srgb, var(--gold) 26%, var(--surface-2))) 50%, var(--sk-a, color-mix(in srgb, var(--accent) 11%, var(--surface-2))) 70%);
@@ -184,8 +191,8 @@ html.auth-pending .page-skeleton.login, body.leaving .page-skeleton.login { grid
 .sk-line-row > span { flex: 1; display: flex; flex-direction: column; gap: 7px; min-width: 0; }
 .sk-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
 .sk-pill { width: 62px; height: 20px; border-radius: 999px; flex: none; }
-/* shapes cut to the rows that replace them, so nothing moves when the data arrives (7 November 2026):
-   a one-line row (a scan: 43 px), a ranked row (a brand: 45 px), a suggestion with its two buttons (61 px), a legend line, a note (48 px) */
+
+
 .sk-line-row.one, .sk-line-row.rank, .sk-line-row.sugg { padding-block: 0; }
 .sk-line-row.one { min-height: 43px; }
 .sk-line-row.rank { min-height: 45px; }
@@ -198,13 +205,13 @@ html.auth-pending .page-skeleton.login, body.leaving .page-skeleton.login { grid
 .sk-legend .sk-text { flex: 1; max-width: 45%; }
 .sk-legend .sk-time { margin-left: auto; width: 36px; }
 .sk-note { height: 48px; }
-.sk-review-tile { height: 44px; border-radius: var(--radius-sm); }    /* the dashboard's "waiting for review" tile */
-.assist-sk { height: 36px; flex: none; }                 /* where a helper line will be (adminAssist.js): one line high */
+.sk-review-tile { height: 44px; border-radius: var(--radius-sm); }
+.assist-sk { height: 36px; flex: none; }
 .sk-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
 .sk-card { display: flex; flex-direction: column; justify-content: center; gap: 9px; height: 66px; padding: 0 16px 0 42px; border-radius: var(--radius-sm); }
 .sk-login { display: flex; flex-direction: column; align-items: center; gap: 14px; width: 360px; max-width: calc(100vw - 48px); padding: 32px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); }
 .sk-login .sk-field, .sk-login .sk-button { width: 100%; }
-/* "Getting things ready": the sparkle breathes in the corner */
+
 .sk-wait { position: absolute; right: 22px; bottom: 18px; display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; border-radius: 999px; font-size: var(--fs-sm); color: var(--text-2);
     background: var(--surface); border: 1px solid color-mix(in srgb, var(--gold) 40%, var(--border)); box-shadow: var(--shadow); }
 .sk-wait .sk-mark { width: 30px; height: 30px; border-radius: 50%; color: var(--gold); background: color-mix(in srgb, var(--gold) 16%, transparent); }
@@ -215,79 +222,35 @@ html.auth-pending .page-skeleton.login, body.leaving .page-skeleton.login { grid
     .sk-brand span { display: none; } .sk-tiles, .sk-tiles.five { grid-template-columns: repeat(2, minmax(0, 1fr)); } .sk-split { grid-template-columns: 1fr; }
 }
 html.auth-stuck .page-skeleton { display: none !important; }
-/* the login page has no frame script: its own short message (the admin pages show a box with a "Try again" button) */
+
 html.auth-stuck body:not(:has(.auth-stuck-box))::before {
     content: "Could not reach the sign-in service. Check your internet connection, then reload this page.";
     visibility: visible; position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-size: var(--fs-sm);
     color: var(--bad); padding: 24px; text-align: center;
 }
-/* a panel whose data is still loading: rows (or cards) in the shape of what is coming */
+
 .sk-list { display: flex; flex-direction: column; width: 100%; }
 .empty-state.loading { border-style: solid; border-color: transparent; padding: 0; align-items: stretch; }
 .empty-state.loading > :not(.sk-list) { display: none; }
 .empty-state:not(.loading) > .sk-list { display: none; }
 
-/* RESIZING (7 November 2026): pageFrame.js / pageSkeleton.js put html.resizing on while the window edge moves (until 150 ms
-   after the last resize event). Nothing eases into place then: every frame shows the layout for the width of that frame.
-   Animations are cut to zero length rather than removed, so a one-time entrance does not play again afterwards. */
+
+
+
 html.resizing *, html.resizing *::before, html.resizing *::after { transition: none !important; animation-duration: 0s !important; animation-delay: 0s !important; }
 
-/* the text size steps (see --t-* above): half a pixel smaller with each layout step down */
+
 @media (max-width: 1023px) { :root { --t-base: 13.5px; --t-md: 15px; } }
 @media (max-width: 767px) { :root { --t-sm: 12px; --t-base: 13px; --t-md: 14.5px; } }
 
-/* ============================================================== 2. page frame */
-/* THE SIDEBAR'S WIDTH, in one place (5 November 2026): the sidebar, its edge tab and the settings window all read this one value, so
-   while it animates their edges are the same at every frame. It animates only after the first picture (html.sb-ready, pageFrame.js). */
-@property --sidebar-w { syntax: "<length>"; inherits: true; initial-value: 232px; }
-:root { --sidebar-w: 232px; }
-html.sb-collapsed { --sidebar-w: 72px; }
-/* MOTION (7 November 2026): the width is NOT animated any more. An animated grid track made the whole page lay out again at
-   every frame, and made the content trail behind the window edge whenever a resize crossed 1024 or 768 px. The width snaps;
-   what moves is composited: the labels fade in, and the page slides from where it was (transform, --sb-shift by pageFrame.js). */
-@keyframes sb-label-in { from { opacity: 0; transform: translateX(-6px); } }
-@keyframes sb-page-in { from { transform: translateX(var(--sb-shift, 0px)); } }
-html.sb-moving .sidebar .label, html.sb-moving .signed-in-as { animation: sb-label-in .18s ease-out both; }
-html.sb-moving .main-content { animation: sb-page-in .2s ease-out; }
-@media (min-width: 1024px) { .sidebar { position: relative; z-index: 3; } }
-body.app { display: grid; grid-template-columns: var(--sidebar-w) 1fr; overflow: hidden; }
-.sidebar {
-    background: var(--surface); border-right: 1px solid var(--border);
-    display: flex; flex-direction: column; padding: 20px 14px; gap: 22px; min-height: 0; overflow: hidden;
-}
-/* unfolding: the menu keeps its full width and is uncovered, so its labels do not wrap and jump on the way */
-@media (min-width: 1024px) { html:not(.sb-collapsed) .sidebar > * { width: 204px; flex-shrink: 0; } html:not(.sb-collapsed) .sidebar > .nav-links { flex-shrink: 1; } }
-.sidebar-brand { position: relative; display: flex; align-items: center; gap: 10px; }
-/* a thin line between the logo and the menu, in the middle of the gap between them (nothing moves for it) */
-.sidebar-brand::after { content: ""; position: absolute; left: 0; right: 0; bottom: -11px; height: 1px; background: var(--border); }
-/* the logo and the name together are one link to the dashboard */
-.brand-home { display: flex; align-items: center; gap: 10px; min-width: 0; color: inherit; text-decoration: none; cursor: pointer; border-radius: 12px; }
-.brand-home:hover .brand-title { color: var(--accent-text); }
-.brand-home:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-html.sb-collapsed .brand-home { flex-direction: column; gap: 12px; }
+
 .brand-logo { width: 34px; height: 34px; border-radius: 10px; flex: none; overflow: hidden; display: block; }
 .brand-logo img { display: block; width: 100%; height: 100%; }
-/* the menu folded to its icons: an edge tab centred on the sidebar's right edge, placed by pageFrame.js below the last link (the choice is
-   kept there too). 26 px wide: its 13 px on either side stay inside the sidebar's and the page's own padding, so it touches neither.
-   Above the settings window (901), under dialogs (1000). By id, because the tile animation's .fx would make it position: relative. */
-#sidebarToggle {
-    position: fixed; z-index: 902; top: 58vh; left: calc(var(--sidebar-w) - 13px); width: 26px; height: 44px; padding: 0; display: grid; place-items: center; cursor: pointer;
-    border-radius: 13px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); view-transition-name: glowup-sidebar-toggle;
-}
-#sidebarToggle:hover { background: var(--surface-3); color: var(--text); }
-#sidebarToggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.sidebar-toggle svg.ic { width: 16px; height: 16px; transition: transform .2s var(--ease); }
-html.sb-collapsed .sidebar { padding-left: 6px; padding-right: 6px; }
-html.sb-collapsed .sidebar .nav-links .label, html.sb-collapsed .sidebar-footer .label, html.sb-collapsed .signed-in-as { display: none; }
-html.sb-collapsed .sidebar-brand .brand-title { font-size: var(--fs-xs); white-space: nowrap; }
-html.sb-collapsed .sidebar-brand { flex-direction: column; padding: 0; gap: 12px; }
-html.sb-collapsed .sidebar-toggle svg.ic { transform: rotate(180deg); }
-html.sb-collapsed .nav-links a, html.sb-collapsed .sign-out { justify-content: center; padding-left: 0; padding-right: 0; }
 .brand-title { font-size: var(--fs-md); font-weight: 700; line-height: 1.15; letter-spacing: .1px; }
 .brand-subtitle { font-size: var(--fs-xs); color: var(--muted); }
 .nav-links { list-style: none; display: flex; flex-direction: column; gap: 4px; flex: 1; position: relative; }
-/* HOVER: a light gold drop that flows to the link under the pointer, like the liquid drop of the app's bottom bar.
-   It is only there while the pointer (or the keyboard) is on a link, and never on the selected page. */
+
+
 .nav-links .nav-drop {
     position: absolute; left: 0; right: 0; z-index: 0; border-radius: var(--radius-sm); pointer-events: none; opacity: 0;
     background: color-mix(in srgb, var(--gold) 12%, transparent); border: 1px solid color-mix(in srgb, var(--gold) 38%, transparent);
@@ -298,8 +261,8 @@ html.sb-collapsed .nav-links a, html.sb-collapsed .sign-out { justify-content: c
 }
 .nav-links a { position: relative; z-index: 1; transition: color .2s; }
 .nav-links a:hover { color: var(--text); }
-/* THE PAGE YOU ARE ON: its own highlight, on the link itself. It comes from the address, so it is there after a reload
-   and a direct link, and it does not move or fade when the pointer leaves. */
+
+
 .nav-links a.active {
     color: var(--text); font-weight: 600;
     background: color-mix(in srgb, var(--accent) 15%, transparent); border-color: color-mix(in srgb, var(--accent) 40%, transparent);
@@ -318,11 +281,10 @@ html.sb-collapsed .nav-links a, html.sb-collapsed .sign-out { justify-content: c
 .main-content { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: auto; }
 .topbar {
     position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 14px;
-    padding: 14px var(--page-x); background: color-mix(in srgb, var(--bg) 95%, transparent);
+    padding: 14px var(--gutter); background: color-mix(in srgb, var(--bg) 95%, transparent);
     border-bottom: 1px solid var(--border);
 }
-.topbar-titles { flex: 1; min-width: 0; }
-/* the Recycle Bin button of the header, with its optional count */
+
 .bin-link { position: relative; display: inline-grid; place-items: center; color: var(--text-2); text-decoration: none; }
 .bin-link:hover { color: var(--text); }
 .bin-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -331,8 +293,6 @@ html.sb-collapsed .nav-links a, html.sb-collapsed .sign-out { justify-content: c
     font-size: 12px; font-weight: 700; line-height: 1; color: #fff; background: var(--accent); border: 2px solid var(--bg);
 }
 .bin-badge[hidden] { display: none; }
-.header-title { font-size: var(--fs-lg); font-weight: 700; letter-spacing: -.1px; }
-.header-subtitle { font-size: var(--fs-sm); color: var(--muted); }
 .topbar-tools { display: flex; align-items: center; gap: 8px; }
 .operator-chip {
     display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 999px; font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
@@ -341,30 +301,30 @@ html.sb-collapsed .nav-links a, html.sb-collapsed .sign-out { justify-content: c
 }
 .operator-chip:hover svg.ic { transform: rotate(-12deg) scale(1.1); }
 
-/* the board: a 12-column grid of panels; each panel says how many columns it takes */
-.board { position: relative; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--gap); padding: 20px var(--page-x) 40px; align-items: start; }
+
+.board { position: relative; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: var(--gap); padding: 20px var(--gutter) 40px; align-items: start; }
 .panel {
     grid-column: span var(--w, 12); min-width: 0; position: relative;
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
     transition: border-color .2s, box-shadow .25s, background-color .25s, transform .25s var(--ease);
 }
-/* a panel's content sits in its inner box, so a fixed height scrolls the content and never cuts the panel's own frame */
+
 .panel-inner { display: flex; flex-direction: column; gap: 12px; padding: var(--pad); height: 100%; min-height: 0; border-radius: inherit; }
 .panel[data-fixed-h] > .panel-inner { overflow: auto; }
-/* the shadow an admin chose for a panel and for the cards inside it (Style and text > Shadow); "Page default" sets nothing */
+
 .panel[data-pshadow] { box-shadow: var(--panel-shadow); }
 .panel[data-cshadow] :is(.kpi, .stat, .w-tile, .w-card, .ingredient-card, .tile):not(:hover) { box-shadow: var(--card-shadow); }
-/* a panel is not clickable: it does not lift or cast a shadow under the pointer (9 November 2026); only its edge light below shows */
+
 .panel.bare { background: none; border: none; }
 .panel.bare > .panel-inner { padding: 0; }
 .panel-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; min-height: 30px; user-select: none; }
-/* a pager or a button never shrinks under its own size: on a narrow panel the title line wraps instead */
+
 .panel-head > .pager, .panel-head > .head-end, .panel-head > .icon-btn, .panel-head > .guide-badge { flex: none; }
 .panel-title { min-width: min(7ch, 100%); overflow-wrap: anywhere; }
 .panel-title { font-size: var(--fs-md); font-weight: 650; }
 .panel-head .spacer { flex: 1; }
 .panel-count { font-size: var(--fs-xs); color: var(--muted); }
-/* a light travels round the edge of the panel under the pointer (the app's edge light) */
+
 @property --spin { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 .panel:not(.bare)::before {
     content: ""; position: absolute; inset: -1px; border-radius: inherit; padding: 1.5px; pointer-events: none; opacity: 0; transition: opacity .18s ease-out;
@@ -374,28 +334,28 @@ html.sb-collapsed .nav-links a, html.sb-collapsed .sign-out { justify-content: c
 .panel:not(.bare):hover::before { opacity: .85; }
 .panel.member::before, .panel.preview::before, body.layout-editing .panel::before { display: none; }
 @keyframes edge-light { to { --spin: 360deg; } }
-/* the "..." of a panel: always shown (7 November 2026; it used to appear only under the pointer), quiet until pointed at */
+
 .panel-menu-btn { opacity: 1; background: transparent; border-color: transparent; color: var(--muted); transition: background-color .15s, color .15s; }
 .panel-menu-btn:hover { color: var(--text); }
 .panel:hover > .panel-inner > .panel-head > .panel-menu-btn, .panel:hover > .panel-inner > .panel-head > .head-end > .panel-menu-btn, .panel-menu-btn:focus-visible, .panel-menu-btn[aria-expanded] { opacity: 1; }
 @media (hover: none) { .panel-menu-btn { opacity: 1; } }
-/* ---- Auto resize: the panels are packed without gaps ----
-   The board becomes a grid of very low rows; adminLayouts.js gives every panel the number of rows its own height needs
-   (--rows), and "dense" lets the next panel move up into a free place beside a taller one. While it measures, every
-   panel has its own height for a moment (.measuring). */
+
+
+
+
 .board.fit { grid-auto-flow: row dense; grid-auto-rows: var(--row-unit, 4px); row-gap: 0; align-items: stretch; }
 .board.fit > .panel { grid-row: span var(--rows, 40); margin-bottom: var(--gap); }
 .board.fit.measuring { grid-auto-rows: auto; align-items: start; }
 .board.fit.measuring > .panel { grid-row: auto; }
 
-/* ---- a folded panel shows only its title line (adminFold.js) ---- */
+
 .panel-head > .panel-fold-btn, .head-end > .panel-fold-btn { margin-left: auto; background: transparent; border-color: transparent; box-shadow: none; color: var(--muted); }
 .panel-head > .panel-fold-btn:hover, .panel-head > .panel-fold-btn:focus-visible, .head-end > .panel-fold-btn:hover, .head-end > .panel-fold-btn:focus-visible { background: color-mix(in srgb, var(--text) 8%, transparent); color: var(--text); }
 .panel-head > .spacer ~ .panel-fold-btn, .head-end > .panel-fold-btn { margin-left: 0; }
 .panel-fold-btn svg.ic { transition: transform .2s var(--ease); }
 .panel.folded > .panel-inner > .panel-head > .panel-fold-btn svg.ic, .panel.folded > .panel-inner > .panel-head > .head-end > .panel-fold-btn svg.ic { transform: rotate(-90deg); }
 .panel-summary { display: none; flex: 1; min-width: 0; font-size: var(--fs-xs); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.panel.folded { height: auto !important; }          /* a height set by hand does not hold a folded panel open */
+.panel.folded { height: auto !important; }
 .panel.folded > .panel-inner { padding-block: calc(var(--pad) * .5); overflow: visible; }
 .panel.folded > .panel-inner > :not(.panel-head) { display: none !important; }
 .panel.folded > .panel-inner > .panel-head > .head-end > :not(.panel-fold-btn):not(.panel-menu-btn) { display: none !important; }
@@ -406,65 +366,29 @@ html.sb-collapsed .nav-links a, html.sb-collapsed .sign-out { justify-content: c
 .panel.group > .panel-inner > .panel-head > .panel-fold-btn, .panel.group > .panel-inner > .panel-head > .head-end > .panel-fold-btn, .panel.preview .panel-fold-btn { display: none; }
 body.layout-editing .board > .panel .panel-fold-btn { pointer-events: auto; }
 
-/* a built-in panel that is shown as a list, a row, a grid or a graph: its own content steps aside */
+
 .panel.alt-view > .panel-inner > :not(.panel-head):not(.widget-body):not(.assist) { display: none !important; }
 .panel.alt-view > .panel-inner > .panel-head .pager:not(.widget-pager) { display: none; }
-/* PANELS FOLLOW THE ROOM THE BOARD HAS, not the window (7 November 2026). The board is a size container, so a folded or
-   unfolded sidebar, the settings panel and a snapped window all count. Wide boards keep each panel's own width; on a board
-   under 1000 px a panel of half the width or less takes half (so three narrow panels become two per row and a wide one the
-   whole row); under 640 px every panel takes the whole row. */
+
+
+
+
 .board { container: board / inline-size; }
 @container board (max-width: 999px) { html:not(.qs-open) .board > .panel { grid-column: span calc(6 + 6 * clamp(0, var(--w, 12) - 6, 1)) !important; } }
-/* Opening Quick settings only narrows the page (9 November 2026, the user's wish: "it just has to move left"): the panels keep
-   their places and widths and are squeezed, down to a board of 720 px. Only a board narrower than that is rearranged. */
+
+
 @media (min-width: 1024px) { @container board (max-width: 719px) { html.qs-open .board > .panel { grid-column: span calc(6 + 6 * clamp(0, var(--w, 12) - 6, 1)) !important; } } }
-/* under 1024 px Quick settings lies OVER the page and does not narrow it: the board then behaves as with it closed */
+
 @media (max-width: 1023px) { @container board (max-width: 999px) { html.qs-open .board > .panel { grid-column: span calc(6 + 6 * clamp(0, var(--w, 12) - 6, 1)) !important; } } }
-/* while Quick settings pushes the page, a panel with empty room at the right of its row fills it (adminLayouts.js sets
-   data-qs-grow and --qs-span; both go when Quick settings closes, so the saved width comes back) */
+
+
 html.qs-open .board > .panel[data-qs-grow] { grid-column: span var(--qs-span) !important; }
 @container board (max-width: 639px) {
     .board > .panel { grid-column: 1 / -1 !important; }
     .panel.group[data-group="side"] > .panel-inner > .group-body { grid-template-columns: minmax(0, 1fr); }
 }
-@media (max-width: 1023px) { body.app { grid-template-columns: 72px 1fr; } .sidebar .nav-links .label, .sidebar-footer .label, .signed-in-as { display: none; } }
-/* up to 1023 px (half a screen) the sidebar is icons only; the edge tab opens the whole menu OVER the page (html.sb-peek, not kept) */
-@media (max-width: 1023px) {
-    :root { --sidebar-w: 72px; }
-    html.sb-peek, html.sb-peek.sb-collapsed { --sidebar-w: 232px; }
-    html:not(.sb-peek) .sidebar { padding-left: 6px; padding-right: 6px; }
-    html:not(.sb-peek) .sidebar-brand { justify-content: center; flex-direction: column; padding: 0; gap: 12px; }
-    html:not(.sb-peek) .sidebar-brand .brand-home { flex-direction: column; gap: 12px; }
-    html:not(.sb-peek) .sidebar-brand .brand-title { font-size: var(--fs-xs); white-space: nowrap; }
-    .sidebar-toggle svg.ic { transform: rotate(180deg); }
-    html.sb-peek .sidebar-toggle svg.ic, html.sb-peek.sb-collapsed .sidebar-toggle svg.ic { transform: none; }
-    .sidebar { position: fixed; top: 0; bottom: 0; left: 0; width: var(--sidebar-w); z-index: 900; }
-    .main-content { grid-column: 2; }
-    html.sb-peek .sidebar { box-shadow: var(--shadow); }
-    html.sb-peek .sidebar > * { width: 204px; flex-shrink: 0; }
-    html.sb-peek .sidebar > .nav-links { flex-shrink: 1; }
-    html.sb-peek .sidebar .label { display: inline; }
-    html.sb-peek.sb-collapsed .nav-links a { justify-content: flex-start; padding: 10px 12px; }
-    html.sb-peek.sb-collapsed .sidebar-brand { align-items: flex-start; }
-}
-/* PHONES AND NARROW WINDOWS (up to 767 px, 7 November 2026): the sidebar leaves the screen, and the menu button at the left of
-   the top bar slides it in over the page (Esc, a link or a tap outside closes it: pageFrame.js). The page gets the whole width. */
-.topbar > .menu-btn { display: none; }
-@media (max-width: 767px) {
-    :root { --sidebar-w: 0px; }
-    html.sb-peek, html.sb-peek.sb-collapsed { --sidebar-w: 0px; }
-    body.app { grid-template-columns: minmax(0, 1fr); }
-    .main-content { grid-column: 1; }
-    .sidebar { width: 232px; translate: -100% 0; visibility: hidden; transition: translate .2s ease-in, visibility 0s .2s; }
-    html.sb-peek .sidebar { translate: 0 0; visibility: visible; transition: translate .22s ease-out; }
-    html.sb-peek body.app::after { content: ""; position: fixed; inset: 0; z-index: 899; background: var(--overlay); }
-    #sidebarToggle { display: none; }
-    .topbar > .menu-btn { display: inline-flex; }
-}
-@media (max-width: 767px) and (prefers-reduced-motion: reduce) { .sidebar, html.sb-peek .sidebar { transition: none; } }
 
-/* ============================================================== 3. components */
-/* ---- buttons ---- */
+
 .btn, .primary-btn, .secondary-btn, .row-btn, .cancel-btn, .save-btn, .login-btn, .icon-btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; white-space: nowrap;
     border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
@@ -488,7 +412,7 @@ html.qs-open .board > .panel[data-qs-grow] { grid-column: span var(--qs-span) !i
 .icon-btn.small { width: 30px; height: 30px; border-radius: 8px; }
 button:disabled, .btn[disabled] { opacity: .5; cursor: not-allowed; }
 
-/* several buttons that belong together sit in one small panel */
+
 .btn-group {
     display: inline-flex; align-items: center; gap: 4px; padding: 4px; border-radius: calc(var(--radius-sm) + 4px);
     background: var(--surface-2); border: 1px solid var(--border);
@@ -500,7 +424,7 @@ button:disabled, .btn[disabled] { opacity: .5; cursor: not-allowed; }
 .btn-group .sep { width: 1px; align-self: stretch; margin: 4px 2px; background: var(--border); }
 .with-guide { display: inline-flex; align-items: center; gap: 2px; }
 
-/* ---- inputs ---- */
+
 .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .toolbar .spacer { flex: 1; }
 .search-container { position: relative; flex: 1; min-width: min(200px, 100%); max-width: 420px; }
@@ -516,7 +440,7 @@ button:disabled, .btn[disabled] { opacity: .5; cursor: not-allowed; }
 }
 ::placeholder { color: var(--muted); opacity: .8; }
 
-/* ---- tables ---- */
+
 .table-container { overflow: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
 .admin-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
 .admin-table th {
@@ -534,16 +458,16 @@ button:disabled, .btn[disabled] { opacity: .5; cursor: not-allowed; }
 .row-sub.warn { color: var(--warn); }
 .row-sub.review { color: var(--info); }
 
-/* ---- THE ONE BADGE FOR A STATE: a dot and the word together (see statusBadge in adminCommon.js) ----
-   Active, Pending, Inactive and Recycle bin look the same on every page. The dot is part of the badge, never a second
-   sign beside it, and the word stays: colour alone is not enough. */
+
+
+
 .status-badge {
     display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px 2px 8px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 600;
     white-space: nowrap; --c: var(--muted); color: var(--c); background: color-mix(in srgb, var(--c) 13%, transparent);
     border: 1px solid color-mix(in srgb, var(--c) 30%, transparent);
 }
-/* 7 November 2026: no dot. The word on its tint is the badge; its text is the tone mixed with the body text colour, which keeps
-   it at 5:1 or better on the tint in both themes (WCAG AA; the pure tone was 3.7:1 for green on the light theme). */
+
+
 .status-badge { padding: 2px 10px; color: color-mix(in srgb, var(--c) 75%, var(--text)); }
 .status-badge.active, .status-badge.tone-ok { --c: var(--ok); }
 .status-badge.pending, .status-badge.tone-warn { --c: var(--warn); }
@@ -551,9 +475,9 @@ button:disabled, .btn[disabled] { opacity: .5; cursor: not-allowed; }
 .status-badge.bin, .status-badge.tone-bad { --c: var(--bad); }
 .status-badge.tone-info { --c: var(--info); }
 th .guide-badge { margin-left: 6px; vertical-align: 1px; }
-.guide-pop { white-space: pre-line; }       /* a guide may list things line by line (the status guide does) */
+.guide-pop { white-space: pre-line; }
 
-/* ---- pills and chips ---- */
+
 .status-pill, .risk-pill, .chip, .badge {
     display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 600;
     white-space: nowrap; border: 1px solid transparent; --c: var(--muted);
@@ -572,7 +496,7 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .count-link { color: var(--accent-text); text-decoration: none; font-weight: 600; }
 .count-link:hover { text-decoration: underline; }
 .source-link { color: var(--info); text-decoration: underline; text-underline-offset: 2px; }
-/* the kind of page after a source link (the same words as in the app); hover for the advice */
+
 .chip.source-kind { margin: 0 2px; font-size: var(--fs-xs); cursor: help; vertical-align: baseline; }
 .source-guide { display: block; margin-top: 6px; }
 .source-line { font-size: var(--fs-xs); color: var(--muted); line-height: 1.6; overflow-wrap: anywhere; }
@@ -581,13 +505,13 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
     border-radius: var(--radius-sm); background: color-mix(in srgb, var(--info) 10%, transparent); border: 1px solid color-mix(in srgb, var(--info) 32%, transparent);
 }
 
-/* ---- stat cards (all pages): one row of equal cards when their panel is 640 px or wider, else two per row; the icon sits bare.
-   By the PANEL's width (container query, 7 November 2026), not the window's: with Quick settings open a 1024 px window can
-   leave the panel only 400 px. Every panel's inner box is a size container named "panel". ---- */
+
+
+
 .panel-inner { container: panel / inline-size; }
 .stat-row, .kpi-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap); }
 .stat-row > :last-child:nth-child(odd), .kpi-row > :last-child:nth-child(odd) { grid-column: 1 / -1; }
-/* a row of at most 4 tiles stays one row down to a 520 px panel (Quick settings squeezes the page; it must not restack it) */
+
 @container panel (min-width: 520px) {
     .stat-row:not(:has(> :nth-child(5))) { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
     .stat-row:not(:has(> :nth-child(5))) > :last-child:nth-child(odd) { grid-column: auto; }
@@ -610,12 +534,12 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .stat-value, .kpi-value { font-size: calc(22px * var(--scale)); font-weight: 700; line-height: 1.15; letter-spacing: -.3px; font-variant-numeric: tabular-nums; min-width: 1.4em; width: fit-content; }
 .stat-title, .kpi-title { grid-column: 1 / -1; font-size: var(--fs-xs); line-height: 1.3; color: var(--muted); overflow-wrap: anywhere; }
 
-/* ---- empty states ---- */
+
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; padding: 28px 16px; border: 1px dashed var(--border); border-radius: var(--radius-sm); min-height: 120px; }
 .empty-message { font-size: var(--fs-base); font-weight: 600; }
 .empty-hint { font-size: var(--fs-xs); color: var(--muted); max-width: 46ch; }
 
-/* ---- pop-up windows ---- */
+
 .modal-overlay { display: none; position: fixed; inset: 0; background: var(--overlay); z-index: 1000; align-items: center; justify-content: center; padding: 24px; }
 .modal-content {
     background: var(--surface); border: 1px solid var(--border); padding: 24px; border-radius: var(--radius); width: min(440px, 100%); max-width: 100%; max-height: 100%;
@@ -638,14 +562,14 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .field-hint.warn { color: var(--warn); }
 .form-section { border-top: 1px solid var(--border); padding-top: 14px; display: flex; flex-direction: column; gap: 14px; }
 .form-section-title { font-size: var(--fs-sm); font-weight: 650; color: var(--accent-text); text-transform: uppercase; letter-spacing: .5px; }
-/* two boxes side by side start on the same line, read left to right; one column on a narrow window */
+
 .form-row { align-items: start; }
 .form-row > .field > label, .form-row > .field > .field-label { min-height: 24px; }
 @media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
 .inline-actions { display: flex; align-items: center; gap: 8px; }
 .inline-actions > input, .inline-actions > select { flex: 1 1 0; min-width: 0; }
 .inline-actions > .btn { flex: none; white-space: nowrap; }
-/* "Already in the library": a note across the form with its two buttons at the right of the words */
+
 .name-clash { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--warn) 40%, transparent); border-radius: var(--radius-sm); background: color-mix(in srgb, var(--warn) 10%, var(--surface)); font-size: var(--fs-sm); color: var(--text-2); }
 .name-clash[hidden] { display: none; }
 .name-clash-row { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; justify-content: space-between; }
@@ -655,7 +579,7 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .checks { display: flex; flex-wrap: wrap; gap: 6px 14px; }
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); cursor: pointer; }
 .check input { accent-color: var(--accent); width: 15px; height: 15px; }
-/* check boxes shown as pills (few, short choices): the box itself is hidden, the pill fills when it is ticked */
+
 .checks.pills { gap: 8px; }
 .checks.pills .check { position: relative; padding: 6px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); color: var(--text-2); transition: background .15s var(--ease), border-color .15s var(--ease); }
 .checks.pills .check input { position: absolute; opacity: 0; width: 0; height: 0; }
@@ -663,7 +587,7 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .checks.pills .check:has(input:checked) { background: color-mix(in srgb, var(--accent) 18%, var(--surface)); border-color: var(--accent); color: var(--text); font-weight: 600; }
 .checks.pills .check:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* one row per skin type / condition: its name on the left, Avoid / no effect / Good on the right */
+
 .fit-list { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
 .fit-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 8px 6px 12px; font-size: var(--fs-sm); }
 .fit-row + .fit-row { border-top: 1px solid var(--border); }
@@ -683,11 +607,11 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 .confirm-list { margin: 12px 0 0 18px; font-size: var(--fs-sm); color: var(--text-2); max-height: 230px; overflow: auto; line-height: 1.6; }
-/* In a form taller than the window, the message and the buttons stay in view while the form scrolls. */
+
 .modal-form .modal-actions { position: sticky; bottom: -24px; margin: 0 -24px -24px; padding: 12px 24px 24px; background: var(--surface); z-index: 2; border-top: 1px solid var(--border); }
 .modal-form .form-error { position: sticky; bottom: 76px; z-index: 2; }
 
-/* ---- shade swatches ---- */
+
 .swatch { display: inline-block; width: 16px; height: 16px; border-radius: 50%; border: 1px solid color-mix(in srgb, var(--text) 35%, transparent); margin-right: 4px; vertical-align: middle; }
 .shade-editor { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .shade-item { display: inline-flex; align-items: center; gap: 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 999px; padding: 3px 6px 3px 3px; }
@@ -696,7 +620,7 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .shade-item button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px; }
 .shade-item button:hover { color: var(--bad); }
 
-/* ---- messages in the corner ---- */
+
 .toast-host { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 2000; max-width: 380px; }
 .toast {
     background: var(--surface); color: var(--text); border: 1px solid var(--border); border-left: 4px solid var(--muted); border-radius: var(--radius-sm);
@@ -708,7 +632,7 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .toast.error { border-left-color: var(--bad); }
 .toast.warn { border-left-color: var(--warn); }
 
-/* ---- guide badges: a small "i" next to a control; pointing at it shows a short instruction ---- */
+
 .guide-badge {
     display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; flex: none; cursor: help; padding: 0;
     border: 1px solid color-mix(in srgb, var(--gold) 55%, transparent); color: var(--gold); background: transparent;
@@ -726,14 +650,14 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .guide-pop .preview { display: flex; gap: 6px; align-items: flex-start; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); color: var(--text-2); font-size: var(--fs-xs); }
 .guide-pop .preview svg.ic { color: var(--gold); margin-top: 1px; }
 
-/* ---- pagers ---- */
+
 .pager { display: flex; align-items: center; gap: 8px; justify-content: flex-end; font-size: var(--fs-xs); color: var(--muted); flex-wrap: wrap; }
 .pager .btn-group { padding: 3px; }
 .pager .icon-btn { width: 28px; height: 28px; }
 .pager .page-now { min-width: 76px; text-align: center; color: var(--text-2); }
 .pager:empty { display: none; }
-/* "Page 1 of 3" in a list bar; the short "1/3" in a panel's title bar (7 November 2026): smaller buttons, so the title, the
-   fold arrow and the pager stay on one line in a narrow panel */
+
+
 .pager .page-short { display: none; }
 .panel-head .widget-pager { gap: 4px; }
 .panel-head .widget-pager .btn-group { padding: 2px; }
@@ -741,21 +665,21 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .panel-head .widget-pager .page-now { min-width: 0; padding-inline: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .panel-head .widget-pager .page-long { display: none; }
 .panel-head .widget-pager .page-short { display: inline; }
-/* with a pager in it the title bar stays one line: a long title breaks between its words instead of pushing the controls down */
+
 .panel-head:has(> .head-end > .widget-pager:not(:empty)) { flex-wrap: nowrap; }
 .panel-head:has(> .head-end > .widget-pager:not(:empty)) > .panel-title { flex: 0 1 auto; min-width: 0; }
 
-/* ---- loading skeletons ---- */
+
 .skeleton { min-height: 1em; }
 .skeleton-line { height: 14px; margin: 9px 0; }
 .skeleton-line.short { width: 55%; }
 .skeleton-row { height: 46px; margin-bottom: 8px; }
 
-/* ============================================================== 4. the tile animation of the mobile app
-   Hovering lifts the control and lights its outline; pressing sends a band of small squares across it,
-   from the bottom-left corner to the top-right one, with a pulse of the glowing outline. */
+
+
+
 .fx { position: relative; isolation: isolate; }
-/* only what answers a click lifts; the number tiles (.kpi, .stat) stay still and keep their outline (9 November 2026) */
+
 .fx:is(button, a[href], [role=button], .can-open, .can-pick, .w-tile, .ingredient-card, .tile):not(.kpi):not(.stat):hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent), 0 3px 8px color-mix(in srgb, var(--accent) 10%, transparent); }
 .fx:not(.kpi):not(.stat):active:not(:disabled) { transform: translateY(0) scale(.985); }
 .fx::after {
@@ -767,7 +691,7 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
     -webkit-mask-composite: source-in; mask-composite: intersect;
     -webkit-mask-position: 0 0, 0 0, 100% 0%; mask-position: 0 0, 0 0, 100% 0%;
 }
-/* the pixel sweep is only for panels whose admin chose it in Style and text > Buttons when pressed (12 November 2026) */
+
 [data-btn="pixel"] .fx.fx-run::after { animation: fx-sweep .52s var(--ease); }
 .fx.fx-run { animation: fx-glow .52s ease-out; }
 [data-btn="none"] .fx.fx-run { animation: none; }
@@ -791,8 +715,8 @@ th .guide-badge { margin-left: 6px; vertical-align: 1px; }
 .board > .panel:nth-child(4) { animation-delay: .12s; } .board > .panel:nth-child(5) { animation-delay: .16s; } .board > .panel:nth-child(n+6) { animation-delay: .2s; }
 @media (prefers-reduced-motion: reduce) { *, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 
-/* ============================================================== 5. moving panels, combined panels, the Customise drawer */
-/* with a layout of your own a panel is moved by its title bar at any time */
+
+
 body.own-layout .board > .panel > .panel-inner > .panel-head { cursor: grab; }
 body.is-dragging { user-select: none; cursor: grabbing; }
 body.is-dragging * { cursor: grabbing !important; }
@@ -804,7 +728,7 @@ body.is-dragging * { cursor: grabbing !important; }
 .resize-y::after { left: 40%; right: 40%; top: 4px; height: 4px; }
 .resize-x:hover::after { scale: 1.6 1; } .resize-y:hover::after { scale: 1 1.6; }
 
-/* "Arranging": every panel can be grabbed anywhere; under the pointer it lifts off the page like a floating card */
+
 body.layout-editing .board > .panel { outline: 1px dashed color-mix(in srgb, var(--gold) 60%, transparent); outline-offset: 2px; cursor: grab; user-select: none; }
 body.layout-editing .board > .panel > .panel-inner { pointer-events: none; opacity: .82; }
 body.layout-editing .board > .panel .panel-menu-btn { pointer-events: auto; opacity: 1; }
@@ -820,7 +744,7 @@ body.layout-editing .resize-y { display: block; left: 12px; right: 12px; bottom:
 .panel.is-hidden { display: none; }
 body.layout-editing .panel.is-hidden { display: block; opacity: .35; }
 
-/* held: it floats above the others and sends out rings, like a beacon, so you never lose the panel you are moving */
+
 .panel.held, .panel.floating {
     z-index: 20; outline: 1px solid var(--gold) !important; outline-offset: 2px; border-color: var(--gold) !important;
     animation: beacon 1.15s ease-out infinite !important;
@@ -833,7 +757,7 @@ body.layout-editing .panel.is-hidden { display: block; opacity: .35; }
     65% { box-shadow: 0 24px 54px rgba(0, 0, 0, .42), 0 0 0 12px color-mix(in srgb, var(--gold) 0%, transparent), 0 0 0 28px color-mix(in srgb, var(--gold) 0%, transparent); }
     100% { box-shadow: 0 24px 54px rgba(0, 0, 0, .42), 0 0 0 12px transparent, 0 0 0 28px transparent; }
 }
-/* where the held panel will land */
+
 .drop-slot {
     position: absolute; z-index: 0; pointer-events: none; border-radius: var(--radius);
     border: 2px dashed color-mix(in srgb, var(--gold) 75%, transparent); background: color-mix(in srgb, var(--gold) 9%, transparent);
@@ -842,13 +766,13 @@ body.layout-editing .panel.is-hidden { display: block; opacity: .35; }
 .board.settled > .panel { animation: none; }
 
 .editing-bar {
-    display: none; position: sticky; top: 0; z-index: 25; margin: 12px var(--page-x) 0; padding: 8px 12px; border-radius: var(--radius-sm); align-items: center; gap: 10px;
+    display: none; position: sticky; top: 0; z-index: 25; margin: 12px var(--gutter) 0; padding: 8px 12px; border-radius: var(--radius-sm); align-items: center; gap: 10px;
     background: color-mix(in srgb, var(--gold) 16%, var(--surface)); border: 1px solid color-mix(in srgb, var(--gold) 50%, transparent); font-size: var(--fs-sm);
 }
 body.layout-editing .editing-bar { display: flex; animation: rise .25s var(--ease); }
 .editing-bar .spacer { flex: 1; }
 
-/* ---- combined panels: several panels in one, as tabs, stacked or side by side ---- */
+
 .group-tabs { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); }
 .group-tab { border: 0; background: transparent; color: var(--text-2); padding: 6px 13px; border-radius: 999px; font-size: var(--fs-sm); font-weight: 600; cursor: pointer; transition: background-color .22s, color .22s, transform .16s var(--ease); }
 .group-tab:hover { color: var(--text); transform: translateY(-1px); }
@@ -865,7 +789,7 @@ body.layout-editing .editing-bar { display: flex; animation: rise .25s var(--eas
 .panel.group[data-group="stack"] .panel.member + .panel.member { border-top: 1px solid var(--border); border-radius: 0; padding-top: var(--gap); }
 @container panel (max-width: 520px) { .panel.group[data-group="side"] > .panel-inner > .group-body { grid-template-columns: 1fr; } }
 
-/* ---- the Layout & Style view: shown inside the settings window (adminSettingsMenu.css) ---- */
+
 .layout-view h4 { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 650; display: flex; align-items: center; gap: 6px; }
 .lw-theme-tabs { align-self: flex-start; }
 .layout-view > .drawer-section.first { border-top: 0; padding-top: 0; }
@@ -877,7 +801,7 @@ body.layout-editing .editing-bar { display: flex; animation: rise .25s var(--eas
 .drawer-row #profileSelect { flex: 1; width: auto; min-width: 0; }
 .drawer-row input[type=color] { width: 40px; height: 28px; border: 1px solid var(--border); border-radius: 8px; background: none; padding: 2px; cursor: pointer; }
 .drawer-actions { display: flex; gap: 8px; }
-/* an on / off switch (Layout & Style: "Keep the gaps closed") */
+
 .switch { position: relative; width: 38px; height: 22px; flex: none; padding: 0; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); cursor: pointer; transition: background-color .2s, border-color .2s; }
 .switch i { position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--muted); transition: transform .2s var(--ease), background-color .2s; }
 .switch[aria-checked="true"] { background: color-mix(in srgb, var(--accent) 30%, var(--surface-2)); border-color: var(--accent); }
@@ -887,8 +811,8 @@ body.layout-editing .editing-bar { display: flex; animation: rise .25s var(--eas
 .drawer-note { font-size: var(--fs-xs); color: var(--muted); line-height: 1.5; }
 input[type=range] { accent-color: var(--accent); }
 
-/* ============================================================== 6. menus and data panels */
-/* ---- a small menu ---- */
+
+
 .menu {
     position: fixed; z-index: 3500; min-width: min(230px, calc(100vw - 16px)); max-width: min(320px, calc(100vw - 16px)); max-height: min(72vh, 540px); overflow: auto; padding: 6px; border-radius: var(--radius-sm);
     background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow);
@@ -908,7 +832,7 @@ input[type=range] { accent-color: var(--accent); }
 .menu-heading { padding: 8px 10px 4px; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .6px; color: var(--muted); font-weight: 650; }
 .menu-sep { height: 1px; margin: 5px 4px; background: var(--border); }
 
-/* ---- choose one of a few (the panel form) ---- */
+
 .segmented { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: calc(var(--radius-sm) + 4px); background: var(--surface-2); border: 1px solid var(--border); width: fit-content; }
 .seg { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text-2); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; }
 .seg.on { background: var(--accent); color: var(--accent-ink); }
@@ -916,14 +840,14 @@ input[type=range] { accent-color: var(--accent); }
 .panel.preview { grid-column: auto; animation: none; max-height: 290px; overflow: auto; }
 .panel.preview .widget-body { pointer-events: none; }
 
-/* ---- rows that can be clicked, and row buttons that wait until the pointer is on the row ---- */
+
 .row-actions, .suggestion-actions { opacity: 0; transition: opacity .18s; }
 tr:hover .row-actions, tr:focus-within .row-actions, .ingredient-card:hover .row-actions, .ingredient-card:focus-within .row-actions,
 .suggestion-item:hover .suggestion-actions, .suggestion-item:focus-within .suggestion-actions, .row-actions:has(.approve) { opacity: 1; }
 @media (hover: none) { .row-actions, .suggestion-actions { opacity: 1; } }
 .product-row, .ingredient-card, .rank-item.can-open, .activity-item { cursor: pointer; }
 
-/* ---- data panels ---- */
+
 .widget-body { position: relative; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .tone-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: var(--c, var(--viz-other)); box-shadow: 0 0 0 4px color-mix(in srgb, var(--c, var(--viz-other)) 18%, transparent); }
 .tone-ok { --c: var(--ok); } .tone-warn { --c: var(--warn); } .tone-bad { --c: var(--bad); } .tone-info { --c: var(--info); } .tone-pink { --c: var(--accent); } .tone-muted { --c: var(--viz-other); }
@@ -941,7 +865,7 @@ tr:hover .row-actions, tr:focus-within .row-actions, .ingredient-card:hover .row
 .w-value small { font-weight: 400; color: var(--muted); font-size: var(--fs-xs); }
 .w-swatches .swatch { width: 13px; height: 13px; margin-right: 2px; }
 
-/* a row of cards: sideways, with the mouse wheel or by dragging */
+
 .w-strip { display: flex; gap: 12px; overflow-x: auto; padding: 4px 2px 10px; scroll-snap-type: x proximity; cursor: grab; scrollbar-width: none; }
 .w-strip::-webkit-scrollbar { height: 0; }
 .w-strip.dragging { cursor: grabbing; scroll-snap-type: none; user-select: none; }
@@ -956,27 +880,27 @@ tr:hover .row-actions, tr:focus-within .row-actions, .ingredient-card:hover .row
 .w-foot { margin-top: auto; padding-top: 6px; display: flex; justify-content: flex-end; min-height: 20px; }
 .w-card .w-title, .w-tile .w-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
-/* a grid of tiles; where the data can be removed they behave like the tiles of the mobile app */
+
 .w-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 12px; }
 .w-tile { cursor: pointer; user-select: none; touch-action: pan-y; }
-/* chosen: the glowing outline stays, as on the app's tiles */
+
 .w-tile.is-selected { border-color: var(--accent); scale: 1.03; background: color-mix(in srgb, var(--accent) 10%, var(--surface-2)); animation: neon 1.7s ease-in-out infinite; }
 @keyframes neon {
     0%, 100% { box-shadow: 0 0 0 1px var(--accent), 0 0 14px color-mix(in srgb, var(--accent) 45%, transparent); }
     50% { box-shadow: 0 0 0 1px var(--accent), 0 0 24px color-mix(in srgb, var(--accent) 72%, transparent); }
 }
-/* press and hold: every tile shakes ... */
+
 .widget-body.shaking .w-tile { animation: wiggle .3s ease-in-out infinite alternate; cursor: grab; }
 .widget-body.shaking .w-tile:nth-child(2n) { animation-duration: .26s; animation-delay: -.12s; }
 .widget-body.shaking .w-tile:nth-child(3n) { animation-duration: .34s; animation-delay: -.2s; }
 @keyframes wiggle { from { rotate: -1.3deg; } to { rotate: 1.3deg; } }
 .w-tile.dragging { animation: none !important; z-index: 6; scale: 1.06; rotate: -2deg; box-shadow: var(--shadow); cursor: grabbing; transition: none; }
-/* ... dragged far enough to the left it swells and bursts ... */
+
 .w-tile.popping { animation: pop-away .26s ease-in forwards !important; pointer-events: none; }
 @keyframes pop-away { 0% { scale: 1; opacity: 1; } 65% { scale: 1.18; opacity: 1; } 100% { scale: .2; opacity: 0; } }
 .w-tile.arriving { animation: pop-back .32s var(--ease) both; }
 @keyframes pop-back { from { scale: .6; opacity: 0; } to { scale: 1; opacity: 1; } }
-/* ... and this shadow over the left side shows where to drag */
+
 .remove-zone {
     position: absolute; left: calc(var(--pad) * -1 + 2px); top: -6px; bottom: 30px; width: 44%; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .25s;
     border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--zone) 0%, color-mix(in srgb, var(--zone) 50%, transparent) 55%, transparent 100%);
@@ -986,7 +910,7 @@ tr:hover .row-actions, tr:focus-within .row-actions, .ingredient-card:hover .row
 .zone-disc { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; font-size: 24px; background: var(--surface); color: var(--bad); border: 2px solid var(--bad); transition: scale .2s var(--ease); }
 .remove-zone.armed .zone-disc { scale: 1.22; }
 .zone-text { font-size: var(--fs-sm); font-weight: 650; max-width: 120px; text-shadow: 0 1px 6px rgba(0, 0, 0, .55); }
-/* the bar at the bottom: what is selected, what was removed (it can come back), and Done */
+
 .w-bar {
     position: sticky; bottom: 0; z-index: 4; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 8px 10px 8px 18px; border-radius: 999px;
     background: var(--text); color: var(--bg); box-shadow: var(--shadow); font-size: var(--fs-sm); animation: rise .25s var(--ease);
@@ -998,7 +922,7 @@ tr:hover .row-actions, tr:focus-within .row-actions, .ingredient-card:hover .row
 .w-bar .bar-quiet.danger { color: color-mix(in srgb, var(--bad) 62%, var(--bg)); }
 .w-bar.busy { opacity: .6; pointer-events: none; }
 
-/* ---- graphs: thin marks, quiet grid, text in text colours (never in the colour of the mark) ---- */
+
 .chart-cap { font-size: var(--fs-sm); color: var(--text-2); }
 .chart-cap b { color: var(--text); font-size: var(--fs-md); }
 .chart-note { font-size: var(--fs-xs); color: var(--muted); }
@@ -1048,24 +972,24 @@ svg.chart { display: block; max-width: 100%; overflow: visible; }
 .legend-share { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; min-width: 34px; text-align: right; }
 .w-table .num { font-variant-numeric: tabular-nums; }
 
-/* ---- small fits ---- */
+
 .toolbar .search-container { flex: 0 1 300px; }
 .toolbar .toolbar-select { max-width: 200px; }
 .row-actions { padding: 2px; }
 
-/* ============================================================== 7. folders, the Recycle bin, picking and dragging, details, helpers */
 
-/* ---- the shelf above a list: everything, each folder, and the Recycle bin ---- */
+
+
 .shelf { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .shelf .spacer { flex: 1; }
-/* a shelf drawn INTO a panel's head (All, New folder, the bin): its chips are items of the head's own row, so they wrap with it */
+
 .panel-head > .shelf { display: contents; }
 .panel-head > .shelf .folder-chip { padding-block: 4px; }
-/* a head that wraps onto a second row, in the same order, instead of squeezing its controls on top of each other */
+
 .panel-head.wraps { flex-wrap: wrap; row-gap: 8px; }
 .panel-head.wraps > :not(.spacer):not(.shelf) { flex: none; }
 .panel-head.wraps > .shelf > * { flex: none; }
-/* the pager, the fold arrow and the bin are ONE group (.head-end) at the row's right end: they wrap together, never one by one */
+
 .panel-head.wraps > .spacer { display: none; }
 .panel-head.wraps > .segmented[hidden] { display: none; }
 .head-end { margin-left: auto; flex: none; display: flex; align-items: center; gap: 8px; }
@@ -1083,8 +1007,8 @@ svg.chart { display: block; max-width: 100%; overflow: visible; }
 .folder-chip.on svg.ic { color: inherit; }
 .chip-count { font-size: var(--fs-xs); font-variant-numeric: tabular-nums; opacity: .72; }
 .folder-chip.add { border-style: dashed; background: transparent; color: var(--muted); }
-/* the Recycle bin is LOW-KEY: a small grey bin at the end of the row, without a frame or a name. It shows itself
-   fully when it is pointed at, opened, or while entries are being dragged (then it is a place to drop them). */
+
+
 .folder-chip.bin-chip { border-color: transparent; background: transparent; color: var(--muted); opacity: .6; padding-inline: 8px; transition: opacity .15s var(--ease), border-color .15s var(--ease); }
 .folder-chip.bin-chip svg.ic { color: var(--muted); }
 .folder-chip.bin-chip:hover, .folder-chip.bin-chip:focus-visible, .folder-chip.bin-chip.on, body.is-moving-items .folder-chip.bin-chip { opacity: 1; border-color: var(--border); }
@@ -1093,18 +1017,18 @@ svg.chart { display: block; max-width: 100%; overflow: visible; }
 .folder-chip.bin-chip.on svg.ic { color: var(--bad); }
 .shelf-note { font-size: var(--fs-xs); color: var(--muted); }
 
-/* while entries are being dragged, everything that takes a drop says so */
+
 body.is-moving-items .shelf [data-drop] { border-style: dashed; border-color: color-mix(in srgb, var(--gold) 70%, transparent); }
 body.is-moving-items .shelf [data-drop="bin"] { border-color: color-mix(in srgb, var(--bad) 70%, transparent); }
 [data-drop].drop-on { scale: 1.09; border-style: solid !important; border-color: var(--gold) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 35%, transparent), 0 10px 26px rgba(0, 0, 0, .3); }
 [data-drop="bin"].drop-on { border-color: var(--bad) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--bad) 38%, transparent), 0 10px 26px rgba(0, 0, 0, .3); }
 [data-drop].gulp { animation: gulp .4s var(--ease); }
 @keyframes gulp { 0% { scale: 1.09; } 40% { scale: 1.22; } 100% { scale: 1; } }
-/* the bin opens its lid for what is held over it */
+
 .bin-ic .bin-lid { transition: transform .22s var(--ease); transform-origin: 20px 7px; }
 .drop-on .bin-ic .bin-lid, .bin-chip:hover .bin-ic .bin-lid { transform: rotate(22deg) translate(1px, -1.5px); }
 
-/* the drop bar that comes up from the bottom of the window while something is dragged */
+
 .dock {
     position: fixed; left: 50%; bottom: 22px; translate: -50% 0; z-index: 2500; display: flex; align-items: stretch; gap: 10px; padding: 10px;
     max-width: min(940px, calc(100vw - 32px)); border-radius: calc(var(--radius) + 6px);
@@ -1125,7 +1049,7 @@ body.is-moving-items .shelf [data-drop="bin"] { border-color: color-mix(in srgb,
 .dock-target.dock-bin { min-width: 124px; border-color: color-mix(in srgb, var(--bad) 60%, var(--border)); }
 .dock-target.dock-bin svg.ic { width: 28px; height: 28px; color: var(--bad); }
 
-/* what is being dragged: a small card under the pointer (a stack when it is more than one) */
+
 .drag-ghost {
     position: fixed; left: 0; top: 0; z-index: 2600; pointer-events: none; display: flex; align-items: center; gap: 8px; padding: 9px 12px 9px 14px; max-width: 300px;
     border-radius: var(--radius-sm); background: var(--surface); color: var(--text); border: 1px solid var(--accent); font-size: var(--fs-sm); font-weight: 600; rotate: -2deg;
@@ -1140,7 +1064,7 @@ body.is-moving-items .shelf [data-drop="bin"] { border-color: color-mix(in srgb,
 .drag-ghost.popping { transition: translate .14s var(--ease); animation: pop-away .26s ease-in forwards; }
 .drag-ghost.back { transition: translate .3s cubic-bezier(.3, 1.4, .5, 1), opacity .3s; opacity: 0; }
 
-/* ---- picking: the small box at the start of a row or card ---- */
+
 .pick {
     width: 18px; height: 18px; flex: none; padding: 0; border-radius: 6px; cursor: pointer; display: inline-grid; place-items: center; vertical-align: -4px;
     border: 1.5px solid color-mix(in srgb, var(--muted) 75%, transparent); background: transparent; opacity: .4;
@@ -1159,11 +1083,11 @@ tr:hover .pick, .ingredient-card:hover .pick, .pick:focus-visible, .picking .pic
 tr.is-picked > td { background: color-mix(in srgb, var(--accent) 11%, transparent); }
 tr.is-picked > td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 .sel-bar { margin-top: 2px; }
-body.is-moving-items .sel-bar { visibility: hidden; }          /* the drop bar takes its place while something is dragged */
+body.is-moving-items .sel-bar { visibility: hidden; }
 .th-line { display: inline-flex; align-items: center; gap: 10px; }
 .th-line .pick { vertical-align: 0; }
 
-/* ---- a row or card that was clicked shows the rest ---- */
+
 tr.open > td { background: color-mix(in srgb, var(--accent) 5%, transparent); border-bottom-color: transparent; }
 tr.detail-row > td { padding: 0 12px 12px; background: color-mix(in srgb, var(--accent) 5%, transparent); }
 .detail-box { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--surface); border: 1px solid var(--border); animation: rise .22s var(--ease); cursor: default; }
@@ -1178,11 +1102,11 @@ tr.detail-row > td { padding: 0 12px 12px; background: color-mix(in srgb, var(--
 .row-btn.main:hover { background: color-mix(in srgb, var(--accent) 88%, #fff); }
 .row-btn svg.ic { width: 1.05em; height: 1.05em; }
 
-/* ---- a filter a helper switched on: shown as a chip that takes it off again ---- */
+
 .filter-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 6px 3px 10px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 600; cursor: pointer; color: var(--accent-text); background: color-mix(in srgb, var(--accent) 12%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); animation: pop-back .25s var(--ease); }
 .filter-chip svg.ic { width: 1em; height: 1em; }
 
-/* ---- helpers: one slim line in a panel that says what needs attention there, and offers the next step ---- */
+
 .assist {
     display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 4px 4px 4px 10px; border-radius: var(--radius-sm); font-size: var(--fs-sm); color: var(--text-2);
     background: color-mix(in srgb, var(--gold) 7%, transparent); border: 1px solid color-mix(in srgb, var(--gold) 24%, transparent);
@@ -1194,12 +1118,12 @@ tr.detail-row > td { padding: 0 12px 12px; background: color-mix(in srgb, var(--
 .assist[data-tone="warn"] .assist-icon { color: var(--warn); }
 .assist[data-tone="info"] .assist-icon { color: var(--info); }
 .assist[data-tone="ok"] .assist-icon { color: var(--ok); }
-/* icon | text (takes the room, wraps) | button and pager (never shrink, centred). When the text would get less than about
-   eleven words' width, the button and pager move onto a line of their own under it, at the right: never on top of the text. */
-/* ONE banner for every panel (adminAssist.js), 7 November 2026:
-     row 1: icon + words (the whole width, wrapping freely)      row 2: the action at the left, the pager at the right
-   It is ONE row only when everything fits without wrapping: the words ask for their one-line width (flex-basis max-content); when
-   that and the controls do not fit side by side, the controls go to a row of their own. No fixed breakpoint decides it. */
+
+
+
+
+
+
 .assist { flex-wrap: wrap; row-gap: 4px; column-gap: 12px; padding: 6px 6px 6px 10px; }
 .assist-main { display: flex; align-items: flex-start; gap: 8px; flex: 1000 1 max-content; min-width: 0; }
 .assist-text { flex: 1 1 auto; min-width: min(7ch, 100%); overflow-wrap: anywhere; padding-block: 3px; }
@@ -1218,13 +1142,13 @@ tr.detail-row > td { padding: 0 12px 12px; background: color-mix(in srgb, var(--
 .chart-insight { display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--text-2); }
 .chart-insight svg.ic { color: var(--gold); }
 
-/* ---- the toolbar's "Sort" button and the two-way switch ---- */
+
 .toolbar .segmented { padding: 3px; }
 .toolbar .seg { padding: 6px 11px; transition: background-color .2s, color .2s, transform .16s var(--ease); }
 .sort-now { color: var(--muted); font-weight: 500; }
 @media (max-width: 1280px) { .sort-now { display: none; } }
 
-/* ============================================================== 8. Clean up and Find duplicates (adminCleanup.js) */
+
 .modal-content.xl { width: min(1040px, 100%); display: flex; flex-direction: column; padding: 0; overflow: hidden; }
 .xl-head { display: flex; align-items: flex-start; gap: 12px; padding: 20px 24px 14px; border-bottom: 1px solid var(--border); }
 .xl-titles { flex: 1; min-width: 0; }
@@ -1269,14 +1193,14 @@ tr.detail-row > td { padding: 0 12px 12px; background: color-mix(in srgb, var(--
 .dup-role { font-size: var(--fs-xs); font-weight: 650; color: var(--accent-text); white-space: nowrap; }
 .dup-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
 
-/* the X that empties a search box */
+
 .search-clear { position: absolute; right: 6px; top: 50%; translate: 0 -50%; display: inline-grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; }
 .search-clear:hover { background: var(--surface-3); color: var(--text); }
 .search-container .search-clear svg.ic { position: static; transform: none; pointer-events: auto; width: 14px; height: 14px; }
 .search-container:has(.search-clear:not([hidden])) .search-input { padding-right: 36px; }
 @media (max-width: 720px) { .modal-content.xl { width: 100%; } .xl-head, .xl-body, .xl-foot { padding-left: 14px; padding-right: 14px; } .plan-head { flex-wrap: wrap; } }
 
-/* ---- import from a file (Inventory and Curator): a roomy drop zone for a side column ---- */
+
 .import-dropbox {
     width: 100%; min-height: 88px; display: flex; align-items: center; gap: 14px; padding: 16px;
     border: 1px dashed var(--line-strong, var(--line)); border-radius: 12px; background: var(--surface-2);
@@ -1295,7 +1219,7 @@ tr.detail-row > td { padding: 0 12px 12px; background: color-mix(in srgb, var(--
 .import-panel .import-dropbox small { font-size: var(--fs-sm); }
 .import-types { margin: 10px 0 0; font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); }
 
-/* ---- Quick actions tiles (Dashboard and Ingredient Curator share them) ---- */
+
 .tile-stack { display: flex; flex-direction: column; gap: 8px; }
 .tile-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
 .tile.small { padding: 9px 12px; font-size: var(--fs-sm); }
@@ -1304,11 +1228,11 @@ tr.detail-row > td { padding: 0 12px 12px; background: color-mix(in srgb, var(--
     background: var(--surface-2); border: 1px solid var(--border); font-size: var(--fs-base); font-weight: 550;
     transition: transform .16s var(--ease), box-shadow .2s, background-color .2s;
 }
-/* a tile says in full what it does: on a narrow panel its words wrap onto a second line instead of being cut */
+
 .tile .tile-title { flex: 1; min-width: min(7ch, 100%); overflow-wrap: anywhere; line-height: 1.25; }
 .tile-pair { grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr)); }
 .result-legend li > span:not(.num) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* a ranked name wraps onto more lines; the count beside it never shrinks and is never covered */
+
 .rank-name { flex: 1; min-width: min(7ch, 100%); overflow-wrap: anywhere; }
 .rank-value { flex: none; white-space: nowrap; }
 .tile svg.ic:first-child { color: var(--gold); }
@@ -1320,7 +1244,7 @@ button.tile.small { width: auto; }
 .tile:hover { background: var(--surface-3); }
 .tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* ---- info badge and its pop-over ---- */
+
 .info-slot { display: inline-flex; vertical-align: middle; margin-left: 6px; }
 .info-badge { cursor: pointer; position: relative; }
 .info-badge[data-tone="bad"] { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 55%, transparent); }
@@ -1339,18 +1263,18 @@ button.tile.small { width: auto; }
 .info-line { margin: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .info-line + .info-line { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
 .info-line[data-tone="bad"] { color: var(--bad); }
-/* ---- the Refresh data button: an icon; blocked while its pause or hourly cap is on ---- */
+
 .refresh-btn.is-blocked { opacity: .5; cursor: not-allowed; }
 .refresh-btn.is-working svg.ic { animation: refresh-spin 1s linear infinite; }
 @keyframes refresh-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .refresh-btn.is-working svg.ic { animation: none; } }
-/* ---- toolbar in two groups: what to look at (left), what to do (right) ---- */
+
 .toolbar.split { justify-content: space-between; }
 .tool-group { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-width: 0; }
 .tool-group.end { margin-left: auto; flex-wrap: nowrap; }
 
-/* ---- the search toolbar of Inventory and the Ingredient Curator, in the order it is used:
-        1 search (left)  2 narrow the list (dropdowns, Sort, Filters)  3 act (More, Add: right) ---- */
+
+
 .toolbar.inv-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .inv-tools .search-container { flex: 1 1 260px; max-width: none; min-width: min(260px, 100%); }
 .inv-tools .toolbar-select { flex: 0 1 180px; width: auto; max-width: 220px; min-width: 140px; }
@@ -1361,20 +1285,20 @@ button.tile.small { width: auto; }
     .inv-tools .toolbar-select { flex: 1 1 140px; max-width: none; }
 }
 
-/* ---- Pending Snapshot Reviews: a button in the table's bar, with a count badge (both pages) ---- */
+
 .snapshots-chip { gap: 8px; }
 .count-badge { min-width: 24px; height: 22px; padding: 0 7px; border-radius: 999px; display: inline-grid; place-items: center; font-size: var(--fs-xs); font-weight: 700;
     font-variant-numeric: tabular-nums; background: var(--surface-3); color: var(--text-2); }
 .snapshots-chip.has-waiting { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
 .snapshots-chip.has-waiting .count-badge { background: var(--accent); color: #fff; }
-/* read by screen readers, not shown */
+
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
-/* ---- right-hand column in the default layout: panels marked data-right stay on the right edge ---- */
+
 .board.pinned > .panel[data-right] { grid-column: calc(13 - var(--w, 4)) / span var(--w, 4); }
 @media (max-width: 1023px) { .board.pinned > .panel[data-right] { grid-column: span 12 !important; } }
 
-/* ---- the floating notes window: one row per note, serious matters first ---- */
+
 .info-window {
     position: fixed; z-index: 4500; display: none; flex-direction: column; width: min(380px, calc(100vw - 8px)); max-height: min(70vh, 560px);
     background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden;
@@ -1407,7 +1331,7 @@ button.tile.small { width: auto; }
 .iw-row .row-btn { flex: none; align-self: center; white-space: nowrap; }
 @container panel (max-width: 480px) { .iw-row { flex-wrap: wrap; } .iw-row .row-btn { align-self: flex-start; } }
 
-/* ---- the shade editor: swatch (a colour box), editable code, move and remove ---- */
+
 .shade-item { gap: 6px; padding: 3px 6px 3px 4px; }
 .shade-swatch { position: relative; flex: none; width: 26px; height: 26px; border-radius: 50%; overflow: hidden; border: 1px solid var(--border); cursor: pointer; }
 .shade-item .shade-picker { position: absolute; inset: -6px; width: 40px; height: 40px; opacity: 0; cursor: pointer; border: 0; padding: 0; }
@@ -1416,12 +1340,12 @@ button.tile.small { width: auto; }
 .shade-item button:disabled { opacity: .3; cursor: default; }
 .shade-item.shade-new { border-style: dashed; border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
 .shade-msg { flex-basis: 100%; color: var(--bad); }
-/* 11 shades or more: the shades sit in a box of about ten rows that scrolls up and down; each shade keeps its full size */
+
 .shade-strip { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; max-height: 440px; overflow-y: auto; overscroll-behavior-y: contain; padding: 2px 6px 2px 2px; scrollbar-width: thin; }
 .shade-strip .shade-item { flex: none; }
 .shade-strip + .field-hint { flex-basis: 100%; }
 
-/* ---- the "Edit list" window for allergen families, highlights and skin conditions ---- */
+
 .field-label .list-edit { width: 22px; height: 22px; margin-left: 6px; vertical-align: middle; }
 .field-label .list-edit svg.ic { width: 13px; height: 13px; }
 .lists-box { width: min(760px, 100%); }
@@ -1444,7 +1368,7 @@ button.tile.small { width: auto; }
 .lists-add-note, .lists-note { min-height: 1.2em; margin: 6px 0 0; }
 @container panel (max-width: 640px) { .lists-row { grid-template-columns: auto minmax(0, 1fr); } .lists-meta, .lists-actions { grid-column: 2; flex-direction: row; justify-content: flex-start; gap: 10px; } }
 
-/* ---- the ingredient picker of the product form: search, pills, "create on the fly" ---- */
+
 .ing-search { position: relative; }
 .ing-search input { width: 100%; }
 .ing-results { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none; max-height: 260px; overflow-y: auto;
@@ -1468,7 +1392,7 @@ button.ing-pill-name { cursor: pointer; text-decoration: underline dotted; }
 .ing-pill-x:hover { color: var(--bad); }
 .ing-pill-note:hover { color: var(--text); }
 
-/* ---- the Filters panel ---- */
+
 .facet-panel { position: fixed; z-index: 3500; width: min(320px, calc(100vw - 16px)); padding: 14px; display: flex; flex-direction: column; gap: 12px;
     background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
 .facet-title { margin: 0; font-size: var(--fs-md); }
@@ -1478,7 +1402,7 @@ button.ing-pill-name { cursor: pointer; text-decoration: underline dotted; }
 .facet-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .btn.on { border-color: var(--accent); color: var(--accent-text); }
 
-/* ---- Pending snapshots: the button in the Inventory's right column ---- */
+
 .snapshots-open {
     display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px; border-radius: var(--radius-sm); cursor: pointer; text-align: left;
     background: var(--surface-2); border: 1px solid var(--border); color: var(--text); font: inherit;
@@ -1496,7 +1420,7 @@ button.ing-pill-name { cursor: pointer; text-decoration: underline dotted; }
     background: var(--surface-3); color: var(--text-2); }
 .snapshots-open.has-waiting .snapshots-count { background: var(--accent); color: #fff; }
 
-/* ---- the floating review window: the page behind dimmed and blurred, ONE snapshot at a time ---- */
+
 body.snapx-open { overflow: hidden; }
 .snapx-overlay { position: fixed; inset: 0; z-index: 2500; display: grid; place-items: center; padding: 20px;
     background: color-mix(in srgb, #140c0e 68%, transparent); opacity: 0; transition: opacity .2s; }
@@ -1556,7 +1480,7 @@ body.snapx-open { overflow: hidden; }
 .snapx-pill.new { border-style: dashed; color: var(--text-2); }
 .snapx-badge { margin: 0; width: fit-content; padding: 3px 10px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 600; color: var(--text); border: 1px dashed color-mix(in srgb, var(--warn) 70%, transparent); background: color-mix(in srgb, var(--warn) 10%, transparent); }
 .snapx-extra { display: flex; flex-direction: column; gap: 6px; }
-/* what the app's web search found (11 November 2026): a folding block, fields like the ones above, links that wrap */
+
 .snapx-web { display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; background: var(--surface-2); }
 .snapx-web > summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
 .snapx-web[open] > summary { margin-bottom: 6px; }
@@ -1586,26 +1510,25 @@ body.snapx-open { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
     .snapx-overlay, .snapx-window, .snapx-card, .snapx-fill { transition: none; }
 }
-/* a question asked from inside the review window (Reject?) comes above it */
+
 body.snapx-open .modal-overlay { z-index: 3000; }
 
-/* ---- New4.pdf: Inventory and Curator ---- */
-/* the search box lives in the page header, beside the title; Add / More sit at the right end next to the layout button */
-.topbar.has-search .topbar-titles { flex: 0 0 auto; }
-.topbar > .search-container { flex: 1 1 260px; max-width: 520px; min-width: min(160px, 100%); margin: 0 auto 0 8px; }
+
+
+.topbar-controls > .search-container { height: 36px; flex: 1 1 260px; max-width: 520px; min-width: min(160px, 100%); margin: 0; }
+.topbar-controls > .search-container .search-input { height: 36px; }
 .topbar-tools .tool-group.end { margin-left: 0; flex-wrap: nowrap; }
-@media (max-width: 800px) { .topbar { flex-wrap: wrap; } .topbar > .search-container { order: 3; flex-basis: 100%; max-width: none; margin: 0; } }
-/* the filter bar: ONE row of dropdowns (the buttons moved to the header and to the table's bar) */
+
 .toolbar.inv-tools { flex-wrap: nowrap; }
 .inv-tools .toolbar-select { flex: 1 1 200px; max-width: 320px; min-width: 120px; }
-/* Sort and Filters sit in the table's bar, right after its title */
+
 .table-tools { display: inline-flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
 .table-tools .btn { padding-block: 5px; white-space: nowrap; }
-/* a dropdown in the table's bar ("Any risk level" in the Ingredients bar) is as tall as the Sort button beside it */
+
 .panel-head .head-select { width: auto; max-width: 180px; height: calc(var(--fs-base) * 1.1 + 12px); padding-block: 0; line-height: 1.1; font-weight: 550; background: var(--surface-2); }
-/* no "1-10 of 50 brands" text and no count line: the pager keeps only "< Page 1 of 5 >" */
+
 .pager-range { display: none; }
-/* Needs your attention: one list, most important first, a colour and a word per level */
+
 .notes-list { display: flex; flex-direction: column; gap: 8px; }
 .note-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--surface-2);
     border-left: 4px solid var(--border); }
@@ -1624,28 +1547,15 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 .note-row[data-tone=""] .note-text { color: var(--muted); }
 @container panel (max-width: 700px) { .note-row { flex-wrap: wrap; } .note-text { flex-basis: 100%; order: 3; } }
 
-/* ---- the header of the Recycle Bin and the Archive (placeHeaderParts in adminShell.js): one line, the search gives way first ---- */
-.topbar.has-tabs { flex-wrap: nowrap; flex: none; }
-.topbar.has-tabs .topbar-titles { flex: none; }
-.topbar.has-tabs > .topbar-tools { flex: none; margin-left: auto; }
-.topbar.has-tabs > .topbar-tools .btn { white-space: nowrap; }
-.topbar > .header-tabs { flex: none; padding-block: 0; height: 36px; }
-.topbar > .header-tabs .seg { padding-block: 0; height: 30px; align-self: center; }
-.topbar.has-tabs > .search-container { order: 0; flex: 0 1 300px; max-width: none; min-width: 0; margin: 0; overflow: hidden; }
-.topbar.has-tabs > .search-container .search-input { height: 36px; padding-block: 0; }
-/* less room: the tabs keep their words and lose their icons and counts */
-@media (max-width: 900px) { .topbar > .header-tabs .seg svg.ic, .topbar > .header-tabs .tab-count { display: none; } }
-/* FLUID (7 November 2026): no sideways scroll in the header. With little room it wraps: the menu, title and buttons first,
-   then the tabs across the whole width, then the search across the whole width. */
-@media (max-width: 760px) {
-    .topbar.has-tabs { flex-wrap: wrap; overflow-x: visible; row-gap: 10px; }
-    .topbar.has-tabs > .topbar-tools { order: 1; }
-    .topbar.has-tabs > .header-tabs { order: 2; flex: 1 1 100%; display: flex; }
-    .topbar.has-tabs > .header-tabs .seg { flex: 1 1 0; min-width: 0; justify-content: center; }
-    .topbar.has-tabs > .search-container { order: 3; flex: 1 1 100%; }
-}
 
-/* ---- the site's own drop-down (adminSelect.js): dark panel, light text, pink hover and selected row ---- */
+.topbar-controls > .header-tabs { flex: none; padding-block: 0; height: 36px; }
+.topbar-controls > .header-tabs .seg { padding-block: 0; height: 30px; align-self: center; }
+.topbar.has-tabs .topbar-controls > .search-container { order: 0; flex: 0 1 300px; max-width: none; min-width: 0; margin: 0; overflow: hidden; }
+.topbar.has-tabs .topbar-controls > .search-container .search-input { height: 36px; padding-block: 0; }
+
+@media (max-width: 900px) { .topbar-controls > .header-tabs .seg svg.ic, .topbar-controls > .header-tabs .tab-count { display: none; } }
+
+
 .combo { position: relative; }
 .combo-native { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .combo-btn {
@@ -1673,8 +1583,8 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 .combo-sep { height: 1px; margin: 4px 6px; background: var(--border); }
 .combo-none { padding: 10px; color: var(--muted); font-size: var(--fs-sm); }
 
-/* ============================================================== 8. "Style and text" of one panel (componentStyle.js, 9 November 2026)
-   Set by an admin per panel. Everything here keeps the board's grid: no panel is turned or moved out of its place. */
+
+
 .panel[data-panel-bg] { background: var(--panel-bg); }
 .panel[data-card-bg] > .panel-inner { --surface: var(--card-bg); --surface-2: var(--card-bg); }
 .panel[data-pscale] {
@@ -1687,7 +1597,7 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 .panel-subtitle-text { margin: -6px 0 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.4; overflow-wrap: anywhere; }
 .panel-note { margin: 0; padding: 8px 12px; border-radius: var(--radius-sm); background: color-mix(in srgb, var(--accent) 7%, transparent);
     border-left: 3px solid color-mix(in srgb, var(--accent) 55%, transparent); font-size: var(--fs-sm); color: var(--text-2); line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
-/* entrance: once, when the page opens */
+
 .board:not(.settled) > .panel[data-anim="none"] { animation: none; }
 .board:not(.settled) > .panel[data-anim="fade"] { animation-name: p-fade; }
 .board:not(.settled) > .panel[data-anim="zoom"] { animation-name: p-zoom; }
@@ -1705,16 +1615,16 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 @keyframes p-drop { from { opacity: 0; transform: translateY(-18px); } to { opacity: 1; transform: none; } }
 @keyframes p-flip { from { opacity: 0; transform: perspective(900px) rotateX(-14deg); } to { opacity: 1; transform: none; } }
 @keyframes p-blur { from { opacity: 0; filter: blur(6px); } to { opacity: 1; filter: none; } }
-/* the edge light: under the pointer (default), always and moving, or off */
+
 .panel[data-edge="off"]::before { display: none; }
 .panel[data-edge="always"]::before { opacity: .85; background: conic-gradient(from var(--spin), transparent 0 68%, var(--gold) 84%, var(--accent) 93%, transparent 100%); animation: edge-light 5s linear infinite; }
-/* how quickly things inside answer hover and press */
+
 .panel[data-trans] :is(button, a, .fx, .kpi, .stat, .w-tile, .w-card, .w-item, .rank-item, .activity-item, .bar-row, .bar-fill, .row-btn, .chip) { transition-timing-function: var(--p-ease, var(--ease)); }
 .panel[data-trans="quick"] :is(button, a, .fx, .kpi, .stat, .w-tile, .w-card, .w-item, .rank-item, .activity-item, .bar-row, .bar-fill, .row-btn, .chip) { transition-duration: .08s !important; }
 .panel[data-trans="slow"] :is(button, a, .fx, .kpi, .stat, .w-tile, .w-card, .w-item, .rank-item, .activity-item, .bar-row, .bar-fill, .row-btn, .chip) { transition-duration: .5s !important; }
 .panel[data-trans="springy"] { --p-ease: cubic-bezier(.34, 1.56, .64, 1); }
 .panel[data-trans="none"] :is(button, a, .fx, .kpi, .stat, .w-tile, .w-card, .w-item, .rank-item, .activity-item, .bar-row, .bar-fill, .row-btn, .chip) { transition: none !important; }
-/* orientation of the cards inside (never a turned panel: that would cover its neighbours) */
+
 .panel[data-orient="row"] :is(.kpi-row, .stat-row) { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
 .panel[data-orient="row"] :is(.kpi-row, .stat-row) > :last-child:nth-child(odd) { grid-column: auto; }
 .panel[data-orient="column"] :is(.kpi-row, .stat-row) { grid-template-columns: minmax(0, 1fr); grid-auto-flow: row; }
@@ -1722,7 +1632,7 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 @container panel (max-width: 520px) {
     .panel[data-orient="row"] :is(.kpi-row, .stat-row) { grid-auto-flow: row; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-/* the "Style and text" form */
+
 .style-dialog .form-section + .form-section { margin-top: 4px; }
 .style-dialog .contrast-note { min-height: 1.4em; }
 .style-dialog .contrast-note.warn { color: var(--warn); }
@@ -1734,7 +1644,7 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 .undo-row .btn { flex: 1 1 0; min-width: 0; padding-inline: 8px; white-space: nowrap; justify-content: center; }
 .sd-play { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin: 4px 0 12px; }
 @media (prefers-reduced-motion: reduce) { .panel[data-edge="always"]::before { animation: none; } }
-/* the "Style and text" form sits at the side (at the bottom on a phone), so the panel it changes stays in view */
+
 .modal-overlay.style-overlay { justify-content: flex-end; align-items: stretch; padding: 0; background: color-mix(in srgb, #000 10%, transparent); }
 .style-overlay .style-dialog { width: min(460px, 100%); height: 100%; max-height: none; border-radius: 0; border-width: 0 0 0 1px; animation: slide-in .22s var(--ease); }
 .style-dialog .modal-actions { position: sticky; bottom: -24px; z-index: 2; margin: 16px -24px -24px; padding: 12px 24px; background: var(--surface); border-top: 1px solid var(--border); flex-wrap: wrap; }
@@ -1745,10 +1655,10 @@ body.snapx-open .modal-overlay { z-index: 3000; }
     .style-overlay .style-dialog { width: 100%; height: 62vh; border-radius: var(--radius) var(--radius) 0 0; border-width: 1px 0 0; }
 }
 
-/* ============================================================== 9. the import drop box: reading cover and check window (importReview.js) */
+
 .import-drop-holder { position: relative; }
 .import-drop-holder > .import-dropbox { width: 100%; }
-/* the cover lies over the drop box only, the same size: nothing on the page moves or is covered */
+
 .import-cover { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 14px;
     border-radius: var(--radius); background: var(--surface); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
     text-align: center; animation: p-fade .2s var(--ease); }
@@ -1759,7 +1669,7 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 .import-cover.ready .import-spinner { animation: none; border-color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, transparent); }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .import-spinner { animation-duration: 2.5s !important; } }
-/* the check window */
+
 .import-check { height: min(860px, 100%); }
 .import-check .xl-head .icon-btn { margin-left: auto; }
 .ic-head-text { min-width: 0; }
@@ -1779,12 +1689,12 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 .import-check .xl-foot { flex-wrap: wrap; }
 .ic-notes { flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; }
 @media (max-width: 720px) { .ic-tabs { margin-left: 14px; margin-right: 14px; } .ic-bar { margin-left: -14px; margin-right: -14px; padding-left: 14px; padding-right: 14px; } }
-/* toasts on a phone: the whole width minus the page's gutter, never past the edge */
+
 @media (max-width: 480px) { .toast-host { left: 12px; right: 12px; bottom: 12px; max-width: none; } }
-/* while a window is open, messages sit above its bottom bar, so they never cover its Save or Cancel */
+
 body:has(> .modal-overlay[style*="flex"]) .toast-host { bottom: 96px; }
-/* a list's pager in a title bar takes the short "1/16" when the panel is not wide, so the bar stays ONE line (9 November 2026:
-   Inventory's pager dropped to a second line with Quick settings closed) */
+
+
 @container panel (max-width: 1150px) {
     .panel-head .pager .page-long { display: none; }
     .panel-head .pager .page-short { display: inline; }
@@ -1794,8 +1704,8 @@ body:has(> .modal-overlay[style*="flex"]) .toast-host { bottom: 96px; }
     .panel-head .pager .page-now { min-width: 0; padding-inline: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .panel-head .sort-now { display: none; }
 }
-/* a narrower list (Quick settings open, a half-width panel): Sort, Filters and New folder show only their icons, so the title bar
-   still keeps ONE line; the words stay for screen readers (9 November 2026) */
+
+
 @container panel (max-width: 900px) {
     .panel-head .table-tools .btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     .panel-head .table-tools .btn { padding-inline: 9px; gap: 0; }
@@ -1803,21 +1713,21 @@ body:has(> .modal-overlay[style*="flex"]) .toast-host { bottom: 96px; }
     .panel-head .folder-chip.add { padding-inline: 8px; }
 }
 
-/* ============================================================== 10. Keyboard shortcuts (shortcuts.js, shortcutsPanel.js; 9 November 2026)
-   Key chips, the list in Quick settings, the Add / Edit dialog, the "?" help and the command palette. Only the site's tokens. */
+
+
 :root { --z-layer: 1000; --z-layer-top: 1100; }
 .kb-layer { z-index: var(--z-layer); }
 .kb-layer.kb-top { align-items: flex-start; padding-top: min(12vh, 96px); }
-/* a key chip: never broken inside, the combo never wraps between its chips */
+
 .kb-combo { display: inline-flex; align-items: center; gap: 3px; flex: none; white-space: nowrap; vertical-align: middle; }
 .kb-key { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border: 1px solid var(--border); border-bottom-width: 2px;
     border-radius: 6px; background: var(--surface-2); color: var(--text); font: 600 var(--fs-xs)/1 var(--font); font-variant-numeric: tabular-nums; }
 .kb-combo.is-partial .kb-key { border-style: dashed; }
 .kb-dots { color: var(--muted); font-size: var(--fs-xs); padding-left: 2px; }
-/* combo hints are for a keyboard: on a touch-only device they are not shown (the settings stay reachable) */
+
 @media (hover: none) and (pointer: coarse) { .kb-hint, .menu-item .kb-combo { display: none; } }
 
-/* the list in Quick settings */
+
 .keys-view { display: flex; flex-direction: column; gap: 12px; }
 .keys-view[hidden] { display: none; }
 .kb-actions .btn { flex: 1 1 0; min-width: 0; white-space: nowrap; justify-content: center; }
@@ -1841,7 +1751,7 @@ body:has(> .modal-overlay[style*="flex"]) .toast-host { bottom: 96px; }
 .kb-note.bad { color: var(--text); background: color-mix(in srgb, var(--bad) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--bad) 40%, transparent); }
 .kb-note.warn svg.ic { color: var(--warn); } .kb-note.bad svg.ic { color: var(--bad); }
 
-/* the dialogs: the body scrolls, the head and the footer (Cancel / Save) stay in view at any zoom */
+
 .kb-modal { width: min(620px, 100%); max-height: 100%; }
 .kb-modal .xl-body { min-height: 0; }
 .kb-help { width: min(560px, 100%); }
@@ -1852,7 +1762,7 @@ body:has(> .modal-overlay[style*="flex"]) .toast-host { bottom: 96px; }
 .kb-record:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .kb-record.is-recording { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
 .kb-placeholder { color: var(--muted); font-size: var(--fs-sm); }
-/* the messages under the key field open and close their height smoothly: nothing below jumps */
+
 .kb-collapse { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .2s var(--ease); }
 .kb-collapse.open { grid-template-rows: 1fr; }
 .kb-collapse > .kb-msgs { overflow: hidden; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -1876,14 +1786,14 @@ body:has(> .modal-overlay[style*="flex"]) .toast-host { bottom: 96px; }
 .kb-save-error { display: flex; align-items: center; gap: 8px; font-size: var(--fs-sm); color: var(--bad); min-width: 0; }
 .kb-save-error[hidden] { display: none; }
 
-/* "?" help */
+
 .kb-help-list { display: grid; grid-template-columns: max-content 1fr; gap: 8px 14px; margin: 4px 0 8px; align-items: baseline; }
 .kb-help-list dt { margin: 0; }
 .kb-help-list dd { margin: 0; display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: var(--fs-sm); }
 .kb-help-list dd span { color: var(--muted); font-size: var(--fs-xs); overflow-wrap: break-word; }
 @media (max-width: 480px) { .kb-help-list { grid-template-columns: 1fr; } }
 
-/* command palette */
+
 .kb-search { width: 100%; }
 .kb-results { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; }
 .kb-result { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; cursor: pointer; font-size: var(--fs-sm); }
@@ -1901,14 +1811,14 @@ body:has(> .modal-overlay[style*="flex"]) .toast-host { bottom: 96px; }
     .kb-test .kb-bar { animation: none; }
 }
 
-/* =====================================================================================================================
-   THE ADD / EDIT INGREDIENT WINDOW (10 November 2026)
-   One column of three flex parts (header, section bar, form = scrolling body + footer), so the footer is never laid over a field.
-   One field pattern everywhere: label row (label left, info and edit icons right) / control / hint line (hint left, counter right) /
-   one "Sources (N)" row. A 12-column grid with the spacing steps 4, 8, 12, 16, 24, 32 only. Radius: boxes and buttons 8, section
-   cards 12, the window 16, chips fully round. Brand pink: the Save button and the active marker only. Colours below were measured
-   against WCAG AA (text 4.5:1, borders and focus rings 3:1) in both themes: see scripts/contrast-check.mjs.
-   ===================================================================================================================== */
+
+
+
+
+
+
+
+
 :is(#addIngredientModal, #addBrandModal, #productModal) {
     --im-input-bg: #1d1d24; --im-border: #8b8894; --im-hint: #b0adb8; --im-placeholder: #a8a5b0; --im-link: #86b7f7; --im-danger: #ff8a8a;
     --im-selected: #4a2433; --im-text: #f2f1f4;
@@ -1931,7 +1841,7 @@ body:has(> .modal-overlay[style*="flex"]) .toast-host { bottom: 96px; }
 .ing-head .modal-intro { margin: 4px 0 0; font-size: 13px; line-height: 1.45; color: var(--im-hint); }
 .ing-close { width: 32px; height: 32px; border-radius: 8px; flex: none; color: var(--im-hint); }
 
-/* the section bar: always in view above the scrolling body; the section being read is marked */
+
 .ing-nav { flex: none; display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 24px 10px; border-bottom: 1px solid var(--border); }
 .ing-nav-btn {
     flex: none; min-height: 32px; padding: 4px 12px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--text-2);
@@ -1953,7 +1863,7 @@ body:has(> .modal-overlay[style*="flex"]) .toast-host { bottom: 96px; }
 .ing-grid > .half { grid-column: span 6; }
 .ing-modal .section-note { margin: -8px 0 0; }
 
-/* the field pattern */
+
 .ing-modal .field { display: flex; flex-direction: column; gap: 0; min-width: 0; }
 .label-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; margin-bottom: 2px; min-width: 0; }
 .label-row > label, .label-row > .label-text { font-size: 14px; font-weight: 600; line-height: 1.3; color: var(--text); min-width: 0; display: block; }
@@ -1973,7 +1883,7 @@ body:has(> .modal-overlay[style*="flex"]) .toast-host { bottom: 96px; }
     width: 100%; min-width: 0; min-height: 40px; padding: 8px 12px; border: 1px solid var(--im-border); border-radius: 8px;
     background: var(--im-input-bg); color: var(--im-text); font: inherit; font-size: 15px; font-weight: 400; line-height: 1.4;
 }
-.ing-modal select.combo-native { width: 1px; height: 1px; min-height: 0; padding: 0; border: 0; }       /* the real list behind the drop-down box stays invisible */
+.ing-modal select.combo-native { width: 1px; height: 1px; min-height: 0; padding: 0; border: 0; }
 .ing-modal textarea, .ing-modal .field > textarea { min-height: 96px; resize: vertical; }
 .ing-modal input::placeholder, .ing-modal textarea::placeholder { color: var(--im-placeholder); opacity: 1; }
 .ing-modal .combo-btn.is-placeholder .combo-label { color: var(--im-placeholder); }
@@ -1991,7 +1901,7 @@ body:has(> .modal-overlay[style*="flex"]) .toast-host { bottom: 96px; }
 .ing-modal .paste-note { margin-top: 6px; }
 .ing-modal .name-clash { margin: 0; }
 
-/* Sources (N): one closed row under a box; inside, one list: source | what to look for | + ref */
+
 .ing-modal .field-sources { margin-top: 8px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .ing-modal .field-sources[hidden] { display: none; }
 .ing-modal .definition-basis { margin: 0; font-size: 13px; line-height: 1.45; color: var(--im-hint); }
@@ -2023,7 +1933,7 @@ details.sources-box > summary:focus-visible { outline: 2px solid var(--accent); 
 details.sources-box > .field-hint { padding: 0 12px 8px; }
 details.sources-box > .field-hint:first-of-type { padding-top: 8px; }
 
-/* chips: outline when off, filled with a check when on (never colour alone) */
+
 .ing-modal .checks.pills { display: flex; flex-wrap: wrap; gap: 8px; }
 .ing-modal .checks.pills + .checks.pills { margin-top: 8px; }
 .ing-modal .checks.pills:empty { display: none; }
@@ -2036,7 +1946,7 @@ details.sources-box > .field-hint:first-of-type { padding-top: 8px; }
 .ing-modal .checks.pills .check:has(input:checked)::before { content: "\2713"; font-size: 12px; line-height: 1; }
 .ing-modal .checks.pills .check:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* Skin Types and Skin Conditions: full-width tables, every row the same height; Avoid | Neutral | Good, fill plus icon when chosen */
+
 .ing-modal .fit-list { display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .ing-modal .fit-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; min-height: 48px; margin: 0; padding: 8px 12px; border: 0; min-width: 0; font-size: 14px; }
 .ing-modal .fit-row + .fit-row { border-top: 1px solid var(--border); }
@@ -2058,7 +1968,7 @@ details.sources-box > .field-hint:first-of-type { padding-top: 8px; }
 .ing-modal .fit-choice.good input:checked + span::before { content: "\2713"; font-size: 12px; }
 .ing-modal .fit-choice input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: -2px; }
 
-/* the footer is a flex sibling of the body: it cannot cover a field. The message of a failed save sits in it, with an icon. */
+
 .ing-foot { flex: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 24px 16px; border-top: 1px solid var(--border); background: var(--surface); }
 :is(#addIngredientModal, #addBrandModal, #productModal) .ing-foot .form-error {
     position: static; margin: 0; padding: 8px 12px; font-size: 13px; line-height: 1.45; color: var(--im-danger); border-radius: 8px;
@@ -2071,7 +1981,7 @@ details.sources-box > .field-hint:first-of-type { padding-top: 8px; }
 .ing-foot .cancel-btn:focus-visible, .ing-foot .save-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ing-foot .save-btn { background: var(--accent); color: var(--accent-ink); border: 1px solid var(--accent); }
 
-/* a toast never sits over Save or Cancel: with this window open it is at the top, in the middle */
+
 body:has(> :is(#addIngredientModal, #addBrandModal, #productModal)[style*="flex"]) .toast-host { top: 16px; bottom: auto; left: 50%; right: auto; transform: translateX(-50%); align-items: center; max-width: min(380px, calc(100vw - 32px)); }
 
 @media (pointer: coarse) {
@@ -2096,7 +2006,7 @@ body:has(> :is(#addIngredientModal, #addBrandModal, #productModal)[style*="flex"
 @media (prefers-reduced-motion: reduce) { details.sources-box > summary::before { transition: none; } }
 .ing-modal .source-link.is-wait { opacity: .6; cursor: progress; }
 
-/* ---- the brand and product windows use the same window (header, section bar, body, footer) and the same field pattern ---- */
+
 .ing-modal .label-actions .row-btn { min-height: 32px; border-radius: 8px; font-size: 13px; }
 .ing-modal .check-line { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.45; color: var(--im-hint); }
 .ing-modal .check-line input { margin-top: 2px; flex: none; width: 16px; height: 16px; accent-color: var(--accent); }
@@ -2118,15 +2028,15 @@ body:has(> :is(#addIngredientModal, #addBrandModal, #productModal)[style*="flex"
 .ing-modal .hint-row:has(> .field-hint:empty) { display: none; }
 #addBrandModal .ing-foot .form-error, #productModal .ing-foot .form-error, #addIngredientModal .ing-foot .form-error { max-height: 96px; overflow-y: auto; }
 
-/* ---- the SOURCE LINK beside a box, and the Source Finder (10 November 2026) ----
-   Wide window (640 px or more): two columns, 2fr box / 1fr source; the source box is top-aligned with the box (not with its label) and
-   spans the box and its hint. Narrow: one column, the source directly under the box and above the hint. Counters stay in the box's
-   own hint line. No absolute positioning; every grid child may shrink (min-width 0). */
+
+
+
+
 .ing-modal { container-type: inline-size; container-name: ingwindow; }
 .ing-modal .field.has-src {
     display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); column-gap: 16px; row-gap: 0; align-items: start;
     grid-template-areas: "label slabel" "control sbody" "hint sbody" "note note" "sources sources" "finder finder";
-    grid-template-rows: auto auto 1fr auto auto auto;          /* the source column's extra height goes under the hint, so the hint stays right under its box */
+    grid-template-rows: auto auto 1fr auto auto auto;
 }
 .ing-modal .field.has-src > .label-row { grid-area: label; }
 .ing-modal .field.has-src > input, .ing-modal .field.has-src > textarea, .ing-modal .field.has-src > select { grid-area: control; }
@@ -2210,35 +2120,106 @@ body:has(> :is(#addIngredientModal, #addBrandModal, #productModal)[style*="flex"
     .ing-modal .finder-row .finder-what { grid-column: 1 / -1; grid-row: 2; }
 }
 
-/* "Sign out?" and other one-line questions: the question on the left, its buttons on the right, one row (12 November 2026) */
+
 .modal-content.confirm-inline { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px 28px; }
 .modal-content.confirm-inline > h3 { margin: 0; flex: 0 1 auto; }
 .modal-content.confirm-inline > .modal-actions { margin: 0; flex: 0 0 auto; }
 
-/* ============================================================== GMAIL-STYLE MENU (12 November 2026)
-   The menu is the icon rail by default. Hovering it opens it OVER the page (html.sb-hover from 1024 px; html.sb-peek below), leaving it
-   closes it. The menu button left of the logo pins it open (the page moves over, as before) or folds it back. The old edge tab is hidden. */
-.sb-menu-btn { display: none; }
-@media (min-width: 768px) {
-    .sb-menu-btn { display: inline-grid; place-items: center; flex: none; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text-2); cursor: pointer; }
-    .sb-menu-btn:hover { background: var(--surface-3); color: var(--text); }
-    .sb-menu-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    .sb-menu-btn svg.ic { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
-    #sidebarToggle { display: none; }
+
+html.sb-pinned { --content-left: var(--nav-w); }
+html.sb-mobile-open { --content-left: 0px; }
+body.app { display: block; min-height: 100%; overflow-x: hidden; overflow-y: visible; }
+.sidebar {
+    position: fixed; z-index: 900; top: var(--header-h); bottom: 0; left: 0; width: var(--rail-w);
+    display: flex; flex-direction: column; gap: 18px; overflow: hidden; padding: 12px 9px 12px 10px;
+    background: var(--surface); border-right: 1px solid var(--border);
+    transition: width .2s var(--ease), translate .2s var(--ease);
 }
-@media (min-width: 1024px) {
-    html.sb-collapsed:not(.sb-hover) .sidebar-brand .brand-home { display: none; }                       /* the rail shows only the menu button */
-    html.sb-collapsed .sidebar-brand { flex-direction: row; justify-content: center; }
-    html.sb-collapsed.sb-hover .sidebar { width: 232px; z-index: 900; box-shadow: var(--shadow); }       /* over the page: the grid column stays 72 px */
-    html.sb-collapsed.sb-hover .sidebar > * { width: 204px; flex-shrink: 0; }
-    html.sb-collapsed.sb-hover .sidebar > .nav-links { flex-shrink: 1; }
-    html.sb-collapsed.sb-hover .sidebar .label, html.sb-collapsed.sb-hover .signed-in-as { display: inline; animation: sb-label-in .18s ease-out both; }
-    html.sb-collapsed.sb-hover .sidebar-brand { flex-direction: row; justify-content: flex-start; gap: 10px; }
-    html.sb-collapsed.sb-hover .brand-home { flex-direction: row; gap: 10px; }
-    html.sb-collapsed.sb-hover .nav-links a, html.sb-collapsed.sb-hover .sign-out { justify-content: flex-start; padding-left: 12px; padding-right: 12px; }
+.sidebar > * { width: 100%; min-width: 0; flex-shrink: 0; }
+.sidebar > .nav-links { flex: 1; min-height: 0; flex-shrink: 1; }
+.nav-icon { width: var(--icon-box); height: var(--icon-box); flex: 0 0 var(--icon-box); display: grid; place-items: center; border-radius: var(--radius-sm); }
+.sidebar .nav-links a {
+    height: 38px; gap: calc(var(--label-start-x) - var(--icon-center-x) - var(--icon-box) / 2);
+    padding: 0 12px 0 calc(var(--icon-center-x) - var(--icon-box) / 2 - 11px);
 }
-@media (min-width: 768px) and (max-width: 1023px) {
-    html:not(.sb-peek) .sidebar-brand .brand-home { display: none; }
-    html.sb-peek .sidebar-brand, html.sb-peek.sb-collapsed .sidebar-brand { flex-direction: row; justify-content: flex-start; align-items: center; gap: 10px; }
+.sidebar .label { display: inline-block; flex: 1; min-width: 0; overflow: hidden; text-overflow: clip; white-space: nowrap; }
+html.sb-collapsed:not(.sb-hover) .sidebar .label { visibility: hidden; }
+html.sb-pinned .sidebar { width: var(--nav-w); }
+html.sb-pinned .sidebar .label, html.sb-hover .sidebar .label { visibility: visible; }
+html.sb-collapsed.sb-hover .sidebar { width: var(--nav-w); box-shadow: var(--shadow); }
+.sidebar .sign-out {
+    height: 38px; gap: calc(var(--label-start-x) - var(--icon-center-x) - var(--icon-box) / 2);
+    padding: 0 12px 0 calc(var(--icon-center-x) - var(--icon-box) / 2 - 10px);
 }
-@media (prefers-reduced-motion: reduce) { html.sb-hover .sidebar .label { animation: none !important; } }
+.brand-home { display: flex; align-items: center; gap: 10px; flex: none; min-width: 0; color: inherit; text-decoration: none; cursor: pointer; border-radius: 12px; }
+.topbar > .brand-home { height: 100%; margin-left: calc(var(--label-start-x) - var(--rail-w)); }
+.brand-home:hover .brand-title { color: var(--accent-text); }
+.brand-home:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.brand-logo { width: 34px; height: 34px; border-radius: 10px; flex: none; overflow: hidden; display: block; }
+.brand-logo img { display: block; width: 100%; height: 100%; }
+.brand-title { font-size: var(--fs-md); font-weight: 700; line-height: 1.15; letter-spacing: .1px; }
+.main-content {
+    display: flex; flex-direction: column; min-width: 0; min-height: 100vh;
+    margin-left: var(--content-left); padding-top: var(--header-h); overflow: visible;
+}
+.main-content > .topbar {
+    position: fixed; z-index: 950; top: 0; left: 0; right: 0; height: var(--header-h);
+    display: flex; align-items: center; gap: 0; padding: 0;
+    background: color-mix(in srgb, var(--bg) 95%, transparent); border-bottom: 1px solid var(--border);
+}
+.topbar-leading { width: var(--rail-w); height: 100%; flex: 0 0 var(--rail-w); display: grid; place-items: center; }
+.topbar .menu-btn { width: var(--icon-box); height: var(--icon-box); padding: 0; flex: none; display: grid; place-items: center; border-radius: var(--radius-sm); }
+.topbar-controls {
+    position: absolute; top: 0; bottom: 0;
+    left: max(calc(var(--content-left) + var(--gutter)), calc(var(--brand-right, 0px) + 16px));
+    right: var(--gutter); min-width: 0; display: flex; align-items: center; gap: 12px; overflow-x: auto; overflow-y: hidden;
+    scrollbar-width: none; transition: left .2s var(--ease);
+}
+.topbar-controls::-webkit-scrollbar { display: none; }
+.topbar-controls > .search-container { flex: 1 1 260px; max-width: 520px; min-width: min(160px, 100%); margin: 0; }
+.topbar-tools { display: flex; align-items: center; gap: 8px; flex: none; }
+html.sb-ready .main-content { transition: margin-left .2s var(--ease); }
+html.sb-mobile-open body::after { content: ""; position: fixed; z-index: 899; inset: var(--header-h) 0 0; background: var(--overlay); }
+.editing-bar { top: var(--header-h); }
+@media (max-width: 768px), (hover: none) {
+    :root { --content-left: 0px; }
+    .sidebar { width: min(var(--nav-w), calc(100vw - 56px)); translate: -100% 0; visibility: hidden; transition: translate .2s var(--ease), visibility 0s .2s; }
+    html.sb-mobile-open .sidebar { translate: 0 0; visibility: visible; transition: translate .2s var(--ease); box-shadow: var(--shadow); }
+    html.sb-mobile-open .sidebar .label { display: inline-block !important; visibility: visible !important; }
+    .main-content { margin-left: 0; }
+    .topbar-controls { gap: 8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    html.sb-ready .main-content, .sidebar, html.sb-mobile-open .sidebar, .topbar-controls { transition: none !important; }
+}
+
+/* ---- Style and text panel (round New16) ---- */
+/* A pixel width is a ceiling inside the panel's columns, on wide screens only: the panel can get narrower than its room, never wider, so it cannot overlap a neighbour. */
+@media (min-width: 1024px) { .panel[data-fixed-w]:not(.member) { width: min(var(--wpx), 100%); justify-self: start; } }
+.field-error { display: block; margin-top: 4px; font-size: var(--fs-sm); line-height: 1.4; color: var(--bad, #b3402f); overflow-wrap: anywhere; }
+.style-dialog [aria-invalid="true"] { border-color: var(--bad, #b3402f); }
+.style-dialog .label-rows { display: flex; flex-direction: column; gap: 12px; }
+.style-dialog .label-row { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); min-width: 0; }
+.style-dialog .label-look { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.1fr) minmax(0, 1.1fr); gap: 8px; }
+.style-dialog .label-look .field { min-width: 0; }
+.style-dialog .label-look :is(input, select) { width: 100%; min-width: 0; min-height: 44px; }
+@media (max-width: 480px) { .style-dialog .label-look { grid-template-columns: minmax(0, 1fr); } }
+/* a label whose alignment was chosen fills its card's width so the alignment has room to work; long text wraps instead of overlapping */
+[data-lalign] { display: block; width: 100%; overflow-wrap: anywhere; }
+.kpi-title, .stat-title { overflow-wrap: anywhere; }
+
+/* motion of the drawer: it slides in, its sections come up one after the other, and it slides out */
+@keyframes sd-section-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes sd-out { to { opacity: 0; transform: translateX(24px); } }
+@keyframes sd-fade-out { to { opacity: 0; } }
+.style-overlay .style-dialog .form-section { animation: sd-section-in .28s var(--ease) both; }
+.style-overlay .style-dialog .form-section:nth-of-type(2) { animation-delay: .04s; }
+.style-overlay .style-dialog .form-section:nth-of-type(3) { animation-delay: .08s; }
+.style-overlay .style-dialog .form-section:nth-of-type(4) { animation-delay: .12s; }
+.style-overlay .style-dialog .form-section:nth-of-type(n+5) { animation-delay: .16s; }
+.style-overlay.closing { pointer-events: none; animation: sd-fade-out .18s ease both; }
+.style-overlay.closing .style-dialog { animation: sd-out .18s var(--ease) both; }
+@media (prefers-reduced-motion: reduce) { .style-overlay .style-dialog, .style-overlay .style-dialog .form-section, .style-overlay.closing, .style-overlay.closing .style-dialog { animation: none !important; } }
+
+/* A chip holding a long name (an ingredient such as "Polyglyceryl-4 Diisostearate/Polyhydroxystearate/Sebacate") wraps inside its parent instead of pushing the page sideways. */
+.chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; border-radius: 14px; }

@@ -1,6 +1,6 @@
-// Source checks of Quick settings (the gear in the header, the plain logo, the count only inside the open panel).
-// No browser and no network: this test reads the shared files as text and cannot run the DOM. The browser checklist covers the rest.
-//   Run: node tests/quickSettings.test.mjs
+
+
+
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -15,7 +15,7 @@ const shell = read("_Shared/adminShell.js");
 const frame = read("_Shared/pageFrame.js");
 const css = read("_Shared/adminSettingsMenu.css") + read("_Shared/adminCommon.css");
 
-// ---- every page mounts the shared shell, which adds the gear
+
 const pages = {
     Dashboard: "_Admin_Dashboard/adminDashboard.js",
     "Brand & Product Inventory": "_Admin_Brand_Inventory/adminBrandInventory.js",
@@ -33,12 +33,12 @@ check(/icon\("gear"\)/.test(menu) && /\n\s+gear: '/.test(shell), "the gear is an
 check(/class="icon-btn quick-gear"|className = "icon-btn quick-gear"/.test(menu), "the gear uses the header's icon-btn style (36 px)");
 check(/aria-label", "Quick settings"/.test(menu) && /<h3 id="swTitle">Quick settings<\/h3>/.test(menu), 'the panel is titled "Quick settings"');
 
-// ---- the logo is a plain badge
+
 check(!/brandMenuBtn|brand-badge|brandBinBadge|brand-menu/.test(frame + menu + shell + css), "no logo button, no logo badge left anywhere");
 check(!/<button[^>]*brand/.test(frame), "the logo is not a button");
 check(/alt=""/.test(frame), "the logo image keeps its alt text");
 
-// ---- the count only inside the open panel
+
 check(!/badge/i.test(menu.split("export function mountSettingsMenu")[1]), "the gear gets no badge");
 check((menu.match(/binCount\(\)/g) || []).length === 2, "binCount() is called in one place only (renderMenu), and defined once");
 check(/function renderMenu[\s\S]*binCount\(\)/.test(menu), "the count is drawn by renderMenu, which draws the open panel");
@@ -47,10 +47,10 @@ check(!/binCount|BIN_LISTS|keptBinnedCount/.test(frame), "the page frame knows n
 check(/function openWindow\(\)[\s\S]*if \(!win\) build\(\)/.test(menu), "the panel is built on the first open");
 check(!/win = document\.createElement/.test(menu.split("export function mountSettingsMenu")[1]), "mountSettingsMenu builds no panel");
 
-// ---- no new Firestore reads
+
 check(!/getDocs|onSnapshot|getCountFromServer|getDoc\b|firebase-firestore|collection\(|query\(/.test(menu), "adminSettingsMenu.js has no Firestore call or import at all");
 
-// ---- Esc, outside click, narrow sheet
+
 check(/event\.key !== "Escape"/.test(menu) && /pointerdown/.test(menu), "Esc and a click outside close the panel");
 check(/max-width: 599px/.test(css), "under 600 px the panel is a full-width sheet");
 check(/main-content > \.board[^{]*\{ margin-right: var\(--qs-shift, 0px\)/.test(css) && /html\.qs-open \{ --qs-shift: var\(--settings-w\)/.test(css), "beside the page the panel is a column under the header: the page content gets narrower, nothing is covered");

@@ -1,32 +1,32 @@
-// Helpers: one slim line in a panel that says what needs attention there and offers the next step.
-//
-// A page tells what the helper of a panel can say:
-//     registerAssist("table", () => [{ text, tone, label, run, tip }, ...])     // most important first
-// and calls refreshAssist() whenever its data changed. The helper shows the first line; the small
-// arrow steps to the next one. tone = "bad" | "warn" | "info" | "ok" | "" (a plain tip).
-// "label" + "run" add one button that does what the line suggests.
-// A provider that returns null says "my data is not here yet": the panel shows a loading shape where the line will be.
-// A helper can be hidden per panel (its small x); the panel's "..." menu and Customise bring it back.
-//
-// The text is always written with textContent, never as HTML.
+
+
+
+
+
+
+
+
+
+
+
 import { icon, toast, infoBadge, refreshInfoWindow } from "./adminShell.js";
 import { setPanelSummary } from "./adminFold.js";
 
 const OFF_KEY = "glowup.assist.off.v1";
-const providers = new Map();          // panel id -> what the page registered
-const shown = new Map();              // panel id -> which of its lines shows
-const notesOf = new Map();            // panel id -> id of the list (in a notes panel) that carries its lines, most important first
-const badgeOf = new Map();            // panel id -> id of the slot whose info badge carries its lines (instead of a strip in the panel)
+const providers = new Map();
+const shown = new Map();
+const notesOf = new Map();
+const badgeOf = new Map();
 let pageName = "";
 
 const readOff = () => {
     try { const saved = JSON.parse(localStorage.getItem(OFF_KEY) || "[]"); return new Set(Array.isArray(saved) ? saved.map(String) : []); }
     catch (error) { return new Set(); }
 };
-const writeOff = (set) => { try { localStorage.setItem(OFF_KEY, JSON.stringify(Array.from(set).slice(0, 60))); } catch (error) { /* private window: hidden until the page is left */ } };
+const writeOff = (set) => { try { localStorage.setItem(OFF_KEY, JSON.stringify(Array.from(set).slice(0, 60))); } catch (error) {                                                     } };
 const nameOf = (panelId) => pageName + "/" + panelId;
 
-/** Call once per page, before the helpers are registered: a hidden helper is remembered per page. */
+
 export function setAssistPage(page) { pageName = String(page || ""); }
 
 export function registerAssist(panelId, provider, options) {
@@ -36,7 +36,7 @@ export function registerAssist(panelId, provider, options) {
     paint(panelId);
 }
 
-/** The lines of every helper that shares a slot, as ONE small info badge (its pop-over lists them, with their buttons). */
+
 function paintBadge(slotId) {
     const slot = document.getElementById(slotId);
     if (!slot) return;
@@ -55,11 +55,11 @@ function paintBadge(slotId) {
     slot.appendChild(badge);
 }
 
-/**
- * The lines of every helper that shares a notes panel, as ONE list, most important first: Urgent (red), Check (amber),
- * Next (blue), Good (green), Tip (grey). Each row can carry the button of its line. The panel folds like any other panel and
- * says how many lines of each level it holds while it is folded. Nothing is replaced until a helper has something to say.
- */
+
+
+
+
+
 const LEVELS = { bad: [0, "Urgent"], warn: [1, "Check"], info: [2, "Next"], ok: [3, "Good"], "": [4, "Tip"] };
 function paintNotes(slotId) {
     const slot = document.getElementById(slotId);
@@ -94,7 +94,7 @@ function paintNotes(slotId) {
     if (panel) setPanelSummary(panel.dataset.panel, parts.length ? parts.join(" · ") : "All good");
 }
 
-/** Draws the helper of one panel again (or of every panel when no id is given). */
+
 export function refreshAssist(panelId) {
     if (panelId) paint(panelId);
     else providers.forEach((provider, id) => paint(id));
@@ -111,7 +111,7 @@ export function setAssistHidden(panelId, hidden) {
     paint(panelId);
 }
 
-/** Every hidden helper of this page comes back. */
+
 export function showAllAssists() {
     const off = readOff();
     providers.forEach((provider, id) => off.delete(nameOf(id)));
@@ -158,8 +158,8 @@ function paint(panelId, stepped) {
     let lines = [], raw = [];
     try { const provider = providers.get(panelId); raw = provider ? provider() : []; lines = (raw || []).filter((line) => line && line.text); }
     catch (error) { console.warn("A helper could not work out what to say: ", error); }
-    // A provider answers null while its panel's data is still on the way (7 November 2026): the line will come, so a loading
-    // shape of the same size holds its place and the panel does not jump when the words arrive. Any other answer ends it.
+
+
     let waiting = inner.querySelector(":scope > .assist-sk");
     if (raw === null && !assistHidden(panelId)) {
         if (!strip && !waiting) { waiting = document.createElement("div"); waiting.className = "sk assist-sk"; waiting.setAttribute("aria-hidden", "true"); place(waiting); }

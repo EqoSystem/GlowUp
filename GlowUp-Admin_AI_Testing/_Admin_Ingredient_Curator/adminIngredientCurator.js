@@ -1,27 +1,27 @@
-// Ingredient Curator: the 'ingredients' collection the mobile app reads when it analyses a scan.
-// An ingredient document:
-//   name (shown as "INCI name"), description            - what app users read (always filled in here)
-//   classificationId, purpose                          - the classification's document id (see adminClassifications.js) and one line on what it does in a product;
-//                                                        required in the form; empty = "Needs classification", and the app hides the badge and the line
-//   aliases[]                                          - other spellings found on labels; the first one is shown as the common name
-//   techName                                           - the old INCI field. Only entries from before the field change, or from the app's AI look-up, still have it:
-//                                                        it is shown as an alias, and saving the entry removes it
-//   riskLevel ("" | "safe" | "caution" | "harmful"), cautionNote, commonUses, minAge, keyActive, umbrella
-//   allergenTags[], avoidForSkinTypes[], goodForSkinTypes[], avoidForConditions[], goodForConditions[]
-//   source, reviewed, sources[], fdaUnii, webSearched  - only on entries that were NOT typed here:
-//       source "ai"      = found by the app's AI lookup during a scan (document id starts with "ai_")
-//       source "starter" = copied from the app's built-in list
-//       source "fda"     = from the US FDA's list of prohibited and restricted cosmetic ingredients
-//       reviewed false   = no admin has checked it yet. For an "ai" entry the app then uses its warnings
-//                          but never treats it as proof that the ingredient is safe.
-// Every field after "description" is optional: left empty, the app falls back to its built-in knowledge.
-//
-// Arranging and removing (see ../_Shared/adminOrganizer.js):
-//   folder       - the name of the folder the entry was put in ("" = none). Only this website uses it.
-//   binned true  - in the Recycle bin: the app leaves the entry out (app builds from 2026-10-10 on) until it
-//                  is restored. Only "Delete forever" removes the document.
-//
-// A card shows the ingredient's name and its scientific name only. A click on it shows everything else.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import { db } from "../_Database/firebase-console.js";
 import { collection, doc, serverTimestamp, deleteField } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { refreshRecommendabilityFlags } from "../_Shared/recommendabilityAdmin.js";
@@ -56,39 +56,39 @@ import { SOURCE_LINK_FIELDS } from "../_Shared/fieldSources.js";
 import { FIELD_GUIDE, SOURCES, linksFor, allSourcesFor, addReference, labelBareUrls, pubchemLookupUrl, firstCompoundId, pubchemPageUrl, insertPaste } from "../_Shared/fieldSources.js";
 import { aliasesWithInci, firstAlias, needsClassification, MAX_PURPOSE, CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING } from "../_Shared/classificationRules.js";
 
-const pageState = { page: 1, size: 10 };          // the list shows ten ingredients at a time
-const BATCH_LIMIT = 400;                          // Firestore allows 500 writes in one batch
+const pageState = { page: 1, size: 10 };
+const BATCH_LIMIT = 400;
 const VIEW_KEY = "glowup.curator.view.v1";
-// true  = an ingredient the app's AI lookup found is approved by itself when it comes with a CREDIBLE SOURCE (see hasCredibleSource):
-//         nobody has to press Approve. It is marked "approved automatically", so it can still be found and corrected
-//         (filter "AI-found (all)"). An entry without such a source keeps waiting for an admin's review.
-// false = every such entry waits for review, and until then the app never counts it as proof that an ingredient is safe.
+
+
+
+
 const AUTO_APPROVE_AI = true;
-/**
- * Credible = the AI really searched the web and one of the pages it used backs up the rating it gave: a regulator for
- * "harmful", a regulator or a medical or scientific body for "caution" (the evidence tiers of glowupRules.js). Any other
- * web page, an ingredient database, and pages the AI only named from memory, do not count.
- */
-// an entry that came from a document import or a user's photo (item.via) is NEVER approved by itself: a person has to look at it
+
+
+
+
+
+
 const NEVER_AUTO = ["document-import", "snapshot"];
-// ... and it needs a SOURCE LINK that backs up its rating by the evidence tiers of docs/DATA_SOURCE_POLICY.md (evidenceProblem in glowupRules.js):
-// "harmful" needs a regulator's page, "caution" a regulator's or a medical / scientific body's page. An ingredient database alone is not enough
-// (it explains what an ingredient is, it does not rate it). A claim written into the entry itself (a UNII code, "searched the web") is not enough:
-// only the link counts, and sourceKind judges the real host of the address.
-// Only a WARNING (caution or harmful) is approved by itself: a false warning does little harm, but "safe" or an empty level on a
-// fabricated entry could hide a harmful ingredient, so those wait for a person.
+
+
+
+
+
+
 const hasCredibleSource = (item) => !NEVER_AUTO.includes(item.via) && (item.riskLevel === "caution" || item.riskLevel === "harmful")
     && evidenceProblem(item.riskLevel, item.sources) === "";
 
-let everyIngredient = [];             // every document, also the ones in the Recycle bin
-let ingredients = [];                 // listed: [{ id, name, techName, description, ... }]
-let binIngredients = [];              // in the Recycle bin
-let productUse = new Map();           // ingredient key -> number of catalogue products that list it
+let everyIngredient = [];
+let ingredients = [];
+let binIngredients = [];
+let productUse = new Map();
 let productUseKnown = false;
 let editingIngredientId = null;
 let modal = null;
-let sourceUi = null;                     // the source link beside each box and the Source Finder (sourceLinks.js)
-/** The header's "Sources: n of N fields" (N = boxes with a value, n = those with a source link). */
+let sourceUi = null;
+
 function paintSourceCount() {
     const chip = el("ingredientSourceCount");
     if (!chip || !sourceUi) return;
@@ -96,17 +96,17 @@ function paintSourceCount() {
     chip.textContent = `Sources: ${n} of ${total} fields`;
     chip.classList.toggle("ok", total > 0 && n === total);
 }
-let windowKit = { reset() {} };          // the section bar, focus trap and invalid marks of the window (set when the page starts)
-let fromProducts = [];                // ingredient names the inventory's products list that the Curator has no entry for: [{ key, name, products[] }]
-let fdaBrands = [];                   // the brands whose products were checked on the FDA Philippines list (for the helper line)
-let fieldFound = {};                 // pages Assist found for each box of the form: { purpose: [page], description: [page], ... }
-let definitionBasis = null;          // what the User-Friendly Definition rests on: { source, title, url, quote, how, replaced } (Assist, 9 November 2026)
-let assisted = null;                  // description draft evidence: { sources, model } (null = the description was written by hand)
+let windowKit = { reset() {} };
+let fromProducts = [];
+let fdaBrands = [];
+let fieldFound = {};
+let definitionBasis = null;
+let assisted = null;
 let ingredientAiDrafts = [];
-let org = null;                       // folders, the Recycle bin, picking and dragging
-let openId = "";                      // the card whose details are open
-let quick = "";                       // a filter a helper switched on: "" | a key of QUICK
-const view = { sort: "name", layout: "rows" };        // the order and the look of the list (rows or cards); remembered in this browser
+let org = null;
+let openId = "";
+let quick = "";
+const view = { sort: "name", layout: "rows" };
 
 const el = (id) => document.getElementById(id);
 const RISK_LEVELS = ["safe", "caution", "harmful"];
@@ -116,15 +116,15 @@ const titleOf = (item) => item.name || item.techName || "Unnamed Ingredient";
 const byName = (a, b) => titleOf(a).localeCompare(titleOf(b), undefined, { sensitivity: "base" });
 const many = (n, one, more) => `${n} ${n === 1 ? one : more}`;
 const toneOfRisk = (risk) => ({ harmful: "bad", caution: "warn", safe: "ok" }[risk] || "muted");
-/** Text an old build of the app wrote when the AI answered with a list instead of a sentence. It is never shown. */
+
 const brokenText = (text) => /System\.Collections\./i.test(String(text || ""));
 
-/** Found by the app's AI lookup and not checked by an admin yet. */
+
 const needsReview = (item) => item.source === "ai" && !item.reviewed;
-/** The admin account that approves an entry is recorded on it (reviewedBy), so it is known who verified it. */
+
 const reviewer = () => (auth.currentUser ? auth.currentUser.uid : "");
 
-// the "show" box next to the search box
+
 const FILTERS = [
     { value: "", label: "All ingredients", test: () => true },
     { value: "review", label: "AI-found, waiting for review", test: needsReview },
@@ -132,14 +132,14 @@ const FILTERS = [
     { value: "starter", label: "Starter data", test: (item) => item.source === "starter" || item.source === "fda" },
     { value: "admin", label: "Origin not recorded", test: (item) => item.source === "" || item.source === "admin" }
 ];
-/** The choice that shows what the inventory's products list and the Curator does not explain yet. */
+
 const FROM_PRODUCTS = "products";
-const NO_CLASS = "__none";            // the classification filter's choice "Needs classification"
-const ADD_CLASS = "__add";            // the form's choice "+ Add new classification"
-let classCombo = null;                // the form's classification drop-down (adminSelect.js)
+const NO_CLASS = "__none";
+const ADD_CLASS = "__add";
+let classCombo = null;
 const lacksClass = (item) => needsClassification(item, classifications());
 
-// the orders the Sort button offers
+
 const RISK_ORDER = { harmful: 0, caution: 1, "": 2, safe: 3 };
 const SORTS = [
     { id: "name", label: "Name A to Z", short: "A to Z", cmp: byName },
@@ -151,7 +151,7 @@ const SORTS = [
 ];
 const sortNow = () => SORTS.find((s) => s.id === view.sort) || SORTS[0];
 
-// the filters a helper can switch on
+
 const QUICK = {
     broken: { label: "Broken \"Used in\" text", test: (item) => item.usesBroken },
     noNote: { label: "Flagged without a caution note", test: (item) => (item.riskLevel === "harmful" || item.riskLevel === "caution") && !item.cautionNote },
@@ -161,27 +161,40 @@ const QUICK = {
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
-    try { const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || "{}"); if (SORTS.some((s) => s.id === saved.sort)) view.sort = saved.sort; } catch (error) { /* first visit */ }
-    registerData();                   // before the page frame: a saved layout may hold panels that show this data
+    try { const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || "{}"); if (SORTS.some((s) => s.id === saved.sort)) view.sort = saved.sort; } catch (error) {                   }
+    registerData();
     mountShell("curator");
-    // keyboard shortcuts (shortcuts.js): they press the same buttons, only when the buttons could be pressed
+
     bindButtons({ "curator.addIngredient": "#addIngredientBtn", "curator.import": "#chooseIngredientFileBtn", "curator.classifications": "#manageClassBtn",
         "curator.approveDrafts": "#ingredientApproveAllBtn", "curator.sort": "#sortMenuBtn" });
-    placeInHeader(".search-container", "headerActions");      // search beside the title, + Ingredient and More beside the layout button
+    placeInHeader(".search-container", "headerActions");
     wireSignOut();
     setupNavigationGuard();
     await requireAdmin();
 
-    if (TEST_MODE) {                  // a preview or localhost: real ingredients, but a TEST copy of the classification list
-        const banner = document.createElement("div");
-        banner.className = "test-banner";
-        banner.setAttribute("role", "note");
-        banner.textContent = "TEST COPY: the classifications on this address are a separate test list. Saving an ingredient and the field change are switched off here, so nothing live is changed by them.";
-        document.querySelector("main.main-content > header.topbar").after(banner);
+    if (TEST_MODE) {
+        let hidden = false;
+        try { hidden = sessionStorage.getItem("glowup.testBannerHidden") === "1"; } catch (error) { /* storage blocked: show it */ }
+        if (!hidden) {
+            const banner = document.createElement("div");
+            banner.className = "test-banner";
+            banner.setAttribute("role", "note");
+            const text = document.createElement("p");
+            text.className = "test-banner-text";
+            text.innerHTML = "<strong>Test copy.</strong> The classifications on this address are a separate test list. Saving an ingredient and the field change are switched off here, so nothing live is changed.";
+            const close = document.createElement("button");
+            close.type = "button";
+            close.className = "test-banner-close";
+            close.setAttribute("aria-label", "Hide the test copy notice");
+            close.textContent = "Hide";
+            close.addEventListener("click", () => { banner.remove(); try { sessionStorage.setItem("glowup.testBannerHidden", "1"); } catch (error) { /* ignore */ } });
+            banner.append(text, close);
+            document.querySelector("main.main-content > header.topbar").after(banner);
+        }
     }
-    await loadLists();                // allergen families, highlights and skin conditions: one document, built-in lists when it is missing
-    await loadClassifications();      // their own collection: about 25 reads when the page opens
-    // a database that has no classification at all gets the starting list once (an admin is signed in here); it is never added again by itself
+    await loadLists();
+    await loadClassifications();
+
     if (classifications().length === 0) {
         try { await addStartingClassifications(); } catch (error) { console.warn("The starting classifications could not be added:", error); }
     }
@@ -192,7 +205,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (!button) return;
         if (button.dataset.listEdit === "classifications") { manageClassifications(); return; }
         openListManager(button.dataset.listEdit, {
-            ingredients: () => everyIngredient,                 // also the ones in the Recycle bin: restoring one must not point at a deleted item
+            ingredients: () => everyIngredient,
             onSaved: async () => { renderPickers(editingIngredientId ? everyIngredient.find((i) => i.id === editingIngredientId) || null : null); renderIngredients(); }
         });
     });
@@ -221,7 +234,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("ingredientApproveAllBtn").addEventListener("click", approveIngredientDrafts);
 
     wireSearch(el("ingredientSearchInput"), el("ingredientSearchClear"), fromFirstPage);
-    // what was behind "..." here is listed in the settings window under "This page" (5 November 2026)
+
     setPageSettings(() => [
         { label: "Manage classifications", icon: "sliders", description: "Add, rename or remove the classifications ingredients can have.", run: manageClassifications },
         ...(fieldChangeWaits() ? [{ label: "Change the ingredient fields", icon: "layers", description: "One time: back up, add the classification list, move old INCI values into Also Known As.", run: runFieldChange }] : []),
@@ -239,16 +252,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         narrow(tile.dataset.source || "", tile.dataset.risk || "");
     });
     el("sortMenuBtn").addEventListener("click", (event) => openMenu(event.currentTarget, [{ heading: "Order of the list" }].concat(
-        SORTS.map((s) => ({ label: s.label, checked: s.id === view.sort, run: () => { view.sort = s.id; try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) { /* private window */ } fromFirstPage(); } })))));
+        SORTS.map((s) => ({ label: s.label, checked: s.id === view.sort, run: () => { view.sort = s.id; try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) {                      } fromFirstPage(); } })))));
     el("ingredientQuick").addEventListener("click", () => { quick = ""; fromFirstPage(); });
     el("addIngredientBtn").addEventListener("click", () => openIngredientForm(null));
     Array.from(el("listLayoutSwitch").querySelectorAll(".seg")).forEach((button) => button.addEventListener("click", () => {
         view.layout = button.dataset.layout === "cards" ? "cards" : "rows";
-        try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) { /* private window */ }
+        try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) {                      }
         paintListLayout();
     }));
     paintListLayout();
-    // import of ingredient data from a file
+
     el("chooseIngredientFileBtn").addEventListener("click", () => el("ingredientFileInput").click());
     el("ingredientDropBox").addEventListener("click", () => el("ingredientFileInput").click());
     el("ingredientFileInput").addEventListener("change", (event) => {
@@ -268,7 +281,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("ingredientNameInput").addEventListener("input", showNameClash);
     el("ingredientNameInput").addEventListener("input", paintFieldSources);
     el("addIngredientForm").addEventListener("click", onFieldSourceClick);
-    el("addIngredientForm").addEventListener("toggle", onSourcesToggle, true);       // "toggle" does not bubble: caught on the way down
+    el("addIngredientForm").addEventListener("toggle", onSourcesToggle, true);
     el("ingredientSourcesInput").addEventListener("blur", labelReferenceLinks);
     windowKit = wireWindow(el("addIngredientModal"));
     sourceUi = mountSourceLinks({
@@ -288,11 +301,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         const item = card ? ingredients.find((i) => i.id === card.dataset.id) : null;
         if (item) openIngredientForm(item);
     });
-    // the list on screen came from the site's own copy; when the database turns out to hold something newer, show that
+
     onListsRefreshed(() => { if (!dialogIsOpen()) loadIngredients(); });
     el("ingredientsList").addEventListener("keydown", (event) => { if (event.key === "Enter" && event.target.matches(".ingredient-card")) { event.preventDefault(); toggleDetails(event.target.dataset.id); } });
 
-    // the Dashboard's shortcuts: ?add=1 opens the empty ingredient form, ?cleanup=1 the Clean up steps, once the ingredients are here
+
     const askedFor = new URLSearchParams(window.location.search);
     loadIngredients().then(() => {
         if (askedFor.get("add") === "1") openIngredientForm(null);
@@ -303,7 +316,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function fromFirstPage() { pageState.page = 1; renderIngredients(); }
 
-/** Rows (one ingredient per line) or cards: the list's look. */
+
 function paintListLayout() {
     el("ingredientsList").classList.toggle("as-rows", view.layout !== "cards");
     Array.from(el("listLayoutSwitch").querySelectorAll(".seg")).forEach((button) => {
@@ -312,7 +325,7 @@ function paintListLayout() {
         button.setAttribute("aria-pressed", String(on));
     });
 }
-/** Narrows the list to one origin and one risk level (a count tile, a graph or a helper does this). */
+
 function narrow(source, risk) {
     el("ingredientSearchInput").value = "";
     el("ingredientSourceFilter").value = source;
@@ -322,9 +335,9 @@ function narrow(source, risk) {
     if (org.view.kind !== "all") org.show({ kind: "all" }); else fromFirstPage();
 }
 
-// ---------------------------------------------------------------------------------------------
-// Loading and showing
-// ---------------------------------------------------------------------------------------------
+
+
+
 async function loadIngredients() {
     const container = el("ingredientsList");
     try {
@@ -383,8 +396,8 @@ async function loadIngredients() {
         return;
     }
 
-    // what the app's AI lookup added since the last visit is approved by itself
-    if (AUTO_APPROVE_AI && !TEST_MODE) {                 // (a test address writes no live ingredient)
+
+    if (AUTO_APPROVE_AI && !TEST_MODE) {
         const fresh = everyIngredient.filter((item) => needsReview(item) && !item.binned && hasCredibleSource(item));
         if (fresh.length > 0) {
             try {
@@ -396,12 +409,12 @@ async function loadIngredients() {
                 fresh.forEach((item) => { item.reviewed = true; item.autoApproved = true; });
                 notify(`${many(fresh.length, "ingredient with a credible source was", "ingredients with a credible source were")} approved automatically.`, "ok");
             } catch (error) {
-                console.warn("Automatic approval did not work: ", error);       // they simply stay "waiting for review"
+                console.warn("Automatic approval did not work: ", error);
             }
         }
     }
 
-    // how many catalogue products list each ingredient ("Used in 3 products"). Optional: the list still shows without it.
+
     productUse = new Map();
     try {
         const productSnapshot = await getDocs(collection(db, "products"));
@@ -420,7 +433,7 @@ async function loadIngredients() {
                 listedBy.get(key).products.push([String(d.data().brandName || "").trim(), String(d.data().name || "").trim()].filter((x) => x).join(": "));
             });
         });
-        // what the products list and the Curator does not explain: most used first
+
         const known = new Set();
         everyIngredient.forEach((item) => { if (!item.binned) keysOf(item).forEach((k) => known.add(k)); });
         fromProducts = Array.from(listedBy.values()).filter((x) => x.key.length >= 2 && !known.has(x.key)).sort((a, b) => b.products.length - a.products.length || a.name.localeCompare(b.name));
@@ -439,7 +452,7 @@ async function loadIngredients() {
     afterChange();
 }
 
-/** Splits what was loaded into what is listed and what is in the Recycle bin, and draws everything again. */
+
 function afterChange() {
     everyIngredient.sort(byName);
     ingredients = everyIngredient.filter((item) => !item.binned);
@@ -449,10 +462,10 @@ function afterChange() {
     fillSourceFilter();
     fillClassFilter();
     renderIngredients();
-    datasetChanged("ingredients");        // the data panels (lists, grids, graphs) draw the new data
+    datasetChanged("ingredients");
 }
 
-/** The "show" box, with how many entries each choice has. The first time, an address ending in ?show=review opens on that choice. */
+
 function fillSourceFilter() {
     const select = el("ingredientSourceFilter");
     const wanted = select.dataset.ready ? select.value : (new URLSearchParams(window.location.search).get("show") || "");
@@ -462,7 +475,7 @@ function fillSourceFilter() {
     select.value = wanted === FROM_PRODUCTS || FILTERS.some((f) => f.value === wanted) ? wanted : "";
 }
 
-/** The classification filter, with how many ingredients each choice has. */
+
 function fillClassFilter() {
     const select = el("ingredientClassFilter"), wanted = select.value;
     const options = [make("", "Any classification"), make(NO_CLASS, `Needs classification (${ingredients.filter(lacksClass).length})`)];
@@ -472,11 +485,11 @@ function fillClassFilter() {
     function make(value, text) { const option = document.createElement("option"); option.value = value; option.textContent = text; return option; }
 }
 
-/** The form's classification box: the list, then "+ Add new classification". */
+
 function fillClassInput(selected) {
     const select = el("ingredientClassInput");
     const make = (value, text) => { const option = document.createElement("option"); option.value = value; option.textContent = text; return option; };
-    // the one list from the database: A to Z, "Other" last; the placeholder cannot be chosen; "+ Add" sits under a thin line
+
     const placeholder = make("", "Choose a classification"), line = make("", "-"), add = make(ADD_CLASS, "+ Add new classification");
     placeholder.disabled = true; line.disabled = true; line.setAttribute("data-sep", ""); add.setAttribute("data-add", "");
     select.replaceChildren(placeholder, ...classifications().map((c) => make(c.id, c.name)), line, add);
@@ -487,7 +500,7 @@ function fillClassInput(selected) {
 
 function manageClassifications() {
     openClassificationManager({
-        ingredients: () => everyIngredient,               // also the ones in the Recycle bin: restoring one must not point at a deleted classification
+        ingredients: () => everyIngredient,
         onChanged: async () => { fillClassInput(el("ingredientClassInput").value); fillClassFilter(); renderIngredients(); datasetChanged("ingredients"); }
     });
 }
@@ -508,10 +521,10 @@ function wirePurposeAndClassification() {
 }
 function paintPurposeCount() { paintLimited(); }
 
-/**
- * Every box with a character limit: a wrapping box that is tall enough for the WHOLE limit (so a full-length text is always in view, no
- * scrolling), still resizable by dragging, with a "n / limit" counter under it. Single-line boxes keep Enter from adding a line.
- */
+
+
+
+
 const LIMITED_IDS = ["ingredientPurposeInput", "ingredientCautionInput", "ingredientUsesInput", "ingredientAliasesInput", "ingredientDescInput", "ingredientChemInput", "ingredientSourcesInput"];
 let limitedWidth = 0;
 function wireLimited() {
@@ -547,7 +560,7 @@ function paintLimited(only) {
     });
     if (!only) fitLimited();
 }
-/** The least height that shows a text of the full limit, measured with the box's own font and current width. */
+
 function fitLimited() {
     const canvas = fitLimited.canvas || (fitLimited.canvas = document.createElement("canvas")), ctx = canvas.getContext("2d");
     LIMITED_IDS.forEach((id) => {
@@ -566,22 +579,22 @@ function fitLimited() {
     });
 }
 
-/** True while the one-time field change has something left to do. */
+
 const fieldChangeWaits = () => everyIngredient.length > 0 && (classifications().length === 0 || everyIngredient.some((item) => item.rawTech || !item.rawMarked));
 function runFieldChange() { return openFieldMigration(async () => { await loadIngredients(); }); }
 
-/** Every way this ingredient can be written on a label. */
+
 function keysOf(item) {
     return [item.name, item.techName, ...item.aliases].map(sameKey).filter((k) => k.length > 0);
 }
 
-/** Listed entries (not this one, not already marked different) that use one of these names. */
+
 function nameClashes(name, aliases) {
     const mine = new Set([name, ...(aliases || [])].map(sameKey).filter((k) => k.length > 0));
     return everyIngredient.filter((other) => other.id !== editingIngredientId && !other.binned && !differentIds.has(other.id) && keysOf(other).some((k) => mine.has(k)));
 }
 
-/** The note under the INCI name box: the name is used already. A different ingredient is told to the system with one button. */
+
 function showNameClash() {
     const box = el("ingredientNameClash");
     if (!box) return;
@@ -620,7 +633,7 @@ function usedInProducts(item) {
     return total;
 }
 
-/** Draws the allergen, highlight and condition pickers from the lists; what is ticked stays ticked, and a retired item an ingredient already has is still offered. */
+
 function renderPickers(item) {
     const allergens = readChecks(el("allergenTagsChecks")), highlights = readChecks(el("highlightTagsChecks"));
     const conditions = readFit(el("conditionsFit"));
@@ -637,7 +650,7 @@ const labelOf = (options, value) => {
     return match ? match.label : value;
 };
 
-/** Where an entry's information came from: the pages, and the US FDA substance registry's code when it has one. */
+
 function proofLines(item) {
     const lines = [];
     const links = sourceLinks(item.sources);
@@ -654,7 +667,7 @@ function proofLines(item) {
     return lines;
 }
 
-/** The four counts above the list; a click on one filters the list. */
+
 function paintStats() {
     const inBin = org.view.kind === "bin";
     const source = el("ingredientSourceFilter").value, risk = el("ingredientRiskFilter").value;
@@ -665,7 +678,7 @@ function paintStats() {
         { label: "Caution", value: ingredients.filter((i) => i.riskLevel === "caution").length, iconName: "shield", source: "", risk: "caution", tip: "Ingredients marked Caution here." },
         { label: "From products, not explained", value: fromProducts.length, iconName: "lipstick", source: FROM_PRODUCTS, risk: "", tip: "Ingredients the inventory's products list that have no entry here yet. The app uses its built-in knowledge for them." }
     ];
-    // the tiles and their labels are fixed HTML (they show before any data): only the numbers and the chosen one change here
+
     const buttons = Array.from(el("curatorStats").querySelectorAll(".stat"));
     tiles.forEach((t, index) => {
         const button = buttons[index];
@@ -687,8 +700,8 @@ function renderIngredients() {
     el("ingredientQuick").innerHTML = quick && !inBin ? `<button type="button" class="filter-chip" data-tip="Showing only these ingredients. Click to show all again.">${escapeHtml(QUICK[quick].label)}${icon("x")}</button>` : "";
 
     if (!inBin && el("ingredientSourceFilter").value === FROM_PRODUCTS) { renderFromProducts(term, typed); return; }
-    // Search: any letter case, with or without accents and punctuation, parts of words, several words in any order;
-    // it looks at the name, the label name, the other spellings and the definition.
+
+
     const matches = (item) => matchesSearch(typed, [item.name, item.techName, ...item.aliases, item.description]);
     const pool = inBin ? binIngredients : ingredients;
     const shown = (inBin
@@ -722,7 +735,7 @@ function renderIngredients() {
     refreshAssist();
 }
 
-/** The ingredients the inventory's products list that have no entry yet: a card each, with the products that list it. */
+
 function renderFromProducts(term, typed) {
     const container = el("ingredientsList");
     const shown = fromProducts.filter((x) => matchesSearch(typed, [x.name]));
@@ -756,7 +769,7 @@ function renderFromProducts(term, typed) {
 const actionButton = (classes, act, id, iconHtml, title, tip, preview) =>
     `<button type="button" class="icon-btn small ${classes}" data-act="${act}" data-id="${escapeHtml(id)}" aria-label="${escapeHtml(title)}" data-tip-title="${escapeHtml(title)}" data-tip="${escapeHtml(tip)}"${preview ? ` data-tip-preview="${escapeHtml(preview)}"` : ""}>${iconHtml}</button>`;
 
-/** One card: the name and the scientific name. Clicked, it also shows everything else. */
+
 function cardOf(item, inBin) {
     const open = item.id === openId;
     const review = needsReview(item);
@@ -782,15 +795,15 @@ function cardOf(item, inBin) {
         </article>`;
 }
 
-/** The classification column: one neutral chip, or "Needs classification". */
+
 const classCell = (item) => lacksClass(item) ? `<span class="chip warn">Needs classification</span>` : `<span class="chip">${escapeHtml(classificationName(item.classificationId))}</span>`;
 
-/** Everything else about an ingredient: shown inside its card when the card is clicked. */
+
 function detailOf(item, inBin) {
     const review = needsReview(item);
     const origin = originLabel(item.source);
     const facts = [];
-    // the risk is on the card's own badge (with what it means in its tooltip): it is not said a second time here
+
     if (item.purpose) facts.push(["Purpose", escapeHtml(item.purpose)]);
     facts.push(["Definition", escapeHtml(item.description || "No description provided.")]);
     if (item.chemicalDescription) facts.push(["What the chemical is", escapeHtml(item.chemicalDescription)]);
@@ -844,10 +857,10 @@ function toggleDetails(id) {
     if (openId) { const card = el("ingredientsList").querySelector(`.ingredient-card[data-id="${CSS.escape(openId)}"]`); if (card) { card.focus({ preventScroll: true }); card.scrollIntoView({ block: "nearest", behavior: "smooth" }); } }
 }
 
-// ---------------------------------------------------------------------------------------------
-// "Avoid / no effect / Good" rows of the form: one row per skin type or condition
-// ---------------------------------------------------------------------------------------------
-/** Draws one row per option with three choices. `group` keeps the radio buttons of one row together. */
+
+
+
+
 function renderFit(container, group, options) {
     container.innerHTML = options.map((o, i) => {
         const name = `fit_${group}_${i}`;
@@ -858,7 +871,7 @@ function renderFit(container, group, options) {
     }).join("");
 }
 
-/** What the rows say: { avoid: [...], good: [...] } (the values as they are stored). */
+
 function readFit(container) {
     const result = { avoid: [], good: [] };
     container.querySelectorAll(".fit-row").forEach((row) => {
@@ -868,7 +881,7 @@ function readFit(container) {
     return result;
 }
 
-/** Sets the rows from the two stored lists (capital letters do not matter; a name in both lists counts as "avoid"). */
+
 function writeFit(container, avoid, good) {
     const lower = (list) => new Set((Array.isArray(list) ? list : []).map((v) => String(v).toLowerCase()));
     const no = lower(avoid), yes = lower(good);
@@ -879,13 +892,13 @@ function writeFit(container, avoid, good) {
     });
 }
 
-// ---------------------------------------------------------------------------------------------
-// Assist with AI: a DRAFT of the description only, with source pages (the server function api/assist-ingredient.js)
-// ---------------------------------------------------------------------------------------------
-const ASSIST_PER_DAY = 40;                    // drafts one browser may ask for in a day, so a slip cannot use up the AI's quota
+
+
+
+const ASSIST_PER_DAY = 40;
 const ASSIST_KEY = "glowup.curator.assist";
 
-/** How many drafts were asked for today in this browser. */
+
 function assistsToday(add) {
     const today = new Date().toISOString().slice(0, 10);
     let kept = {};
@@ -895,21 +908,21 @@ function assistsToday(add) {
     return count;
 }
 
-/** The sources as links, each with its kind label (Regulator / government, Ingredient database ...), then the guide line. */
+
 function assistSources(pages) {
     return assistSourceLinks(pages, "<b>The AI named no web page.</b> Treat every box as unchecked.");
 }
 
-/**
- * Under each box of the form that has a home in a dictionary or database: ONE "Sources (N)" row, closed until opened. Inside, one
- * list: the source (a link to its own site), what to look for there, and "+ ref" (only for the page of THIS ingredient). The page
- * Assist took a box's text from, and the source a definition rests on, stay above the row. Nothing is fetched here (see
- * _Shared/fieldSources.js for what each link is).
- */
-const sourcesOpen = new Map();        // box name -> is its list open? (kept until the page is closed, so a repaint or the next ingredient does not fold it)
-try { JSON.parse(sessionStorage.getItem("glowup.curator.sourcesOpen") || "[]").forEach((field) => sourcesOpen.set(field, true)); } catch (error) { /* browser storage may be blocked */ }
+
+
+
+
+
+
+const sourcesOpen = new Map();
+try { JSON.parse(sessionStorage.getItem("glowup.curator.sourcesOpen") || "[]").forEach((field) => sourcesOpen.set(field, true)); } catch (error) {                                      }
 function rememberSources() {
-    try { sessionStorage.setItem("glowup.curator.sourcesOpen", JSON.stringify(Array.from(sourcesOpen).filter(([, open]) => open).map(([field]) => field))); } catch (error) { /* keep it in memory only */ }
+    try { sessionStorage.setItem("glowup.curator.sourcesOpen", JSON.stringify(Array.from(sourcesOpen).filter(([, open]) => open).map(([field]) => field))); } catch (error) {                              }
 }
 
 function sourceRow(link, detail) {
@@ -934,7 +947,7 @@ function paintFieldSources() {
         const found = (fieldFound[field] || []).filter((page) => page && /^https:\/\//i.test(page.url || "")).map((page) =>
             `<a class="source-link" href="${escapeHtml(page.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(page.title || page.site || page.url)}</a> `
             + `<span class="chip source-kind${page.tone ? " " + page.tone : ""}">${escapeHtml(page.label || "Source")}</span>`);
-        // the definition says which source it rests on, with that source's own words, so the admin can check it in one look
+
         const basis = field === "description" && definitionBasis && /^https:\/\//i.test(definitionBasis.url || "")
             ? `<p class="definition-basis"><b>Based on:</b> <a class="source-link" href="${escapeHtml(definitionBasis.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(definitionBasis.title)}</a>`
                 + (definitionBasis.quote ? ` <q>${escapeHtml(definitionBasis.quote)}</q>` : "")
@@ -949,8 +962,8 @@ function paintFieldSources() {
     });
 }
 
-// PubChem's page of THIS ingredient: its documented PUG REST service answers a name with a compound number. One request per click,
-// 5 seconds at most, remembered for the name. (PubChem allows requests from a web page; nothing else is asked for.)
+
+
 const pubchemAnswers = new Map();
 async function pubchemPage(name) {
     const key = name.trim().toLowerCase();
@@ -959,7 +972,7 @@ async function pubchemPage(name) {
     try {
         const answer = await fetch(pubchemLookupUrl(name), { signal: AbortSignal.timeout(5000) });
         cid = answer.ok ? firstCompoundId(await answer.text()) : 0;
-        if (answer.ok || answer.status === 404) pubchemAnswers.set(key, cid);      // a slow or failed answer is not remembered
+        if (answer.ok || answer.status === 404) pubchemAnswers.set(key, cid);
     } catch (error) { cid = 0; }
     return cid;
 }
@@ -968,9 +981,9 @@ function copyInciName(name) {
     if (name && navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(name).catch(() => {});
 }
 
-/** Clicks inside the Sources rows: a landing page copies the INCI name; PubChem opens this ingredient's page; "+ ref" adds that page to Reference links. */
-// Click limit: a source opens at most once every 2 seconds (the same site from any row), and "+ ref" once per lookup, so an admin
-// who taps again and again while a page is slow to open gets one tab and one message, not ten.
+
+
+
 const SOURCE_CLICK_GAP_MS = 2000;
 const lastSourceClick = new Map();
 function tooSoon(key, node) {
@@ -994,7 +1007,7 @@ async function onFieldSourceClick(event) {
         if (tooSoon("open:" + link.dataset.source, link)) { event.preventDefault(); return; }
         if (source.kind === "page") {
             event.preventDefault();
-            const tab = window.open("about:blank", "_blank");              // opened now, while the click still counts, and sent on when PubChem has answered
+            const tab = window.open("about:blank", "_blank");
             if (tab) tab.opener = null;
             const cid = await pubchemPage(name);
             if (cid) { if (tab) tab.location.href = pubchemPageUrl(cid); else notify("PubChem opened in a new tab was blocked. Allow pop-ups for this site.", "error"); return; }
@@ -1023,7 +1036,7 @@ async function onFieldSourceClick(event) {
     } finally { add.disabled = false; }
 }
 
-/** Remembers which Sources rows are open (until the page is closed). */
+
 function onSourcesToggle(event) {
     const box = event.target.closest && event.target.closest("details.sources-box");
     if (!box || event.target !== box) return;
@@ -1031,14 +1044,14 @@ function onSourcesToggle(event) {
     rememberSources();
 }
 
-/** A bare address in Reference links gets its label (from the site it is on) when the box is left. */
+
 function labelReferenceLinks() {
     const box = el("ingredientSourcesInput");
     const labelled = labelBareUrls(box.value);
     if (labelled !== box.value) box.value = labelled.slice(0, box.maxLength > 0 ? box.maxLength : 900);
 }
 
-/** Pasting into the text boxes tidies the text (spaces, line breaks, list separators) and may show a non-blocking notice. Nothing is fetched. */
+
 function wirePasteTidy() {
     const kinds = { ingredientNameInput: "name", ingredientPurposeInput: "purpose", ingredientDescInput: "description", ingredientChemInput: "chemical", ingredientAliasesInput: "aliases" };
     Object.entries(kinds).forEach(([id, kind]) => {
@@ -1066,7 +1079,7 @@ function showPasteNote(box, text) {
     note.textContent = text;
 }
 
-/** Asks the server for a description draft of `name`; other ingredient fields stay under the admin's control. */
+
 async function assistWithAi(name) {
     const note = el("ingredientReviewNote"), form = el("addIngredientForm"), saveButton = el("saveIngredientBtn");
     const say = (html) => { note.innerHTML = html; note.style.display = ""; };
@@ -1090,12 +1103,12 @@ async function assistWithAi(name) {
         assistsToday(true);
         const body = await answer.json().catch(() => ({}));
         if (!answer.ok) throw new Error(body.error || "The AI could not be reached (error " + answer.status + ").");
-        if (!dialogIsOpen() || el("ingredientNameInput").value.trim() !== name.trim()) return;      // the form was closed or used for something else meanwhile
+        if (!dialogIsOpen() || el("ingredientNameInput").value.trim() !== name.trim()) return;
         if (!body.found) { say(`<b>No description draft.</b> ${escapeHtml(body.message || "The AI found no source for this name.")}<br>${assistSources(body.sources)}`); return; }
 
         const d = body.draft;
         el("ingredientDescInput").value = d.description;
-        // the other boxes are filled only when they are EMPTY: what the admin already wrote is never replaced
+
         const filled = ["Definition"];
         const fillEmpty = (id, value, label) => { const box = el(id); if (value && !box.value.trim()) { box.value = value; filled.push(label); box.dispatchEvent(new Event("input", { bubbles: true })); } };
         fillEmpty("ingredientPurposeInput", String(d.purpose || "").slice(0, MAX_PURPOSE), "Purpose");
@@ -1130,16 +1143,16 @@ async function assistWithAi(name) {
     }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Import ingredients from a file: ingredient data ONLY, saved as Pending (source "ai", not reviewed) for an admin to check
-// ---------------------------------------------------------------------------------------------
-// No size limit (9 November 2026): any PDF, Excel, Word, CSV or text file, of any length (adminDocumentReader.js says which types it reads).
-const IMPORT_MAX_ROWS = 60;                   // ingredients saved per database batch (an import itself has no limit)
 
-/**
- * The import drop box (importReview.js): read, then check every ingredient in a window, then save. Nothing reaches the
- * database before the admin has checked it and pressed Save.
- */
+
+
+
+const IMPORT_MAX_ROWS = 60;
+
+
+
+
+
 function importIngredientFile(file) {
     startImport({
         dropbox: el("ingredientDropBox"), choose: el("chooseIngredientFileBtn"), status: el("ingredientImportStatus"), file,
@@ -1171,15 +1184,15 @@ const INGREDIENT_REVIEW = {
     }]
 };
 
-/** What a file's text holds, for the check window: { draft: { ingredients }, notes, model, refused }. Nothing is saved here. */
+
 async function extractIngredients(documentText, say, signal) {
-    // a file in the GlowUp import format is read as it is, with no AI; any other document is read by the AI
+
     const keyed = parseImportText(documentText);
     if (keyed.kind === "inventory") return { refused: "This file lists only brands or products. " + inventoryNotHere(keyed.draft.products.length + keyed.draft.brands.length) };
     if (keyed.kind === "mixed") return { refused: `This file mixes ${many(keyed.counts.ingredients, "ingredient record", "ingredient records")} with brands or products, so nothing was imported. ` + inventoryNotHere(keyed.counts.inventory) };
     if (keyed.kind === "ingredients") { say("Reading the file's own fields. No AI is used."); return { draft: keyed.draft, notes: keyed.notes.slice(0, 6), model: "" }; }
     if (assistsToday(false) >= ASSIST_PER_DAY) throw new Error(`The AI was used ${ASSIST_PER_DAY} times today in this browser. Try again tomorrow.`);
-    // no size limit: the AI reads the file in parts, one after the other (the whole file counts once in the day's limit)
+
     const parts = splitForAi(documentText);
     const found = [], failedParts = [];
     let model = "", inventoryRecords = 0;
@@ -1202,7 +1215,7 @@ async function extractIngredients(documentText, say, signal) {
     return { draft: { ingredients: found }, notes, model: model || "the AI" };
 }
 
-/** Writes the checked ingredients (NEW entries only, Pending) in groups; answers what was saved. */
+
 async function saveIngredientDraft(draft, say) {
     const records = Array.isArray(draft.ingredients) ? draft.ingredients : [];
     const result = { saved: 0, skippedDuplicates: 0, skippedInvalid: 0, unmatched: [] };
@@ -1212,7 +1225,7 @@ async function saveIngredientDraft(draft, say) {
         const part = await saveImportedIngredients(records.slice(g * IMPORT_MAX_ROWS, (g + 1) * IMPORT_MAX_ROWS));
         result.saved += part.saved; result.skippedDuplicates += part.skippedDuplicates; result.skippedInvalid += part.skippedInvalid;
         part.unmatched.forEach((name) => { if (!result.unmatched.includes(name)) result.unmatched.push(name); });
-        // the next group must see what this one added (duplicates inside one file)
+
         if (part.saved && g < groups - 1) await loadIngredients();
     }
     if (result.saved === 0) {
@@ -1228,16 +1241,16 @@ async function saveIngredientDraft(draft, say) {
     return summary;
 }
 
-/** Writes new ingredient entries only (never changes one that exists). Only ingredient fields are copied from a record. */
+
 async function saveImportedIngredients(records) {
     const batch = writeBatch(db);
     const planned = new Set();
-    const unmatched = new Set();          // allergen / condition / highlight names the page's lists do not have (left out)
+    const unmatched = new Set();
     let saved = 0, skippedDuplicates = 0, skippedInvalid = 0;
     records.slice(0, IMPORT_MAX_ROWS).forEach((record) => {
         const name = String(record.name || "").replace(/\s+/g, " ").trim().slice(0, 80);
         if (name.length < 2) { skippedInvalid++; return; }
-        // the file's label name becomes an alias when it differs from the name: the same rule as the field change
+
         const aliases = aliasesWithInci(name, String(record.techName || "").slice(0, 120), (Array.isArray(record.aliases) ? record.aliases : []).map((a) => String(a).replace(/\s+/g, " ").trim().slice(0, 80)).filter(Boolean).slice(0, 6));
         const mine = [name, ...aliases].map(sameKey).filter((k) => k.length > 0);
         if (mine.some((k) => planned.has(k)) || everyIngredient.some((other) => keysOf(other).some((k) => mine.includes(k)))) { skippedDuplicates++; return; }
@@ -1264,7 +1277,7 @@ async function saveImportedIngredients(records) {
             avoidForConditions: avoidConditions, goodForConditions: listIds("conditions", record.goodConditions, unmatched).filter((id) => !avoidConditions.includes(id)),
             sources,
             folder: "",
-            // "ai" + not reviewed is the existing Pending state: the app uses such an entry as a warning at most, never as proof of safety
+
             source: "ai", reviewed: false, via: "document-import",
             createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         });
@@ -1275,11 +1288,11 @@ async function saveImportedIngredients(records) {
     return { saved, skippedDuplicates, skippedInvalid, unmatched: Array.from(unmatched) };
 }
 
-/**
- * The ids of a list (allergens, conditions, highlights) that the names in a document stand for: a name matches an item's
- * label, id or one of its keywords. A name that matches nothing is noted in `unmatched` and left out (add it to the
- * list first with "Manage lists", then edit the ingredient).
- */
+
+
+
+
+
 function listIds(kind, names, unmatched) {
     const items = (listsNow()[kind] || []).filter((item) => !item.retired);
     const ids = [];
@@ -1302,7 +1315,7 @@ async function askCuratorApi(payload, signal = null) {
     if (!user) throw new Error("You are signed out. Sign in again.");
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 75000);
-    const onCancel = () => controller.abort();            // Cancel on the drop box stops the question at once
+    const onCancel = () => controller.abort();
     if (signal) signal.addEventListener("abort", onCancel);
     let response;
     try {
@@ -1415,7 +1428,7 @@ async function approveIngredientDrafts() {
 
 async function approveSelectedIngredients(keys) {
     const waiting = keys.map((id) => everyIngredient.find((item) => item.id === id && !item.binned && needsReview(item))).filter((item) => item);
-    // a "harmful" rating without a regulator's page is not approved in bulk (docs/DATA_SOURCE_POLICY.md); it is edited one by one
+
     const selected = waiting.filter((item) => !(item.riskLevel === "harmful" && evidenceProblem("harmful", item.sources)));
     if (selected.length < waiting.length) notify(`${many(waiting.length - selected.length, "harmful entry was", "harmful entries were")} left out: no regulator's page backs the rating. Use Edit on each.`, "warn");
     if (!selected.length) {
@@ -1439,9 +1452,9 @@ async function approveSelectedIngredients(keys) {
     }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Folders and the Recycle bin (what adminOrganizer.js asks this page to save)
-// ---------------------------------------------------------------------------------------------
+
+
+
 async function saveOrReload(ops) {
     try {
         for (let i = 0; i < ops.length; i += BATCH_LIMIT) {
@@ -1464,7 +1477,7 @@ async function moveToFolder(keys, folder) {
     if (list.length === 0) throw friendly(folder ? `Already in "${folder}".` : "Not in a folder.");
     const before = list.map((item) => ({ item, folder: item.folder }));
     const write = (changes) => saveOrReload(changes.map((c) => ({ ref: refOf(c.item), data: { folder: c.folder, updatedAt: serverTimestamp() } })));
-    list.forEach((item) => { item.folder = folder; });           // shown at once; the database follows
+    list.forEach((item) => { item.folder = folder; });
     afterChange();
     await write(list.map((item) => ({ item, folder })));
     return { text: named(list), undo: async () => { before.forEach((c) => { c.item.folder = c.folder; }); afterChange(); await write(before); } };
@@ -1496,7 +1509,7 @@ async function restoreFromBin(keys, folder) {
     return { text: named(list) };
 }
 
-/** "Delete forever": asks with the list of names, then deletes the documents. Resolves true when it was done. */
+
 async function purgeFromBin(keys) {
     const list = pick(keys).filter((item) => item.binned);
     if (list.length === 0) return false;
@@ -1521,13 +1534,13 @@ async function purgeFromBin(keys) {
     return true;
 }
 
-// ---------------------------------------------------------------------------------------------
-// Clean up, and Find duplicates (the lists come from ../_Shared/glowupCatalog.js, the dialogs from adminCleanup.js)
-// ---------------------------------------------------------------------------------------------
-/**
- * Writes changes as glowupCatalog.js describes them: { collection: "ingredients", docId, action: "bin" | "update", fields,
- * reason }. "bin" moves the entry to the Recycle bin and notes why. Nothing is deleted. The page then loads its data again.
- */
+
+
+
+
+
+
+
 async function applyChanges(changes) {
     const ops = [];
     changes.forEach((change) => {
@@ -1537,16 +1550,16 @@ async function applyChanges(changes) {
         else if (change.action === "update" && change.fields) ops.push({ ref: refOf(item), data: Object.assign({}, change.fields, { updatedAt: serverTimestamp() }) });
     });
     if (ops.length === 0) return 0;
-    await saveOrReload(ops);                 // after a failure the page shows what is really there, and the failure is passed on
+    await saveOrReload(ops);
     await loadIngredients();
     return ops.length;
 }
 
-// "Clean up" and "Find duplicates" compare every ingredient with every other one. That runs in THIS page (nothing is sent to a server), so it is
-// cut into slices (ingredientLookalikesAsync): a window with a bar shows at once, the page stays alive, and a second click while a scan runs is
-// refused. When the scan ends, or fails, or is cancelled, the guard is lifted again.
+
+
+
 let scanning = false;
-// ids of entries the admin said are DIFFERENT ingredients from the one in the form (kept on the saved entry; the duplicate tools then leave the pair alone)
+
 let differentIds = new Set();
 async function openCleanUp() {
     if (scanning) { notify("A scan is running already.", "info"); return; }
@@ -1558,7 +1571,7 @@ async function openCleanUp() {
     catch (error) { console.error("Clean up: the scan failed:", error); scan.close(); scanning = false; notify("The scan did not finish. Please try again.", "error"); return; }
     scan.close();
     scanning = false;
-    if (groups === null) return;                                  // cancelled
+    if (groups === null) return;
     showCleanUp(groups);
 }
 function showCleanUp(lookalikes) {
@@ -1584,7 +1597,7 @@ function openDuplicates() {
         threshold: 0.93,
         sections: [{
             id: "ingredients", label: "Ingredients",
-            // the slow part (names that are nearly the same) is awaited in slices; the dialog shows its own bar and drops an older search
+
             find: async (threshold, progress) => {
                 scanning = true;
                 try {
@@ -1612,15 +1625,15 @@ function openDuplicates() {
                     .concat(merged.bin.map((gone) => ({ collection: "ingredients", docId: gone.item.id, action: "bin", reason: gone.reason }))));
             },
             remove: (others, keep) => applyChanges(others.map((item) => ({ collection: "ingredients", docId: item.id, action: "bin", reason: `Removed as a copy of "${titleOf(keep)}".` }))),
-            // an entry that product lists still use must not simply disappear: its names have to move to the one that is kept
+
             whyNotRemove: (item) => (productUseKnown && usedInProducts(item) > 0 ? `${many(usedInProducts(item), "listed product uses", "listed products use")} "${titleOf(item)}".` : "")
         }]
     });
 }
 
-// ---------------------------------------------------------------------------------------------
-// Add / edit
-// ---------------------------------------------------------------------------------------------
+
+
+
 function openIngredientForm(item) {
     const form = el("addIngredientForm");
     form.reset();
@@ -1687,13 +1700,13 @@ async function saveIngredient(event) {
     const aliases = toList(el("ingredientAliasesInput").value).filter((a) => sameKey(a) !== sameKey(name));
     const minAgeText = el("ingredientMinAgeInput").value.trim();
     const minAge = toWholeNumber(minAgeText);
-    // one choice per skin type and per condition, so a name can never be both "avoid" and "good"
+
     const types = readFit(el("skinTypesFit")), conditions = readFit(el("conditionsFit"));
     const avoidTypes = types.avoid, goodTypes = types.good, avoidConditions = conditions.avoid, goodConditions = conditions.good;
 
     if (!name) { setFormError(form, "Type the INCI name."); el("ingredientNameInput").focus(); return; }
-    // "Aqua / Water" in the one name box: the box holds ONLY the INCI name. Split it, show the result and ask for one more Save, so nothing is
-    // saved that the admin has not seen.
+
+
     if (/\s\/\s/.test(name)) {
         const parts = name.split(/\s+\/\s+/).map((p) => p.trim()).filter(Boolean);
         el("ingredientNameInput").value = parts[0];
@@ -1704,13 +1717,13 @@ async function saveIngredient(event) {
         el("ingredientNameInput").focus();
         return;
     }
-    // a NEW ingredient needs a classification and a purpose. Whether an EXISTING one that has none yet may be saved without is decided for each
-    // box on its own in classificationRules.js (CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING); one that has them cannot lose them.
+
+
     const existing = editingIngredientId ? everyIngredient.find((i) => i.id === editingIngredientId) : null;
     if ((!classificationId || classificationId === ADD_CLASS) && (!existing || CLASSIFICATION_REQUIRED_ON_EXISTING || !lacksClass(existing))) { setFormError(form, "Choose the ingredient classification."); el("ingredientClassInput").focus(); return; }
     if (!purpose && (!existing || PURPOSE_REQUIRED_ON_EXISTING || existing.purpose)) { setFormError(form, "Write one line on what this ingredient does in a product."); el("ingredientPurposeInput").focus(); return; }
     if (!description) { setFormError(form, "Write a short user-friendly definition."); el("ingredientDescInput").focus(); return; }
-    // reference links: one per line, "Title | https://..." or just the address; only https is kept
+
     const sourceLines = el("ingredientSourcesInput").value.split(/\r?\n/).map((line) => line.replace(/\s+/g, " ").trim()).filter(Boolean);
     const badLine = sourceLines.find((line) => { try { return new URL((line.split("|").pop() || "").trim()).protocol !== "https:"; } catch (error) { return true; } });
     if (badLine) { setFormError(form, "Each reference link must contain a web address that starts with https://  (" + badLine.slice(0, 50) + ")"); el("ingredientSourcesInput").focus(); return; }
@@ -1718,10 +1731,10 @@ async function saveIngredient(event) {
     if (badSource) { setFormError(form, badSource.message); badSource.input.focus(); return; }
     if (minAgeText !== "" && (!/^\d+$/.test(minAgeText) || minAge > 99)) { setFormError(form, "Minimum age must be a whole number from 0 to 99."); el("ingredientMinAgeInput").focus(); return; }
 
-    // the same ingredient must not be in the list twice (any of its names matching any name of another entry)
+
     const myKeys = new Set([name, ...aliases].map(sameKey));
-    // hard stop: the same INCI name, or an entry in the Recycle bin that uses a name. A name shared only through Also known as can be a different
-    // ingredient: the admin may say so (nameClashes / the button under the name box).
+
+
     const clash = everyIngredient.find((other) => other.id !== editingIngredientId && !differentIds.has(other.id)
         && (other.binned ? keysOf(other).some((k) => myKeys.has(k)) : sameKey(other.name) === sameKey(name)));
     if (clash) { setFormError(form, clash.binned ? `"${titleOf(clash)}" uses one of these names and is in the Recycle bin. Restore it from there instead.` : `"${titleOf(clash)}" already uses one of these names. Edit that entry instead.`); return; }
@@ -1748,7 +1761,7 @@ async function saveIngredient(event) {
         goodForConditions: goodConditions,
         updatedAt: serverTimestamp()
     };
-    // an admin who opens an entry that was not typed here and saves it has checked it
+
     const before = ingredients.find((i) => i.id === editingIngredientId);
     if (sourceUi) {
         const links = sourceUi.values();
@@ -1760,23 +1773,23 @@ async function saveIngredient(event) {
     }
     const nowReviewed = !!before && before.source !== "" && before.source !== "admin" && !before.reviewed;
     if (nowReviewed) { data.reviewed = true; data.reviewedBy = reviewer(); data.reviewedAt = serverTimestamp(); }
-    // a draft the AI wrote and the admin has now read and saved: the pages it came from are kept with the entry
+
     if (assisted && !editingIngredientId)
         Object.assign(data, { source: "aiassist", reviewed: true, reviewedBy: reviewer(), reviewedAt: serverTimestamp(), webSearched: assisted.sources.length > 0, model: assisted.model,
             sources: Array.from(new Set(assisted.sources.map((p) => `${p.title || p.site || "web page"} | ${p.url}`).concat(sourceLines))).slice(0, 10) });
 
-    // "Harmful" must be backed by a regulator's page (docs/DATA_SOURCE_POLICY.md). An entry that was already harmful can still be saved
-    // (its other fields); it is listed under "Harmful without a regulator's page" until a page is added.
+
+
     const unbacked = data.riskLevel === "harmful" && !(before && before.riskLevel === "harmful") ? evidenceProblem("harmful", data.sources) : "";
     if (unbacked) { setFormError(form, unbacked); el("ingredientSourcesInput").focus(); return; }
 
     setBusy(saveButton, true, "Saving...");
     try {
         if (editingIngredientId) {
-            await updateDoc(doc(db, "ingredients", editingIngredientId), { ...data, techName: deleteField() });           // its folder is left as it is; the old INCI field is now one of its aliases
+            await updateDoc(doc(db, "ingredients", editingIngredientId), { ...data, techName: deleteField() });
             notify(nowReviewed ? "Ingredient saved and marked as reviewed." : "Ingredient saved.", "ok");
         } else {
-            const folder = org.view.kind === "folder" ? org.view.name : "";               // added while a folder is open: it goes into that folder
+            const folder = org.view.kind === "folder" ? org.view.name : "";
             await addDoc(collection(db, "ingredients"), { ...data, folder, createdAt: serverTimestamp() });
             notify(folder ? `Ingredient added to "${folder}".` : "Ingredient added.", "ok");
         }
@@ -1790,13 +1803,13 @@ async function saveIngredient(event) {
     }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Clicks on the cards
-// ---------------------------------------------------------------------------------------------
+
+
+
 function onListClick(event) {
     const button = event.target.closest("button");
     if (!button) {
-        // a click on the card itself shows (or hides) the rest of it
+
         if (event.target.closest("a, .detail-box")) return;
         const card = event.target.closest(".ingredient-card");
         if (card) toggleDetails(card.dataset.id);
@@ -1820,7 +1833,7 @@ function onListClick(event) {
     else if (act === "purge") org.purge([item.id]);
 }
 
-/** Marks an AI-found entry as checked, unchanged. To correct it first, use Edit: saving there marks it reviewed too. */
+
 async function approveIngredient(item, button) {
     if (button.disabled) return;
     const unbacked = item.riskLevel === "harmful" ? evidenceProblem("harmful", item.sources) : "";
@@ -1837,7 +1850,7 @@ async function approveIngredient(item, button) {
     }
 }
 
-/** Takes the unreadable "Used in" text (written by an older build of the app) off every entry that has it. */
+
 async function clearBrokenUses() {
     const list = everyIngredient.filter((item) => item.usesBroken);
     if (list.length === 0) return;
@@ -1854,9 +1867,9 @@ async function clearBrokenUses() {
     } catch (error) { notify("Not cleared. " + error.message, "error"); }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Helpers: the line in each panel that says what needs attention (see adminAssist.js)
-// ---------------------------------------------------------------------------------------------
+
+
+
 function registerHelpers() {
     const ready = () => everyIngredient.length > 0;
     const showLabel = (on) => (on ? "Show all" : "Show");
@@ -1917,9 +1930,9 @@ function registerHelpers() {
     }, { notes: "notesList" });
 }
 
-// ---------------------------------------------------------------------------------------------
-// The data this page offers to data panels (lists, rows, grids and graphs; see adminWidgets.js)
-// ---------------------------------------------------------------------------------------------
+
+
+
 function registerData() {
     registerTileDataset("curatorCounts", {
         label: "Counts", noun: "counts", nounOne: "count", valueNoun: "Number", selector: "#curatorStats .stat", watch: "#curatorStats",
@@ -1944,7 +1957,7 @@ function registerData() {
             { id: "folder", label: "Folder", of: (i) => i.folder || null, none: "No folder", pick: (k) => org.show(k === "No folder" ? { kind: "all" } : { kind: "folder", name: k }) }
         ],
         open: (i) => openIngredientForm(i),
-        // a tile that is removed goes to the Recycle bin (it can be restored there)
+
         bin: (rows) => org.toBin(rows.map((i) => i.id))
     });
 }

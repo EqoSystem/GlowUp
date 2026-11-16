@@ -1,34 +1,34 @@
-// The import drop box, step by step (9 November 2026), the same on Brand & Product Inventory and the Ingredient Curator:
-//
-//   1. READING  - a calm cover lies over the drop box ONLY (never over the page): what is happening now, and Cancel. The
-//                 admin can keep working anywhere else on the page meanwhile.
-//   2. READY    - the cover says how many records were found, with "Check and save" and "Discard". A message in the corner
-//                 says so too (with "Check now"), and when the tab is in the background its title shows "File read".
-//   3. CHECKING - a large window lists every record, each field editable, each one can be left out; a second tab shows the
-//                 text that was read from the file (editable, and "Read again" from it). NOTHING is in the database yet.
-//                 X / Escape / "Later" close it and keep the records waiting in the drop box; "Discard" asks first.
-//   4. SAVING   - only now are the ticked records written, as Pending, by the page's own save. The window cannot be closed
-//                 while saving. The result is said under the drop box.
-//
-// The rules of docs/NAVIGATION_RULES.md: a visible exit everywhere; Escape and the backdrop never discard and never save;
-// discarding asks "Discard ...?" with "Keep checking"; leaving the page while records wait asks the browser's question;
-// every wait has Cancel; nothing covers other panels (the cover is the drop box's own size); reduced motion is respected.
-// Everything read from a file is written with textContent / .value, never as HTML.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import { icon, toast, askConfirm } from "./adminShell.js";
 
-const PAGE_SIZE = 20;                          // records per page of the check window: a file of any length stays quick
+const PAGE_SIZE = 20;
 
-/**
- * Starts one import on a drop box. One at a time per drop box.
- * spec = {
- *   dropbox, choose, status,                  // the drop box button, the "Choose file" button, the status line under it
- *   file,                                     // the File
- *   read: async (file, say) => text,          // reads the file in this browser
- *   extract: async (text, say, signal) => ({ draft, notes: [], model, refused: "" }),
- *   review: { title, lists: [{ key, label, nounOne, noun, fields: [{ key, label, kind: "text" | "lines" | "area" | "select", options, wide }], titleOf, noteOf }] },
- *   save: async (draft, say) => "what was saved"     // writes the ticked records; its answer is shown under the drop box
- * }
- */
+
+
+
+
+
+
+
+
+
+
+
 export function startImport(spec) {
     const { dropbox, choose, status } = spec;
     if (dropbox.dataset.importBusy) { toast("A file is already being read here. Wait for it, or cancel it first.", "info"); return; }
@@ -39,7 +39,7 @@ export function startImport(spec) {
     const report = (message, failed) => { status.textContent = message || ""; status.classList.toggle("error", !!failed); };
     report("");
 
-    // the cover: over the drop box only, in a holder of the same size (nothing moves, nothing else is covered)
+
     let holder = dropbox.parentElement.classList.contains("import-drop-holder") ? dropbox.parentElement : null;
     if (!holder) {
         holder = document.createElement("div");
@@ -57,7 +57,7 @@ export function startImport(spec) {
     const button = (label, cls, run, ic) => { const b = document.createElement("button"); b.type = "button"; b.className = cls; if (ic) b.innerHTML = icon(ic); b.append(label); b.addEventListener("click", run); return b; };
     let lastSay = 0;
     const say = (message) => {
-        // a message at most every 120 ms: a long OCR or many parts never make the page busy with redrawing
+
         const now = Date.now();
         if (now - lastSay < 120 && !/done|ready|failed/i.test(message)) return;
         lastSay = now;
@@ -122,7 +122,7 @@ export function startImport(spec) {
         if (result.refused) { finish(result.refused, true); toast(`"${spec.file.name}" cannot be imported here. The reason is under the drop box.`, "error"); return; }
         const total = spec.review.lists.reduce((n, list) => n + (result.draft[list.key] || []).length, 0);
         if (total === 0) { finish((result.notes || []).join(" ") || "No records were found in this file. Nothing was saved.", true); return; }
-        // every record starts ticked; the window shows what the page knows about it (already listed, flagged ...)
+
         spec.review.lists.forEach((list) => (result.draft[list.key] || []).forEach((record) => { record.__keep = true; }));
         job.result = result;
         ready();
@@ -130,12 +130,12 @@ export function startImport(spec) {
         toast(`"${spec.file.name}" is read: ${counts(result.draft)} to check.`, "ok", { label: "Check now", run: openCheck });
     }
 
-    // ---- 3. the check window ----
+
     let windowOpen = false;
     function openCheck() {
         if (windowOpen || !job.result) return;
         windowOpen = true;
-        // the "is read" message has done its work: it must not lie over the window's buttons
+
         document.querySelectorAll("#toastHost .toast").forEach((t) => { if (t.textContent.includes(`"${spec.file.name}" is read`)) t.remove(); });
         const draft = job.result.draft;
         const lists = spec.review.lists.filter((list) => (draft[list.key] || []).length > 0);
@@ -168,11 +168,11 @@ export function startImport(spec) {
         const paintSave = () => { const n = kept(); const b = box.querySelector("[data-save]"); b.textContent = n ? `Save ${n} as Pending` : "Nothing ticked"; b.disabled = n === 0 || saving; };
         const close = () => { document.removeEventListener("keydown", onKey, true); overlay.remove(); windowOpen = false; };
         const later = () => { if (saving) return; close(); };
-        // Escape is for the window on top only (a "Discard ...?" question above this one answers it itself)
+
         const onTop = () => Array.from(document.querySelectorAll(".modal-overlay")).filter((o) => getComputedStyle(o).display !== "none").pop() === overlay;
         const onKey = (event) => { if (event.key === "Escape" && onTop()) { event.stopPropagation(); later(); } };
         document.addEventListener("keydown", onKey, true);
-        // the backdrop does nothing: a stray click must not close a long check (X, Later and Escape do)
+
         box.querySelectorAll("[data-later]").forEach((b) => b.addEventListener("click", later));
         box.querySelector("[data-discard]").addEventListener("click", async () => {
             if (saving) return;

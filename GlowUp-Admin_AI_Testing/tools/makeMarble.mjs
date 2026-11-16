@@ -1,13 +1,13 @@
-// Draws the login page's marble backgrounds (_Index/marble-light.svg and marble-dark.svg). Run: node tools/makeMarble.mjs
-// Soft pink clouds (SVG noise), then gold and pink veins drawn as real curves (crisp at any size) and given an organic wobble by a
-// displacement filter. A fixed seed: the same picture every time.
+
+
+
 import fs from "node:fs";
 
 let seed = 20261107;
 const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
 const W = 1600, H = 1000;
 
-/** A meandering line across the picture, as a smooth path, plus short branches off it. */
+
 function vein(startX, startY, angle, length, steps) {
     let x = startX, y = startY, a = angle;
     const points = [[x, y]];
@@ -50,7 +50,6 @@ function picture(theme) {
     const gold = veins(6, [1.2, 3.2], [0.75, 0.95], 4);
     const pink = veins(9, [0.8, 2.2], [0.45, 0.75], 5);
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice">
-  <!-- GlowUp login background (${theme}): blush marble with gold veins. Made by tools/makeMarble.mjs (no photo). -->
   <defs>
     <filter id="clouds" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
       <feTurbulence type="fractalNoise" baseFrequency="0.0022 0.0055" numOctaves="5" seed="11"/>

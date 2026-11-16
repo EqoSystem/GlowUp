@@ -1,15 +1,15 @@
-// Archive purge: once a day (Vercel Cron, see vercel.json) the entries of the "archive" collection whose expires_at has
-// passed are deleted for good. Design and impact check: ARCHIVE_DESIGN.md.
-//
-//   Who may call:  only a caller that sends "Authorization: Bearer <CRON_SECRET>" (Vercel Cron does that by itself once the
-//                  env var CRON_SECRET is set). Without CRON_SECRET the function answers 503 and does nothing.
-//   Dry run:       THE DEFAULT. It lists what it would delete and deletes nothing. Only ARCHIVE_PURGE_LIVE = "1" deletes.
-//   What it may delete: documents directly in "archive" whose expires_at is in the past, checked in the query AND again for each
-//                  document, each delete with a precondition on the document's update time. No other path is ever built.
-//   How many:      at most ARCHIVE_PURGE_MAX per run (default 50, never more than 200); the rest waits for the next day.
-//   Log:           every run (dry or live) writes archive_purge_log/<run> and prints one JSON line to the Vercel log.
-//   Credentials:   a cron job has no signed-in admin, so it needs a Google service account: FIREBASE_SERVICE_ACCOUNT = the JSON
-//                  key in one line. Only the project's owner creates it and sets it in Vercel. Nothing to install (plain fetch + crypto).
+
+
+
+
+
+
+
+
+
+
+
+
 "use strict";
 
 const crypto = require("crypto");
@@ -28,24 +28,24 @@ function send(res, status, body) {
     res.end(JSON.stringify(body));
 }
 
-/** Compares two secrets in constant time. */
+
 function sameSecret(given, expected) {
     const a = Buffer.from(String(given || "")), b = Buffer.from(String(expected || ""));
     return a.length > 0 && a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-/** Dry run unless ARCHIVE_PURGE_LIVE is exactly "1"; the cap between 1 and 200. */
+
 function settingsOf(env) {
     const asked = parseInt(env.ARCHIVE_PURGE_MAX, 10);
     return { live: env.ARCHIVE_PURGE_LIVE === "1", max: Math.min(HARD_MAX, Math.max(1, Number.isFinite(asked) ? asked : DEFAULT_MAX)) };
 }
 
-/** The service account from FIREBASE_SERVICE_ACCOUNT, only for this project. Null when it is missing or for another project. */
+
 function serviceAccountOf(env) {
     try {
         const account = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT || "");
         if (account && account.client_email && account.private_key && account.project_id === PROJECT) return account;
-    } catch (error) { /* not set, or not JSON */ }
+    } catch (error) {                            }
     return null;
 }
 
@@ -66,13 +66,13 @@ async function accessToken(account, fetchFn, nowSeconds) {
 const DOCS_PATH = `projects/${PROJECT}/databases/(default)/documents`;
 const API = "https://firestore.googleapis.com/v1/";
 
-/** True only for a document directly in "archive" of this project: archive/<id>, nothing deeper, nothing else. */
+
 function isArchiveDocument(name) {
     const prefix = DOCS_PATH + "/" + COLLECTION + "/";
     return typeof name === "string" && name.startsWith(prefix) && /^[^/]+$/.test(name.slice(prefix.length));
 }
 
-/** The expired archive documents, oldest first, at most `limit`. */
+
 async function findExpired(token, fetchFn, nowIso, limit) {
     const answer = await fetchFn(API + DOCS_PATH + ":runQuery", {
         method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
@@ -101,10 +101,10 @@ async function writeLog(token, fetchFn, runId, record) {
     return answer.ok;
 }
 
-/**
- * One run. `env` = the environment, `fetchFn` = fetch (pretend in the tests), `now` = Date. Returns { status, body }.
- * Nothing is deleted unless env.ARCHIVE_PURGE_LIVE === "1".
- */
+
+
+
+
 async function purge({ env, fetchFn, now, authorization }) {
     if (!env.CRON_SECRET) return { status: 503, body: { error: "Not set up: CRON_SECRET is missing, so nothing runs." } };
     if (!sameSecret(String(authorization || "").replace(/^Bearer\s+/i, ""), env.CRON_SECRET)) return { status: 401, body: { error: "Not allowed." } };

@@ -1,7 +1,7 @@
-// Turns the login marble (_Index/marble-light.svg, marble-dark.svg, drawn by tools/makeMarble.mjs) into JPEG pictures.
-// Why: the SVG is drawn with noise filters (feTurbulence, feDisplacementMap). A browser works those out again every time the
-// window changes size, so dragging the edge of the login page stuttered. A JPEG is decoded once and only scaled.
-// Run after makeMarble.mjs:  node tools/rasterMarble.mjs   (uses playwright-core from tests/responsive: npm install there once)
+
+
+
+
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,7 +9,7 @@ import { chromium } from "../tests/responsive/node_modules/playwright-core/index
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DIR = path.resolve(HERE, "../_Index");
-const W = 2400, H = 1500;                        // covers a 2560 x 1440 screen at its "cover" scale without visible softness
+const W = 2400, H = 1500;
 const browser = await chromium.launch({ executablePath: process.env.CHROME || "C:/Program Files/Google/Chrome/Application/chrome.exe", headless: true });
 try {
     const page = await browser.newPage({ viewport: { width: W, height: H } });

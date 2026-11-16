@@ -1,20 +1,20 @@
-// The ingredient picker of the product form: search the ingredient library as you type, click a result to make it a
-// removable pill, and create an ingredient on the spot when the library does not have it.
-//
-//   - The product's ingredient list stays ONE text box (the textarea): pasting a whole list, "Assist with AI" and saving all
-//     keep working on it. The pills are a view of that text, and the search adds to it. A pill that matches an ingredient of the
-//     library is solid ("linked"); one that does not is dashed, and clicking it offers to create it.
-//   - The search costs no database read: it looks through the ingredients the page already holds.
-//   - Everything typed is put on the page with textContent or .value, never as HTML.
-//
-// Things to change quickly:
+
+
+
+
+
+
+
+
+
+
 import { dialogFrame } from "./adminShell.js";
 import { matchesSearch } from "./glowupRules.js";
 import { sameKey, toList } from "./adminCommon.js";
 
-export const SHOW_AT_MOST = 8;              // results shown under the search box
-export const SEARCH_FROM_LETTERS = 2;       // the search starts at this many letters
-export const OFFER_CREATE = true;           // "+ Create new ingredient" when the library has no exact match
+export const SHOW_AT_MOST = 8;
+export const SEARCH_FROM_LETTERS = 2;
+export const OFFER_CREATE = true;
 export const WORDS = {
     placeholder: "Search the ingredient library, for example Niac...",
     nothing: "No ingredient in the library matches.",
@@ -25,8 +25,8 @@ export const WORDS = {
     note: "Note for this product only (a different warning, or how much of it is in this formula)",
     noteSet: (text) => `Product note: ${text}`
 };
-export const NOTE_MAX_CHARS = 160;          // longest product-specific caution
-export const MAX_NOTES = 80;                // most notes one product keeps
+export const NOTE_MAX_CHARS = 160;
+export const MAX_NOTES = 80;
 
 const make = (tag, className, text) => {
     const node = document.createElement(tag);
@@ -35,30 +35,30 @@ const make = (tag, className, text) => {
     return node;
 };
 
-/** What was typed under "Also known as": no empty names, not the name itself. */
+
 const toAliases = (typed, name) => String(typed || "").split(",").map((a) => a.replace(/\s+/g, " ").trim()).filter((a) => a && a.toLowerCase() !== String(name).toLowerCase());
 
-/**
- * options = {
- *   textarea, search, results, pills   - the elements (see the product form)
- *   library()                          - [{ id, name, techName, aliases }] of the ingredients that exist (not in the bin)
- *   create({ name, aliases, description, riskLevel })  - saves a new ingredient; resolves to its library entry (or throws)
- *   onChange()                         - called after the list was changed here
- * }
- * Returns { refresh() }: draw the pills again after the text was set by code.
- */
+
+
+
+
+
+
+
+
+
 export function mountIngredientPicker(options) {
     const { textarea, search, results, pills } = options;
     search.placeholder = WORDS.placeholder;
     let shown = [], active = -1;
-    // product-specific overrides: what is said for THIS product when it differs from the ingredient's own caution note.
-    // { ingredient key -> { name, caution, percent } }; the app and the website fall back to the ingredient's own note when there is none.
+
+
     const notes = new Map();
 
     const names = () => toList(textarea.value);
     const write = (list) => {
         textarea.value = list.join(", ");
-        textarea.dispatchEvent(new Event("input", { bubbles: true }));       // the page's own summary and the pills follow
+        textarea.dispatchEvent(new Event("input", { bubbles: true }));
     };
     const libraryEntry = (name) => {
         const key = sameKey(name);
@@ -81,7 +81,7 @@ export function mountIngredientPicker(options) {
         if (options.onChange) options.onChange();
     }
 
-    // ---- the pills
+
     function refresh() {
         pills.replaceChildren();
         names().forEach((name) => {
@@ -106,7 +106,7 @@ export function mountIngredientPicker(options) {
     }
     textarea.addEventListener("input", refresh);
 
-    // ---- the search box
+
     function closeResults() {
         results.hidden = true; active = -1; shown = [];
         results.replaceChildren();
@@ -161,16 +161,16 @@ export function mountIngredientPicker(options) {
             const choice = shown[active];
             if (choice && choice.type === "add") add(choice.name);
             else if (choice && choice.type === "create") { closeResults(); openCreate(choice.name); }
-            else if (search.value.trim()) add(search.value);                       // nothing offered: the typed words are taken as they are
+            else if (search.value.trim()) add(search.value);
         } else if (event.key === "Escape" && !results.hidden) {
             event.preventDefault(); event.stopPropagation(); closeResults();
         } else if (event.key === "Backspace" && search.value === "" && names().length > 0) {
-            // nothing typed: Backspace takes the last pill back, like a tag box
+
             const list = names(); list.pop(); write(list);
         }
     });
 
-    // ---- a note for this product only
+
     function openNote(name) {
         const key = sameKey(name), own = notes.get(key) || { caution: "", percent: null };
         const frame = dialogFrame(name, () => frame.close());
@@ -206,7 +206,7 @@ export function mountIngredientPicker(options) {
         cautionInput.focus();
     }
 
-    // ---- "Create on the fly": a small form, then the new ingredient is in the library AND in this product
+
     function openCreate(startName) {
         const frame = dialogFrame("New ingredient", () => frame.close());
         const note = make("p", "modal-intro", "Saved in the ingredient library at once, so every product can use it. You can add the rest later in the Ingredient Curator.");
@@ -232,12 +232,12 @@ export function mountIngredientPicker(options) {
             if (name.length < 2) { error.textContent = "Type the ingredient name."; nameInput.focus(); return; }
             if (!description) { error.textContent = "Write a short plain-words definition."; descInput.focus(); return; }
             const existing = libraryEntry(name);
-            if (existing) { frame.close(); add(existing.name); return; }              // it was there all along: just use it
+            if (existing) { frame.close(); add(existing.name); return; }
             save.disabled = true; save.textContent = "Saving...";
             try {
                 const made = await options.create({ name, aliases: toAliases(techInput.value, name), description, riskLevel: riskInput.value });
                 frame.close();
-                // a pill typed with another spelling than the new name now links to it
+
                 const list = names().filter((n) => sameKey(n) !== sameKey(startName || ""));
                 if (!list.some((n) => sameKey(n) === sameKey(made && made.name ? made.name : name))) list.push(made && made.name ? made.name : name);
                 write(list);
@@ -252,12 +252,12 @@ export function mountIngredientPicker(options) {
         nameInput.focus();
     }
 
-    /** The product-specific notes of the ingredients that are in the list now: [{ name, caution, percent }]. */
+
     function getNotes() {
         const keys = new Set(names().map(sameKey));
         return Array.from(notes.entries()).filter(([key]) => keys.has(key)).map(([, note]) => ({ name: note.name, caution: note.caution || "", percent: note.percent === undefined ? null : note.percent }));
     }
-    /** Loads the notes a product already has (call it when a product is opened, before refresh()). */
+
     function setNotes(list) {
         notes.clear();
         (Array.isArray(list) ? list : []).slice(0, MAX_NOTES).forEach((item) => {

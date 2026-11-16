@@ -1,5 +1,5 @@
-// Browser check: the admin login card has no icon above its title; the title is the card's first line and the card stays centred (12 November 2026).
-//   Run: node tests/responsive/loginCard.scenario.mjs   (SHOT_DIR=folder saves pictures)
+
+
 import { launch, openPage } from "./harness.mjs";
 let checks = 0, failed = 0;
 const ok = (good, what) => { checks++; if (!good) { failed++; console.log("FAILED: " + what); } };

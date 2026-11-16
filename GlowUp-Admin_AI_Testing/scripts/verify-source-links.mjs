@@ -1,9 +1,9 @@
-// Tests every source link of the Ingredient form against the real sites (needs the internet).
-//   Run from the website folder:   node scripts/verify-source-links.mjs
-// For each source: the LANDING address must answer 200 on an allowed host. A SEARCH address (the site's own search, plain GET)
-// is tested with 3 sample ingredients: final status 200, final host allowed, and the page text contains the ingredient name.
-// A PAGE builder (PubChem) resolves each sample to a compound number, then the compound page must answer 200 and the compound's
-// own synonym list must contain the name. Exit code 1 when anything that is shipped fails. Prints one table.
+
+
+
+
+
+
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -24,7 +24,7 @@ let failed = 0;
 const note = (source, type, url, ok, detail) => { rows.push([source, type, url, ok ? "PASS" : "FAIL " + detail]); if (!ok) failed++; };
 
 for (const [id, source] of Object.entries(f.SOURCES)) {
-    // landing: always tested
+
     try {
         const r = await get(source.landing);
         note(source.label, "landing", source.landing, r.status === 200 && f.hostAllowed(r.finalUrl), `status ${r.status}, host ${new URL(r.finalUrl).hostname}`);
@@ -57,7 +57,7 @@ for (const [id, source] of Object.entries(f.SOURCES)) {
     }
 }
 
-// ---- the CosIng Checker index (Source Finder): each sample's own page must answer 200, stay on cosingchecker.com and name the ingredient
+
 const rules = await import(new URL("../_Shared/sourceLinkRules.mjs", import.meta.url).href);
 for (const name of SAMPLES) {
     const api = `https://cosingchecker.com/api/v1/ingredients/?q=${encodeURIComponent(name)}&per_page=50`;
@@ -69,7 +69,7 @@ for (const name of SAMPLES) {
         const r = await get(page);
         const named = r.text.toLowerCase().includes(name.toLowerCase()) || (hit.cas_number && r.text.includes(hit.cas_number));
         note("CosIng Checker index", "page", page, r.status === 200 && new URL(r.finalUrl).hostname === "cosingchecker.com" && named, `status ${r.status}, name in page: ${named}`);
-        // the official CosIng page for the same reference number: used only if it shows the ingredient without scripts
+
         if (hit.ref_number) {
             const official = `https://ec.europa.eu/growth/tools-databases/cosing/details/${hit.ref_number}`;
             const o = await get(official);

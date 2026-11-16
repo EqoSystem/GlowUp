@@ -1,17 +1,17 @@
-// Responsive and motion proof for the admin site (7 November 2026). Run from this folder's parent:
-//   cd tests/responsive && npm install        (once: playwright-core; it uses the Chrome of this computer, or CHROME=...)
-//   node tests/responsive.spec.js             (all three parts)
-//   node tests/responsive.spec.js matrix      (or: live, perf; several may be given)
-//   SHOTS=0 node tests/responsive.spec.js     (no screenshots)
-// 1. matrix: login + every admin page at 11 sizes, light and dark, Quick settings closed and open, menu expanded and collapsed.
-//    Each picture: no sideways scroll, nothing past the right edge, no text or badge overlapping another in its card, nothing
-//    cut off, Quick settings beside the content from 1024 px. A screenshot of each goes to tests/screenshots/.
-// 2. live: one tab per page, the window made 10 px narrower at a time from 1440 to 320 without reloading; the same checks at
-//    every step, two frames after the step (no waiting for animations: the content must already be at the edge).
-// 3. perf: a Chrome trace of the dashboard while the window is dragged from 1440 to 400 px, Quick settings opened and closed
-//    and the menu folded and unfolded. Average FPS (target 55 or more), long tasks over 50 ms (none allowed) and layouts
-//    forced by script inside a resize handler (none allowed).
-// Firebase is answered by tests/responsive/mocks: nothing reaches the live project.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -73,14 +73,14 @@ try {
     }
 
     if (run("perf")) {
-        // The same exercise twice. Pass 1 has no tracer: its frame times and long tasks are what a person gets (a DevTools trace
-        // that records JavaScript stacks slows every task down several times). Pass 2 records the Chrome trace, and is used only
-        // to find layouts that script forces, and whether any of them sits inside a resize handler.
+
+
+
         const exercise = async (page) => {
             const phase = (name) => page.evaluate((name) => window.__perf.phases.push({ name, t: performance.now() }), name);
             await phase("the window drag");
             const t0 = Date.now();
-            for (let w = 1440; w >= 400; w -= 10) {          // a drag of the window edge: one step per frame
+            for (let w = 1440; w >= 400; w -= 10) {
                 await page.setViewportSize({ width: w, height: 900 });
                 await page.evaluate(() => new Promise((r) => requestAnimationFrame(r)));
             }
@@ -92,8 +92,8 @@ try {
             for (let i = 0; i < 2; i++) {
                 await phase("Quick settings opening"); await setQuickSettings(page, true); await page.waitForTimeout(350);
                 await phase("Quick settings closing"); await setQuickSettings(page, false); await page.waitForTimeout(350);
-                await phase("menu folding"); await page.evaluate(() => document.getElementById("sbMenuBtn").click()); await page.waitForTimeout(350);
-                await phase("menu unfolding"); await page.evaluate(() => document.getElementById("sbMenuBtn").click()); await page.waitForTimeout(350);
+                await phase("menu folding"); await page.evaluate(() => document.getElementById("menuBtn").click()); await page.waitForTimeout(350);
+                await phase("menu unfolding"); await page.evaluate(() => document.getElementById("menuBtn").click()); await page.waitForTimeout(350);
             }
             return dragMs;
         };
@@ -104,7 +104,7 @@ try {
             window.__perfRaf = requestAnimationFrame(tick);
         });
 
-        // pass 1: as a person sees it
+
         let tab = await openPage(browser, "dash", { theme: "light", width: 1440, height: 900 });
         await watch(tab.page);
         const dragMs = await exercise(tab.page);
@@ -117,7 +117,7 @@ try {
         const phaseOf = (t) => (perf.phases.filter((p) => p.t <= t).pop() || { name: "page start" }).name;
         const longTasks = perf.long.filter((l) => l.d > 50).map((l) => l.d + " ms during " + phaseOf(l.t));
 
-        // pass 2: the Chrome trace
+
         tab = await openPage(browser, "dash", { theme: "light", width: 1440, height: 900 });
         await watch(tab.page);
         const tracePath = path.join(HERE, "screenshots", "resize-trace.json");
@@ -126,8 +126,8 @@ try {
         await exercise(tab.page);
         await browser.stopTracing();
         await tab.ctx.close();
-        // layouts forced by script: a Layout event that carries a JS stack; inside a resize handler when it falls within a
-        // "resize" EventDispatch (or a ResizeObserver callback) of the same thread
+
+
         const trace = JSON.parse(fs.readFileSync(tracePath, "utf8"));
         const events = trace.traceEvents || trace;
         const handlers = events.filter((e) => e.ph === "X" && ((e.name === "EventDispatch" && e.args && e.args.data && e.args.data.type === "resize") || e.name === "ResizeObserverCallback"));

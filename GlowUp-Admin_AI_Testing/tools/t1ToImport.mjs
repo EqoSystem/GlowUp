@@ -1,15 +1,15 @@
-// Turns a filled-in copy of tools/templates/t1_restricted_template.csv into an ingredient import file for the Ingredient Curator (CSV import).
-//
-//   node tools/t1ToImport.mjs <filled-template.csv> [--out file.csv]
-//
-// The template is EMPTY on purpose. A person fills it from the regulation's own annex (for example EU Regulation 1223/2009, Annex II for
-// prohibited and Annex III for restricted substances, or the ASEAN Cosmetic Directive annexes adopted by FDA Philippines) and writes the annex and
-// entry number in the "reference" column. Nothing is copied from memory, and this script adds no ingredient.
-//
-// Rules (docs/DATA_SOURCE_POLICY.md):
-//   status "prohibited"  -> RISK_LEVEL harmful   (needs a tier 1 page in "source_url")
-//   status "restricted"  -> RISK_LEVEL caution   (needs a tier 1 or tier 2 page), CAUTION_NOTE says it is restricted and under what conditions
-// A row whose source_url is missing, not https, or not a page of the right tier is NOT written; it goes to the rejects file with the reason.
+
+
+
+
+
+
+
+
+
+
+
+
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -19,11 +19,11 @@ import { evidenceProblem } from "../_Shared/glowupRules.js";
 export const TEMPLATE_HEADERS = ["inci_name", "aliases", "status", "regulation", "reference", "conditions", "source_url"];
 export const IMPORT_KEYS = ["NAME", "LABEL_NAME", "OTHER_NAMES", "DESCRIPTION", "CAUTION_NOTE", "RISK_LEVEL", "SOURCES"];
 
-/** { rows, rejects } from the template's records. */
+
 export function t1ToImport(records) {
     const rows = [], rejects = [];
     records.forEach((r, i) => {
-        const line = i + 2;                                    // the header is line 1
+        const line = i + 2;
         const name = r.inci_name, status = (r.status || "").toLowerCase(), url = r.source_url;
         const reject = (why) => rejects.push({ LINE: line, INCI_NAME: name, REASON: why });
         if (!name) return reject("no inci_name");

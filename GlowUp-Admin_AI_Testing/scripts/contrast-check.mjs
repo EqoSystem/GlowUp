@@ -1,4 +1,4 @@
-// WCAG contrast of the colour pairs of the Edit Ingredient window. Run: node contrast.mjs   (or pass "ci" to read the live CSS values from the css file)
+
 const lum = (hex) => {
     const v = hex.replace("#", "");
     const [r, g, b] = [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));

@@ -1,37 +1,37 @@
-// Brand & Product Inventory: the 'brands' and 'products' collections the mobile app reads.
-// GlowUp lists MAKE-UP ONLY. Skin care, hair, body, nail and fragrance entries are never shown in the normal list:
-// they wait under "Not make-up" until they are moved to the Recycle bin. A product whose kind the rule cannot tell
-// (or that is of a kind the project has not decided on yet) is listed, marked, and hidden by the app until an admin
-// has given it a clear kind. The rule is the app's own: ../_Shared/glowupRules.js.
-//
-// A brand document:   { name, category, market, status, scans, createdAt, updatedAt }
-//   - the app only uses brands whose status is "Active"
-//   - "scans": the app adds 1 each time a scan is found to be this brand
-//     (the brand's name is on the scanned label, or the scan is one of the brand's products)
-//
-// A product document: { name, brandId, brandName, cosmeticType, description, ingredients[], shades[],
-//                       minAge, status, scans, createdAt, updatedAt }
-//   - ingredients: the names printed on the packaging; the app checks each one against the user's profile
-//   - shades: colours as "#RRGGBB"; AR Try-On offers them for this product
-//   - shadeCodes: the shade code printed on the pack ("119", "N20") at the same place as its colour, "" = not known
-//   - "scans": the app adds 1 each time a scan is recognised as this product (its ingredient list matches)
-//   - the app only uses a product when its status AND its brand's status are "Active"
-//
-// Entries that were NOT typed here also carry { source, reviewed, addedBy, addedAtUnix } (products: sources[] too):
-//   - source "scan": the app added it by itself when a user scanned something that was not listed (id starts with "scan_")
-//   - source "openbeautyfacts": imported from the Open Beauty Facts database
-//   - they arrive with status "Pending" and reviewed false, so the app does not use them until an admin approves them here
-//
-// Arranging and removing (see ../_Shared/adminOrganizer.js):
-//   - folder: the name of the folder a product was put in ("" = none). Only this website uses it.
-//   - binned true = in the Recycle bin. The entry's status is set to "Inactive" at the same moment, so the app stops
-//     using it at once; statusBeforeBin keeps what it was, for "Restore". A brand goes to the bin together with its
-//     products (binnedWith = the brand's id). Only "Delete forever" removes a document.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import { db } from "../_Database/firebase-console.js";
 import { auth } from "../_Database/firebase-console.js";
 import { collection, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-// reading and writing go through the site's own copy of its lists: a list is downloaded once and kept between pages,
-// and after a change only the documents that were written are read again (see adminStore.js)
+
+
 import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed } from "../_Shared/adminStore.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
@@ -64,66 +64,66 @@ import { applyRole, brandPageOf, groupByType, bulkAllowed } from "../_Shared/sou
 import { gs1Hint, VERIFIED_BY_GS1 } from "../_Shared/gs1Hint.js";
 
 const OTHER_TYPE = "__other__";
-const NO_BRAND = "__none__";                // the group for products whose brand no longer exists
-const MAX_SHADES = 100;               // no practical limit for a real range (foundations run to 40+); the database rule allows 100
-const SHADE_STRIP_FROM = 11;         // from 11 shades on, the shades sit in a box that scrolls up and down
-const MAX_TAGS = 10;                        // filter words kept on a product (tags), so a filter needs one cheap query and no join
-const BATCH_LIMIT = 400;                    // Firestore allows 500 writes in one batch
-const BRANDS_PER_PAGE = 10;                 // "Brands": this many brands at a time
-const PRODUCTS_PER_PAGE = 10;               // "All products" and the Recycle bin: this many rows at a time
-const PRODUCTS_AT_A_TIME = 10;              // products of one brand, until "Show more" is pressed
-const SHOWN_INGREDIENTS = 16;               // names listed in a product's details
+const NO_BRAND = "__none__";
+const MAX_SHADES = 100;
+const SHADE_STRIP_FROM = 11;
+const MAX_TAGS = 10;
+const BATCH_LIMIT = 400;
+const BRANDS_PER_PAGE = 10;
+const PRODUCTS_PER_PAGE = 10;
+const PRODUCTS_AT_A_TIME = 10;
+const SHOWN_INGREDIENTS = 16;
 const VIEW_KEY = "glowup.inventory.view.v1";
-// true = when this page opens, the products of the FDA Philippines catalogue (../_Shared/data/fdaCatalogue.json) that are not
-//        in the inventory yet are added by themselves, without a question. false = only the "..." menu adds them, after a question.
-const AUTO_ADD_FDA_CATALOGUE = false;      // off since 2026-10-22: a brand or product deleted for good came back at the next visit of the page
-let catalogueChecked = false;               // the catalogue is looked at once per visit of the page
-// true = a product the app added from a scan is approved by itself (set to Active, with its brand) when the app found it on the
-//        FDA Philippines list of notified cosmetics and that notification is still valid. Everything else keeps waiting for review.
+
+
+const AUTO_ADD_FDA_CATALOGUE = false;
+let catalogueChecked = false;
+
+
 const AUTO_APPROVE_FDA = true;
-/** The app writes this into the description of a scanned product it found on the FDA Philippines Verification Portal. */
+
 const fdaVerified = (p) => /FDA Philippines: notified as/i.test(p.description) && !/Notification ended/i.test(p.description);
 const pageState = { page: 1, size: BRANDS_PER_PAGE };
 const flatPage = { page: 1, size: PRODUCTS_PER_PAGE };
 const binPage = { page: 1, size: PRODUCTS_PER_PAGE };
-const closed = new Set();                   // brands whose products are folded away
-const moreShown = new Map();                // brand id -> how many of its products are shown
-let shownGroups = [];                       // the brands the table currently lists (all pages)
-// The two count tiles open their own view of the list (5 November 2026): null = the normal list, or
-//   { kind: "brands" }          only the brands; a click on one opens it
-//   { kind: "brand", id }       the products of one brand, A to Z, 10 per page
-//   { kind: "types" }           every product under its cosmetic type, A to Z, all on one page
-let drill = null;
-let keepDrill = false;                      // the organizer goes back to "All" because a tile asked for it
-const brandPage = { page: 1, size: PRODUCTS_PER_PAGE };
-let sourceEditor = null;                    // the sources box of the product form (productSources.js)
+const closed = new Set();
+const moreShown = new Map();
+let shownGroups = [];
 
-let everyBrand = [];                        // every brand document, also the ones in the Recycle bin
+
+
+
+let drill = null;
+let keepDrill = false;
+const brandPage = { page: 1, size: PRODUCTS_PER_PAGE };
+let sourceEditor = null;
+
+let everyBrand = [];
 let everyProduct = [];
 let ingredientSuggestions = [];
 let ingredientSuggestionsError = "";
 let inventoryAiDrafts = [];
-let brands = [];                            // listed (not in the bin): [{ id, name, category, market, status, scans }]
-let products = [];                          // listed: [{ id, name, brandId, brandName, cosmeticType, description, ingredients, shades, minAge, status, scans, folder }]
-let binBrands = [];                         // in the Recycle bin
+let brands = [];
+let products = [];
+let binBrands = [];
 let binProducts = [];
-let curatedKeys = new Set();                // every name / technical name / alias in the Ingredient Curator
-let curatedList = [];                       // the same ingredients with their ids, for the picker of the product form: [{ id, name, techName, aliases }]
-let ingredientPicker = null;                // the picker of the product form (adminIngredientPicker.js)
+let curatedKeys = new Set();
+let curatedList = [];
+let ingredientPicker = null;
 let curatorKnown = false;
 let editingBrandId = null;
 let editingProductId = null;
-let formShades = [];                        // the shades being edited in the open product form
-let formShadeCodes = [];                    // the shade codes printed on the pack ("119", "N20"), at the same places as formShades ("" = not known)
+let formShades = [];
+let formShadeCodes = [];
 let assistedProductSources = [];
 let brandModal = null;
 let productModal = null;
-let brandWindow = { reset() {} };           // the section bar etc. of the two windows (set when the page starts)
+let brandWindow = { reset() {} };
 let productWindow = { reset() {} };
-let org = null;                             // folders, the Recycle bin, picking and dragging
-let openId = "";                            // the product whose details are open
-let quick = "";                             // a filter a helper switched on: "" | a key of QUICK
-// The Filters button: several choices at once. Looked up in the products already loaded (no database read).
+let org = null;
+let openId = "";
+let quick = "";
+
 const FACTS = [
     { value: "has-shades", label: "Has shades" },
     { value: "no-ingredient-list", label: "No ingredient list" },
@@ -133,20 +133,20 @@ let facets = { type: "", status: "", facts: [] };
 const facetCount = () => (facets.type ? 1 : 0) + (facets.status ? 1 : 0) + facets.facts.length;
 const facetOk = (p) => (!facets.type || sameKey(p.cosmeticType) === sameKey(facets.type)) && (!facets.status || p.status === facets.status)
     && facets.facts.every((fact) => productTags(p).includes(fact));
-const view = { mode: "brands", sort: "name", layout: "rows" };      // "Brands" or "All products", the order, rows or cards; remembered in this browser
+const view = { mode: "brands", sort: "name", layout: "rows" };
 
 const el = (id) => document.getElementById(id);
 const DASH = `<span class="muted">–</span>`;
 const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
 const many = (n, one, more) => `${n} ${n === 1 ? one : more}`;
 
-/** "Are you sure?" as a dialog: the first paragraph of the question is its title, the rest its text. */
+
 const sure = (question, confirmLabel, danger) => {
     const parts = question.split("\n\n");
     return askConfirm({ title: parts[0], message: parts.slice(1).join(" "), confirmLabel, danger });
 };
 
-// the orders the Sort button offers
+
 const SORTS = [
     { id: "name", label: "Name A to Z", short: "A to Z", cmp: byName },
     { id: "nameDesc", label: "Name Z to A", short: "Z to A", cmp: (a, b) => byName(b, a) },
@@ -157,7 +157,7 @@ const SORTS = [
 ];
 const sortNow = () => SORTS.find((s) => s.id === view.sort) || SORTS[0];
 
-// the filters a helper can switch on
+
 const QUICK = {
     noIngredients: { label: "No ingredient list", test: (p) => p.ingredients.length === 0 },
     noShades: { label: "Make-up without shades", test: (p) => p.shades.length === 0 && productScope(p.cosmeticType, p.name) === "makeup" },
@@ -166,10 +166,10 @@ const QUICK = {
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
-    try { const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || "{}"); if (saved.mode === "all") view.mode = "all"; if (SORTS.some((s) => s.id === saved.sort)) view.sort = saved.sort; } catch (error) { /* first visit */ }
-    registerData();                   // before the page frame: a saved layout may hold panels that show this data
+    try { const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || "{}"); if (saved.mode === "all") view.mode = "all"; if (SORTS.some((s) => s.id === saved.sort)) view.sort = saved.sort; } catch (error) {                   }
+    registerData();
     mountShell("inventory");
-    placeInHeader(".search-container", "headerActions");      // search beside the title, Add and More beside the layout button
+    placeInHeader(".search-container", "headerActions");
     wireSignOut();
     wireWebsiteAndGs1Buttons();
     setupNavigationGuard();
@@ -182,7 +182,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     brandModal = setupModal(el("addBrandModal"), () => { editingBrandId = null; });
     productModal = setupModal(el("productModal"), () => { editingProductId = null; });
-    brandWindow = wireWindow(el("addBrandModal"));          // section bar, focus that stays inside, the box that failed marked
+    brandWindow = wireWindow(el("addBrandModal"));
     productWindow = wireWindow(el("productModal"));
 
     org = createOrganizer({
@@ -200,7 +200,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             { label: "Approve All", className: "bar-quiet", tip: "Approve only eligible selected entries after you confirm you have reviewed them.", run: approveSelectedInventory },
             { label: "Apply website or source", className: "bar-quiet", tip: "Give every selected product a web address, also those on other pages. You see how many change and confirm first.", icon: icon("layers"), run: applyToSelected }
         ],
-        // one brand's view: "select all" means the whole brand, also the products on other pages
+
         pickScope: () => (drill && drill.kind === "brand" && org.view.kind !== "bin" ? productsOf(drill.id).map((p) => "p:" + p.id) : null),
         onView: () => { if (!keepDrill) drill = null; fromFirstPage(); }
     });
@@ -210,11 +210,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("inventoryApproveAllBtn").addEventListener("click", approveInventoryDrafts);
 
     const askedFor = new URLSearchParams(window.location.search).get("q");
-    if (askedFor) el("inventorySearchInput").value = askedFor;                 // ?q=blush: the search comes back after a reload
+    if (askedFor) el("inventorySearchInput").value = askedFor;
     wireSearchExtras();
     wireSearch(el("inventorySearchInput"), el("inventorySearchClear"), fromFirstPage);
-    // the brand dropdown also says how the list is drawn: "All brands, grouped" or "All products, one list" (it replaced the
-    // Brands / All products pills, which did the same job twice)
+
+
     el("brandFilterSelect").addEventListener("change", () => {
         drill = null;
         const value = el("brandFilterSelect").value;
@@ -233,14 +233,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         { label: "Brand", icon: "tag", description: "A new brand: name, category, market, status.", keys: comboFor("inventory.addBrand"), run: () => openBrandForm(null) },
         { label: "Product", icon: "lipstick", description: "A make-up product of a listed brand.", keys: comboFor("inventory.addProduct"), disabled: brands.length === 0, run: () => openProductForm(null, brandFilterValue()) }
     ]));
-    // keyboard shortcuts (shortcuts.js): the same handlers and the same conditions as the buttons and the Add menu
+
     bindButtons({ "inventory.new": "#addMenuBtn", "inventory.import": "#chooseInventoryFileBtn", "inventory.filters": "#filterMenuBtn",
         "inventory.approveDrafts": "#inventoryApproveAllBtn", "inventory.sort": "#sortMenuBtn" });
     bindActions({
         "inventory.addBrand": { run: () => openBrandForm(null) },
         "inventory.addProduct": { run: () => openProductForm(null, brandFilterValue()), isAvailable: () => (brands.length === 0 ? "Add product: add a brand first. A product needs a listed brand." : true) }
     });
-    // what was behind "..." here is listed in the settings window under "This page" (5 November 2026)
+
     setPageSettings(() => {
         const allClosed = shownGroups.length > 0 && shownGroups.every((g) => closed.has(g.id));
         const outside = outsideCount();
@@ -259,7 +259,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     el("sortMenuBtn").addEventListener("click", (event) => openMenu(event.currentTarget, [{ heading: "Order of the list" }].concat(
         SORTS.map((s) => ({ label: s.label, checked: s.id === view.sort, run: () => { view.sort = s.id; saveView(); fromFirstPage(); } })))));
-    // Rows or Cards: only how the same rows are drawn (CSS), so every click, drag, selection and the pager work the same
+
     el("inventoryLayoutSwitch").addEventListener("click", (event) => {
         const button = event.target.closest("[data-layout]");
         if (!button) return;
@@ -268,9 +268,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         paintLayout();
     });
     paintLayout();
-    // a narrow list (a snapped or small window) draws products as cards by itself, so the table never needs a sideways scroll;
-    // it goes back to the chosen look when there is room again (two limits, so it cannot flicker).
-    // Opening Quick settings beside the page only makes the list narrower: the look stays as it was (9 November 2026).
+
+
+
     if (window.ResizeObserver) new ResizeObserver(() => {
         const width = el("inventoryHost").clientWidth;
         if (width === 0) return;
@@ -287,7 +287,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     el("filterMenuBtn").addEventListener("click", (event) => {
         const types = Array.from(new Set(products.map((p) => p.cosmeticType).filter(Boolean))).sort((a, b) => a.localeCompare(b));
-        // "Show": the brand dropdown that sat above the table until 29 October 2026 (it stays in the page, hidden, and keeps the choice)
+
         const shows = Array.from(el("brandFilterSelect").options).filter((o) => o.value !== "").map((o) => ({ value: o.value, label: o.textContent }));
         openFacets(event.currentTarget, {
             title: "Filters",
@@ -354,18 +354,18 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("productShadeEditor").addEventListener("change", onShadeChange);
     el("productShadeEditor").addEventListener("keydown", onShadeKey);
 
-    // the list on screen came from the site's own copy; when the database turns out to hold something newer, show that
+
     onListsRefreshed(() => { if (!dialogIsOpen()) loadInventory(); });
     const firstLoad = loadInventory();
 
-    // the Dashboard's "Add product" opens this page with ?add=product: the empty product form opens once the brands are here
+
     if (new URLSearchParams(location.search).get("add") === "product") firstLoad.then(() => openProductForm(null));
 });
 
-const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) { /* private window */ } };
+const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) {                      } };
 function fromFirstPage() { pageState.page = 1; flatPage.page = 1; binPage.page = 1; brandPage.page = 1; renderInventory(); }
 
-/** A count tile (or the chip that goes back) chose a view of the list. Opening another brand starts on its page 1 with nothing selected. */
+
 function openDrill(next) {
     const otherBrand = !!(drill && drill.kind === "brand" && !(next && next.kind === "brand" && next.id === drill.id));
     drill = next;
@@ -377,7 +377,7 @@ function openDrill(next) {
     else fromFirstPage();
 }
 
-/** The sources box or the selection bar asked to apply an address: the window, and what is kept on this page afterwards. */
+
 function openApply(ask) {
     openApplyWindow({
         ...ask,
@@ -389,7 +389,7 @@ function openApply(ask) {
                 const product = everyProduct.find((p) => p.id === change.id);
                 if (product) product.sources = change.after;
             });
-            // the form behind the window keeps what the admin typed, and gets what was just saved for this product
+
             if (editingProductId && written.some((change) => change.id === editingProductId)) {
                 assistedProductSources = applyRole(assistedProductSources, role, url);
                 sourceEditor.paint();
@@ -401,7 +401,7 @@ function openApply(ask) {
     });
 }
 
-/** "Apply website or source" in the bar: everything selected counts, also what is on other pages. */
+
 function applyToSelected(keys) {
     const ids = keys.filter((key) => key.startsWith("p:")).map((key) => key.slice(2));
     const first = products.find((p) => ids.includes(p.id));
@@ -410,7 +410,7 @@ function applyToSelected(keys) {
     if (!brand || !bulkAllowed(brand.name)) { notify("Applying to other products is not switched on for this brand yet.", "error"); return; }
     openApply({ role: "primary", url: "", brandId: first.brandId, chosen: ids });
 }
-/** What a count tile (or a helper) narrows the list to: "" | "review" | "out". The same choice again shows everything. */
+
 function showOnly(value, keep) {
     const select = el("reviewFilterSelect");
     select.value = select.value === value && !keep ? "" : value;
@@ -418,7 +418,7 @@ function showOnly(value, keep) {
     drill = null;
     if (org.view.kind === "bin") org.show({ kind: "all" }); else fromFirstPage();
 }
-/** A visible "Show all" action returns to the whole inventory, not just the current search or folder. */
+
 function resetAllFilters() {
     facets = { type: "", status: "", facts: [] };
     el("inventorySearchInput").value = "";
@@ -428,12 +428,12 @@ function resetAllFilters() {
     org.show({ kind: "all" });
 }
 
-// ---------------------------------------------------------------------------------------------
-// Loading
-// ---------------------------------------------------------------------------------------------
-/** When an entry was made, in seconds (for "Newest first"). */
+
+
+
+
 const madeAt = (data) => { const made = toDate(data.createdAt); return made ? Math.floor(made.getTime() / 1000) : toWholeNumber(data.addedAtUnix); };
-/** What the Recycle bin wrote on an entry. */
+
 const binFields = (data) => { const since = toDate(data.binnedAt); return { binned: data.binned === true, binnedAt: since ? since.getTime() : 0, statusBeforeBin: String(data.statusBeforeBin || ""), binnedWith: String(data.binnedWith || ""), binnedReason: String(data.binnedReason || "") }; };
 
 function renderIngredientSuggestions() {
@@ -513,16 +513,16 @@ async function loadInventory() {
                 category: data.category || "",
                 market: data.market || "Global",
                 status: normalizeStatus(data.status),
-                rawStatus: String(data.status || ""),          // as stored: an empty one is NOT Active for the app (see productVisibility)
+                rawStatus: String(data.status || ""),
                 scans: toWholeNumber(data.scans),
                 source: String(data.source || "").trim().toLowerCase(),
                 reviewed: data.reviewed === true,
-                needsReview: data.reviewed === false,         // only entries the app or an import added carry this mark
-                autoApproved: data.autoApproved === true,     // approved by this page itself (the FDA Philippines list confirmed it)
-                aliases: asArray(data.aliases),               // other ways the name is written (kept when two entries are merged)
-                logoUrl: String(data.logoUrl || ""),          // the brand's logo and picture: web addresses only
-                // the brand's own website: "website" is set ONLY by an admin who confirmed it (then its pages are labelled
-                // "Manufacturer's own site"); "websiteSuggested" is what Assist with AI or an import proposed, not trusted
+                needsReview: data.reviewed === false,
+                autoApproved: data.autoApproved === true,
+                aliases: asArray(data.aliases),
+                logoUrl: String(data.logoUrl || ""),
+
+
                 website: String(data.website || ""),
                 websiteSuggested: String(data.websiteSuggested || ""),
                 websiteConfirmedAt: toDate(data.websiteConfirmedAt),
@@ -555,7 +555,7 @@ async function loadInventory() {
                 barcode: String(data.barcode || ""),
                 fdaNumber: String(data.fdaNumber || "").replace(/\s+/g, " ").trim().slice(0, 40),
                 imageUrl: String(data.imageUrl || ""),
-                ingredientNotes: Array.isArray(data.ingredientNotes) ? data.ingredientNotes : [],     // per-product caution and share of an ingredient
+                ingredientNotes: Array.isArray(data.ingredientNotes) ? data.ingredientNotes : [],
                 aliases: asArray(data.aliases),
                 folder: cleanFolder(data.folder),
                 addedAt: madeAt(data)
@@ -570,8 +570,8 @@ async function loadInventory() {
         return;
     }
 
-    // Suggestions are admin-only, but the catalogue itself is readable without that collection.
-    // A missing admins/{uid} record must not blank the otherwise-readable inventory table.
+
+
     ingredientSuggestionsError = "";
     try {
         const suggestionSnapshot = await getDocs(collection(db, "productIngredientSuggestions"));
@@ -593,7 +593,7 @@ async function loadInventory() {
     }
     renderIngredientSuggestions();
 
-    // the Ingredient Curator's names, to point out ingredients it does not explain yet (optional)
+
     curatedKeys = new Set();
     curatedList = [];
     try {
@@ -627,7 +627,7 @@ async function loadInventory() {
                 fresh.concat(freshBrands).forEach((x) => { x.status = "Active"; x.rawStatus = "Active"; x.reviewed = true; x.needsReview = false; });
                 notify(`${many(fresh.length, "scanned product", "scanned products")} confirmed by FDA Philippines: approved automatically.`, "ok");
             } catch (error) {
-                console.warn("Automatic approval did not work: ", error);       // they simply stay "waiting for review"
+                console.warn("Automatic approval did not work: ", error);
             }
         }
 
@@ -637,11 +637,11 @@ async function loadInventory() {
     fillBrandSelects();
     fillReviewFilter();
     renderInventory();
-    datasetChanged("products");           // the data panels (lists, grids, graphs) draw the new data
+    datasetChanged("products");
     datasetChanged("brands");
 
-    // a brand the app added from a scan (still Pending) that holds products from the FDA Philippines list is approved by itself:
-    // otherwise the app would keep hiding those products
+
+
     if (AUTO_APPROVE_FDA) {
         const waiting = everyBrand.filter((b) => b.needsReview && !b.binned && !categoryOutOfScope(b.category)
             && everyProduct.some((p) => p.brandId === b.id && !p.binned && p.source === "fdaph"));
@@ -668,7 +668,7 @@ async function loadInventory() {
     if (AUTO_ADD_FDA_CATALOGUE && !catalogueChecked) { catalogueChecked = true; importFdaCatalogue(true); }
 }
 
-/** Splits everything that was loaded into what is listed and what is in the Recycle bin. */
+
 function sortOut() {
     everyBrand.sort(byName);
     everyProduct.sort(byName);
@@ -680,7 +680,7 @@ function sortOut() {
     if (org) org.sync(everyProduct.map((p) => "p:" + p.id).concat(everyBrand.map((b) => "b:" + b.id)));
 }
 
-/** Something was changed on this page: the lists, the table and the data panels follow at once. */
+
 function afterChange() {
     sortOut();
     fillBrandSelects();
@@ -690,7 +690,7 @@ function afterChange() {
     datasetChanged("brands");
 }
 
-/** The "waiting for review" box, with how many entries are waiting. The first time, an address ending in ?show=review opens on it. */
+
 function fillReviewFilter() {
     const select = el("reviewFilterSelect");
     const asked = new URLSearchParams(window.location.search).get("show");
@@ -700,10 +700,10 @@ function fillReviewFilter() {
     select.value = wanted;
 }
 
-/** The CONFIRMED website whose pages count as the maker's own site: the product's brand's, or the brand's own. */
+
 const websiteOfEntry = (entry) => ("brandId" in entry ? (brandOf(entry) || {}).website : entry.website) || "";
 
-/** Where an entry came from and whether an admin has checked it, as HTML ("" for an entry typed here). */
+
 function originText(entry) {
     const origin = originLabel(entry.source) || (entry.needsReview ? "Added automatically" : "");
     if (!origin) return "";
@@ -712,11 +712,11 @@ function originText(entry) {
     return escapeHtml(origin + state) + (links ? " · " + links : "");
 }
 
-/** The dropdown's choice that lists every product in one list (no brand rows). */
+
 const FLAT_LIST = "__all_products";
-/** The brand the list is narrowed to ("" = every brand). */
+
 const brandFilterValue = () => { const value = el("brandFilterSelect").value; return value === FLAT_LIST ? "" : value; };
-/** Chooses in the (hidden) brand dropdown as if the admin had picked it there: its own change handler does the rest. */
+
 function setBrandChoice(value) {
     const select = el("brandFilterSelect");
     select.value = value;
@@ -725,7 +725,7 @@ function setBrandChoice(value) {
 
 function fillBrandSelects() {
     const filter = el("brandFilterSelect");
-    // the first time, an address ending in ?brand=ID opens on that brand
+
     const wanted = filter.dataset.ready ? filter.value : (new URLSearchParams(window.location.search).get("brand") || "");
     filter.dataset.ready = "1";
     const option = (b) => `<option value="${escapeHtml(b.id)}">${escapeHtml(b.name || "Unnamed Brand")}${b.status === "Active" ? "" : " (" + escapeHtml(b.status) + ")"}</option>`;
@@ -736,7 +736,7 @@ function fillBrandSelects() {
 }
 
 const INVENTORY_AI_DAILY_LIMIT = 40;
-const IMPORT_GROUP = 40;                      // imported records saved per database batch (an import itself has no limit)
+const IMPORT_GROUP = 40;
 const INVENTORY_AI_LIMIT_KEY = "glowup.inventory.ai.daily";
 function inventoryAiCalls(add) {
     const today = new Date().toISOString().slice(0, 10);
@@ -747,14 +747,14 @@ function inventoryAiCalls(add) {
     return count;
 }
 
-/** countIt = false: a later part of one imported file (a whole file counts as ONE use of the day's limit). */
+
 async function askInventoryAi(payload, countIt = true, signal = null) {
     if (countIt && inventoryAiCalls(false) >= INVENTORY_AI_DAILY_LIMIT) throw new Error(`Assist with AI was used ${INVENTORY_AI_DAILY_LIMIT} times today in this browser. Try again tomorrow.`);
     const user = auth.currentUser;
     if (!user) throw new Error("You are signed out. Sign in again.");
     const stop = new AbortController();
     const timer = setTimeout(() => stop.abort(), 75000);
-    const onCancel = () => stop.abort();                  // Cancel on the drop box stops the question at once
+    const onCancel = () => stop.abort();
     if (signal) signal.addEventListener("abort", onCancel);
     let answer;
     try {
@@ -944,7 +944,7 @@ async function assistProductIngredients() {
         el("productIngredientsInput").value = body.draft.ingredients.join(", ");
         if (ingredientPicker) ingredientPicker.refresh();
         const sources = (body.sources || []).filter((page) => page && /^https:\/\//i.test(page.url || ""))
-            .map((page) => `${page.title || page.site || page.url} | ${page.url}`);      // the kind label is worked out when shown, never stored
+            .map((page) => `${page.title || page.site || page.url} | ${page.url}`);
         if (body.draft.fdaVerifiedLink && /^https:\/\/([a-z0-9-]+\.)*fda\.gov\.ph\//i.test(body.draft.fdaVerifiedLink))
             sources.unshift(`FDA Philippines verification | ${body.draft.fdaVerifiedLink}`);
         assistedProductSources = Array.from(new Set(assistedProductSources.concat(sources))).slice(0, 10);
@@ -962,10 +962,10 @@ async function assistProductIngredients() {
     }
 }
 
-/**
- * The import drop box (importReview.js): read, then check every record in a window, then save. Nothing reaches the
- * database before the admin has checked it and pressed Save.
- */
+
+
+
+
 function importInventoryFile(file) {
     showImportFlags(el("inventoryImportFlags"), []);
     startImport({
@@ -1010,17 +1010,17 @@ const INVENTORY_REVIEW = {
     ]
 };
 
-/** What a file's text holds, for the check window: { draft: { products, brands }, notes, model, refused }. Nothing is saved here. */
+
 async function extractInventory(documentText, say, signal) {
-    // a file in the GlowUp import format is read as it is, with no AI; any other document is read by the AI
+
     const keyed = parseImportText(documentText);
     if (keyed.kind === "ingredients") return { refused: "This file lists only ingredients. " + ingredientsNotHere(keyed.draft.ingredients.length) };
     if (keyed.kind === "mixed") return { refused: `This file mixes ${many(keyed.counts.inventory, "brand or product record", "brand or product records")} with ingredient records, so nothing was imported. ` + ingredientsNotHere(keyed.counts.ingredients) };
     if (keyed.kind === "inventory") { say("Reading the file's own fields. No AI is used."); return { draft: keyed.draft, notes: keyed.notes.slice(0, 6), model: "" }; }
-    // a document that labels each product ("Brand:", "Product:", "Ingredients:") is read here too, with no AI and no quota
+
     const labeled = parseLabeledProducts(documentText);
     if (labeled.kind === "inventory") { say("Reading the labelled Brand / Product / Ingredients lines. No AI is used."); return { draft: labeled.draft, notes: labeled.notes.slice(0, 6), model: "" }; }
-    // no size limit: the AI reads the file in parts, one after the other; a part that fails is named, the others still count
+
     const parts = splitForAi(documentText);
     const found = { products: [], brands: [] }, failedParts = [];
     let model = "", ingredientRecords = 0;
@@ -1043,10 +1043,10 @@ async function extractInventory(documentText, say, signal) {
     return { draft: found, notes, model: model || "the AI" };
 }
 
-/** Writes the checked records (NEW entries only, all Pending) in groups; answers what was saved. */
+
 async function saveInventoryDraft(draft, fileName, say) {
     const records = Array.isArray(draft.products) ? draft.products : [], brandRecords = Array.isArray(draft.brands) ? draft.brands : [];
-    // no limit on records: saved in groups of IMPORT_GROUP, one database batch each, remembering what earlier groups added
+
     const memory = { newBrands: new Map(), plannedProducts: new Set() };
     const result = { savedProducts: 0, savedBrands: 0, suggestedLists: 0, skippedDuplicates: 0, skippedInvalid: 0, withFdaLink: 0, flagged: [] };
     const groups = Math.max(Math.ceil(records.length / IMPORT_GROUP), Math.ceil(brandRecords.length / IMPORT_GROUP), 1);
@@ -1075,10 +1075,10 @@ async function saveInventoryDraft(draft, fileName, say) {
     return summary;
 }
 
-/**
- * The records an import FLAGGED, under the drop box: skin care and other non-make-up records (not saved: GlowUp lists
- * make-up only) and make-up whose kind the rule cannot tell (saved as Pending; the app hides it until its kind is set).
- */
+
+
+
+
 function showImportFlags(box, flagged) {
     if (!box) return;
     box.hidden = flagged.length === 0;
@@ -1089,15 +1089,15 @@ function showImportFlags(box, flagged) {
         + (unclear.length ? `<span class="chip review">Flagged: kind not clear</span> Saved as Pending; open each one and choose its make-up kind, or move it to the Recycle bin.<ul>${unclear.map(line).join("")}</ul>` : "");
 }
 
-/**
- * Writes what an import found. NEW entries only, all Pending and not reviewed; an existing entry is never changed. The
- * one exception goes through the existing review queue: an existing product WITHOUT an ingredient list gets the imported
- * list as a suggestion (productIngredientSuggestions), which an admin applies or dismisses.
- */
+
+
+
+
+
 async function saveImportedProducts(records, brandRecords, fileName, memory) {
     const batch = writeBatch(db);
     const kept = memory || { newBrands: new Map(), plannedProducts: new Set() };
-    const newBrands = new Map();                    // made by THIS group (written in its batch)
+    const newBrands = new Map();
     const plannedProducts = kept.plannedProducts;
     const flagged = [];
     const uid = auth.currentUser ? auth.currentUser.uid : "";
@@ -1106,7 +1106,7 @@ async function saveImportedProducts(records, brandRecords, fileName, memory) {
     const names = (list, most, count) => Array.from(new Map((Array.isArray(list) ? list : []).map((v) => clean(v, most)).filter(Boolean).map((v) => [sameKey(v), v])).values()).slice(0, count);
     const knownBrand = (name) => everyBrand.find((item) => [item.name, ...item.aliases].some((known) => sameKey(known) === sameKey(name)));
 
-    /** A new Pending brand from what the document says about it (its website only as a SUGGESTION). */
+
     const addBrand = (name, info) => {
         const ref = doc(collection(db, "brands"));
         const brand = { id: ref.id, name, ref };
@@ -1132,7 +1132,7 @@ async function saveImportedProducts(records, brandRecords, fileName, memory) {
         const cosmeticType = clean(record.cosmeticType, 60);
         if (brandName.length < 2 || !name) { skippedInvalid++; return; }
         const scope = productScope(cosmeticType, name);
-        // skin care and other non-make-up records are FLAGGED and not saved (make-up only)
+
         if (scope === "out" || scope === "skincare") {
             flagged.push({ name, brandName, cosmeticType, saved: false, why: scope === "skincare" ? `skin care (${scopeWords(cosmeticType, name)})` : `not make-up (${scopeWords(cosmeticType, name)})` });
             return;
@@ -1152,7 +1152,7 @@ async function saveImportedProducts(records, brandRecords, fileName, memory) {
         const key = brand.id + "|" + compactName(name);
         const existing = everyProduct.find((item) => item.brandId === brand.id && [item.name, ...item.aliases].some((known) => compactName(known) === compactName(name)));
         if (plannedProducts.has(key) || existing) {
-            // an existing product with NO ingredient list: the imported list goes to the review queue (once)
+
             const queued = existing && ingredientSuggestions.some((s) => s.productId === existing.id);
             if (existing && !existing.binned && existing.ingredients.length === 0 && ingredients.length >= 3 && !queued) {
                 batch.set(doc(collection(db, "productIngredientSuggestions")), {
@@ -1186,7 +1186,7 @@ async function saveImportedProducts(records, brandRecords, fileName, memory) {
         savedProducts++;
     });
 
-    // records about a brand only: a NEW brand at most (an existing brand is never changed by an import)
+
     (Array.isArray(brandRecords) ? brandRecords : []).slice(0, IMPORT_GROUP).forEach((record) => {
         const name = clean(record.name, 60);
         if (name.length < 2) { skippedInvalid++; return; }
@@ -1201,30 +1201,30 @@ async function saveImportedProducts(records, brandRecords, fileName, memory) {
 }
 
 const productsOf = (brandId) => products.filter((p) => p.brandId === brandId);
-/** Skin care, hair, body, nail, fragrance and the like: not what GlowUp lists. */
+
 const isOut = (product) => notMakeup(product.cosmeticType, product.name);
-/** The rule cannot tell that it is make-up (or its kind is not decided yet): listed, but the app hides it. */
+
 const isUnclear = (product) => productScope(product.cosmeticType, product.name) === "unclear";
-/** A brand that is not a make-up brand and has nothing but such products (or none at all). */
+
 const brandOut = (brand) => categoryOutOfScope(brand.category) && productsOf(brand.id).every(isOut);
 const hasBrand = (product) => brands.some((b) => b.id === product.brandId);
 const brandOf = (product) => brands.find((b) => b.id === product.brandId) || null;
-/** The products the normal list shows: make-up (and what may be make-up) that is not in the bin. */
+
 const listed = () => products.filter((p) => !isOut(p));
 const outsideCount = () => products.filter(isOut).length + brands.filter(brandOut).length;
-/** Waiting for an admin: what the app or an import added, and products whose kind is not clear. */
+
 const waits = (p) => p.needsReview || isUnclear(p);
 const reviewCount = () => brands.filter((b) => b.needsReview && !brandOut(b)).length + listed().filter(waits).length;
-/** The brand or product a key of the organiser ("b:id" / "p:id") stands for, also when it is in the bin. */
+
 const itemOf = (key) => (key.startsWith("b:") ? everyBrand.find((b) => b.id === key.slice(2)) : everyProduct.find((p) => p.id === key.slice(2))) || null;
 
-/** "#c24b62", "C24B62" -> "#C24B62"; anything that is not a colour -> null. */
-/** "#C24B62", "c24b62", "#C46" or "rgb(194, 75, 98)" become "#C24B62"; anything else is null. */
+
+
 function cleanShade(value) {
     let text = String(value || "").trim().toUpperCase();
     const rgb = text.match(/^RGB\(\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*[, ]\s*(\d{1,3})\s*\)$/);
     if (rgb) return [1, 2, 3].every((i) => Number(rgb[i]) <= 255) ? "#" + [1, 2, 3].map((i) => Number(rgb[i]).toString(16).padStart(2, "0")).join("").toUpperCase() : null;
-    // a SHADE NUMBER is never taken for a colour ("#128", "128"): the same rule as normalShade in the Assist with AI server
+
     if (text && text[0] !== "#") {
         if (!/^[0-9A-F]{6}$/.test(text) || !/[A-F]/.test(text)) return null;
         text = "#" + text;
@@ -1236,16 +1236,16 @@ function cleanShade(value) {
     return /^#[0-9A-F]{6}$/.test(text) ? text : null;
 }
 
-/** The listed ingredients the Ingredient Curator has no entry for. */
+
 function notCurated(ingredientNames) {
     return curatorKnown ? ingredientNames.filter((n) => !curatedKeys.has(sameKey(n))) : [];
 }
 
-/**
- * What is wrong with a product BESIDES its status, for the small dot in front of its name: { tone, text } or null.
- * The status has its own badge in the row, so "waiting for review" is not said a second time here; and where the
- * brand's own row stands above the product (`brandShown`), the brand's status is not repeated either.
- */
+
+
+
+
+
 function attentionOf(p, brand, brandShown) {
     const notes = [];
     let tone = "";
@@ -1257,25 +1257,25 @@ function attentionOf(p, brand, brandShown) {
     if (!brand) { tone = tone || "warn"; notes.push("Its brand is gone."); }
     return notes.length > 0 ? { tone, text: notes.join(" ") } : null;
 }
-/** How much a product needs attention (for "Needs attention first"). */
+
 function weightOf(p) {
     return (isOut(p) ? 8 : 0) + (waits(p) ? 4 : 0) + (p.ingredients.length === 0 ? 2 : 0) + (brandOf(p) && brandOf(p).status === "Active" ? 0 : 1);
 }
 
-// ---------------------------------------------------------------------------------------------
-// The counts, the toolbar and the table
-// ---------------------------------------------------------------------------------------------
-/** The brand chosen in the toolbar (or null), and the folder that is open (or ""): every panel narrows to them. */
+
+
+
+
 const focusBrand = () => brands.find((b) => b.id === brandFilterValue()) || null;
 const focusFolder = () => (org && org.view.kind === "folder" ? org.view.name : "");
-/** True for a product inside what the page is narrowed to (the chosen brand and the open folder). */
+
 const inFocus = (p) => { const b = focusBrand(), f = focusFolder(); return (!b || p.brandId === b.id) && (!f || sameKey(p.folder) === sameKey(f)); };
 
 function paintStats() {
     const set = (id, value) => { const box = el(id); box.classList.remove("skeleton"); box.textContent = value; };
     const brand = focusBrand(), folder = focusFolder();
     const mine = listed().filter(inFocus);
-    // the count tiles follow the brand that is chosen and the folder that is open
+
     set("statBrands", brand ? 1 : folder ? new Set(mine.map((p) => p.brandId)).size : brands.filter((b) => !brandOut(b)).length);
     set("statProducts", mine.length);
     set("statReview", brand || folder ? mine.filter(waits).length + (brand && brand.needsReview ? 1 : 0) : reviewCount());
@@ -1293,11 +1293,11 @@ function paintStats() {
 function paintToolbar() {
     const inBin = org.view.kind === "bin";
     el("sortNow").textContent = sortNow().short;
-    // the dropdown always shows how the list is drawn (a search or a count tile sets it back to "every brand")
+
     const select = el("brandFilterSelect");
     if (select.value === "" && view.mode === "all") select.value = FLAT_LIST;
     if (select.value === FLAT_LIST && view.mode !== "all") select.value = "";
-    // the brand chosen in Filters ("Show") is said on a chip, because the dropdown that showed it is hidden now
+
     const brandChosen = brandFilterValue() ? brands.find((b) => b.id === brandFilterValue()) : null;
     el("inventoryQuick").innerHTML = (brandChosen && !inBin ? `<button type="button" class="filter-chip" data-clear="brand" data-tip="Showing one brand only. Click to show every brand again.">${escapeHtml(brandChosen.name || "Unnamed Brand")}${icon("x")}</button>` : "")
         + (quick && !inBin ? `<button type="button" class="filter-chip" data-clear="quick" data-tip="Showing only these products. Click to show all again.">${escapeHtml(QUICK[quick].label)}${icon("x")}</button>` : "")
@@ -1308,7 +1308,7 @@ function paintToolbar() {
         el("inventoryQuick").insertAdjacentHTML("afterbegin", `<button type="button" class="filter-chip" data-clear="drill" data-tip="${drill.kind === "brand" ? "Back to the list of brands." : "Back to the whole inventory."}">${drill.kind === "brand" ? icon("left") : ""}${label}${drill.kind === "brand" ? "" : icon("x")}</button>`);
         if (brand) el("inventoryQuick").insertAdjacentHTML("beforeend", `<span class="drill-name">${escapeHtml(brand.name || "Unnamed Brand")}</span>`);
     }
-    // a view has its own order (A to Z), so the Sort button has nothing to say there
+
     el("sortMenuBtn").hidden = !!drill && !inBin;
     el("filterNow").textContent = facetCount() > 0 ? " " + facetCount() : "";
     el("filterMenuBtn").classList.toggle("on", facetCount() > 0);
@@ -1323,7 +1323,7 @@ function renderInventory() {
     syncSearchUrl();
     org.refresh();
     refreshAssist();
-    // the data panels (lists, grids, graphs) follow the same brand and folder
+
     const focus = (focusBrand() ? focusBrand().id : "") + "|" + focusFolder();
     if (focus !== lastFocus) { lastFocus = focus; datasetChanged("products"); datasetChanged("brands"); }
 }
@@ -1332,7 +1332,7 @@ let lastFocus = "|";
 const pickBox = (label) => `<button type="button" class="pick" role="checkbox" aria-checked="false" aria-label="Select ${escapeHtml(label)}"></button>`;
 const pickAllBox = (what) => `<button type="button" class="pick" data-pick-all role="checkbox" aria-checked="false" aria-label="Select all shown" data-tip="Select every ${what} shown here."></button>`;
 
-/** The hint under the Barcode box: whether the digits are a valid barcode (check digit) and where its number was issued. */
+
 function showBarcodeCheck() {
     const note = el("productBarcodeCheck");
     if (!note) return;
@@ -1340,13 +1340,13 @@ function showBarcodeCheck() {
     note.textContent = text ? (barcodeKey(text) ? gs1Hint(text).text : "Not a barcode yet: 6 to 14 digits.") : "";
 }
 
-/** Under this width the list is drawn as cards whatever the switch says (the table needs about 640 px). */
+
 const NARROW_LIST_PX = 600;
 let listIsNarrow = false;
 
-/** Rows or Cards on the inventory list (the switch in its title line). */
+
 function paintLayout() {
-    // the Recycle bin keeps its table: cards are for products
+
     el("inventoryHost").classList.toggle("as-cards", (view.layout === "cards" || listIsNarrow) && !(org && org.view.kind === "bin"));
     el("inventoryLayoutSwitch").querySelectorAll("[data-layout]").forEach((button) => {
         const on = button.dataset.layout === view.layout;
@@ -1360,21 +1360,21 @@ function setPagers(state, total, noun) {
     renderPager(el("inventoryPagerTop"), state, total, renderInventory, noun);
 }
 
-// ---------------------------------------------------------------------------------------------
-// Search (Gmail style). The box searches EVERY listed product, on every page of the list: name, other names, brand, type,
-// barcode, description and ingredients; any letter case, parts of words. While you type (2+ letters) a drop-down offers Brands,
-// Products and Ingredients (5 each). The words are kept in the address (?q=), so Back and a reload keep the search.
-// ---------------------------------------------------------------------------------------------
-const SUGGEST_MAX = 5;
-let suggestItems = [];                      // the options in the drop-down: { kind, group, text, note?, brand?, product? }
-let suggestAt = -1;                         // the highlighted option, -1 = none
-let searchCount = null;                     // products found by the last search of the list (null = no search, or a view without a count)
-let nextPush = false;                       // the next address change is a step Back can return to (Enter, a suggestion, clear)
 
-/** The texts of a product the search looks in (ingredients are added by productMatches). */
+
+
+
+
+const SUGGEST_MAX = 5;
+let suggestItems = [];
+let suggestAt = -1;
+let searchCount = null;
+let nextPush = false;
+
+
 const productTexts = (p) => [p.name, ...p.aliases, p.cosmeticType, p.description, p.barcode, (brandOf(p) || {}).name || p.brandName];
 
-/** The ingredient that made a product match: the whole search first, then each word of it. "" when none. */
+
 function ingredientFor(p, typed) {
     const list = p.ingredients || [];
     const whole = list.find((name) => matchesSearch(typed, name));
@@ -1386,7 +1386,7 @@ function ingredientFor(p, typed) {
     return "";
 }
 
-/** "contains: niacinamide" on a row that was found only through its ingredients. */
+
 function containsNote(p) {
     const typed = el("inventorySearchInput").value;
     if (!sameKey(typed) || matchesSearch(typed, productTexts(p))) return "";
@@ -1394,17 +1394,17 @@ function containsNote(p) {
     return found ? `<span class="contains-note">contains: ${escapeHtml(found)}</span>` : "";
 }
 
-/** Keeps ?q= equal to the box. Typing replaces the address; Enter, a suggestion and clearing add a step for Back. */
+
 function syncSearchUrl() {
     const url = new URL(window.location.href), typed = el("inventorySearchInput").value.trim();
     if (typed) url.searchParams.set("q", typed); else url.searchParams.delete("q");
     const push = nextPush;
     nextPush = false;
     if (url.href === window.location.href) return;
-    try { window.history[push ? "pushState" : "replaceState"](null, "", url); } catch (error) { /* an address that cannot change: the search still works */ }
+    try { window.history[push ? "pushState" : "replaceState"](null, "", url); } catch (error) {                                                             }
 }
 
-/** "12 results for "blush"" with an X that clears the search. Hidden when nothing is searched. */
+
 function paintSearchStatus() {
     const status = el("inventorySearchStatus"), typed = el("inventorySearchInput").value.trim();
     const show = !!typed && searchCount !== null && org.view.kind !== "bin";
@@ -1432,7 +1432,7 @@ function paintSuggestActive() {
     if (suggestAt < 0) input.removeAttribute("aria-activedescendant");
 }
 
-/** The drop-down for what is typed: up to 5 brands, 5 products, 5 ingredients; "No results" when there are none. */
+
 function openSuggest() {
     const input = el("inventorySearchInput"), box = el("inventorySuggest"), typed = input.value.trim();
     if (sameKey(typed).length < 2) { closeSuggest(); return; }
@@ -1441,7 +1441,7 @@ function openSuggest() {
         .map((b) => ({ kind: "brand", group: "Brands", text: b.name, brand: b }));
     const foundProducts = listed.filter((p) => matchesSearch(typed, [p.name, ...p.aliases, p.cosmeticType, (brandOf(p) || {}).name || p.brandName])).slice(0, SUGGEST_MAX)
         .map((p) => ({ kind: "product", group: "Products", text: p.name || "Unnamed Product", note: (brandOf(p) || {}).name || p.brandName || "", product: p }));
-    const byIngredient = new Map();         // key -> { text, count }
+    const byIngredient = new Map();
     listed.forEach((p) => (p.ingredients || []).forEach((name) => {
         if (!matchesSearch(typed, name)) return;
         const key = sameKey(name), row = byIngredient.get(key) || { text: name, count: 0 };
@@ -1478,7 +1478,7 @@ function openSuggest() {
             name.textContent = item.text;
             row.appendChild(name);
             if (item.note) { const note = document.createElement("span"); note.className = "sug-note"; note.textContent = item.note; row.appendChild(note); }
-            row.addEventListener("mousedown", (event) => event.preventDefault());       // the box keeps the focus
+            row.addEventListener("mousedown", (event) => event.preventDefault());
             row.addEventListener("click", () => chooseSuggestion(at));
             box.appendChild(row);
         });
@@ -1487,7 +1487,7 @@ function openSuggest() {
     input.setAttribute("aria-expanded", "true");
 }
 
-/** A brand shows its products, an ingredient the products that contain it, a product opens (all by searching for it). */
+
 function chooseSuggestion(at) {
     const item = suggestItems[at];
     if (!item) return;
@@ -1506,7 +1506,7 @@ function wireSearchExtras() {
     input.setAttribute("aria-autocomplete", "list");
     input.setAttribute("aria-expanded", "false");
     input.setAttribute("aria-controls", "inventorySuggest");
-    // these run BEFORE the box's own Enter / Esc handling (wireSearch), so they are added first
+
     input.addEventListener("input", openSuggest);
     input.addEventListener("keydown", (event) => {
         const open = !box.hidden, count = suggestItems.length;
@@ -1521,7 +1521,7 @@ function wireSearchExtras() {
             closeSuggest();
             nextPush = true;
         } else if (event.key === "Escape") {
-            if (open) { event.stopImmediatePropagation(); closeSuggest(); }          // the first Esc closes the drop-down, the next one clears the box
+            if (open) { event.stopImmediatePropagation(); closeSuggest(); }
             else if (input.value) nextPush = true;
         }
     });
@@ -1535,7 +1535,7 @@ function wireSearchExtras() {
         fromFirstPage();
         input.focus();
     });
-    // "/" anywhere on the page jumps to the box, unless you are already typing in a field or a dialog is open
+
     document.addEventListener("keydown", (event) => {
         if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
         const target = event.target;
@@ -1545,7 +1545,7 @@ function wireSearchExtras() {
         input.focus();
         input.select();
     });
-    // Back / Forward: the box follows the address
+
     window.addEventListener("popstate", () => {
         input.value = new URLSearchParams(window.location.search).get("q") || "";
         el("inventorySearchClear").hidden = input.value.length === 0;
@@ -1559,9 +1559,9 @@ function renderList(now) {
     searchCount = null;
     const body = el("inventoryTableBody");
     const typed = el("inventorySearchInput").value;
-    const term = sameKey(typed);                            // "" when nothing is searched for
+    const term = sameKey(typed);
     const brandFilter = brandFilterValue();
-    const show = el("reviewFilterSelect").value;            // "" | "review" | "out"
+    const show = el("reviewFilterSelect").value;
     const folder = now.kind === "folder" ? now.name : "";
     const flat = view.mode === "all";
     const columns = flat ? 7 : 6;
@@ -1577,8 +1577,8 @@ function renderList(now) {
 
     const base = (p) => (show === "out" ? isOut(p) : !isOut(p)) && (!folder || sameKey(p.folder) === sameKey(folder))
         && (show !== "review" || waits(p)) && (!quick || QUICK[quick].test(p)) && facetOk(p);
-    // Search: any letter case, with or without accents and punctuation, parts of words, several words in any order.
-    // A product is also found by its other names, its kind, its barcode, its brand ("maybelline lipstick") and its ingredients.
+
+
     const productMatches = (p) => matchesSearch(typed, [...productTexts(p), ...(p.ingredients || [])]);
     const brandMatches = (b) => !!b && matchesSearch(typed, [b.name, ...b.aliases, b.category, b.market]);
     paintBrandPageSize();
@@ -1596,15 +1596,15 @@ function renderList(now) {
         el("inventoryCountLine").textContent = list.length === 0 ? "" : many(list.length, "product", "products") + (folder ? ` in "${folder}"` : "");
         setPagers(flatPage, list.length, "products");
     } else {
-        const groups = [];                                  // one per brand: { id, head, rows[] }
+        const groups = [];
         sortedBrands().forEach((brand) => {
             if (brandFilter && brand.id !== brandFilter) return;
             const out = brandOut(brand);
-            if (show === "out" ? false : out) return;                                  // such a brand only shows under "Not make-up or face"
+            if (show === "out" ? false : out) return;
             const mine = productsOf(brand.id);
             const hit = !term || brandMatches(brand);
             const rows = mine.filter((p) => base(p) && (hit || productMatches(p))).sort(order);
-            // does the brand itself belong in this view, also without a product to show?
+
             const belongs = show === "out" ? out : show === "review" ? brand.needsReview : !folder && !quick;
             if (rows.length === 0 && !(belongs && hit)) return;
             const lines = rows.map((p) => productRow(p, brand, false));
@@ -1613,7 +1613,7 @@ function renderList(now) {
             groups.push({ id: brand.id, head: brandRow(brand, mine.length, columns), rows: lines });
         });
 
-        // products that point to a brand that was deleted outside this page
+
         const orphans = products.filter((p) => !hasBrand(p) && base(p) && (!term || productMatches(p))).sort(order);
         if (orphans.length > 0 && !brandFilter) {
             productsShown += orphans.length;
@@ -1627,11 +1627,11 @@ function renderList(now) {
         shownGroups = groups;
         searchCount = term ? productsShown : null;
         paginate(groups, pageState).forEach((group) => {
-            const folded = !term && closed.has(group.id);           // a search always shows what it found
+            const folded = !term && closed.has(group.id);
             html.push(folded ? group.head.replace('class="brand-row', 'class="brand-row closed') : group.head);
             if (folded) return;
             const limit = moreShown.get(group.id) || PRODUCTS_AT_A_TIME;
-            group.rows.slice(0, limit).forEach((row) => html.push(row));        // one entry per product (its open details come with it)
+            group.rows.slice(0, limit).forEach((row) => html.push(row));
             const left = group.rows.length - limit;
             if (left > 0) html.push(`<tr class="more-row"><td colspan="${columns}"><button type="button" class="row-btn" data-act="more" data-brand="${escapeHtml(group.id)}">${icon("down")}Show ${Math.min(PRODUCTS_AT_A_TIME, left)} more (${left} left)</button></td></tr>`);
         });
@@ -1648,7 +1648,7 @@ function renderList(now) {
     body.innerHTML = html.length > 0 ? html.join("") : `<tr><td colspan="${columns}" class="table-message">${nothing}</td></tr>`;
 }
 
-/** The size box beside the pager: only for one brand with more than 10 products. It keeps its value when it is hidden. */
+
 function paintBrandPageSize() {
     const select = el("brandPageSize");
     const count = drill && drill.kind === "brand" && org.view.kind !== "bin" ? productsOf(drill.id).filter((p) => !isOut(p)).length : 0;
@@ -1656,7 +1656,7 @@ function paintBrandPageSize() {
     select.value = String(brandPage.size);
 }
 
-/** The views the two count tiles open. Search and Filters still narrow them; "base" is the same test as in the normal list. */
+
 function renderDrill({ base, productMatches, brandMatches, term, typed }) {
     const body = el("inventoryTableBody"), head = el("inventoryTableHead");
     shownGroups = [];
@@ -1689,13 +1689,13 @@ function renderDrill({ base, productMatches, brandMatches, term, typed }) {
     const groups = groupByType(products.filter((p) => base(p) && (!term || productMatches(p))));
     const total = groups.reduce((sum, group) => sum + group.rows.length, 0);
     el("inventoryCountLine").textContent = many(total, "product", "products");
-    setPagers(flatPage, 0, "products");                     // this view is one long list: no pager
+    setPagers(flatPage, 0, "products");
     if (total === 0) { nothing(7, term ? `Nothing here matches "${escapeHtml(typed)}".` : "Nothing to show."); return; }
     body.innerHTML = groups.map((group) => `<tr class="type-row"><td colspan="7"><span class="type-name">${escapeHtml(group.label)}</span> <span class="muted small">${many(group.rows.length, "product", "products")}</span></td></tr>`
         + group.rows.map((p) => productRow(p, brandOf(p), true)).join("")).join("");
 }
 
-/** The brands in the order the Sort button asks for (the orders that only fit products keep the brands A to Z). */
+
 function sortedBrands() {
     const list = brands.slice();
     const needs = (b) => (b.needsReview ? 2 : 0) + (productsOf(b.id).some((p) => weightOf(p) > 0) ? 1 : 0);
@@ -1706,7 +1706,7 @@ function sortedBrands() {
     return list;
 }
 
-/** A small button with only an icon; pointing at it says what it does. */
+
 const actionButton = (classes, act, id, iconHtml, title, tip, preview) =>
     `<button type="button" class="icon-btn small ${classes}" data-act="${act}" data-id="${escapeHtml(id)}" aria-label="${escapeHtml(title)}" data-tip-title="${escapeHtml(title)}" data-tip="${escapeHtml(tip)}"${preview ? ` data-tip-preview="${escapeHtml(preview)}"` : ""}>${iconHtml}</button>`;
 const rowActions = (buttons) => `<div class="btn-group row-actions">${buttons.join("")}</div>`;
@@ -1761,10 +1761,10 @@ function productRow(p, brand, flat) {
         </tr>` + (open ? detailRow(p, brand, flat ? 7 : 6) : "");
 }
 
-/**
- * The status of a product as the app sees it (productVisibility: the app's own rule). A product that is not Active keeps its
- * status badge; an Active one says whether the app really shows it.
- */
+
+
+
+
 function productStatusCell(p, brand) {
     const { live, reason } = productVisibility(p, brand);
     if (live) return toneBadge("Live", "ok", "The app shows this product.");
@@ -1776,7 +1776,7 @@ function productStatusCell(p, brand) {
 }
 const BRAND_HINT = "Approve the brand too so users can see this product.";
 
-/** Everything else about a product: shown under its row when the row is clicked. */
+
 function detailRow(p, brand, columns) {
     const scope = productScope(p.cosmeticType, p.name);
     const kind = scope === "makeup" ? "Make-up. The app checks it and offers AR Try-On."
@@ -1831,10 +1831,10 @@ function toggleDetails(productId) {
     if (openId) { const row = el("inventoryTableBody").querySelector(`tr.product-row[data-product="${CSS.escape(openId)}"]`); if (row) row.focus({ preventScroll: true }); }
 }
 
-// ---------------------------------------------------------------------------------------------
-// The Recycle bin
-// ---------------------------------------------------------------------------------------------
-/** What the bin lists: every brand in it, and every product that did not go there together with its brand. */
+
+
+
+
 function binEntries() {
     const brandIds = new Set(binBrands.map((b) => b.id));
     const entries = binBrands.map((b) => ({ key: "b:" + b.id, item: b, brand: true, riders: binProducts.filter((p) => p.binnedWith === b.id).length }));
@@ -1874,7 +1874,7 @@ function renderBin() {
     }).join("");
 }
 
-/** Updates and deletes, in batches the database accepts. ops = [{ ref, data }] (no data = delete). */
+
 async function runBatches(ops) {
     for (let i = 0; i < ops.length; i += BATCH_LIMIT) {
         const batch = writeBatch(db);
@@ -1882,7 +1882,7 @@ async function runBatches(ops) {
         await batch.commit();
     }
 }
-/** Saves what the page already shows. When the database refuses, the page shows what is really there again. */
+
 async function saveOrReload(ops) {
     try { await runBatches(ops); }
     catch (error) {
@@ -1898,7 +1898,7 @@ const split = (keys) => {
 };
 const named = (items, one, more) => (items.length === 1 ? `"${items[0].name || "Unnamed"}"` : many(items.length, one, more));
 
-/** Puts products (or all products of a brand) into a folder. folder "" takes them out. */
+
 async function moveToFolder(keys, folder) {
     const { p, b } = split(keys);
     const wanted = new Map(p.filter((x) => !x.binned).map((x) => [x.id, x]));
@@ -1907,13 +1907,13 @@ async function moveToFolder(keys, folder) {
     if (list.length === 0) throw friendly(wanted.size === 0 ? "That brand has no products to move." : folder ? `Already in "${folder}".` : "Not in a folder.");
     const before = list.map((x) => ({ item: x, folder: x.folder }));
     const write = (changes) => saveOrReload(changes.map((c) => ({ ref: doc(db, "products", c.item.id), data: { folder: c.folder, updatedAt: serverTimestamp() } })));
-    list.forEach((x) => { x.folder = folder; });                 // shown at once; the database follows
+    list.forEach((x) => { x.folder = folder; });
     afterChange();
     await write(list.map((x) => ({ item: x, folder })));
     return { text: named(list, "product", "products"), undo: async () => { before.forEach((c) => { c.item.folder = c.folder; }); afterChange(); await write(before); } };
 }
 
-/** A folder gets another name, or (to = "") is taken off everything that is in it. */
+
 async function refolder(from, to) {
     const list = everyProduct.filter((x) => sameKey(x.folder) === sameKey(from));
     list.forEach((x) => { x.folder = to; });
@@ -1921,7 +1921,7 @@ async function refolder(from, to) {
     await saveOrReload(list.map((x) => ({ ref: doc(db, "products", x.id), data: { folder: to, updatedAt: serverTimestamp() } })));
 }
 
-/** Moves products and brands (a brand with its products) to the Recycle bin: the app stops using them at once. */
+
 async function moveToBin(keys) {
     const { p, b } = split(keys);
     const goneBrands = new Set(b.map((x) => x.id));
@@ -1946,7 +1946,7 @@ async function moveToBin(keys) {
     return { text: parts.join(" and "), undo: () => restoreFromBin(keys) };
 }
 
-/** Brings entries back from the Recycle bin with the status they had. A product never comes back without its brand. */
+
 async function restoreFromBin(keys, folder) {
     const { p, b } = split(keys);
     const ops = [], seen = new Set();
@@ -1975,7 +1975,7 @@ async function restoreFromBin(keys, folder) {
     return { text: parts.join(" and ") };
 }
 
-/** "Delete forever": asks with the list of names, then deletes the documents. Resolves true when it was done. */
+
 async function purgeFromBin(keys) {
     const { p, b } = split(keys);
     const refs = new Map(), names = [];
@@ -1985,7 +1985,7 @@ async function purgeFromBin(keys) {
         riders.forEach((x) => refs.set("products/" + x.id, doc(db, "products", x.id)));
     });
     p.filter((x) => x.binned).forEach((x) => { if (!refs.has("products/" + x.id)) { names.push(`${x.brandName ? x.brandName + ": " : ""}${x.name || "Unnamed product"}`); refs.set("products/" + x.id, doc(db, "products", x.id)); } });
-    b.filter((brand) => brand.binned).forEach((brand) => refs.set("brands/" + brand.id, doc(db, "brands", brand.id)));       // the brands themselves go last
+    b.filter((brand) => brand.binned).forEach((brand) => refs.set("brands/" + brand.id, doc(db, "brands", brand.id)));
     if (refs.size === 0) return false;
     if (!(await askConfirm({
         title: `Delete forever: ${many(names.length, "entry", "entries")}?`,
@@ -2003,10 +2003,10 @@ async function purgeFromBin(keys) {
     return true;
 }
 
-// ---------------------------------------------------------------------------------------------
-// Make-up and face products only
-// ---------------------------------------------------------------------------------------------
-/** The line under the type box of the product form: what the app will do with a product of this kind. */
+
+
+
+
 function showScopeHint() {
     const hint = el("productScopeHint");
     const type = el("productTypeInput").value === OTHER_TYPE ? el("productTypeOtherInput").value : el("productTypeInput").value;
@@ -2018,7 +2018,7 @@ function showScopeHint() {
     hint.className = scope === "makeup" ? "field-hint" : "field-hint warn";
 }
 
-/** Moves every listed product that is not make-up, and the brands that are left without anything else, to the Recycle bin. */
+
 async function removeOutOfScope() {
     const gone = products.filter(isOut);
     const goneIds = new Set(gone.map((p) => p.id));
@@ -2045,14 +2045,14 @@ async function removeOutOfScope() {
     }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Writing a list of changes (from "Clean up", "Find duplicates" and "Remove what is not make-up")
-// ---------------------------------------------------------------------------------------------
-/**
- * Writes changes as glowupCatalog.js describes them: { collection: "brands" | "products", docId, action: "bin" | "update",
- * fields, reason }. "bin" moves the entry to the Recycle bin exactly as dragging it there does (it is switched off for
- * the app and keeps the status it had, for Restore), and notes why. Nothing is deleted. The page then loads its data again.
- */
+
+
+
+
+
+
+
+
 async function applyChanges(changes) {
     const find = (change) => (change.collection === "brands" ? everyBrand : everyProduct).find((item) => item.id === change.docId);
     const ops = [];
@@ -2070,13 +2070,13 @@ async function applyChanges(changes) {
     });
     if (ops.length === 0) return 0;
     try { await runBatches(ops); }
-    finally { await loadInventory(); }           // also after a failure: the page then shows what is really there
+    finally { await loadInventory(); }
     return ops.length;
 }
 
-// ---------------------------------------------------------------------------------------------
-// Clean up, and Find duplicates (the lists come from ../_Shared/glowupCatalog.js, the dialogs from adminCleanup.js)
-// ---------------------------------------------------------------------------------------------
+
+
+
 const CLEANUP_STEPS = ["notMakeup", "notMakeupCheck", "brands", "brandDuplicates", "productDuplicates", "types", "names"];
 
 function openCleanUp() {
@@ -2158,19 +2158,19 @@ function openDuplicates(startWith) {
     });
 }
 
-// ---------------------------------------------------------------------------------------------
-// The FDA Philippines catalogue: make-up gathered from the FDA's public Verification Portal
-// (https://verification.fda.gov.ph), kept in ../_Shared/data/fdaCatalogue.json. Each entry carries its
-// notification number and, where Open Beauty Facts has it, its ingredient list. Nothing is added
-// until the admin confirms; what is in the inventory already (also in the Recycle bin) is left alone.
-// ---------------------------------------------------------------------------------------------
+
+
+
+
+
+
 const slug = (text) => sameKey(text).replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 80);
 
-/**
- * The catalogue was made smaller (fewer brands, more of them with an ingredient list). What an earlier, bigger catalogue added
- * and is no longer in the file goes to the Recycle bin, together with brands that are left without products. Only entries that
- * came from the FDA list, have no ingredient list and were never scanned are touched; they can be restored from the bin.
- */
+
+
+
+
+
 async function trimFdaCatalogue() {
     let catalogue;
     try {
@@ -2200,21 +2200,21 @@ async function importFdaCatalogue(byItself) {
         if (!answer.ok) throw new Error("the catalogue file was not found");
         catalogue = await answer.json();
     } catch (error) { if (!byItself) notify("The catalogue could not be read. " + error.message, "error"); return; }
-    // make-up only. An entry whose kind is not clear is added too when an admin asks for the catalogue (as Pending, to be
-    // looked at); the automatic pass leaves it out.
+
+
     const scopeOfEntry = (e) => productScope(e.type, e.name);
     const entries = (Array.isArray(catalogue.products) ? catalogue.products : []).filter((e) => e && e.name && e.brand && e.type
         && (scopeOfEntry(e) === "makeup" || (!byItself && scopeOfEntry(e) === "unclear")));
 
-    // brands: the ones already listed are used (also under another spelling they are known by), the others are added.
-    // A listed brand wins over one that is in the Recycle bin.
+
+
     const brandIdOf = new Map();
-    // (the last one set wins: first what is in the bin, then imported entries, then the ones typed or approved here)
+
     const standing = (b) => (b.binned ? 0 : b.source && !b.reviewed ? 1 : b.source ? 2 : 3);
     everyBrand.slice().sort((a, b) => standing(a) - standing(b)).forEach((b) => [b.name, ...b.aliases].forEach((known) => { if (compactName(known)) brandIdOf.set(compactName(known), b.id); }));
     const newBrands = new Map();
-    // what is there already, also in the Recycle bin, under any of its names and with or without the brand in front:
-    // a product the clean-up renamed or merged must not come back as a new one
+
+
     const keyOf = (brand, name) => compactName(brand) + "|" + compactName(nameWithoutBrand(name, brand));
     const have = new Set();
     everyProduct.forEach((p) => [p.name, ...p.aliases].forEach((known) => { have.add(keyOf(brandNameOf(p), known)); have.add(keyOf(p.brandName, known)); }));
@@ -2225,9 +2225,9 @@ async function importFdaCatalogue(byItself) {
         if (!brandIdOf.has(compactName(e.brand)) && !newBrands.has(compactName(e.brand))) newBrands.set(compactName(e.brand), { id: "fda_" + slug(e.brand), name: e.brand });
         fresh.push(e);
     });
-    // A product that is in the inventory already but still has NO ingredient list gets the list the catalogue file now
-    // has for it. Only products that came from this list and that nobody has given a list: nothing an admin typed, an
-    // import approved or a scan read is ever overwritten.
+
+
+
     const listed = new Map();
     everyProduct.forEach((p) => { if (!p.binned) [p.name, ...p.aliases].forEach((known) => { listed.set(keyOf(brandNameOf(p), known), p); listed.set(keyOf(p.brandName, known), p); }); });
     const fills = [];
@@ -2255,7 +2255,7 @@ async function importFdaCatalogue(byItself) {
         });
         fresh.forEach((e) => {
             const note = `FDA Philippines: notified as "${e.fdaName || e.name}" (${e.fdaNumber})` + (e.company ? `, by ${e.company}` : "") + "." + (e.validUntil ? ` Valid until ${e.validUntil}.` : "") + (e.note ? " " + e.note : "");
-            const clear = scopeOfEntry(e) === "makeup";          // a kind that is not clear waits as Pending for an admin
+            const clear = scopeOfEntry(e) === "makeup";
             sets.push({
                 ref: doc(db, "products", "fda_" + slug(e.fdaNumber || e.brand + "_" + e.name)),
                 data: {
@@ -2265,7 +2265,7 @@ async function importFdaCatalogue(byItself) {
                 }
             });
         });
-        // the lists for products that had none: only the list and where it came from are written, the rest of the entry stays
+
         fills.forEach((f) => sets.push({
             ref: doc(db, "products", f.product.id), update: true,
             data: { ingredients: f.entry.ingredients.slice(0, 80), sources: f.product.sources.concat(f.entry.ingredientSource && !f.product.sources.includes(f.entry.ingredientSource) ? [f.entry.ingredientSource] : []) }
@@ -2286,9 +2286,9 @@ async function importFdaCatalogue(byItself) {
     await loadInventory();
 }
 
-// ---------------------------------------------------------------------------------------------
-// Brand form
-// ---------------------------------------------------------------------------------------------
+
+
+
 function openBrandForm(brand) {
     const form = el("addBrandForm");
     form.reset();
@@ -2323,7 +2323,7 @@ async function saveBrand(event) {
     if (imageUrl === null) { setFormError(form, "The picture link must be a web address that starts with https://"); el("brandImageInput").focus(); return; }
     if (!name) { setFormError(form, "Type the brand name."); el("brandNameInput").focus(); return; }
     if (name.length < 2) { setFormError(form, "The brand name is too short."); el("brandNameInput").focus(); return; }
-    // the same brand written another way ("L'Oreal" / "LOREAL", an accent, a space) is the same brand
+
     const duplicate = everyBrand.find((b) => b.id !== editingBrandId && [b.name, ...b.aliases].some((known) => compactName(known) === compactName(name)));
     if (duplicate) { setFormError(form, duplicate.binned ? `"${duplicate.name}" is in the Recycle bin. Restore it from there instead.` : `"${duplicate.name}" is already in the inventory.`); el("brandNameInput").focus(); return; }
     setFormError(form, "");
@@ -2335,9 +2335,9 @@ async function saveBrand(event) {
             const renamed = before && before.name !== name;
             const mine = renamed ? everyProduct.filter((p) => p.brandId === editingBrandId) : [];
 
-            // the brand and (when it was renamed) the brand name stored on each of its products, together
+
             const brandData = { name, category: BRAND_CATEGORY, market, status, logoUrl, imageUrl, ...websiteFields(website, before), updatedAt: serverTimestamp() };
-            if (before && before.needsReview) { brandData.reviewed = true; brandData.reviewedAt = serverTimestamp(); }     // an admin who opens it and saves has checked it
+            if (before && before.needsReview) { brandData.reviewed = true; brandData.reviewedAt = serverTimestamp(); }
             const writes = [{ ref: doc(db, "brands", editingBrandId), data: brandData }];
             mine.forEach((p) => writes.push({ ref: doc(db, "products", p.id), data: { brandName: name, updatedAt: serverTimestamp() } }));
             await runBatches(writes);
@@ -2356,11 +2356,11 @@ async function saveBrand(event) {
     }
 }
 
-/**
- * The "Official website" box of the Brand form. The confirmed address is the only one whose pages are labelled
- * "Manufacturer's own site" (here, in the app and in Assist with AI). A suggestion from Assist with AI or an import is
- * shown with a "Use this address" button; the barcodes of the brand's products are shown with their GS1 hints.
- */
+
+
+
+
+
 function paintWebsiteBox(brand) {
     const input = el("brandWebsiteInput"), confirm = el("brandWebsiteConfirm"), state = el("brandWebsiteState"), hints = el("brandWebsiteHints");
     input.value = brand ? brand.website : "";
@@ -2378,7 +2378,7 @@ function paintWebsiteBox(brand) {
         : "";
 }
 
-/** The website typed in the box: "" (none), the address, or null after showing what is wrong (not https, or not confirmed). */
+
 function websiteFromForm(form) {
     const input = el("brandWebsiteInput");
     const value = cleanLink(input.value);
@@ -2392,7 +2392,7 @@ function websiteFromForm(form) {
     return value;
 }
 
-/** The website fields to save: a new or changed address records who confirmed it and when; a cleared one removes both. */
+
 function websiteFields(website, before) {
     const old = before ? before.website : "";
     if (website === old) return {};
@@ -2400,12 +2400,12 @@ function websiteFields(website, before) {
     return { website, websiteConfirmedBy: auth.currentUser ? auth.currentUser.uid : "", websiteConfirmedAt: serverTimestamp() };
 }
 
-/** True for an address with no user name and no backslash (the same "plain address" the source labels require). */
+
 function plainLink(url) {
     try { const parsed = new URL(url); return !parsed.username && !parsed.password && !url.includes(String.fromCharCode(92)); } catch (error) { return false; }
 }
 
-/** A barcode's GS1 hint and a button that opens Verified by GS1 (the barcode is copied first, to paste there). */
+
 function gs1Line(barcode) {
     const hint = gs1Hint(barcode);
     if (!hint.text) return "";
@@ -2413,7 +2413,7 @@ function gs1Line(barcode) {
         + (hint.valid ? ` <button type="button" class="row-btn" data-gs1="${escapeHtml(String(barcode).replace(/[^0-9]/g, ""))}" data-tip="Copies the barcode and opens GS1's free search page (about 30 searches a day). Paste it there to see which company licenses it.">Check on Verified by GS1</button>` : "");
 }
 
-/** The two buttons above, wherever they are on the page. */
+
 function wireWebsiteAndGs1Buttons() {
     document.addEventListener("click", async (event) => {
         const use = event.target.closest("[data-website-use]");
@@ -2428,10 +2428,10 @@ function wireWebsiteAndGs1Buttons() {
     }, true);
 }
 
-// ---------------------------------------------------------------------------------------------
-// Product form
-// ---------------------------------------------------------------------------------------------
-/** product = null for a new one; brandId = the brand a new product starts with. */
+
+
+
+
 function openProductForm(product, brandId) {
     const form = el("productForm");
     form.reset();
@@ -2478,7 +2478,7 @@ function openProductForm(product, brandId) {
     if (brands.length === 0) setFormError(form, "There are no brands yet. Close this, add a brand first, then add the brand's products.");
 }
 
-/** The blue note at the top of a form that is open on an entry nobody has checked yet. */
+
 function showReviewNote(note, entry, kind) {
     if (!entry || !entry.needsReview) { note.textContent = ""; note.style.display = "none"; return; }
     const origin = originLabel(entry.source) || "Added automatically";
@@ -2527,7 +2527,7 @@ function showIngredientSummary() {
     hint.className = missing.length > 0 ? "field-hint warn" : "field-hint";
 }
 
-/** The newest products as a CSV file (capped at EXPORT_MAX_ROWS; built from the loaded list, so it costs no reads). */
+
 function exportProductsCsv() {
     const newest = listed().slice().sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
     const columns = [
@@ -2540,8 +2540,8 @@ function exportProductsCsv() {
     notify(`${Math.min(EXPORT_MAX_ROWS, newest.length)} products saved to a file.${newest.length > EXPORT_MAX_ROWS ? " The export holds the newest " + EXPORT_MAX_ROWS + " only." : ""}`, "ok");
 }
 
-// ----- ingredients picked in the product form -----
-/** A new ingredient made from the product form: saved in the library at once, so the next product finds it too. */
+
+
 async function createIngredientFromPicker(fields) {
     const data = {
         name: fields.name, description: fields.description, aliases: fields.aliases || [], classificationId: "", purpose: "",
@@ -2560,14 +2560,14 @@ async function createIngredientFromPicker(fields) {
     return entry;
 }
 
-/** The library entry of a name as written on a product ("" when the library does not have it). */
+
 function libraryIdOf(name) {
     const key = sameKey(name);
     const found = curatedList.find((entry) => [entry.name, entry.techName, ...entry.aliases].some((n) => sameKey(n) === key));
     return found ? found.id : "";
 }
 
-/** Words a product can be found by (kept on the product itself): its kind, its brand and a few facts. */
+
 function productTags(product) {
     const slug = (text) => String(text || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30);
     const tags = [slug(product.cosmeticType), slug(product.brandName)];
@@ -2577,15 +2577,15 @@ function productTags(product) {
     return Array.from(new Set(tags.filter(Boolean))).slice(0, MAX_TAGS);
 }
 
-/** A web address typed into a form: "" when empty, null when it is not an https address, else the clean address. */
+
 function cleanLink(value) {
     const text = String(value || "").trim();
     if (!text) return "";
     try { const url = new URL(text); return url.protocol === "https:" && text.length <= 300 ? url.href : null; } catch (error) { return null; }
 }
 
-/** The FDA Philippines page of a product, from its sources ("FDA Philippines verification | https://...") */
-/** An FDA registration (notification) number: letters, digits and . , # ( ) _ - / and single spaces, at most 40 characters; "" when empty, null when it is not one. */
+
+
 function cleanFdaNumber(value) {
     const text = String(value == null ? "" : value).replace(/\s+/g, " ").trim();
     if (text === "") return "";
@@ -2597,11 +2597,11 @@ const fdaLinkOf = (sources) => {
     return entry ? (entry.split("|").pop() || "").trim() : "";
 };
 
-// ----- shades -----
-// Each shade is "#RRGGBB" (the app and AR Try-On read them in this order) and may have its SHADE CODE, the number or letters the brand
-// prints on the pack ("119", "N20", "12A"). The app reads that code from the pack and finds the colour with it. The admin adds one by
-// typing a hex code or picking a colour (nothing is added by itself), edits one by its picker, its hex or its code, moves it earlier or
-// later (the code goes with it), or removes it.
+
+
+
+
+
 let shadeAdding = false, shadeMessage = "", shadeDraft = "#C24B62", shadeNearOk = "";
 
 function renderShadeEditor() {
@@ -2627,7 +2627,7 @@ function renderShadeEditor() {
     } else if (formShades.length < MAX_SHADES) tail = `<button type="button" class="row-btn" id="addShadeBtn">${icon("plus")}Shade</button>`;
     else tail = `<span class="field-hint">A product can have up to ${MAX_SHADES} shades.</span>`;
     const note = shadeMessage ? `<span class="field-hint shade-msg" role="alert">${escapeHtml(shadeMessage)}</span>` : "";
-    // many shades: a box that scrolls up and down, so the form stays short; the add box stays below it
+
     const strip = formShades.length >= SHADE_STRIP_FROM;
     el("productShadeEditor").innerHTML = (strip ? `<div class="shade-strip" role="group" aria-label="${formShades.length} shades, scroll to see them all">${items}</div><span class="field-hint">${formShades.length} shades. Scroll the list to see them all.</span>` : items) + tail + note;
     if (strip && shadeAdding) { const row = el("productShadeEditor").querySelector(".shade-strip"); if (row) row.scrollTop = row.scrollHeight; }
@@ -2642,7 +2642,7 @@ function addShadeFromDraft() {
     if (code && formShadeCodes.some((other) => other === code)) { shadeMessage = "Code " + code + " belongs to another shade of this product already."; renderShadeEditor(); return; }
     if (formShades.includes(shade)) { shadeMessage = shade + " is in the list already."; renderShadeEditor(); return; }
     if (formShades.length >= MAX_SHADES) return;
-    // a colour that is almost one already in the list: said once, and the same colour again means "add anyway"
+
     const near = nearShade(formShades, shade);
     if (near && shadeNearOk !== shade) { shadeNearOk = shade; shadeMessage = shade + " looks almost like " + near + ", which is in the list. Press Add again to add it anyway."; renderShadeEditor(); return; }
     shadeNearOk = "";
@@ -2673,7 +2673,7 @@ function onShadeClick(event) {
     renderShadeEditor();
 }
 
-/** A colour picked with the colour box: the code and the swatch follow, without a full re-draw (the picker stays open). */
+
 function onShadeInput(event) {
     const input = event.target;
     if (input.classList.contains("shade-picker")) {
@@ -2694,7 +2694,7 @@ function onShadeInput(event) {
     }
 }
 
-/** A code typed into an existing shade: kept when it is a colour, put back (with a note) when it is not. */
+
 function onShadeChange(event) {
     const input = event.target;
     if (input.classList.contains("shade-code") && input.id !== "newShadeCode") { onShadeCodeChange(input); return; }
@@ -2708,7 +2708,7 @@ function onShadeChange(event) {
     renderShadeEditor();
 }
 
-/** A shade code typed into an existing shade: kept when it is a code (or empty), put back with a note when it is not or another shade has it. */
+
 function onShadeCodeChange(input) {
     const index = Number(input.getAttribute("data-index"));
     if (!(index >= 0 && index < formShades.length)) return;
@@ -2725,7 +2725,7 @@ function onShadeKey(event) {
     if (event.target.id === "newShadeHex" || event.target.id === "newShadeCode") addShadeFromDraft(); else event.target.blur();
 }
 
-// ----- saving -----
+
 async function saveProduct(event) {
     event.preventDefault();
     const form = el("productForm");
@@ -2762,15 +2762,15 @@ async function saveProduct(event) {
     if (duplicate) { setFormError(form, duplicate.binned ? `"${duplicate.name}" of ${brand.name} is in the Recycle bin. Restore it from there instead.` : `${brand.name} already has a product named "${duplicate.name}".`); el("productNameInput").focus(); return; }
     setFormError(form, "");
 
-    // the FDA page lives in the sources, as "FDA Philippines verification | https://..." (the convention of the import and of the scan)
-    const sources = assistedProductSources.slice();          // links already kept (also an FDA page) stay as they are
+
+    const sources = assistedProductSources.slice();
     const notes = ingredientPicker ? ingredientPicker.getNotes() : [];
     const data = {
         name, brandId: brand.id, brandName: brand.name, cosmeticType, description,
         ingredients, shades, minAge, status, imageUrl, fdaNumber, barcode,
-        // the codes printed on the pack, at the same places as the shades: the app reads a code on a scanned pack and finds the colour (ShadeCode.cs)
+
         shadeCodes: shadeCodes.some(Boolean) ? shadeCodes : [],
-        // light summaries kept on the product so that nothing needs a join: the links to the library, how many, and the words a filter uses
+
         ingredientIds: Array.from(new Set(ingredients.map(libraryIdOf).filter(Boolean))),
         ingredientCount: ingredients.length,
         ingredientNotes: notes.map((n) => ({ name: n.name, id: libraryIdOf(n.name), caution: n.caution, percent: n.percent })),
@@ -2779,15 +2779,15 @@ async function saveProduct(event) {
     };
     if (sources.length > 0 || editingProductId) data.sources = Array.from(new Set(sources)).slice(0, 10);
     const before = products.find((p) => p.id === editingProductId);
-    if (before && before.needsReview) { data.reviewed = true; data.reviewedAt = serverTimestamp(); }     // an admin who opens it and saves has checked it
+    if (before && before.needsReview) { data.reviewed = true; data.reviewedAt = serverTimestamp(); }
 
     setBusy(saveButton, true, "Saving...");
     try {
         if (editingProductId) {
-            await updateDoc(doc(db, "products", editingProductId), data);           // "scans" and the folder are left as they are
+            await updateDoc(doc(db, "products", editingProductId), data);
             notify("Product saved.", "ok");
         } else {
-            const folder = org.view.kind === "folder" ? org.view.name : "";          // added while a folder is open: it goes into that folder
+            const folder = org.view.kind === "folder" ? org.view.name : "";
             const made = await addDoc(collection(db, "products"), { ...data, scans: 0, folder, createdAt: serverTimestamp() });
             notify(folder ? `Product added to "${folder}".` : "Product added.", "ok");
         }
@@ -2801,10 +2801,10 @@ async function saveProduct(event) {
     }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Approving what the app added by itself (from a scan) or what came from a data import
-// ---------------------------------------------------------------------------------------------
-// reviewedBy = the admin account that pressed Approve (who verified it); an automatic approval has none
+
+
+
+
 const approval = () => ({ status: "Active", reviewed: true, reviewedBy: auth.currentUser ? auth.currentUser.uid : "", reviewedAt: serverTimestamp(), updatedAt: serverTimestamp() });
 
 async function approveBrand(brand, button) {
@@ -2814,7 +2814,7 @@ async function approveBrand(brand, button) {
     if (!(await sure(question, "Approve", false))) return;
 
     button.disabled = true;
-    // the badge changes at once; if the write fails, the old state comes back
+
     const before = { status: brand.status, rawStatus: brand.rawStatus, reviewed: brand.reviewed, needsReview: brand.needsReview };
     Object.assign(brand, { status: "Active", rawStatus: "Active", reviewed: true, needsReview: false });
     afterChange();
@@ -2835,7 +2835,7 @@ async function approveProduct(product, button) {
     if (!brand) { notify(`"${product.name}" has no brand. Open it with Edit, choose its brand and save.`, "error"); return; }
     if (product.ingredients.length === 0) { notify(`"${product.name}" has no ingredient list, so the app cannot check it. Open it with Edit and paste the list.`, "error"); return; }
 
-    // a product and its brand are approved separately: approving one never approves the other
+
     let question = `Approve "${product.name}"?\n\nIt becomes Active: the app can recognise it in scans and recommend it to the users it suits. Check its name, type and ingredient list first.`;
     if (brand.status !== "Active") question += `\n\nIts brand "${brand.name}" is ${brand.status} and is NOT approved by this. The app hides the product until the brand is approved too.`;
     if (!(await sure(question, "Approve", false))) return;
@@ -2854,12 +2854,12 @@ async function approveProduct(product, button) {
     }
 }
 
-/**
- * What the one-button approval of a product row can do: approve the product AND its brand, or only the brand of a product that is
- * Active already. The app uses a product only while its brand is Active too, so a product whose brand still waits stays invisible
- * ("Approved · Hidden (brand pending)"): the app then says the product is not in the catalogue, ingredient list or not. null = nothing
- * to offer (the plain Approve button, or no button).
- */
+
+
+
+
+
+
 function approvalFor(p, brand) {
     if (!brand || isOut(p) || isUnclear(p) || brandOut(brand) || brand.status !== "Pending") return null;
     if (p.needsReview) return { product: true, brand: true, label: "Approve with brand", tip: `You have checked this product and its brand "${brand.name}": set both to Active.` };
@@ -2867,7 +2867,7 @@ function approvalFor(p, brand) {
     return null;
 }
 
-/** The product and its brand become Active together (one write: both or none). */
+
 async function approveWithBrand(product, button) {
     const brand = brands.find((b) => b.id === product.brandId);
     const plan = brand ? approvalFor(product, brand) : null;
@@ -2898,9 +2898,9 @@ async function approveWithBrand(product, button) {
     }
 }
 
-// ---------------------------------------------------------------------------------------------
-// Clicks in the table
-// ---------------------------------------------------------------------------------------------
+
+
+
 function toggleBrand(id) {
     if (closed.has(id)) closed.delete(id); else closed.add(id);
     renderInventory();
@@ -2908,15 +2908,15 @@ function toggleBrand(id) {
 
 function onTableClick(event) {
     const button = event.target.closest("button");
-    // the list of brands: a click on a brand opens its products (its own buttons keep working)
+
     if (drill && drill.kind === "brands" && org.view.kind !== "bin") {
         const row = event.target.closest("tr.brand-row");
         if (row && (!button || button.dataset.act === "toggle")) { openDrill({ kind: "brand", id: row.dataset.brand }); return; }
     }
-    // one brand's view: its heading stays open
+
     if (drill && drill.kind === "brand" && event.target.closest("tr.brand-row") && (!button || button.dataset.act === "toggle")) return;
     if (!button) {
-        // a click on a row itself: a product shows (or hides) its details, a brand opens or closes
+
         if (event.target.closest("a, .detail-box")) return;
         const productRowEl = event.target.closest("tr.product-row"), brandRowEl = event.target.closest("tr.brand-row");
         if (productRowEl) toggleDetails(productRowEl.dataset.product);
@@ -2942,7 +2942,7 @@ function onTableClick(event) {
     else if (act === "bin-product" && product) org.toBin(["p:" + product.id]);
 }
 
-/** A double click on a product opens it to be edited. */
+
 function onTableDoubleClick(event) {
     if (event.target.closest("button, a, .detail-box")) return;
     const row = event.target.closest("tr.product-row");
@@ -2950,13 +2950,13 @@ function onTableDoubleClick(event) {
     if (product) openProductForm(product, null);
 }
 
-// ---------------------------------------------------------------------------------------------
-// Helpers: the line in each panel that says what needs attention (see adminAssist.js)
-// ---------------------------------------------------------------------------------------------
+
+
+
 function registerHelpers() {
     const ready = () => everyBrand.length + everyProduct.length > 0;
     const setQuick = (name) => { quick = quick === name ? "" : name; el("reviewFilterSelect").value = ""; el("inventorySearchInput").value = ""; el("brandFilterSelect").value = ""; if (org.view.kind !== "all") org.show({ kind: "all" }); else fromFirstPage(); };
-    /** The button of a line that narrows the list: "Show", or "Show all" while the list is narrowed to it already. */
+
     const showLabel = (on) => (on ? "Show all" : "Show");
     const reviewing = () => el("reviewFilterSelect").value === "review";
 
@@ -2967,7 +2967,7 @@ function registerHelpers() {
         if (out > 0) lines.push({ tone: "bad", text: `${many(out, "entry is", "entries are")} not make-up. GlowUp lists make-up only.`, label: "Clean up", run: openCleanUp, tip: "You see every entry with the reason, and apply one step at a time. Nothing is deleted." });
         if (review > 0) lines.push({ tone: "info", text: `Next: ${many(review, "entry waits", "entries wait")} for your review. The app does not use ${review === 1 ? "it" : "them"} until you approve ${review === 1 ? "it" : "them"}.`, label: reviewing() ? "Show all" : "Show them", run: () => reviewing() ? resetAllFilters() : showOnly("review") });
         if (lines.length === 0) lines.push({ tone: "ok", text: "Everything listed is make-up and has been checked." });
-        // the brands that were checked on the FDA Philippines list
+
         const checked = brands.filter((b) => b.source === "fdaph" || productsOf(b.id).some(QUICK.fda.test));
         const onList = listed().filter(QUICK.fda.test).length;
         if (onList > 0) lines.push({ tone: "ok", text: `${many(onList, "product", "products")} of ${many(checked.length, "brand", "brands")} are on the FDA Philippines list: ${checked.slice(0, 8).map((b) => b.name).join(", ")}${checked.length > 8 ? ` and ${checked.length - 8} more` : ""}.`, label: quick === "fda" ? "Show all" : "Show them", run: () => setQuick("fda") });
@@ -3013,16 +3013,16 @@ function registerHelpers() {
     }, { notes: "notesList" });
 }
 
-// ---------------------------------------------------------------------------------------------
-// The data this page offers to data panels (lists, rows, grids and graphs; see adminWidgets.js)
-// ---------------------------------------------------------------------------------------------
+
+
+
 function registerData() {
     const SCOPE_NAMES = { makeup: "Make-up", unclear: "Kind not clear", skincare: "Skin care (not listed)", out: "Hair, body, nail, fragrance (not listed)" };
     const toneOfStatus = (status) => (status === "Active" ? "ok" : status === "Pending" ? "warn" : "muted");
-    /** A click on a group in a graph narrows the table to it. */
+
     const search = (text) => { el("reviewFilterSelect").value = ""; el("brandFilterSelect").value = ""; el("inventorySearchInput").value = text; quick = ""; if (org.view.kind !== "all") org.show({ kind: "all" }); else fromFirstPage(); };
 
-    /** A click on a brand in a graph or list chooses it in the toolbar: the table, the counts and the other data panels follow. */
+
     const chooseBrand = (name) => {
         const brand = brands.find((b) => sameKey(b.name) === sameKey(name));
         el("reviewFilterSelect").value = ""; el("inventorySearchInput").value = ""; quick = "";
@@ -3030,7 +3030,7 @@ function registerData() {
         if (org.view.kind === "bin") org.show({ kind: "all" }); else fromFirstPage();
     };
 
-    // "Show as" for the counts panel and the AI ingredient suggestions (12 November 2026)
+
     registerTileDataset("inventoryCounts", {
         label: "Counts", noun: "counts", nounOne: "count", valueNoun: "Number", selector: ".stat-row .stat", watch: ".stat-row",
         map: (tile) => ({ title: ((tile.querySelector(".stat-title") || {}).textContent || tile.getAttribute("data-tip-title") || "").trim(), value: parseFloat(((tile.querySelector(".stat-value") || {}).textContent || "0").replace(/[^\d.]/g, "")) || 0, tone: "info" }),
@@ -3046,7 +3046,7 @@ function registerData() {
 
     registerDataset("products", {
         label: "Products", noun: "products", nounOne: "product",
-        items: () => products.filter(inFocus),                  // the brand that is chosen and the folder that is open narrow the data panels too
+        items: () => products.filter(inFocus),
         map: (p) => ({
             id: p.id, title: p.name || "Unnamed Product", subtitle: [p.brandName, p.cosmeticType].filter((t) => t).join(" · "), meta: p.needsReview ? "needs review" : p.status,
             tone: isOut(p) ? "bad" : isUnclear(p) ? "warn" : p.needsReview ? "info" : toneOfStatus(p.status), value: p.scans, valueLabel: p.scans === 1 ? "scan" : "scans", swatches: p.shades
@@ -3062,7 +3062,7 @@ function registerData() {
         ],
         measures: [{ id: "scans", label: "Scans", noun: "scans", of: (p) => p.scans }],
         open: (p) => openProductForm(p, null),
-        // a tile that is removed goes to the Recycle bin (it can be restored there)
+
         bin: (rows) => org.toBin(rows.map((p) => "p:" + p.id))
     });
 

@@ -1,5 +1,5 @@
-// Admin login. Signs in with Firebase Authentication, then opens the dashboard.
-import "../_Shared/quietConsole.js";                 // first: no debug output on the live site
+
+import "../_Shared/quietConsole.js";
 import { auth } from "../_Database/firebase-console.js";
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { DASHBOARD_PAGE, REQUIRE_ADMIN_RECORD, isAdmin } from "../_Shared/adminCommon.js";
@@ -10,8 +10,8 @@ console.log("GlowUp Admin Login Portal Initialized.");
 const NOT_ADMIN = "This account is not an admin account.";
 
 document.addEventListener("DOMContentLoaded", () => {
-    hydrate(document);                                           // icons, guide badge, the tile animation on the button
-    mountThemeToggle(document.getElementById("loginTools"));     // dark / light, upper right
+    hydrate(document);
+    mountThemeToggle(document.getElementById("loginTools"));
     const loginForm = document.getElementById("login-form");
     const usernameInput = document.getElementById("username");
     const passwordInput = document.getElementById("password");
@@ -19,7 +19,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const message = document.getElementById("loginMessage");
     let signingIn = false;
 
-    // the eye in the password box: shows what was typed, and hides it again. The password is hidden again when the form is sent.
+
     const eye = document.getElementById("passwordEye");
     const showPassword = (show) => {
         passwordInput.type = show ? "text" : "password";
@@ -32,9 +32,9 @@ document.addEventListener("DOMContentLoaded", () => {
         loginForm.addEventListener("submit", () => showPassword(false));
     }
 
-    // When the form is sent, the dots in the password box suddenly become a long row, so someone looking over the shoulder cannot count
-    // the characters. Only a picture is laid over the box: the real value stays in the input (password managers and sign-in read it).
-    // The long row goes away as soon as the box is used again (typing, or the eye).
+
+
+
     const passwordBox = passwordInput.parentElement;
     let lengthCover = null;
     const hideLengthCover = () => { if (lengthCover) { lengthCover.remove(); lengthCover = null; passwordBox.classList.remove("length-hidden"); } };
@@ -54,7 +54,7 @@ document.addEventListener("DOMContentLoaded", () => {
     passwordInput.addEventListener("input", hideLengthCover);
     if (eye) eye.addEventListener("click", hideLengthCover);
 
-    // a message goes away by itself after 1.5 seconds (the "signed out" note passes its own time, 2 seconds)
+
     let messageTimer = 0;
     function say(text, seconds = 1.5) {
         window.clearTimeout(messageTimer);
@@ -73,21 +73,25 @@ document.addEventListener("DOMContentLoaded", () => {
         setButton(usernameInput.value.trim() !== "" && passwordInput.value !== "", "Log in");
     }
 
-    usernameInput.addEventListener("input", validateForm);
+    // Clearing the email also clears the password, so a typed password never stays behind for the next person.
+    usernameInput.addEventListener("input", () => {
+        if (usernameInput.value === "" && passwordInput.value !== "") { passwordInput.value = ""; hideLengthCover(); showPassword(false); }
+        validateForm();
+    });
     passwordInput.addEventListener("input", validateForm);
     validateForm();
 
-    // sent back here by an admin page because the account is not in the admins list
+
     if (new URLSearchParams(window.location.search).get("denied")) say(NOT_ADMIN);
     if (new URLSearchParams(window.location.search).get("idle")) {
-        // the "signed out" note goes by itself after 7 seconds (9 November 2026), unless another message has replaced it meanwhile
+
         const idleNote = "You were signed out after 30 minutes without activity. Sign in again to continue.";
         say(idleNote, 2);
-        // the address loses "?idle=1", so a reload does not show the note again
-        try { history.replaceState(null, "", window.location.pathname + window.location.hash); } catch (error) { /* keep the address */ }
+
+        try { history.replaceState(null, "", window.location.pathname + window.location.hash); } catch (error) {                        }
     }
 
-    // already signed in (for example the page was reopened): go straight to the dashboard
+
     onAuthStateChanged(auth, async (user) => {
         if (!user || signingIn) return;
         if (REQUIRE_ADMIN_RECORD && !(await isAdmin(user))) { await signOut(auth); return; }
@@ -123,7 +127,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
-/** A sign-in error in plain words. */
+
 function explain(error) {
     const code = error && error.code ? String(error.code) : "";
     if (code === "glowup/not-admin") return NOT_ADMIN;

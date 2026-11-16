@@ -1,27 +1,27 @@
-// QUICK SETTINGS: the gear at the far right of the header, on every admin page (like Gmail's quick settings).
-//
-// Like Gmail's quick settings: the header stays whole with the gear at its far right. A click on the gear slides ONE panel in from
-// the right edge, UNDER the header and NEXT to the page (the page content gets narrower, nothing is covered). A second click, the X
-// or Esc slides it out again and the page is full width again. Focus moves into the panel on open and back to the gear on close.
-// On a window of 900 px or less there is no room: the panel covers the page (a click outside closes it there), and under 600 px
-// it is full width. It always starts closed on a new page. The GlowUp logo is a plain badge (pageFrame.js): no click, no count.
-//
-// The panel is built on its FIRST OPEN, not at page load. Only an empty, hidden holder for the Layout & Style controls exists
-// before that (adminLayouts.js builds them into #layoutHost at start; the first open moves them into the panel).
-//
-// Two views in the same panel (never a second one), so both have the same place, size and opening animation:
-//   Quick settings   - Layout and style, Recycle bin (red count), Appearance (Light / Dark / System), the page's own tools.
-//   Layout and style - the existing Layout & Style controls (adminLayouts.js builds them into #layoutHost); a back arrow in the
-//                      title bar returns to Quick settings.
-// adminLayouts.js talks to it with two events: "glowup:settings-close" (arranging hides the panel) and "glowup:layout-view"
-// (the Layout and style view was shown: paint it).
-//
-// What used to be behind the "..." on Inventory and the Curator (Clean up, Find duplicates ...) is listed in the Quick settings view
-// under "This page" (setPageSettings); a page with nothing of its own has no such heading.
-//
-// THE RECYCLE BIN COUNT is shown ONLY inside the open panel (never on the gear, the logo, a title, a tooltip, an aria-label or a data
-// attribute). It is added up from the lists adminStore.js keeps in this browser, when the panel is opened or while it is open and a
-// list changes. It makes NO Firestore read or query. A list that is not kept is not counted.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import { keptBinnedCount, onListsRefreshed } from "./adminStore.js";
 import { themeChoice, setThemeChoice, icon, hydrate } from "./adminShell.js";
 import { paintShortcutsView } from "./shortcutsPanel.js";
@@ -30,22 +30,22 @@ export const BIN_PAGE = "../_Admin_Recycle_Bin/adminRecycleBin.html";
 const BIN_LISTS = ["ingredients", "brands", "products"];
 
 let win = null, button = null;
-let pageItems = null;                             // () => the page's own entries, in the form openMenu takes
-let view = "menu";                                // "menu" | "layout" | "shortcuts"
+let pageItems = null;
+let view = "menu";
 
 const el = (id) => document.getElementById(id);
 const isOpen = () => !!win && win.classList.contains("is-open");
 
-/** The entries removed, added up from the kept lists only. { n, unknown } (unknown = some list is not kept in this browser). */
+
 function binCount() {
     let n = 0, unknown = false;
     BIN_LISTS.forEach((name) => { const kept = keptBinnedCount(name); if (kept === null) unknown = true; else n += kept; });
     return { n, unknown };
 }
 
-// ---------------------------------------------------------------------------------------------
-// Open, close, views
-// ---------------------------------------------------------------------------------------------
+
+
+
 function show(next) {
     view = next;
     const host = el("layoutHost");
@@ -62,7 +62,7 @@ function show(next) {
     else document.dispatchEvent(new CustomEvent("glowup:layout-view"));
 }
 
-/** Builds the panel (once, on the first open). */
+
 function build() {
     win = document.createElement("aside");
     win.className = "settings-window";
@@ -81,14 +81,14 @@ function build() {
             <div class="sw-view keys-view" id="swKeysView" hidden></div>
         </div>`;
     document.body.appendChild(win);
-    // the dimmed backdrop of the narrow-window sheet (shown by CSS only under 1024 px); a press on it closes the panel
+
     const backdrop = document.createElement("div");
     backdrop.className = "sw-backdrop";
     backdrop.setAttribute("aria-hidden", "true");
     backdrop.addEventListener("click", closeSettingsWindow);
     document.body.appendChild(backdrop);
     const body = win.querySelector(".sw-body");
-    const host = el("layoutHost");                // built by adminLayouts.js into the holder; it moves in here
+    const host = el("layoutHost");
     if (host) { host.classList.add("sw-view", "layout-view"); host.hidden = true; body.appendChild(host); }
     const stash = el("layoutStash");
     if (stash) stash.remove();
@@ -100,13 +100,13 @@ function build() {
     hydrate(win);
 }
 
-const overlay = () => window.matchMedia("(max-width: 1023px)").matches;    // no room beside the page: a sheet over a dimmed backdrop
+const overlay = () => window.matchMedia("(max-width: 1023px)").matches;
 let hideTimer = 0;
 
-/**
- * The panel starts under the page header and left of the page's scroll bar: --qs-top is the header's height, --qs-sb the width of
- * the page's scroll bar (the header can take two lines on a narrow window).
- */
+
+
+
+
 function placeBelowHeader() {
     const bar = button && button.closest(".topbar"), page = document.querySelector("main.main-content"), root = document.documentElement.style;
     if (bar) root.setProperty("--qs-top", bar.offsetHeight + "px");
@@ -118,12 +118,16 @@ function openWindow() {
     if (!win) build();
     placeBelowHeader();
     clearTimeout(hideTimer);
-    win.classList.add("is-shown");                // its start place (off to the right) is @starting-style in adminSettingsMenu.css: no forced reflow
+    win.classList.add("is-shown");
     win.classList.add("is-open");
-    // one layer over the page at a time: the menu opened over the page (narrow windows) closes first
-    if (document.documentElement.classList.contains("sb-peek")) {
-        document.documentElement.classList.remove("sb-peek");
-        document.querySelectorAll("#sidebarToggle, #menuBtn").forEach((b) => b.setAttribute("aria-expanded", "false"));
+
+    if (document.documentElement.classList.contains("sb-mobile-open") || document.documentElement.classList.contains("sb-hover")) {
+        document.documentElement.classList.remove("sb-mobile-open", "sb-hover");
+        const menuButton = document.getElementById("menuBtn");
+        if (menuButton) {
+            menuButton.setAttribute("aria-expanded", "false");
+            menuButton.setAttribute("aria-label", "Open menu");
+        }
     }
     document.documentElement.classList.add("qs-open");
     button.setAttribute("aria-expanded", "true");
@@ -137,20 +141,20 @@ export function closeSettingsWindow() {
     win.classList.remove("is-open");
     document.documentElement.classList.remove("qs-open");
     button.setAttribute("aria-expanded", "false");
-    // it slides out first, then leaves the layout
+
     hideTimer = setTimeout(() => { if (!isOpen()) win.classList.remove("is-shown"); }, 320);
     if (hadFocus) button.focus({ preventScroll: true });
 }
 
-/** The page's own entries for the Quick settings view: a function that returns them as openMenu takes them, asked each time the view is drawn. */
+
 export function setPageSettings(items) {
     pageItems = items;
     if (isOpen() && view === "menu") renderMenu();
 }
 
-// ---------------------------------------------------------------------------------------------
-// The Quick settings view
-// ---------------------------------------------------------------------------------------------
+
+
+
 function item({ label, description, iconName, danger, checked, badge, disabled, run }) {
     const row = document.createElement("button");
     row.type = "button";
@@ -172,7 +176,7 @@ function item({ label, description, iconName, danger, checked, badge, disabled, 
 const heading = (text) => { const h = document.createElement("div"); h.className = "menu-heading"; h.textContent = text; return h; };
 const separator = () => { const s = document.createElement("div"); s.className = "menu-sep"; return s; };
 
-/** "This page": the entries that moved here from the page's "..." menu. Choosing one closes the panel, because a dialog or the list comes next. */
+
 function pageEntries() {
     const items = (pageItems ? pageItems() : []).filter((entry) => !entry.separator);
     if (items.length === 0) return [];
@@ -203,13 +207,13 @@ function renderMenu() {
     );
 }
 
-// ---------------------------------------------------------------------------------------------
-// Start
-// ---------------------------------------------------------------------------------------------
-/**
- * Adds the gear to the header's tools (once) and wires it. Called by adminShell.mountShell on every admin page, before adminLayouts
- * fills #layoutHost. `tools` = the header's .topbar-tools. Returns the gear. Nothing of the panel is built yet.
- */
+
+
+
+
+
+
+
 export function mountSettingsMenu(tools) {
     if (!tools) return null;
     if (button && tools.contains(button)) return button;
@@ -218,13 +222,13 @@ export function mountSettingsMenu(tools) {
     button.className = "icon-btn quick-gear";
     button.id = "quickSettingsBtn";
     button.setAttribute("aria-label", "Quick settings");
-    button.setAttribute("data-tip", "Quick settings");        // the site shows no hover label on controls (adminShell.js tipOf); the text is here for it
+    button.setAttribute("data-tip", "Quick settings");
     button.setAttribute("aria-haspopup", "dialog");
     button.setAttribute("aria-expanded", "false");
     button.innerHTML = icon("gear");
     tools.append(button);
 
-    // the holder for the Layout & Style controls until the panel exists (adminLayouts.js finds #layoutHost)
+
     if (!el("layoutHost")) {
         const stash = document.createElement("div");
         stash.id = "layoutStash";
@@ -233,25 +237,25 @@ export function mountSettingsMenu(tools) {
     }
 
     button.addEventListener("click", () => { if (isOpen()) closeSettingsWindow(); else openWindow(); });
-    // the panel is built while the browser has nothing else to do, so the first press only slides it in (building it inside the
-    // press made that one frame long)
+
+
     const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1200));
     idle(() => { if (!win) build(); }, { timeout: 3000 });
     document.addEventListener("glowup:settings-close", closeSettingsWindow);
-    // Esc closes it, unless a dialog, pop-up or menu has taken that key already (they stop it before it gets here)
+
     document.addEventListener("keydown", (event) => {
         if (event.key !== "Escape" || event.defaultPrevented || !isOpen()) return;
         if (document.querySelector(".modal-overlay[style*='flex'], .menu.show, .facet-panel")) return;
         closeSettingsWindow();
     });
-    // Beside the page the panel stays open while the page is used. Over the page (a small window) a click outside closes it;
-    // a dialog, menu or message opened from inside the panel is part of it.
+
+
     document.addEventListener("pointerdown", (event) => {
         if (!isOpen() || !overlay() || win.contains(event.target) || button.contains(event.target)) return;
         if (event.target.closest && event.target.closest(".modal-overlay, .menu, .info-pop, .toast, .facet-panel")) return;
         closeSettingsWindow();
     }, true);
-    // once per frame at most, after the resize has been laid out (never a size read inside the resize event itself)
+
     let placeQueued = 0;
     window.addEventListener("resize", () => { if (isOpen() && !placeQueued) placeQueued = requestAnimationFrame(() => { placeQueued = 0; placeBelowHeader(); }); }, { passive: true });
     document.addEventListener("glowup:theme", () => { if (isOpen() && view === "menu") renderMenu(); });

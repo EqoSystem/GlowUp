@@ -1,5 +1,5 @@
-// Browser check of the source link beside the Ingredient form's boxes and the Source Finder (10 November 2026).
-//   Run: node tests/responsive/sourceLinks.scenario.mjs        (SHOTS=<folder> also saves screenshots of the three sections at every size)
+
+
 import { launch, openPage } from "./harness.mjs";
 import fs from "node:fs";
 import path from "node:path";
@@ -32,7 +32,7 @@ async function overlaps(page) {
             if (!hit || !(n === hit || n.contains(hit) || hit.contains(n) || (hit.closest("label") && hit.closest("label").contains(n)))) out.push("covered " + (n.id || n.className));
             if (r.bottom > foot.top + 1 && r.top < foot.bottom) out.push("under footer " + (n.id || n.className));
         }
-        // counters stay inside their own row's hint line, left of the source column
+
         document.querySelectorAll(".has-src .counter").forEach((c) => {
             const row = c.closest(".field").getBoundingClientRect(), r = c.getBoundingClientRect(), box = c.closest(".field").querySelector("input, textarea").getBoundingClientRect();
             if (r.right > box.right + 1 || r.left < row.left - 1) out.push("counter outside its row " + c.id);
@@ -51,7 +51,7 @@ try {
         await page.waitForSelector("#addIngredientForm", { state: "visible" });
         await page.fill("#ingredientNameInput", "Glycerin");
         ok(await page.locator(".field.has-src").count() === 6, `${label}: six boxes have a source link`);
-        // layout: wide = source beside the box, top-aligned with it; narrow = under it, above the hint
+
         const geo = await page.evaluate(() => {
             const box = document.getElementById("ingredientPurposeInput").getBoundingClientRect(), src = document.getElementById("ingredientPurposeInputSource").getBoundingClientRect();
             const hint = document.querySelector("#ingredientPurposeInput ~ .hint-row").getBoundingClientRect();
@@ -61,11 +61,11 @@ try {
         else ok(geo.under, `${label}: narrow window - the source box is under the box and above the hint`);
         ok(Math.abs(geo.srcH - 40) < 1.5, `${label}: the source box is 40 px high`);
         ok(await page.evaluate(() => document.getElementById("ingredientDescInputSource").getBoundingClientRect().height < 45), `${label}: beside a text area it stays one line (not stretched)`);
-        // the header chip
+
         ok(/Sources: 0 of 0 fields/.test(await page.textContent("#ingredientSourceCount")), `${label}: header chip: no box has a value yet`);
         let problems = await overlaps(page);
         ok(problems.length === 0, `${label}: nothing overlaps or hides (plain) ${problems.join(" ; ")}`);
-        // every kind of address, in every box
+
         const cases = [
             ["ingredientPurposeInput", "https://www.cir-safety.org/ingredient/glycerin", /Industry\/reference/, "valid CIR page"],
             ["ingredientDescInput", "https://www.google.com/search?q=glycerin", /search engine/, "Google search blocked"],
@@ -84,7 +84,7 @@ try {
         ok(await page.evaluate(() => ["ingredientDescInputSource", "ingredientAliasesInputSource", "ingredientUsesInputSource"].every((id) => document.getElementById(id).getAttribute("aria-invalid") === "true")
             && document.getElementById("ingredientPurposeInputSource").getAttribute("aria-invalid") === "false"), `${label}: the three blocked ones are marked, the good one is not`);
         ok(/Sources: 2 of \d fields/.test(await page.textContent("#ingredientSourceCount")), `${label}: the chip counts saved-able sources`);
-        // the finder, under the last row
+
         await page.locator("#ingredientUsesInputSource ~ .src-actions .src-find, .field:has(#ingredientUsesInput) .src-find").first().click();
         await page.waitForSelector(".src-finder:not([hidden])");
         ok(await page.evaluate(() => document.querySelector(".src-finder").closest(".field").contains(document.getElementById("ingredientUsesInput"))), `${label}: the finder opens in the page, under its own box`);
@@ -100,21 +100,21 @@ try {
                 await page.screenshot({ path: path.join(SHOTS, `${label}-${sec}.png`) });
             }
         }
-        // Esc closes the finder and gives the focus back
+
         await page.focus("#finderName");
         await page.keyboard.press("Escape");
         await page.waitForTimeout(150);
         ok(await page.locator(".src-finder:not([hidden])").count() === 0, `${label}: Esc closes the finder`);
         ok(await page.evaluate(() => document.activeElement && document.activeElement.classList.contains("src-find")), `${label}: and the focus is back on Find source`);
         ok(await page.evaluate(() => getComputedStyle(document.getElementById("addIngredientModal")).display !== "none"), `${label}: the window stays open`);
-        // a blocked address stops the save
+
         await page.click("#saveIngredientBtn");
         await page.waitForTimeout(250);
         ok(/source link|TEST|test copy/i.test(await page.textContent("#addIngredientForm .form-error")), `${label}: a blocked source link is reported on save`);
         ok(errors.filter((e) => !/404/.test(e)).length === 0, `${label}: no page errors ${errors.join("; ")}`);
         await page.context().close();
     }
-    // keyboard order in one row: box -> source -> Open -> Check link -> Find source
+
     {
         const { page, settle } = await openPage(browser, "cur", { width: 1200, height: 900 });
         await settle(400);
@@ -128,7 +128,7 @@ try {
         await page.keyboard.press("Enter");
         await page.waitForTimeout(200);
         ok(await page.locator(".src-finder:not([hidden])").count() === 1, "Enter on Find source opens the finder");
-        // the Find source button waits for a name
+
         await page.fill("#ingredientNameInput", "");
         ok(await page.locator(".field:has(#ingredientPurposeInput) .src-find").isDisabled(), "Find source is off without an INCI name");
         ok(/Enter the INCI name first/.test(await page.textContent(".field:has(#ingredientPurposeInput) .src-find-hint")), "and says why");

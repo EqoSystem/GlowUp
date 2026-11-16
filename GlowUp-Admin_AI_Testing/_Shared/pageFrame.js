@@ -1,20 +1,20 @@
-// THE PAGE FRAME, DRAWN AT ONCE.
-//
-// This small script (no imports, nothing to wait for) is the first thing inside <main> of every admin page. It builds
-// the real sidebar and the real top bar straight away, so the menu, the page's title and every fixed text of the
-// page are on screen with the first picture. Nothing fixed waits for the sign-in check or for data any more: only the
-// places where real data will appear show a loading shape (they are part of each page's own HTML).
-//
-//   - EVERY visit gets the frame at once (html.frame-first): the static shell (menu, title, panel headings, fixed
-//     labels) never waits for the sign-in check or for data. Only the data containers (counts, lists, tables) show a
-//     loading shape. The page cannot be used until the sign-in check has passed, and no data is asked for before that:
-//     the check itself is unchanged, and somebody who is not an admin is sent to the login page as before (the frame
-//     holds no data, only fixed text).
-//   - When the check does not answer within 10 seconds, a message with a "Try again" button shows instead of an
-//     endless loading screen.
-//   - Resting the pointer on a menu link fetches that page ahead, so it opens without a wait.
-//
-// adminShell.js (mountShell) takes this frame over: it adds the tools of the top bar and the movement of the menu.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 (function () {
     var script = document.currentScript;
     var main = script && script.parentElement && script.parentElement.tagName === "MAIN" ? script.parentElement : document.querySelector("main.main-content");
@@ -22,7 +22,7 @@
     var path = location.pathname;
     var page = path.indexOf("Inventory") >= 0 ? "inventory" : path.indexOf("Curator") >= 0 ? "curator" : path.indexOf("Recycle") >= 0 ? "bin" : path.indexOf("_Admin_Archive") >= 0 ? "archive" : "dashboard";
 
-    // the same drawings as in adminShell.js (ICONS): the frame cannot wait for that file
+
     var ICON = {
         logo: '<path d="M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"/>',
         dashboard: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
@@ -38,188 +38,134 @@
         { id: "dashboard", label: "Dashboard", icon: "dashboard", href: "../_Admin_Dashboard/adminDashboard.html" },
         { id: "inventory", label: "Brand & Product Inventory", icon: "box", href: "../_Admin_Brand_Inventory/adminBrandInventory.html" },
         { id: "curator", label: "Ingredient Curator", icon: "flask", href: "../_Admin_Ingredient_Curator/adminIngredientCurator.html" }
-        // (Pending Snapshot Reviews is a window inside Brand & Product Inventory since 22 October 2026, not a page of its own)
-        // (no menu entry for the Recycle Bin since 12 October 2026: the bin is opened INSIDE Brand & Product Inventory and
-        //  inside Ingredient Curator, each with its own "Recycle bin" chip; both read the same database)
+
+
+
     ];
-    // the menu can be folded to its icons; the choice is kept in this browser (and applied before the menu is drawn)
+
     var FOLD_KEY = "glowup.sidebar.folded";
-    // GMAIL-STYLE MENU (12 November 2026): the menu starts as the icon rail; hovering it opens it over the page, leaving it closes it again,
-    // and the menu button at its top (left of the logo) pins it open ("0" = pinned open, kept in this browser) or folds it back.
     var pinnedOpen = false;
-    try { pinnedOpen = localStorage.getItem(FOLD_KEY) === "0"; } catch (error) { /* a private window */ }
-    if (!pinnedOpen) root.classList.add("sb-collapsed");
-    // the width animates only from here on: a page that opens with the menu folded must not show it folding
+    try { pinnedOpen = localStorage.getItem(FOLD_KEY) === "0"; } catch (error) {                        }
+    root.classList.toggle("sb-pinned", pinnedOpen);
+    root.classList.toggle("sb-collapsed", !pinnedOpen);
     requestAnimationFrame(function () { requestAnimationFrame(function () { root.classList.add("sb-ready"); }); });
     var esc = function (value) { return String(value == null ? "" : value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); };
     var svg = function (name) { return '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">' + (ICON[name] || ICON.logo) + "</svg>"; };
 
-    /** Builds the sidebar and the top bar (once). */
+
     function build() {
         if (!main || document.querySelector("aside.sidebar")) return;
         document.body.classList.add("app");
         var sidebar = document.createElement("aside");
         sidebar.className = "sidebar";
-        // the logo and the name "Glow Up" are ONE link to the dashboard (like a site's home logo, 7 November 2026): a real <a href>,
-        // so a middle click or "open in new tab" works. It only opens a page; the dashboard runs its own sign-in check as always.
-        // The Quick settings gear is in the top bar (adminShell.js, adminSettingsMenu.js). Navigation labels fold away; the brand stays visible.
-        // The bottom holds the signed-in e-mail and Sign Out. adminCommon.js fills the e-mail
-        // in once the sign-in check has answered, and wires the button.
         sidebar.innerHTML =
-            '<div class="sidebar-brand"><button type="button" class="sb-menu-btn" id="sbMenuBtn" aria-controls="sidebarNav" aria-expanded="false" aria-label="Main menu">' + svg("menu") + '</button><a class="brand-home" href="' + NAV[0].href + '" aria-label="GlowUp – go to dashboard"><span class="brand-mark"><span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"></span></span><span class="brand-title label">Glow Up</span></a></div>' +
             '<ul class="nav-links" id="sidebarNav" aria-label="Pages"><li class="nav-drop" aria-hidden="true"></li>' +
             NAV.map(function (n) {
                 var here = n.id === page;
-                // the page you are on is marked on the link itself (and for screen readers), not by where the pointer is
-                return '<li><a href="' + n.href + '"' + (here ? ' class="active" aria-current="page"' : "") + ' aria-label="' + esc(n.label) + '">' + svg(n.icon) + '<span class="label">' + esc(n.label) + "</span></a></li>";
+
+                return '<li><a href="' + n.href + '"' + (here ? ' class="active" aria-current="page"' : "") + ' aria-label="' + esc(n.label) + '"><span class="nav-icon">' + svg(n.icon) + '</span><span class="label">' + esc(n.label) + "</span></a></li>";
             }).join("") +
             "</ul>" +
-            '<div class="sidebar-footer"><button type="button" class="sign-out" aria-label="Sign Out">' + svg("logout") + '<span class="label">Sign Out</span></button></div>';
+            '<div class="sidebar-footer"><button type="button" class="sign-out" aria-label="Sign Out"><span class="nav-icon">' + svg("logout") + '</span><span class="label">Sign Out</span></button></div>';
         document.body.insertBefore(sidebar, main);
 
-        // THE BUTTON THAT FOLDS THE MENU: an edge tab, half on the sidebar and half over its border line, below the last link. It is
-        // not inside the sidebar (the sidebar is a layer of its own, so the page would paint over the tab's outer half and the settings
-        // window would cover it) but right after it, so the keyboard reaches it after the links and before the page.
-        // Up to 1023 px wide the sidebar is always icons only: there the tab opens the whole menu over the page, and that is not kept.
-        (function watchResizing() {
-            if (window.__glowupResizing) return;
-            window.__glowupResizing = true;
-            var resizeTimer = 0;
-            window.addEventListener("resize", function () {
-                if (!resizeTimer) root.classList.add("resizing");
-                clearTimeout(resizeTimer);
-                resizeTimer = setTimeout(function () { root.classList.remove("resizing"); resizeTimer = 0; }, 150);
-            }, { passive: true });
-        })();
-
-        var toggle = document.createElement("button");
-        toggle.type = "button";
-        toggle.className = "sidebar-toggle";
-        toggle.id = "sidebarToggle";
-        toggle.setAttribute("aria-controls", "sidebarNav");
-        toggle.innerHTML = svg("chevron");
-        document.body.insertBefore(toggle, main);
-        var narrow = window.matchMedia("(max-width: 1023px)");
         var links = sidebar.querySelectorAll(".nav-links a");
-        var sbMenu = sidebar.querySelector("#sbMenuBtn");
-        var paintToggle = function () {
-            var open = narrow.matches ? root.classList.contains("sb-peek") : !root.classList.contains("sb-collapsed");
-            var text = open ? "Collapse sidebar" : "Expand sidebar";
-            toggle.setAttribute("aria-expanded", open ? "true" : "false");
-            toggle.setAttribute("aria-label", text);
-            if (sbMenu) { sbMenu.setAttribute("aria-expanded", open ? "true" : "false"); sbMenu.setAttribute("aria-label", open ? "Close the main menu" : "Open the main menu"); }
-        };
-        // lower-middle of the window, but always below the last link and never off the bottom (on a very short window the bottom wins:
-        // the tab stays reachable, and it is too narrow to reach the links beside it)
-        var placeToggle = function () {
-            var height = toggle.offsetHeight, room = window.innerHeight;
-            var wanted = Math.max(links[links.length - 1].getBoundingClientRect().bottom + 12, room * 0.58 - height / 2);
-            toggle.style.top = Math.round(Math.max(0, Math.min(wanted, room - height - 12))) + "px";
-        };
-        paintToggle();
-        placeToggle();
-        // folding and unfolding: the column width snaps (never animated: it is layout); the page slides from where it was with a
-        // transform (FLIP: --sb-shift = its old left minus its new left) and the labels fade in. Composited, 200 ms.
-        var slideTimer = 0;
-        // The distance is the change of the sidebar column (--sidebar-w), read from styles only: no layout is forced in the click.
-        var sidebarWidth = function () { return parseFloat(getComputedStyle(root).getPropertyValue("--sidebar-w")) || 0; };
-        var slidePage = function (change) {
-            var before = narrow.matches ? 0 : sidebarWidth();
-            change();
-            var shift = narrow.matches ? 0 : before - sidebarWidth();   // under 1024 px the menu opens over the page: it does not move
-            root.style.setProperty("--sb-shift", Math.round(shift) + "px");
-            root.classList.remove("sb-moving");
-            clearTimeout(slideTimer);
-            requestAnimationFrame(function () {       // a second click starts the animation again, one frame later, without a reflow
-                root.classList.add("sb-moving");
-                slideTimer = setTimeout(function () { root.classList.remove("sb-moving"); }, 240);
-            });
-        };
-        // the menu button: pins the menu open, or folds it back (the same as the old edge tab, which is hidden now)
-        var hoverTimer = 0, hoverPeek = false;
-        sbMenu.addEventListener("click", function () {
-            clearTimeout(hoverTimer);
-            if (narrow.matches && hoverPeek) { hoverPeek = false; return; }        // opened by the pointer: a click keeps it open
-            root.classList.remove("sb-hover");
-            toggle.click();
-        });
-        // hovering the rail opens the menu OVER the page (the page does not move); leaving it closes it. Mouse and pen only.
-        var canHover = window.matchMedia("(hover: hover)");
-        var hoverOpen = function () {
-            clearTimeout(hoverTimer);
-            if (!canHover.matches || window.innerWidth < 768) return;
-            if (narrow.matches) {
-                if (!root.classList.contains("sb-peek")) { root.classList.add("sb-peek"); hoverPeek = true; paintToggle(); }
-            } else if (root.classList.contains("sb-collapsed")) root.classList.add("sb-hover");
-        };
-        var hoverClose = function () {
-            clearTimeout(hoverTimer);
-            hoverTimer = setTimeout(function () {
-                root.classList.remove("sb-hover");
-                if (hoverPeek) { hoverPeek = false; root.classList.remove("sb-peek"); paintToggle(); }
-            }, 160);
-        };
-        sidebar.addEventListener("pointerenter", function (event) { if (event.pointerType !== "touch") hoverOpen(); });
-        sidebar.addEventListener("pointerleave", hoverClose);
-        toggle.addEventListener("click", function () {
-            slidePage(function () {
-                if (narrow.matches) root.classList.toggle("sb-peek");
-                else {
-                    var folded = root.classList.toggle("sb-collapsed");
-                    try { localStorage.setItem(FOLD_KEY, folded ? "1" : "0"); } catch (error) { /* not kept */ }
-                }
-            });
-            paintToggle();
-            placeToggle();
-        });
-        narrow.addEventListener("change", function () { root.classList.remove("sb-peek"); paintToggle(); });
-        // the tab's place is worked out after the browser has laid the page out (a ResizeObserver: the sidebar is as tall as the
-        // window), never inside a resize event, where reading sizes would force an extra layout at every step of a drag
-        if (window.ResizeObserver) {
-            var watcher = new ResizeObserver(placeToggle);
-            watcher.observe(sidebar);
-            Array.prototype.forEach.call(links, function (link) { watcher.observe(link); });
-        } else window.addEventListener("resize", placeToggle);
-
+        var heading = document.createElement("h1");
+        heading.className = "sr-only";
+        heading.textContent = main.getAttribute("data-title") || "";
+        main.insertBefore(heading, main.firstChild);
         var topbar = document.createElement("header");
         topbar.className = "topbar";
-        // the menu button only shows up to 600 px wide (adminCommon.css): there the sidebar is off the screen and this slides it in
         topbar.innerHTML =
-            '<button type="button" class="icon-btn menu-btn" id="menuBtn" aria-controls="sidebarNav" aria-expanded="false" aria-label="Open the menu">' + svg("menu") + "</button>" +
-            '<div class="topbar-titles"><h2 class="header-title">' + esc(main.getAttribute("data-title") || "") + "</h2></div>" +
-            '<div class="topbar-tools"></div>';
+            '<div class="topbar-leading"><button type="button" class="icon-btn menu-btn" id="menuBtn" aria-controls="sidebarNav" aria-expanded="' + (pinnedOpen ? "true" : "false") + '" aria-label="' + (pinnedOpen ? "Close menu" : "Open menu") + '">' + svg("menu") + "</button></div>" +
+            '<a class="brand-home" href="' + NAV[0].href + '" aria-label="GlowUp – go to dashboard"><span class="brand-mark"><span class="brand-logo"><img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async"></span></span><span class="brand-title">Glow Up</span></a>' +
+            '<div class="topbar-controls"><div class="topbar-tools"></div></div>';
         main.insertBefore(topbar, main.firstChild);
-        var menuBtn = topbar.querySelector("#menuBtn");
+        var menuBtn = topbar.querySelector("#menuBtn"), brand = topbar.querySelector(".brand-home"), hoverTimer = 0;
+        var mobileMenu = window.matchMedia("(max-width: 768px), (hover: none)");
+        var expanded = function () {
+            return mobileMenu.matches ? root.classList.contains("sb-mobile-open") : root.classList.contains("sb-pinned") || root.classList.contains("sb-hover");
+        };
         var paintMenuBtn = function () {
-            var open = root.classList.contains("sb-peek");
+            var open = expanded();
             menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
-            menuBtn.setAttribute("aria-label", open ? "Close the menu" : "Open the menu");
+            menuBtn.setAttribute("aria-label", open ? "Close menu" : "Open menu");
         };
-        var closePeek = function (focusBack) {
-            if (!root.classList.contains("sb-peek")) return;
-            root.classList.remove("sb-peek");
-            paintToggle(); paintMenuBtn(); placeToggle();
-            if (focusBack) focusBack.focus();
+        paintMenuBtn();
+        var closeMobileMenu = function (focusBack) {
+            if (!root.classList.contains("sb-mobile-open")) return;
+            root.classList.remove("sb-mobile-open");
+            paintMenuBtn();
+            if (focusBack) menuBtn.focus({ preventScroll: true });
         };
+        var updateHeaderLayout = function () {
+            root.style.setProperty("--header-h", Math.ceil(topbar.getBoundingClientRect().height) + "px");
+            root.style.setProperty("--brand-right", brand.getBoundingClientRect().right + "px");
+        };
+        updateHeaderLayout();
+        if (window.ResizeObserver) {
+            var headerObserver = new ResizeObserver(updateHeaderLayout);
+            headerObserver.observe(topbar);
+            headerObserver.observe(brand);
+        } else window.addEventListener("resize", updateHeaderLayout);
         menuBtn.addEventListener("click", function () {
-            root.classList.toggle("sb-peek");
-            paintToggle(); paintMenuBtn();
-            if (root.classList.contains("sb-peek")) { var here = sidebar.querySelector(".nav-links a.active") || links[0]; if (here) here.focus({ preventScroll: true }); }
+            if (mobileMenu.matches) {
+                root.classList.toggle("sb-mobile-open");
+                paintMenuBtn();
+                if (root.classList.contains("sb-mobile-open")) {
+                    var here = sidebar.querySelector(".nav-links a.active") || links[0];
+                    if (here) here.focus({ preventScroll: true });
+                }
+                return;
+            }
+            pinnedOpen = !root.classList.contains("sb-pinned");
+            root.classList.toggle("sb-pinned", pinnedOpen);
+            root.classList.toggle("sb-collapsed", !pinnedOpen);
+            root.classList.remove("sb-hover");
+            try { localStorage.setItem(FOLD_KEY, pinnedOpen ? "0" : "1"); } catch (error) {                }
+            paintMenuBtn();
         });
-        // the menu opened over the page (narrow windows) closes with Esc, or with a press anywhere outside it
+        var hoverOpen = function (event) {
+            if (mobileMenu.matches || !window.matchMedia("(hover: hover)").matches || event && event.pointerType === "touch" || root.classList.contains("sb-pinned")) return;
+            clearTimeout(hoverTimer);
+            root.classList.add("sb-hover");
+            paintMenuBtn();
+        };
+        var hoverClose = function (delay) {
+            clearTimeout(hoverTimer);
+            hoverTimer = setTimeout(function () {
+                if (sidebar.matches(":hover") || sidebar.matches(":focus-within") || root.classList.contains("sb-pinned")) return;
+                root.classList.remove("sb-hover");
+                paintMenuBtn();
+            }, delay);
+        };
+        sidebar.addEventListener("pointerenter", hoverOpen);
+        sidebar.addEventListener("pointerleave", function (event) { if (event.pointerType !== "touch") hoverClose(190); });
+        sidebar.addEventListener("focusin", hoverOpen);
+        sidebar.addEventListener("focusout", function () { hoverClose(0); });
+        links.forEach(function (link) {
+            link.addEventListener("click", function () { if (mobileMenu.matches) closeMobileMenu(false); });
+        });
         document.addEventListener("keydown", function (event) {
-            if (event.key !== "Escape" || !root.classList.contains("sb-peek")) return;
-            closePeek(window.matchMedia("(max-width: 767px)").matches ? menuBtn : toggle);
+            if (event.key !== "Escape") return;
+            if (root.classList.contains("sb-mobile-open")) { closeMobileMenu(true); return; }
+            if (!root.classList.contains("sb-pinned") && root.classList.contains("sb-hover")) {
+                root.classList.remove("sb-hover");
+                paintMenuBtn();
+                menuBtn.focus({ preventScroll: true });
+            }
         });
         document.addEventListener("pointerdown", function (event) {
-            if (!root.classList.contains("sb-peek")) return;
-            if (sidebar.contains(event.target) || toggle.contains(event.target) || menuBtn.contains(event.target)) return;
-            closePeek(null);
+            if (root.classList.contains("sb-mobile-open") && !sidebar.contains(event.target) && !menuBtn.contains(event.target)) closeMobileMenu(false);
         });
-        narrow.addEventListener("change", paintMenuBtn);
-        toggle.addEventListener("click", paintMenuBtn);
+        mobileMenu.addEventListener("change", function () {
+            root.classList.remove("sb-mobile-open", "sb-hover");
+            root.classList.toggle("sb-pinned", !mobileMenu.matches && pinnedOpen);
+            root.classList.toggle("sb-collapsed", mobileMenu.matches || !pinnedOpen);
+            paintMenuBtn();
+        });
 
-        // a page the pointer rests on is fetched ahead (its HTML and its script), so opening it does not wait for them
+
         var fetched = {};
         var ahead = function (link) {
             var href = link.getAttribute("href");
@@ -238,7 +184,7 @@
         });
     }
 
-    /** GlowUp's own loading mark, for the sign-in check of somebody this browser does not know yet. */
+
     function brandLoader() {
         var holder = document.createElement("div");
         holder.className = "brand-loader";
@@ -247,7 +193,7 @@
         document.body.insertBefore(holder, document.body.firstChild);
     }
 
-    /** The sign-in check did not answer: say so, and offer to try again (never an endless loading screen). */
+
     function stuck() {
         if (!root.classList.contains("auth-pending") || document.querySelector(".auth-stuck-box")) return;
         root.classList.add("auth-stuck");
@@ -262,10 +208,10 @@
         document.body.appendChild(box);
     }
 
-    // the static shell is drawn at once on every visit; only a page without a <main> (none today) falls back to the loading mark
+
     if (main) { root.classList.add("frame-first"); build(); }
     else brandLoader();
-    // never a page that stays empty: if the board was not arranged in 8 seconds (a script failed), it is shown as it is
+
     setTimeout(function () { root.classList.add("board-ready"); }, 8000);
     setTimeout(stuck, 10000);
 

@@ -1,6 +1,6 @@
-// Unit checks of the keyboard shortcuts' pure part (_Shared/shortcutKeys.js) and the catalogue (9 November 2026):
-// key normalisation, the one formatter, the reason codes A-H, scope matching, availability gating, defaults and orphans.
-// Run: node tests/shortcutKeys.test.mjs
+
+
+
 import * as K from "../_Shared/shortcutKeys.js";
 import { CATALOG, PAGES } from "../_Shared/shortcutCatalog.js";
 
@@ -12,7 +12,7 @@ const actions = Object.fromEntries(CATALOG.map((a) => [a.id, a]));
 const check = (keys, actionId, scope, shortcuts = [], browser = "Chrome", mac = false) => K.checkCombo({ keys, actionId, scope, shortcuts, actions, pages: PAGES, browser, mac });
 const codes = (list) => list.map((m) => m.code + ":" + m.level);
 
-// ---- normalisation ----
+
 eq(K.comboFromEvent(ev("KeyB", { ctrl: true, alt: true })).keys, "Ctrl+Alt+KeyB", "Ctrl+Alt+B");
 eq(K.comboFromEvent(ev("KeyB", { meta: true, alt: true })).keys, "Ctrl+Alt+KeyB", "Cmd counts as Ctrl");
 eq(K.comboFromEvent(ev("KeyB", { shift: true, alt: true, ctrl: true })).keys, "Ctrl+Alt+Shift+KeyB", "modifier order is fixed");
@@ -22,20 +22,20 @@ eq(K.normaliseCombo("Hyper+KeyZ"), null, "unknown modifier is refused");
 ok(K.isValidFormat("Ctrl+Alt+KeyB") && K.isValidFormat("Alt+Digit3") && K.isValidFormat("Ctrl+F5"), "valid formats");
 ok(!K.isValidFormat("KeyB") && !K.isValidFormat("Shift+KeyB") && !K.isValidFormat("Ctrl+Alt+ArrowUp") && !K.isValidFormat("Ctrl+Tab"), "invalid formats");
 
-// ---- the one formatter ----
+
 K.setLayoutMap(null);
 eq(K.comboText("Ctrl+Alt+KeyB", { mac: false }), "Ctrl+Alt+B", "Windows text");
 eq(K.comboText("Ctrl+Alt+Shift+KeyB", { mac: true }), "⌘⌥⇧B", "Mac text");
 eq(K.comboLabels("Ctrl+Alt+Digit1", { mac: false }), ["Ctrl", "Alt", "1"], "digit chips");
 eq(K.comboText("Ctrl+Slash", { mac: false }), "Ctrl+/", "punctuation");
 ok(!/Key|Digit/.test(K.comboText("Ctrl+Alt+KeyQ", { mac: false })), "never shows a raw code");
-K.setLayoutMap(new Map([["KeyY", "z"], ["KeyZ", "y"]]));      // a German keyboard: Y and Z change places
+K.setLayoutMap(new Map([["KeyY", "z"], ["KeyZ", "y"]]));
 eq(K.comboText("Ctrl+Alt+KeyY", { mac: false }), "Ctrl+Alt+Z", "the admin's own layout is used for the letter");
 K.setLayoutMap(null);
 eq(K.ariaKeys("Ctrl+Alt+KeyB", { mac: false }), "Control+Alt+B", "aria-keyshortcuts on Windows");
 eq(K.ariaKeys("Ctrl+Alt+KeyB", { mac: true }), "Meta+Alt+B", "aria-keyshortcuts on a Mac");
 
-// ---- A. IN_USE_SAME_PAGE ----
+
 const mine = [{ actionId: "inventory.addBrand", pageScope: "inventory", keys: "Ctrl+Alt+KeyB", enabled: true }, { actionId: "bin.restore", pageScope: "bin", keys: "Ctrl+Alt+KeyR", enabled: true }, { actionId: "nav.dashboard", pageScope: "all", keys: "Ctrl+Alt+Digit1", enabled: true }];
 let r = check("Ctrl+Alt+KeyB", "inventory.addProduct", "inventory", mine);
 eq(codes(r), ["IN_USE_SAME_PAGE:warn"], "A: same page");
@@ -46,13 +46,13 @@ ok(/Also used on Recycle Bin for 'Restore selected'\. That's fine; shortcuts onl
 eq(codes(check("Ctrl+Alt+Digit1", "inventory.addProduct", "inventory", mine)), ["IN_USE_SAME_PAGE:warn"], "A: a combo for every page clashes on every page");
 eq(codes(check("Ctrl+KeyK", "inventory.addProduct", "inventory", mine)), ["IN_USE_SAME_PAGE:block"], "A: GlowUp's own keys cannot be taken");
 
-// ---- B. ACTION_ALREADY_BOUND ----
+
 r = check("Ctrl+Alt+KeyJ", "inventory.addBrand", "inventory", mine);
 eq(codes(r), ["ACTION_ALREADY_BOUND:warn"], "B");
 ok(/'Add brand' currently uses Ctrl\+Alt\+B\. Saving will replace it\./.test(r[0].text), "B words: " + r[0].text);
 eq(codes(check("Ctrl+Alt+KeyB", "inventory.addBrand", "inventory", mine)), [], "B: the same combo again is no change");
 
-// ---- C. BROWSER_RESERVED ----
+
 r = check("Ctrl+KeyT", "inventory.addBrand", "inventory");
 eq(codes(r), ["BROWSER_RESERVED:block"], "C");
 ok(/Ctrl\+T is reserved by your browser for opening a new tab, so GlowUp can't use it\. Try a combo with Ctrl\+Alt\./.test(r[0].text), "C words: " + r[0].text);
@@ -60,13 +60,13 @@ eq(codes(check("F5", "inventory.addBrand", "inventory")), ["BROWSER_RESERVED:blo
 eq(codes(check("Ctrl+Shift+Tab", "inventory.addBrand", "inventory")), ["BROWSER_RESERVED:block"], "C: Ctrl+Shift+Tab");
 eq(codes(check("Ctrl+Digit3", "inventory.addBrand", "inventory")), ["BROWSER_RESERVED:block"], "C: Ctrl+3 switches tabs");
 
-// ---- D. OS_RESERVED ----
+
 r = check("Alt+Tab", "inventory.addBrand", "inventory");
 eq(codes(r), ["OS_RESERVED:block"], "D");
 ok(/Alt\+Tab is used by your operating system for switching apps\./.test(r[0].text), "D words: " + r[0].text);
 eq(codes(check("Ctrl+Space", "inventory.addBrand", "inventory", [], "Safari", true)), ["OS_RESERVED:block"], "D: Cmd+Space on a Mac");
 
-// ---- E. BROWSER_CONFLICT ----
+
 r = check("Ctrl+Shift+KeyP", "inventory.addBrand", "inventory", [], "Firefox");
 eq(codes(r), ["BROWSER_CONFLICT:warn"], "E");
 ok(/^In Firefox, Ctrl\+Shift\+P opens a private window/.test(r[0].text) && /won't work in Firefox/.test(r[0].text), "E leads with the admin's browser: " + r[0].text);
@@ -76,7 +76,7 @@ r = check("Alt+KeyF", "inventory.addBrand", "inventory", [], "Brave");
 eq(codes(r), ["BROWSER_CONFLICT:warn"], "E: Alt+letter menu keys");
 ok(/^In Brave/.test(r[0].text), "E: Brave counts as Chromium/all: " + r[0].text);
 
-// ---- F. INVALID_FORMAT ----
+
 r = check("Shift+KeyB", "inventory.addBrand", "inventory");
 eq(codes(r), ["INVALID_FORMAT:block"], "F: Shift + a letter is typing");
 ok(/Add a letter or number key with Ctrl, Alt, or Shift\. Single keys aren't allowed so shortcuts don't fire while you type\./.test(r[0].text), "F words");
@@ -84,7 +84,7 @@ eq(codes(check("KeyB", "inventory.addBrand", "inventory")), ["INVALID_FORMAT:blo
 eq(codes(check("Ctrl+Alt+ArrowLeft", "inventory.addBrand", "inventory")), ["INVALID_FORMAT:block"], "F: unsupported key");
 eq(codes(check("", "inventory.addBrand", "inventory")), ["INVALID_FORMAT:block"], "F: nothing");
 
-// ---- G. TEST_NOT_RECEIVED and H. SAVE_FAILED ----
+
 eq(K.testVerdict(true, "Ctrl+Alt+KeyB", "Edge", { mac: false }), { code: null, text: "✓ Works in Edge." }, "G: received");
 r = K.testVerdict(false, "Ctrl+Alt+KeyB", "Edge", { mac: false });
 ok(r.code === "TEST_NOT_RECEIVED" && /^GlowUp didn't receive Ctrl\+Alt\+B\. Your browser, operating system, or a browser extension is probably using it\. Try another combo\.$/.test(r.text), "G: not received words");
@@ -92,7 +92,7 @@ eq(K.saveFailedText({ code: "unavailable" }, true), "You're offline. Shortcuts c
 eq(K.saveFailedText({ code: "internal" }, true), "Couldn't save. Check your connection and try again.", "H: failed save");
 ok(/Only admins/.test(K.saveFailedText({ code: "permission-denied" })), "H: refused (not an admin)");
 
-// ---- scope matching ----
+
 const list = [
     { actionId: "inventory.addProduct", pageScope: "inventory", keys: "Ctrl+Alt+KeyP", enabled: true },
     { actionId: "dashboard.addProduct", pageScope: "dashboard", keys: "Ctrl+Alt+KeyP", enabled: true },
@@ -105,7 +105,7 @@ eq(K.findShortcut(list, "curator", "Ctrl+Alt+KeyP"), null, "nothing on a page wi
 eq((K.findShortcut(list, "archive", "Ctrl+Alt+Digit4") || {}).actionId, "nav.bin", "a combo for every page works on every page");
 eq(K.findShortcut(list, "curator", "Ctrl+Alt+KeyI"), null, "a switched-off shortcut does nothing");
 
-// ---- availability gating ----
+
 const brand = actions["inventory.addBrand"];
 eq(K.availabilityOf(brand, "inventory", { isAvailable: () => true }), true, "available");
 eq(K.availabilityOf(brand, "inventory", { isAvailable: () => "Add brand isn't available right now." }), "Add brand isn't available right now.", "the button's own reason");
@@ -114,7 +114,7 @@ ok(/isn't ready yet/.test(K.availabilityOf(brand, "inventory", undefined)), "no 
 eq(K.availabilityOf(undefined, "inventory", {}), "This action no longer exists.", "a removed action");
 ok(/isn't available/.test(K.availabilityOf(brand, "inventory", { isAvailable: () => { throw new Error("x"); } })), "a failing check is 'not available', not a crash");
 
-// ---- defaults, new defaults, orphans ----
+
 const defaults = K.defaultList(CATALOG, 1);
 ok(defaults.length === CATALOG.filter((a) => a.keys).length && defaults.every((s) => s.isDefault && s.enabled), "the defaults");
 const scopes = {};
@@ -125,7 +125,7 @@ ok(defaults.every((s) => K.checkCombo({ keys: s.keys, actionId: s.actionId, scop
     .every((m) => m.level === "info")), "every default passes its own checks (no block, no warning) in Chrome");
 ok(CATALOG.filter((a) => a.destructive).every((a) => !a.keys), "destructive actions have no default combo");
 ok(CATALOG.every((a) => a.description.length <= 120), "every description fits 120 characters");
-// an admin who moved Add brand to Ctrl+Alt+P and deleted Import; a later release adds a default that clashes with their combo
+
 const stored = { items: { "inventory.addBrand": { keys: "Ctrl+Alt+KeyP", description: "Mine", enabled: true }, "gone.action": { keys: "Ctrl+Alt+KeyG" } },
     seeded: CATALOG.filter((a) => a.keys && a.id !== "inventory.addProduct").map((a) => a.id) };
 const merged = K.mergeWithCatalog(stored, CATALOG, 2);
@@ -139,7 +139,7 @@ eq(fresh.added.length, defaults.length, "a first visit gets every default");
 eq(K.mergeWithCatalog(K.toStored(fresh.list, fresh.seeded), CATALOG, 4).added, [], "saved and read back: nothing added twice");
 eq(K.mergeWithCatalog({ items: { "inventory.addBrand": "junk", "inventory.import": { keys: "nonsense" } }, seeded: CATALOG.map((a) => a.id) }, CATALOG, 5).list.filter((s) => s.actionId === "inventory.addBrand" || s.actionId === "inventory.import").length, 0, "broken rows are skipped, not a crash");
 
-// ---- browsers ----
+
 eq(K.detectBrowser({ userAgent: "Mozilla/5.0 (Windows NT 10.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 Edg/130.0" }), "Edge", "Edge");
 eq(K.detectBrowser({ userAgent: "Mozilla/5.0 (Windows NT 10.0; rv:131.0) Gecko/20100101 Firefox/131.0" }), "Firefox", "Firefox");
 eq(K.detectBrowser({ userAgent: "Mozilla/5.0 (Macintosh) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Safari/605.1.15" }), "Safari", "Safari");

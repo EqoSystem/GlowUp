@@ -1,5 +1,5 @@
-// THE ADMIN ACTIVITY LOG: who changed what on this website, newest first. The records are written by adminStore.js in the same batch as
-// every change (collection "auditLog"); the rules let nobody change or delete them. This window only reads the latest ones.
+
+
 import { db } from "../_Database/firebase-console.js";
 import { collection, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getDocs, AUDIT_COLLECTION } from "./adminStore.js";
@@ -28,7 +28,7 @@ function lineOf(item) {
         + (Array.isArray(item.fields) && item.fields.length > 0 && item.action !== "delete" ? ` (${item.fields.slice(0, 6).join(", ")}${item.fields.length > 6 ? ", ..." : ""})` : "");
 }
 
-/** Opens the window with the latest records. */
+
 export async function openAuditLog() {
     const frame = dialogFrame("Admin activity log", () => frame.close());
     frame.box.classList.add("wide");
