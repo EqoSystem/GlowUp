@@ -541,7 +541,7 @@ namespace GlowUp.Onboarding
 
         void OnApplicationFocus(bool focused) { if (focused && confirmPanel != null && confirmPanel.IsOpen && !busy) _ = LookWhetherConfirmed(false); }
 
-        // New17, layer 2: the confirmation page on glowupapp.xyz opens the app again (App Link or glowup://verified): look at once
+        // New17, layer 2: the confirmation page on glowupapp.xyz opens the app again (glowup://verified): look at once
         void OnEnable() { Application.deepLinkActivated += OnDeepLink; }
         void OnDisable() { Application.deepLinkActivated -= OnDeepLink; }
         void OnDeepLink(string url)

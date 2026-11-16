@@ -33,7 +33,7 @@
 </main>
 <script type="module">
   // New17, email confirmation layer 2. Firebase's email links point here (Firebase console > Authentication > Templates > action URL).
-  //  - mode=verifyEmail: the code is applied with Firebase's own client SDK, then the app is opened again (App Link / glowup://).
+  //  - mode=verifyEmail: the code is applied with Firebase's own client SDK, then the app is opened again (glowup://verified).
   //  - any other mode (password reset, email change): passed on UNCHANGED to Firebase's default handler, so those keep working.
   // Nothing is stored, logged or sent anywhere else; the code in the address is only given to Firebase.
   const DEFAULT_HANDLER = "https://glowup-admin-portal.firebaseapp.com/__/auth/action";
@@ -58,7 +58,7 @@
     }
     next.hidden = false;
     open.hidden = false;
-    // try the app at once: the verified App Link first (opens the app directly), the glowup:// scheme as the fallback
+    // try the app at once through the glowup:// scheme; the button stays for browsers that block the automatic switch
     setTimeout(() => { location.href = "glowup://verified"; }, 600);
   }
 </script>

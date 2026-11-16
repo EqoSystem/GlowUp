@@ -147,7 +147,7 @@ function watchIdle() {
 }
 
 async function confirmSignOut() {
-    const sure = await askConfirm({ title: "Sign out?", message: "You need your email and password to come back in.", confirmLabel: "Sign out", danger: true, inline: true, badgeIcon: "logout", confirmIcon: "logout", cancelIcon: "x" });
+    const sure = await askConfirm({ title: "Sign out?", confirmLabel: "Sign out", danger: true, inline: true, confirmIcon: "logout", cancelIcon: "x" });
     if (!sure) return;
     remember(false);
     clearStore();

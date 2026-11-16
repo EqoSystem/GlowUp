@@ -1,4 +1,4 @@
-// Sign out dialog: badge, short line, Cancel (x icon) and Sign out (logout icon); fits at 360 px with no sideways scroll.
+// Sign out dialog: title only, Cancel (x icon) and Sign out (logout icon); fits at 360 px with no sideways scroll.
 import { launch, openPage } from "./harness.mjs";
 
 let checks = 0, failed = 0;
@@ -31,8 +31,8 @@ try {
             };
         });
         const where = `${width}px ${theme}`;
-        ok(m.badge, `${where}: badge icon`);
-        ok(m.line.length > 0, `${where}: short line`);
+        ok(!m.badge, `${where}: no badge`);
+        ok(m.line.length === 0, `${where}: no sub text`);
         ok(m.labels.join("|") === "Cancel|Sign out", `${where}: labels ${m.labels}`);
         ok(m.icons.every(Boolean), `${where}: both buttons have an icon`);
         ok(m.heights.every((h) => h >= 43), `${where}: 44px (page scale rounds to 43.5) buttons ${m.heights}`);

@@ -8,14 +8,8 @@
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
-      <!-- New17, email confirmation layer 2: the page glowupapp.xyz/app/verified/ opens the app again after the email is confirmed.
-           A verified App Link (assetlinks.json on the same domain), and the glowup://verified scheme as the fallback. -->
-      <intent-filter android:autoVerify="true">
-        <action android:name="android.intent.action.VIEW" />
-        <category android:name="android.intent.category.DEFAULT" />
-        <category android:name="android.intent.category.BROWSABLE" />
-        <data android:scheme="https" android:host="glowupapp.xyz" android:pathPrefix="/app/" />
-      </intent-filter>
+      <!-- New17, email confirmation layer 2: the page glowupapp.xyz/app/verified/ opens the app again through glowup://verified
+           after the email is confirmed (no App Link, so no signing fingerprint is published anywhere; 16 November 2026). -->
       <intent-filter>
         <action android:name="android.intent.action.VIEW" />
         <category android:name="android.intent.category.DEFAULT" />
