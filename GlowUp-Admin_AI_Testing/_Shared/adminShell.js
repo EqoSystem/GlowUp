@@ -809,6 +809,22 @@ export function askConfirm(options) {
         cancel.type = "button"; cancel.className = "cancel-btn"; cancel.textContent = options.cancelLabel || "Cancel";
         const ok = document.createElement("button");
         ok.type = "button"; ok.className = options.danger ? "btn danger solid" : "save-btn"; ok.textContent = options.confirmLabel || "Confirm";
+        // optional icons (Sign out, 16 November 2026): an icon before each label, and a badge before the title
+        if (options.cancelIcon) { cancel.classList.add("has-ic"); cancel.insertAdjacentHTML("afterbegin", icon(options.cancelIcon)); }
+        if (options.confirmIcon) { ok.classList.add("has-ic"); ok.insertAdjacentHTML("afterbegin", icon(options.confirmIcon)); }
+        if (options.badgeIcon) {
+            const head = frame.box.querySelector("h3");
+            const wrap = document.createElement("div");
+            wrap.className = "confirm-head" + (options.danger ? " danger" : "");
+            wrap.innerHTML = `<span class="confirm-badge">${icon(options.badgeIcon)}</span>`;
+            const words = document.createElement("div");
+            words.className = "confirm-words";
+            head.replaceWith(wrap);
+            words.appendChild(head);
+            const intro = frame.box.querySelector(".modal-intro");
+            if (intro) words.appendChild(intro);
+            wrap.appendChild(words);
+        }
         cancel.addEventListener("click", () => done(false));
         ok.addEventListener("click", () => done(true));
         actions.append(cancel, ok);

@@ -406,6 +406,8 @@ html.qs-open .board > .panel[data-qs-grow] { grid-column: span var(--qs-span) !i
 .btn.danger:hover, .row-btn.danger:hover { background: color-mix(in srgb, var(--bad) 14%, transparent); }
 .btn.danger.solid { background: var(--bad); border-color: var(--bad); color: #fff; }
 .btn.danger.solid:hover { background: color-mix(in srgb, var(--bad) 86%, #000); }
+/* dark theme: white on the light red is 2.8:1, dark ink on it passes AA (16 November 2026) */
+:root:not([data-theme="light"]) .btn.danger.solid { color: var(--accent-ink); }
 .primary-btn:hover svg.ic, .btn.primary:hover svg.ic, .save-btn:hover svg.ic { transform: translateX(2px) scale(1.1); }
 .row-btn { padding: 6px 10px; font-size: var(--fs-sm); border-radius: 8px; }
 .row-btn.approve { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); background: color-mix(in srgb, var(--ok) 10%, transparent); }
@@ -2134,6 +2136,20 @@ body:has(> :is(#addIngredientModal, #addBrandModal, #productModal)[style*="flex"
 .modal-content.confirm-inline { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px 28px; }
 .modal-content.confirm-inline > h3 { margin: 0; flex: 0 1 auto; }
 .modal-content.confirm-inline > .modal-actions { margin: 0; flex: 0 0 auto; }
+/* confirm dialogs with icons (Sign out): badge + title + one short line, icon buttons */
+.modal-content.confirm-inline > .confirm-head + .modal-actions { margin-left: auto; }
+.confirm-head { display: flex; align-items: center; gap: 14px; min-width: 0; flex: 1 1 16rem; }
+.confirm-badge { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent-text); }
+.confirm-head.danger .confirm-badge { background: color-mix(in srgb, var(--bad) 13%, transparent); color: var(--bad); }
+.confirm-badge svg.ic { width: 22px; height: 22px; }
+.confirm-words { min-width: 0; }
+.confirm-words > h3 { margin: 0; }
+.confirm-words > .modal-intro { margin: 4px 0 0; color: var(--muted); }
+.modal-actions button.has-ic { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; }
+@media (max-width: 480px) {
+    .modal-content.confirm-inline > .modal-actions { flex: 1 1 100%; display: flex; gap: 10px; }
+    .modal-content.confirm-inline > .modal-actions > button.has-ic { flex: 1 1 0; }
+}
 
 
 html.sb-pinned { --content-left: var(--nav-w); }
