@@ -281,7 +281,7 @@ namespace GlowUp.Common
                 // signed in without internet last time: that session is kept too
                 if (user == null && !string.IsNullOrEmpty(UserProfileRepository.OfflineEmail) && hasProfile) return dashboardScene;
             }
-            catch (Exception e) { Debug.LogWarning("Start-up: the sign-in check was skipped: " + e.Message); }
+            catch (Exception e) { { } }
             return loginScene;
         }
 

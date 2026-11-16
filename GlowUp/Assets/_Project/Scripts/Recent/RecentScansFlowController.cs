@@ -154,7 +154,7 @@ namespace GlowUp.Recent
             // Only when this phone knows no profile yet is there something to wait for: then the count is a bar and the list
             // shows placeholder rows meanwhile (TextSkeleton). Otherwise the saved scans are simply there.
             if (UserProfileRepository.Cached() == null) TextSkeleton.Waiting(this);
-            try { await UserProfileRepository.Load(); } catch (Exception e) { Debug.LogWarning("Recent scans: " + e.Message); }
+            try { await UserProfileRepository.Load(); } catch (Exception e) { { } }
             TextSkeleton.Ready(this);
             if (this != null) Refresh();
         }
@@ -375,7 +375,7 @@ namespace GlowUp.Recent
             {
                 // into the removed scans, all in one save: the Restore bar can bring them back. A group is never left half removed.
                 int gone = ids.Count == 1 ? RemoveOne(ids[0]) : ScanHistoryRepository.RemoveMany(ids);
-                if (gone < ids.Count) Debug.LogWarning("Recent scans: " + (ids.Count - gone) + " of " + ids.Count + " scans were no longer there to remove.");
+                if (gone < ids.Count) { }
                 foreach (string id in ids) selected.Remove(id);
                 if (this != null) Refresh();
             });

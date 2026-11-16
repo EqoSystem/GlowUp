@@ -64,9 +64,9 @@ namespace GlowUp.Common
                     activity.Call("startActivity", intent);
                 }
             }
-            catch (System.Exception e) { Debug.LogWarning("The phone's settings could not be opened: " + e.Message); }
+            catch (System.Exception e) { { } }
 #else
-            Debug.Log("[GlowUp] On a phone this opens the app's page in the phone's settings.");
+            { }
 #endif
         }
     }

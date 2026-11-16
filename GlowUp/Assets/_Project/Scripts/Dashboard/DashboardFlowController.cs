@@ -114,7 +114,7 @@ namespace GlowUp.Dashboard
             // Its labels, the titles and the buttons are never bars (see TextSkeleton).
             if (nothingYet) TextSkeleton.Waiting(this);
             try { profile = await UserProfileRepository.Load() ?? profile; }
-            catch (Exception e) { Debug.LogWarning("Dashboard: profile not loaded: " + e.Message); }
+            catch (Exception e) { { } }
             TextSkeleton.Ready(this);
             if (this == null) return;                       // the scene was left while loading
             ShowProfile(profile);
@@ -122,7 +122,7 @@ namespace GlowUp.Dashboard
             try { await ShowRecommendations(); }
             catch (Exception e)
             {
-                Debug.LogWarning("Dashboard: recommendations not loaded: " + e.Message);
+                { }
                 if (this != null && recommendationsEmptyText != null)
                 {
                     recommendationsEmptyText.gameObject.SetActive(true);

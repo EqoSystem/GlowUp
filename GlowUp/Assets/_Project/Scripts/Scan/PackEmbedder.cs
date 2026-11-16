@@ -51,7 +51,7 @@ namespace GlowUp.Scan
             }
             catch (Exception e)
             {
-                Debug.LogWarning("[Scan] The picture model is not part of this build: " + e.Message);
+                { }
                 if (javaClass != null) javaClass.Dispose();
                 return null;
             }
@@ -70,10 +70,10 @@ namespace GlowUp.Scan
                     else if (state == JavaFailed)
                     {
                         failed = true;
-                        Debug.LogWarning("[Scan] The picture model could not start: " + java.CallStatic<string>("failure"));
+                        { }
                     }
                 }
-                catch (Exception e) { failed = true; Debug.LogWarning("[Scan] " + e.Message); }
+                catch (Exception e) { failed = true; { } }
                 return ready;
             }
         }
@@ -97,7 +97,7 @@ namespace GlowUp.Scan
                 callback.done = done;           // one picture at a time (the Java half refuses a second), so one callback is enough
                 return java.CallStatic<bool>("embed", pixels, width, height, Mathf.Clamp(Middle, 0.3f, 1f), callback);
             }
-            catch (Exception e) { Debug.LogWarning("[Scan] " + e.Message); return false; }
+            catch (Exception e) { { } return false; }
         }
 
         /// <summary>Lets go of the model (it leaves the phone's memory).</summary>
@@ -115,7 +115,7 @@ namespace GlowUp.Scan
             public volatile Answer done;
             public Callback() : base(JavaClass + "$Callback") { }
             [Preserve] public void onResult(string numbers) { done?.Invoke(string.IsNullOrEmpty(numbers) ? null : numbers); }
-            [Preserve] public void onError(string message) { Debug.LogWarning("[Scan] The picture model: " + message); done?.Invoke(null); }
+            [Preserve] public void onError(string message) { { } done?.Invoke(null); }
         }
 #else
         public static PackEmbedder Begin() { return null; }

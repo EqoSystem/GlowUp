@@ -246,7 +246,7 @@ namespace GlowUp.Result
         void OnFdaSimilarAnswered(bool isMyProduct)
         {
             if (record == null || !PhFdaVerification.ConfirmSimilar(record, isMyProduct)) return;
-            try { ScanHistoryRepository.Update(record); } catch (Exception e) { Debug.LogWarning("Result: " + e.Message); }
+            try { ScanHistoryRepository.Update(record); } catch (Exception e) { { } }
             ShowProof();
         }
         void OnFdaCheckEnded(string scanId) { if (record != null && record.id == scanId) ShowProof(); }
@@ -256,7 +256,7 @@ namespace GlowUp.Result
             record = ScanSession.Current ?? ScanHistoryRepository.Active().FirstOrDefault();     // nothing handed over: show the latest saved scan
             Show();
             if (UserProfileRepository.Cached() == null) TextSkeleton.Waiting(this);      // nothing on the phone yet: the fetched texts are bars meanwhile
-            try { profile = await UserProfileRepository.Load(); } catch (Exception e) { Debug.LogWarning("Result: " + e.Message); }
+            try { profile = await UserProfileRepository.Load(); } catch (Exception e) { { } }
             TextSkeleton.Ready(this);
             if (this == null) return;
             if (record == null) { record = ScanHistoryRepository.Active().FirstOrDefault(); Show(); }
@@ -321,7 +321,7 @@ namespace GlowUp.Result
                 (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
                 Application.OpenURL(uri.AbsoluteUri);
             else
-                Debug.LogWarning("Result: FDA Philippines verification URL is invalid.");
+                { }
         }
 
         void ShowChips()
@@ -591,7 +591,7 @@ namespace GlowUp.Result
 
             List<ProductData> products;
             try { products = await ProductRepository.LoadActive(); await IngredientRepository.LoadAll(); }
-            catch (Exception e) { Debug.LogWarning("Alternatives: " + e.Message); products = new List<ProductData>(); }
+            catch (Exception e) { { } products = new List<ProductData>(); }
             if (this == null) return;
 
             // Make-up of the same kind whose ingredients are not flagged for this user (the same check as the dashboard's

@@ -104,7 +104,7 @@ namespace GlowUp.Data
             }
             catch (Exception e)
             {
-                Debug.LogWarning("Recommendation query failed; using cached recommendable products: " + e.Message);
+                { }
                 return CachedRecommendable(limit);
             }
         }
@@ -198,7 +198,7 @@ namespace GlowUp.Data
                 Changed();
                 ClearLookups();                 // the catalogue just changed: earlier answers (also "not found") may be out of date
             }
-            catch (Exception e) { TaskLimits.NoteFailure(e); Debug.LogWarning("Product sync failed, using the saved copy: " + e.Message); }
+            catch (Exception e) { TaskLimits.NoteFailure(e); { } }
         }
 
         /// <summary>
@@ -224,28 +224,20 @@ namespace GlowUp.Data
 
             List<ProductData> ofBrand = await ProductsOfBrand(brandName, retryAfterMiss);      // one fetch per brand, whatever the product name is
             List<ProductIndex.Candidate> found = ProductIndex.Build(ofBrand).Search(brandName, productName, 3, kindHint);
-            Debug.Log("[MATCH] server-query brand=\"" + brandName + "\" name=\"" + productName + "\" candidates=" + found.Count);
+            { }
             foreach (ProductIndex.Candidate candidate in found)
-                Debug.Log("[MATCH] server-candidate id=\"" + candidate.product.id + "\" name=\"" + candidate.product.name
-                    + "\" brand=\"" + candidate.product.brandName + "\" score=" + candidate.score.ToString("0.000")
-                    + " bestField=" + BestScoredField(productName, candidate.product) + " exactName=" + candidate.exactName
-                    + " brandAgrees=" + candidate.brandAgrees);
+                { }
 
             foreach (ProductIndex.Candidate candidate in found)
                 if (candidate != null && candidate.product != null && (candidate.exactName || candidate.score >= ProductIndex.Sure))
                 {
                     AddLocal(candidate.product);
                     lookupCache[key] = new Looked { product = candidate.product, at = Time.realtimeSinceStartup };
-                    Debug.Log("[MATCH] server-final=accept id=\"" + candidate.product.id + "\" name=\"" + candidate.product.name
-                        + "\" score=" + candidate.score.ToString("0.000") + " bestField=" + BestScoredField(productName, candidate.product));
+                    { }
                     return candidate.product;
                 }
             lookupCache[key] = new Looked { product = null, at = Time.realtimeSinceStartup };       // asked and not found: not asked again for a while
-            Debug.Log("[MATCH] server-final=no-match query=\"" + brandName + " " + productName + "\" bestNearMiss="
-                + (found.Count > 0
-                    ? "\"" + found[0].product.name + "\" score=" + found[0].score.ToString("0.000")
-                        + " bestField=" + BestScoredField(productName, found[0].product)
-                    : "none"));
+            { }
             return null;
         }
 
@@ -317,10 +309,10 @@ namespace GlowUp.Data
                 if (snapshot.Count < BrandQueryLimit) return all;
                 if (i == BrandPageCap - 1)
                 {
-                    Debug.LogWarning("Product look-up: " + label + " still had more after " + BrandPageCap + " pages of " + BrandQueryLimit + "; the list may be incomplete.");
+                    { }
                     break;
                 }
-                Debug.LogWarning("Product look-up: " + label + " returned exactly " + BrandQueryLimit + " documents; fetching the next page.");
+                { }
                 page = query.StartAfter(all[all.Count - 1]).Limit(BrandQueryLimit);
             }
             return all;

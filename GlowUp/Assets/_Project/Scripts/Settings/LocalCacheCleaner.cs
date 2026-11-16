@@ -70,7 +70,7 @@ namespace GlowUp.AppSettings
                 if (clearTemporaryFiles)
                 {
                     EmptyFolder(Application.temporaryCachePath);
-                    try { Caching.ClearCache(); } catch (Exception e) { Debug.LogWarning("Clear cache: " + e.Message); }
+                    try { Caching.ClearCache(); } catch (Exception e) { { } }
                 }
 
                 // Firestore's own cache can only be emptied while its connection is closed; the next use opens a new one
@@ -82,10 +82,10 @@ namespace GlowUp.AppSettings
                         await db.TerminateAsync();
                         await db.ClearPersistenceAsync();
                     }
-                    catch (Exception e) { Debug.LogWarning("Clear cache: Firestore's offline cache was left as it is: " + e.Message); }
+                    catch (Exception e) { { } }
                 }
             }
-            catch (Exception e) { Debug.LogWarning("Clear cache failed: " + e.Message); }
+            catch (Exception e) { { } }
 
             if (this == null) return;
             busy = false;
@@ -133,7 +133,7 @@ namespace GlowUp.AppSettings
                 foreach (string file in Directory.GetFiles(folder, "*", SearchOption.AllDirectories))
                     try { File.Delete(file); } catch (Exception) { /* in use: left for next time */ }
             }
-            catch (Exception e) { Debug.LogWarning("Clear cache: " + e.Message); }
+            catch (Exception e) { { } }
         }
 
         static string Readable(long bytes)

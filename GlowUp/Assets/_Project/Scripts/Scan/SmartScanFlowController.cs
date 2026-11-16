@@ -115,6 +115,10 @@ namespace GlowUp.Scan
         [Tooltip("The photo button appears after the scan has run this many seconds without finishing")]
         [Min(1f)] [SerializeField] private float photoButtonAfterSeconds = 6f;
         [SerializeField] private string msgPhotoHint = "Slow or read wrong? Tap the camera button to take a photo of the product.";
+        [Tooltip("Toast when volume down chooses photo capture")]
+        [SerializeField] private string volumePhotoToast = "Photo capture. Press both volume keys to take the photo.";
+        [Tooltip("Toast when volume up chooses live scanning")]
+        [SerializeField] private string volumeLiveToast = "Live scan. Press both volume keys to start or pause.";
         [SerializeField] private string msgPhotoOffer = "Not reading it right? Take a photo of the product: GlowUp's AI searches the web for it.";
         [SerializeField] private string msgSnapshotStuck = "Not getting further? Take one photo of the pack and the AI will read it.";
         [SerializeField] private string msgFoundStagedOwn = "Found it among the products you sent. It is waiting for an admin's approval.";
@@ -513,7 +517,7 @@ namespace GlowUp.Scan
                 foreach (BrandData b in brands) if (b != null && !string.IsNullOrWhiteSpace(b.name)) brandNames.Add(b.name.Trim());
                 ProductAiAdvisor.KnownBrands = brandNames;
             }
-            catch (Exception e) { Debug.LogWarning("Scan: brands and products could not be loaded: " + e.Message); }
+            catch (Exception e) { { } }
         }
 
         // phase 2A: the volume buttons belong to this screen only while it is shown, and only when Settings gives them a job
@@ -636,15 +640,40 @@ namespace GlowUp.Scan
         LongPressHint modeHint;
         bool photoAfterCameraStarts;                  // the camera button was tapped before the camera ran: photo mode once it runs
 
-        /// <summary>
-        /// VOLUME UP (owner's rule, 12 November 2026): switches between live scan and photo capture, as the Photo / Live scan button does.
-        /// </summary>
-        void VolumeUpPressed()
+        // ---------------------------------------------------------------------------------------
+        //  VOLUME KEYS (New17, Settings > Camera Helpers > "Volume keys" on): volume DOWN chooses photo capture, volume UP chooses live
+        //  scanning, and BOTH keys pressed together (within VolumeChordSeconds) do the chosen mode's action (take the photo / start or
+        //  pause the scan). A single press waits that short moment for the other key before it counts as a mode choice.
+        //  Keys are read through GlowUpVolumeKeys.java, only on this screen and only while the setting is on.
+        // ---------------------------------------------------------------------------------------
+        const float VolumeChordSeconds = 0.3f;
+        float volumeUpAt = -1f, volumeDownAt = -1f;
+
+        void ReadVolumeKeys()
+        {
+            VolumeKeyInput.Take(out int up, out int down);
+            float now = Time.unscaledTime;
+            if (up > 0) volumeUpAt = now;
+            if (down > 0) volumeDownAt = now;
+            if (volumeUpAt >= 0f && volumeDownAt >= 0f && Mathf.Abs(volumeUpAt - volumeDownAt) <= VolumeChordSeconds)
+            {
+                volumeUpAt = volumeDownAt = -1f;
+                VolumeButtonPressed();                       // both together: the action of the mode that is chosen
+                return;
+            }
+            if (volumeUpAt >= 0f && now - volumeUpAt > VolumeChordSeconds) { volumeUpAt = -1f; ChooseScanMode(false); }
+            if (volumeDownAt >= 0f && now - volumeDownAt > VolumeChordSeconds) { volumeDownAt = -1f; ChooseScanMode(true); }
+        }
+
+        /// <summary>Volume down = photo capture, volume up = live scanning (nothing happens when that mode is already on, or the screen is busy).</summary>
+        void ChooseScanMode(bool photo)
         {
             if (PopupOpen || stage == Stage.Recognising || stage == Stage.Leaving) return;
             if (snapshot != null && (snapshot.IsOpen || snapshot.PreviewOpen)) return;
-            if (photoMode) { ExitPhotoMode(); return; }
-            if (photoButton != null && photoButton.interactable) OnPhotoButton();
+            if (photo == photoMode) return;
+            if (photo) { if (photoButton == null || !photoButton.interactable) return; OnPhotoButton(); }
+            else ExitPhotoMode();
+            FormalToast.OnScreen(transform, statusText)?.Show(FormalToast.Kind.Info, photo ? volumePhotoToast : volumeLiveToast);
         }
 
         /// <summary>
@@ -838,13 +867,7 @@ namespace GlowUp.Scan
         void Update()
         {
             if (Input.GetKeyDown(KeyCode.Escape)) { BackKey(); return; }
-            UiPreferences.VolumeKeys keys = UiPreferences.VolumeKey;
-            if (keys != UiPreferences.VolumeKeys.Off)
-            {
-                VolumeKeyInput.Take(out int up, out int down);
-                if (up > 0 && keys != UiPreferences.VolumeKeys.Down) VolumeUpPressed();
-                if (down > 0 && keys != UiPreferences.VolumeKeys.Up) VolumeButtonPressed();
-            }
+            if (UiPreferences.VolumeKey != UiPreferences.VolumeKeys.Off) ReadVolumeKeys();
             WakeByDoubleTap();
             if (stage != Stage.Scanning) return;
             TakeEarlyBarcode();                              // fast early barcode / QR recognition
@@ -1001,7 +1024,7 @@ namespace GlowUp.Scan
         // called on the text reader's own thread: only the answer is stored
         void OnReaderAnswer(FrameReading reading, string problem)
         {
-            if (problem != null) Debug.LogWarning("[Scan] Could not read this picture: " + problem);
+            if (problem != null) { }
             if (reading != null && reading.lines != null)
             {
                 PoolTokensFromLines(reading.lines);
@@ -1011,7 +1034,7 @@ namespace GlowUp.Scan
 
         void OnReaderAnswerRotated(FrameReading reading, string problem)
         {
-            if (problem != null) Debug.LogWarning("[Scan] Could not read rotated picture: " + problem);
+            if (problem != null) { }
             if (reading != null)
             {
                 reading.isRotated = true;
@@ -1360,27 +1383,20 @@ namespace GlowUp.Scan
         {
             string query = (text ?? "").Replace('\r', ' ').Replace('\n', '|');
             ProductIndex index = ProductRepository.Index;
-            Debug.Log("[MATCH] local-query text=\"" + query + "\" candidates in catalogue=" + index.Count);
+            { }
             if (string.IsNullOrWhiteSpace(text))
             {
-                Debug.Log("[MATCH] local-final=reject reason=empty-query bestNearMiss=none");
+                { }
                 return null;
             }
             // the kind read on the pack ("Foundation") chooses between products that share a name and differ in kind
             List<ProductIndex.Candidate> found = index.InText(text, index.Count, ProductScope.TypeFromLabel(text));
             foreach (ProductIndex.Candidate candidate in found)
-                Debug.Log("[MATCH] local-candidate id=\"" + candidate.product.id + "\" name=\"" + candidate.product.name
-                    + "\" brand=\"" + candidate.product.brandName + "\" score=" + candidate.score.ToString("0.000")
-                    + " bestField=product.name brandVisible=" + candidate.brandAgrees + " exactName=" + candidate.exactName);
+                { }
 
             ProductIndex.Candidate best = found.Count > 0 ? found[0] : null;
             bool accepted = best != null && best.exactName && best.score >= ProductIndex.Sure;
-            Debug.Log(accepted
-                ? "[MATCH] local-final=accept id=\"" + best.product.id + "\" name=\"" + best.product.name
-                    + "\" score=" + best.score.ToString("0.000") + " bestField=product.name"
-                : "[MATCH] local-final=reject bestNearMiss=" + (best != null
-                    ? "\"" + best.product.name + "\" score=" + best.score.ToString("0.000") + " bestField=product.name"
-                    : "none"));
+            { }
             return accepted ? best.product : null;
         }
 
@@ -1445,25 +1461,23 @@ namespace GlowUp.Scan
         {
             try
             {
-                Debug.Log("[MATCH] firebase-query brand=\"" + brand + "\" name=\"" + name + "\" kind=\"" + identity.cosmeticType + "\"");
+                { }
                 // the kind read on the pack ("Foundation") chooses between products that share this name
                 ProductData product = ProductRepository.Index.Exact(brand, name, identity.cosmeticType);
                 List<ProductData> sameName = ProductRepository.Index.SameNameDifferentKind(brand, name, identity.cosmeticType);
                 if (product != null)
                 {
                     string field = TextKey.Compact(name) == TextKey.Compact(product.name) ? "product.name" : "product.alias";
-                    Debug.Log("[MATCH] local-exact-candidate id=\"" + product.id + "\" name=\"" + product.name
-                        + "\" score=1.000 bestField=" + field + " brandAgrees=true");
+                    { }
                 }
                 foreach (ProductData candidate in sameName)
                 {
                     string field = TextKey.Compact(name) == TextKey.Compact(candidate.name) ? "product.name" : "product.alias";
-                    Debug.Log("[MATCH] kind-candidate id=\"" + candidate.id + "\" name=\"" + candidate.name
-                        + "\" type=\"" + candidate.cosmeticType + "\" score=1.000 bestField=" + field);
+                    { }
                 }
                 if (sameName.Count > 1)
                 {
-                    Debug.Log("[MATCH] final=ambiguous-kind candidates=" + sameName.Count + " query=\"" + brand + " " + name + "\"");
+                    { }
                     AskWhichKind(sameName);
                     return;
                 }
@@ -1479,7 +1493,7 @@ namespace GlowUp.Scan
                     ShowIdentity();
                     if (HasStoredList(product))
                     {
-                        Debug.Log("[MATCH] final=accept source=catalogue id=\"" + product.id + "\" name=\"" + product.name + "\"");
+                        { }
                         UseLookedUpList(product.ingredients, ListPagesOf(product), "inventory", false);
                         return;
                     }
@@ -1497,10 +1511,9 @@ namespace GlowUp.Scan
                 if (this != null && scan == scanNumber && stage == Stage.Scanning)
                 {
                     if (product == null)
-                        Debug.Log("[MATCH] no-match branch=FirebaseProductLookup query=\"" + brand + " " + name
-                            + "\" bestNearMiss=see preceding [MATCH] local/server candidate logs");
+                        { }
                     else
-                        Debug.Log("[MATCH] final=product-found-without-ingredients id=\"" + product.id + "\" name=\"" + product.name + "\"");
+                        { }
                     Say(!ConnectivityMonitor.Online ? msgFirebaseUnavailable
                         : AiCanLook ? msgWebNoMatch
                         : !ProductAiAdvisor.Available ? msgAiUnavailable
@@ -1510,7 +1523,7 @@ namespace GlowUp.Scan
             }
             catch (Exception e)
             {
-                Debug.LogWarning("Firebase product lookup failed: " + e.Message);
+                { }
                 if (this != null && scan == scanNumber && stage == Stage.Scanning) Say(msgFirebaseUnavailable);
             }
             finally
@@ -1621,14 +1634,14 @@ namespace GlowUp.Scan
                 foreach (ProductAiAdvisor.HiddenAdditive hidden in match.list.hidden)
                 {
                     try { HiddenAdditives.Learn(hidden.term, hidden.substances, hidden.note, match.list.sources, match.list.webSearched, match.list.model); }
-                    catch (Exception e) { Debug.LogWarning("Hidden ingredients were not saved: " + e.Message); }
+                    catch (Exception e) { { } }
                 }
                 UseLookedUpList(match.list.ingredients, match.list.sources, "web", match.list.webSearched);
                 return true;
             }
             catch (Exception e)
             {
-                Debug.LogWarning("Scan: the Firebase-miss product web search failed: " + e.Message);
+                { }
                 return false;
             }
             finally
@@ -1691,7 +1704,7 @@ namespace GlowUp.Scan
             }
             catch (Exception e)
             {
-                Debug.LogWarning("Scan: typed-product web search failed: " + e.Message);
+                { }
                 return false;
             }
             finally
@@ -2056,11 +2069,11 @@ namespace GlowUp.Scan
                     }
                 }
                 cachedBrandProducts = deduped;
-                Debug.Log($"[SMART_SCAN_MATCH] Brands tried: [{string.Join(", ", candidateBrands)}] loaded {deduped.Count} candidates");
+                { }
             }
             catch (Exception e)
             {
-                Debug.LogWarning("[SMART_SCAN_MATCH] Error warming brand candidates: " + e.Message);
+                { }
             }
             finally
             {
@@ -2403,7 +2416,7 @@ namespace GlowUp.Scan
             }
             string candsStr = string.Join("; ", candList);
 
-            Debug.Log("[SMART_SCAN_MATCH] Outcome=" + outcome + " Brand=" + brandStr + " Tokens=[" + tokensStr + "] Candidates=[" + candsStr + "]");
+            { }
         }
 
         bool PopupOpen => (barcodeCard != null && barcodeCard.IsOpen) || (shortlist != null && shortlist.IsOpen) || (startOverPanel != null && startOverPanel.IsOpen) || (manualPanel != null && manualPanel.IsOpen)
@@ -2442,7 +2455,7 @@ namespace GlowUp.Scan
                     // the name the user typed for it is remembered on this phone: next time it finds the product at once
                     if (entry.product != null && !string.IsNullOrWhiteSpace(typedName))
                     {
-                        try { LocalAliases.Learn(typedName, entry.product); } catch (Exception e) { Debug.LogWarning("Scan: the typed name was not kept: " + e.Message); }
+                        try { LocalAliases.Learn(typedName, entry.product); } catch (Exception e) { { } }
                     }
                     Named(named);
                 },
@@ -2616,7 +2629,7 @@ namespace GlowUp.Scan
             string text = evidence.FrontText.Length > 0 ? evidence.FrontText : evidence.Text.AllText(ScanEvidence.UsableLine);
             ProductAiAdvisor.Identity seen = null;
             try { seen = await ProductAiAdvisor.Identify(jpg, text); }
-            catch (Exception e) { Debug.LogWarning("Scan: the AI's early look failed: " + e.Message); }
+            catch (Exception e) { { } }
             if (this == null || scan != scanNumber) return;          // the screen was left, or a new scan was started meanwhile
             earlyOut = false; earlyTook = Time.unscaledTime - earlyAskedAt;
             SetWorking(false);
@@ -2703,7 +2716,7 @@ namespace GlowUp.Scan
                         list = match.list;
                 }
             }
-            catch (Exception e) { Debug.LogWarning("Scan: the web check failed: " + e.Message); }
+            catch (Exception e) { { } }
             if (this == null || scan != scanNumber) return;
             webOut = false; webTook = Time.unscaledTime - askedAt;
             messageOver = null; shownStatus = null;
@@ -2761,7 +2774,7 @@ namespace GlowUp.Scan
             foreach (ProductAiAdvisor.HiddenAdditive hidden in list.hidden)
             {
                 try { HiddenAdditives.Learn(hidden.term, hidden.substances, hidden.note, list.sources, list.webSearched, list.model); }
-                catch (Exception e) { Debug.LogWarning("Hidden ingredients were not saved: " + e.Message); }
+                catch (Exception e) { { } }
             }
             // This web result has already been confirmed as this product and includes a source-backed list. Prefer it to
             // an OCR list that may have accumulated fragments from several frames.
@@ -2804,7 +2817,7 @@ namespace GlowUp.Scan
             shadeOut = true;
             ProductAiAdvisor.Identity seen = null;
             try { seen = await ProductAiAdvisor.Identify(jpg, ""); }
-            catch (Exception e) { Debug.LogWarning("Scan: the AI's look for the shade failed: " + e.Message); }
+            catch (Exception e) { { } }
             if (this == null || scan != scanNumber) return;
             shadeOut = false;
             if (stage == Stage.Leaving) return;
@@ -3005,7 +3018,7 @@ namespace GlowUp.Scan
                 picture.SetPixels32(colours); picture.Apply();
                 return picture.EncodeToJPG(aiPictureQuality);
             }
-            catch (Exception e) { Debug.LogWarning("Scan: " + e.Message); return null; }
+            catch (Exception e) { { } return null; }
             finally { if (picture != null) Destroy(picture); }
         }
 
@@ -3094,7 +3107,7 @@ namespace GlowUp.Scan
             }
             catch (Exception e)
             {
-                Debug.LogWarning("Ingredient look-up: " + e.Message);
+                { }
                 if (this != null) Say(msgFirebaseUnavailable);
             }
             finally
@@ -3292,7 +3305,7 @@ namespace GlowUp.Scan
                 if (seen.Add(entry.Key)) entries.Add(entry);
             }
             nearBarcodesFor = read;
-            Debug.Log("[Barcode] partly read (" + read.Length + " digits): " + entries.Count + " nearest catalogue product(s) offered");
+            { }
             OpenShortlist(shortlistTitle, msgBarcodeUnclear, shortlistNoneLabel, () => { nearBarcodesFor = ""; }, () => noneOfThese?.Invoke(), entries);      // after None, the same number is not offered again
             return true;
         }
@@ -3335,7 +3348,7 @@ namespace GlowUp.Scan
                 () =>
                 {
                     ExitPhotoMode();
-                    if (knownProduct != null && PhotoBarcodeMemory.Learn(barcodeToLearn, knownProduct)) Debug.Log("[PhotoBarcode] learned " + barcodeToLearn + " for " + knownProduct.name);
+                    if (knownProduct != null && PhotoBarcodeMemory.Learn(barcodeToLearn, knownProduct)) { }
                     barcodeToLearn = "";
                 },
                 () => { barcodeToLearn = ""; OpenManual(); },
@@ -3398,7 +3411,7 @@ namespace GlowUp.Scan
                 foreach (BrandData b in BrandRepository.All()) if (!string.IsNullOrWhiteSpace(b.name) && !knownBrandNames.Contains(b.name)) knownBrandNames.Add(b.name);
                 foreach (ProductData p in ProductRepository.Every.Products) if (!string.IsNullOrWhiteSpace(p.brandName) && !knownBrandNames.Contains(p.brandName)) knownBrandNames.Add(p.brandName);
             }
-            catch (Exception e) { Debug.LogWarning("Scan: the brand list is not available: " + e.Message); }
+            catch (Exception e) { { } }
             return knownBrandNames;
         }
 
@@ -3523,7 +3536,7 @@ namespace GlowUp.Scan
             }
             catch (Exception e)
             {
-                Debug.LogWarning("Scan: looking a typed product up failed: " + e.Message);
+                { }
                 if (this != null) ManualStatus(StatusMessage.Kind.Error, msgFirebaseUnavailable);
             }
             finally

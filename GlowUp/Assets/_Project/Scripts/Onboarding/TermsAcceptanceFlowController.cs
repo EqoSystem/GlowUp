@@ -94,7 +94,9 @@ namespace GlowUp.Onboarding
 
         IEnumerator Start()
         {
-            showSteps = !readOnly && openedFromSignUp;
+            // New17: the page is read top to bottom without a progress bar, from the log-in page AND after Generate Profile on Step 5
+            // (the user reads, agrees and continues: it is not shown as one more step)
+            showSteps = false;
             openedFromSignUp = false;
             LayHeader();
             if (!readOnly) OnboardingSession.LoadDraft();
@@ -191,7 +193,7 @@ namespace GlowUp.Onboarding
                     {
                         // the phone's copy of the account can be older than the confirmation: ask once before saying no
                         try { await signedIn.ReloadAsync().OrTimeout(createWaitSeconds, "Checking the confirmation"); }
-                        catch (Exception e) { Debug.LogWarning("Sign-up: the confirmation could not be checked: " + e.Message); }
+                        catch (Exception e) { { } }
                         signedIn = FirebaseAuth.DefaultInstance.CurrentUser ?? signedIn;
                         if (!signedIn.IsEmailVerified) { Say(msgConfirmFirst); busy = false; Refresh(); return; }
                     }
@@ -230,7 +232,7 @@ namespace GlowUp.Onboarding
             // that fails is only noted, and the profile is always kept on the phone and sent again later.
             OnboardingSession.HealthConsent = healthToggle != null && healthToggle.isOn;
             try { await UserProfileRepository.Save(OnboardingSession.ToProfile(uid)); }
-            catch (Exception e) { Debug.LogWarning("Sign-up: the profile will be sent later: " + e.Message); }
+            catch (Exception e) { { } }
             try
             {
                 // Argon2id verifier for offline sign-in (runs in the background). The password is only in memory: after the app was
@@ -241,7 +243,7 @@ namespace GlowUp.Onboarding
                 PlayerPrefs.SetInt("IsOnboarded", 1);
                 ContextualHintController.MarkNewUser(true);
             }
-            catch (Exception e) { Debug.LogWarning("Sign-up: a follow-up step was skipped: " + e.Message); }
+            catch (Exception e) { { } }
             OnboardingSession.Clear();
             if (this == null) return;
             SceneNavigator.Go(dashboardScene);
@@ -281,7 +283,7 @@ namespace GlowUp.Onboarding
         // ---------------------------------------------------------------------------------------
         //  The header (New13 item 3, 10 November 2026): the page name wrapped onto the progress bar. Now it flows: the name (at most two
         //  lines, centred, clear of the Back arrow and the X), then the bar 12 units under it, then "Step 5 of 5", then the document.
-        //  The bar and its line show ONLY when the page was opened by Generate Profile on Step 5 (OpenFromSignUp).
+        //  The bar and its line are hidden in every case since New17 (OpenFromSignUp is kept for the callers; showSteps stays false).
         // ---------------------------------------------------------------------------------------
         static bool openedFromSignUp;
         /// <summary>Step 5's Generate Profile opens this page as the last step of the sign-up (the progress bar shows).</summary>

@@ -156,7 +156,7 @@ namespace GlowUp.Auth
                 : Outcome.Failed;
             FirebaseException firebase = TaskLimits.FirebaseError(e);
             result.detail = firebase != null ? firebase.Message : e.InnerException != null ? e.InnerException.Message : e.Message;
-            Debug.LogWarning("Sign-up account: " + result.outcome + " (" + result.detail + ")");
+            { }
             return result;
         }
 

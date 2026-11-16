@@ -103,7 +103,7 @@ namespace GlowUp.SafeAreaFix
                     }
                 }
             }
-            catch (Exception e) { Debug.LogWarning("[SafeArea] Android cutout query failed: " + e.Message); return false; }
+            catch (Exception e) { { } return false; }
         }
 
         static float AndroidStatusBar()
@@ -117,7 +117,7 @@ namespace GlowUp.SafeAreaFix
                     return id > 0 ? resources.Call<int>("getDimensionPixelSize", id) : 0f;
                 }
             }
-            catch (Exception e) { Debug.LogWarning("[SafeArea] status_bar_height query failed: " + e.Message); return 0f; }
+            catch (Exception e) { { } return 0f; }
         }
 #endif
     }

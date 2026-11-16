@@ -46,7 +46,7 @@ namespace GlowUp.Auth
         {
             if (string.IsNullOrEmpty(encodedHash) || password == null) return false;
             try { return Argon2.Verify(encodedHash, password); }
-            catch (Exception e) { Debug.LogWarning("Argon2 verify failed: " + e.Message); return false; }
+            catch (Exception e) { { } return false; }
         }
     }
 
@@ -73,7 +73,7 @@ namespace GlowUp.Auth
                 Task.Run(() =>
                 {
                     try { return Argon2idHasher.Hash(password); }
-                    catch (Exception e) { Debug.LogWarning("Offline sign-in was not set up on this phone: " + e.Message); return null; }
+                    catch (Exception e) { { } return null; }
                 }).ContinueWith(done =>
                 {
                     if (done.Status != TaskStatus.RanToCompletion || string.IsNullOrEmpty(done.Result)) return;
@@ -81,7 +81,7 @@ namespace GlowUp.Auth
                     PlayerPrefs.Save();
                 }, mainThread);
             }
-            catch (Exception e) { Debug.LogWarning("Offline sign-in was not set up on this phone: " + e.Message); }
+            catch (Exception e) { { } }
         }
 
         public static bool Check(string email, string password)
@@ -95,7 +95,7 @@ namespace GlowUp.Auth
             string saved = PlayerPrefs.GetString(Key(email), "");
             if (string.IsNullOrEmpty(saved) || password == null) return false;
             try { return await Task.Run(() => Argon2idHasher.Verify(saved, password)); }
-            catch (Exception e) { Debug.LogWarning("Offline sign-in check failed: " + e.Message); return false; }
+            catch (Exception e) { { } return false; }
         }
 
         public static bool HasCredential(string email) => PlayerPrefs.HasKey(Key(email));

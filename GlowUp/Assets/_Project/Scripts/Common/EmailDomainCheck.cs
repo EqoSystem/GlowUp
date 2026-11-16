@@ -44,9 +44,9 @@ namespace GlowUp.Common
             {
                 var list = Resources.Load<TextAsset>(ThrowAwayList);
                 if (list != null) EmailDomains.AddThrowAway(list.text);
-                else Debug.LogWarning("Email rule: Resources/" + ThrowAwayList + ".txt is missing, only the built-in throw-away domains are refused.");
+                else { }
             }
-            catch (Exception e) { Debug.LogWarning("Email rule: the throw-away list was not read: " + e.Message); }
+            catch (Exception e) { { } }
         }
 
         /// <summary>An answer the app already has for this domain (from this run, or a good one kept on the phone).</summary>
@@ -98,7 +98,7 @@ namespace GlowUp.Common
             }
             catch (Exception e)
             {
-                Debug.LogWarning("Email rule: a mail-domain check got no answer: " + e.Message);
+                { }
                 return EmailDomains.Mail.NoAnswer;
             }
         }
@@ -129,7 +129,7 @@ namespace GlowUp.Common
                 while (all.items.Count > KeepMost) all.items.RemoveAt(0);
                 OfflineCache.Save(KeptFile, all);
             }
-            catch (Exception e) { Debug.LogWarning("Email rule: the answer was not kept on the phone: " + e.Message); }
+            catch (Exception e) { { } }
         }
     }
 }

@@ -61,7 +61,7 @@ namespace GlowUp.Common
         static void TellLeaving(string next)
         {
             try { Leaving?.Invoke(next); }
-            catch (Exception e) { Debug.LogException(e); }          // a listener's fault must never stop the screen change
+            catch (Exception e) { { } }          // a listener's fault must never stop the screen change
         }
 
         /// <summary>Opens a scene. Between two main screens the change slides in the direction of the bottom bar.</summary>
@@ -75,7 +75,7 @@ namespace GlowUp.Common
         /// <param name="enterFrom">1 = the next screen comes in from the right, -1 = from the left, 0 = it fades in</param>
         public static void Go(string sceneName, int enterFrom)
         {
-            if (string.IsNullOrEmpty(sceneName)) { Debug.LogWarning("SceneNavigator: no scene name given"); return; }
+            if (string.IsNullOrEmpty(sceneName)) { { } return; }
             if (ScreenTransition.IsBusy) return;                    // a change is already on its way
             // AR Try-On needs a product (12 November 2026): without one it is not opened at all, the open screen says why
             if (sceneName == SceneNames.ArTryOn && !TryOnGate.Allowed) { TryOnGate.RaiseBlocked(); return; }
@@ -143,7 +143,7 @@ namespace GlowUp.Common
 
         public void Navigate()
         {
-            if (string.IsNullOrEmpty(targetScene)) { Debug.LogWarning("SceneNavigateButton: target scene not set", this); return; }
+            if (string.IsNullOrEmpty(targetScene)) { { } return; }
             if (goThroughLoadingScene) SceneNavigator.GoViaLoading(targetScene, loadingMessage);
             else SceneNavigator.Go(targetScene);
         }

@@ -262,7 +262,7 @@ namespace GlowUp.AR
                 }
             }
 
-            catch (Exception e) { Debug.LogWarning("AR Try-On: could not read the phone's processor type: " + e.Message); return true; }
+            catch (Exception e) { { } return true; }
 #else
             return false;
 #endif
@@ -334,7 +334,7 @@ namespace GlowUp.AR
                 }
                 if (firstAllow)
                 {
-                    Debug.Log("[GlowUp] AR Try-On: the camera was just allowed; the guided preview is used for this visit (live tracking next time).");
+                    { }
                     UseGuidedPreview("the camera was just allowed: the phone is still coming back from its question", msgLiveNextTime);
                     yield break;
                 }
@@ -345,7 +345,7 @@ namespace GlowUp.AR
                 // the user has just answered "no": say so on the screen, do not ask a second time
                 routine = null;
                 if (quality != null) quality.EndSession();
-                Debug.Log("[GlowUp] AR Try-On: the camera permission was not given.");
+                { }
                 if (faceGuide != null) faceGuide.SetActive(true);
                 if (guidedCamera != null) guidedCamera.ReportPermissionRefused();
                 ModeDecided?.Invoke(false);
@@ -369,7 +369,7 @@ namespace GlowUp.AR
             Say(msgStarting);
             bool prepared = false;
             try { PreparePicture(); Subscribe(); prepared = true; }
-            catch (Exception e) { Debug.LogWarning("AR Try-On: live tracking could not be prepared: " + e.Message); }
+            catch (Exception e) { { } }
             if (!prepared) { StopLive(); UseGuidedPreview("live tracking could not be prepared"); yield break; }
 
             frames = 0;
@@ -419,7 +419,7 @@ namespace GlowUp.AR
                 if (!IsLive || picture == null) break;
                 black = BlackFrameProbe.LooksBlack(picture) ? black + 1 : 0;
                 if (black < 5) continue;
-                Debug.Log("[GlowUp] AR Try-On: the live picture stayed black although the camera runs; the guided preview is used instead.");
+                { }
                 blackWatch = null;
                 EndGuard();
                 StopLive();
@@ -452,7 +452,7 @@ namespace GlowUp.AR
             if (guidedCamera != null && guidedCamera.IsPlaying) return;
             if (!Permission.HasUserAuthorizedPermission(Permission.Camera)) return;
             recoveries++;
-            Debug.Log("[GlowUp] AR Try-On: the screen was left empty while the app was away; starting it again.");
+            { }
             routine = StartCoroutine(Run());
 #endif
         }
@@ -464,7 +464,7 @@ namespace GlowUp.AR
             IsLive = false;
             EndGuard();
             if (quality != null) quality.EndSession();
-            Debug.Log("[GlowUp] AR Try-On uses the guided preview: " + reason + ".");
+            { }
             if (faceGuide != null) faceGuide.SetActive(true);
             if (guidedCamera != null)
             {
@@ -604,7 +604,7 @@ namespace GlowUp.AR
                     if (best >= 0) cameraManager.currentConfiguration = modes[best];
                 }
             }
-            catch (System.Exception e) { Debug.LogWarning("AR Try-On: the camera kept its own picture mode: " + e.Message); }
+            catch (System.Exception e) { { } }
         }
 
         /// <summary>
@@ -815,7 +815,7 @@ namespace GlowUp.AR
                 float yawMult = tracked != null ? 1f - Mathf.SmoothStep(0f, 1f, yawT) : 1f;
                 makeup.Presence = Mathf.Min(makeup.Presence, yawMult);
                 if (Mathf.Abs(makeup.Presence - prevPresence) > 0.2f)
-                    Debug.Log($"[AR] Presence jump {prevPresence:F2}→{makeup.Presence:F2}  yaw={yaw:F1}  tracking={(seen ? "Tracking" : holding ? "Held" : "Lost")}");
+                    { }
             }
 
             string say = hasFace ? msgTracking

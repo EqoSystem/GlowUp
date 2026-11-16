@@ -85,9 +85,7 @@ namespace GlowUp.Scanning
                                 goto nextModel; // exhausted retries on this model, try the next one
 
                             float delay = ComputeBackoffSeconds(retry);
-                            Debug.LogWarning($"[GeminiApiClient] {model} attempt {retry + 1} failed " +
-                                              $"({attemptResult.ErrorCode}: {attemptResult.ErrorMessage}). " +
-                                              $"Retrying in {delay:F1}s.");
+                            { }
                             try
                             {
                                 await Task.Delay(TimeSpan.FromSeconds(delay), cancellationToken);

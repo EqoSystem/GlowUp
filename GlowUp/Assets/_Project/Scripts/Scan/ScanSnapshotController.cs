@@ -330,7 +330,7 @@ namespace GlowUp.Scan
         {
             // a barcode was read on this photo and the user named its product: this phone remembers the number for it (photo only)
             if (picked && chosen != null && barcodeSeen.Length > 0 && PhotoBarcodeMemory.Learn(barcodeSeen, chosen))
-                Debug.Log("[PhotoBarcode] learned " + barcodeSeen + " for " + chosen.name);
+                { }
             if (choice != null) { choice.TrySetResult(picked); }
         }
 
@@ -464,7 +464,7 @@ namespace GlowUp.Scan
             }
             catch (Exception e)
             {
-                Debug.LogWarning("Product photo look-up failed: " + e.Message);
+                { }
                 if (this != null && preview != null && mine == attempt) preview.Problem(msgDownV2, typeItInLabel, OpenTyping, false);
             }
             finally
@@ -495,7 +495,7 @@ namespace GlowUp.Scan
                     foreach (ProductData p in ProductRepository.Every.Products) { AddWords(p.name); AddWords(p.brandName); }
                     foreach (BrandData b in BrandRepository.All()) AddWords(b.name);
                 }
-                catch (Exception e) { Debug.LogWarning("Photo check: the catalogue words are not available: " + e.Message); }
+                catch (Exception e) { { } }
             }
             if (vocabulary.Contains(lower)) return true;
             try { return lower.Length >= 4 && IngredientKnowledge.IsExactName(lower); } catch (Exception) { return false; }
@@ -511,7 +511,7 @@ namespace GlowUp.Scan
                 foreach (BrandData b in BrandRepository.All()) if (!string.IsNullOrWhiteSpace(b.name) && !catalogueBrands.Contains(b.name)) catalogueBrands.Add(b.name);
                 foreach (ProductData p in ProductRepository.Every.Products) if (!string.IsNullOrWhiteSpace(p.brandName) && !catalogueBrands.Contains(p.brandName)) catalogueBrands.Add(p.brandName);
             }
-            catch (Exception e) { Debug.LogWarning("Photo check: the brand list is not available: " + e.Message); }
+            catch (Exception e) { { } }
             return catalogueBrands;
         }
 

@@ -198,7 +198,7 @@ namespace GlowUp.Scan
                 Refusal refusal = Check(product, brand, who, out ScanRecord record, out string reasonCode);
                 if (refusal == Refusal.None) picks.Add(new Pick { product = product, record = record });
                 else if (product.recommendable && refusal != Refusal.NotMarkedRecommendable)
-                    Debug.LogWarning($"[RecFilter] productId={product.id} reason={reasonCode}");
+                    { }
             }
             return picks;
         }

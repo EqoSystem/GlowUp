@@ -34,7 +34,7 @@ namespace GlowUp.Scan
             }
             catch (Exception e)
             {
-                Debug.LogWarning("[Scan] The phone's barcode reader is not in this build: " + e.Message);
+                { }
                 return false;
             }
         }
@@ -52,7 +52,7 @@ namespace GlowUp.Scan
                 Buffer.BlockCopy(jpg, 0, bytes, 0, jpg.Length);
                 reader.CallStatic("read", bytes, new Answer(done));
             }
-            catch (Exception e) { Debug.LogWarning("[Scan] Barcode: " + e.Message); done(""); }
+            catch (Exception e) { { } done(""); }
         }
 
         class Answer : AndroidJavaProxy

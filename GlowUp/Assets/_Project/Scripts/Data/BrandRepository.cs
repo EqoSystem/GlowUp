@@ -112,7 +112,7 @@ namespace GlowUp.Data
                 OfflineCache.Save(CacheKey, holder);
                 Changed();
             }
-            catch (Exception e) { TaskLimits.NoteFailure(e); Debug.LogWarning("Brand sync failed, using the saved copy: " + e.Message); }
+            catch (Exception e) { TaskLimits.NoteFailure(e); { } }
         }
 
         static bool IsActive(string status) => string.Equals((status ?? "").Trim(), "Active", StringComparison.OrdinalIgnoreCase);

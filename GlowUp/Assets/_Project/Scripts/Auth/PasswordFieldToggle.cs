@@ -5,7 +5,7 @@ using UnityEngine.UI;
 namespace GlowUp.Auth
 {
     /// <summary>
-    /// Password field helper: asterisks by default, an eye / closed-eye button at the end of the
+    /// Password field helper: dots by default (see <see cref="PasswordDotMask"/>), an eye / closed-eye button at the end of the
     /// field to reveal the text, and paste blocking. Put on the password TMP_InputField object;
     /// assign the eye button and the two icons in the Inspector.
     /// </summary>
@@ -31,7 +31,7 @@ namespace GlowUp.Auth
             field = GetComponent<TMP_InputField>();
             field.characterLimit = maxLength;
             field.inputType = TMP_InputField.InputType.Password;
-            field.asteriskChar = '*';
+            PasswordDotMask.ApplyTo(field);                   // dots, not asterisks; the last typed character shows for a second
             field.contentType = TMP_InputField.ContentType.Password;
             field.onValueChanged.AddListener(OnChanged);
             if (eyeButton != null) eyeButton.onClick.AddListener(Toggle);

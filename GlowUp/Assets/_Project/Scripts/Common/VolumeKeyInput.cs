@@ -25,7 +25,7 @@ namespace GlowUp.Common
                 using (var keys = new AndroidJavaClass("com.glowup.input.GlowUpVolumeKeys"))
                     keys.CallStatic("setActive", activity, on);
             }
-            catch (Exception e) { Debug.LogWarning("Volume buttons could not be " + (on ? "taken" : "given back") + ": " + e.Message); }
+            catch (Exception e) { { } }
 #endif
         }
 

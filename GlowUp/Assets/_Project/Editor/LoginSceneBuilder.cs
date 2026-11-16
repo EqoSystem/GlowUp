@@ -171,6 +171,29 @@ namespace GlowUp.EditorTools
             // ----- the app's own list of emails used on this phone -----
             BuildSavedAccounts(card, emailInput, pwInput, fb, savedListY);
 
+            // ----- New17: the "Reset your password" pop-up (its email box is filled from the Email field when one is typed) -----
+            Transform oldReset = Kit.Loose(ct, "ForgotPasswordPanel");
+            if (oldReset != null) Object.DestroyImmediate(oldReset.gameObject);
+            A.AppPopup reset = A.Overlay(new A.AppScreen { canvas = ct }, "ForgotPasswordPanel", "Reset your password");
+            A.At(reset.box, A.MC, new Vector2(0, 120), new Vector2(Inner, 780));
+            TextMeshProUGUI resetIntro = A.Label(reset.box, "IntroText", "Type the email of your account. We send a link to set a new password.",
+                                                 32, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            A.TopStrip(resetIntro.transform, 130, 110, 48, 48);
+            TMP_InputField resetEmail = SceneBuilderCore.MakeInput(reset.box, "ResetEmailField", "Enter your email", A.TC, Vector2.zero, new Vector2(800, Kit.FieldHeight));
+            A.TopStrip(resetEmail.transform, 262, Kit.FieldHeight, 48, 48);
+            Kit.StyleInput(resetEmail, "Enter your email", ThemeRole.InputBackground);
+            ClearTypedText(resetEmail);
+            var resetBehaviour = SceneBuilderCore.Ensure<InputFieldBehaviour>(resetEmail.gameObject);
+            SceneBuilderCore.SetField(resetBehaviour, "characterLimit", Kit.EmailLimit);
+            SceneBuilderCore.SetField(resetBehaviour, "contentType", (int)TMP_InputField.ContentType.EmailAddress);
+            TextMeshProUGUI resetMessage = A.Label(reset.box, "ResetMessageText", "", 29, ThemeRole.Warning, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            A.TopStrip(resetMessage.transform, 262 + Kit.FieldHeight + 12, 90, 48, 48);
+            A.ShrinkWrapped(resetMessage, 22);
+            Button resetCancel = A.PillButton(reset.box, "CancelResetButton", "Cancel", 36, ThemeRole.SurfaceAlt, ThemeRole.MainText);
+            A.BottomStrip(resetCancel.transform, 44, 108, 48, 462);
+            Button resetSend = A.PillButton(reset.box, "SendResetButton", "Send link", 36, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Mail);
+            A.BottomStrip(resetSend.transform, 44, 108, 462, 48);
+
             // ----- controller -----
             var flow = SceneBuilderCore.Ensure<LoginFlowController>(SceneBuilderCore.EnsureRoot("LoginFlowController"));
             SceneBuilderCore.SetField(flow, "emailInput", emailInput);
@@ -181,6 +204,11 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(flow, "signUpButton", signUpBtn);
             SceneBuilderCore.SetField(flow, "googleButton", google);
             SceneBuilderCore.SetField(flow, "legalEntryText", termsText != null ? termsText.GetComponent<TextMeshProUGUI>() : null);
+            SceneBuilderCore.SetField(flow, "resetPanel", reset.panel);
+            SceneBuilderCore.SetField(flow, "resetEmailInput", resetEmail);
+            SceneBuilderCore.SetField(flow, "resetMessageText", resetMessage);
+            SceneBuilderCore.SetField(flow, "resetSendButton", resetSend);
+            SceneBuilderCore.SetField(flow, "resetCancelButton", resetCancel);
 
             ThemeKit.FinishScene();       // canvas scaler, paper background, input text, round shapes, fonts, colours
             SceneBuilderCore.Save(scene);

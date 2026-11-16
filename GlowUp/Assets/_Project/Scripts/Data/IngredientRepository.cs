@@ -115,7 +115,7 @@ namespace GlowUp.Data
                 Rebuild();
                 GlowUp.Notifications.IngredientRuleWatcher.OnDownloaded(holder.items);     // tells the user when an admin changed the rules
             }
-            catch (Exception e) { TaskLimits.NoteFailure(e); Debug.LogWarning("Ingredient sync failed, using the saved copy: " + e.Message); }
+            catch (Exception e) { TaskLimits.NoteFailure(e); { } }
         }
 
         /// <summary>The comparable key of a name (the same rule as everywhere else: capitals, accents and punctuation do not matter).</summary>

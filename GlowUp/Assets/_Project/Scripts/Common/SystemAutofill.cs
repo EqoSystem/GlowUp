@@ -22,7 +22,7 @@ namespace GlowUp.Common
         {
             if (!SwitchedOff) return;
             string result = Call("switchOff");
-            if (result != null) Debug.Log("The phone's own saved-account list: " + result + ".");
+            if (result != null) { }
         }
 
         /// <summary>Call when one of the app's input fields is tapped: the keyboard's own text box is marked as soon as it exists.</summary>
@@ -47,7 +47,7 @@ namespace GlowUp.Common
             }
             catch (Exception e)
             {
-                Debug.LogWarning("The phone's own saved-account list could not be switched off: " + e.Message);
+                { }
                 return null;
             }
 #else

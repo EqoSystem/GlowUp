@@ -112,7 +112,7 @@ namespace GlowUp.Common
         void Update()
         {
             if (!busy || Time.unscaledTime - busySince < Mathf.Max(5f, giveUpAfterSeconds)) return;
-            Debug.LogWarning("ScreenTransition: the screen change did not finish; the sheet was taken away.");
+            { }
             StopAllCoroutines();
             Finish();
         }

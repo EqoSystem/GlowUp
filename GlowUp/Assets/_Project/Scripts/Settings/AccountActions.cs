@@ -30,10 +30,15 @@ namespace GlowUp.AppSettings
         [Header("Log out")]
         [SerializeField] private Button logOutButton;
         [SerializeField] private ConfirmDialog confirm;
-        [SerializeField] private string logOutTitle = "Log out?";
+        [SerializeField] private string logOutTitle = "Log Out?";
         [SerializeField] private string logOutMessage = "You can sign back in at any time with your email and password.";
         [SerializeField] private string logOutMessageWithPending = "{0} change(s) have not been sent to your account yet. They stay on this phone and are sent the next time you sign in online.";
         [SerializeField] private string logOutConfirm = "Log Out";
+        [Tooltip("The own \"Log Out?\" pop-up (exit-door button + cancel button). Empty in an older scene: the general Are-you-sure pop-up is used.")]
+        [SerializeField] private OverlayPanel logOutPanel;
+        [SerializeField] private TextMeshProUGUI logOutMessageText;
+        [SerializeField] private Button logOutConfirmButton;
+        [SerializeField] private Button logOutCancelButton;
 
         [Header("Delete account")]
         [SerializeField] private Button deleteAccountButton;
@@ -65,7 +70,7 @@ namespace GlowUp.AppSettings
         [Header("Google accounts (12 November 2026)")]
         [Tooltip("What a Google account types: only a guard against an accidental tap, never proof of who it is (Google's sign-in is)")]
         [SerializeField] private string confirmPhrase = "Confirm Delete";
-        [SerializeField] private string googleWarning = "Confirm with your Google account to delete your GlowUp account. This cannot be undone.";
+        [SerializeField] private string googleWarning = "Type Confirm Delete to permanently delete your GlowUp account, skin profile and scan history. If you signed in a while ago, Google asks you to confirm once. This cannot be undone.";
         [SerializeField] private string passwordWarning = "This permanently deletes your GlowUp account, your skin profile and your scan history. It cannot be undone.";
         [SerializeField] private string phraseLabel = "Type Confirm Delete to continue";
         [SerializeField] private string passwordLabelWords = "Type your password to confirm";
@@ -85,10 +90,13 @@ namespace GlowUp.AppSettings
         void Awake()
         {
             if (logOutButton != null) logOutButton.onClick.AddListener(AskLogOut);
+            if (logOutConfirmButton != null) logOutConfirmButton.onClick.AddListener(() => { if (logOutPanel != null) logOutPanel.Hide(); LogOut(); });
+            if (logOutCancelButton != null) logOutCancelButton.onClick.AddListener(() => { if (logOutPanel != null) logOutPanel.Hide(); });
             if (deleteAccountButton != null) deleteAccountButton.onClick.AddListener(OpenDelete);
             if (confirmDeleteButton != null) confirmDeleteButton.onClick.AddListener(() => { _ = DeleteAccount(); });
             if (cancelDeleteButton != null) cancelDeleteButton.onClick.AddListener(() => { if (!busy && deletePanel != null) deletePanel.Hide(); });
             if (passwordInput != null) passwordInput.onValueChanged.AddListener(_ => RefreshConfirm());
+            if (passwordInput != null) PasswordDotMask.ApplyTo(passwordInput);         // the password re-entry shows dots like every password box
             if (switchMethodButton != null) switchMethodButton.onClick.AddListener(() => { if (!busy) ShowMode(!googleMode); });
         }
 
@@ -99,7 +107,12 @@ namespace GlowUp.AppSettings
         {
             int waiting = SyncQueue.PendingCount;
             string message = waiting > 0 ? string.Format(logOutMessageWithPending, waiting) + "\n\n" + logOutMessage : logOutMessage;
-            if (confirm != null) confirm.Ask(logOutTitle, message, logOutConfirm, LogOut, true);
+            if (logOutPanel != null)
+            {
+                if (logOutMessageText != null) logOutMessageText.text = message;
+                logOutPanel.Show();
+            }
+            else if (confirm != null) confirm.Ask(logOutTitle, message, logOutConfirm, LogOut, true);
             else LogOut();
         }
 
@@ -182,7 +195,7 @@ namespace GlowUp.AppSettings
 
             FirebaseUser user = null;
             try { if (await FirebaseBootstrap.Ready) user = FirebaseAuth.DefaultInstance.CurrentUser; }
-            catch (Exception e) { Debug.LogWarning("Delete account: " + e.Message); }
+            catch (Exception e) { { } }
             if (user == null) { Say(msgOfflineSignIn); return; }
 
             string password = passwordInput != null ? passwordInput.text : "";
@@ -197,6 +210,11 @@ namespace GlowUp.AppSettings
                 // 1. a FRESH proof of identity, every time (never a cached session): the password against Firebase, or a new Google sign-in
                 if (!googleMode)
                     await user.ReauthenticateAsync(EmailAuthProvider.GetCredential(email, password)).OrTimeout(StepWaitSeconds, "Checking your password");
+                else if (SignedInRecently(user))
+                {
+                    // New17: a Google account that signed in a moment ago only types "Confirm Delete" (Firebase and the database
+                    // rules accept a sign-in of the last 5 minutes); an older sign-in still needs the Google check below
+                }
                 else
                 {
                     NativeGoogleSignIn.Answer google = await NativeGoogleSignIn.RequestToken();              // no time limit: the user is choosing
@@ -232,7 +250,7 @@ namespace GlowUp.AppSettings
                 }
                 await profile.DeleteAsync().OrTimeout(StepWaitSeconds, "Deleting your profile");
                 dataRemoved = true;
-                Debug.Log("[GlowUp] Delete account: " + removedScans + " scan(s) and the profile removed; deleting the sign-in.");
+                { }
                 // (no Firebase Storage is used by the app: there are no files to remove)
 
                 // 4. only then the sign-in itself
@@ -240,7 +258,7 @@ namespace GlowUp.AppSettings
             }
             catch (Exception e)
             {
-                Debug.LogWarning("Delete account: " + e.Message);
+                { }
                 if (dataRemoved) ForgetOnThisPhone(uid, email);     // the database copy is gone, so the copy on this phone must not bring it back
                 if (this == null) return;
                 SetBusy(false);
@@ -254,6 +272,18 @@ namespace GlowUp.AppSettings
             PlayerPrefs.DeleteKey("UserEmail");
             if (this == null) return;
             SceneNavigator.Go(loginScene);
+        }
+
+        /// <summary>True when the last sign-in is under 4 minutes old (the rules allow 5: one minute is left for the deleting itself).</summary>
+        static bool SignedInRecently(FirebaseUser user)
+        {
+            try
+            {
+                ulong last = user.Metadata != null ? user.Metadata.LastSignInTimestamp : 0;
+                long now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+                return last > 0 && now - (long)last < 4 * 60 * 1000;
+            }
+            catch (Exception) { return false; }
         }
 
         static void ForgetOnThisPhone(string uid, string email)

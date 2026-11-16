@@ -28,7 +28,7 @@ namespace GlowUp.Common
                     vibrator = activity.Call<AndroidJavaObject>("getSystemService", "vibrator");
                 if (vibrator != null && !vibrator.Call<bool>("hasVibrator")) vibrator = null;
             }
-            catch (Exception e) { vibrator = null; Debug.LogWarning("[Haptics] " + e.Message); }
+            catch (Exception e) { vibrator = null; { } }
             return vibrator;
         }
 #endif
@@ -55,7 +55,7 @@ namespace GlowUp.Common
                 }
                 v.Call("vibrate", length);
             }
-            catch (Exception e) { Debug.LogWarning("[Haptics] " + e.Message); }
+            catch (Exception e) { { } }
 #endif
         }
     }

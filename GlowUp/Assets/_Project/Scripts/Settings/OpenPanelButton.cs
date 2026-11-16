@@ -19,7 +19,7 @@ namespace GlowUp.AppSettings
 
         public void Open()
         {
-            if (panel == null) { Debug.LogWarning("OpenPanelButton: no pop-up chosen", this); return; }
+            if (panel == null) { { } return; }
             panel.Show();
             if (scrollToTop != null) scrollToTop.verticalNormalizedPosition = 1f;
         }

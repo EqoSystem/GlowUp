@@ -59,7 +59,7 @@ public class ProductScanner : MonoBehaviour
         }
         else
         {
-            Debug.LogError("GeminiApiConfig is missing in the Inspector!");
+            { }
         }
 
         // Set initial panel states: Scanner active, Results hidden
@@ -70,7 +70,7 @@ public class ProductScanner : MonoBehaviour
         tesseractDriver = new TesseractDriver();
         tesseractDriver.Setup(() => {
             isTesseractReady = true;
-            Debug.Log("[ProductScanner] Tesseract Initialized successfully.");
+            { }
         });
 
         CheckAndRequestCameraPermission();
@@ -84,7 +84,7 @@ public class ProductScanner : MonoBehaviour
             var callbacks = new PermissionCallbacks();
             callbacks.PermissionGranted += (string permissionName) => { InitializeCamera(); };
             callbacks.PermissionDenied += (string permissionName) => {
-                Debug.LogWarning("Camera permission denied.");
+                { }
                 if (scanStatusText != null) scanStatusText.text = "Camera permission required.";
             };
             Permission.RequestUserPermission(Permission.Camera, callbacks);
@@ -180,25 +180,25 @@ public class ProductScanner : MonoBehaviour
     // Hook this up to your "Start Scan" Button
     public async void OnStartScanClicked()
     {
-        Debug.Log("[ProductScanner] Scan button clicked!");
+        { }
 
         if (!isTesseractReady)
         {
-            Debug.LogWarning("[ProductScanner] Scan clicked, but Tesseract is still setting up.");
+            { }
             if (scanStatusText != null) scanStatusText.text = "Getting the text reader ready, please wait...";
             return;
         }
 
         if (webCamTexture == null || !webCamTexture.isPlaying)
         {
-            Debug.LogError("[ProductScanner] WebCam is not active.");
+            { }
             if (scanStatusText != null) scanStatusText.text = "Camera not ready.";
             return;
         }
 
         if (client == null)
         {
-            Debug.LogError("[ProductScanner] GeminiApiClient is not initialized.");
+            { }
             if (scanStatusText != null) scanStatusText.text = "Something went wrong. Please try again.";
             return;
         }
@@ -212,18 +212,18 @@ public class ProductScanner : MonoBehaviour
 
         // Perform local OCR recognition via Tesseract wrapper
         string rawExtractedText = tesseractDriver != null ? tesseractDriver.Recognize(snapshot) : "";
-        Debug.Log($"[ProductScanner] Raw OCR Result: '{rawExtractedText}'");
+        { }
 
         if (string.IsNullOrEmpty(rawExtractedText))
         {
             rawExtractedText = "Water, Glycerin, Niacinamide, Fragrance, Phenoxyethanol";
-            Debug.Log("[ProductScanner] No text extracted from camera frame. Using fallback text for testing.");
+            { }
         }
 
         // --- NORMALIZATION & CLEANUP INTEGRATION ---
         List<string> cleanIngredients = IngredientNormalizer.ParseAndNormalizeBatch(rawExtractedText);
         string extractedText = string.Join(", ", cleanIngredients);
-        Debug.Log($"[ProductScanner] Normalized Ingredients: '{extractedText}'");
+        { }
 
         // --- FIRESTORE BATCH QUERY INTEGRATION ---
         FirestoreManager managerToUse = firestoreManager != null ? firestoreManager : FirestoreManager.Instance;
@@ -239,13 +239,13 @@ public class ProductScanner : MonoBehaviour
                 }
                 else
                 {
-                    Debug.Log($"[ProductScanner] {details}");
+                    { }
                 }
             });
         }
         else
         {
-            Debug.LogWarning("[ProductScanner] FirestoreManager instance not found in scene.");
+            { }
         }
 
         if (scanStatusText != null) scanStatusText.text = "Analyzing ingredients...";
@@ -271,13 +271,13 @@ public class ProductScanner : MonoBehaviour
 
         if (!result.Success)
         {
-            Debug.LogWarning($"[Scan] Failed after {result.AttemptsMade} attempt(s): {result.ErrorMessage}");
+            { }
             if (scanStatusText != null)
                 scanStatusText.text = result.UserFacingMessage ?? "Scan failed. Please try again.";
             return;
         }
 
-        Debug.Log($"[Scan] Succeeded via {result.ModelUsed} in {result.AttemptsMade} attempt(s).");
+        { }
         ParseGeminiResponse(result.Analysis);
     }
 
@@ -343,14 +343,14 @@ public class ProductScanner : MonoBehaviour
    
     public void OnARTryOnClicked()
     {
-        Debug.Log("Launching AR Try-On module...");
+        { }
         if (arTryOnManager != null)
         {
             arTryOnManager.LaunchARTryOn();
         }
         else
         {
-            Debug.LogWarning("[ProductScanner] ARTryOnManager reference is missing in the Inspector.");
+            { }
         }
     }
 

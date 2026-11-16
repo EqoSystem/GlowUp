@@ -119,7 +119,7 @@ namespace GlowUp.Onboarding
             editing = value;
             if (rows != null) foreach (var r in rows) if (r != null) r.SetEditing(value);
             // the email belongs to the account (confirmed on Step 1, or Google / Facebook's own): it is not changed here
-            if (value && (OnboardingSession.Social || OnboardingSession.HasAccount) && email != null)
+            if (value && (OnboardingSession.Social || OnboardingSession.HasAccount || OnboardingSession.Retake) && email != null)
             {
                 SummaryRow emailRow = email.GetComponentInParent<SummaryRow>(true);
                 if (emailRow != null) emailRow.SetEditing(false);
@@ -153,7 +153,7 @@ namespace GlowUp.Onboarding
             // Signed in with Google: Step 1 was skipped and Google gives no birthday, so the names and the birthday are asked here and
             // are required, like on Step 1. The email is the account's own.
             bool social = OnboardingSession.Social;
-            bool hasAccount = OnboardingSession.HasAccount;        // its email was confirmed on Step 1 and is fixed
+            bool hasAccount = OnboardingSession.HasAccount || OnboardingSession.Retake;        // its email was confirmed on Step 1 and is fixed (a retake: the account's own)
             // the email: a well-known provider, or a domain that was checked online (an answer Step 1 already has is used again)
             if (!social && !hasAccount && (emailCheck == null || !emailCheck.Look(T(email))))
             {
@@ -204,7 +204,7 @@ namespace GlowUp.Onboarding
                 return;
             }
             OnboardingSession.FirstName = T(firstName); OnboardingSession.MiddleName = T(middleName); OnboardingSession.LastName = T(lastName);
-            if (!OnboardingSession.Social && !OnboardingSession.HasAccount) OnboardingSession.Email = T(email).ToLowerInvariant();     // an account's email stays the account's
+            if (!OnboardingSession.Social && !OnboardingSession.HasAccount && !OnboardingSession.Retake) OnboardingSession.Email = T(email).ToLowerInvariant();     // an account's email stays the account's
             if (birthday != null && birthday.Value.HasValue)
             {
                 var dob = birthday.Value.Value;
@@ -215,8 +215,78 @@ namespace GlowUp.Onboarding
             OnboardingSession.SkinConditions = ParseList(T(conditions));
             OnboardingSession.Allergens = ParseList(T(allergens));
             OnboardingSession.SaveDraft();
-            TermsAcceptanceFlowController.OpenFromSignUp();           // the progress bar shows on the next page only on this way in
+            if (OnboardingSession.Retake) { AskSaveEdits(); return; }   // New17: the retake ends here, with Save edits / Cancel instead of the Terms page
+            TermsAcceptanceFlowController.OpenFromSignUp();
             SceneNavigator.Go(termsScene);
+        }
+
+        // =====================================================================================
+        //  New17: the retake from Settings ends with "Save edits" / "Cancel". Save edits updates the profile of the signed-in
+        //  account (the skin answers, and the names and birthday); no account is made and the email and password stay as they are.
+        //  Cancel discards every change of the retake and returns to where it started.
+        // =====================================================================================
+        [Header("Retake (New17)")]
+        [SerializeField] private string saveEditsTitle = "Save your edits?";
+        [SerializeField] private string saveEditsMessage = "Your skin profile is updated with these answers. Your email and password stay the same.";
+        [SerializeField] private string saveEditsLabel = "Save edits";
+        [SerializeField] private string cancelEditsLabel = "Cancel";
+        [SerializeField] private string msgEditsSaved = "Your skin profile is updated.";
+        [SerializeField] private string msgEditsDiscarded = "Your edits were discarded.";
+        [SerializeField] private string msgEditsQueued = "Saved on this phone. It is sent to your account when you are online.";
+        bool savingEdits;
+
+        void AskSaveEdits()
+        {
+            var dialog = FindObjectOfType<GlowUp.AppSettings.ConfirmDialog>(true);
+            if (dialog == null) { _ = SaveEdits(); return; }
+            dialog.Ask(saveEditsTitle, saveEditsMessage, saveEditsLabel, () => _ = SaveEdits(), DiscardEdits, false, cancelEditsLabel);
+        }
+
+        string RetakeReturn => string.IsNullOrEmpty(OnboardingSession.RetakeReturnScene) ? SceneNames.Settings : OnboardingSession.RetakeReturnScene;
+
+        void DiscardEdits()
+        {
+            string back = RetakeReturn;
+            OnboardingSession.EndRetake();                      // nothing was written: the saved profile is as it was
+            FormalToast.ShowAfterNextScene(FormalToast.Kind.Info, msgEditsDiscarded);
+            SceneNavigator.Go(back);
+        }
+
+        async System.Threading.Tasks.Task SaveEdits()
+        {
+            if (savingEdits) return;
+            savingEdits = true;
+            if (generateButton != null) generateButton.interactable = false;          // no double saving
+            string back = RetakeReturn;
+            bool online = GlowUp.Net.ConnectivityMonitor.Online;
+            try
+            {
+                await GlowUp.Data.UserProfileRepository.SaveSkinProfile(OnboardingSession.SkinType, OnboardingSession.SkinTone,
+                    new List<string>(OnboardingSession.SkinConditions), new List<string>(OnboardingSession.Allergens));
+                if (OnboardingSession.RetakeWithDetails)
+                    await GlowUp.Data.UserProfileRepository.SavePersonalDetails(OnboardingSession.FirstName, OnboardingSession.MiddleName,
+                        OnboardingSession.LastName, OnboardingSession.BirthdayIso, OnboardingSession.Age);
+                // items typed that were not on the lists go to the admin website for review, as on Step 4 before
+                string uid = GlowUp.Data.UserProfileRepository.ActiveUid;
+                if (!string.IsNullOrEmpty(uid))
+                {
+                    long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                    foreach (string c in OnboardingSession.CustomConditions)
+                        GlowUp.Data.SyncQueue.EnqueueSet("conditionSuggestions/" + Guid.NewGuid().ToString("N"), new SuggestionRecord { text = c, uid = uid, status = "pending", createdAtUnix = now });
+                    foreach (string a in OnboardingSession.CustomAllergens)
+                        GlowUp.Data.SyncQueue.EnqueueSet("allergenSuggestions/" + Guid.NewGuid().ToString("N"), new SuggestionRecord { text = a, uid = uid, status = "pending", createdAtUnix = now });
+                }
+                FormalToast.ShowAfterNextScene(FormalToast.Kind.Success, online ? msgEditsSaved : msgEditsQueued);
+                OnboardingSession.EndRetake();
+                SceneNavigator.Go(back);
+            }
+            catch (Exception)
+            {
+                // the answers stay in the draft, so nothing typed is lost: the user can tap Save edits again
+                savingEdits = false;
+                if (this != null && generateButton != null) generateButton.interactable = true;
+                FormalToast.OnScreen(transform, feedbackText)?.Show(FormalToast.Kind.Error, "Your edits were not saved. Check your connection and try again.");
+            }
         }
     }
 }

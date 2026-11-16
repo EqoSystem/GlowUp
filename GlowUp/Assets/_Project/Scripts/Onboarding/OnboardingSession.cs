@@ -89,13 +89,37 @@ namespace GlowUp.Onboarding
         public static void BeginRetake(string returnScene)
         {
             Clear();
-            Retake = true; RetakeReturnScene = returnScene ?? "";
+            Retake = true; RetakeReturnScene = returnScene ?? ""; RetakeWithDetails = false;
+            SaveDraft();
+        }
+
+        /// <summary>
+        /// New17: true while the retake started from Settings runs through ALL steps (1 to 5) with the saved answers filled in. The email
+        /// and password are locked, and Step 5 ends with "Save edits" / "Cancel" instead of the Terms page. False = the older
+        /// quiz-only retake (Steps 2 to 4, saved on Step 4), still used after a sign-in whose quiz was reset.
+        /// </summary>
+        public static bool RetakeWithDetails;
+
+        /// <summary>Starts the full retake (Steps 1 to 5) with what `profile` holds now, so the user edits instead of starting over.</summary>
+        public static void BeginRetakeWith(UserProfileData profile, string returnScene)
+        {
+            BeginRetake(returnScene);
+            RetakeWithDetails = true;
+            if (profile != null)
+            {
+                FirstName = profile.firstName ?? ""; MiddleName = profile.middleName ?? ""; LastName = profile.lastName ?? "";
+                Email = (profile.email ?? "").Trim().ToLowerInvariant();
+                BirthdayIso = profile.birthday ?? ""; Age = profile.age;
+                SkinType = profile.skinType ?? ""; SkinTone = profile.skinTone ?? "";
+                SkinConditions = new List<string>(profile.skinConditions ?? new List<string>());
+                Allergens = new List<string>(profile.knownAllergens ?? new List<string>());
+            }
             SaveDraft();
         }
 
         public static void EndRetake()
         {
-            Retake = false; RetakeReturnScene = "";
+            Retake = false; RetakeReturnScene = ""; RetakeWithDetails = false;
             Clear();
         }
 
@@ -117,6 +141,7 @@ namespace GlowUp.Onboarding
             // a quiz retake is remembered too: after a restart it is still ONLY the quiz (Steps 2 to 4), never the account steps
             PlayerPrefs.SetInt(Prefix + "Retake", Retake ? 1 : 0);
             PlayerPrefs.SetString(Prefix + "RetakeReturn", RetakeReturnScene ?? "");
+            PlayerPrefs.SetInt(Prefix + "RetakeDetails", RetakeWithDetails ? 1 : 0);
             PlayerPrefs.Save();
         }
 
@@ -137,6 +162,7 @@ namespace GlowUp.Onboarding
             AccountMadeHere = PlayerPrefs.GetInt(Prefix + "AccountMadeHere", AccountMadeHere ? 1 : 0) == 1;
             Retake = PlayerPrefs.GetInt(Prefix + "Retake", Retake ? 1 : 0) == 1;
             RetakeReturnScene = PlayerPrefs.GetString(Prefix + "RetakeReturn", RetakeReturnScene ?? "");
+            RetakeWithDetails = Retake && PlayerPrefs.GetInt(Prefix + "RetakeDetails", RetakeWithDetails ? 1 : 0) == 1;
         }
 
         public static void Clear()
@@ -145,7 +171,7 @@ namespace GlowUp.Onboarding
             FirstName = MiddleName = LastName = Username = Email = BirthdayIso = SkinType = SkinTone = Password = "";
             Age = 0; SkinConditions = new List<string>(); Allergens = new List<string>();
             CustomConditions = new List<string>(); CustomAllergens = new List<string>();
-            foreach (var k in new[] { "First", "Middle", "Last", "User", "Email", "Birthday", "Age", "Type", "Tone", "Cond", "Allergens", "Account", "AccountMadeHere", "Retake", "RetakeReturn" })
+            foreach (var k in new[] { "First", "Middle", "Last", "User", "Email", "Birthday", "Age", "Type", "Tone", "Cond", "Allergens", "Account", "AccountMadeHere", "Retake", "RetakeReturn", "RetakeDetails" })
                 PlayerPrefs.DeleteKey(Prefix + k);
             PlayerPrefs.Save();
         }

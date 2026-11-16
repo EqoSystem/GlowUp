@@ -21,7 +21,7 @@ namespace GlowUp.Data
                 Directory.CreateDirectory(Dir);
                 File.WriteAllText(PathFor(key), JsonUtility.ToJson(data));
             }
-            catch (Exception e) { Debug.LogWarning($"OfflineCache.Save({key}) failed: {e.Message}"); }
+            catch (Exception e) { { } }
         }
 
         public static bool TryLoad<T>(string key, out T data)
@@ -34,7 +34,7 @@ namespace GlowUp.Data
                 data = JsonUtility.FromJson<T>(File.ReadAllText(p));
                 return data != null;
             }
-            catch (Exception e) { Debug.LogWarning($"OfflineCache.Load({key}) failed: {e.Message}"); return false; }
+            catch (Exception e) { { } return false; }
         }
 
         public static void Delete(string key)

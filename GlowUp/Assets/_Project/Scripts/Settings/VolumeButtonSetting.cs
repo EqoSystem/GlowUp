@@ -6,25 +6,25 @@ using UnityEngine;
 namespace GlowUp.AppSettings
 {
     /// <summary>
-    /// "Volume keys as shutter" on the Settings page (Camera Helpers; 11 November 2026): four tabs, Both keys, Volume up, Volume down and Off,
-    /// saved in UiPreferences.VolumeKey, and a line that says what a press does. On AI Smart Scan the chosen key starts / pauses the live
-    /// scan, and takes the photo in photo mode. Only that screen uses the keys; everywhere else they change the volume.
+    /// "Volume keys" on the Settings page (Camera Helpers). New17: On / Off, saved with the other settings in UiPreferences.VolumeKey
+    /// (On = Both, Off = Off; the older Up / Down choices count as On). On AI Smart Scan, while it is on: volume down chooses photo
+    /// capture, volume up chooses live scanning, and both keys together take the photo or start / pause the scan. Only that screen uses
+    /// the keys; everywhere else, and while this is off, they change the volume.
     /// </summary>
     public class VolumeButtonSetting : MonoBehaviour
     {
-        [Tooltip("Tab 0 = Both keys, tab 1 = Volume up, tab 2 = Volume down, tab 3 = Off")]
+        [Tooltip("Tab 0 = On, tab 1 = Off")]
         [SerializeField] private ChoiceTabs tabs;
         [SerializeField] private TextMeshProUGUI statusText;
+        const int OffIndex = 1;
 
         [Header("Wording")]
-        [SerializeField] private string bothEffect = "On AI Smart Scan: volume up switches between live scan and photo capture; volume down starts or pauses the scan, or takes the photo.";
-        [SerializeField] private string upEffect = "On AI Smart Scan: volume up switches between live scan and photo capture. Volume down changes the volume.";
-        [SerializeField] private string downEffect = "On AI Smart Scan: volume down starts or pauses the scan, or takes the photo. Volume up changes the volume.";
+        [SerializeField] private string onEffect = "On AI Smart Scan: volume down = photo capture, volume up = live scan, both keys together = take the photo or start / pause the scan.";
         [SerializeField] private string offEffect = "The volume keys only change the volume.";
 
         void Awake()
         {
-            if (tabs != null) tabs.Changed += index => UiPreferences.VolumeKey = (UiPreferences.VolumeKeys)Mathf.Clamp(index, 0, 3);
+            if (tabs != null) tabs.Changed += index => UiPreferences.VolumeKey = index == 0 ? UiPreferences.VolumeKeys.Both : UiPreferences.VolumeKeys.Off;
         }
 
         void OnEnable() { UiPreferences.Changed += Refresh; }
@@ -33,11 +33,9 @@ namespace GlowUp.AppSettings
 
         void Refresh()
         {
-            UiPreferences.VolumeKeys now = UiPreferences.VolumeKey;
-            if (tabs != null) tabs.Select((int)now);
-            if (statusText != null)
-                statusText.text = now == UiPreferences.VolumeKeys.Both ? bothEffect : now == UiPreferences.VolumeKeys.Up ? upEffect
-                                : now == UiPreferences.VolumeKeys.Down ? downEffect : offEffect;
+            bool on = UiPreferences.VolumeKey != UiPreferences.VolumeKeys.Off;
+            if (tabs != null) tabs.Select(on ? 0 : OffIndex);
+            if (statusText != null) statusText.text = on ? onEffect : offEffect;
         }
     }
 }

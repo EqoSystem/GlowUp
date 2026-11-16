@@ -143,7 +143,7 @@ namespace GlowUp.AR
             if (split != null && split.IsOn && liveTracking != null) liveTracking.SetCompare(true);
 
             if (UserProfileRepository.Cached() == null) TextSkeleton.Waiting(this);      // nothing on the phone yet: the fetched texts are bars meanwhile
-            try { profile = await UserProfileRepository.Load(); } catch (Exception e) { Debug.LogWarning("AR Try-On: " + e.Message); }
+            try { profile = await UserProfileRepository.Load(); } catch (Exception e) { { } }
             TextSkeleton.Ready(this);
             if (this == null) return;
 
@@ -408,7 +408,7 @@ namespace GlowUp.AR
         {
             if (inventory != null) return;
             try { inventory = await ProductRepository.LoadActive() ?? new List<ProductData>(); }
-            catch (Exception e) { Debug.LogWarning("AR Try-On: " + e.Message); inventory = new List<ProductData>(); }
+            catch (Exception e) { { } inventory = new List<ProductData>(); }
             if (this != null && SearchWords().Length >= searchFromLetters) FillPicker();
         }
 
@@ -440,7 +440,7 @@ namespace GlowUp.AR
                     {
                         made = ProductAnalysisEngine.Analyse(product.ingredients ?? new List<string>(), "", profile ?? new UserProfileData(), null, product.name, product.brandName, product.cosmeticType);
                     }
-                    catch (Exception e) { Debug.LogWarning("AR Try-On: " + e.Message); continue; }
+                    catch (Exception e) { { } continue; }
                     made.source = "recommendation"; made.brandId = product.brandId; made.productId = product.id;
                     made.productShades = new List<string>(product.shades ?? new List<string>());
                     made.productShadeCodes = new List<string>(product.shadeCodes ?? new List<string>());

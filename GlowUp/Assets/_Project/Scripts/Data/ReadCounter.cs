@@ -21,7 +21,7 @@ namespace GlowUp.Data
             if (documents <= 0) return;
             int scan, session;
             lock (gate) { scanTotal += documents; sessionTotal += documents; scan = scanTotal; session = sessionTotal; }
-            Debug.Log("[reads] " + label + ": " + documents + " (this scan " + scan + ", this session " + session + ")");
+            { }
         }
 
         /// <summary>A query read `documents` documents. An empty result still bills 1 read, so it is counted as 1 and says so in the label.</summary>
@@ -38,7 +38,7 @@ namespace GlowUp.Data
         {
             int finished, number;
             lock (gate) { finished = scanTotal; number = ++scanNumber; scanTotal = 0; }
-            Debug.Log("[reads] scan " + (number - 1) + " read " + finished + " documents in all. Scan " + number + " begins.");
+            { }
         }
     }
 }

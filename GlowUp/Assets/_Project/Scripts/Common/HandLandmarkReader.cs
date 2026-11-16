@@ -64,7 +64,7 @@ namespace GlowUp.Common
             catch (Exception e)
             {
                 problem = "Hand detection is not part of this build of the app.";
-                Debug.LogWarning("[FingerSigns] " + e.Message);
+                { }
                 if (javaClass != null) javaClass.Dispose();
                 return null;
             }
@@ -89,7 +89,7 @@ namespace GlowUp.Common
                 catch (Exception e)
                 {
                     Problem = "Hand detection could not start on this phone.";
-                    Debug.LogWarning("[FingerSigns] " + e.Message);
+                    { }
                     status = Status.Failed;
                 }
                 return status;
@@ -115,7 +115,7 @@ namespace GlowUp.Common
                 callback.done = done;           // one picture at a time (the Java half refuses a second), so one callback is enough
                 return reader.CallStatic<bool>("read", pixels, width, height, 0, callback);
             }
-            catch (Exception e) { Debug.LogWarning("[FingerSigns] " + e.Message); return false; }
+            catch (Exception e) { { } return false; }
         }
 
         /// <summary>Lets go of the hand finder (the model leaves the phone's memory).</summary>

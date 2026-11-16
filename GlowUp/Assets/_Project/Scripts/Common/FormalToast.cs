@@ -26,8 +26,8 @@ namespace GlowUp.Common
     {
         public enum Kind { Error, Info, Success, Warning }
 
-        [SerializeField] private float showSeconds = 3f;
-        [SerializeField] private float errorSeconds = 5f;
+        [SerializeField] private float showSeconds = 2.5f;
+        [SerializeField] private float errorSeconds = 4f;
 
         Image box, icon;
         TextMeshProUGUI words, link;
@@ -44,6 +44,29 @@ namespace GlowUp.Common
 
         void OnEnable() { if (!all.Contains(this)) all.Add(this); }
         void OnDestroy() { all.Remove(this); if (Current == this) Current = null; }
+
+        /// <summary>
+        /// A toast for the NEXT screen (New17), for a message that belongs to a change of screen, for example "Email confirmed" when
+        /// Step 1 goes on to Step 2 by itself. It shows once the next scene has loaded and its first frame is drawn.
+        /// </summary>
+        public static void ShowAfterNextScene(Kind kind, string message)
+        {
+            if (string.IsNullOrWhiteSpace(message)) return;
+            void Loaded(UnityEngine.SceneManagement.Scene scene, UnityEngine.SceneManagement.LoadSceneMode mode)
+            {
+                if (scene.name == "LoadingScene") return;                          // the loading screen in between is not the target
+                UnityEngine.SceneManagement.SceneManager.sceneLoaded -= Loaded;
+                foreach (GameObject root in scene.GetRootGameObjects())
+                {
+                    Canvas canvas = root.GetComponentInChildren<Canvas>();
+                    if (canvas == null) continue;
+                    TMP_Text font = canvas.GetComponentInChildren<TMP_Text>(true);
+                    OnScreen(canvas.transform, font)?.Show(kind, message);
+                    return;
+                }
+            }
+            UnityEngine.SceneManagement.SceneManager.sceneLoaded += Loaded;
+        }
 
         /// <summary>Kept for older callers: gives the ONE top toast of the screen (the card and anchor are no longer used).</summary>
         public static FormalToast Above(RectTransform card, RectTransform anchor, RectTransform widthFrom, TMP_Text fontFrom, float gap = 16f)
@@ -72,16 +95,59 @@ namespace GlowUp.Common
             return toast;
         }
 
-        // ---- where it sits: the header row, between the corner buttons (ToastPlacement holds the numbers, tested) ----
+        // ---- where it sits (New17): near the BOTTOM, inside the safe area, just above the lowest buttons of the screen (the bottom bar,
+        //      Continue). When that band would lie over any button or text box, or the keyboard is open, it uses the header row between
+        //      the corner buttons instead (the place that is free on every screen). ToastPlacement holds the numbers (tested). ----
         static void Place(RectTransform rt, RectTransform layer)
         {
             Rect safe = Screen.safeArea;
             float scale = layer.rect.height > 0f ? Screen.height / layer.rect.height : 1f;
             float safeTop = scale > 0f ? (Screen.height - safe.yMax) / scale : 0f;
+            float safeBottom = scale > 0f ? safe.yMin / scale : 0f;
             ToastPlacement.Band band = ToastPlacement.For(layer.rect.width, safeTop);
-            rt.anchorMin = new Vector2(0.5f, 1f); rt.anchorMax = new Vector2(0.5f, 1f); rt.pivot = new Vector2(0.5f, 1f);
             rt.sizeDelta = new Vector2(band.width, rt.sizeDelta.y);
+
+            if (!KeyboardOpen && BottomBand(rt, layer, band.width, safeBottom, out float fromBottom))
+            {
+                rt.anchorMin = new Vector2(0.5f, 0f); rt.anchorMax = new Vector2(0.5f, 0f); rt.pivot = new Vector2(0.5f, 0f);
+                rt.anchoredPosition = new Vector2(0f, fromBottom);
+                return;
+            }
+            rt.anchorMin = new Vector2(0.5f, 1f); rt.anchorMax = new Vector2(0.5f, 1f); rt.pivot = new Vector2(0.5f, 1f);
             rt.anchoredPosition = new Vector2(0f, -band.top);
+        }
+
+        static bool KeyboardOpen { get { try { return TouchScreenKeyboard.visible; } catch (Exception) { return false; } } }
+
+        /// <summary>
+        /// The bottom band: its lower edge stands a gap above the highest top edge of the buttons in the lowest part of the screen
+        /// (ToastPlacement.LowZone), and never under the safe area. False when that band would cover any visible button or text box.
+        /// </summary>
+        static bool BottomBand(RectTransform rt, RectTransform layer, float width, float safeBottom, out float fromBottom)
+        {
+            fromBottom = 0f;
+            Transform root = layer.parent;
+            if (root == null) return false;
+            Rect area = layer.rect;
+            var controls = new List<Rect>();
+            var corners = new Vector3[4];
+            foreach (Selectable control in root.GetComponentsInChildren<Selectable>(false))
+            {
+                if (control == null || !control.isActiveAndEnabled || control.transform.IsChildOf(layer)) continue;
+                if (control.GetComponentInParent<CanvasGroup>() is CanvasGroup g && g.alpha < 0.01f) continue;
+                ((RectTransform)control.transform).GetWorldCorners(corners);
+                Vector3 a = layer.InverseTransformPoint(corners[0]), b = layer.InverseTransformPoint(corners[2]);
+                Rect r = Rect.MinMaxRect(Mathf.Min(a.x, b.x), Mathf.Min(a.y, b.y), Mathf.Max(a.x, b.x), Mathf.Max(a.y, b.y));
+                if (r.width >= 1f && r.height >= 1f && r.Overlaps(area)) controls.Add(r);
+            }
+            float floor = area.yMin + safeBottom + ToastPlacement.BottomGap;
+            float lowZone = area.yMin + area.height * ToastPlacement.LowZone;
+            foreach (Rect r in controls) if (r.yMin < lowZone && r.center.y < lowZone) floor = Mathf.Max(floor, r.yMax + ToastPlacement.BottomGap);
+            Rect band = new Rect(area.center.x - width / 2f, floor, width, ToastPlacement.MaxHeight);
+            if (band.yMax > area.yMin + area.height * 0.5f) return false;                      // the bottom is full of controls: use the header row
+            foreach (Rect r in controls) if (r.Overlaps(band)) return false;
+            fromBottom = floor - area.yMin;
+            return true;
         }
 
         static FormalToast Build(RectTransform parent, TMP_Text fontFrom)
@@ -132,6 +198,30 @@ namespace GlowUp.Common
         public void Show(Kind kind, string message, string linkWords = null, Action action = null)
         {
             if (string.IsNullOrWhiteSpace(message)) { Hide(); return; }
+            // no duplicates: the same words that already show only stay a little longer
+            if (IsShowing && shownKind == kind && words.text == message && onLink == null && action == null)
+            {
+                hideAt = Mathf.Max(hideAt, Time.unscaledTime + SecondsFor(kind));
+                return;
+            }
+            // no flood: a new toast waits while the one on screen has shown for less than a moment (an error never waits)
+            if (IsShowing && kind != Kind.Error && Time.unscaledTime - shownAt < ToastPlacement.MinShowSeconds)
+            {
+                foreach (Pending p in queue) if (p.message == message && p.kind == kind) return;
+                if (queue.Count >= ToastPlacement.MaxWaiting) queue.RemoveAt(0);
+                queue.Add(new Pending { kind = kind, message = message, linkWords = linkWords, action = action });
+                return;
+            }
+            ShowNow(kind, message, linkWords, action);
+        }
+
+        struct Pending { public Kind kind; public string message, linkWords; public Action action; }
+        readonly List<Pending> queue = new List<Pending>();
+        Kind shownKind;
+
+        void ShowNow(Kind kind, string message, string linkWords, Action action)
+        {
+            shownKind = kind;
             foreach (FormalToast other in all.ToArray()) if (other != null && other != this) other.Hide();
             ThemeProfile.Palette p = RuntimeTheme.Palette;
             Color tone = ToneOf(kind, p);
@@ -188,6 +278,13 @@ namespace GlowUp.Common
         {
             if (gameObject.activeSelf) gameObject.SetActive(false);
             if (Current == this) Current = null;
+            // the next waiting toast, if any (one at a time, in the order they came)
+            if (queue.Count > 0)
+            {
+                Pending next = queue[0];
+                queue.RemoveAt(0);
+                ShowNow(next.kind, next.message, next.linkWords, next.action);
+            }
         }
 
         public bool IsShowing => gameObject.activeSelf;
@@ -239,6 +336,11 @@ namespace GlowUp.Common
         public const float TopGap = 40f + 20f;                            // card margin + a little air
         public const float MaxWidthDp = 420f, UnitsPerDp = 3f;           // 1080 units ~ 360 dp
         public const int PadX = 28, PadY = 16;
+        /// <summary>The bottom band: the gap above the lowest buttons (and above the safe area), and how high "the lowest part" reaches.</summary>
+        public const float BottomGap = 24f, LowZone = 0.3f;
+        /// <summary>A new toast waits until the shown one has been up this long; at most this many wait.</summary>
+        public const float MinShowSeconds = 1.2f;
+        public const int MaxWaiting = 3;
         public const float IconSize = 40f, FontSize = 30f, SmallestFont = 26f;
 
         public struct Band { public float top, width; }

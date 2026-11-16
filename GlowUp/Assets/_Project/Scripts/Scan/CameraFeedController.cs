@@ -205,7 +205,7 @@ namespace GlowUp.Scan
                 black = 0;
                 if (restarts >= 2) { Started?.Invoke(false, "The camera picture stays black. Close other apps that use the camera, then try again."); yield break; }
                 restarts++;
-                Debug.Log("[GlowUp] Camera: the picture stayed black although the camera runs; starting it again (" + restarts + ").");
+                { }
                 cam.Stop();
                 yield return new WaitForSecondsRealtime(0.4f);
                 if (cam == null) yield break;
@@ -398,7 +398,7 @@ namespace GlowUp.Scan
                 cam.autoFocusPoint = new Vector2(x, Mathf.Clamp(cameraPoint.y, 0.01f, 0.99f));
                 return true;
             }
-            catch (Exception e) { Debug.LogWarning("Camera: refocus is not available: " + e.Message); canRefocus = false; return false; }
+            catch (Exception e) { { } canRefocus = false; return false; }
         }
 
         // ---------------------------------------------------------------------------------------

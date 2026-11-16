@@ -60,7 +60,7 @@ namespace GlowUp.Performance
                 PlayerPrefs.SetInt(ModeKey, (int)Mode);
                 PlayerPrefs.SetInt(ModeChosenKey, 0);
                 PlayerPrefs.Save();
-                Debug.Log($"[GlowUp] First launch: {Device.Describe()} -> {Mode}");
+                { }
             }
             FrameRate = PlayerPrefs.HasKey(FrameRateKey) ? PlayerPrefs.GetInt(FrameRateKey) : Profile.Get(Mode).defaultFrameRate;
             Apply();
@@ -113,7 +113,7 @@ namespace GlowUp.Performance
             // 1. the quality level (in this project each level uses its own render settings: shadows, anti-aliasing, render scale)
             string[] levels = QualitySettings.names;
             int level = Array.FindIndex(levels, n => string.Equals(n, settings.qualityLevel, StringComparison.OrdinalIgnoreCase));
-            if (level < 0) Debug.LogWarning($"[GlowUp] Quality level '{settings.qualityLevel}' does not exist (Project Settings > Quality). Check the PerformanceProfile asset.");
+            if (level < 0) { }
 
             // In the Editor the project's own Quality settings are left alone: a change made while playing there
             // would be written into the project. On a phone the level and vSync are switched for real.

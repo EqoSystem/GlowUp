@@ -101,7 +101,7 @@ namespace GlowUp.Scan
                     if (known == null) known = ProductMatcher.Find(names, await ProductRepository.LoadActive(), record.brandId);
                     if (known != null) ApplyCatalogueProduct(record, known, profile);
                 }
-                catch (Exception e) { Debug.LogWarning("Product recognition skipped: " + e.Message); }
+                catch (Exception e) { { } }
             }
 
             // Until here the product's kind is only a guess from the label text. It is KNOWN when the inventory, the scan
@@ -121,7 +121,7 @@ namespace GlowUp.Scan
 
             // is there a SECOND place that has this product's list, and does it say the same?
             try { await CheckOtherSources(record, label, secondOpinion); }
-            catch (Exception e) { Debug.LogWarning("The list was not checked against a second source: " + e.Message); }
+            catch (Exception e) { { } }
 
             // the FDA Philippines answer: taken now when it has arrived. Otherwise the result waits a few seconds for it and then
             // opens without it: its badge says "checking" and fills in by itself when the answer comes (FinishFdaLater).
@@ -148,14 +148,14 @@ namespace GlowUp.Scan
                 if (scopeNotice.Length > 0) ScanSession.Alerts.Insert(0, new SafetyAlert { trigger = SafetyAlert.Notice, detail = scopeNotice });
                 ScanSession.AlertPending = ScanSession.Alerts.Count > 0;
             }
-            catch (Exception e) { ScanSession.AlertPending = false; Debug.LogWarning("Safety alerts skipped: " + e.Message); }
+            catch (Exception e) { ScanSession.AlertPending = false; { } }
 
             report(3, "Preparing your result");
             // Save the product to the device catalogue now; signed-in users also queue a pending website entry or review suggestion.
             // a product staged from a photo is already in pending_products: it is not added to the inventory a second time
             if (!record.pendingApproval)
                 try { ScannedProductPublisher.PublishIfNew(record, names, kindIsKnown); }
-            catch (Exception e) { Debug.LogWarning("Adding the product to the inventory was skipped: " + e.Message); }
+            catch (Exception e) { { } }
             // every scan is saved to Recent Scans automatically; a scan that was done again takes the earlier one's place
             bool replaced = earlier != null && ScanHistoryRepository.Replace(earlier.id, record);
             if (!replaced) ScanHistoryRepository.Add(record);
@@ -288,14 +288,14 @@ namespace GlowUp.Scan
                     ? PhFdaVerification.Find(productName, brandName, ScanSession.PendingShadeName)
                     : PhFdaVerification.FindInText(ScanSession.PendingText);
             }
-            catch (Exception e) { Debug.LogWarning("FDA Philippines check skipped: " + e.Message); return null; }
+            catch (Exception e) { { } return null; }
         }
 
         static Task<OpenBeautyFacts.Result> StartSecondOpinion(string barcode)
         {
             if (!ConnectivityMonitor.Online || !OpenBeautyFacts.Enabled || OpenBeautyFacts.Digits(barcode).Length == 0) return null;
             try { return OpenBeautyFacts.Find(barcode); }
-            catch (Exception e) { Debug.LogWarning("Open Beauty Facts check skipped: " + e.Message); return null; }
+            catch (Exception e) { { } return null; }
         }
 
         /// <summary>
@@ -373,7 +373,7 @@ namespace GlowUp.Scan
         /// <returns>true when the FDA's record gave the product its kind</returns>
         static bool UseFdaAnswer(ScanRecord record, Task<PhFdaVerification.Result> search, bool kindIsKnown)
         {
-            if (search.Status != TaskStatus.RanToCompletion || search.Result == null) { Debug.LogWarning("FDA Philippines check skipped: the search ended with a problem."); return false; }
+            if (search.Status != TaskStatus.RanToCompletion || search.Result == null) { { } return false; }
             PhFdaVerification.Result fda = search.Result;
             ApplyFda(record, fda);
             if (!fda.found) return false;
@@ -402,7 +402,7 @@ namespace GlowUp.Scan
                 ScanRecord kept = ScanHistoryRepository.Find(record.id);
                 if (kept == record || (kept != null && kept.scannedAtUnix == record.scannedAtUnix)) ScanHistoryRepository.Update(record);
             }
-            catch (Exception e) { Debug.LogWarning("FDA Philippines check skipped: " + e.Message); }
+            catch (Exception e) { { } }
             finally { PhFdaVerification.SetChecking(record.id, false); }
         }
 

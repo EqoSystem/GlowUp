@@ -80,11 +80,11 @@ namespace GlowUp.Scan
 
             say?.Invoke(unknown.Count == 1 ? "Looking up 1 ingredient we have not seen before" : $"Looking up {unknown.Count} ingredients we have not seen before");
             AiResearchClient.Answer answer = await AiResearchClient.Ask(config, apiKey, Question(unknown), SearchTheWeb, TimeoutSeconds);
-            if (!answer.ok) { Debug.LogWarning("Ingredient lookup skipped: " + answer.error); return 0; }
+            if (!answer.ok) { { } return 0; }
 
             var root = AiResearchClient.JsonObjectIn(answer.text);
             var items = root != null && root.TryGetValue("ingredients", out object list) ? list as List<object> : null;
-            if (items == null) { Debug.LogWarning("Ingredient lookup: the AI's answer was not in the expected form."); return 0; }
+            if (items == null) { { } return 0; }
 
             string uid = UserProfileRepository.CurrentUid;          // null when not signed in to the cloud: then it is kept on this phone only
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();

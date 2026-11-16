@@ -34,7 +34,7 @@ namespace GlowUp.AppSettings
             Show(profile);
             if (profile == null) GlowUp.Common.TextSkeleton.Waiting(this);
             try { profile = await UserProfileRepository.Load() ?? profile; }
-            catch (Exception e) { Debug.LogWarning("Settings: profile not loaded: " + e.Message); }
+            catch (Exception e) { { } }
             GlowUp.Common.TextSkeleton.Ready(this);
             if (this == null) return;
             Show(profile);

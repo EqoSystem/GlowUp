@@ -27,7 +27,9 @@ namespace GlowUp.EditorTools
         // Brief of 11 November 2026 (phase 1B): from the top down under the camera: the status line, the four chips (two rows of two),
         // then ONE row of controls: Start over | Type it in | SCAN (centred, the largest) | Photo | Finish. Nothing crowds or clips.
         static readonly Color ScanDisc = new Color32(255, 185, 213, 255), ScanDiscInk = new Color32(58, 47, 48, 255);
-        const float CornerStep = 112;                                                       // 92 button + 20 gap
+        // New17: equal steps, wide enough that the 144-unit (48 dp) touch areas of the stacked buttons never overlap
+        const float CornerStep = 148;                                                       // 92 button + 56 gap
+        const float TouchArea = 144;                                                        // 48 dp on a 1080-wide canvas (3 units per dp)
         const float SideButton = 120;                                                       // the round part of a side control (40 dp)
         const float ChipRowY = RingBottom + RingSize + 16, ChipRowH = 2 * 60 + 12;          // 304 .. 436
         const float StatusY = ChipRowY + ChipRowH + 14, StatusH = BottomBlock - StatusY - 10; // 450 .. 590: two lines
@@ -566,6 +568,11 @@ namespace GlowUp.EditorTools
             button.targetGraphic = fill;
             iconImage = A.RawIcon(fill.transform, "Icon", icon, 48, Color.white);
             SceneBuilderCore.Ensure<ButtonPressFeedback>(fill.gameObject);
+            // New17: the round button stays 92 units, but a finger may hit a 48 dp (144-unit) square around it; a tap there reaches the button
+            Image touch = A.RawPanel(fill.transform, "TouchArea", new Color(0, 0, 0, 0f), 0f);
+            touch.raycastTarget = true;
+            A.At(touch.transform, A.MC, Vector2.zero, new Vector2(TouchArea, TouchArea));
+            touch.transform.SetAsFirstSibling();
             return button;
         }
 

@@ -42,7 +42,7 @@ namespace GlowUp.Scan
             }
             catch (Exception e)
             {
-                Debug.LogWarning("FDA substance check skipped: " + e.Message);
+                { }
                 return "";
             }
         }

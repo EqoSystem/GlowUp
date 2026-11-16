@@ -18,9 +18,15 @@ namespace GlowUp.Onboarding
     /// </summary>
     public class FlipCardTile : MonoBehaviour
     {
-        const float Seconds = 0.28f;
+        const float Seconds = 0.36f;
+        // New17: the turn PIXELATES - a mosaic of squares fills the card towards the edge and clears again on the new face.
+        // Only on these skin type cards (never on Continue or another button); with reduced effects there is no mosaic.
+        const int Columns = 8, Rows = 6;
 
         readonly List<GameObject> front = new List<GameObject>();
+        readonly List<Image> cells = new List<Image>();
+        readonly List<float> cellOrder = new List<float>();
+        RectTransform mosaic;
         CanvasGroup back;
         CheckFillIndicator tick;
         bool showingBack, wantBack;
@@ -58,6 +64,53 @@ namespace GlowUp.Onboarding
             // the check in the corner: the card is chosen, whichever face shows. It FILLS when chosen (New13 item 7): the circle grows
             // and fills with the brand colour, then the tick is drawn; it empties again when another card is chosen.
             tick = CheckFillIndicator.AddTo(rt, 44f, 14f, p.buttonFill, p.buttonText);
+            BuildMosaic(rt, p);
+        }
+
+        /// <summary>The mosaic: Columns x Rows squares over the card (inside its frame), each with its own moment to appear.</summary>
+        void BuildMosaic(RectTransform rt, ThemeProfile.Palette p)
+        {
+            mosaic = RuntimeUiKit.Rect("PixelMosaic", rt);
+            RuntimeUiKit.Stretch(mosaic, 10, 10, 10, 10);
+            var grid = mosaic.gameObject.AddComponent<GridLayoutGroup>();
+            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount; grid.constraintCount = Columns;
+            var random = new System.Random(GetInstanceID());
+            for (int i = 0; i < Columns * Rows; i++)
+            {
+                RectTransform cell = RuntimeUiKit.Rect("Cell", mosaic);
+                Image img = cell.gameObject.AddComponent<Image>();
+                img.raycastTarget = false;
+                float shade = (float)random.NextDouble();
+                img.color = RuntimeTheme.Mix(p.surface, p.accent, 0.10f + 0.30f * shade);
+                cells.Add(img);
+                cellOrder.Add((float)random.NextDouble() * 0.7f);              // when this square appears (0 = first)
+            }
+            mosaic.gameObject.SetActive(false);
+        }
+
+        void SizeMosaic()
+        {
+            if (mosaic == null) return;
+            var grid = mosaic.GetComponent<GridLayoutGroup>();
+            Rect r = mosaic.rect;
+            grid.cellSize = new Vector2(Mathf.Ceil(r.width / Columns), Mathf.Ceil(r.height / Rows));
+        }
+
+        /// <summary>k = 0 (no squares) .. 1 (the card is all squares). Each square fades in over a short part of k, at its own moment.</summary>
+        void PaintMosaic(float k)
+        {
+            if (mosaic == null) return;
+            bool show = k > 0.001f;
+            if (mosaic.gameObject.activeSelf != show) { mosaic.gameObject.SetActive(show); if (show) SizeMosaic(); }
+            if (!show) return;
+            mosaic.SetAsLastSibling();
+            if (tick != null) tick.transform.SetAsLastSibling();
+            for (int i = 0; i < cells.Count; i++)
+            {
+                Color c = cells[i].color;
+                c.a = Mathf.Clamp01((k - cellOrder[i]) / 0.3f);
+                cells[i].color = c;
+            }
         }
 
         /// <summary>The card was chosen (true) or another one was (false). `animate` = turn; false = jump (a page restoring a saved answer).</summary>
@@ -103,9 +156,11 @@ namespace GlowUp.Onboarding
             float angle = eased < 0.5f ? Mathf.Lerp(0f, 90f, eased * 2f) : Mathf.Lerp(90f, 0f, (eased - 0.5f) * 2f);
             if (!swapped && eased >= 0.5f) { Face(wantBack); swapped = true; }
             transform.localRotation = Quaternion.Euler(0f, angle, 0f);
-            if (t >= 1f) transform.localRotation = Quaternion.identity;
+            // the mosaic: builds up towards the edge (all squares at 90 degrees), clears on the new face
+            PaintMosaic(eased < 0.5f ? eased * 2f : (1f - eased) * 2f);
+            if (t >= 1f) { transform.localRotation = Quaternion.identity; PaintMosaic(0f); }
         }
 
-        void OnDisable() { if (t < 1f) { Face(wantBack); t = 1f; transform.localRotation = Quaternion.identity; } }
+        void OnDisable() { if (t < 1f) { Face(wantBack); t = 1f; transform.localRotation = Quaternion.identity; } PaintMosaic(0f); }
     }
 }

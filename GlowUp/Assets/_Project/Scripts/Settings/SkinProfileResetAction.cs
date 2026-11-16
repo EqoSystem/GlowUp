@@ -35,7 +35,7 @@ namespace GlowUp.AppSettings
         [SerializeField] private string notSet = "not set";
         [SerializeField] private string noneSaved = "none";
         [SerializeField] private string confirmTitle = "Retake the skin quiz?";
-        [SerializeField] private string confirmMessage = "The quiz starts empty: skin type, skin conditions, skin tone and allergens. Your new answers replace the ones saved now when you finish.\n\nYour name, email, birthday and scan history are not changed.";
+        [SerializeField] private string confirmMessage = "You go through Steps 1 to 5 again with your current answers filled in. Change what you like; your email and password stay locked.\n\nOn the last step, Save edits keeps the changes and Cancel discards them.";
         [SerializeField] private string confirmMessageWhenClearing = "Your saved skin type, skin tone, skin conditions and allergens are cleared now and the quiz starts empty.\n\nYour name, email, birthday and scan history are not changed.";
         [SerializeField] private string confirmButtonText = "Retake Quiz";
 
@@ -50,7 +50,7 @@ namespace GlowUp.AppSettings
             Show(profile);
             if (profile == null) GlowUp.Common.TextSkeleton.Waiting(this);
             try { profile = await UserProfileRepository.Load() ?? profile; }
-            catch (Exception e) { Debug.LogWarning("Settings: profile not loaded: " + e.Message); }
+            catch (Exception e) { { } }
             GlowUp.Common.TextSkeleton.Ready(this);
             if (this == null) return;
             Show(profile);
@@ -81,7 +81,15 @@ namespace GlowUp.AppSettings
                 profile.skinConditions = new List<string>(); profile.knownAllergens = new List<string>();
                 // the four skin fields only: the account itself is never written from here (7 November 2026)
                 try { await UserProfileRepository.SaveSkinProfile("", "", new List<string>(), new List<string>()); }
-                catch (Exception e) { Debug.LogWarning("Retake: could not clear the saved profile: " + e.Message); }
+                catch (Exception e) { { } }
+            }
+            // New17: the retake goes through Steps 1 to 5 with the saved answers filled in (email and password locked), and ends with
+            // "Save edits" / "Cancel" on Step 5. With the saved profile cleared above, the quiz-only retake is kept (nothing to edit).
+            if (!clearSavedProfileBeforeQuiz && profile != null)
+            {
+                OnboardingSession.BeginRetakeWith(profile, returnScene);
+                SceneNavigator.Go(SceneNames.Onboarding1);
+                return;
             }
             OnboardingSession.BeginRetake(returnScene);
             SceneNavigator.Go(quizScene);

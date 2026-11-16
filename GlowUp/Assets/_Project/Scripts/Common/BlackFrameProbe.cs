@@ -33,7 +33,7 @@ namespace GlowUp.Common
             }
             catch (System.Exception e)
             {
-                Debug.LogWarning("Black frame probe: " + e.Message);
+                { }
                 return false;
             }
         }

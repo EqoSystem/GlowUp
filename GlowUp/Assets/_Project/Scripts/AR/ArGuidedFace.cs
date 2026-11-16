@@ -185,7 +185,7 @@ namespace GlowUp.AR
             End();
             feed = feedCamera; makeup = targetMakeup; quality = pipeline; layerParent = parent; say = sayLine; filterSettings = oneEuroSettings;
             choices = makeup != null ? makeup.Choices : null;
-            if (feed == null || makeup == null || choices == null || layerParent == null) { Debug.Log("[GuidedFace] not started: an object is missing."); return; }
+            if (feed == null || makeup == null || choices == null || layerParent == null) { { } return; }
             oldVisuals = new CanvasGroup[hide != null ? hide.Length : 0];
             for (int i = 0; i < oldVisuals.Length; i++)
             {
@@ -230,7 +230,7 @@ namespace GlowUp.AR
             lastInferenceMilliseconds = meshUpdateMilliseconds = 0f;
             filterSettings = null;
             SetFollowing(false);
-            if (was) Debug.Log("[GuidedFace] stopped.");
+            if (was) { }
         }
 
         void OnDisable() { End(); }
@@ -364,7 +364,7 @@ namespace GlowUp.AR
             ShowOldGuide(false);
             SetFollowing(true);
             Say(msgLooking);
-            Debug.Log("[GuidedFace] following the face (pipeline " + (quality != null && quality.IsLight ? "light" : "full") + ", pictures of " + pace.MaxSide + " px).");
+            { }
         }
 
         ArGuidedFaceLayer MakeLayer(string name, Texture mask, Material material)
@@ -570,7 +570,7 @@ namespace GlowUp.AR
             haveFace = false;
             presence = 0f;
             makeup.Presence = 0f;
-            Debug.LogWarning("[GuidedFace] restarted a face inference that was busy for over 2 seconds (attempt " + readerRecoveries + ").");
+            { }
         }
 
         // ---------------------------------------------------------------------------------------
@@ -635,7 +635,7 @@ namespace GlowUp.AR
         void Fail(string problem)
         {
             failed = true;
-            Debug.Log("[GuidedFace] the face cannot be followed on this phone, the guide stays: " + problem);
+            { }
             if (reader != null) { reader.Close(); reader = null; }
             ShowOldGuide(true);
             Say(problem);

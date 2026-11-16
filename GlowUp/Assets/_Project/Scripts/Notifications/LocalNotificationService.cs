@@ -72,7 +72,7 @@ namespace GlowUp.Notifications
                 AndroidNotificationCenter.CancelNotification(id);
                 AndroidNotificationCenter.SendNotificationWithExplicitID(new AndroidNotification(title, text, first, TimeSpan.FromDays(1)), ChannelId, id);
             }
-            catch (Exception e) { Debug.LogWarning("Reminder was not scheduled: " + e.Message); }
+            catch (Exception e) { { } }
         }
 
         /// <summary>A notification a moment from now.</summary>
@@ -84,14 +84,14 @@ namespace GlowUp.Notifications
                 EnsureChannel();
                 AndroidNotificationCenter.SendNotificationWithExplicitID(new AndroidNotification(title, text, DateTime.Now.AddSeconds(2)), ChannelId, id);
             }
-            catch (Exception e) { Debug.LogWarning("Notification was not shown: " + e.Message); }
+            catch (Exception e) { { } }
         }
 
         public static void Cancel(int id)
         {
             if (!Supported) return;
             try { AndroidNotificationCenter.CancelNotification(id); }
-            catch (Exception e) { Debug.LogWarning("Notification was not cancelled: " + e.Message); }
+            catch (Exception e) { { } }
         }
 #else
         /// <summary>False: the notifications package is not in this build (or this is not Android).</summary>

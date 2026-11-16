@@ -89,7 +89,7 @@ namespace GlowUp.Scan
             catch (Exception e)
             {
                 Error = e.Message;
-                Debug.LogWarning("[OcrService] Text reading is not available: " + e.Message);
+                { }
             }
         }
 
@@ -107,7 +107,7 @@ namespace GlowUp.Scan
             {
                 phoneReader.Read(uprightPicture, (text, boxes, problem) =>
                 {
-                    if (problem != null) Debug.LogWarning("[OcrService] Could not read this frame: " + problem);
+                    if (problem != null) { }
                     read.Finish(text, boxes);
                 });
                 return read;
@@ -127,7 +127,7 @@ namespace GlowUp.Scan
             try { return driver.Recognize(uprightPicture) ?? ""; }
             catch (Exception e)
             {
-                Debug.LogWarning("[OcrService] Could not read this frame: " + e.Message);
+                { }
                 return "";
             }
         }

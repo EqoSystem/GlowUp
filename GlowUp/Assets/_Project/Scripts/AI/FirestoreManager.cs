@@ -26,7 +26,7 @@ public class FirestoreManager : MonoBehaviour
     void InitializeFirebase()
     {
         db = FirebaseFirestore.DefaultInstance;
-        Debug.Log("[FirestoreManager] Initialized successfully.");
+        { }
     }
 
     public void LookupProductByIngredients(List<string> normalizedIngredients, Action<bool, string, string> onResultFound)
@@ -38,7 +38,7 @@ public class FirestoreManager : MonoBehaviour
 
         if (normalizedIngredients == null || normalizedIngredients.Count == 0)
         {
-            Debug.LogWarning("[FirestoreManager] No ingredients provided for lookup.");
+            { }
             onResultFound?.Invoke(false, "", "No ingredients provided.");
             return;
         }
@@ -63,18 +63,18 @@ public class FirestoreManager : MonoBehaviour
                     string productName = doc.ContainsField("productName") ? doc.GetValue<string>("productName") : doc.Id;
                     string productDescription = doc.ContainsField("description") ? doc.GetValue<string>("description") : "No description available in database.";
 
-                    Debug.Log($"[FirestoreManager] Product found via multi-ingredient query: {productName}");
+                    { }
                     onResultFound?.Invoke(true, productName, productDescription);
                 }
                 else
                 {
-                    Debug.Log("[FirestoreManager] No product match found for the scanned ingredients.");
+                    { }
                     onResultFound?.Invoke(false, "", "Product not found in local database.");
                 }
             }
             else
             {
-                Debug.LogError($"[FirestoreManager] Failed to query Firestore: {task.Exception}");
+                { }
                 onResultFound?.Invoke(false, "", "Database query error.");
             }
         });

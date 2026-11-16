@@ -34,7 +34,7 @@ namespace GlowUp.Common
                 }
                 catch (System.Exception e)
                 {
-                    Debug.LogWarning("Flashlight: " + e.Message);
+                    { }
                     available = 1;              // not known: keep the button, the phone says no when it is pressed
                 }
 #else
@@ -81,13 +81,13 @@ namespace GlowUp.Common
                                 string refused = torch.CallStatic<string>("set", activity, on);
                                 if (string.IsNullOrEmpty(refused)) { IsOn = on; cameraLight = on; return true; }
                                 problem = refused;
-                                Debug.LogWarning("Flashlight (through the camera): " + refused);
+                                { }
                                 if (!on) { IsOn = false; cameraLight = false; }
                                 return false;
                             }
                         }
                     }
-                    catch (System.Exception e) { Debug.LogWarning("Flashlight (through the camera): " + e.Message); }
+                    catch (System.Exception e) { { } }
 
                     // 2. no camera is on: the phone's flashlight service
                     if (!on && cameraLight) { IsOn = false; cameraLight = false; return true; }      // it went out with the camera
@@ -116,7 +116,7 @@ namespace GlowUp.Common
             {
                 IsOn = false;
                 problem = e.Message;
-                Debug.LogWarning("Flashlight: " + e.Message);
+                { }
                 return false;
             }
 #else

@@ -101,7 +101,7 @@ namespace GlowUp.AppSettings
             if (string.IsNullOrEmpty(currentReportDocId))
             {
                 currentReportDocId = Guid.NewGuid().ToString("N");
-                Debug.Log($"[SupportReport] Generated report session docId={currentReportDocId}");
+                { }
             }
         }
 
@@ -135,7 +135,7 @@ namespace GlowUp.AppSettings
             }
             else
             {
-                Debug.LogWarning($"[SupportReport] CenteredFeedbackPopup unavailable on root canvas. Message: {message}");
+                { }
             }
         }
 
@@ -185,7 +185,7 @@ namespace GlowUp.AppSettings
 
             if (!categoryValid || !descriptionValid)
             {
-                Debug.Log("[SupportReport] Validation failed: Category unselected or description empty.");
+                { }
                 ShowCenteredPopup("Incomplete Report", msgValidation, "OK");
                 return; // Keep form open, keep existing input intact
             }
@@ -221,7 +221,7 @@ namespace GlowUp.AppSettings
                 }
                 catch (Exception authEx)
                 {
-                    Debug.LogWarning("[SupportReport] Auth check warning: " + authEx.Message);
+                    { }
                 }
 
                 // Build report data dictionary
@@ -250,10 +250,10 @@ namespace GlowUp.AppSettings
                 }
                 catch (Exception scanEx)
                 {
-                    Debug.LogWarning("[SupportReport] Error extracting last scan details (continuing anyway): " + scanEx.Message);
+                    { }
                 }
 
-                Debug.Log($"[SupportReport] Initiating Firestore write docId={docId}, category={category}, length={message.Length}");
+                { }
 
                 // 3. EXECUTE FIRESTORE WRITE WITH 8-SECOND TIMEOUT WATCHDOG
                 var firestore = FirebaseFirestore.DefaultInstance;
@@ -266,7 +266,7 @@ namespace GlowUp.AppSettings
                 if (completedTask == timeoutTask)
                 {
                     // TIMEOUT: Firestore queues offline writes and will sync when back online
-                    Debug.Log($"[SupportReport] Network timeout after {sendTimeoutSeconds}s. Offline sync queued for docId={docId}");
+                    { }
                     ShowCenteredPopup(
                         "Offline Mode",
                         msgTimeout,
@@ -279,7 +279,7 @@ namespace GlowUp.AppSettings
                     // Await writeTask to capture any genuine exception (e.g., permission denied)
                     await writeTask;
 
-                    Debug.Log($"[SupportReport] Success: Document written to {Collection}/{docId}");
+                    { }
 
                     // SUCCESS OUTCOME
                     ShowCenteredPopup(
@@ -301,7 +301,7 @@ namespace GlowUp.AppSettings
             catch (Exception ex)
             {
                 // FAILURE OUTCOME (permission-denied, server exception, etc.)
-                Debug.Log($"[SupportReport] Failure writing report docId={docId}. Exception: {ex.Message}");
+                { }
                 string why = ex.Message ?? "";
                 string reason = why.IndexOf("permission", StringComparison.OrdinalIgnoreCase) >= 0 ? "The server refused the report (permission denied)."
                     : why.IndexOf("unavailable", StringComparison.OrdinalIgnoreCase) >= 0 || why.IndexOf("network", StringComparison.OrdinalIgnoreCase) >= 0 ? "The server could not be reached."

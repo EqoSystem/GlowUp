@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>GlowUp email confirmation</title>
+<style>
+  :root { --bg: #f6f1ee; --surface: #ffffff; --text: #2b2326; --muted: #6b5f63; --accent: #b83f6a; --ok: #2e7d4f; --bad: #b3402f; --border: #e6dcd8; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1f1b1d; --surface: #2a2528; --text: #f3ecee; --muted: #c4b8bc; --accent: #f08fb1; --ok: #7fd3a1; --bad: #ff9b8a; --border: #3d3639; } }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px; background: var(--bg); color: var(--text);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { width: 100%; max-width: 420px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px 24px; text-align: center; }
+  h1 { font-size: 1.4rem; margin: 0 0 8px; }
+  p { margin: 0 0 16px; color: var(--muted); overflow-wrap: anywhere; }
+  .state { font-weight: 600; color: var(--text); }
+  .state.ok::before { content: "\2713  "; color: var(--ok); }
+  .state.bad::before { content: "!  "; color: var(--bad); }
+  a.btn { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; min-width: 200px; padding: 0 20px; border-radius: 999px;
+          background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; }
+  a.btn:focus-visible { outline: 3px solid var(--text); outline-offset: 3px; }
+  @media (prefers-color-scheme: dark) { a.btn { color: #1f1b1d; } }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>GlowUp</h1>
+  <p class="state" id="state" role="status" aria-live="polite">Confirming your email...</p>
+  <p id="next" hidden>Go back to the GlowUp app: it continues with your skin profile by itself.</p>
+  <a class="btn" id="open" href="glowup://verified" hidden>Open GlowUp</a>
+</main>
+<script type="module">
+  // New17, email confirmation layer 2. Firebase's email links point here (Firebase console > Authentication > Templates > action URL).
+  //  - mode=verifyEmail: the code is applied with Firebase's own client SDK, then the app is opened again (App Link / glowup://).
+  //  - any other mode (password reset, email change): passed on UNCHANGED to Firebase's default handler, so those keep working.
+  // Nothing is stored, logged or sent anywhere else; the code in the address is only given to Firebase.
+  const DEFAULT_HANDLER = "https://glowup-admin-portal.firebaseapp.com/__/auth/action";
+  const params = new URLSearchParams(location.search);
+  const mode = params.get("mode"), code = params.get("oobCode");
+  const state = document.getElementById("state"), next = document.getElementById("next"), open = document.getElementById("open");
+  const say = (text, tone) => { state.textContent = text; state.className = "state" + (tone ? " " + tone : ""); };
+
+  if (mode !== "verifyEmail") {
+    if (mode && code) location.replace(DEFAULT_HANDLER + location.search);
+    else { say("This page opens from the link in a GlowUp email.", "bad"); }
+  } else {
+    try {
+      const { auth } = await import("../../_Database/firebase-console.js");
+      const { applyActionCode } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js");
+      await applyActionCode(auth, code);
+      say("Your email is confirmed.", "ok");
+    } catch (error) {
+      // an already used link is the usual case (the email was confirmed before): the app checks the account itself
+      const used = error && /invalid-action-code|expired-action-code/.test(String(error.code || ""));
+      say(used ? "This link was already used or has expired. If you confirmed before, the app goes on by itself." : "The email could not be confirmed here. Open the app and tap \"I have confirmed\".", used ? "" : "bad");
+    }
+    next.hidden = false;
+    open.hidden = false;
+    // try the app at once: the verified App Link first (opens the app directly), the glowup:// scheme as the fallback
+    setTimeout(() => { location.href = "glowup://verified"; }, 600);
+  }
+</script>
+</body>
+</html>

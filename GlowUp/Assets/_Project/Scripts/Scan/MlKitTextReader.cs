@@ -29,7 +29,7 @@ namespace GlowUp.Scan
             }
             catch (Exception e)
             {
-                Debug.LogWarning("[OcrService] The phone's text reader is not in this build: " + e.Message);
+                { }
                 return false;
             }
         }

@@ -51,7 +51,7 @@ namespace GlowUp.Scan
             catch (Exception e)
             {
                 Available = false;
-                Debug.LogWarning("[Scan] The phone's text reader is not in this build: " + e.Message);
+                { }
             }
         }
 
@@ -74,7 +74,7 @@ namespace GlowUp.Scan
                 callback.barcodeEarly = onBarcode;
                 return java.CallStatic<bool>("read", pixels, width, height, wantBarcode && ReadsBarcodes, callback);
             }
-            catch (Exception e) { Debug.LogWarning("[Scan] " + e.Message); return false; }
+            catch (Exception e) { { } return false; }
         }
 
         class Callback : AndroidJavaProxy

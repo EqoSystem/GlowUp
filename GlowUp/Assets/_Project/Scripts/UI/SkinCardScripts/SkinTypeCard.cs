@@ -41,7 +41,7 @@ public class SkinTypeCard : MonoBehaviour
         PlayerPrefs.SetString("SelectedSkinType", skinTypeName);
         PlayerPrefs.Save();
 
-        Debug.Log("Selected Skin Type: " + skinTypeName);
+        { }
 
       
         if (continueButton != null)

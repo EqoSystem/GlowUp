@@ -29,7 +29,7 @@ namespace GlowUp.AppSettings
         [SerializeField] private Color dangerFill = new Color32(181, 71, 47, 255);
         [SerializeField] private Color dangerText = Color.white;
 
-        Action onConfirm;
+        Action onConfirm, onCancel;
         bool danger;
 
         /// <summary>True while the question is on the screen.</summary>
@@ -41,7 +41,23 @@ namespace GlowUp.AppSettings
         void Awake()
         {
             if (confirmButton != null) confirmButton.onClick.AddListener(Confirm);
-            if (cancelButton != null) cancelButton.onClick.AddListener(() => { if (panel != null) panel.Hide(); });
+            if (cancelButton != null) cancelButton.onClick.AddListener(Cancel);
+        }
+
+        /// <summary>The Cancel button: the question goes away; a caller that asked for it (`cancelled`) is told.</summary>
+        void Cancel()
+        {
+            Action action = onCancel;
+            onCancel = null; onConfirm = null;
+            if (panel != null) panel.Hide();
+            action?.Invoke();
+        }
+
+        /// <summary>Like Ask, and `cancelled` runs when the user presses Cancel (New17: the retake's "Save edits" / "Cancel").</summary>
+        public void Ask(string title, string message, string confirmText, Action confirmed, Action cancelled, bool isDangerous = false, string cancelText = null)
+        {
+            Ask(title, message, confirmText, confirmed, isDangerous, cancelText);
+            onCancel = cancelled;
         }
 
         protected override void ApplyPalette(ThemeProfile.Palette p)
@@ -55,7 +71,7 @@ namespace GlowUp.AppSettings
         /// <summary>Shows the question. `confirmed` runs when the user presses the confirm button.</summary>
         public void Ask(string title, string message, string confirmText, Action confirmed, bool isDangerous = false, string cancelText = null)
         {
-            onConfirm = confirmed; danger = isDangerous;
+            onConfirm = confirmed; onCancel = null; danger = isDangerous;
             if (titleText != null) titleText.text = title;
             if (messageText != null) messageText.text = message;
             if (confirmLabel != null) confirmLabel.text = confirmText;
@@ -67,7 +83,7 @@ namespace GlowUp.AppSettings
         void Confirm()
         {
             Action action = onConfirm;
-            onConfirm = null;
+            onConfirm = null; onCancel = null;
             if (panel != null) panel.Hide();
             action?.Invoke();
         }

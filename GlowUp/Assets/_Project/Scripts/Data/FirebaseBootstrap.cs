@@ -28,13 +28,13 @@ namespace GlowUp.Data
                 var status = await FirebaseApp.CheckAndFixDependenciesAsync();
                 if (status != DependencyStatus.Available)
                 {
-                    Debug.LogWarning("Firebase unavailable: " + status);
+                    { }
                     return false;
                 }
             }
             catch (Exception e)
             {
-                Debug.LogWarning("Firebase init failed (offline mode): " + e.Message);
+                { }
                 return false;
             }
 
@@ -50,7 +50,7 @@ namespace GlowUp.Data
             }
             catch (Exception e)
             {
-                Debug.LogWarning("Firestore settings were left at their defaults: " + e.Message);
+                { }
             }
             return true;
         }

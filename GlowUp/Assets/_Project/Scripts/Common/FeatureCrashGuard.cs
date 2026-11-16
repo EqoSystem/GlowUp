@@ -78,7 +78,7 @@ namespace GlowUp.Common
             if (PlayerPrefs.GetString(Key(feature, "build"), "") == Build)
             {
                 PlayerPrefs.SetInt(Key(feature, "blocked"), 1);
-                Debug.LogWarning("[GlowUp] \"" + feature + "\" closed the app the last time it was started. It is switched off on this phone until the app is updated.");
+                { }
             }
             PlayerPrefs.Save();
         }

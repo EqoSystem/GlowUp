@@ -112,14 +112,14 @@ namespace GlowUp.Auth
         {
             if (emails != null) return;
             try { emails = OfflineCache.TryLoad(KeptFile, out Kept kept) && kept != null && kept.emails != null ? With(kept.emails, null, Most) : new List<string>(); }
-            catch (Exception e) { Debug.LogWarning("Saved emails: the list could not be read: " + e.Message); emails = new List<string>(); }
+            catch (Exception e) { { } emails = new List<string>(); }
         }
 
         static void Save()
         {
             if (memoryOnly) return;
             try { OfflineCache.Save(KeptFile, new Kept { emails = new List<string>(emails) }); }
-            catch (Exception e) { Debug.LogWarning("Saved emails: the list was not kept: " + e.Message); }
+            catch (Exception e) { { } }
         }
     }
 }

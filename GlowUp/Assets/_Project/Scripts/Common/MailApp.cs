@@ -28,7 +28,7 @@ namespace GlowUp.Common
                     }
                 }
             }
-            catch (System.Exception e) { Debug.LogWarning("[GlowUp] Open Gmail: " + e.Message); return Result.None; }
+            catch (System.Exception e) { { } return Result.None; }
 #else
             return Result.NotOnThisPlatform;
 #endif

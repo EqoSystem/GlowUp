@@ -121,7 +121,7 @@ namespace GlowUp.AR
                 readBack.Apply(false);
                 RenderTexture.active = previous;
             }
-            catch (System.Exception e) { Debug.LogWarning("AR Try-On: the light could not be measured, the colours stay as they are: " + e.Message); running = false; return; }
+            catch (System.Exception e) { { } running = false; return; }
 
             Color32[] pixels = readBack.GetPixels32();
             double all = 0; int count = 0;

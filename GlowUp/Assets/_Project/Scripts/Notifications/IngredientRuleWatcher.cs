@@ -51,7 +51,7 @@ namespace GlowUp.Notifications
                     LocalNotificationService.ShowNow(ReminderScheduler.RuleUpdateId, NotificationPreferences.RuleUpdateTitle, NotificationPreferences.RuleUpdateText);
                 Updated?.Invoke();
             }
-            catch (Exception e) { Debug.LogWarning("Rule update check skipped: " + e.Message); }
+            catch (Exception e) { { } }
         }
 
         /// <summary>One short text that changes whenever a trusted entry is added, removed or edited.</summary>

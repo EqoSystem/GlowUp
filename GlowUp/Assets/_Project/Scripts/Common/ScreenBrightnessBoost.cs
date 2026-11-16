@@ -122,7 +122,7 @@ namespace GlowUp.Common
         {
 #if (UNITY_ANDROID || UNITY_IOS) && !UNITY_EDITOR
             try { float now = Screen.brightness; if (now > 0.02f && now <= 1f) return now; }
-            catch (System.Exception e) { Debug.LogWarning("Screen brightness could not be read: " + e.Message); }
+            catch (System.Exception e) { { } }
 #endif
             return 0.5f;
         }
@@ -138,7 +138,7 @@ namespace GlowUp.Common
                 using (var helper = new AndroidJavaClass("com.glowup.screen.GlowUpScreen"))
                     helper.CallStatic("setBrightness", activity, value);        // Assets/Plugins/Android/GlowUpScreen.java
             }
-            catch (System.Exception e) { Debug.LogWarning("Screen brightness: " + e.Message); }
+            catch (System.Exception e) { { } }
 #elif UNITY_IOS && !UNITY_EDITOR
             if (value >= 0f) Screen.brightness = Mathf.Clamp(value, 0.05f, 1f);
 #endif

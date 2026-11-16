@@ -25,16 +25,16 @@ namespace GlowUp.Scan
             if (picture == null) return "";
             if (!MlKitBarcodeReader.TryCreate(out MlKitBarcodeReader reader))
             {
-                Debug.LogWarning("[PhotoBarcode] the phone's barcode reader is not in this build (not in the Editor, or the ML Kit barcode library is missing).");
+                { }
                 return "";
             }
             var done = new TaskCompletionSource<string>();
             try { reader.Read(picture, code => done.TrySetResult(code ?? "")); }
-            catch (Exception e) { Debug.LogWarning("[PhotoBarcode] " + e.Message); return ""; }
+            catch (Exception e) { { } return ""; }
             Task first = await Task.WhenAny(done.Task, Task.Delay(TimeSpan.FromSeconds(ReadSeconds)));
             string raw = first == done.Task ? done.Task.Result : "";
             string key = MlKitBarcodeReader.Key(raw);
-            Debug.Log("[PhotoBarcode] picture " + picture.width + "x" + picture.height + ": " + (key.Length > 0 ? "read " + key : raw.Length > 0 ? "read '" + raw + "' (not a product number)" : "no barcode seen"));
+            { }
             return key;
         }
 

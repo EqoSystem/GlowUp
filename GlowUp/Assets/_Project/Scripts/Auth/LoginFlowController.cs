@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Firebase;
 using Firebase.Auth;
 using GlowUp.Common;
 using GlowUp.Data;
@@ -34,6 +35,19 @@ namespace GlowUp.Auth
         [SerializeField] private Button privacyPolicyButton;
         [SerializeField] private Button termsButton;
         [SerializeField] private TextMeshProUGUI legalEntryText;
+
+        [Header("Forgot password (New17)")]
+        [Tooltip("The \"Reset your password\" pop-up. Empty in an older scene: the Email field is used directly, as before.")]
+        [SerializeField] private OverlayPanel resetPanel;
+        [SerializeField] private TMP_InputField resetEmailInput;
+        [SerializeField] private TextMeshProUGUI resetMessageText;
+        [SerializeField] private Button resetSendButton;
+        [SerializeField] private Button resetCancelButton;
+        [SerializeField] private string msgResetSending = "Sending reset link...";
+        [Tooltip("The same words whether or not an account uses that email, so nobody can find out which emails have an account")]
+        [SerializeField] private string msgResetGeneric = "If an account uses that email, a reset link is on its way. Check your inbox and spam folder.";
+        [SerializeField] private string msgResetBadEmail = "Check the email address: it should look like name@example.com.";
+        [SerializeField] private string msgResetFailed = "The reset link could not be sent. Try again in a moment.";
 
         [Header("Scenes")]
         [SerializeField] private string dashboardScene = SceneNames.Dashboard;
@@ -76,6 +90,9 @@ namespace GlowUp.Auth
             if (emailInput != null) emailInput.onValueChanged.AddListener(value => { if (string.IsNullOrEmpty(value) && passwordInput != null && !string.IsNullOrEmpty(passwordInput.text)) passwordInput.text = ""; });
 
             Hook(signInButton, SignIn); Hook(forgotPasswordButton, ForgotPassword); Hook(signUpButton, SignUp);
+            Hook(resetSendButton, SendReset);
+            Hook(resetCancelButton, () => { if (resetPanel != null) resetPanel.Hide(); });
+            if (resetEmailInput != null) resetEmailInput.onValueChanged.AddListener(_ => SayReset(""));        // a message goes once the user types again
             Hook(googleButton, () => Social("Google"));
             if (privacyPolicyButton != null) Hook(privacyPolicyButton, OpenLegalDocuments);
             if (termsButton != null && termsButton != privacyPolicyButton) Hook(termsButton, OpenLegalDocuments);
@@ -161,7 +178,7 @@ namespace GlowUp.Auth
                     if (profile == null)
                     {
                         try { profile = await UserProfileRepository.Load(); }
-                        catch (Exception e) { Debug.LogWarning("Session restore: " + e.Message); }
+                        catch (Exception e) { { } }
                         if (this == null) return;
                     }
                     // a quiz retake that was going on when the app closed: back into the quiz only (Steps 2 to 4)
@@ -186,7 +203,7 @@ namespace GlowUp.Auth
                 if (!string.IsNullOrEmpty(UserProfileRepository.OfflineEmail) && UserProfileRepository.Cached() != null)
                     SceneNavigator.Go(dashboardScene);
             }
-            catch (Exception e) { Debug.LogWarning("Session restore skipped: " + e.Message); }
+            catch (Exception e) { { } }
         }
 
         async void SignIn()
@@ -214,7 +231,7 @@ namespace GlowUp.Auth
                     catch (Exception e)
                     {
                         if (!TaskLimits.IsNetworkProblem(e)) { Fail(msgBadCredentials); return; }
-                        Debug.LogWarning("Sign-in: no answer from the sign-in service, checking on this phone instead: " + e.Message);
+                        { }
                     }
                 }
 
@@ -226,7 +243,7 @@ namespace GlowUp.Auth
                     SavedAccounts.Remember(email);                     // only the email: it is offered under the email field next time
                     UserProfileData profile = null;
                     try { profile = await UserProfileRepository.Load(); }
-                    catch (Exception e) { Debug.LogWarning("Sign-in: the profile could not be loaded yet: " + e.Message); }
+                    catch (Exception e) { { } }
                     if (this == null) return;
                     if (profile == null && !UserProfileRepository.NoProfileInCloud)
                     {
@@ -254,11 +271,78 @@ namespace GlowUp.Auth
                 }
                 else Fail(OfflineCredentialStore.HasCredential(email) ? msgBadCredentials : msgOfflineNoRecord);
             }
-            catch (Exception e) { Debug.LogWarning("Sign-in failed: " + e.Message); Fail(msgBadCredentials); }
+            catch (Exception e) { { } Fail(msgBadCredentials); }
             finally { if (this != null && signInButton != null) signInButton.interactable = true; }
         }
 
-        async void ForgotPassword()
+        /// <summary>
+        /// Forgot Password? opens "Reset your password": the email typed on the login page is already in its box; with none typed the
+        /// box is empty and has the focus. The pop-up sends Firebase's own password-reset email.
+        /// </summary>
+        void ForgotPassword()
+        {
+            if (resetPanel == null || resetEmailInput == null) { ForgotPasswordDirect(); return; }
+            string typed = emailInput != null ? emailInput.text.Trim() : "";
+            resetEmailInput.text = typed;
+            SayReset("");
+            if (resetSendButton != null) resetSendButton.interactable = true;
+            resetPanel.Show();
+            if (typed.Length == 0) { resetEmailInput.Select(); resetEmailInput.ActivateInputField(); }
+        }
+
+        void SayReset(string message) { if (resetMessageText != null) resetMessageText.text = message; }
+
+        static bool LooksLikeEmail(string s)
+        {
+            int at = s.IndexOf('@');
+            return at > 0 && at == s.LastIndexOf('@') && s.IndexOf('.', at) > at + 1 && !s.EndsWith(".") && s.IndexOf(' ') < 0;
+        }
+
+        async void SendReset()
+        {
+            string email = resetEmailInput != null ? resetEmailInput.text.Trim() : "";
+            // checked when Send is tapped, never while typing; the typed text stays in the box
+            if (email.Length == 0) { SayReset(msgEnterEmail); return; }
+            if (!LooksLikeEmail(email)) { SayReset(msgResetBadEmail); return; }
+            if (!ConnectivityMonitor.Online) { Toast()?.Show(FormalToast.Kind.Error, msgResetNeedsOnline); return; }
+            if (resetSendButton != null) resetSendButton.interactable = false;          // no double sending
+            Toast()?.Show(FormalToast.Kind.Info, msgResetSending);
+            try
+            {
+                await FirebaseBootstrap.Ready;
+                await FirebaseAuth.DefaultInstance.SendPasswordResetEmailAsync(email).OrTimeout(signInWaitSeconds, "Sending the reset email");
+                ResetDone();
+            }
+            catch (Exception e)
+            {
+                if (this == null) return;
+                if (resetSendButton != null) resetSendButton.interactable = true;
+                AuthError code = AuthErrorOf(e);
+                if (code == AuthError.UserNotFound) { ResetDone(); return; }            // the same answer as a sent link: nothing reveals the account
+                if (code == AuthError.InvalidEmail) { SayReset(msgResetBadEmail); return; }
+                Toast()?.Show(FormalToast.Kind.Error, TaskLimits.IsNetworkProblem(e) ? msgResetNeedsOnline : msgResetFailed);
+            }
+        }
+
+        void ResetDone()
+        {
+            if (this == null) return;
+            if (resetPanel != null) resetPanel.Hide();
+            Toast()?.Show(FormalToast.Kind.Success, msgResetGeneric);
+        }
+
+        static AuthError AuthErrorOf(Exception e)
+        {
+            for (Exception x = e; x != null; x = x.InnerException)
+                if (x is FirebaseException f) return (AuthError)f.ErrorCode;
+            if (e is AggregateException a)
+                foreach (Exception inner in a.Flatten().InnerExceptions)
+                    for (Exception x = inner; x != null; x = x.InnerException)
+                        if (x is FirebaseException f) return (AuthError)f.ErrorCode;
+            return AuthError.None;
+        }
+
+        async void ForgotPasswordDirect()
         {
             string email = emailInput != null ? emailInput.text.Trim() : "";
             if (email.Length == 0) { Fail(msgEnterEmail); return; }
@@ -303,13 +387,13 @@ namespace GlowUp.Auth
                 UserProfileRepository.OfflineEmail = null;
                 UserProfileData profile = null;
                 try { profile = await UserProfileRepository.Load(); }
-                catch (Exception e) { Debug.LogWarning("Sign-in: the profile could not be loaded yet: " + e.Message); }
+                catch (Exception e) { { } }
                 if (this == null) return;
                 if (HasSkinProfile(profile)) SceneNavigator.Go(dashboardScene);       // already has a skin profile: straight to the dashboard
                 else if (FinishedSignUp(profile)) RetakeQuizOnly();                   // a finished account whose quiz was reset: the quiz only
                 else StartSocialSignUp(outcome.User);                                  // no skin profile yet: the skin quiz (Onboarding Step 2)
             }
-            catch (Exception e) { Debug.LogWarning(name + " sign-in failed: " + e); FailWithRetry(SocialSignIn.DidNotComplete, name); }
+            catch (Exception e) { { } FailWithRetry(SocialSignIn.DidNotComplete, name); }
             finally { socialBusy = false; }
         }
 

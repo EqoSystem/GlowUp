@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.UnityTechnologies.com.unity.template.urpblank",
+      "sha256_cert_fingerprints": [
+        "3C:65:2F:DF:05:79:6F:60:DF:E8:B7:62:AB:8D:05:B1:6A:6C:88:A1:E4:5D:CA:42:CA:EC:1E:B1:67:7C:56:C1"
+      ]
+    }
+  }
+]

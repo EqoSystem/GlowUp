@@ -290,7 +290,7 @@ namespace GlowUp.AR
         {
             RefreshMetrics();
             GUIUtility.systemCopyBuffer = text.ToString();
-            Debug.Log("[ARLatency] Debug values copied to the clipboard.");
+            { }
         }
 
         void SetVisible(bool on)

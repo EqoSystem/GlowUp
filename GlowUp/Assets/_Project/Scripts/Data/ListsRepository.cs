@@ -209,7 +209,7 @@ namespace GlowUp.Data
                 Version++;
                 Changed?.Invoke();
             }
-            catch (Exception e) { TaskLimits.NoteFailure(e); Debug.LogWarning("The lists could not be downloaded, using the copy on the phone: " + e.Message); }
+            catch (Exception e) { TaskLimits.NoteFailure(e); { } }
         }
 
         static List<ListItem> ReadItems(Dictionary<string, object> data, string key)

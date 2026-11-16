@@ -104,7 +104,7 @@ namespace GlowUp.Views
             Message(msgAsking, false);
             ProductAiAdvisor.Insight answer = null;
             try { answer = await ProductAiAdvisor.Describe(productName, brand, type, ingredients); }
-            catch (Exception e) { Debug.LogWarning("AI product description: " + e.Message); }
+            catch (Exception e) { { } }
             if (this == null || mine != request) return;
             SetBusy(false);
             if (answer == null || string.IsNullOrWhiteSpace(answer.text)) { Message(msgNothing, true); return; }

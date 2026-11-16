@@ -68,7 +68,7 @@ namespace GlowUp.Auth
             }
             if (native.result == NativeGoogleSignIn.Result.Failed)
             {
-                Debug.LogWarning("[GlowUp] Google sign-in on the phone failed: " + native.detail);
+                { }
                 return new Outcome { Problem = DidNotComplete };
             }
             // 2. NO BROWSER any more (10 November 2026). The old fallback opened Google's page in the phone's browser and came back through
@@ -76,7 +76,7 @@ namespace GlowUp.Auth
             //    tabs, some in-app browsers) lose the sign-in state there and show Firebase's black "missing initial state" page, which the
             //    app cannot style or recover from. A clear message is shown instead.
             if (native.result == NativeGoogleSignIn.Result.NoAccount) return new Outcome { Problem = NoGoogleAccount };
-            Debug.LogWarning("[GlowUp] Google sign-in on the phone is not available: " + native.detail);
+            { }
             return new Outcome { Problem = GoogleUnavailable };
         }
 
@@ -125,8 +125,7 @@ namespace GlowUp.Auth
         {
             FirebaseException firebase = TaskLimits.FirebaseError(e);
             AuthError code = firebase != null ? (AuthError)firebase.ErrorCode : AuthError.None;
-            Debug.LogWarning("[GlowUp] " + name + " sign-in: " + (firebase != null ? code + " " + firebase.Message : e.ToString())
-                + (e.InnerException != null ? " | inner: " + e.InnerException.Message : ""));
+            { }
             switch (code)
             {
                 case AuthError.WebContextCancelled:

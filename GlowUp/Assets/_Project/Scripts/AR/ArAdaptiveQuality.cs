@@ -108,7 +108,7 @@ namespace GlowUp.AR
             policy.Begin(ArQualitySettings.Tier, ArQualitySettings.FoundSlow);
             running = true; sinceStart = 0f; windowTime = 0f; frames = 0;
             ApplyFrameCap();
-            Debug.Log("[GlowUp] AR Try-On pipeline: " + Tier + " (choice " + ArQualitySettings.Choice + ", " + ArQualitySettings.DescribeDevice() + ").");
+            { }
         }
 
         /// <summary>Live tracking stopped: the app's own frame-rate cap comes back.</summary>
@@ -153,20 +153,20 @@ namespace GlowUp.AR
             switch (verdict)
             {
                 case ArTierPolicy.Verdict.MoveToLight:
-                    Debug.Log("[GlowUp] AR Try-On frame-time check: " + window.averageFps.ToString("0") + " fps, 95% of frames within " + window.p95Ms.ToString("0") + " ms. Moving this phone to the light pipeline.");
+                    { }
                     ArQualitySettings.RememberSlow();
                     ApplyFrameCap();
                     sinceStart = 0f;                     // the new pipeline gets its own warm-up
                     TierChanged?.Invoke();
                     break;
                 case ArTierPolicy.Verdict.TryFull:
-                    Debug.Log("[GlowUp] AR Try-On runs steadily in the light pipeline (" + window.p95Ms.ToString("0") + " ms). Trying the full pipeline again.");
+                    { }
                     ApplyFrameCap();
                     sinceStart = 0f;
                     TierChanged?.Invoke();
                     break;
                 case ArTierPolicy.Verdict.TrialPassed:
-                    Debug.Log("[GlowUp] AR Try-On: the full pipeline keeps up now; it stays.");
+                    { }
                     ArQualitySettings.ForgetSlow();
                     break;
             }

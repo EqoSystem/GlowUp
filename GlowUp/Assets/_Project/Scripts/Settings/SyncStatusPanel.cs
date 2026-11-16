@@ -112,7 +112,7 @@ namespace GlowUp.AppSettings
                 // also covers a send that was already running when the button was pressed
                 while ((!sending.IsCompleted || SyncQueue.IsSyncing) && Time.realtimeSinceStartup < deadline) await System.Threading.Tasks.Task.Delay(150);
             }
-            catch (Exception e) { Debug.LogWarning("Sync Now: " + e.Message); }
+            catch (Exception e) { { } }
             if (this == null) return;
             busy = false;
             Refresh();

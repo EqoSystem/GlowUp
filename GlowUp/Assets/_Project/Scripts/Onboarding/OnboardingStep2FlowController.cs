@@ -55,7 +55,8 @@ namespace GlowUp.Onboarding
         /// </summary>
         void GoBack()
         {
-            if (OnboardingSession.Retake || OnboardingSession.Social) OnboardingLeaveGuard.RequestLeave();
+            if (OnboardingSession.Retake && OnboardingSession.RetakeWithDetails) SceneNavigator.Go(previousScene);     // New17: the full retake has Step 1 before this page
+            else if (OnboardingSession.Retake || OnboardingSession.Social) OnboardingLeaveGuard.RequestLeave();
             else SceneNavigator.Go(previousScene);
         }
 

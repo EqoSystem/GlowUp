@@ -114,10 +114,11 @@ namespace GlowUp.Tests
             try
             {
                 FormalToast t = go.AddComponent<FormalToast>();
-                Assert.AreEqual(3f, t.SecondsFor(FormalToast.Kind.Success), 0.01f);
-                Assert.AreEqual(3f, t.SecondsFor(FormalToast.Kind.Info), 0.01f);
-                Assert.AreEqual(5f, t.SecondsFor(FormalToast.Kind.Error), 0.01f);
-                Assert.AreEqual(5f, t.SecondsFor(FormalToast.Kind.Warning), 0.01f);
+                // New17: about 2-3 s for a normal message, slightly longer for warnings and errors
+                Assert.AreEqual(2.5f, t.SecondsFor(FormalToast.Kind.Success), 0.01f);
+                Assert.AreEqual(2.5f, t.SecondsFor(FormalToast.Kind.Info), 0.01f);
+                Assert.AreEqual(4f, t.SecondsFor(FormalToast.Kind.Error), 0.01f);
+                Assert.AreEqual(4f, t.SecondsFor(FormalToast.Kind.Warning), 0.01f);
             }
             finally { Object.DestroyImmediate(go); }
         }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using GlowUp.Auth;
 using GlowUp.Common;
@@ -121,10 +122,16 @@ namespace GlowUp.Onboarding
             Limit(email, emailMax); Limit(password, passwordMax); Limit(retypePassword, passwordMax);
 
             foreach (var f in new[] { firstName, middleName, lastName, email, password, retypePassword })
-                if (f != null) f.onValueChanged.AddListener(_ => { flowMessage = ""; Validate(); });
+                if (f != null)
+                {
+                    f.onValueChanged.AddListener(_ => { flowMessage = ""; Validate(); });
+                    TMP_InputField field = f;
+                    f.onEndEdit.AddListener(_ => { if (T(field).Length > 0) left.Add(field); Validate(); });        // a field's error shows once the user leaves it
+                }
             if (password != null) password.onSelect.AddListener(_ => RevealPasswordRequirements());
             if (birthday != null) birthday.DateChanged += OnBirthday;
             if (continueButton != null) continueButton.onClick.AddListener(OnContinue);
+            DisabledTapRelay.On(continueButton, OnContinue);         // a tap on the greyed Continue names the field that needs correcting
             if (backButton != null) backButton.onClick.AddListener(OnBack);
             if (age != null) { age.readOnly = true; age.interactable = false; }
             // any real mail domain may sign up now (12 October 2026); the verifier says when a checked domain has its answer
@@ -157,11 +164,47 @@ namespace GlowUp.Onboarding
             Set(firstName, OnboardingSession.FirstName); Set(middleName, OnboardingSession.MiddleName);
             Set(lastName, OnboardingSession.LastName); Set(email, OnboardingSession.Email);
             if (DateTime.TryParse(OnboardingSession.BirthdayIso, out var dob)) { birthday.SetValue(dob); SetAge(dob); }
-            if (OnboardingSession.Social || OnboardingSession.HasAccount) UseAccountEmail();
+            if (OnboardingSession.Retake) LockForRetake();
+            else if (OnboardingSession.Social || OnboardingSession.HasAccount) UseAccountEmail();
             Limit(email, emailMax);          // once more after every script on the field has started: theirs is the older, shorter limit in a scene that was not rebuilt
             Show("");
             Validate();
             if (OnboardingSession.HasAccount) _ = CheckAccountIsStillThere();
+            StartCoroutine(FocusFirstEmpty());
+        }
+
+        /// <summary>New17: the first empty box gets the focus when the page opens (the keyboard opens with it), once the layout has settled.</summary>
+        IEnumerator FocusFirstEmpty()
+        {
+            yield return null;
+            yield return new WaitForSecondsRealtime(0.35f);
+            foreach (TMP_InputField f in new[] { firstName, lastName, email, password, retypePassword })
+            {
+                if (f == null || !f.isActiveAndEnabled || !f.interactable || f.readOnly || T(f).Length > 0) continue;
+                f.Select(); f.ActivateInputField();
+                yield break;
+            }
+        }
+
+        // New17: errors are shown when Continue is tapped or a field is left, never while the user is typing
+        readonly HashSet<TMP_InputField> left = new HashSet<TMP_InputField>();
+        bool submitted;
+        [SerializeField] private string msgNoMatch = "The two passwords are not the same.";
+
+        bool Judged(TMP_InputField f) => submitted || (f != null && left.Contains(f));
+
+        /// <summary>After a tap on Continue that cannot go on: the first box that needs correcting gets the focus (what was typed stays).</summary>
+        void FocusFirstWrong()
+        {
+            string pw = password != null ? password.text : "", re = retypePassword != null ? retypePassword.text : "";
+            bool askingPassword = !(OnboardingSession.Social || OnboardingSession.HasAccount);
+            TMP_InputField wrong =
+                requireFirstAndLastName && T(firstName).Length == 0 ? firstName :
+                requireFirstAndLastName && T(lastName).Length == 0 ? lastName :
+                !emailFromAccount && (emailCheck == null || !emailCheck.Look(T(email))) ? email :
+                askingPassword && pw.Length < passwordMin ? password :
+                askingPassword && re != pw ? retypePassword : null;
+            if (wrong != null && wrong.isActiveAndEnabled && wrong.interactable) { wrong.Select(); wrong.ActivateInputField(); }
         }
 
         bool emailFromAccount, busy;
@@ -184,6 +227,33 @@ namespace GlowUp.Onboarding
                 if (emailCheck != null) emailCheck.SetNote(SignUpAccount.ConfirmedSoFar ? msgConfirmed : msgWaiting, SignUpAccount.ConfirmedSoFar);
             }
         }
+
+        /// <summary>
+        /// New17, the retake from Settings: the names and birthday can be corrected, the email and the password are LOCKED (shown, not
+        /// editable). The password row shows dots with "not changed here"; the retype row and the requirement ticks are hidden.
+        /// </summary>
+        void LockForRetake()
+        {
+            emailFromAccount = true;
+            if (email != null) { email.readOnly = true; email.interactable = false; }
+            ShowPasswordRows(false);
+            if (password != null)
+            {
+                password.gameObject.SetActive(true);
+                foreach (Transform r in password.transform.parent)
+                    if (r == password.transform || r.name.StartsWith("PasswordText", StringComparison.Ordinal)) r.gameObject.SetActive(true);
+                password.SetTextWithoutNotify("");
+                password.readOnly = true; password.interactable = false;
+                if (password.placeholder is TMP_Text hint) hint.text = msgPasswordLocked;
+                Transform eye = password.transform.Find("EyeButton");
+                if (eye != null) eye.gameObject.SetActive(false);
+            }
+            if (useAnotherEmailButton != null) useAnotherEmailButton.gameObject.SetActive(false);
+            if (emailCheck != null) emailCheck.SetNote(msgEmailLocked, true);
+        }
+
+        [SerializeField] private string msgPasswordLocked = "•••••••• (not changed here)";
+        [SerializeField] private string msgEmailLocked = "Your account's email. It is not changed here.";
 
         void ShowPasswordRows(bool show)
         {
@@ -275,7 +345,7 @@ namespace GlowUp.Onboarding
             bool pwOk = pw.Length >= passwordMin && pw.Length <= passwordMax && InputRules.HasUpper(pw) && InputRules.HasLower(pw) && InputRules.HasDigit(pw) && InputRules.HasSpecial(pw);
             bool match = pwOk && re.Length > 0 && re == pw;
             pwMatch?.SetMet(match);
-            if (OnboardingSession.Social || OnboardingSession.HasAccount) { pwOk = true; match = true; }     // the account exists: no password is asked for here
+            if (OnboardingSession.Social || OnboardingSession.HasAccount || OnboardingSession.Retake) { pwOk = true; match = true; }     // the account exists: no password is asked for here
 
             bool emailOk = emailFromAccount || (emailCheck != null && emailCheck.Look(T(email)));
             bool namesOk = !requireFirstAndLastName || (T(firstName).Length > 0 && T(lastName).Length > 0);
@@ -289,7 +359,11 @@ namespace GlowUp.Onboarding
             FieldHint dobHint = birthday != null ? FieldHint.After(birthday.transform, feedbackText) : null;
             if (dobHint != null) { if (birthday.Value.HasValue && !dobOk) dobHint.Show(FieldHint.Kind.Error, string.Format(msgUnderAge, minimumAge)); else dobHint.Hide(); }
             FieldHint mailHint = email != null && emailCheck != null && !emailCheck.ShowsOwnMessages ? FieldHint.After(email.transform, feedbackText) : null;
-            if (mailHint != null) { if (!emailOk && T(email).Length > 0) mailHint.Show(FieldHint.Kind.Error, emailCheck.Message); else mailHint.Hide(); }
+            if (mailHint != null) { if (!emailOk && T(email).Length > 0 && Judged(email)) mailHint.Show(FieldHint.Kind.Error, emailCheck.Message); else mailHint.Hide(); }
+            // the retyped password: named under its box once judged (the tick "Passwords match" shows the live state)
+            bool askingPassword = !(OnboardingSession.Social || OnboardingSession.HasAccount);
+            FieldHint retypeHint = askingPassword && retypePassword != null && retypePassword.isActiveAndEnabled ? FieldHint.After(retypePassword.transform, feedbackText) : null;
+            if (retypeHint != null) { if (Judged(retypePassword) && re.Length > 0 && re != pw) retypeHint.Show(FieldHint.Kind.Error, msgNoMatch); else retypeHint.Hide(); }
             Show("");
         }
 
@@ -297,9 +371,21 @@ namespace GlowUp.Onboarding
         void OnContinue()
         {
             if (busy) return;
-            if (continueButton != null && !continueButton.interactable) { OnboardingNotices.Error(feedbackText, msgFillAll); return; }
+            submitted = true;
+            Validate();
+            if (continueButton != null && !continueButton.interactable) { OnboardingNotices.Error(feedbackText, msgFillAll); FocusFirstWrong(); return; }
             OnboardingSession.FirstName = T(firstName); OnboardingSession.MiddleName = T(middleName); OnboardingSession.LastName = T(lastName);
             OnboardingSession.Username = "";                                                                      // no longer asked for
+            if (OnboardingSession.Retake)
+            {
+                // New17: the retake keeps the account's email and password; nothing is confirmed or made here
+                var retakeDob = birthday.Value.Value;
+                OnboardingSession.BirthdayIso = retakeDob.ToString("yyyy-MM-dd");
+                OnboardingSession.Age = InputRules.CalculateAge(retakeDob);
+                OnboardingSession.SaveDraft();
+                SceneNavigator.Go(nextScene);
+                return;
+            }
             OnboardingSession.Email = T(email).ToLowerInvariant();
             // memory only. With an account the password field is hidden: what was typed when the account was made is kept as it is.
             if (OnboardingSession.Social) OnboardingSession.Password = "";
@@ -343,7 +429,7 @@ namespace GlowUp.Onboarding
                         // it carries on), but an account WITH a profile is somebody's finished account and is never signed up again.
                         UserProfileData existing = null;
                         try { existing = await UserProfileRepository.Load(); }
-                        catch (Exception e) { Debug.LogWarning("Sign-up: the profile check failed: " + e.Message); }
+                        catch (Exception e) { { } }
                         if (this == null) return;
                         if (existing != null || !UserProfileRepository.NoProfileInCloud)
                         {
@@ -421,8 +507,11 @@ namespace GlowUp.Onboarding
         {
             if (emailCheck != null) emailCheck.SetNote(msgConfirmed, true);
             if (confirmPanel != null && confirmPanel.IsOpen) confirmPanel.Hide();
+            FormalToast.ShowAfterNextScene(FormalToast.Kind.Success, msgEmailConfirmedToast);       // New17: said on Step 2, where the user lands
             SceneNavigator.Go(nextScene);
         }
+
+        [SerializeField] private string msgEmailConfirmedToast = "Email confirmed. Let's set up your skin profile.";
 
         void ShowSendAgain()
         {
@@ -451,6 +540,15 @@ namespace GlowUp.Onboarding
         }
 
         void OnApplicationFocus(bool focused) { if (focused && confirmPanel != null && confirmPanel.IsOpen && !busy) _ = LookWhetherConfirmed(false); }
+
+        // New17, layer 2: the confirmation page on glowupapp.xyz opens the app again (App Link or glowup://verified): look at once
+        void OnEnable() { Application.deepLinkActivated += OnDeepLink; }
+        void OnDisable() { Application.deepLinkActivated -= OnDeepLink; }
+        void OnDeepLink(string url)
+        {
+            if (string.IsNullOrEmpty(url) || url.IndexOf("verified", StringComparison.OrdinalIgnoreCase) < 0) return;
+            if (OnboardingSession.HasAccount && !busy) _ = LookWhetherConfirmed(false);
+        }
         void OnApplicationPause(bool paused) { if (!paused && confirmPanel != null && confirmPanel.IsOpen && !busy) _ = LookWhetherConfirmed(false); }
 
         /// <summary>"Use another email": asked first, because the sign-up for the old email is dropped.</summary>

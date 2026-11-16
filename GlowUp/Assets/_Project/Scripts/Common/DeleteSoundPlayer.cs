@@ -176,17 +176,17 @@ namespace GlowUp.Common
             try
             {
                 bool wasLoaded = clip.loadState == AudioDataLoadState.Loaded;
-                if (!wasLoaded && !clip.LoadAudioData()) { Debug.LogWarning("Delete sound: the clip could not be loaded."); return; }
+                if (!wasLoaded && !clip.LoadAudioData()) { { } return; }
                 var all = new float[clip.samples * clip.channels];
                 bool read = clip.GetData(all, 0);
                 if (!wasLoaded) clip.UnloadAudioData();                 // the whole file is not needed any more
-                if (!read) { Debug.LogWarning("Delete sound: set the clip's Load Type to 'Decompress On Load' so a piece can be cut out of it."); return; }
+                if (!read) { { } return; }
                 float[] cut = Cut(all, clip.channels, clip.frequency, skipSilenceAtStart, startAtSeconds, playSeconds, fadeOutSeconds, loudestPoint, mostGain);
                 if (cut.Length == 0) return;
                 piece = AudioClip.Create("DeleteSoundPiece", cut.Length / clip.channels, clip.channels, clip.frequency, false);
                 piece.SetData(cut, 0);
             }
-            catch (System.Exception e) { Debug.LogWarning("Delete sound: not ready: " + e.Message); piece = null; }
+            catch (System.Exception e) { { } piece = null; }
         }
 
         void Release()

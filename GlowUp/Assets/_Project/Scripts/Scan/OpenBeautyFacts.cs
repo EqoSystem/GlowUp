@@ -74,7 +74,7 @@ namespace GlowUp.Scan
                     await request.SendWebRequest();
                     if (request.result != UnityWebRequest.Result.Success || request.responseCode != 200)
                     {
-                        Debug.LogWarning("Open Beauty Facts: no answer (HTTP " + request.responseCode + (string.IsNullOrEmpty(request.error) ? "" : ", " + request.error) + ").");
+                        { }
                         return none;
                     }
                     Result result = Parse(request.downloadHandler.text, code);
@@ -84,7 +84,7 @@ namespace GlowUp.Scan
             }
             catch (Exception e)
             {
-                Debug.LogWarning("Open Beauty Facts check skipped: " + e.Message);
+                { }
                 return none;
             }
         }
@@ -176,7 +176,7 @@ namespace GlowUp.Scan
                 while (all.items.Count > KeepMost) all.items.RemoveAt(0);
                 OfflineCache.Save(KeptFile, all);
             }
-            catch (Exception e) { Debug.LogWarning("Open Beauty Facts: the answer was not kept on the phone: " + e.Message); }
+            catch (Exception e) { { } }
         }
     }
 }

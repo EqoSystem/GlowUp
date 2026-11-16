@@ -93,7 +93,7 @@ namespace GlowUp.Data
                 holder = next;
                 OfflineCache.Save(CacheKey, holder);
             }
-            catch (Exception e) { TaskLimits.NoteFailure(e); Debug.LogWarning("The classifications could not be downloaded, using the copy on the phone: " + e.Message); }
+            catch (Exception e) { TaskLimits.NoteFailure(e); { } }
         }
     }
 }

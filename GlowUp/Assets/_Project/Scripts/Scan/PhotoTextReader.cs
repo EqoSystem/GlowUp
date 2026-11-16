@@ -52,7 +52,7 @@ namespace GlowUp.Scan
             }
             if (!OcrService.Shared.Ready)
             {
-                Debug.LogWarning("[PhotoTextReader] The text reader did not start: " + (OcrService.Shared.Error ?? "unknown reason"));
+                { }
                 return result;
             }
             var texts = new StringBuilder();

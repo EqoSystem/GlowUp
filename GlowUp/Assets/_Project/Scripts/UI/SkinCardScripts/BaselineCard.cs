@@ -25,7 +25,7 @@ public class BaselineCard : MonoBehaviour
         PlayerPrefs.SetString("SelectedBaseline", baselineName);
         PlayerPrefs.Save();
 
-        Debug.Log("Selected Baseline Mapping: " + baselineName);
+        { }
 
      
         if (continueButton != null)

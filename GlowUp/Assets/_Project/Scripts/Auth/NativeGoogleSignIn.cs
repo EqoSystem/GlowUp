@@ -43,7 +43,7 @@ namespace GlowUp.Auth
             }
             catch (Exception e)
             {
-                Debug.LogWarning("[GlowUp] Native Google sign-in is not in this build: " + e.Message);
+                { }
                 done.TrySetResult(new Answer());
             }
             return done.Task;

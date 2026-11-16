@@ -56,7 +56,7 @@ namespace GlowUp.Data
         /// <summary>Signs out. The copy of the profile stays on the device so the same person can sign back in offline.</summary>
         public static void SignOut()
         {
-            try { FirebaseAuth.DefaultInstance.SignOut(); } catch (Exception e) { Debug.LogWarning("Sign out: " + e.Message); }
+            try { FirebaseAuth.DefaultInstance.SignOut(); } catch (Exception e) { { } }
             Current = null; OfflineEmail = null;
         }
 
@@ -100,7 +100,7 @@ namespace GlowUp.Data
                     // an answer from the phone's own store (no answer from the cloud) only counts when there is nothing better
                     if (snap.Exists && (fromCloud || Current == null)) { Current = FromSnapshot(snap); Current.uid = uid; OfflineCache.Save(CacheKey, Current); }
                 }
-                catch (Exception e) { TaskLimits.NoteFailure(e); Debug.LogWarning("Profile load failed, using the copy on this device: " + e.Message); }
+                catch (Exception e) { TaskLimits.NoteFailure(e); { } }
             }
             return Current;
         }
@@ -136,12 +136,12 @@ namespace GlowUp.Data
                     TaskScheduler main = SynchronizationContext.Current != null ? TaskScheduler.FromCurrentSynchronizationContext() : TaskScheduler.Default;
                     _ = write.ContinueWith(t =>
                     {
-                        try { Debug.LogWarning("Profile save queued: " + (t.Exception != null ? t.Exception.GetBaseException().Message : "failed")); SyncQueue.EnqueueSet(path, p); }
-                        catch (Exception late) { Debug.LogWarning("Profile save: " + late.Message); }
+                        try { { } SyncQueue.EnqueueSet(path, p); }
+                        catch (Exception late) { { } }
                     }, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, main);
                     return;
                 }
-                catch (Exception e) { Debug.LogWarning("Profile save queued: " + e.Message); }
+                catch (Exception e) { { } }
             }
             SyncQueue.EnqueueSet(path, p);
         }
@@ -213,11 +213,50 @@ namespace GlowUp.Data
                     Task write = FirebaseFirestore.DefaultInstance.Document(path).SetAsync(patch, SetOptions.MergeAll);
                     if (await write.Within(SaveWaitSeconds)) return;
                     TaskScheduler main = SynchronizationContext.Current != null ? TaskScheduler.FromCurrentSynchronizationContext() : TaskScheduler.Default;
-                    _ = write.ContinueWith(t => { try { SyncQueue.EnqueueSet(path, queued); } catch (Exception late) { Debug.LogWarning("Skin save: " + late.Message); } },
+                    _ = write.ContinueWith(t => { try { SyncQueue.EnqueueSet(path, queued); } catch (Exception late) { { } } },
                         CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, main);
                     return;
                 }
-                catch (Exception e) { Debug.LogWarning("Skin save queued: " + e.Message); }
+                catch (Exception e) { { } }
+            }
+            SyncQueue.EnqueueSet(path, queued);
+        }
+
+        [Serializable]
+        public class PersonalDetailsPatch
+        {
+            public string firstName = "", middleName = "", lastName = "", birthday = "";
+            public int age;
+        }
+
+        /// <summary>
+        /// New17, the retaken quiz ("Save edits"): the name and birthday the user corrected on Step 1. Only these five fields are
+        /// written (merge): never the email, the account, the Terms record or the skin fields. Queued while offline, like the skin save.
+        /// </summary>
+        public static async Task SavePersonalDetails(string first, string middle, string last, string birthdayIso, int age)
+        {
+            string uid = UidForTests ?? ActiveUid;
+            if (string.IsNullOrEmpty(uid)) return;
+            if (Current != null && Belongs(Current, uid))
+            {
+                Current.firstName = first ?? ""; Current.middleName = middle ?? ""; Current.lastName = last ?? "";
+                Current.birthday = birthdayIso ?? ""; Current.age = age;
+                OfflineCache.Save(CacheKey, Current);
+            }
+            string path = "users/" + uid;
+            var patch = new Dictionary<string, object>
+            {
+                { "firstName", first ?? "" }, { "middleName", middle ?? "" }, { "lastName", last ?? "" }, { "birthday", birthdayIso ?? "" }, { "age", age }
+            };
+            var queued = new PersonalDetailsPatch { firstName = first ?? "", middleName = middle ?? "", lastName = last ?? "", birthday = birthdayIso ?? "", age = age };
+            if (ConnectivityMonitor.Online && await FirebaseBootstrap.Ready)
+            {
+                try
+                {
+                    Task write = FirebaseFirestore.DefaultInstance.Document(path).SetAsync(patch, SetOptions.MergeAll);
+                    if (await write.Within(SaveWaitSeconds)) return;
+                }
+                catch (Exception) { /* queued below */ }
             }
             SyncQueue.EnqueueSet(path, queued);
         }

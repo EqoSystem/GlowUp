@@ -87,7 +87,7 @@ namespace GlowUp.Scan
             q.Append(ProductScope.AiRules);
 
             AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), SearchTheWeb, TimeoutSeconds);
-            if (answer == null || !answer.ok) { Debug.LogWarning("AI product description: " + (answer != null ? answer.error : "no answer")); return null; }
+            if (answer == null || !answer.ok) { { } return null; }
 
             var insight = new Insight
             {
@@ -163,7 +163,7 @@ namespace GlowUp.Scan
             q.Append("If the photo shows no cosmetic product, reply {\"found\":false}.");
 
             AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), false, TimeoutSeconds, jpegPhoto);
-            if (answer == null || !answer.ok) { Debug.LogWarning("AI product recognition: " + (answer != null ? answer.error : "no answer")); return result; }
+            if (answer == null || !answer.ok) { { } return result; }
             return IdentityFrom(answer.text, answer.model);
         }
 
@@ -319,7 +319,7 @@ namespace GlowUp.Scan
             q.Append("confidence is 0 to 1. NEVER invent a product, a page or an ingredient list. If you cannot find the product, reply {\"same\":false}.");
 
             AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), true, TimeoutSeconds + 10f, jpegPhoto);
-            if (answer == null || !answer.ok) { Debug.LogWarning("AI web check: " + (answer != null ? answer.error : "no answer")); return result; }
+            if (answer == null || !answer.ok) { { } return result; }
             return WebMatchFrom(answer.text, answer.sources, answer.usedWebSearch, answer.model, guess != null ? guess.brandName : "");
         }
 
@@ -355,7 +355,7 @@ namespace GlowUp.Scan
             q.Append("confidence is 0 to 1. NEVER invent a product, a page or an ingredient list. If you cannot find the product, reply {\"same\":false,\"question\":\"...\"}.");
 
             AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), true, TimeoutSeconds + 10f);
-            if (answer == null || !answer.ok) { Debug.LogWarning("AI look-up of a typed product: " + (answer != null ? answer.error : "no answer")); return result; }
+            if (answer == null || !answer.ok) { { } return result; }
             return WebMatchFrom(answer.text, answer.sources, answer.usedWebSearch, answer.model, typedBrand);
         }
 
@@ -459,7 +459,7 @@ namespace GlowUp.Scan
             q.Append("NEVER invent an ingredient list. If you cannot find the product's own published list, reply with found false and an empty ingredients array.");
 
             AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), SearchTheWeb, TimeoutSeconds + 10f);
-            if (answer == null || !answer.ok) { Debug.LogWarning("AI ingredient lookup: " + (answer != null ? answer.error : "no answer")); return result; }
+            if (answer == null || !answer.ok) { { } return result; }
             Dictionary<string, object> json = AiResearchClient.JsonObjectIn(answer.text);
             if (json == null) return result;
             return LookupFrom(json, answer.sources, answer.usedWebSearch, answer.model, brand, true);
@@ -494,7 +494,7 @@ namespace GlowUp.Scan
             bool said = mustSayFound ? Flag(json, "found") : true;
             result.found = said && result.ingredients.Count >= 3 && result.sources.Count > 0;
             if (said && result.ingredients.Count >= 3 && result.sources.Count == 0)
-                Debug.LogWarning("AI ingredient lookup: a list came without a source that can be shown, so it was not accepted.");
+                { }
             return result;
         }
 

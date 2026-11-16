@@ -28,7 +28,7 @@ namespace GlowUp.AppSettings
             UserProfileData profile = null;
             if (UserProfileRepository.Cached() == null) GlowUp.Common.TextSkeleton.Waiting(this);
             try { profile = await UserProfileRepository.Load(); }
-            catch (Exception e) { Debug.LogWarning("Settings: profile not loaded: " + e.Message); }
+            catch (Exception e) { { } }
             GlowUp.Common.TextSkeleton.Ready(this);
             if (this == null) return;
             SafetyAlertPreferences.SeedFromProfile(profile);

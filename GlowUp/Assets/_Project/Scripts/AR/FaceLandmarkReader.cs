@@ -58,7 +58,7 @@ namespace GlowUp.AR
             catch (Exception e)
             {
                 problem = "Face finding is not part of this build of the app.";
-                Debug.LogWarning("[GuidedFace] " + e.Message);
+                { }
                 if (javaClass != null) javaClass.Dispose();
                 return null;
             }
@@ -83,7 +83,7 @@ namespace GlowUp.AR
                 catch (Exception e)
                 {
                     Problem = "Face finding could not start on this phone.";
-                    Debug.LogWarning("[GuidedFace] " + e.Message);
+                    { }
                     status = Status.Failed;
                 }
                 return status;
@@ -110,7 +110,7 @@ namespace GlowUp.AR
         {
             if (reader == null || status != Status.Ready) return false;
             try { return reader.CallStatic<bool>("look", pixels, width, height); }
-            catch (Exception e) { Debug.LogWarning("[GuidedFace] " + e.Message); return false; }
+            catch (Exception e) { { } return false; }
         }
 
         /// <summary>
@@ -126,7 +126,7 @@ namespace GlowUp.AR
                 if (!reader.CallStatic<bool>("hasNew")) return false;
                 points = reader.CallStatic<float[]>("take") ?? new float[0];
             }
-            catch (Exception e) { Debug.LogWarning("[GuidedFace] " + e.Message); return false; }
+            catch (Exception e) { { } return false; }
             return true;
         }
 

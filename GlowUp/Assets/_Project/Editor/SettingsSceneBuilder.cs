@@ -44,6 +44,10 @@ namespace GlowUp.EditorTools
             Transform card = s.card;
             PerformanceProfile performanceProfile = EnsurePerformanceProfile();
             GameObject features = SceneBuilderCore.EnsureRoot(FeaturesRootName);
+            // New17: finger signs are not part of the Settings page. An older build left an object with no rows or buttons
+            // wired to it; it is removed here (the FingerSignSettings script itself stays in the project).
+            Transform oldSignSettings = features.transform.Find("FingerSignSettings");
+            if (oldSignSettings != null) Object.DestroyImmediate(oldSignSettings.gameObject);
 
             // ---- the scrolling list ----
             GameObject listArea = A.Node(card, "SettingsArea");
@@ -72,6 +76,18 @@ namespace GlowUp.EditorTools
             A.Set(confirm, "panel", confirmPopup.panel); A.Set(confirm, "titleText", confirmPopup.title); A.Set(confirm, "messageText", confirmMessage);
             A.Set(confirm, "confirmButton", confirmOk); A.Set(confirm, "confirmLabel", A.LabelOf(confirmOk));
             A.Set(confirm, "cancelButton", confirmCancel); A.Set(confirm, "cancelLabel", A.LabelOf(confirmCancel));
+
+            // ---- log out (New17): "Log Out?" with an exit-door button and a cancel button; each icon has its words beside it ----
+            A.AppPopup logOutPopup = A.Overlay(s, "LogOutPanel", "Log Out?");
+            A.At(logOutPopup.box, A.MC, new Vector2(0, 60), new Vector2(900, 600));
+            TextMeshProUGUI logOutMessage = A.Label(logOutPopup.box, "MessageText", "You can sign back in at any time with your email and password.",
+                                                    32, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            A.Fill(logOutMessage.transform, 48, 190, 48, 130);
+            A.ShrinkWrapped(logOutMessage, 26);
+            Button logOutCancel = A.PillButton(logOutPopup.box, "CancelLogOutButton", "Cancel", 36, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Close);
+            A.BottomStrip(logOutCancel.transform, 44, 108, 48, 462);
+            Button logOutConfirm = A.PillButton(logOutPopup.box, "ConfirmLogOutButton", "Log Out", 36, ThemeRole.Warning, ThemeRole.Background, IconFactory.SignOut);
+            A.BottomStrip(logOutConfirm.transform, 44, 108, 462, 48);
 
             // ---- delete account ----
             A.AppPopup deletePopup = A.Overlay(s, "DeleteAccountPanel", "Delete account");
@@ -242,8 +258,9 @@ namespace GlowUp.EditorTools
             Divider(cameraHelpers);
             GameObject volumeBlock = Block(cameraHelpers, "VolumeButtonBlock");
             A.Label(volumeBlock.transform, "Title", "Volume keys", RowTitle, ThemeRole.MainText, FontRole.Label);
-            ChoiceTabs volumeTabs = TabsGrid(volumeBlock.transform, "VolumeButtonTabs", new[] { "Both keys", "Up: switch mode", "Down: trigger", "Off" }, 0, 2, 28);
-            TextMeshProUGUI volumeStatus = A.Label(volumeBlock.transform, "StatusText", "On AI Smart Scan: volume up switches between live scan and photo capture; volume down starts or pauses the scan, or takes the photo.",
+            // New17: one On / Off choice; the line under it says what the three key actions do
+            ChoiceTabs volumeTabs = Tabs(volumeBlock.transform, "VolumeButtonTabs", new[] { "On", "Off" }, 0, out _, 32);
+            TextMeshProUGUI volumeStatus = A.Label(volumeBlock.transform, "StatusText", "On AI Smart Scan: volume down = photo capture, volume up = live scan, both keys together = take the photo or start / pause the scan.",
                                                    RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             var volumeSetting = Feature<VolumeButtonSetting>(features, "VolumeButtonSetting");
             A.Set(volumeSetting, "tabs", volumeTabs); A.Set(volumeSetting, "statusText", volumeStatus);
@@ -395,6 +412,8 @@ namespace GlowUp.EditorTools
 
             var accountActions = Feature<AccountActions>(features, "AccountActions");
             A.Set(accountActions, "logOutButton", logOut); A.Set(accountActions, "confirm", confirm);
+            A.Set(accountActions, "logOutPanel", logOutPopup.panel); A.Set(accountActions, "logOutMessageText", logOutMessage);
+            A.Set(accountActions, "logOutConfirmButton", logOutConfirm); A.Set(accountActions, "logOutCancelButton", logOutCancel);
             A.Set(accountActions, "deleteAccountButton", deleteAccount); A.Set(accountActions, "deletePanel", deletePopup.panel);
             A.Set(accountActions, "passwordInput", password); A.Set(accountActions, "confirmDeleteButton", deleteConfirm);
             A.Set(accountActions, "confirmDeleteLabel", A.LabelOf(deleteConfirm)); A.Set(accountActions, "cancelDeleteButton", deleteCancel);

@@ -159,11 +159,11 @@ namespace GlowUp.Common
             {
                 Task task = null;
                 try { task = work(Report); }
-                catch (Exception e) { Debug.LogError("Loading work failed to start: " + e); failed = true; }
+                catch (Exception e) { { } failed = true; }
                 if (task != null)
                 {
                     while (!task.IsCompleted) yield return null;
-                    if (task.IsFaulted) { Debug.LogError("Loading work failed: " + task.Exception); failed = true; }
+                    if (task.IsFaulted) { { } failed = true; }
                 }
             }
             else Report(steps != null ? steps.Length - 1 : 0, null);

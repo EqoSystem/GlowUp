@@ -86,7 +86,8 @@ namespace GlowUp.Onboarding
                 ? new List<string> { UserProfileData.NoKnownAllergens }
                 : allergens.Selected;
             OnboardingSession.SaveDraft();
-            if (OnboardingSession.Retake) { SaveRetake(); return; }
+            // New17: the full retake goes on to the summary (Step 5), where "Save edits" saves; the quiz-only retake still saves here
+            if (OnboardingSession.Retake && !OnboardingSession.RetakeWithDetails) { SaveRetake(); return; }
             SceneNavigator.Go(nextScene);
         }
 
@@ -118,7 +119,7 @@ namespace GlowUp.Onboarding
                         SyncQueue.EnqueueSet("allergenSuggestions/" + System.Guid.NewGuid().ToString("N"), new SuggestionRecord { text = a, uid = uid, status = "pending", createdAtUnix = now });
                 }
             }
-            catch (System.Exception e) { Debug.LogWarning("Retake: the profile was not saved: " + e.Message); }
+            catch (System.Exception e) { { } }
             OnboardingSession.EndRetake();
             SceneNavigator.Go(returnScene);
         }

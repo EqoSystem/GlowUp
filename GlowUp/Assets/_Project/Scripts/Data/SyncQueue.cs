@@ -159,16 +159,16 @@ namespace GlowUp.Data
                         {
                             // a passing problem: keep it at the head of the queue and try again later
                             OfflineCache.Save(CacheKey, queue);
-                            Debug.LogWarning($"SyncQueue: will retry {w.op} {w.path} later: {e.Message}");
+                            { }
                             break;
                         }
-                        Debug.LogWarning($"SyncQueue: dropped {w.op} {w.path}: {e.Message}");
+                        { }
                     }
                     queue.items.RemoveAt(0);
                     OfflineCache.Save(CacheKey, queue);
                 }
             }
-            catch (Exception e) { Debug.LogWarning("SyncQueue flush stopped: " + e.Message); }
+            catch (Exception e) { { } }
             finally
             {
                 flushing = false;

@@ -173,7 +173,7 @@ namespace GlowUp.Data
                 Keep(found);
                 return found.isApproved ? null : found;
             }
-            catch (Exception e) { TaskLimits.NoteFailure(e); Debug.LogWarning("Pending products: the look-up failed: " + e.Message); return null; }
+            catch (Exception e) { TaskLimits.NoteFailure(e); { } return null; }
         }
 
         /// <summary>Stages a product the AI read from a photo. The photo (JPG bytes, may be null) goes to its own document.</summary>

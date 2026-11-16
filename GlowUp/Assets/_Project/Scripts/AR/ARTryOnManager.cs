@@ -24,7 +24,7 @@ public class ARTryOnManager : MonoBehaviour
     // Called from ProductScanner.cs when OnARTryOnClicked() is triggered
     public void LaunchARTryOn()
     {
-        Debug.Log("[ARTryOnManager] Activating AR Try-On module.");
+        { }
 
         if (resultsPanel != null) resultsPanel.SetActive(false);
         if (arSessionObject != null) arSessionObject.SetActive(true);
@@ -38,7 +38,7 @@ public class ARTryOnManager : MonoBehaviour
 
     public void ExitARTryOn()
     {
-        Debug.Log("[ARTryOnManager] Exiting AR Try-On module.");
+        { }
 
         if (arSessionObject != null) arSessionObject.SetActive(false);
         if (arTryOnOverlayPanel != null) arTryOnOverlayPanel.SetActive(false);

@@ -31,7 +31,7 @@ namespace GlowUp.Common
         /// <summary>Tells the open screen that AR Try-On was refused.</summary>
         public static void RaiseBlocked()
         {
-            try { Blocked?.Invoke(); } catch (Exception e) { UnityEngine.Debug.LogException(e); }
+            try { Blocked?.Invoke(); } catch (Exception e) { { } }
         }
     }
 }

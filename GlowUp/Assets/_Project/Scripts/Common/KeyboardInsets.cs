@@ -75,7 +75,7 @@ namespace GlowUp.Common
             catch (System.Exception e)
             {
                 javaBroken = true; decor = null; frame = null;
-                Debug.LogWarning("Keyboard: Java objects could not be made, no keyboard padding: " + e.Message);
+                { }
                 return false;
             }
         }
@@ -97,7 +97,7 @@ namespace GlowUp.Common
             catch (System.Exception e)
             {
                 insetsBroken = true;                                   // do not try again; the frame method still works
-                Debug.LogWarning("Keyboard: window insets failed, using the window frame: " + e.Message);
+                { }
                 return 0f;
             }
         }
@@ -118,7 +118,7 @@ namespace GlowUp.Common
             catch (System.Exception e)
             {
                 javaBroken = true;
-                Debug.LogWarning("Keyboard: window frame failed, no keyboard padding: " + e.Message);
+                { }
                 return 0f;
             }
         }
@@ -141,7 +141,7 @@ namespace GlowUp.Common
             if (!LogNumbers || !(Debug.isDebugBuild || Application.isEditor)) return;
             if (Mathf.Abs(used - lastLogged) < 0.005f) return;         // only when the answer changes
             lastLogged = used;
-            Debug.Log("Keyboard: " + Describe());
+            { }
         }
 
         /// <summary>One line for the log and the on-screen label: method and numbers only.</summary>
