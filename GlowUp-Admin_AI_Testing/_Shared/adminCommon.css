@@ -1149,6 +1149,9 @@ tr.detail-row > td { padding: 0 12px 12px; background: color-mix(in srgb, var(--
 .assist:hover .assist-x, .assist-x:focus-visible { opacity: 1; }
 @media (hover: none) { .assist-x { opacity: 1; } }
 .panel.bare > .panel-inner > .assist { background: color-mix(in srgb, var(--gold) 7%, var(--surface)); }
+/* A helper strip or panel head never shrinks below its content in a fixed-height panel; when it did, its wrapped
+   button ("Curator") was drawn over the list under it. The panel itself scrolls instead. */
+.panel-inner > .assist, .panel-inner > .assist-sk, .panel-inner > .panel-head { flex: none; }
 .chart-insight { display: flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--text-2); }
 .chart-insight svg.ic { color: var(--gold); }
 

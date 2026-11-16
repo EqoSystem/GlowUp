@@ -58,8 +58,20 @@
 .rank-item.can-open:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); transform: translateX(3px); }
 
 
-.support-item { align-items: flex-start; }
-.support-message { flex-basis: 100%; margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: var(--fs-sm); color: var(--text); }
+/* Suggestions, Bug reports, Wrong scan results, Other reports: one row layout (New20).
+   Line 1: kind chip, then date (wraps under the chip when narrow). Line 2: the message. Line 3: who sent it.
+   The two actions sit in their own column at the top right and are always visible (no hover needed). */
+.report-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 4px 12px; padding: 12px 4px; }
+.report-item .suggestion-main { display: flex; flex-direction: column; align-items: stretch; gap: 4px; flex-wrap: nowrap; }
+.report-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; }
+.report-head .chip { margin: 0; flex: none; }
+.report-when { min-width: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.report-text { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; color: var(--text); }
+.report-from { margin: 0; overflow-wrap: anywhere; line-height: 1.4; }
+.report-item .suggestion-actions { opacity: 1; display: flex; gap: 6px; flex: none; }
+.report-item .row-btn { width: 32px; height: 32px; }
+@media (pointer: coarse) { .report-item .row-btn { width: 44px; height: 44px; } }
+.support-message { font-size: var(--fs-sm); }
 .support-scan { flex-basis: 100%; font-size: var(--fs-sm); }
 .support-scan summary { cursor: pointer; color: var(--text-2); }
 .support-scan p { margin: 4px 0 0; overflow-wrap: anywhere; }

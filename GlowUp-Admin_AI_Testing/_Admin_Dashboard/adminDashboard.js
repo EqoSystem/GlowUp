@@ -412,11 +412,14 @@ function renderSuggestions() {
     list.style.display = "";
     renderPager(el("suggestionPager"), suggestionPage, suggestions.length, renderSuggestions, "suggestions");
     list.innerHTML = paginate(suggestions, suggestionPage).map((s) => `
-        <li class="suggestion-item">
+        <li class="suggestion-item report-item">
             <div class="suggestion-main">
-                <span class="suggestion-text">${escapeHtml(s.text || "(empty)")}</span>
-                <span class="chip ${s.kind === "Allergen" ? "warn" : s.kind === "App suggestion" ? "good" : "pink"}">${escapeHtml(s.kind)}</span>
-                <span class="small muted">${s.from ? escapeHtml(s.from) + " · " : ""}${escapeHtml(formatWhen(s.createdAtUnix))} · ${escapeHtml(timeAgo(s.createdAtUnix))}</span>
+                <div class="report-head">
+                    <span class="chip ${s.kind === "Allergen" ? "warn" : s.kind === "App suggestion" ? "good" : "pink"}">${escapeHtml(s.kind)}</span>
+                    <span class="report-when small muted">${escapeHtml(formatWhen(s.createdAtUnix))} · ${escapeHtml(timeAgo(s.createdAtUnix))}</span>
+                </div>
+                <p class="report-text suggestion-text">${escapeHtml(s.text || "(empty)")}</p>
+                ${s.from ? `<p class="report-from small muted">${escapeHtml(s.from)}</p>` : ""}
                 ${lastScanDetails(s.lastScan)}
             </div>
             <div class="suggestion-actions btn-group">
@@ -501,11 +504,14 @@ function renderSupportKind(kind) {
     const tone = (c) => (c === "Bug" ? "bad" : c === "Wrong scan result" ? "warn" : "pink");
     list.innerHTML = paginate(mine, kind.page).map((r) => {
         const scan = lastScanDetails(r.lastScan);
-        return `<li class="suggestion-item support-item">
+        return `<li class="suggestion-item support-item report-item">
             <div class="suggestion-main">
-                <span class="chip ${tone(r.category)}">${escapeHtml(r.category)}</span>
-                <span class="small muted">${escapeHtml(formatWhen(r.createdAtUnix))} · ${escapeHtml(timeAgo(r.createdAtUnix))} · ${senderHtml(r)}${r.appVersion ? " · app " + escapeHtml(r.appVersion) : ""}</span>
-                <p class="support-message">${escapeHtml(r.message)}</p>
+                <div class="report-head">
+                    <span class="chip ${tone(r.category)}">${escapeHtml(r.category)}</span>
+                    <span class="report-when small muted">${escapeHtml(formatWhen(r.createdAtUnix))} · ${escapeHtml(timeAgo(r.createdAtUnix))}</span>
+                </div>
+                <p class="support-message report-text">${escapeHtml(r.message)}</p>
+                <p class="report-from small muted">${senderHtml(r)}${r.appVersion ? " · app " + escapeHtml(r.appVersion) : ""}</p>
                 ${scan}
             </div>
             <div class="suggestion-actions btn-group">
