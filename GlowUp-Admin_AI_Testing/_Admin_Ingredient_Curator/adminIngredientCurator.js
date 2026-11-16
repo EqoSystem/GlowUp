@@ -172,11 +172,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     await requireAdmin();
 
     if (TEST_MODE) {
-        const banner = document.createElement("div");
-        banner.className = "test-banner";
-        banner.setAttribute("role", "note");
-        banner.textContent = "TEST COPY: the classifications on this address are a separate test list. Saving an ingredient and the field change are switched off here, so nothing live is changed by them.";
-        document.querySelector("main.main-content > header.topbar").after(banner);
+        let hidden = false;
+        try { hidden = sessionStorage.getItem("glowup.testBannerHidden") === "1"; } catch (error) { /* storage blocked: show it */ }
+        if (!hidden) {
+            const banner = document.createElement("div");
+            banner.className = "test-banner";
+            banner.setAttribute("role", "note");
+            const text = document.createElement("p");
+            text.className = "test-banner-text";
+            text.innerHTML = "<strong>Test copy.</strong> The classifications on this address are a separate test list. Saving an ingredient and the field change are switched off here, so nothing live is changed.";
+            const close = document.createElement("button");
+            close.type = "button";
+            close.className = "test-banner-close";
+            close.setAttribute("aria-label", "Hide the test copy notice");
+            close.textContent = "Hide";
+            close.addEventListener("click", () => { banner.remove(); try { sessionStorage.setItem("glowup.testBannerHidden", "1"); } catch (error) { /* ignore */ } });
+            banner.append(text, close);
+            document.querySelector("main.main-content > header.topbar").after(banner);
+        }
     }
     await loadLists();
     await loadClassifications();

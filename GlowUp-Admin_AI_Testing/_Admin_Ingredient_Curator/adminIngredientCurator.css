@@ -81,7 +81,10 @@
 .migration-lines { margin: 0 0 10px; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-base); }
 
 
-.test-banner { margin: 12px var(--gutter) 0; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--warn, #d9a441); background: color-mix(in srgb, var(--warn, #d9a441) 16%, var(--surface)); color: var(--text); font-size: var(--fs-sm); }
+.test-banner { flex: none; display: flex; align-items: center; gap: 12px; margin: 12px var(--gutter) 0; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--warn, #d9a441); background: color-mix(in srgb, var(--warn, #d9a441) 16%, var(--surface)); color: var(--text); font-size: var(--fs-sm); line-height: 1.4; }
+.test-banner-text { flex: 1 1 auto; min-width: 0; margin: 0; overflow-wrap: anywhere; }
+.test-banner-close { flex: none; min-height: 32px; padding: 0 12px; border-radius: var(--radius-sm); border: 1px solid var(--border, currentColor); background: transparent; color: inherit; font: inherit; cursor: pointer; }
+@media (max-width: 767px) { .test-banner { flex-wrap: wrap; } .test-banner-close { min-height: 44px; min-width: 44px; } }
 
 
 .scan-status { margin: 4px 0 10px; color: var(--text); }

@@ -86,7 +86,29 @@ export const NOTE_PLACES = [
     { id: "top", label: "At the top, under the title" },
     { id: "bottom", label: "At the bottom of the panel" }
 ];
-export const LIMITS = { title: 40, subtitle: 120, note: 300, label: 40, labels: 12, scaleMin: 0.85, scaleMax: 1.25, radiusMax: 24 };
+export const LIMITS = { title: 40, subtitle: 120, note: 300, label: 40, labels: 12, scaleMin: 0.85, scaleMax: 1.25, radiusMax: 24, labelSizeMin: 12, labelSizeMax: 28, widthMin: 240, widthMax: 2400, heightMin: 120, heightMax: 1400 };
+export const LABEL_FONT_STYLES = [
+    { id: "", label: "Same as the page" },
+    { id: "bold", label: "Bold" },
+    { id: "italic", label: "Italic" },
+    { id: "bolditalic", label: "Bold italic" }
+];
+export const LABEL_ALIGNS = [
+    { id: "", label: "Same as the page" },
+    { id: "left", label: "Left" },
+    { id: "center", label: "Centre" },
+    { id: "right", label: "Right" }
+];
+
+/** A pixel size from a typed value: { ok, value, message }. Empty = no fixed size (value 0). Never throws, never returns NaN. */
+export function readPixels(raw, min, max, what) {
+    const text = String(raw == null ? "" : raw).trim();
+    if (text === "") return { ok: true, value: 0, message: "" };
+    const n = Number(text);
+    if (!Number.isFinite(n)) return { ok: false, value: 0, message: `${what} must be a number of pixels.` };
+    if (n < min || n > max) return { ok: false, value: 0, message: `${what} must be between ${min} and ${max} pixels.` };
+    return { ok: true, value: Math.round(n), message: "" };
+}
 
 const ids = (list) => list.map((item) => item.id);
 const oneOf = (value, list) => (ids(list).includes(String(value == null ? "" : value)) ? String(value == null ? "" : value) : "");
@@ -132,16 +154,27 @@ export function cleanStyle(raw, fonts = []) {
 export function cleanTexts(raw) {
     const t = raw && typeof raw === "object" ? raw : {};
     const out = {};
-    const title = plainText(t.title, LIMITS.title), subtitle = plainText(t.subtitle, LIMITS.subtitle), note = plainText(t.note, LIMITS.note, true);
+    // Only text that already exists on the panel can be changed (its title and its card labels). Added text (subtitle, note) is no longer kept.
+    const title = plainText(t.title, LIMITS.title);
     if (title) out.title = title;
-    if (subtitle) out.subtitle = subtitle;
-    if (note) { out.note = note; out.notePlace = oneOf(t.notePlace, NOTE_PLACES) || "top"; }
     const labels = {};
     Object.keys(t.labels && typeof t.labels === "object" ? t.labels : {}).slice(0, LIMITS.labels).forEach((key) => {
         const value = plainText(t.labels[key], LIMITS.label);
         if (/^\d{1,2}$/.test(key) && Number(key) < LIMITS.labels && value) labels[key] = value;
     });
     if (Object.keys(labels).length) out.labels = labels;
+    const looks = {};
+    Object.keys(t.labelStyles && typeof t.labelStyles === "object" ? t.labelStyles : {}).slice(0, LIMITS.labels).forEach((key) => {
+        if (!/^\d{1,2}$/.test(key) || Number(key) >= LIMITS.labels) return;
+        const v = t.labelStyles[key] || {}, one = {};
+        const size = Number(v.size);
+        if (v.size !== undefined && v.size !== "" && Number.isFinite(size) && size >= LIMITS.labelSizeMin && size <= LIMITS.labelSizeMax) one.size = Math.round(size);
+        const fontStyle = oneOf(v.style, LABEL_FONT_STYLES), align = oneOf(v.align, LABEL_ALIGNS);
+        if (fontStyle) one.style = fontStyle;
+        if (align) one.align = align;
+        if (Object.keys(one).length) looks[key] = one;
+    });
+    if (Object.keys(looks).length) out.labelStyles = looks;
     return out;
 }
 
@@ -203,6 +236,21 @@ export const LABEL_SELECTOR = ".kpi-title, .stat-title";
 const own = (panel, selector) => Array.from(panel.querySelectorAll(selector)).filter((node) => node.closest(".panel") === panel);
 
 
+// Writes only what changed, so typing or changing the alignment touches one label and nothing else (no page-wide re-layout).
+function paintLabelLook(label, look) {
+    const v = look || {};
+    const size = v.size ? Math.max(LIMITS.labelSizeMin, v.size) + "px" : "";
+    const weight = v.style === "bold" || v.style === "bolditalic" ? "700" : "";
+    const slant = v.style === "italic" || v.style === "bolditalic" ? "italic" : "";
+    const align = v.align || "";
+    if (label.style.fontSize !== size) label.style.fontSize = size;
+    if (label.style.fontWeight !== weight) label.style.fontWeight = weight;
+    if (label.style.fontStyle !== slant) label.style.fontStyle = slant;
+    if (label.style.textAlign !== align) label.style.textAlign = align;
+    if (align) label.dataset.lalign = align; else delete label.dataset.lalign;
+}
+
+
 export function applyPanelTexts(panel, texts) {
     if (!panel || !panel.querySelector) return;
     const t = texts || {};
@@ -213,24 +261,14 @@ export function applyPanelTexts(panel, texts) {
         if (heading.dataset.ownText === undefined) heading.dataset.ownText = heading.textContent;
         heading.textContent = t.title || heading.dataset.ownText;
     }
-    const slot = (cls, text, place) => {
-        let node = inner.querySelector(`:scope > .${cls}`);
-        if (!text) { if (node) node.remove(); return; }
-        if (!node) { node = document.createElement("p"); node.className = cls; }
-        node.textContent = text;
-        if (place === "bottom") inner.appendChild(node);
-        else {
-
-            const after = cls === "panel-note" ? inner.querySelector(":scope > .panel-subtitle-text") || head : head;
-            if (after) after.insertAdjacentElement("afterend", node); else inner.insertBefore(node, inner.firstChild);
-        }
-    };
-    slot("panel-subtitle-text", t.subtitle, "top");
-    slot("panel-note", t.note, t.notePlace);
+    // text that older versions added (subtitle, note) is taken away: nothing new is ever put into a panel
+    inner.querySelectorAll(":scope > .panel-subtitle-text, :scope > .panel-note").forEach((node) => node.remove());
     own(panel, LABEL_SELECTOR).forEach((label, index) => {
         if (label.dataset.ownText === undefined) label.dataset.ownText = label.textContent;
         const mine = t.labels && t.labels[String(index)];
-        label.textContent = mine || label.dataset.ownText;
+        const wanted = mine || label.dataset.ownText;
+        if (label.textContent !== wanted) label.textContent = wanted;
+        paintLabelLook(label, t.labelStyles && t.labelStyles[String(index)]);
     });
 }
 

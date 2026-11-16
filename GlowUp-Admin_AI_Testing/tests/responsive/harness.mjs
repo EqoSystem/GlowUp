@@ -25,10 +25,10 @@ export async function launch() {
 
 
 export async function openPage(browser, key, { theme = "light", width = 1440, height = 900, lat = { auth: 0, read: 0 }, go = true } = {}) {
-    const ctx = await browser.newContext({ viewport: { width, height }, colorScheme: theme });
+    const ctx = await browser.newContext({ viewport: { width, height }, colorScheme: theme || "dark" });
     await ctx.addInitScript(({ seed, signedIn, theme, lat }) => {
         window.__SEED = seed; window.__LAT = lat; window.__SIGNED_IN = signedIn;
-        try { localStorage.setItem("glowup.theme", theme); } catch (e) { }
+        if (theme) { try { localStorage.setItem("glowup.theme", theme); } catch (e) { } }
     }, { seed: makeSeed(), signedIn: key !== "login", theme, lat });
     await ctx.addInitScript(auditSrc);
     await ctx.route("**/*", async (route) => {

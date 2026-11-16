@@ -73,7 +73,11 @@ document.addEventListener("DOMContentLoaded", () => {
         setButton(usernameInput.value.trim() !== "" && passwordInput.value !== "", "Log in");
     }
 
-    usernameInput.addEventListener("input", validateForm);
+    // Clearing the email also clears the password, so a typed password never stays behind for the next person.
+    usernameInput.addEventListener("input", () => {
+        if (usernameInput.value === "" && passwordInput.value !== "") { passwordInput.value = ""; hideLengthCover(); showPassword(false); }
+        validateForm();
+    });
     passwordInput.addEventListener("input", validateForm);
     validateForm();
 

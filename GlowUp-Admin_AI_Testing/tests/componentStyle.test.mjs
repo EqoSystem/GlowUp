@@ -1,6 +1,6 @@
 
 
-import { cleanStyle, cleanTexts, cleanPanelMap, contrast, plainText, LIMITS, ANIMATIONS, ANIMATION_FRAMES } from "../_Shared/componentStyle.js";
+import { cleanStyle, cleanTexts, cleanPanelMap, contrast, plainText, readPixels, LIMITS, ANIMATIONS, ANIMATION_FRAMES } from "../_Shared/componentStyle.js";
 
 let checks = 0, failed = 0;
 const check = (ok, what) => { checks++; if (!ok) { failed++; console.log("FAILED: " + what); } };
@@ -21,10 +21,15 @@ equal(cleanStyle({ colors: { dark: { bg: "#112233", text: "red", card: "#ABCDEF"
 equal(cleanStyle({ rotate: 45, transform: "rotate(45deg)" }), {}, "a panel is never turned at an angle");
 equal(cleanStyle("not an object"), {}, "rubbish gives nothing");
 
-equal(cleanTexts({ title: "  Scans   today ", subtitle: "x".repeat(500), note: "line 1\nline 2", notePlace: "middle" }),
-    { title: "Scans today", subtitle: "x".repeat(LIMITS.subtitle), note: "line 1\nline 2", notePlace: "top" }, "texts are trimmed, cut to their limits, and the note goes to a fixed place");
-equal(cleanTexts({ note: "a\nb\nc\nd\ne\nf\ng" }).note.split("\n").length, 5, "a note keeps at most 5 lines");
-equal(cleanTexts({ note: "Hi", notePlace: "bottom" }).notePlace, "bottom", "the bottom is a fixed place too");
+equal(cleanTexts({ title: "  Scans   today ", subtitle: "x".repeat(500), note: "line 1 / line 2", notePlace: "middle" }),
+    { title: "Scans today" }, "only the title is kept: added text (subtitle, note) is dropped, nothing new goes into a panel");
+equal(cleanTexts({ labels: { 0: "A" }, labelStyles: { 0: { size: "20", style: "bold", align: "center" }, 1: { size: 5, style: "huge", align: "diagonal" }, 99: { size: 20 } } }).labelStyles,
+    { 0: { size: 20, style: "bold", align: "center" } }, "a label look keeps a size of 12 to 28, a known style and a known alignment, and nothing else");
+equal(readPixels("", 120, 1400, "The height"), { ok: true, value: 0, message: "" }, "an empty size is automatic");
+equal(readPixels("abc", 120, 1400, "The height").ok, false, "text is refused");
+equal(readPixels("50", 120, 1400, "The height").message, "The height must be between 120 and 1400 pixels.", "a too small size is named");
+equal(readPixels("99999", 240, 2400, "The width").ok, false, "a huge size is refused");
+equal(readPixels("300.4", 240, 2400, "The width").value, 300, "a size is a whole number of pixels");
 equal(cleanTexts({ labels: { 0: "Today", 1: "", 99: "far", x: "bad", 2: "y".repeat(80) } }), { labels: { 0: "Today", 2: "y".repeat(LIMITS.label) } }, "card labels: by number, in their limit");
 equal(cleanTexts({ title: "<script>alert(1)</script>" }).title, "<script>alert(1)</script>", "text is kept as text (the page writes it with textContent, never as HTML)");
 equal(plainText("a\u0000b\u0007c", 10), "a b c", "control characters become spaces");

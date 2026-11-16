@@ -2192,3 +2192,34 @@ html.sb-mobile-open body::after { content: ""; position: fixed; z-index: 899; in
 @media (prefers-reduced-motion: reduce) {
     html.sb-ready .main-content, .sidebar, html.sb-mobile-open .sidebar, .topbar-controls { transition: none !important; }
 }
+
+/* ---- Style and text panel (round New16) ---- */
+/* A pixel width is a ceiling inside the panel's columns, on wide screens only: the panel can get narrower than its room, never wider, so it cannot overlap a neighbour. */
+@media (min-width: 1024px) { .panel[data-fixed-w]:not(.member) { width: min(var(--wpx), 100%); justify-self: start; } }
+.field-error { display: block; margin-top: 4px; font-size: var(--fs-sm); line-height: 1.4; color: var(--bad, #b3402f); overflow-wrap: anywhere; }
+.style-dialog [aria-invalid="true"] { border-color: var(--bad, #b3402f); }
+.style-dialog .label-rows { display: flex; flex-direction: column; gap: 12px; }
+.style-dialog .label-row { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); min-width: 0; }
+.style-dialog .label-look { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.1fr) minmax(0, 1.1fr); gap: 8px; }
+.style-dialog .label-look .field { min-width: 0; }
+.style-dialog .label-look :is(input, select) { width: 100%; min-width: 0; min-height: 44px; }
+@media (max-width: 480px) { .style-dialog .label-look { grid-template-columns: minmax(0, 1fr); } }
+/* a label whose alignment was chosen fills its card's width so the alignment has room to work; long text wraps instead of overlapping */
+[data-lalign] { display: block; width: 100%; overflow-wrap: anywhere; }
+.kpi-title, .stat-title { overflow-wrap: anywhere; }
+
+/* motion of the drawer: it slides in, its sections come up one after the other, and it slides out */
+@keyframes sd-section-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes sd-out { to { opacity: 0; transform: translateX(24px); } }
+@keyframes sd-fade-out { to { opacity: 0; } }
+.style-overlay .style-dialog .form-section { animation: sd-section-in .28s var(--ease) both; }
+.style-overlay .style-dialog .form-section:nth-of-type(2) { animation-delay: .04s; }
+.style-overlay .style-dialog .form-section:nth-of-type(3) { animation-delay: .08s; }
+.style-overlay .style-dialog .form-section:nth-of-type(4) { animation-delay: .12s; }
+.style-overlay .style-dialog .form-section:nth-of-type(n+5) { animation-delay: .16s; }
+.style-overlay.closing { pointer-events: none; animation: sd-fade-out .18s ease both; }
+.style-overlay.closing .style-dialog { animation: sd-out .18s var(--ease) both; }
+@media (prefers-reduced-motion: reduce) { .style-overlay .style-dialog, .style-overlay .style-dialog .form-section, .style-overlay.closing, .style-overlay.closing .style-dialog { animation: none !important; } }
+
+/* A chip holding a long name (an ingredient such as "Polyglyceryl-4 Diisostearate/Polyhydroxystearate/Sebacate") wraps inside its parent instead of pushing the page sideways. */
+.chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; text-align: left; border-radius: 14px; }

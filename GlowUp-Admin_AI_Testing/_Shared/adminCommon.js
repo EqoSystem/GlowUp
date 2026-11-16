@@ -77,19 +77,26 @@ export async function isAdmin(user) {
 
 
 
+// Session expiry, sign-out and the login redirect are the app leaving by itself:
+// the browser's "Leave site?" question must not appear for them (only a real window close asks).
+function leaveToLogin(address) {
+    window.__glowupLeaving = true;
+    window.location.replace(address);
+}
+
 export function requireAdmin() {
     return new Promise((resolve) => {
         let resolved = false;
         let leaving = false;
         onAuthStateChanged(auth, async (user) => {
             if (leaving) return;
-            if (!user) { leaving = true; remember(false); clearStore(); window.location.replace(LOGIN_PAGE); return; }
+            if (!user) { leaving = true; remember(false); clearStore(); leaveToLogin(LOGIN_PAGE); return; }
             if (REQUIRE_ADMIN_RECORD && !(await isAdmin(user))) {
                 if (leaving) return;
                 leaving = true;
                 remember(false); clearStore();
                 try { await signOut(auth); } catch (error) { console.error("Sign out failed:", error); }
-                window.location.replace(LOGIN_PAGE + "?denied=1");
+                leaveToLogin(LOGIN_PAGE + "?denied=1");
                 return;
             }
             remember(true);
@@ -135,7 +142,7 @@ function watchIdle() {
         remember(false);
         clearStore();
         try { await signOut(auth); } catch (error) { console.error("Sign out failed:", error); }
-        window.location.replace(LOGIN_PAGE + "?idle=1");
+        leaveToLogin(LOGIN_PAGE + "?idle=1");
     }, 30 * 1000);
 }
 
@@ -146,7 +153,7 @@ async function confirmSignOut() {
     clearStore();
     try { await signOut(auth); }
     catch (error) { console.error("Sign out failed:", error); }
-    window.location.replace(LOGIN_PAGE);
+    leaveToLogin(LOGIN_PAGE);
 }
 
 

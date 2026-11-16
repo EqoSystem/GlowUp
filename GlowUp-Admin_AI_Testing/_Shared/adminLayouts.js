@@ -23,7 +23,7 @@ import { datasetList, datasetSpec, measuresOf, mountWidget, unmountWidget, norma
 import { hasAssist, assistHidden, setAssistHidden, anyAssistHidden, showAllAssists } from "./adminAssist.js";
 import { rowsFor, ROW_UNIT } from "./layoutRules.js";
 import { setFoldPage, foldButton, FOLD_PARTS, paintFold, toggleFold, foldedNow, anyFoldChoice, forgetFoldChoices } from "./adminFold.js";
-import { ANIMATIONS, ANIMATION_FRAMES, TRANSITIONS, EDGES, BUTTON_FX, SHADOWS, ORIENTS, NOTE_PLACES, LIMITS, cleanStyle, cleanTexts, cleanPanelMap, contrast, applyPanelStyle, applyPanelTexts, ownTexts } from "./componentStyle.js";
+import { ANIMATIONS, ANIMATION_FRAMES, TRANSITIONS, EDGES, BUTTON_FX, SHADOWS, ORIENTS, LABEL_FONT_STYLES, LABEL_ALIGNS, readPixels, LIMITS, cleanStyle, cleanTexts, cleanPanelMap, contrast, applyPanelStyle, applyPanelTexts, ownTexts } from "./componentStyle.js";
 import { SHARED_PAGES, cachedShared, readShared, writeShared, clearShared } from "./sharedLayouts.js";
 
 const LAYOUT_KEY = "glowup.layouts.v1";
@@ -68,7 +68,7 @@ function cleanView(view) {
 function cleanPage(raw) {
     const page = raw && typeof raw === "object" ? raw : {};
     const size = {};
-    Object.keys(page.size || {}).slice(0, 60).forEach((id) => { if (ID.test(id)) size[id] = { w: Math.min(12, Math.max(2, Number(page.size[id].w) || 12)), h: Math.min(1400, Math.max(0, Number(page.size[id].h) || 0)) }; });
+    Object.keys(page.size || {}).slice(0, 60).forEach((id) => { if (ID.test(id)) size[id] = { w: Math.min(12, Math.max(2, Number(page.size[id].w) || 12)), h: Math.min(1400, Math.max(0, Number(page.size[id].h) || 0)), wpx: Math.min(2400, Math.max(0, Number(page.size[id].wpx) || 0)) }; });
     const views = {};
     Object.keys(page.views || {}).slice(0, 30).forEach((id) => { if (ID.test(id)) views[id] = cleanView(page.views[id]); });
     return {
@@ -414,7 +414,7 @@ function applyLayout() {
     tops.forEach((panel, id) => {
         const size = (page && page.size[id]) || defaults.size[id] || { w: 6 };
         panel.style.setProperty("--w", String(Math.min(12, Math.max(2, Number(size.w) || 6))));
-        if (size.h) { panel.style.height = size.h + "px"; panel.setAttribute("data-fixed-h", "1"); } else { panel.style.height = ""; panel.removeAttribute("data-fixed-h"); }
+        applyPixelSize(panel, size.wpx, size.h);
         panel.classList.toggle("is-hidden", !!(page && page.hidden.includes(id)));
         labelSize(panel);
     });
@@ -577,7 +577,15 @@ async function autoResize() {
 
 function labelSize(panel) {
     const label = panel.querySelector(":scope > .panel-tools .size");
-    if (label) label.textContent = `${getComputedStyle(panel).getPropertyValue("--w").trim() || 12}/12` + (panel.style.height ? " · " + panel.style.height : "");
+    if (label) label.textContent = `${getComputedStyle(panel).getPropertyValue("--w").trim() || 12}/12` + (panel.hasAttribute("data-fixed-w") ? " · " + panel.style.getPropertyValue("--wpx") + " wide" : "") + (panel.style.height ? " · " + panel.style.height : "");
+}
+
+// Pixel size of a panel (0 = automatic). The width is a ceiling inside the panel's columns (CSS: width min(--wpx, 100%), wide screens only).
+function applyPixelSize(panel, wpx, h) {
+    if (wpx > 0) { panel.style.setProperty("--wpx", Math.round(wpx) + "px"); panel.setAttribute("data-fixed-w", "1"); }
+    else { panel.style.removeProperty("--wpx"); panel.removeAttribute("data-fixed-w"); }
+    if (h > 0) { panel.style.height = Math.round(h) + "px"; panel.setAttribute("data-fixed-h", "1"); }
+    else { panel.style.height = ""; panel.removeAttribute("data-fixed-h"); }
 }
 
 
@@ -642,7 +650,7 @@ function capture() {
     const page = pageData(true);
     if (!page) return;
     page.order = topPanels().map((panel) => panel.dataset.panel);
-    topPanels().forEach((panel) => { page.size[panel.dataset.panel] = { w: Number(getComputedStyle(panel).getPropertyValue("--w")) || 12, h: panel.style.height ? parseInt(panel.style.height, 10) : 0 }; });
+    topPanels().forEach((panel) => { page.size[panel.dataset.panel] = { w: Number(getComputedStyle(panel).getPropertyValue("--w")) || 12, h: panel.style.height ? parseInt(panel.style.height, 10) : 0, wpx: panel.hasAttribute("data-fixed-w") ? parseInt(panel.style.getPropertyValue("--wpx"), 10) || 0 : 0 }; });
     saveStore();
 }
 
@@ -969,7 +977,7 @@ async function openStyleDialog(id) {
     const page = pageData(true);
     page.styles = page.styles || {}; page.texts = page.texts || {};
     const theme = currentTheme();
-    const before = { style: JSON.parse(JSON.stringify(page.styles[id] || {})), texts: JSON.parse(JSON.stringify(page.texts[id] || {})), w: getComputedStyle(panel).getPropertyValue("--w").trim(), h: panel.style.height };
+    const before = { style: JSON.parse(JSON.stringify(page.styles[id] || {})), texts: JSON.parse(JSON.stringify(page.texts[id] || {})), w: getComputedStyle(panel).getPropertyValue("--w").trim(), h: panel.style.height, wpx: panel.hasAttribute("data-fixed-w") ? parseInt(panel.style.getPropertyValue("--wpx"), 10) || 0 : 0 };
     let style = JSON.parse(JSON.stringify(before.style)), texts = JSON.parse(JSON.stringify(before.texts));
     const named = !!panel.dataset.custom || panel.classList.contains("group");
     const own = ownTexts(panel);
@@ -991,9 +999,10 @@ async function openStyleDialog(id) {
                     <span class="form-section-title">Size</span>
                     <div class="form-row">
                         <div class="field"><label for="sdWidth">Width</label><select id="sdWidth">${widthOptions.map(([w, l]) => `<option value="${w}"${w === width ? " selected" : ""}>${esc(l)} (${w}/12)</option>`).join("")}</select></div>
-                        <div class="field"><label for="sdHeight">Height (pixels)</label><input type="number" id="sdHeight" min="120" max="1400" step="10" placeholder="Automatic" value="${before.h ? parseInt(before.h, 10) : ""}"></div>
+                        <div class="field"><label for="sdWidthPx">Width (pixels)</label><input type="number" id="sdWidthPx" inputmode="numeric" min="${LIMITS.widthMin}" max="${LIMITS.widthMax}" step="10" placeholder="Automatic" value="${before.wpx || ""}"><span class="field-error" id="sdWidthPxErr" role="alert" hidden></span></div>
+                        <div class="field"><label for="sdHeight">Height (pixels)</label><input type="number" id="sdHeight" inputmode="numeric" min="${LIMITS.heightMin}" max="${LIMITS.heightMax}" step="10" placeholder="Automatic" value="${before.h ? parseInt(before.h, 10) : ""}"><span class="field-error" id="sdHeightErr" role="alert" hidden></span></div>
                     </div>
-                    <span class="field-hint">Empty height = as tall as its content. On a tablet a narrow panel takes half the width, on a phone every panel takes the whole width: this setting is for wide screens.</span>
+                    <span class="field-hint">Empty = automatic. The columns set the room the panel has; a pixel width can only make it narrower than that room, never wider, so panels never overlap. On a tablet a narrow panel takes half the width and on a phone every panel takes the whole width: pixel sizes apply on wide screens only. Height ${LIMITS.heightMin} to ${LIMITS.heightMax}, width ${LIMITS.widthMin} to ${LIMITS.widthMax} pixels; a panel taller than its content scrolls inside.</span>
                 </div>
 
                 <div class="form-section">
@@ -1004,17 +1013,22 @@ async function openStyleDialog(id) {
 
                 <div class="form-section">
                     <span class="form-section-title">Text</span>
-                    <p class="field-hint">Text goes only into these fixed places, so it always lines up and moves with the panel. Names and numbers from the database are never changed here.</p>
+                    <p class="field-hint">Only the text this panel already has can be changed here (its title and its card labels); nothing new is added to the panel. Names and numbers from the database are never changed.</p>
                     <div class="field"${own.title === null ? " hidden" : ""}><label for="sdTitleText">Title</label><input type="text" id="sdTitleText" maxlength="${LIMITS.title}" autocomplete="off" placeholder="${esc(own.title || "")}" value="${esc(named ? labelOf(id) : texts.title || "")}">
                         <span class="field-hint">${named ? "This panel's own name." : "Empty = the page's own title."}</span></div>
-                    <div class="field"><label for="sdSubtitle">Subtitle</label><input type="text" id="sdSubtitle" maxlength="${LIMITS.subtitle}" autocomplete="off" placeholder="One short line under the title" value="${esc(texts.subtitle || "")}">
-                        <span class="field-hint">Shown right under the title. At most ${LIMITS.subtitle} characters.</span></div>
-                    <div class="field"><label for="sdNote">Note</label><textarea id="sdNote" rows="3" maxlength="${LIMITS.note}" placeholder="For example: Check these every morning before 10.">${esc(texts.note || "")}</textarea>
-                        <div class="form-row"><div class="field"><label for="sdNotePlace">Where the note goes</label><select id="sdNotePlace">${opt(NOTE_PLACES, texts.notePlace || "top")}</select></div></div>
-                        <span class="field-hint">Plain text in a framed box, at the top or the bottom of the panel only. At most ${LIMITS.note} characters and 5 lines.</span></div>
                     <div class="field" id="sdLabelsField"${own.labels.length ? "" : " hidden"}><span class="field-label">Card labels</span>
-                        <div class="form-row" id="sdLabels">${own.labels.slice(0, LIMITS.labels).map((label, i) => `<div class="field"><label for="sdLabel${i}">Card ${i + 1}</label><input type="text" id="sdLabel${i}" data-label-index="${i}" maxlength="${LIMITS.label}" autocomplete="off" placeholder="${esc(label)}" value="${esc((texts.labels && texts.labels[i]) || "")}"></div>`).join("")}</div>
-                        <span class="field-hint">Empty = the page's own label (shown greyed).</span></div>
+                        <div class="label-rows" id="sdLabels">${own.labels.slice(0, LIMITS.labels).map((label, i) => {
+                            const look = (texts.labelStyles && texts.labelStyles[i]) || {};
+                            return `<div class="label-row">
+                                <div class="field"><label for="sdLabel${i}">Card ${i + 1}</label><input type="text" id="sdLabel${i}" data-label-index="${i}" maxlength="${LIMITS.label}" autocomplete="off" placeholder="${esc(label)}" value="${esc((texts.labels && texts.labels[i]) || "")}"></div>
+                                <div class="label-look">
+                                    <div class="field"><label for="sdLabelSize${i}">Size (px)</label><input type="number" id="sdLabelSize${i}" data-label-size="${i}" inputmode="numeric" min="${LIMITS.labelSizeMin}" max="${LIMITS.labelSizeMax}" step="1" placeholder="Auto" value="${look.size || ""}"></div>
+                                    <div class="field"><label for="sdLabelStyle${i}">Style</label><select id="sdLabelStyle${i}" data-label-style="${i}">${opt(LABEL_FONT_STYLES, look.style)}</select></div>
+                                    <div class="field"><label for="sdLabelAlign${i}">Align</label><select id="sdLabelAlign${i}" data-label-align="${i}">${opt(LABEL_ALIGNS, look.align)}</select></div>
+                                </div>
+                            </div>`;
+                        }).join("")}</div>
+                        <span class="field-hint">Empty text = the page's own label (shown greyed). Size ${LIMITS.labelSizeMin} to ${LIMITS.labelSizeMax} pixels; the label wraps inside its card and never overlaps.</span></div>
                 </div>
 
                 <div class="form-section">
@@ -1072,12 +1086,20 @@ async function openStyleDialog(id) {
     panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
     const q = (selector) => overlay.querySelector(selector);
 
+    const showError = (id, message) => { const box = q("#" + id); box.textContent = message; box.hidden = !message; };
+    // Reads the two pixel boxes; a bad value is named under its own box and nothing is applied.
+    const readSize = () => {
+        const w = readPixels(q("#sdWidthPx").value, LIMITS.widthMin, LIMITS.widthMax, "The width");
+        const h = readPixels(q("#sdHeight").value, LIMITS.heightMin, LIMITS.heightMax, "The height");
+        showError("sdWidthPxErr", w.message); showError("sdHeightErr", h.message);
+        q("#sdWidthPx").setAttribute("aria-invalid", w.ok ? "false" : "true"); q("#sdHeight").setAttribute("aria-invalid", h.ok ? "false" : "true");
+        return { ok: w.ok && h.ok, w: w.value, h: h.value };
+    };
     const sizeNow = () => {
         if (isMember) return;
         panel.style.setProperty("--w", q("#sdWidth").value);
-        const h = Number(q("#sdHeight").value);
-        if (h >= 120 && h <= 1400) { panel.style.height = Math.round(h) + "px"; panel.setAttribute("data-fixed-h", "1"); }
-        else { panel.style.height = ""; panel.removeAttribute("data-fixed-h"); }
+        const size = readSize();
+        if (size.ok) applyPixelSize(panel, size.w, size.h);
         labelSize(panel);
         queueFit();
     };
@@ -1119,7 +1141,7 @@ async function openStyleDialog(id) {
     let saved = false, dirty = false, asking = false;
 
 
-    const onLeave = (event) => { if (dirty && !saved) { event.preventDefault(); event.returnValue = ""; } };
+    const onLeave = (event) => { if (window.__glowupLeaving) return; if (dirty && !saved) { event.preventDefault(); event.returnValue = ""; } };
     window.addEventListener("beforeunload", onLeave);
     overlay.addEventListener("input", () => { dirty = true; });
     overlay.addEventListener("change", () => { dirty = true; });
@@ -1137,12 +1159,13 @@ async function openStyleDialog(id) {
         window.removeEventListener("beforeunload", onLeave);
         document.removeEventListener("keydown", onKey, true);
         panel.classList.remove("style-target");
-        overlay.remove();
+        if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) overlay.remove();
+        else { overlay.classList.add("closing"); setTimeout(() => overlay.remove(), 200); }
         if (saved) return;
 
         if (!isMember) {
             panel.style.setProperty("--w", before.w || "12");
-            if (before.h) { panel.style.height = before.h; panel.setAttribute("data-fixed-h", "1"); } else { panel.style.height = ""; panel.removeAttribute("data-fixed-h"); }
+            applyPixelSize(panel, before.wpx, before.h ? parseInt(before.h, 10) : 0);
             labelSize(panel);
         }
         paintPanelStyles();
@@ -1156,6 +1179,7 @@ async function openStyleDialog(id) {
     const setStyle = (key, value) => { if (value === "" || value === undefined || value === null) delete style[key]; else style[key] = value; show(); };
     q("#sdWidth").addEventListener("change", sizeNow);
     q("#sdHeight").addEventListener("change", sizeNow);
+    q("#sdWidthPx").addEventListener("change", sizeNow);
     q("#sdOrient").addEventListener("change", (event) => setStyle("orient", event.target.value));
     q("#sdFont").addEventListener("change", (event) => setStyle("font", event.target.value));
     q("#sdScale").addEventListener("input", (event) => setStyle("scale", Number(event.target.value) === 1 ? "" : Number(event.target.value)));
@@ -1186,19 +1210,28 @@ async function openStyleDialog(id) {
         delete style.colors[theme][key];
         show();
     });
-    const textInput = () => {
-        texts = { subtitle: q("#sdSubtitle").value, note: q("#sdNote").value, notePlace: q("#sdNotePlace").value, labels: {} };
+    // Typing or changing a label's look repaints on the next animation frame, and only the labels whose values changed are touched.
+    let textFrame = 0;
+    const collectTexts = () => {
+        texts = { labels: {}, labelStyles: {} };
         if (!named) texts.title = q("#sdTitleText").value;
         overlay.querySelectorAll("[data-label-index]").forEach((input) => { if (input.value.trim()) texts.labels[input.dataset.labelIndex] = input.value; });
-        show();
+        overlay.querySelectorAll(".label-row").forEach((row, i) => {
+            texts.labelStyles[i] = { size: row.querySelector("[data-label-size]").value, style: row.querySelector("[data-label-style]").value, align: row.querySelector("[data-label-align]").value };
+        });
     };
-    ["#sdTitleText", "#sdSubtitle", "#sdNote"].forEach((selector) => q(selector).addEventListener("input", textInput));
-    q("#sdNotePlace").addEventListener("change", textInput);
-    overlay.querySelectorAll("[data-label-index]").forEach((input) => input.addEventListener("input", textInput));
+    const textInput = () => {
+        collectTexts();
+        if (textFrame) return;
+        textFrame = requestAnimationFrame(() => { textFrame = 0; show(); });
+    };
+    q("#sdTitleText").addEventListener("input", textInput);
+    overlay.querySelectorAll("[data-label-index], [data-label-size], [data-label-style], [data-label-align]").forEach((input) => { input.addEventListener("input", textInput); input.addEventListener("change", textInput); });
     q("#sdReset").addEventListener("click", () => {
         dirty = true;
         style = {}; texts = {};
-        overlay.querySelectorAll("#sdSubtitle, #sdNote, [data-label-index]").forEach((input) => { input.value = ""; });
+        overlay.querySelectorAll("[data-label-index], [data-label-size]").forEach((input) => { input.value = ""; });
+        overlay.querySelectorAll("[data-label-style], [data-label-align]").forEach((input) => { input.value = ""; });
         if (!named) q("#sdTitleText").value = "";
         ["#sdOrient", "#sdFont", "#sdAnim", "#sdTrans", "#sdEdge", "#sdBtn", "#sdShadow", "#sdCardShadow"].forEach((selector) => { q(selector).value = ""; });
         q("#sdScale").value = 1; q("#sdRadiusOwn").checked = false;
@@ -1208,6 +1241,8 @@ async function openStyleDialog(id) {
 
     q("form").addEventListener("submit", (event) => {
         event.preventDefault();
+        const size = isMember ? { ok: true, w: 0, h: 0 } : readSize();
+        if (!size.ok) { toast("Fix the size first: the box that needs correcting is marked under it.", "error"); (q("#sdWidthPx[aria-invalid=true]") || q("#sdHeight[aria-invalid=true]")).focus(); return; }
         const cleanS = cleanStyle(style, FONT_IDS()), cleanT = cleanTexts(texts);
         if (Object.keys(cleanS).length) page.styles[id] = cleanS; else delete page.styles[id];
         if (Object.keys(cleanT).length) page.texts[id] = cleanT; else delete page.texts[id];
@@ -1218,8 +1253,7 @@ async function openStyleDialog(id) {
 
 
         if (!isMember) {
-            const h = Number(q("#sdHeight").value);
-            page.size[id] = { w: Math.min(12, Math.max(2, Number(q("#sdWidth").value) || 12)), h: h >= 120 && h <= 1400 ? Math.round(h) : 0 };
+            page.size[id] = { w: Math.min(12, Math.max(2, Number(q("#sdWidth").value) || 12)), h: size.h, wpx: size.w };
         }
         saved = true;
         close();

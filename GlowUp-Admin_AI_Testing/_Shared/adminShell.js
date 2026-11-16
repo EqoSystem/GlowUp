@@ -123,7 +123,7 @@ const THEME_KEY = "glowup.theme";
 
 export function currentTheme() { return document.documentElement.dataset.theme === "light" ? "light" : "dark"; }
 
-const systemTheme = () => (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+const systemTheme = () => "light"; // default theme is light; the OS preference is not followed
 
 
 export function themeChoice() {
@@ -145,7 +145,7 @@ function followSystemTheme() {
     if (followingSystem || !window.matchMedia) return;
     followingSystem = true;
     const system = window.matchMedia("(prefers-color-scheme: light)");
-    system.addEventListener("change", () => { if (themeChoice() === "system") setTheme(system.matches ? "light" : "dark", false); });
+    system.addEventListener("change", () => { if (themeChoice() === "system") setTheme("light", false); });
 }
 
 export function setTheme(theme, remember = true) {
