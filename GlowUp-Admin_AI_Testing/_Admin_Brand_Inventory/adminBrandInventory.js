@@ -2614,7 +2614,8 @@ const fdaLinkOf = (sources) => {
 let shadeAdding = false, shadeMessage = "", shadeDraft = "#C24B62", shadeNearOk = "";
 
 function renderShadeEditor() {
-    const swatch = (shade) => `background:${escapeHtml(shade)}`;
+    // a hex colour only: a stored value never reaches the style attribute as other CSS (url(), etc.)
+    const swatch = (shade) => `background:${/^#[0-9a-f]{3,8}$/i.test(String(shade || "").trim()) ? String(shade).trim() : "transparent"}`;
     const items = formShades.map((shade, index) => `
         <span class="shade-item" data-index="${index}">
             <label class="shade-swatch" style="${swatch(shade)}" ><input type="color" class="shade-picker" value="${escapeHtml(shade.toLowerCase())}" data-index="${index}" aria-label="Pick the colour of shade ${index + 1}"></label>

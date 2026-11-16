@@ -1658,6 +1658,7 @@ async function importProfile(event) {
     const file = event.target.files[0];
     event.target.value = "";
     if (!file) return;
+    if (file.size > 1024 * 1024) { toast("A layout file is at most 1 MB. This one is not a GlowUp layout.", "error"); return; }
     try {
         const data = JSON.parse(await file.text());
         if (!data || data.glowupLayout !== 1 || !data.profile || typeof data.profile !== "object") throw new Error("not a layout file");

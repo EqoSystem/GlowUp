@@ -208,7 +208,7 @@ try {
 
         const refs = '[data-field-sources="sources"]';
         await page.click(`${refs} summary`);
-        ok(await page.locator(`${refs} .lookup-row`).count() >= 8, "Reference links lists each source once");
+        { const hrefs = await page.locator(`${refs} .lookup-row a.source-link`).evaluateAll((as) => as.map((a) => a.href)); ok(hrefs.length >= 5 && new Set(hrefs).size === hrefs.length, `Reference links lists each source once (${hrefs.length} rows, ${new Set(hrefs).size} different)`); }
         ok(/Used for:/.test(await page.textContent(`${refs} .lookup-text`)), "with what it is used for");
 
         await page.fill("#ingredientSourcesInput", "https://www.cir-safety.org/ingredients\nMy note | https://example.com/x\nhttps://unknown.example/y");

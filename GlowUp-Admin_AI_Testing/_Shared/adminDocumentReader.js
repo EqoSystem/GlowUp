@@ -4,6 +4,7 @@ export const AI_TEXT_CHARACTERS = 30000;
 export const AI_PART_CHARACTERS = 12000;
 
 
+const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
 const OCR_MAX_PAGES = Infinity;
 const OCR_SCALE = 2;
 const TESSERACT = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
@@ -112,8 +113,15 @@ async function readWord(file) {
 
 export async function readAdminDocument(file, onProgress = () => {}) {
     if (!file) throw new Error("Choose a PDF, Excel, Word, CSV or text file.");
+    // security guideline 10 (16 November 2026): a size limit, and the file's first bytes must match its kind
+    if (file.size > MAX_DOCUMENT_BYTES) throw new Error(`This file is ${Math.round(file.size / 1048576)} MB. Use a file of at most ${MAX_DOCUMENT_BYTES / 1048576} MB, or split it.`);
     const extension = (file.name.split(".").pop() || "").toLowerCase();
     const isPdf = extension === "pdf" || file.type === "application/pdf";
+    const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+    const starts = (...bytes) => bytes.every((b, i) => head[i] === b);
+    if (isPdf && !starts(0x25, 0x50, 0x44, 0x46)) throw new Error("This file is not a real PDF. Save it again as PDF and try once more.");
+    if (["xlsx", "docx"].includes(extension) && !starts(0x50, 0x4b)) throw new Error(`This file is not a real .${extension} file. Save it again from Excel or Word and try once more.`);
+    if (extension === "xls" && !starts(0xd0, 0xcf, 0x11, 0xe0)) throw new Error("This file is not a real .xls workbook. Save it again from Excel and try once more.");
     let text;
     if (isPdf) text = await readPdf(file, onProgress);
     else if (["xlsx", "xls"].includes(extension)) text = await readSpreadsheet(file);

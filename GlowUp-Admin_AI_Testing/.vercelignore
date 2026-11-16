@@ -20,3 +20,6 @@ firestore-debug.log
 # checks for developers (run with: node tests/rules.test.mjs): not part of the website
 tests
 tools
+
+# test screenshots saved at the site root are never published (16 November 2026)
+/*.png

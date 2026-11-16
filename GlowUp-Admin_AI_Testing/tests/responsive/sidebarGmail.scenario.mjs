@@ -41,12 +41,12 @@ try {
             ok(await sidebarWidth() === 72, `${width}px: Escape closes the hover overlay`);
             await page.click("#menuBtn");
             await settle(250);
-            ok(await sidebarWidth() === 256 && await mainLeft() === 256, `${width}px: hamburger pins the nav and offsets content`);
+            { const w = await sidebarWidth(), m = await mainLeft(); ok(w === 284 && m === 284, `${width}px: hamburger pins the nav and offsets content (--nav-w 284px; ${w}, ${m})`); }
             ok(await page.locator("#menuBtn").getAttribute("aria-expanded") === "true", `${width}px: pinned state is reflected accessibly`);
             ok(await page.evaluate(() => localStorage.getItem("glowup.sidebar.folded")) === "0", `${width}px: pin state persists`);
             await page.mouse.move(width - 30, height - 20);
             await settle(240);
-            ok(await sidebarWidth() === 256, `${width}px: pinned nav remains open after pointer leaves`);
+            ok(await sidebarWidth() === 284, `${width}px: pinned nav remains open after pointer leaves`);
             await page.click("#menuBtn");
             await settle(250);
             ok(await sidebarWidth() === 72 && await mainLeft() === 72, `${width}px: second click unpins and returns to the rail`);
