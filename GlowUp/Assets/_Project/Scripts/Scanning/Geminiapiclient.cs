@@ -116,14 +116,16 @@ namespace GlowUp.Scanning
 
         private async Task<GeminiScanResult> TryOnceAsync(string model, string requestJsonBody, CancellationToken cancellationToken)
         {
-            string url = _config.BuildUrl(model);
+            // through GlowUp's server: the AI key is never inside the app (16 November 2026)
+            string url = GlowUp.Security.AiProxy.Url(model);
             byte[] bodyRaw = Encoding.UTF8.GetBytes(requestJsonBody);
 
             using var req = new UnityWebRequest(url, "POST");
             req.uploadHandler = new UploadHandlerRaw(bodyRaw);
             req.downloadHandler = new DownloadHandlerBuffer();
             req.SetRequestHeader("Content-Type", "application/json");
-            req.SetRequestHeader("x-goog-api-key", _apiKey);
+            if (!await GlowUp.Security.AiProxy.Authorize(req))
+                return GeminiScanResult.Failed(GeminiErrorCode.Unknown, "No Firebase sign-in for the AI request.", GlowUp.Security.AiProxy.NotSignedIn, 0);
             req.timeout = _config.TimeoutSeconds;
 
             using var registration = cancellationToken.Register(() =>

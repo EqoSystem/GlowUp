@@ -49,6 +49,9 @@
     "api/source-link.js": {
       "maxDuration": 20,
       "includeFiles": "_Shared/sourceLinkRules.mjs"
+    },
+    "api/app-ai.js": {
+      "maxDuration": 60
     }
   },
   "crons": [

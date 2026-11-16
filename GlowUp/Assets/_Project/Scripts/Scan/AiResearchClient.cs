@@ -67,12 +67,13 @@ namespace GlowUp.Scan
                     for (int attempt = 0; attempt <= retries; attempt++)
                     {
                         bool retryAttempt = false;
-                        using (var request = new UnityWebRequest(config.BuildUrl(model), "POST"))
+                        // through GlowUp's server: the AI key is never inside the app (16 November 2026)
+                        using (var request = new UnityWebRequest(GlowUp.Security.AiProxy.Url(model), "POST"))
                         {
                             request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(Body(question, withSearch, jpegPictures)));
                             request.downloadHandler = new DownloadHandlerBuffer();
                             request.SetRequestHeader("Content-Type", "application/json");
-                            request.SetRequestHeader("x-goog-api-key", apiKey);
+                            if (!await GlowUp.Security.AiProxy.Authorize(request)) return new Answer { error = GlowUp.Security.AiProxy.NotSignedIn };
                             request.timeout = Mathf.Max(5, Mathf.RoundToInt(timeoutSeconds));
                             bool sent = true;
                             try
