@@ -198,6 +198,9 @@ namespace GlowUp.AR
             if (glossMaskOn != null && shownLayer == Brows) glossMaskOn = null;      // the gloss takes the new mask on the next frame
         }
 
+        /// <summary>The colour of the finish's highlight: white, or (metallic) leaning towards the shade.</summary>
+        public Color HighlightTint => choices == null ? Color.white : Color.Lerp(Color.white, choices.Shade, choices.FinishName == "metallic" ? metallicTint : 0.1f);
+
         /// <summary>The colour layer `i` shows now (0 face, 1 cheeks, 2 eyes, 3 lips, 4 brows; alpha = strength). The guided try-on that follows the face copies it.</summary>
         public Color LayerColour(int i) => made && i >= 0 && i < shown.Length ? shown[i] : new Color(1f, 1f, 1f, 0f);
 
@@ -212,7 +215,8 @@ namespace GlowUp.AR
         {
             if (!made || choices == null) return;
             float t = 1f - Mathf.Exp(-blendSpeed * Time.unscaledDeltaTime);
-            Color shade = Color.Lerp(choices.Shade, Color.white, choices.FinishBrighten);
+            // a finish lifts the shade only a little (it used to be pulled towards white, which turned the face grey-white)
+            Color shade = Color.Lerp(choices.Shade, Color.white, choices.FinishBrighten * 0.25f);
             bool has = choices.Shade.a > 0.01f;
             int active = -1; float activeShare = 0f;
             for (int i = 0; i < Areas.Length; i++)

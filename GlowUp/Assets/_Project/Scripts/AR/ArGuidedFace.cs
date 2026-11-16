@@ -67,6 +67,7 @@ namespace GlowUp.AR
         /// <summary>Raised when Following changes.</summary>
         public event Action<bool> FollowingChanged;
 
+        const float LowLagBeta = 24f;
         static readonly int SkinBaseId = Shader.PropertyToID("_SkinBase");
         const int Points = FaceMeshData.PointCount;
 
@@ -102,6 +103,8 @@ namespace GlowUp.AR
         ArGuidedFaceLayer highlight;
         Texture2D[] colourMasks, highlightMasks;
         Material[] materials;
+        Material shineMaterial;
+        float shineSharpSent = -1f, shineSparkleSent = -1f;
         readonly Color[] skinSent = new Color[GuidedFaceShapes.LayerCount];
         Vector2[] meshUvs;
         int[] meshTriangles;
@@ -137,7 +140,7 @@ namespace GlowUp.AR
         public float MeshUpdateMilliseconds => meshUpdateMilliseconds;
         public int ReaderRecoveries => readerRecoveries;
         public float MinCutoff => filterSettings != null ? filterSettings.minCutoff : steadiness;
-        public float Beta => filterSettings != null ? filterSettings.beta : quickness;
+        public float Beta => Mathf.Max(LowLagBeta, filterSettings != null ? filterSettings.beta : quickness);
 
         public void SetSmoothingEnabled(bool value) { smoothingEnabled = value; filter.Reset(); havePreviousFiltered = false; }
         public void SetPredictionEnabled(bool value) { predictionEnabled = value; }
@@ -206,6 +209,8 @@ namespace GlowUp.AR
             Release(colourMasks); Release(highlightMasks); colourMasks = highlightMasks = null;
             if (materials != null) foreach (Material m in materials) if (m != null) Destroy(m);
             materials = null;
+            if (shineMaterial != null) Destroy(shineMaterial);
+            shineMaterial = null;
             ShowOldGuide(true);
             if (makeup != null) { makeup.Presence = 1f; makeup.SkinAdapt = 0f; makeup.ShineGain = 1f; if (prepared) makeup.SetBrowMask(null); }
             prepared = false;
@@ -275,11 +280,12 @@ namespace GlowUp.AR
             if (haveFace)
             {
                 Vector3[] target = filter.Values;
-                float predictionTime = predictionEnabled ? Mathf.Clamp(LandmarkAgeMs * 0.001f, 0f, 0.1f) : 0f;
+                // age of the camera frame the points came from + about one display frame; the One Euro filter's own lag is covered by a higher beta
+                float predictionTime = predictionEnabled ? Mathf.Clamp(LandmarkAgeMs * 0.001f + 0.016f, 0f, 0.16f) : 0f;
                 for (int i = 0; i < Points; i++)
                 {
                     Vector3 delta = velocity[i] * predictionTime;
-                    if (delta.sqrMagnitude > 0.0009f) delta = delta.normalized * 0.03f;
+                    if (delta.sqrMagnitude > 0.0036f) delta = delta.normalized * 0.06f;
                     shown[i] = target[i] + delta;
                 }
             }
@@ -333,7 +339,11 @@ namespace GlowUp.AR
                 layers[layer] = MakeLayer(names[layer], colourMasks[layer], materials[layer]);
                 local[layer] = new Vector3[Points];
             }
-            highlight = MakeLayer("Highlight", null, null);            // the default UI material: a soft white light on top
+            // the highlight ADDS light through its own shader (a grey film of white paint made the face look like a ghost); the finish sets how sharp it is
+            Shader shine = Shader.Find("GlowUp/UiShine");
+            shineMaterial = shine != null ? new Material(shine) { name = "Guided face shine" } : null;
+            shineSharpSent = shineSparkleSent = -1f;
+            highlight = MakeLayer("Highlight", null, shineMaterial);
             local[GuidedFaceShapes.LayerCount] = new Vector3[Points];
             ShowOldGuide(false);
             SetFollowing(true);
@@ -364,7 +374,8 @@ namespace GlowUp.AR
 
             for (int i = 0; i < Points; i++) raw[i] = new Vector3(answer[i * 3], answer[i * 3 + 1], 0f);
             filter.minCutoff = filterSettings != null ? filterSettings.minCutoff : steadiness;
-            filter.beta = filterSettings != null ? filterSettings.beta : quickness;
+            // a floor on beta: with the older saved value (8) the mesh trailed the face when the head tilted or turned
+            filter.beta = Mathf.Max(LowLagBeta, filterSettings != null ? filterSettings.beta : quickness);
             filter.derivativeCutoff = filterSettings != null ? filterSettings.derivativeCutoff : 1f;
             float dt = haveFace && lastAnswerAt > 0f ? Mathf.Clamp(now - lastAnswerAt, 0.005f, 0.5f) : 1f / 30f;
             if (!haveFace)
@@ -449,7 +460,32 @@ namespace GlowUp.AR
 
             bool shineOn = strength > 0.004f && presence > 0.001f;
             if (highlight.enabled != shineOn) { highlight.enabled = shineOn; if (shineOn) DrawPoints(); }
-            if (shineOn) highlight.color = new Color(1f, 1f, 1f, Mathf.Clamp01(strength * 0.55f));
+            if (shineOn)
+            {
+                Color tint = makeup.HighlightTint;
+                highlight.color = new Color(tint.r, tint.g, tint.b, Mathf.Clamp01(strength * 0.5f));
+                ShapeShine();
+            }
+        }
+
+        /// <summary>Each finish has its own sheen: satin wide and soft, glossy a tight bright spot, shimmer glitter, metallic tinted and firm.</summary>
+        void ShapeShine()
+        {
+            if (shineMaterial == null) return;
+            float sharp, sparkle = 0f;
+            switch (choices.FinishName)
+            {
+                case "satin": sharp = 0.7f; break;
+                case "glossy": sharp = 2.6f; break;
+                case "shimmer": sharp = 1.3f; sparkle = Mathf.Clamp01(choices.FinishGlitter); break;
+                case "metallic": sharp = 1.1f; sparkle = Mathf.Clamp01(choices.FinishGlitter * 0.5f); break;
+                default: sharp = 1f; break;
+            }
+            if (Mathf.Approximately(sharp, shineSharpSent) && Mathf.Approximately(sparkle, shineSparkleSent)) return;
+            shineSharpSent = sharp; shineSparkleSent = sparkle;
+            shineMaterial.SetFloat("_Sharpness", sharp); shineMaterial.SetFloat("_Sparkle", sparkle);
+            Material drawn = highlight.materialForRendering;        // the camera view's Mask makes the UI draw a stencil copy
+            if (drawn != null && drawn != shineMaterial) { drawn.SetFloat("_Sharpness", sharp); drawn.SetFloat("_Sparkle", sparkle); }
         }
 
         void AdaptToFrameTime(float dt)

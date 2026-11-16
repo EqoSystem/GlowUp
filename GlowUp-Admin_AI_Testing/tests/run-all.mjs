@@ -13,7 +13,11 @@ for (const file of files) {
     const run = spawnSync(process.execPath, [path.join(here, file)], { cwd: path.join(here, ".."), encoding: "utf8" });
     const lines = (run.stdout + run.stderr).trim().split(/\r?\n/);
     const last = lines[lines.length - 1] || "(no output)";
-    const ok = run.status === 0 && /ALL PASSED/.test(run.stdout);
+    // Most legacy checks print "ALL PASSED"; native node:test files print a
+    // summary instead. Accept either format, while still requiring a clean
+    // process exit and an explicit zero-failure summary for the latter.
+    const nativeTestPassed = /\bfail 0\b/.test(run.stdout) && /\bpass \d+\b/.test(run.stdout);
+    const ok = run.status === 0 && (/ALL PASSED/.test(run.stdout) || nativeTestPassed);
     if (!ok) { failed++; console.log(`FAIL  ${file}\n${lines.slice(-12).map((l) => "      " + l).join("\n")}`); }
     else console.log(`ok    ${file}  (${lines.filter((l) => /checks made/.test(l)).join("").replace(/^.*checks made:\s*/, "") || "?"} checks)`);
 }

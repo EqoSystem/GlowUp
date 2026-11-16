@@ -41,6 +41,16 @@ Shader "GlowUp/UiMakeupBlend"
             fixed4 _Color;
             fixed4 _SkinBase;
 
+
+            // The tint may not LIGHTEN the skin by more than a limited gain (a deep shade may still darken it): a light shade on darker skin used to double
+            // the picture's brightness and turn the face grey-white ("a ghost"). The hue of the shade is kept, only the light is capped.
+            float3 TintFor(float3 shade, float3 skin)
+            {
+                float3 ratio = shade / max(skin, 0.08);
+                float lum = max(dot(ratio, float3(0.2126, 0.7152, 0.0722)), 0.0001);
+                float capped = min(lum, 1.3);
+                return saturate(0.5 * ratio * (capped / lum));
+            }
             struct appdata { float4 vertex : POSITION; float4 color : COLOR; float2 texcoord : TEXCOORD0; };
             struct v2f { float4 pos : SV_POSITION; fixed4 color : COLOR; float2 uv : TEXCOORD0; float4 world : TEXCOORD1; };
 
@@ -60,7 +70,7 @@ Shader "GlowUp/UiMakeupBlend"
                 #ifdef UNITY_UI_CLIP_RECT
                 amount *= UnityGet2DClipping(i.world.xy, _ClipRect);       // the before / after split cuts the shapes
                 #endif
-                float3 tint = saturate(0.5 * i.color.rgb / max(_SkinBase.rgb, 0.08));
+                float3 tint = TintFor(i.color.rgb, _SkinBase.rgb);
                 return fixed4(lerp(float3(0.5, 0.5, 0.5), tint, amount), 1);
             }
             ENDCG

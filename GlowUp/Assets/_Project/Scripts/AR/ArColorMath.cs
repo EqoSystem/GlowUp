@@ -10,22 +10,27 @@ namespace GlowUp.AR
     /// </summary>
     public static class ArColorMath
     {
+        /// <summary>The most a tint may lighten the skin; keep equal to TintFor in the two blend shaders.</summary>
+        public const float MaxGain = 1.3f;
+
         /// <summary>
         /// What one camera pixel becomes under a tint layer: skin of exactly the assumed colour becomes exactly the shade,
-        /// lighter or darker skin a lighter or darker version of it (its own light and texture stay). The blend can at most
-        /// double a pixel's brightness, the limit of "Blend DstColor SrcColor".
+        /// lighter or darker skin a lighter or darker version of it (its own light and texture stay). The change of light is
+        /// capped (MaxGain) so a light shade cannot wash the face out; the blend itself can at most double a pixel.
         /// </summary>
         public static Color Tint(Color pixel, Color shade, Color skin, float amount)
         {
             float a = Mathf.Clamp01(amount);
-            return new Color(Channel(pixel.r, shade.r, skin.r, a), Channel(pixel.g, shade.g, skin.g, a), Channel(pixel.b, shade.b, skin.b, a), pixel.a);
+            float rr = shade.r / Mathf.Max(skin.r, 0.08f), rg = shade.g / Mathf.Max(skin.g, 0.08f), rb = shade.b / Mathf.Max(skin.b, 0.08f);
+            float lum = Mathf.Max(0.2126f * rr + 0.7152f * rg + 0.0722f * rb, 0.0001f);
+            float k = Mathf.Min(lum, MaxGain) / lum;
+            return new Color(Out(pixel.r, rr * k, a), Out(pixel.g, rg * k, a), Out(pixel.b, rb * k, a), pixel.a);
         }
 
-        static float Channel(float pixel, float shade, float skin, float amount)
+        static float Out(float pixel, float ratio, float amount)
         {
-            float tint = Mathf.Clamp01(0.5f * shade / Mathf.Max(skin, 0.08f));
-            float output = Mathf.Lerp(0.5f, tint, amount);
-            return Mathf.Clamp01(pixel * 2f * output);
+            float tint = Mathf.Clamp01(0.5f * ratio);
+            return Mathf.Clamp01(pixel * 2f * Mathf.Lerp(0.5f, tint, amount));
         }
 
         /// <summary>Relative luminance (linear Rec. 709 weights).</summary>

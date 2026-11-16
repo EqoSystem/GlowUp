@@ -66,6 +66,9 @@ namespace GlowUp.Auth
             // both boxes start EMPTY (the grey hint shows until the first letter); nothing has to be deleted before typing
             ClearField(emailInput); ClearField(passwordInput);
 
+            // clearing the e-mail also clears the password
+            if (emailInput != null) emailInput.onValueChanged.AddListener(value => { if (string.IsNullOrEmpty(value) && passwordInput != null && !string.IsNullOrEmpty(passwordInput.text)) passwordInput.text = ""; });
+
             Hook(signInButton, SignIn); Hook(forgotPasswordButton, ForgotPassword); Hook(signUpButton, SignUp);
             Hook(googleButton, () => Social("Google"));
             if (privacyPolicyButton != null) Hook(privacyPolicyButton, OpenLegalDocuments);

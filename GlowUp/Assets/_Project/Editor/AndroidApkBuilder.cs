@@ -39,6 +39,28 @@ namespace GlowUp.EditorTools
         public const string TestFolder = "Builds/Android";
         public const string TestFileName = "GlowUp-AR-debug.apk";
 
+        public const string PanelistFolder = "Builds/Android";
+        public const string PanelistFileName = "GlowUpForPanelist.apk";
+
+        /// <summary>
+        /// Menu: GlowUp > Build Panelist APK. Standard release build named GlowUpForPanelist.apk.
+        /// </summary>
+        [MenuItem("GlowUp/Build Panelist APK", false, 302)]
+        public static void BuildPanelistFromMenu()
+        {
+            bool built = Build(out string message, PanelistFolder, PanelistFileName, false);
+            EditorUtility.DisplayDialog("GlowUp: Panelist Build", message, "OK");
+            if (built) EditorUtility.RevealInFinder(PanelistFolder + "/" + PanelistFileName);
+        }
+
+        /// <summary>Command-line build method for GlowUpForPanelist.apk</summary>
+        public static void BuildPanelistFromCommandLine()
+        {
+            bool built = Build(out string message, PanelistFolder, PanelistFileName, false);
+            Debug.Log("[GlowUp] Android panelist build: " + message);
+            EditorApplication.Exit(built ? 0 : 1);
+        }
+
         /// <summary>
         /// Menu: GlowUp > Build Test APK (development). A DEVELOPMENT build for testing on a phone: the AR debug overlay can be
         /// shown (three fingers held on the screen for a second), and the app's messages reach `adb logcat -s Unity`.

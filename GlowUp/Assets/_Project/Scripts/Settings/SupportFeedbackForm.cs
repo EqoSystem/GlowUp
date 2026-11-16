@@ -302,9 +302,13 @@ namespace GlowUp.AppSettings
             {
                 // FAILURE OUTCOME (permission-denied, server exception, etc.)
                 Debug.Log($"[SupportReport] Failure writing report docId={docId}. Exception: {ex.Message}");
+                string why = ex.Message ?? "";
+                string reason = why.IndexOf("permission", StringComparison.OrdinalIgnoreCase) >= 0 ? "The server refused the report (permission denied)."
+                    : why.IndexOf("unavailable", StringComparison.OrdinalIgnoreCase) >= 0 || why.IndexOf("network", StringComparison.OrdinalIgnoreCase) >= 0 ? "The server could not be reached."
+                    : "Reason: " + (why.Length > 120 ? why.Substring(0, 120) : why);
                 ShowCenteredPopup(
                     "Send Error",
-                    msgFailure,
+                    msgFailure + " " + reason,
                     "OK"
                 );
                 // Keep the form open, KEEP currentReportDocId and user input intact for retry

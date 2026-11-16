@@ -224,6 +224,15 @@ namespace GlowUp.EditorTools.Tests
         }
 
         [Test]
+        public void Tint_ALightShadeOnDarkerSkin_DoesNotWashTheFaceOut()
+        {
+            var skin = new Color(0.40f, 0.28f, 0.24f);
+            var light = new Color(0.95f, 0.80f, 0.70f);
+            Color result = ArColorMath.Tint(skin, light, skin, 1f);
+            Assert.LessOrEqual(ArColorMath.Luminance(result) / ArColorMath.Luminance(skin), ArColorMath.MaxGain + 0.01f);
+        }
+
+        [Test]
         public void Gloss_IsBrightestFacingTheLight_AndFadesAway()
         {
             Vector3 toCamera = Vector3.back;

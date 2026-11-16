@@ -42,6 +42,16 @@ Shader "GlowUp/FaceMakeupBlend"
             float _MouthOpen;
             float _Feather;
 
+
+            // The tint may not LIGHTEN the skin by more than a limited gain (a deep shade may still darken it): a light shade on darker skin used to double
+            // the picture's brightness and turn the face grey-white ("a ghost"). The hue of the shade is kept, only the light is capped.
+            float3 TintFor(float3 shade, float3 skin)
+            {
+                float3 ratio = shade / max(skin, 0.08);
+                float lum = max(dot(ratio, float3(0.2126, 0.7152, 0.0722)), 0.0001);
+                float capped = min(lum, 1.3);
+                return saturate(0.5 * ratio * (capped / lum));
+            }
             struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; float2 mouthUv : TEXCOORD1; };
 
             v2f vert(appdata_base v)
@@ -61,7 +71,7 @@ Shader "GlowUp/FaceMakeupBlend"
                 float amount = saturate(mask * _BaseColor.a);
                 // the inside of an open mouth (teeth, tongue) is not painted: the picture shows through
                 amount *= 1.0 - saturate(tex2D(_MouthMask, i.mouthUv).r * _MouthOpen);
-                float3 tint = saturate(0.5 * _BaseColor.rgb / max(_SkinBase.rgb, 0.08));
+                float3 tint = TintFor(_BaseColor.rgb, _SkinBase.rgb);
                 return fixed4(lerp(float3(0.5, 0.5, 0.5), tint, amount), 1);
             }
             ENDCG
