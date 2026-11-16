@@ -1,9 +1,10 @@
-const MAX_FILE_BYTES = 15 * 1024 * 1024;
-const MAX_TEXT_CHARACTERS = 200000;       // the plain import reads all of it; the AI import sends only its first 30,000 characters (AI_TEXT_CHARACTERS)
-export const AI_TEXT_CHARACTERS = 30000;
+// No size limit (9 November 2026, the user's wish: "unlimited"). A file is read whole in this browser; the AI is then asked
+// about it in PARTS of AI_PART_CHARACTERS, one after the other (splitForAi), so a long file is never cut off.
+export const AI_TEXT_CHARACTERS = 30000;       // the most the server takes in one question
+export const AI_PART_CHARACTERS = 12000;       // one part: small enough that the AI's answer for it is never cut short
 // A scanned PDF (pictures of pages, no text layer) is read with text recognition (OCR) in this browser: tesseract.js, in its own worker, one page
 // after the other so the page stays usable. Nothing is uploaded; the OCR program and its English data are downloaded from the CDN the first time.
-const OCR_MAX_PAGES = 10;
+const OCR_MAX_PAGES = Infinity;           // every page (each one takes a few seconds; progress is shown)
 const OCR_SCALE = 2;                      // pages are drawn at twice their size: small label print is read far better
 const TESSERACT = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
 
@@ -46,13 +47,13 @@ async function readPdf(file, onProgress) {
         throw new Error(`The PDF could not be opened: ${error && error.message ? error.message : "unknown PDF reader error"}`);
     }
     const pages = [];
-    for (let pageNumber = 1; pageNumber <= Math.min(pdf.numPages, 100); pageNumber++) {
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+        if (pdf.numPages > 20 && pageNumber % 10 === 0) onProgress(`Reading page ${pageNumber} of ${pdf.numPages}...`);
         const page = await pdf.getPage(pageNumber);
         const content = await page.getTextContent();
         pages.push(content.items.map((item) => `${item.str || ""}${item.hasEOL ? "\n" : " "}`).join("").trim());
     }
     if (pages.join("").replace(/\s+/g, "").length >= 20) {
-        if (pdf.numPages > 100) pages.push("[Only the first 100 pages were read.]");
         return pages.join("\n");
     }
     return readScannedPdf(pdf, onProgress);
@@ -111,7 +112,6 @@ async function readWord(file) {
  */
 export async function readAdminDocument(file, onProgress = () => {}) {
     if (!file) throw new Error("Choose a PDF, Excel, Word, CSV or text file.");
-    if (file.size > MAX_FILE_BYTES) throw new Error("The document is larger than 15 MB. Split it into smaller files and try again.");
     const extension = (file.name.split(".").pop() || "").toLowerCase();
     const isPdf = extension === "pdf" || file.type === "application/pdf";
     let text;
@@ -120,10 +120,31 @@ export async function readAdminDocument(file, onProgress = () => {}) {
     else if (extension === "docx") text = await readWord(file);
     else if (["csv", "txt"].includes(extension) || file.type === "text/csv" || file.type === "text/plain") text = await file.text();      // plain text: no library, nothing leaves the browser
     else throw new Error("Use a PDF, .xlsx/.xls Excel workbook, .docx Word document, .csv or .txt file.");
-    const clean = String(text || "").replace(/\u0000/g, "").trim().slice(0, MAX_TEXT_CHARACTERS);
+    const clean = String(text || "").replace(/\u0000/g, "").trim();
     if (clean.length < 20) {
         if (isPdf) throw new Error("No readable text was found in this PDF, also not by text recognition (OCR). Use a sharper scan or a PDF with selectable text.");
         throw new Error("No readable text was found. Old .doc Word files are not supported; use a .docx document.");
     }
     return clean;
+}
+
+/**
+ * The text cut into parts of at most `size` characters for the AI, each ending at a line break where one is near
+ * (a record is then rarely cut in two). Every character is in exactly one part, in order.
+ */
+export function splitForAi(text, size = AI_PART_CHARACTERS) {
+    const source = String(text || "");
+    const parts = [];
+    let at = 0;
+    while (at < source.length) {
+        let end = Math.min(source.length, at + size);
+        if (end < source.length) {
+            const lineBreak = source.lastIndexOf("\n", end);
+            if (lineBreak > at + size * 0.5) end = lineBreak + 1;
+        }
+        const part = source.slice(at, end);
+        if (part.trim()) parts.push(part);
+        at = end;
+    }
+    return parts;
 }

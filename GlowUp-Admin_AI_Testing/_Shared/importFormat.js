@@ -164,7 +164,7 @@ function product(f) {
         cosmeticType: MAKEUP_TYPES.find((t) => t.toLowerCase() === kind.toLowerCase()) || kind,
         description: value(f.DESCRIPTION, 400),
         ingredients: listOf(f.INGREDIENTS, 100, 80),
-        shades: listOf(f.SHADES, 40, 24).map(hexOf).filter((s, i, all) => s && all.indexOf(s) === i).slice(0, 12),
+        shades: listOf(f.SHADES, 40, 100).map(hexOf).filter((s, i, all) => s && all.indexOf(s) === i).slice(0, 100),
         fdaVerifiedLink: fda,
         fdaNumber: fdaNumberOf(f.FDA_REGISTRATION_NUMBER),
         sources: Array.from(new Set(sources.concat(fda ? [fda] : []))).slice(0, 10),
@@ -204,7 +204,7 @@ export function parseImportText(text) {
     const records = /={2,}\s*(BRAND|PRODUCT|INGREDIENT)\s*={2,}/i.test(source) ? splitBlocks(source) : sheetRecords(source);
     if (records.length === 0) return { kind: "", notes: [] };
     const hasIngredients = records.some((r) => r.type === "INGREDIENT"), hasInventory = records.some((r) => r.type !== "INGREDIENT");
-    if (hasIngredients && hasInventory) return { kind: "mixed", notes: [] };
+    if (hasIngredients && hasInventory) return { kind: "mixed", notes: [], counts: { ingredients: records.filter((r) => r.type === "INGREDIENT").length, inventory: records.filter((r) => r.type !== "INGREDIENT").length } };
     const notes = [];
     if (hasIngredients) {
         const seen = new Set();
@@ -239,4 +239,23 @@ export function parseImportText(text) {
         if (b) { p.brandMarket = b.market; p.brandAliases = b.aliases; p.brandWebsiteSuggested = b.websiteSuggested; p.brandLogoUrl = b.logoUrl; p.brandImageUrl = b.imageUrl; }
     });
     return { kind: "inventory", draft: { products, brands }, notes };
+}
+
+/**
+ * Why Brand & Product Inventory does not read ingredient details (9 November 2026). `count` = how many were found
+ * (0 or less = not counted). Said whenever a file there has them: the GlowUp import format, or found by the AI.
+ */
+export function ingredientsNotHere(count) {
+    const what = count > 0 ? `${count} ingredient record${count === 1 ? "" : "s"}` : "Ingredient records";
+    return `${what} (what an ingredient is, its risk, classification or which skin it suits) cannot be extracted here. `
+        + "Brand & Product Inventory only reads brands and products. Ingredient details live in the Ingredient Curator: there each one is matched against the ingredient list so it is not saved twice, gets a classification, and is checked by an admin before the app uses it to warn users. "
+        + "Read here, an ingredient could be saved as a product, or an unchecked safety note could reach the app. "
+        + "Put the ingredient part in a file of its own and import it in the Ingredient Curator.";
+}
+
+/** Why the Ingredient Curator does not read brands or products (the same rule, the other way round). */
+export function inventoryNotHere(count) {
+    const what = count > 0 ? `${count} brand or product record${count === 1 ? "" : "s"}` : "Brand and product records";
+    return `${what} cannot be extracted here. The Ingredient Curator only reads ingredients; brands and products are checked for duplicates, make-up only and FDA links in Brand & Product Inventory. `
+        + "Put that part in a file of its own and import it there.";
 }

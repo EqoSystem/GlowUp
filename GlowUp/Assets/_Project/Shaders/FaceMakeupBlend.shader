@@ -18,6 +18,7 @@ Shader "GlowUp/FaceMakeupBlend"
         _Feather ("Soft Edge", Range(0, 1)) = 0.6
         _MouthMask ("Inside of the mouth (set by ArMouthMask)", 2D) = "black" {}
         _MouthOpen ("How open the mouth is (set by ArMouthMask)", Range(0, 1)) = 0
+        _Pigment ("Pigment: share of the shade itself over the tint (set by ArFaceMakeup)", Range(0, 1)) = 0
     }
     SubShader
     {
@@ -73,6 +74,52 @@ Shader "GlowUp/FaceMakeupBlend"
                 amount *= 1.0 - saturate(tex2D(_MouthMask, i.mouthUv).r * _MouthOpen);
                 float3 tint = TintFor(_BaseColor.rgb, _SkinBase.rgb);
                 return fixed4(lerp(float3(0.5, 0.5, 0.5), tint, amount), 1);
+            }
+            ENDCG
+        }
+
+        // PIGMENT (phase 3A, 11 November 2026): a thin see-through layer of the shade itself over the tint. The tint can at most double the
+        // skin's colour, so a shade much lighter than the skin (a nude lipstick on deep lips) stayed dark; this carries the rest. URP draws an
+        // untagged pass and a "UniversalForward" pass of the same shader one after the other, so this runs right after the tint.
+        Pass
+        {
+            Tags { "LightMode" = "UniversalForward" }
+            Blend SrcAlpha OneMinusSrcAlpha
+            ZWrite Off
+            Cull Off
+
+            CGPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            #include "UnityCG.cginc"
+
+            sampler2D _BaseMap;
+            float4 _BaseMap_ST;
+            fixed4 _BaseColor;
+            sampler2D _MouthMask;
+            float4 _MouthMask_ST;
+            float _MouthOpen;
+            float _Feather;
+            float _Pigment;
+
+            struct v2f { float4 pos : SV_POSITION; float2 uv : TEXCOORD0; float2 mouthUv : TEXCOORD1; };
+
+            v2f vert(appdata_base v)
+            {
+                v2f o;
+                o.pos = UnityObjectToClipPos(v.vertex);
+                o.uv = TRANSFORM_TEX(v.texcoord, _BaseMap);
+                o.mouthUv = TRANSFORM_TEX(v.texcoord, _MouthMask);
+                return o;
+            }
+
+            fixed4 frag(v2f i) : SV_Target
+            {
+                float mask = tex2D(_BaseMap, i.uv).a;
+                mask = lerp(mask, mask * mask * (3.0 - 2.0 * mask), _Feather);
+                float amount = saturate(mask * _BaseColor.a * _Pigment);
+                amount *= 1.0 - saturate(tex2D(_MouthMask, i.mouthUv).r * _MouthOpen);
+                return fixed4(_BaseColor.rgb, amount);
             }
             ENDCG
         }

@@ -11,14 +11,20 @@ namespace GlowUp.Auth
     /// <summary>
     /// Signing in with a Google account (the round button on the login page). Facebook sign-in was removed on request.
     ///
-    /// GOOGLE needs nothing extra in the project: Firebase opens Google's own sign-in page in the phone's
-    /// browser and returns to the app. In the Firebase console the Google provider must be switched on and
-    /// the app's SHA-1 fingerprint added (Project settings > Your apps), then the new google-services.json
-    /// put in Assets. It only works on a phone, not in the Editor.
+    /// GOOGLE, since 7 November 2026: the phone's own Google account sheet (Android Credential Manager, NativeGoogleSignIn) gives an
+    /// ID token and Firebase signs in with it. No browser is opened, so browsers that block or split storage (Brave, strict privacy
+    /// modes) can no longer break it with "missing initial state" on firebaseapp.com. Since 10 November 2026 the browser is NEVER used: when the
+    /// phone has no Google account or cannot run its own sign-in, a clear message says so (NoGoogleAccount / GoogleUnavailable).
+    /// In the Firebase console the Google provider must be switched on and the app's SHA-1 fingerprint added (Project settings >
+    /// Your apps), then the new google-services.json put in Assets. It only works on a phone, not in the Editor.
     /// </summary>
     public static class SocialSignIn
     {
         public const string Google = "google.com", Password = "password";
+        /// <summary>What the user reads when Google sign-in did not finish. Never Firebase's own text.</summary>
+        public const string DidNotComplete = "Google sign-in didn't complete. Please try again.";
+        /// <summary>The same, when the browser's own privacy settings are what stopped it (Firebase: "missing initial state" / sessionStorage / storage-partitioned).</summary>
+        public const string BrowserBlocking = "Your browser may be blocking sign-in. Try disabling shields/privacy blocking for this site, or use a different browser.";
         const string Facebook = "facebook.com";          // only so that an account made that way in the past is still recognised
 
         /// <summary>How a sign-in ended. Exactly one of User / Cancelled / Problem says what happened.</summary>
@@ -47,13 +53,37 @@ namespace GlowUp.Auth
         // ---------------------------------------------------------------------------------------
         public static async Task<Outcome> WithGoogle()
         {
-            try
+            // 1. inside the app (no browser)
+            NativeGoogleSignIn.Answer native = await NativeGoogleSignIn.RequestToken();
+            if (native.result == NativeGoogleSignIn.Result.Cancelled) return new Outcome { Cancelled = true };
+            if (native.result == NativeGoogleSignIn.Result.Token)
             {
-                AuthResult result = await FirebaseAuth.DefaultInstance.SignInWithProviderAsync(GoogleProvider());
-                return new Outcome { User = result != null ? result.User : FirebaseAuth.DefaultInstance.CurrentUser };
+                try
+                {
+                    Credential credential = GoogleAuthProvider.GetCredential(native.idToken, null);
+                    AuthResult signedIn = await FirebaseAuth.DefaultInstance.SignInAndRetrieveDataWithCredentialAsync(credential);
+                    return new Outcome { User = signedIn != null ? signedIn.User : FirebaseAuth.DefaultInstance.CurrentUser };
+                }
+                catch (Exception e) { return Failed(e, "Google"); }
             }
-            catch (Exception e) { return Failed(e, "Google"); }
+            if (native.result == NativeGoogleSignIn.Result.Failed)
+            {
+                Debug.LogWarning("[GlowUp] Google sign-in on the phone failed: " + native.detail);
+                return new Outcome { Problem = DidNotComplete };
+            }
+            // 2. NO BROWSER any more (10 November 2026). The old fallback opened Google's page in the phone's browser and came back through
+            //    glowup-admin-portal.firebaseapp.com/__/auth/handler. Browsers that partition or clear storage (Brave with Shields, private
+            //    tabs, some in-app browsers) lose the sign-in state there and show Firebase's black "missing initial state" page, which the
+            //    app cannot style or recover from. A clear message is shown instead.
+            if (native.result == NativeGoogleSignIn.Result.NoAccount) return new Outcome { Problem = NoGoogleAccount };
+            Debug.LogWarning("[GlowUp] Google sign-in on the phone is not available: " + native.detail);
+            return new Outcome { Problem = GoogleUnavailable };
         }
+
+        /// <summary>No Google account on the phone (or none was picked).</summary>
+        public const string NoGoogleAccount = "No Google account was found on this phone. Add one in your phone's Settings > Accounts, then try again, or sign in with your email.";
+        /// <summary>The phone's Google sign-in cannot run (no Google Play services, or this build is missing its setup).</summary>
+        public const string GoogleUnavailable = "Google sign-in isn't available on this phone right now. Please sign in with your email.";
 
         static FederatedOAuthProvider GoogleProvider()
         {
@@ -75,16 +105,28 @@ namespace GlowUp.Auth
         public static async Task Reauthenticate(FirebaseUser user)
         {
             string provider = ProviderOf(user);
-            if (provider == Google) { await user.ReauthenticateWithProviderAsync(GoogleProvider()); return; }
+            if (provider == Google)
+            {
+                NativeGoogleSignIn.Answer native = await NativeGoogleSignIn.RequestToken();
+                if (native.result == NativeGoogleSignIn.Result.Cancelled) throw new OperationCanceledException();
+                if (native.result == NativeGoogleSignIn.Result.Token) { await user.ReauthenticateAsync(GoogleAuthProvider.GetCredential(native.idToken, null)); return; }
+                throw new InvalidOperationException(native.result == NativeGoogleSignIn.Result.NoAccount ? NoGoogleAccount : GoogleUnavailable);   // never the browser (see WithGoogle)
+            }
             throw new InvalidOperationException("This account cannot be checked again on this phone.");
         }
 
         // ---------------------------------------------------------------------------------------
+        static bool BlockedByBrowser(string text) =>
+            text.IndexOf("missing initial state", StringComparison.OrdinalIgnoreCase) >= 0
+            || text.IndexOf("sessionStorage", StringComparison.OrdinalIgnoreCase) >= 0
+            || text.IndexOf("storage-partitioned", StringComparison.OrdinalIgnoreCase) >= 0;
+
         static Outcome Failed(Exception e, string name)
         {
             FirebaseException firebase = TaskLimits.FirebaseError(e);
             AuthError code = firebase != null ? (AuthError)firebase.ErrorCode : AuthError.None;
-            Debug.LogWarning("[GlowUp] " + name + " sign-in: " + (firebase != null ? code + " " + firebase.Message : e.ToString()));
+            Debug.LogWarning("[GlowUp] " + name + " sign-in: " + (firebase != null ? code + " " + firebase.Message : e.ToString())
+                + (e.InnerException != null ? " | inner: " + e.InnerException.Message : ""));
             switch (code)
             {
                 case AuthError.WebContextCancelled:
@@ -95,13 +137,15 @@ namespace GlowUp.Auth
                 case AuthError.EmailAlreadyInUse:
                     return new Outcome { Problem = "This email already has a Glow Up account. Sign in the way you did the first time." };
                 case AuthError.OperationNotAllowed:
-                    return new Outcome { Problem = name + " sign-in is not switched on for this app yet (Firebase console > Authentication > Sign-in method)." };
+                    return new Outcome { Problem = name + " sign-in isn't available right now. Try again later, or sign in with your email." };   // (the Google provider is switched off in the project settings)
                 case AuthError.UserDisabled:
                     return new Outcome { Problem = "This account has been disabled." };
             }
             if (e is OperationCanceledException) return new Outcome { Cancelled = true };
-            string detail = firebase != null ? firebase.Message : e.InnerException != null ? e.InnerException.Message : e.Message;
-            return new Outcome { Problem = name + " sign-in did not work: " + detail };
+            // The raw text is only logged (above), never shown. The sign-in page opens in the phone's browser; a browser that blocks or splits
+            // its storage (Brave with Shields, strict privacy modes, some in-app browsers) makes Firebase answer "missing initial state".
+            string detail = (firebase != null ? firebase.Message : "") + " " + e.Message + " " + (e.InnerException != null ? e.InnerException.Message : "");
+            return new Outcome { Problem = BlockedByBrowser(detail) ? BrowserBlocking : DidNotComplete };
         }
     }
 }

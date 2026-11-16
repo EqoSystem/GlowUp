@@ -1,0 +1,56 @@
+flowchart TB
+  %% ASSUMED: process decomposition (1.0-5.0) and store grouping are an interpretive breakdown of the collections/functions already documented in FIRESTORE_SCHEMA.md and DATA_MODEL.md, not a 1:1 copy of an existing diagram
+  U[["Mobile app user"]]
+  AD[["Admin / curator"]]
+  AI(("Gemini AI API"))
+  FDA(("FDA Philippines portal"))
+  OBF(("Open Beauty Facts"))
+  CRON(("Vercel daily cron"))
+
+  P1((1.0 Scan and analyze))
+  P2((2.0 Catalogue management))
+  P3((3.0 Ingredient curation))
+  P4((4.0 AI assist))
+  P5((5.0 Archive and purge))
+
+  D1[/brands, products/]
+  D2[/ingredients, ingredientClassifications/]
+  D3[/users, users.scans/]
+  D4[/scanActivity, allergenSuggestions, conditionSuggestions/]
+  D5[/pending_products, pending_product_images, productIngredientSuggestions/]
+  D6[/archive, archive_purge_log/]
+  D7[/config.lists/]
+
+  U -- camera frames, typed entry --> P1
+  P1 -- recognition request --> AI
+  AI -- candidate match --> P1
+  P1 -- scan verification --> FDA
+  FDA -- legality badge --> P1
+  P1 -- read --> D1
+  P1 -- read --> D2
+  P1 -- read --> D7
+  P1 -- write scan, counters --> D3
+  P1 -- write anonymous note --> D4
+  P1 -- stage unresolved product --> D5
+  P1 -- result, AR data --> U
+
+  AD -- import files, edits --> P2
+  P2 -- lookup / snapshot --> OBF
+  P2 <--> D1
+  P2 -- pending queue --> D5
+  P2 -- approved records --> AD
+
+  AD -- field edits, review --> P3
+  P3 <--> D2
+  P3 -- labels --> D7
+
+  AD -- draft request --> P4
+  P4 -- web search / draft --> AI
+  P4 -- cited draft --> AD
+  P4 -- save on approval --> D2
+  P4 -- save on approval --> D1
+
+  AD -- move to recycle bin / archive --> P5
+  CRON -- daily trigger --> P5
+  P5 <--> D6
+  P5 -- purge log --> AD

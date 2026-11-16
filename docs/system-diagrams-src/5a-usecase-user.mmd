@@ -1,0 +1,27 @@
+flowchart TD
+  %% ASSUMED: include/extend relationships and the AI secondary actor are an interpretive UML use-case reading of existing flows; not a literal source artifact
+  classDef actor fill:#fff,stroke:#333,stroke-width:1px
+  classDef uc fill:#f5f5f5,stroke:#333,stroke-width:1px
+
+  User[["App user"]]:::actor
+  GeminiA(("Gemini AI<br/>secondary actor")):::actor
+
+  subgraph SYS["GlowUp system boundary — user-facing"]
+    direction LR
+    UC1(("Sign in / sign up")):::uc
+    UC2(("Scan product")):::uc
+    UC3(("View scan result")):::uc
+    UC4(("Try On AR")):::uc
+    UC5(("Manage profile, allergens")):::uc
+    UC6(("View recent scans")):::uc
+    UC2b(("AI recognition fallback")):::uc
+  end
+
+  User --> UC1
+  User --> UC2
+  User --> UC5
+  User --> UC6
+  UC2 -. include .-> UC3
+  UC3 --> UC4
+  UC2 -. extend .-> UC2b
+  UC2b --- GeminiA

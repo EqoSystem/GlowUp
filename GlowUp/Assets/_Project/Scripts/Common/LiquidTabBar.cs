@@ -40,6 +40,8 @@ namespace GlowUp.Common
         [Range(0.6f, 1f)] [SerializeField] private float narrowestShare = 0.86f;
         [Tooltip("How much flatter it gets as it gets longer (1 = it keeps its area like a real drop, 0 = its height never changes)")]
         [Range(0f, 1f)] [SerializeField] private float squash = 0.7f;
+        [Tooltip("On = the pill never gets taller than at rest (phase 1D, 11 November 2026: a taller pill touched the bar's edge and the labels)")]
+        [SerializeField] private bool neverTallerThanRest = true;
         [Range(0f, 1f)] [SerializeField] private float opacity = 1f;
 
         [Header("Liquid feel")]
@@ -223,6 +225,7 @@ namespace GlowUp.Common
             // longer than at rest while it moves; for a moment narrower (and taller) when it has just arrived
             float width = Mathf.Clamp(restWidth + stretch, restWidth * narrowestShare, restWidth + longestStretch);
             float height = restHeight * Mathf.Lerp(1f, restWidth / Mathf.Max(1f, width), squash);
+            if (neverTallerThanRest) height = Mathf.Min(height, restHeight);
             drop.anchoredPosition = new Vector2(x, drop.anchoredPosition.y);
             drop.sizeDelta = current >= 0 ? new Vector2(width, height) : Vector2.zero;
             if (dropImage != null) { Color c = restColor; c.a = current >= 0 ? opacity : 0f; dropImage.color = c; }

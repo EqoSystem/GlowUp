@@ -14,7 +14,8 @@ Make-up scanner app (Unity) plus an admin website. Both share one Firestore data
 ## Firestore data contract (full text: `GlowUp-Admin_AI_Testing/FIRESTORE_SCHEMA.md`)
 - `brands/{id}`: name, category (Makeup), aliases[], market, status (Active|Pending|Inactive), scans, source, reviewed.
 - `products/{id}`: name, brandId, brandName, cosmeticType, ingredients[], shades[], sources[], status, scans, source, reviewed, barcode. App-added ids start `scan_`.
-- `ingredients/{id}`: name, riskLevel (safe|caution|harmful), description, aliases[], sources[], source, reviewed. App-added ids start `ai_`.
+- `ingredients/{id}`: name (shown as INCI name), classificationId, purpose, riskLevel (safe|caution|harmful), description, aliases[], sources[], source, reviewed. App-added ids start `ai_`.
+- `ingredientClassifications/{id}`: name. Everyone reads, admins write; `other` is never deleted.
 - `productIngredientSuggestions`: app creates, admin reviews.
 - `scanActivity`: anonymous, no user id. status safe|caution|harmful, scannedAtUnix, counts.
 - `allergenSuggestions`, `conditionSuggestions`: app creates, admins read.
@@ -28,6 +29,8 @@ Make-up scanner app (Unity) plus an admin website. Both share one Firestore data
 - Do not move or delete anything under `GlowUp/Assets/` outside the Unity Editor (`.meta` files).
 - After large changes, run `/graphify . --update`.
 - Commit a checkpoint before edits.
+- Routes, screens, modals, sheets, drawers, transitions: follow `docs/NAVIGATION_RULES.md`, and end each such change with
+  which of its rules were touched and how each was satisfied.
 
 ## graphify
 Knowledge graph in `graphify-out/` (GRAPH_REPORT.md, graph.json, graph.html).

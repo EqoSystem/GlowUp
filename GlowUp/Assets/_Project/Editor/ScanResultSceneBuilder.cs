@@ -42,14 +42,21 @@ namespace GlowUp.EditorTools
         const float LeastSize = 28;         // no text ever gets smaller than this (auto-size floor)
 
         [MenuItem("GlowUp/Build Scene/12 AI Scan Result", false, 122)]
-        public static void Build()
+        public static void Build() { BuildScene("AiSmartAnalysisResultScene", "Your Result", null); }
+
+        /// <summary>
+        /// Builds a result screen. `extraCards` (may be null) adds cards right under the product card (the verdict), before
+        /// "How it matches you": the Web Search Result screen puts its brand, product, sources and shades cards there.
+        /// </summary>
+        public static void BuildScene(string sceneName, string title, System.Action<A.AppScreen, Transform> extraCards)
         {
-            A.AppScreen s = A.Begin("AiSmartAnalysisResultScene", "Your Result", true, "ResultCard", "AiSmartAnalysisResultCard");
+            A.AppScreen s = A.Begin(sceneName, title, true, "ResultCard", "AiSmartAnalysisResultCard");
             Transform card = s.card;
 
             // ---- header: the title moves left to make room for Alternatives ----
             s.title.alignment = TextAlignmentOptions.MidlineLeft;
             A.TopStrip(s.title.transform, 30, 96, 136, 344);
+            A.Shrink(s.title, 40);                                              // a longer title gets smaller, never under the Alternatives button
             Button alternatives = A.PillButton(card, "AlternativesButton", "Alternatives", 34, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Swap);
             A.At(alternatives.transform, A.TR, new Vector2(-28, -30), new Vector2(304, 100));
             A.Outline(alternatives.transform, ThemeRole.Accent, 100f);
@@ -121,6 +128,8 @@ namespace GlowUp.EditorTools
                                                   ThemeRole.InputBackground, ThemeRole.MainText, IconFactory.ExternalLink);
             A.Size(fdaVerification, -1, Tap);
             A.Outline(fdaVerification.transform, ThemeRole.Accent, Tap);
+
+            extraCards?.Invoke(s, content);
 
             // 2. compatibility matrix
             GameObject matrix = Section(content, "CompatibilityCard", "How it matches you");
@@ -398,7 +407,7 @@ namespace GlowUp.EditorTools
         /// government, Retailer listing ...; the same words as on the admin website) and the "opens a website" icon.
         /// Copied once per page.
         /// </summary>
-        static SourceLinkButton SourceLink(Transform parent, string name)
+        internal static SourceLinkButton SourceLink(Transform parent, string name)
         {
             GameObject go = A.Node(parent, name, typeof(Image), typeof(Button), typeof(SourceLinkButton));
             var background = go.GetComponent<Image>();
@@ -441,7 +450,7 @@ namespace GlowUp.EditorTools
         }
 
         /// <summary>A section of the result: a round panel that grows with its content, with an optional heading.</summary>
-        static GameObject Section(Transform content, string name, string header)
+        internal static GameObject Section(Transform content, string name, string header)
         {
             GameObject go = A.Node(content, name);
             A.VStack(go, 18, 30, 30, 28, 30);

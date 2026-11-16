@@ -34,8 +34,9 @@ namespace GlowUp.Common
         public static bool ShakeToNavigate => false;
 
         // ---- finger signs: hold 1 to 5 fingers up to the selfie camera to open a screen ----
-        /// <summary>Off until the user switches it on (it uses the selfie camera).</summary>
-        public static bool FingerSigns { get => Get("GlowUp.Ui.FingerSigns", false); set => Set("GlowUp.Ui.FingerSigns", value); }
+        /// <summary>REMOVED on 6 November 2026 (the Settings rows and the navigator are no longer built). Always off, so the selfie camera is never
+        /// started for it; the property stays only so the old scripts still compile. Whatever a phone saved earlier is ignored.</summary>
+        public static bool FingerSigns { get => false; set { } }
 
         /// <summary>How long a sign must be held before the screen changes, in seconds.</summary>
         public static float FingerSignHoldSeconds
@@ -101,6 +102,19 @@ namespace GlowUp.Common
         public static bool AutoFlashlight { get => Get("GlowUp.Camera.AutoFlashlight", true); set => Set("GlowUp.Camera.AutoFlashlight", value); }
         /// <summary>AR Try-On lights the face with a bright white frame on the screen when it is dark (the "front flash").</summary>
         public static bool TryOnScreenLight { get => Get("GlowUp.Camera.TryOnScreenLight", true); set => Set("GlowUp.Camera.TryOnScreenLight", value); }
+
+        /// <summary>
+        /// The phone's volume keys on the AI Smart Scan screen (Settings > Camera Helpers; owner's rule of 12 November 2026):
+        ///   volume UP switches between live scan and photo capture; volume DOWN is the trigger (starts / pauses the live scan, takes the
+        ///   photo in photo capture). Both = both keys work, Up / Down = only that key, Off = the keys only change the volume.
+        /// </summary>
+        public enum VolumeKeys { Both = 0, Up = 1, Down = 2, Off = 3 }
+
+        public static VolumeKeys VolumeKey
+        {
+            get => (VolumeKeys)Mathf.Clamp(PlayerPrefs.GetInt("GlowUp.Camera.VolumeKeys", (int)VolumeKeys.Both), 0, 3);
+            set { PlayerPrefs.SetInt("GlowUp.Camera.VolumeKeys", (int)value); Save(); }
+        }
 
         static bool Get(string key, bool fallback) => PlayerPrefs.GetInt(key, fallback ? 1 : 0) == 1;
         static void Set(string key, bool value) { PlayerPrefs.SetInt(key, value ? 1 : 0); Save(); }

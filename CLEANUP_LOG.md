@@ -59,3 +59,11 @@ To remove files from history only if a real secret ever shows up:
 - Empty folder `GlowUp-Admin_AI_Testing/_Admin_Product_Catalog` removed.
 - Code: 8 unused message fields of SmartScanFlowController, two unused private fields, ReadPack (the phone no longer calls the AI itself), the Facebook icon, and five unused website exports.
 - Left for the Unity Editor (files under Assets are not moved from outside it): see the list in the chat of that day.
+
+## 2026-10-31 clean-up (DELETED for good, about 1 GB, on the owner's word: "delete it if it's nothing to do with the mobile and web")
+- From `_quarantine/archive-2026-10-22/`: the Facebook SDK downloads, `firebase_unity_sdk_13.17.0` (743 MB), `tesseract-unity-master` (177 MB), `ScenePreviews`, the Burst debug folder. All can be downloaded or generated again.
+- `_quarantine/root_vercel_link` (duplicate of `GlowUp-Admin_AI_Testing/.vercel`).
+
+Kept in `_quarantine/archive-2026-10-22/`, because they are about the app and the website:
+- `GlowUp-Data_Backup_2026-10-12`: an export of the live brands, products and ingredients. It is NOT in Git and exists nowhere else.
+- The old `GlowUp-Admin_Backup_*`, `GlowUp-Unity_Backup_*` and `GlowUp-Unity_Removed_*` copies (about 92 MB).

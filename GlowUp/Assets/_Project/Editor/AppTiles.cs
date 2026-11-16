@@ -115,10 +115,11 @@ namespace GlowUp.EditorTools
 
             if (kind == TileKind.RecentScan)
             {
-                Button result = RowButton(buttons.transform, "ResultButton", "Result", IconFactory.Document, true, 1.2f);
-                Button tryOn = RowButton(buttons.transform, "TryOnButton", "Try On", IconFactory.Sparkle, false, 1.2f);
-                Button ai = RowButton(buttons.transform, "AiButton", "AI", IconFactory.Ai, false, 0.8f);
-                A.Set(view, "resultButton", result); A.Set(view, "tryOnButton", tryOn); A.Set(view, "aiButton", ai);
+                // Phase 1D (11 November 2026): no "AI" button on a scan card; Result and Try On share the row's width evenly
+                Button result = RowButton(buttons.transform, "ResultButton", "Result", IconFactory.Document, true, 1f);
+                Button tryOn = RowButton(buttons.transform, "TryOnButton", "Try On", IconFactory.Sparkle, false, 1f);
+                buttons.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = true;
+                A.Set(view, "resultButton", result); A.Set(view, "tryOnButton", tryOn); A.Set(view, "aiButton", (Button)null);
 
                 // the pencil appears while the rows shake (press and hold): rename on this phone only. It takes the arrow's place.
                 Button rename = A.IconButton(visual.transform, "RenameButton", IconFactory.Pencil, 62, 34, ThemeRole.MainText, ThemeRole.SurfaceAlt);

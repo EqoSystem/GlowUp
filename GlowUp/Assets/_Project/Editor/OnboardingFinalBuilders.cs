@@ -234,9 +234,21 @@ namespace GlowUp.EditorTools
         public static void BuildTerms()
         {
             var scene = SceneBuilderCore.Open("TermsAndConditionScene");
-            var c = BuildChrome(5, "Privacy Policy & Terms", continueLabel: "Continue", subtitleExisting: "PrivacyPolicySubtitleText");
+            var c = BuildChrome(5, "Privacy Policy and Terms and Conditions", continueLabel: "Continue", subtitleExisting: "PrivacyPolicySubtitleText");
             var ct = c.canvas;
-            const float toggleY = FooterTop + 6, toggleH = 110;
+            // New13 item 3: the page name takes two lines; they flow: name (clear of the Back arrow and the X), the bar 12 units under it,
+            // "Step 5 of 5", then the document. (TermsAcceptanceFlowController does the same at run time, and hides the bar unless the page
+            // was opened by Generate Profile on Step 5.)
+            const float termsNameTop = 176, termsNameH = 128, termsBarTop = termsNameTop + termsNameH + 12, termsStepTop = termsBarTop + 24, termsContentTop = termsStepTop + 46 + 14;
+            Transform termsName = c.subtitle.transform;
+            Top(termsName, c.card, termsNameTop, termsNameH);
+            var tnrt = (RectTransform)termsName; tnrt.sizeDelta = new Vector2(-2 * 140f, termsNameH);
+            SetText(c.subtitle, c.subtitle.text, 40, TextAlignmentOptions.Top);
+            c.subtitle.enableWordWrapping = true; c.subtitle.overflowMode = TextOverflowModes.Ellipsis;
+            c.subtitle.margin = Vector4.zero;                       // the original object had a 49-unit top margin: room for one line only
+            Transform termsBar = Loose(ct, "ProgressBar"); if (termsBar != null) Top(termsBar, c.card, termsBarTop, 16);
+            Transform termsStep = Loose(ct, "StepText"); if (termsStep != null) Top(termsStep, c.card, termsStepTop, 46);
+            const float toggleY = FooterTop + 6, toggleH = 110, healthY = toggleY + toggleH + 8;      // the health-information box sits above the policy box
 
             // ---- the scrollable policy text ----
             var scrollT = Loose(ct, "PrivacyPolicy_Scroll View");
@@ -244,7 +256,7 @@ namespace GlowUp.EditorTools
             if (scrollT != null)
             {
                 var panel = EnsurePanel(c.card, "PrivacyPolicy_Scroll View", ThemeRole.SurfaceAlt, PanelAlpha, scrollT);
-                TopBottom(panel, c.card, HeaderBottom, toggleY + toggleH + 14);
+                TopBottom(panel, c.card, termsContentTop, healthY + toggleH + 14);
                 if (scroll != null)
                 {
                     scroll.vertical = true; scroll.horizontal = false; scroll.scrollSensitivity = 40;
@@ -307,6 +319,9 @@ namespace GlowUp.EditorTools
                     var brt = (RectTransform)box; brt.anchorMin = brt.anchorMax = new Vector2(0, 0.5f); brt.pivot = new Vector2(0, 0.5f);
                     brt.anchoredPosition = new Vector2(8, 0); brt.sizeDelta = new Vector2(64, 64);
                     boxImg = box.GetComponent<Image>(); if (boxImg != null) StyleRounded(boxImg);
+                    // New13 item 3: an unticked box is clearly visible: a border in the secondary text colour (ChecklistRowAnimator keeps it in step)
+                    var border = SceneBuilderCore.Ensure<Outline>(box.gameObject);
+                    border.effectDistance = new Vector2(2.5f, -2.5f); border.effectColor = new Color32(110, 98, 101, 255);
                     Transform ck = box.Find("Checkmark");
                     if (ck != null)
                     {
@@ -320,7 +335,7 @@ namespace GlowUp.EditorTools
                 // label takes its place. The old one is hidden, not removed.
                 Transform oldLabel = toggleT.Find("Label");
                 if (oldLabel != null && oldLabel.GetComponent<TextMeshProUGUI>() == null) oldLabel.gameObject.SetActive(false);
-                toggleLabel = ChildText(toggleT, "ReadLabel", "I have read and agree to the Privacy Policy and the Terms & Conditions", 32, TextAlignmentOptions.MidlineLeft);
+                toggleLabel = ChildText(toggleT, "ReadLabel", "I have read and agree to the Privacy Policy and the Terms and Conditions", 32, TextAlignmentOptions.MidlineLeft);
                 toggleLabel.enableWordWrapping = true; toggleLabel.raycastTarget = false;
                 var lrt = toggleLabel.rectTransform; lrt.anchorMin = Vector2.zero; lrt.anchorMax = Vector2.one; lrt.pivot = new Vector2(0.5f, 0.5f);
                 lrt.offsetMin = new Vector2(92, 0); lrt.offsetMax = Vector2.zero;
@@ -335,8 +350,26 @@ namespace GlowUp.EditorTools
                 SceneBuilderCore.SetField(anim, "punchScale", 1.02f);
             }
 
+            // ---- second box: consent for health information (skin conditions and allergies), a copy of the first so it looks the same ----
+            Toggle healthToggle = null; TextMeshProUGUI healthLabel = null;
+            if (toggle != null)
+            {
+                Transform old = toggleT.parent.Find("HealthToggle");
+                if (old != null) Object.DestroyImmediate(old.gameObject);
+                var healthT = Object.Instantiate(toggleT.gameObject, toggleT.parent).transform;
+                healthT.name = "HealthToggle";
+                healthT.gameObject.SetActive(true);
+                BottomRow(healthT, c.card, healthY, toggleH);
+                healthToggle = healthT.GetComponent<Toggle>();
+                healthToggle.isOn = false;
+                Transform label = healthT.Find("ReadLabel");
+                if (label != null) healthLabel = label.GetComponent<TextMeshProUGUI>();
+                if (healthLabel != null) { healthLabel.text = "I agree that GlowUp keeps my skin type, skin tone, skin conditions and allergies, to personalise my results"; healthLabel.fontSize = 28; }
+            }
+
             var go = SceneBuilderCore.EnsureRoot("TermsAcceptanceFlowController");
             var ctl = SceneBuilderCore.Ensure<TermsAcceptanceFlowController>(go);
+            SceneBuilderCore.SetField(ctl, "healthToggle", healthToggle); SceneBuilderCore.SetField(ctl, "healthLabel", healthLabel);
             SceneBuilderCore.SetField(ctl, "policyScroll", scroll); SceneBuilderCore.SetField(ctl, "readToggle", toggle);
             SceneBuilderCore.SetField(ctl, "toggleLabel", toggleLabel);
             SceneBuilderCore.SetField(ctl, "continueButton", c.cont); SceneBuilderCore.SetField(ctl, "continueAnimator", c.anim);

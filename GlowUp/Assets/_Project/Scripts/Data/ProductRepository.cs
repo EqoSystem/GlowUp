@@ -224,20 +224,44 @@ namespace GlowUp.Data
 
             List<ProductData> ofBrand = await ProductsOfBrand(brandName, retryAfterMiss);      // one fetch per brand, whatever the product name is
             List<ProductIndex.Candidate> found = ProductIndex.Build(ofBrand).Search(brandName, productName, 3, kindHint);
+            Debug.Log("[MATCH] server-query brand=\"" + brandName + "\" name=\"" + productName + "\" candidates=" + found.Count);
+            foreach (ProductIndex.Candidate candidate in found)
+                Debug.Log("[MATCH] server-candidate id=\"" + candidate.product.id + "\" name=\"" + candidate.product.name
+                    + "\" brand=\"" + candidate.product.brandName + "\" score=" + candidate.score.ToString("0.000")
+                    + " bestField=" + BestScoredField(productName, candidate.product) + " exactName=" + candidate.exactName
+                    + " brandAgrees=" + candidate.brandAgrees);
+
             foreach (ProductIndex.Candidate candidate in found)
                 if (candidate != null && candidate.product != null && (candidate.exactName || candidate.score >= ProductIndex.Sure))
                 {
                     AddLocal(candidate.product);
                     lookupCache[key] = new Looked { product = candidate.product, at = Time.realtimeSinceStartup };
+                    Debug.Log("[MATCH] server-final=accept id=\"" + candidate.product.id + "\" name=\"" + candidate.product.name
+                        + "\" score=" + candidate.score.ToString("0.000") + " bestField=" + BestScoredField(productName, candidate.product));
                     return candidate.product;
                 }
             lookupCache[key] = new Looked { product = null, at = Time.realtimeSinceStartup };       // asked and not found: not asked again for a while
+            Debug.Log("[MATCH] server-final=no-match query=\"" + brandName + " " + productName + "\" bestNearMiss="
+                + (found.Count > 0
+                    ? "\"" + found[0].product.name + "\" score=" + found[0].score.ToString("0.000")
+                        + " bestField=" + BestScoredField(productName, found[0].product)
+                    : "none"));
             return null;
+        }
+
+        static string BestScoredField(string productName, ProductData product)
+        {
+            string query = TextKey.Compact(productName);
+            if (query == TextKey.Compact(product.name)) return "product.name";
+            if (product.aliases != null)
+                foreach (string alias in product.aliases)
+                    if (query == TextKey.Compact(alias)) return "product.aliases";
+            return "product.name";
         }
 
         /// <summary>The usable products of one brand, from the server: one fetch per brand (name variants and parallel callers share it).</summary>
         /// <param name="refresh">a "not found" answer for this brand has expired: a list older than NotFoundMinutes is fetched again</param>
-        static async Task<List<ProductData>> ProductsOfBrand(string brandName, bool refresh)
+        public static async Task<List<ProductData>> ProductsOfBrand(string brandName, bool refresh = false)
         {
             string brandKey = TextKey.Normalize(brandName);
             if (brandCache.TryGetValue(brandKey, out OfBrand have) && !(refresh && Time.realtimeSinceStartup - have.at >= NotFoundMinutes * 60f)) return have.products;
@@ -262,7 +286,7 @@ namespace GlowUp.Data
                 queries.Add(AllPages(products.WhereEqualTo("brandName", name), "products of brand \"" + name + "\" (brandName)"));
                 queries.Add(AllPages(products.WhereEqualTo("product_identification.brand", name), "products of brand \"" + name + "\" (product_identification.brand)"));
             }
-            List<DocumentSnapshot>[] answers = await Task.WhenAll(queries).OrTimeout(12f, "Looking up this product in Firebase");
+            List<DocumentSnapshot>[] answers = await Task.WhenAll(queries).OrTimeout(12f, "Looking up this product in our catalog");
 
             var matches = new Dictionary<string, ProductData>(StringComparer.Ordinal);
             foreach (List<DocumentSnapshot> documents in answers)

@@ -1,50 +1,67 @@
-/* The settings window behind the GlowUp logo (adminSettingsMenu.js), on every admin page. */
+/* Quick settings (adminSettingsMenu.js), on every admin page: a gear at the far right of the header opens ONE panel under it. */
 
-/* the logo button: only the "G" and the red Recycle bin count; the G lines up with the left edge of the menu's highlight */
-.brand-menu {
-    flex: none; display: grid; place-items: center; padding: 4px; margin: -4px 0 -4px -5px;
-    border: 1px solid transparent; border-radius: 12px; background: transparent; color: var(--text);
-    font: inherit; cursor: pointer; transition: background-color .15s, border-color .15s;
-}
-.brand-menu:hover, .brand-menu[aria-expanded="true"] { background: var(--surface-2); border-color: var(--border); }
-.brand-menu:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.brand-menu .brand-logo { position: relative; overflow: visible; }
-.brand-menu .brand-logo img { border-radius: 10px; }
-/* a red count on the logo while something is in the Recycle bin */
-.brand-badge {
-    position: absolute; top: -6px; right: -7px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; display: grid; place-items: center;
-    font-size: 10px; font-weight: 700; line-height: 1; color: #fff; background: var(--bad); border: 2px solid var(--surface);
-}
-.brand-badge[hidden] { display: none; }
+/* the logo (part of the link to the dashboard, pageFrame.js); the "G" lines up with the left edge of the menu's highlight */
+.brand-mark { flex: none; display: grid; place-items: center; padding: 4px; margin: -4px 0 -4px -5px; cursor: pointer; }
+.brand-mark .brand-logo img { border-radius: 10px; }
+html.sb-collapsed .brand-mark { margin: 0; }
 
-html.sb-collapsed .brand-menu { margin: 0; }
-
-/* the header keeps only the page's own tools, at its right end */
+/* the gear: the header's own icon button (.icon-btn, 36 px) at the far right of the tools */
 .topbar-tools { margin-left: auto; }
+.quick-gear[aria-expanded="true"] { background: var(--surface-3); border-color: var(--border); }
+.quick-gear:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* ---- the window: floating, no dark cover, dragged by its title bar, resized from its corner ---- */
+/* ---- the panel, as in Gmail: the header stays whole across the top (the gear stays at its far right); the panel is a column under it,
+   at the right edge. It slides in and the page content gets narrower to make room, so nothing is covered. On a window of 900 px or
+   less there is no room: it slides over the page instead. --qs-top (header height) and --qs-sb (the page's scroll bar) are set by
+   adminSettingsMenu.js, so the panel never covers the header or the page's scroll bar. ---- */
+:root { --settings-w: 360px; }
 .settings-window {
-    position: fixed; top: 76px; left: calc(100vw - 384px); width: 360px; max-height: calc(100vh - 16px); z-index: 901;
+    position: fixed; top: var(--qs-top, 56px); right: var(--qs-sb, 0px); bottom: 0; z-index: 901;
     display: none; flex-direction: column; overflow: hidden;
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+    width: var(--settings-w); max-width: calc(100vw - var(--qs-sb, 0px)); background: var(--surface); border-left: 1px solid var(--border);
+    transform: translateX(calc(100% + var(--qs-sb, 0px) + 12px)); transition: transform .18s ease-in;
 }
-.settings-window.is-open { display: flex; animation: rise .2s var(--ease); }
+.settings-window.is-shown { display: flex; }
+.settings-window.is-open { transform: none; transition: transform .22s ease-out; }
+/* the frame it appears in, it starts off to the right and slides in (no script reflow needed to start the transition) */
+@starting-style { .settings-window.is-open { transform: translateX(calc(100% + var(--qs-sb, 0px) + 12px)); } }
 .settings-window:focus { outline: none; }
-.settings-window.moving { user-select: none; box-shadow: 0 18px 50px rgba(0, 0, 0, .35); }
-.sw-head { display: flex; align-items: center; gap: 4px; padding: 10px 10px 10px 16px; border-bottom: 1px solid var(--border); cursor: move; touch-action: none; flex: none; }
-.sw-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.sw-head { display: flex; align-items: center; gap: 4px; padding: 10px 10px 10px 16px; border-bottom: 1px solid var(--border); flex: none; }
 .sw-head:has(#swBack:not([hidden])) { padding-left: 10px; }
 .sw-head h3 { flex: 1; min-width: 0; font-size: var(--fs-md); }
-.sw-body { flex: 1 1 auto; min-height: 0; overflow: auto; }
-.sw-view { padding: 8px; }
+.sw-body { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }          /* the panel scrolls by itself; the page keeps its own scroll */
+.sw-view { padding: 8px 14px 12px 8px; }                                 /* room on the right: a count badge never touches the scroll bar or the edge */
+/* every row: icon | title + description (wraps) | check or count (never pushed out) */
+.settings-window .menu-item { min-width: 0; align-items: center; }
+.settings-window .menu-text { min-width: 0; overflow-wrap: anywhere; }
+.settings-window .menu-item > svg.ic, .settings-window .menu-badge, .settings-window .menu-check { flex: none; }
 .sw-view.layout-view { padding: 16px 20px 22px; display: flex; flex-direction: column; gap: 16px; }
+.sw-view.keys-view { padding: 16px 20px 22px; }                            /* Keyboard shortcuts: the same margins as Layout and style */
 .sw-view[hidden] { display: none; }
-.sw-resize { position: absolute; z-index: 3; right: 0; bottom: 0; width: 22px; height: 22px; cursor: nwse-resize; touch-action: none; }
-.sw-resize::after { content: ""; position: absolute; right: 6px; bottom: 6px; width: 8px; height: 8px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); border-bottom-right-radius: 2px; opacity: .7; }
+
+/* 1024 px and wider (7 November 2026): a side panel that PUSHES the page; the board reflows into the width that is left
+   (its panels follow the board's own width: the container query in adminCommon.css). Nothing is hidden under it. */
+@media (min-width: 1024px) {
+    .main-content > .board, .main-content > .editing-bar { margin-right: var(--qs-shift, 0px); }   /* snaps: a margin is layout, never animated */
+    html.qs-open { --qs-shift: var(--settings-w); }
+}
+/* Under 1024 px: a full-height sheet over a dimmed backdrop. The backdrop, Esc and the close button close it; the page behind
+   does not scroll while it is open. */
+.sw-backdrop { display: none; }
+@media (max-width: 1023px) {
+    .settings-window { top: 0; right: 0; z-index: 960; box-shadow: var(--shadow); width: min(var(--settings-w), 100vw); max-width: 100vw; }
+    html.qs-open .sw-backdrop { display: block; position: fixed; inset: 0; z-index: 950; background: var(--overlay); animation: fade-in .2s ease both; }
+    html.qs-open .main-content { overflow: hidden; }
+    html.qs-open body { overflow: hidden; }
+}
+@media (max-width: 599px) { .settings-window { width: 100vw; border-left: 0; } }
+@keyframes fade-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .settings-window, .settings-window.is-open { transition: opacity .15s !important; } }
+/* before the panel is first opened, the Layout & Style controls wait here */
+#layoutStash { display: none; }
 
 /* the Settings view uses the menu look (.menu-item ... in adminCommon.css) */
 .menu-badge {
     flex: none; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center;
-    font-size: 11px; font-weight: 700; line-height: 1; color: #fff; background: var(--bad);
+    font-size: 12px; font-weight: 700; line-height: 1; color: #fff; background: var(--bad);
 }
-.menu-note { padding: 6px 10px 4px; font-size: var(--fs-xs); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

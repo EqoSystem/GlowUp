@@ -509,7 +509,7 @@ export function wrongIngredientShape(piece) {
 export const SOURCE_REGULATORS = ["europa.eu", "fda.gov", "fda.gov.ph", "nih.gov", "who.int", "aseancosmetics.org", "asean.org", "health.gov.au", "tga.gov.au", "canada.ca", "gov.uk", "echa.europa.eu"];
 export const SOURCE_MEDICAL = ["cir-safety.org", "cir-reports.cir-safety.org", "aad.org", "dermnetnz.org", "contactderm.org", "sciencedirect.com", "wiley.com", "springer.com",
     "nature.com", "jamanetwork.com", "bmj.com", "mayoclinic.org", "clevelandclinic.org"];
-export const SOURCE_REFERENCES = ["personalcarecouncil.org", "incibeauty.com", "incidecoder.com", "paulaschoice.com", "ewg.org", "cosmeticsinfo.org"];
+export const SOURCE_REFERENCES = ["personalcarecouncil.org", "incibeauty.com", "incidecoder.com", "paulaschoice.com", "ewg.org", "cosmeticsinfo.org", "cosmileeurope.eu"];
 export const SOURCE_PUBLIC_LISTS = ["openbeautyfacts.org"];
 // large shops whose product pages copy the list printed on the pack: their WHOLE web addresses (matched like the lists
 // above, never as a piece of a name, so "watsons-deals.xyz" is not Watsons)
@@ -526,7 +526,7 @@ export const SOURCE_RETAILERS = ["watsons.com.ph", "watsons.com.my", "watsons.co
 // `website`, which only an admin sets, after checking that the brand owns the address (Brand form, "Official website").
 const BACKSLASH = String.fromCharCode(92);
 // only a PLAIN address is labelled: http(s), a host of a-z 0-9 . - only (no user name, no other letters), an optional
-// port, and printable ASCII after it. Anything else (a backslash, "user@", look-alike letters) is an Unverified site.
+// port, and printable ASCII after it. Anything else (a backslash, "user@", look-alike letters) is an Other website.
 const STRICT_ADDRESS = /^https?:\/\/([a-z0-9.-]+)(?::[0-9]{1,5})?([/?#][!-~]*)?$/i;
 
 export const SOURCE_KINDS = {
@@ -536,7 +536,7 @@ export const SOURCE_KINDS = {
     reference: { label: "Ingredient database", advice: "Explains what an ingredient is. Not peer-reviewed, and never proof of what one product contains.", tone: "" },
     public: { label: "Public list (anyone can edit)", advice: "A public list anybody can edit. Use it as a second opinion only.", tone: "" },
     retailer: { label: "Retailer listing", advice: "A shop's copy of the pack's list. It can be out of date: compare it with your pack.", tone: "" },
-    other: { label: "Unverified site", advice: "Not recognised. Do not rely on it without checking elsewhere.", tone: "warn" }
+    other: { label: "Other website", advice: "Not on GlowUp's list of known sources. Compare it with the pack or another source before relying on it.", tone: "warn" }
 };
 
 /** The line under every list of source links, for people who are careful about links. */

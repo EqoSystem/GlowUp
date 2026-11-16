@@ -21,11 +21,32 @@ namespace GlowUp.Onboarding
 
         void Awake()
         {
+            Calm();
             if (skinTypeGroup != null) skinTypeGroup.Changed += _ => Refresh();
             if (conditions != null) conditions.CustomAdded += t => { if (!OnboardingSession.CustomConditions.Contains(t)) OnboardingSession.CustomConditions.Add(t); };
             if (continueButton != null) continueButton.onClick.AddListener(OnContinue);
             if (backButton != null) backButton.onClick.AddListener(GoBack);
         }
+
+        /// <summary>
+        /// This page is calm (10 November 2026): no square sweeps, nothing that keeps pulsing. A skin type card turns over when chosen to
+        /// say how to tell that type; a condition row, Add and Continue only give an ordinary press feedback.
+        /// </summary>
+        void Calm()
+        {
+            TMP_Text font = feedbackText;
+            foreach (SelectableTile tile in GetComponentsInScene<SelectableTile>())
+            {
+                if (!SkinTypeHints.Back.ContainsKey(tile.Value)) continue;
+                tile.Flip = FlipCardTile.AddTo(tile, font);
+            }
+            foreach (PixelSweepTileAnimator a in GetComponentsInScene<PixelSweepTileAnimator>()) a.Calm();
+            foreach (PressSweepEffect e in GetComponentsInScene<PressSweepEffect>()) e.Calm();
+            foreach (ChecklistRowAnimator r in GetComponentsInScene<ChecklistRowAnimator>()) r.Calm();
+            foreach (ContinueButtonGlowAnimator c in GetComponentsInScene<ContinueButtonGlowAnimator>()) c.Calm();
+        }
+
+        static T[] GetComponentsInScene<T>() where T : Object => FindObjectsOfType<T>(true);
 
         /// <summary>
         /// Back: Step 1 for a new account. For a Google / Facebook account, and while the quiz is retaken from Settings,
@@ -47,7 +68,10 @@ namespace GlowUp.Onboarding
             _ = ListsRepository.Refresh();
             if (skinTypeGroup != null && !string.IsNullOrEmpty(OnboardingSession.SkinType)) skinTypeGroup.Select(OnboardingSession.SkinType, false);
             if (conditions != null) conditions.SetSelected(OnboardingSession.SkinConditions);
+            // the Google notice is a banner at the top of the page (New13 item 5C); the line under Add holds that row's own hints only
+            OnboardingNotices.OneLine(feedbackText);
             if (feedbackText != null) feedbackText.text = "";
+            OnboardingNotices.SocialBanner(feedbackText, "step2", feedbackText);
             Refresh();
         }
 
@@ -56,6 +80,7 @@ namespace GlowUp.Onboarding
         void ApplyLists()
         {
             if (this != null && conditions != null) conditions.ApplyOptions(ListsRepository.ConditionLabels());
+            if (this != null) Calm();                // the condition rows are made from the list: they are calmed once they exist
         }
 
         void Refresh()
@@ -67,7 +92,7 @@ namespace GlowUp.Onboarding
 
         void OnContinue()
         {
-            if (skinTypeGroup == null || string.IsNullOrEmpty(skinTypeGroup.Value)) { if (feedbackText != null) feedbackText.text = msgChooseSkinType; return; }
+            if (skinTypeGroup == null || string.IsNullOrEmpty(skinTypeGroup.Value)) { OnboardingNotices.Error(feedbackText, msgChooseSkinType); return; }
             OnboardingSession.SkinType = skinTypeGroup.Value;
             OnboardingSession.SkinConditions = conditions != null ? conditions.Selected : new System.Collections.Generic.List<string>();
             OnboardingSession.SaveDraft();

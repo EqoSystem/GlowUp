@@ -1,0 +1,142 @@
+erDiagram
+  %% ASSUMED: cardinalities (1, many, optional) are inferred from firestore.rules and field semantics; Firestore itself enforces no foreign keys
+  BRAND ||--o{ PRODUCT : "has"
+  PRODUCT }o--o{ INGREDIENT : "contains (by ingredientIds)"
+  INGREDIENT }o--|| INGREDIENT_CLASSIFICATION : "classified as"
+  INGREDIENT }o--o{ CONFIG_LISTS : "tags (allergen/highlight ids)"
+  PRODUCT }o--o{ CONFIG_LISTS : "no direct tag (via ingredient)"
+  USER ||--o{ SCAN : "has history"
+  USER ||--o{ ALLERGEN_SUGGESTION : "submits"
+  USER ||--o{ CONDITION_SUGGESTION : "submits"
+  USER ||--o{ SCAN_ACTIVITY : "generates (anonymous)"
+  PRODUCT ||--o{ SCAN_ACTIVITY : "recognized as"
+  PRODUCT ||--o{ PRODUCT_INGREDIENT_SUGGESTION : "receives suggestion for"
+  USER ||--o{ PENDING_PRODUCT : "stages snapshot"
+  PENDING_PRODUCT ||--|| PENDING_PRODUCT_IMAGE : "has one photo"
+  ADMIN ||--o{ BRAND : "approves/edits"
+  ADMIN ||--o{ PRODUCT : "approves/edits"
+  ADMIN ||--o{ INGREDIENT : "approves/edits"
+  BRAND ||--o{ ARCHIVE : "may be archived"
+  PRODUCT ||--o{ ARCHIVE : "may be archived"
+  INGREDIENT ||--o{ ARCHIVE : "may be archived"
+
+  BRAND {
+    string id PK
+    string name
+    string category
+    string[] aliases
+    string market
+    string status
+    number scans
+    string source
+    boolean reviewed
+    string website
+    string websiteConfirmedBy
+    boolean binned
+  }
+  PRODUCT {
+    string id PK
+    string brandId FK
+    string brandName
+    string name
+    string cosmeticType
+    string[] aliases
+    string[] ingredients
+    string[] ingredientIds FK
+    string[] shades
+    string[] shadeCodes
+    string[] sources
+    string barcode
+    string status
+    number scans
+    string source
+    boolean reviewed
+    boolean binned
+  }
+  INGREDIENT {
+    string id PK
+    string name
+    string classificationId FK
+    string purpose
+    string description
+    string[] aliases
+    string riskLevel
+    string cautionNote
+    string[] allergenTags
+    string[] highlights
+    string source
+    boolean reviewed
+    boolean binned
+  }
+  INGREDIENT_CLASSIFICATION {
+    string id PK
+    string name
+  }
+  CONFIG_LISTS {
+    string docId PK
+    number version
+    object allergens
+    object conditions
+    object highlights
+  }
+  USER {
+    string uid PK
+    object profile
+    string[] allergens
+  }
+  SCAN {
+    string id PK
+    string uid FK
+    string productId FK
+    number scannedAtUnix
+  }
+  SCAN_ACTIVITY {
+    string id PK
+    string brandId FK
+    string productName
+    string status
+    number scannedAtUnix
+  }
+  PRODUCT_INGREDIENT_SUGGESTION {
+    string id PK
+    string productId FK
+    string[] ingredients
+    string status
+    boolean reviewed
+  }
+  PENDING_PRODUCT {
+    string id PK
+    string createdByUid FK
+    string brandName
+    string name
+    string[] ingredients
+    boolean isApproved
+  }
+  PENDING_PRODUCT_IMAGE {
+    string id PK
+    string jpegBase64
+    string createdByUid FK
+  }
+  ALLERGEN_SUGGESTION {
+    string id PK
+    string uid FK
+    string text
+    string status
+  }
+  CONDITION_SUGGESTION {
+    string id PK
+    string uid FK
+    string text
+    string status
+  }
+  ADMIN {
+    string uid PK
+  }
+  ARCHIVE {
+    string id PK
+    string type
+    string sourceCollection
+    string sourceId FK
+    object data
+    string expires_at
+  }

@@ -3,7 +3,7 @@
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const handler = require("../api/assist-ingredient.js");
-const { normalShade, ingredientImportQuestion, tidyIngredientImport, firstObject, tidy, tidyProduct, tidyBrand, tidyImport, importQuestion, descriptionQuestion, brandQuestion, isCredible, searchResultUrl, chatContent } = handler.helpers;
+const { cosmileResults, parseCosmile, plainKey, normalShade, ingredientImportQuestion, tidyIngredientImport, firstObject, tidy, tidyProduct, tidyBrand, tidyImport, importQuestion, descriptionQuestion, brandQuestion, isCredible, searchResultUrl, chatContent } = handler.helpers;
 
 let checks = 0, failed = 0;
 const check = (ok, what) => { checks++; if (!ok) { failed++; console.log("FAILED: " + what); } };
@@ -70,12 +70,12 @@ check(isCredible("ec.europa.eu") && isCredible("pubchem.ncbi.nlm.nih.gov") && is
 check(!isCredible("someblog.com") && !isCredible("shopee.ph") && !isCredible("fda.gov.evil.com"), "a blog, a shop and a look-alike address are not");
 
 // ---- the whole function, with pretend services
-function call({ method = "POST", token = "good", body = { name: "Tocopheryl Acetate" }, key = "test-key", gemini } = {}) {
+function call({ method = "POST", token = "good", body = { name: "Tocopheryl Acetate" }, key = "test-key", gemini, cosmile, pubchem } = {}) {
     process.env.GEMINI_API_KEY = key; if (!key) delete process.env.GEMINI_API_KEY;
     const sent = [];
     globalThis.fetch = async (url, options = {}) => {
         sent.push({ url: String(url), options });
-        const reply = (status, json, headers = {}) => ({ ok: status >= 200 && status < 300, status, json: async () => json, headers: { get: (h) => headers[h.toLowerCase()] || null } });
+        const reply = (status, json, headers = {}) => ({ ok: status >= 200 && status < 300, status, json: async () => json, text: async () => (typeof json === "string" ? json : ""), headers: { get: (h) => headers[h.toLowerCase()] || null } });
         if (String(url).includes("accounts:lookup")) return JSON.parse(options.body).idToken === "good" || JSON.parse(options.body).idToken === "notadmin" ? reply(200, { users: [{ localId: JSON.parse(options.body).idToken === "good" ? "admin1" : "user9" }] }) : reply(400, {});
         if (String(url).includes("/documents/admins/")) return String(url).endsWith("/admin1") ? reply(200, {}) : reply(403, {});
         if (String(url).includes("generativelanguage")) return gemini ? gemini(reply) : reply(200, {
@@ -84,6 +84,8 @@ function call({ method = "POST", token = "good", body = { name: "Tocopheryl Acet
                 groundingMetadata: { groundingChunks: [{ web: { uri: "https://vertexaisearch.cloud.google.com/grounding-api-redirect/abc", title: "someblog.com" } }, { web: { uri: "https://vertexaisearch.cloud.google.com/grounding-api-redirect/def", title: "cir-safety.org" } }] }
             }]
         });
+        if (String(url).includes("pubchem.ncbi.nlm.nih.gov") && pubchem) return pubchem(String(url), reply);
+        if (String(url).includes("cosmileeurope.eu") && cosmile) return cosmile(String(url), reply);
         if (String(url).includes("grounding-api-redirect/abc")) return reply(302, {}, { location: "https://someblog.com/vitamin-e" });
         if (String(url).includes("grounding-api-redirect/def")) return reply(302, {}, { location: "https://www.cir-safety.org/ingredients/tocopheryl-acetate" });
         return reply(404, {});
@@ -107,7 +109,8 @@ check(toAi.options.body.includes("Tocopheryl Acetate") && !toAi.options.body.inc
 const productJson = '{"ingredients":["Aqua","Mica"],"fdaVerifiedLink":"https://verification.fda.gov.ph/product"}';
 r = await call({ body: { mode: "description", name: "Mica" },
     gemini: (reply) => reply(200, { candidates: [{ content: { parts: [{ text: '{"description":"A mineral used to add shimmer to make-up."}' }] } }] }) });
-check(r.status === 200 && r.body.found && Object.keys(r.body.draft).join(",") === "description", "ingredient assistance returns only a description draft");
+check(r.status === 200 && r.body.found && Object.keys(r.body.draft).join(",") === "description,purpose,commonUses,aliases,links,chemicalDescription", "ingredient assistance returns only description, purpose, uses, other names and links");
+check(r.body.cosmile && r.body.cosmile.found === false, "no Cosmile record is reported when the site does not answer");
 r = await call({ body: { mode: "product", brandName: "Glow", productName: "Lip Tint" },
     gemini: (reply) => reply(200, { candidates: [{ content: { parts: [{ text: productJson }] },
         groundingMetadata: { groundingChunks: [{ web: { uri: "https://verification.fda.gov.ph/product", title: "FDA Philippines" } }] } }] }) });
@@ -119,6 +122,58 @@ r = await call({ body: { mode: "brand", name: "Glow" },
     gemini: (reply) => reply(200, { candidates: [{ content: { parts: [{ text: '{"aliases":["Glow Cosmetics"],"market":"Global","confidence":"high"}' }] },
         groundingMetadata: { groundingChunks: [{ web: { uri: "https://www.example.com/brand", title: "Official site" } }] } }] }) });
 check(r.status === 200 && r.body.found && r.body.draft.aliases[0] === "Glow Cosmetics" && r.body.sources.length === 1, "brand assistance returns name aliases, market and cited sources");
+
+// ---- COSMILE Europe (pretend pages in the real site's markup)
+const COSMILE_RESULTS = "<div class='inci_box_link'> <div class='inci_box_link-content'> <a class='inci_box_link-link' href='https://cosmileeurope.eu/inci/detail/5/1-2-hexanediol/'>1,2-HEXANEDIOL</a> <svg></svg> </div> <div class='inci_box_link-sub'>1,2-Hexanediol</div> </div>"
+    + "<div class='inci_box_link'> <a class='inci_box_link-link' href='https://cosmileeurope.eu/inci/detail/11555/phenoxyethanol/'>PHENOXYETHANOL</a> <div class='inci_box_link-sub'>Phenoxyethanol; 2-Phenoxyethanol</div> </div>";
+const COSMILE_PAGE = "<div class='inci_db'> <h1 id='inci'>PHENOXYETHANOL</h1> <h2>Name / description</h2> <p>Phenoxyethanol; 2-Phenoxyethanol</p> <hr></hr> <h2>Function(s) of this ingredient in cosmetic products</h2>"
+    + " <h3>ANTIMICROBIAL</h3> <p>Helps control the growth of micro-organisms (eg bacteria and fungi)</p> <h3>PRESERVATIVE</h3> <p>Protects cosmetic products from microbial spoilage</p> <hr></hr>"
+    + " <h2>Origin</h2> <p>synthetic</p> <hr></hr> <h2>Occurrence in cosmetics</h2> <p>Deodorants, care and cleansing agents for skin and hair, makeup</p> <hr></hr>"
+    + " <h2 id='safety'>Information on safe use</h2> <p><a target=\"_blank\" class=\"link\" href=\"http://ec.europa.eu/health/sccs_o_195.pdf\">Opinion of the SCCS (2016)</a> Annex V lists preservatives.</p> <hr></hr>"
+    + " <h2>Belongs to the following substance groups</h2><div class='inci_box_links'><a class='inci_box_link-link' href='https://cosmileeurope.eu/inci/substancegroup/1/preservatives/'>Preservatives</a></div> <hr></hr> <h2>Regulating cosmetics</h2> <p>x</p></div></div>";
+const hits = cosmileResults(COSMILE_RESULTS);
+equal(hits.map((h) => h.name), ["1,2-HEXANEDIOL", "PHENOXYETHANOL"], "Cosmile search hits are read");
+equal(hits[1].sub, ["Phenoxyethanol", "2-Phenoxyethanol"], "other names under a hit are split on ';' only");
+equal(hits[0].sub, ["1,2-Hexanediol"], "a name with a comma in it stays ONE name");
+check(plainKey("2-Hexanediol") !== plainKey("1,2-HEXANEDIOL"), "'2-Hexanediol' is not '1,2-Hexanediol'");
+const rec = parseCosmile(COSMILE_PAGE, "https://cosmileeurope.eu/inci/detail/11555/phenoxyethanol/");
+equal([rec.inci, rec.names, rec.origin, rec.groups], ["PHENOXYETHANOL", ["2-Phenoxyethanol"], "synthetic", ["Preservatives"]], "a Cosmile record page is read");
+equal(rec.functions.map((f) => f.name), ["antimicrobial", "preservative"], "its functions are read");
+equal(rec.safeLinks, [{ title: "Opinion of the SCCS (2016)", url: "https://ec.europa.eu/health/sccs_o_195.pdf" }], "its safety link is kept, as https");
+equal(parseCosmile("<html>not a record</html>", "x"), null, "a page without a record is not one");
+check(/COSMILE EUROPE RECORD/.test(descriptionQuestion("Phenoxyethanol", rec)) && !/COSMILE/.test(descriptionQuestion("Phenoxyethanol", null)), "the record goes into the question only when there is one");
+const cosmilePages = (url, reply) => reply(200, url.includes("/inci/results/") ? COSMILE_RESULTS : url.includes("/inci/detail/11555/") ? COSMILE_PAGE : "");
+const cosmileSaid = '{"description":"A preservative that protects products from spoiling.","purpose":"Keeps microbes from growing in the product.","commonUses":"foundations, mascaras","aliases":["2-Phenoxyethanol","Phenoxyethanol"]}';
+r = await call({ body: { mode: "description", name: "Phenoxyethanol" }, cosmile: cosmilePages,
+    gemini: (reply) => reply(200, { candidates: [{ content: { parts: [{ text: cosmileSaid }] } }] }) });
+check(r.status === 200 && r.body.found && r.body.cosmile.found && r.body.cosmile.inci === "PHENOXYETHANOL", "a Cosmile match is reported");
+check(r.sent.find((s) => s.url.includes("generativelanguage")).options.body.includes("COSMILE EUROPE RECORD"), "the AI is given the record");
+equal(r.body.draft.aliases, ["2-Phenoxyethanol", "Phenoxyethanol"], "other names are kept once each");
+equal(r.body.draft.links.map((l) => l.url), ["https://cosmileeurope.eu/inci/detail/11555/phenoxyethanol/", "https://ec.europa.eu/health/sccs_o_195.pdf"], "the record page and its EU page are offered as reference links");
+check(r.body.sources[0].url.includes("cosmileeurope.eu") && r.body.sources[0].kind === "reference" && r.body.searched === true, "the record page is the first source, an ingredient database");
+check(r.sent.filter((s) => s.url.includes("cosmileeurope.eu")).every((s) => s.options.headers["User-Agent"].startsWith("GlowUpAdmin/")), "the site is asked with an honest name");
+r = await call({ body: { mode: "description", name: "2-Hexanediol" }, cosmile: cosmilePages,
+    gemini: (reply) => reply(200, { candidates: [{ content: { parts: [{ text: '{"description":"A solvent."}' }] } }] }) });
+check(r.status === 200 && r.body.cosmile.found === false && r.sent.filter((s) => s.url.includes("/inci/detail/")).length === 0, "a name that is only close to a record is not used, and no record page is fetched");
+r = await call({ body: { mode: "description", name: "Phenoxyethanol" }, cosmile: cosmilePages, gemini: (reply) => reply(429, {}) });
+check(r.status === 200 && r.body.found && /no AI answered/.test(r.body.model) && /^An? .*ingredient that .*\(.*antimicrobial/.test(r.body.draft.description) && r.body.basis && r.body.basis.source === "COSMILE Europe", "when no AI answers, the record alone fills the description");
+r = await call({ body: { mode: "description", name: "Mica" }, cosmile: (url, reply) => reply(500, {}), gemini: (reply) => reply(429, {}) });
+check(r.status === 502, "no record and no AI is still an error");
+
+// ---- PubChem: "What the chemical is", copied as written, with where it came from
+const PUBCHEM = (url, reply) => reply(200, /Phenoxyethanol/i.test(decodeURIComponent(url)) ? { InformationList: { Information: [{ CID: 31236, Title: "Phenoxyethanol" },
+    { CID: 31236, Description: "2-phenoxyethanol is an aromatic ether that is phenol substituted on oxygen by a 2-hydroxyethyl group.", DescriptionSourceName: "ChEBI", DescriptionURL: "https://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI:64275" }] } }
+    : { Fault: { Code: "PUGREST.NotFound" } });
+r = await call({ body: { mode: "description", name: "Phenoxyethanol" }, cosmile: cosmilePages, pubchem: PUBCHEM,
+    gemini: (reply) => reply(200, { candidates: [{ content: { parts: [{ text: cosmileSaid }] } }] }) });
+equal(r.body.draft.chemicalDescription, "2-phenoxyethanol is an aromatic ether that is phenol substituted on oxygen by a 2-hydroxyethyl group.", "the chemical description is PubChem's text, word for word");
+equal(r.body.fieldSources.chemicalDescription.map((p) => p.url), ["https://pubchem.ncbi.nlm.nih.gov/compound/31236", "https://www.ebi.ac.uk/chebi/searchId.do?chebiId=CHEBI:64275"], "its page and the body that wrote the text are the box's sources");
+check(!r.sent.find((s) => s.url.includes("generativelanguage")).options.body.includes("aromatic ether"), "the AI is not asked to write the chemical description");
+equal(r.body.fieldSources.purpose.map((p) => p.url), ["https://cosmileeurope.eu/inci/detail/11555/phenoxyethanol/"], "the purpose box names the Cosmile record");
+check(r.body.fieldSources.commonUses.length === 1 && r.body.fieldSources.aliases.length === 2, "uses and other names name their pages");
+r = await call({ body: { mode: "description", name: "Mica" }, pubchem: (url, reply) => reply(404, {}),
+    gemini: (reply) => reply(200, { candidates: [{ content: { parts: [{ text: '{"description":"A mineral."}' }] } }] }) });
+check(r.body.draft.chemicalDescription === "" && r.body.fieldSources.chemicalDescription.length === 0 && r.body.fieldSources.purpose.length === 0, "no page, no source: a box without a page has none");
 
 const importJson = '{"products":[{"brandName":"Glow","productName":"Lip Tint","cosmeticType":"Lip Tint","ingredients":["Mica"],"shades":["#AABBCC"]}]}';
 r = await call({ body: { mode: "import", documentText: "Brand: Glow; Product: Lip Tint" },
@@ -327,6 +382,26 @@ check(describeSource({ url: "https://absidy.com/x", site: "absidy.com" }, "").ki
 }
 check(!SEARCH_KINDS.product.includes("reference") && SEARCH_KINDS.product.includes("retailer") && SEARCH_KINDS.product.includes("maker"), "a product's list never rests on an ingredient database; makers and retailers count");
 check(SEARCH_KINDS.ingredient.includes("reference") && !SEARCH_KINDS.ingredient.includes("retailer"), "an ingredient's description rests on references, not shops");
+
+// ---- the User-Friendly Definition rests on its source (9 November 2026) ----
+{
+    const { unsupportedClaims, recordDefinition, definitionBasis } = handler.helpers;
+    // the COSMILE record of 1-Methylhydantoin-2-Imide (as read on 9 November 2026): ONE function, skin conditioning
+    const rec = { url: "https://cosmileeurope.eu/inci/detail/18/1-methylhydantoin-2-imide/", inci: "1-METHYLHYDANTOIN-2-IMIDE", names: ["2-Amino-1,5-dihydro-1-methyl-4H-imidazol-4-one"],
+        functions: [{ name: "skin conditioning", what: "Maintains the skin in good condition" }], origin: "synthetic", occurrence: "", background: "", safeUse: "", safeLinks: [], groups: ["Ingredients for skincare"] };
+    const wrong = "A synthetic compound used in carefully balanced preservation systems. It helps keep products safe, stable, and free from harmful bacteria and mold without altering the product's feel or scent.";
+    check(unsupportedClaims(wrong, rec, null).length >= 1, "an AI definition that claims preservation for a skin-conditioning ingredient is caught");
+    equal(unsupportedClaims("A synthetic ingredient that keeps the skin in good condition.", rec, null), [], "a definition that says what the record says passes");
+    equal(recordDefinition(rec), "A synthetic ingredient that maintains the skin in good condition (skin conditioning).", "the plain definition made from the record");
+    const basis = definitionBasis(rec, null, ["preserv"], []);
+    check(basis.source === "COSMILE Europe" && basis.url === rec.url && /skin conditioning: Maintains the skin in good condition/.test(basis.quote) && basis.how === "made from the record", "the basis names COSMILE, its address and its words");
+    const preservative = Object.assign({}, rec, { functions: [{ name: "preservative", what: "Inhibits primarily the development of micro-organisms in cosmetic products" }] });
+    equal(unsupportedClaims("It helps keep products free from bacteria and mold.", preservative, null), [], "a preservative may be called one");
+    equal(unsupportedClaims("A pigment that gives colour.", rec, { description: "Iron oxide is a pigment used as a colorant." }), [], "PubChem's description also counts as support");
+    const pub = definitionBasis(null, { cid: 1, url: "https://pubchem.ncbi.nlm.nih.gov/compound/1", description: "A text." }, [], []);
+    check(pub.source === "PubChem (NIH)" && pub.how === "checked against PubChem", "without a COSMILE record the basis is PubChem");
+    equal(definitionBasis(null, null, [], [{ url: "https://shop.example", credible: false }]), null, "no credible source: no basis is claimed");
+}
 
 console.log("checks made: " + checks);
 console.log(failed === 0 ? "ALL PASSED" : failed + " FAILED");

@@ -53,7 +53,7 @@
                     <button type="button" class="guide-badge" data-tip-title="Needs your attention" data-tip="Everything on this page that needs a decision, with the most important first: red = urgent, amber = check, blue = next step, green = good, grey = tip. Press a line's button to do it." data-tip-preview="Fold the panel with its arrow; it stays folded until you open it.">i</button>
                     <span class="spacer"></span>
                 </div>
-                <div class="notes-list" id="notesList" aria-live="polite"><p class="field-hint">Looking at what needs you...</p></div>
+                <div class="notes-list" id="notesList" aria-live="polite"><div class="sk sk-note" aria-hidden="true"></div><div class="sk sk-note" aria-hidden="true"></div><div class="sk sk-note" aria-hidden="true"></div><span class="sr-only">Looking at what needs you...</span></div>
             </section>
 
 
@@ -67,6 +67,7 @@
                         <i data-icon="search"></i>
                         <input type="text" placeholder="Search brands and products" class="search-input" id="inventorySearchInput" autocomplete="off" aria-label="Search brands and products">
                         <button type="button" class="search-clear" id="inventorySearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
+                        <div class="search-suggest" id="inventorySuggest" role="listbox" aria-label="Suggestions" hidden></div>
                     </div>
                     <!-- one brand, or every brand grouped, or every product in one list: chosen in Filters ("Show"), kept here -->
                     <select id="brandFilterSelect" class="toolbar-select" aria-label="Which brand, and how the list is drawn" hidden>
@@ -77,7 +78,6 @@
                         <option value="">Everything</option>
                     </select>
                     <div class="tool-group end" id="headerActions">
-                        <button type="button" class="icon-btn" id="moreMenuBtn" aria-label="More" aria-haspopup="menu" data-tip-title="More" data-tip="Clean up, find duplicates, open or close every brand, add the FDA Philippines catalogue."><i data-icon="more"></i></button>
                         <button type="button" class="primary-btn" id="addMenuBtn" aria-haspopup="menu" data-tip-title="Add" data-tip="Add a brand, or a product to a brand that is listed already." data-tip-preview="Choose Brand or Product; a form opens."><i data-icon="plus"></i>Add</button>
                     </div>
                 </div>
@@ -94,37 +94,23 @@
                     <span class="import-drop-icon"><i data-icon="upload"></i></span>
                     <span><strong>Drop a PDF, Excel, or Word file here</strong><small id="inventoryImportHint">Reads brand, product, cosmetic type, ingredients, source links, and shade colors. Imported entries are saved as Pending for admin review.</small></span>
                 </button>
-                <p class="import-types">Accepted: PDF (.pdf), Excel (.xlsx, .xls), Word (.docx), CSV (.csv), text (.txt)</p>
+                <p class="import-types">Accepted: PDF (.pdf), Excel (.xlsx, .xls), Word (.docx), CSV (.csv), text (.txt). Any size: a long file is read in parts.</p>
                 <p class="field-hint import-status" id="inventoryImportStatus" role="status" aria-live="polite"></p>
                 <!-- what the last import FLAGGED: skin care and other non-make-up records (not saved), and make-up whose kind is unclear (saved, to check) -->
                 <div class="import-flags" id="inventoryImportFlags" hidden></div>
             </section>
 
-            <!-- products app users sent as ONE photo: reviewed in a floating window over this page (photo left, the AI's reading right;
-                 Approve & Publish, Edit, Reject). Only a count is read (remembered 10 minutes, shared by both pages). -->
-            <section class="panel snapshots-panel" data-panel="snapshots" data-label="Pending snapshot reviews" data-w="4" data-right>
-                <div class="panel-head">
-                    <h3 class="panel-title">Pending snapshots</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Pending snapshot reviews" data-tip="When a scanned product is not in the catalogue, the app offers to take one photo. The AI reads the brand, name, kind, shade and ingredient list. Users see that reading marked PENDING APPROVAL until you approve it here." data-tip-preview="Opens a review window over this page: one snapshot at a time, photo next to the reading.">i</button>
-                </div>
-                <button type="button" class="snapshots-open" id="snapshotReviewBtn" aria-haspopup="dialog">
-                    <span class="snapshots-icon"><i data-icon="camera"></i></span>
-                    <span class="snapshots-text"><strong>Pending Snapshot Reviews</strong><small id="snapshotReviewHint">One at a time: the photo next to what the AI read.</small></span>
-                    <span class="snapshots-count skeleton" id="snapshotCount" aria-label="Snapshots waiting">00</span>
-                </button>
-            </section>
-
             <!-- the counts; a click on one filters the table -->
-            <section class="panel bare" data-panel="counts" data-label="Counts" data-w="8">
+            <section class="panel bare" data-panel="counts" data-label="Counts" data-w="8" data-source="inventoryCounts">
                 <div class="stat-row">
-                    <button type="button" class="stat" data-show="" data-tip-title="Everything" data-tip="Show every brand and product."><span class="stat-icon"><i data-icon="tag"></i></span><span><span class="stat-value skeleton" id="statBrands">00</span><span class="stat-title">Brands</span></span></button>
-                    <button type="button" class="stat" data-show="" data-tip-title="Everything" data-tip="Show every brand and product."><span class="stat-icon"><i data-icon="lipstick"></i></span><span><span class="stat-value skeleton" id="statProducts">00</span><span class="stat-title">Products</span></span></button>
+                    <button type="button" class="stat" data-drill="brands" data-tip-title="Brands" data-tip="Show the list of brands only." data-tip-preview="Click a brand to see its products."><span class="stat-icon"><i data-icon="tag"></i></span><span><span class="stat-value skeleton" id="statBrands">00</span><span class="stat-title">Brands</span></span></button>
+                    <button type="button" class="stat" data-drill="types" data-tip-title="Products" data-tip="Show every product, grouped by cosmetic type, A to Z." data-tip-preview="All on one page."><span class="stat-icon"><i data-icon="lipstick"></i></span><span><span class="stat-value skeleton" id="statProducts">00</span><span class="stat-title">Products</span></span></button>
                     <button type="button" class="stat" data-show="review" data-tip-title="Waiting for review" data-tip="Entries the app added from a scan or that were imported, and products whose kind is not clear. The app does not use them until you have dealt with them." data-tip-preview="Click: the table shows only these."><span class="stat-icon"><i data-icon="inbox"></i></span><span><span class="stat-value skeleton" id="statReview">00</span><span class="stat-title">Waiting for review</span></span></button>
                     <button type="button" class="stat" data-show="out" data-tip-title="Not make-up" data-tip="Skin care, hair, body, nail and fragrance products. GlowUp is for make-up only." data-tip-preview="Click: the table shows only these, ready to go to the Recycle bin."><span class="stat-icon"><i data-icon="ban"></i></span><span><span class="stat-value skeleton" id="statOut">00</span><span class="stat-title">Not make-up</span></span></button>
                 </div>
             </section>
 
-            <section class="panel ingredient-suggestions" id="ingredientSuggestionsPanel" hidden data-panel="suggestions" data-label="AI ingredient suggestions" data-w="8">
+            <section class="panel ingredient-suggestions" id="ingredientSuggestionsPanel" hidden data-panel="suggestions" data-label="AI ingredient suggestions" data-w="8" data-source="ingredientSuggestions">
                 <div class="panel-head">
                     <h3 class="panel-title">Web ingredient lists to review</h3>
                     <span class="panel-count" id="ingredientSuggestionsCount"></span>
@@ -152,7 +138,8 @@
                     <h3 class="panel-title">Inventory</h3>
                     <button type="button" class="guide-badge" data-tip-title="How to use this list" data-tip="Click a product to see everything about it; double-click to edit it. Click a brand to open or close it. The app only uses Active products of Active brands." data-tip-preview="Drag rows onto a folder or the Recycle bin. The small box in front of a name picks it; Ctrl+click picks several.">i</button>
                     <span class="panel-count" hidden id="inventoryCountLine"></span>
-                    <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most scanned, newest, type, or what needs attention first." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i>Sort<span class="sort-now" id="sortNow"></span></button> <button type="button" class="btn" id="filterMenuBtn" aria-haspopup="dialog" aria-expanded="false" data-tip-title="Filters" data-tip="Narrow the list by kind, status and a few facts at once, then press Apply filters." data-tip-preview="Nothing is read from the database: it only looks through what is already loaded."><i data-icon="sliders"></i>Filters<span class="sort-now" id="filterNow"></span></button></span>
+                    <span class="search-status" id="inventorySearchStatus" role="status" hidden><span id="inventorySearchStatusText"></span><button type="button" class="search-status-clear" id="inventorySearchStatusClear" aria-label="Clear the search"><i data-icon="x"></i></button></span>
+                    <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most scanned, newest, type, or what needs attention first." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i><span class="btn-label">Sort</span><span class="sort-now" id="sortNow"></span></button> <button type="button" class="btn" id="filterMenuBtn" aria-haspopup="dialog" aria-expanded="false" data-tip-title="Filters" data-tip="Narrow the list by kind, status and a few facts at once, then press Apply filters." data-tip-preview="Nothing is read from the database: it only looks through what is already loaded."><i data-icon="sliders"></i><span class="btn-label">Filters</span><span class="sort-now" id="filterNow"></span></button></span>
                     <span class="shelf" id="inventoryShelf"></span>
                     <span class="shelf" id="inventoryShelfAdd"></span>
                     <span id="inventoryQuick"></span>
@@ -164,6 +151,12 @@
                     </div>
                     <!-- the pager, the fold arrow and the bin stay together at the right end, also when the row wraps -->
                     <div class="head-end">
+                        <!-- one brand's products: how many on a page. Never changes what is selected or what a bulk action covers -->
+                        <select id="brandPageSize" class="toolbar-select head-select" aria-label="Products per page" data-tip="Products per page. What you selected stays selected." hidden>
+                            <option value="10">10 per page</option>
+                            <option value="25">25 per page</option>
+                            <option value="50">50 per page</option>
+                        </select>
                         <div class="pager" id="inventoryPagerTop"></div>
                         <span class="shelf" id="inventoryShelfEnd" data-head-end></span>
                     </div>
@@ -171,7 +164,7 @@
                 <div class="table-container" id="inventoryHost">
                     <table class="admin-table inventory-table">
                         <thead id="inventoryTableHead">
-                            <tr><th>Product</th><th>Type</th><th>Shades</th><th class="text-right">Scans</th><th>Status</th><th></th></tr>
+                            <tr><th>Product</th><th>Type</th><th class="shade-col">Shades</th><th class="text-right scan-col">Scans</th><th>Status</th><th></th></tr>
                         </thead>
                         <tbody id="inventoryTableBody">
                             <tr><td colspan="6"><div class="sk-list"><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div></div></td></tr>
@@ -185,164 +178,203 @@
         </div>
     </main>
 
-    <!-- ===================== brand form ===================== -->
+    <!-- ===================== brand form (add and edit) =====================
+         The same window as the Ingredient form: header, section bar, scrolling body, footer; the same field pattern (label row, box, hint line). -->
     <div id="addBrandModal" class="modal-overlay">
-        <div class="modal-content">
-            <h3 id="brandModalTitle">Add New Brand</h3>
-            <p class="review-note" id="brandReviewNote" style="display: none;"></p>
-            <form id="addBrandForm" class="modal-form" novalidate>
-                <div class="field">
-                    <label for="brandNameInput">Brand Name <span class="required">*</span></label>
-                    <input type="text" id="brandNameInput" maxlength="60" placeholder="e.g., Maybelline" autocomplete="off">
-                    <span class="field-hint">Write it exactly as printed on the packaging: the app looks for this name on scanned labels.</span>
+        <div class="modal-content ing-modal" role="dialog" aria-modal="true" aria-labelledby="brandModalTitle">
+            <header class="ing-head">
+                <div class="ing-head-text"><p class="ing-eyebrow">Brand Inventory</p><h3 id="brandModalTitle">Add New Brand</h3></div>
+                <button type="button" class="icon-btn ing-close" data-close aria-label="Close"><i data-icon="x"></i></button>
+            </header>
+            <nav class="ing-nav" aria-label="Sections of this form">
+                <button type="button" class="ing-nav-btn" data-jump="brandSecBasics" aria-current="true">Brand</button>
+                <button type="button" class="ing-nav-btn" data-jump="brandSecLinks">Pictures and website</button>
+            </nav>
+            <form id="addBrandForm" class="modal-form ing-form" novalidate>
+                <div class="ing-body">
+                    <p class="review-note" id="brandReviewNote" style="display: none;"></p>
+
+                    <section class="ing-section" id="brandSecBasics" aria-labelledby="brandSecBasicsTitle">
+                        <h4 class="ing-section-title" id="brandSecBasicsTitle">Brand</h4>
+                        <div class="ing-grid">
+                            <div class="field full">
+                                <div class="label-row"><label for="brandNameInput">Brand Name <span class="required" aria-hidden="true">*</span></label></div>
+                                <input type="text" id="brandNameInput" maxlength="60" placeholder="e.g., Maybelline" autocomplete="off" aria-required="true" aria-describedby="brandNameHint">
+                                <div class="hint-row"><p class="field-hint" id="brandNameHint">Write it exactly as printed on the packaging: the app looks for this name on scanned labels.</p></div>
+                            </div>
+                            <div class="field half">
+                                <div class="label-row"><label for="brandMarketInput">Market</label></div>
+                                <input type="text" id="brandMarketInput" maxlength="40" placeholder="e.g., Global" list="brandMarketOptions" autocomplete="off">
+                                <datalist id="brandMarketOptions">
+                                    <option value="Global"></option>
+                                    <option value="Local"></option>
+                                    <option value="Asia"></option>
+                                    <option value="Europe"></option>
+                                    <option value="North America"></option>
+                                </datalist>
+                            </div>
+                            <div class="field half">
+                                <div class="label-row"><label for="brandStatusInput">Status</label></div>
+                                <select id="brandStatusInput">
+                                    <option value="Active">Active</option>
+                                    <option value="Pending">Pending</option>
+                                    <option value="Inactive">Inactive</option>
+                                </select>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="ing-section" id="brandSecLinks" aria-labelledby="brandSecLinksTitle">
+                        <h4 class="ing-section-title" id="brandSecLinksTitle">Pictures and website</h4>
+                        <div class="ing-grid">
+                            <div class="field half">
+                                <div class="label-row"><label for="brandLogoInput">Logo link</label></div>
+                                <input type="url" id="brandLogoInput" maxlength="300" placeholder="https://... (the brand's official logo)" autocomplete="off" inputmode="url" aria-describedby="brandPicturesHint">
+                            </div>
+                            <div class="field half">
+                                <div class="label-row"><label for="brandImageInput">Picture link</label></div>
+                                <input type="url" id="brandImageInput" maxlength="300" placeholder="https://... (the brand's display or pack picture)" autocomplete="off" inputmode="url" aria-describedby="brandPicturesHint">
+                            </div>
+                            <p class="field-hint full" id="brandPicturesHint">Only the web address is saved (https). Nothing is uploaded.</p>
+
+                            <!-- the brand's own website: only a CONFIRMED address makes its pages "Manufacturer's own site" (here and in the app) -->
+                            <div class="field full website-box">
+                                <div class="label-row"><label for="brandWebsiteInput">Official website</label></div>
+                                <input type="url" id="brandWebsiteInput" maxlength="300" placeholder="https://... (the brand owner's own site, not a shop)" autocomplete="off" inputmode="url">
+                                <label class="field-hint check-line"><input type="checkbox" id="brandWebsiteConfirm"> <span>I checked that this brand owns this address: it is printed on the pack, OR the company on its About or legal page matches the FDA Philippines record, OR the brand's official social accounts link to it.</span></label>
+                                <span class="field-hint" id="brandWebsiteState"></span>
+                                <span class="field-hint" id="brandWebsiteHints"></span>
+                                <span class="field-hint">An address suggested by AI or an import is never trusted until you confirm it here.</span>
+                            </div>
+                        </div>
+                    </section>
                 </div>
 
-                <div class="field">
-                    <label for="brandCategoryInput">Category</label>
-                    <input type="text" id="brandCategoryInput" maxlength="40" value="Makeup" readonly aria-describedby="brandCategoryHint">
-                    <span class="field-hint" id="brandCategoryHint">GlowUp lists make-up brands only, so every brand is a Makeup brand.</span>
-                </div>
-
-                <div class="form-row">
-                    <div class="field">
-                        <label for="brandMarketInput">Market</label>
-                        <input type="text" id="brandMarketInput" maxlength="40" placeholder="e.g., Global" list="brandMarketOptions" autocomplete="off">
-                        <datalist id="brandMarketOptions">
-                            <option value="Global"></option>
-                            <option value="Local"></option>
-                            <option value="Asia"></option>
-                            <option value="Europe"></option>
-                            <option value="North America"></option>
-                        </datalist>
+                <footer class="ing-foot">
+                    <p class="form-error" role="alert"></p>
+                    <div class="modal-actions">
+                        <button type="button" id="cancelModalBtn" class="cancel-btn" data-close>Cancel</button>
+                        <button type="submit" id="saveBrandBtn" class="save-btn">Save Brand</button>
                     </div>
-
-                    <div class="field">
-                        <label for="brandStatusInput">Status</label>
-                        <select id="brandStatusInput">
-                            <option value="Active">Active</option>
-                            <option value="Pending">Pending</option>
-                            <option value="Inactive">Inactive</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="field">
-                        <label for="brandLogoInput">Logo link</label>
-                        <input type="url" id="brandLogoInput" maxlength="300" placeholder="https://... (the brand's official logo)" autocomplete="off" inputmode="url">
-                    </div>
-                    <div class="field">
-                        <label for="brandImageInput">Picture link</label>
-                        <input type="url" id="brandImageInput" maxlength="300" placeholder="https://... (the brand's display or pack picture)" autocomplete="off" inputmode="url">
-                    </div>
-                </div>
-                <span class="field-hint">Only the web address is saved (https). Nothing is uploaded.</span>
-
-                <!-- the brand's own website: only a CONFIRMED address makes its pages "Manufacturer's own site" (here and in the app) -->
-                <div class="field website-box">
-                    <label for="brandWebsiteInput">Official website</label>
-                    <input type="url" id="brandWebsiteInput" maxlength="300" placeholder="https://... (the brand owner's own site, not a shop)" autocomplete="off" inputmode="url">
-                    <label class="field-hint check-line"><input type="checkbox" id="brandWebsiteConfirm"> I checked that this brand owns this address: it is printed on the pack, OR the company on its About or legal page matches the FDA Philippines record, OR the brand's official social accounts link to it.</label>
-                    <span class="field-hint" id="brandWebsiteState"></span>
-                    <span class="field-hint" id="brandWebsiteHints"></span>
-                    <span class="field-hint">An address suggested by AI or an import is never trusted until you confirm it here.</span>
-                </div>
-
-                <p class="form-error" role="alert"></p>
-
-                <div class="modal-actions">
-                    <button type="button" id="cancelModalBtn" class="cancel-btn" data-close>Cancel</button>
-                    <button type="submit" id="saveBrandBtn" class="save-btn">Save Brand</button>
-                </div>
+                </footer>
             </form>
         </div>
     </div>
 
-    <!-- ===================== product form ===================== -->
+    <!-- ===================== product form (add and edit) ===================== -->
     <div id="productModal" class="modal-overlay">
-        <div class="modal-content wide">
-            <h3 id="productModalTitle">Add Product</h3>
-            <p class="review-note" id="productReviewNote" style="display: none;"></p>
-            <form id="productForm" class="modal-form" novalidate>
-                <div class="field">
-                    <label for="productNameInput">Product Name <span class="required">*</span></label>
-                    <input type="text" id="productNameInput" maxlength="100" placeholder="e.g., Superstay Matte Ink Liquid Lipstick" autocomplete="off">
+        <div class="modal-content wide ing-modal" role="dialog" aria-modal="true" aria-labelledby="productModalTitle">
+            <header class="ing-head">
+                <div class="ing-head-text"><p class="ing-eyebrow">Brand Inventory</p><h3 id="productModalTitle">Add Product</h3></div>
+                <button type="button" class="icon-btn ing-close" data-close aria-label="Close"><i data-icon="x"></i></button>
+            </header>
+            <nav class="ing-nav" aria-label="Sections of this form">
+                <button type="button" class="ing-nav-btn" data-jump="productSecBasics" aria-current="true">Product</button>
+                <button type="button" class="ing-nav-btn" data-jump="productSecSources">Sources</button>
+                <button type="button" class="ing-nav-btn" data-jump="productSecContents">Ingredients and shades</button>
+                <button type="button" class="ing-nav-btn" data-jump="productSecListing">Listing</button>
+            </nav>
+            <form id="productForm" class="modal-form ing-form" novalidate>
+                <div class="ing-body">
+                    <p class="review-note" id="productReviewNote" style="display: none;"></p>
+
+                    <section class="ing-section" id="productSecBasics" aria-labelledby="productSecBasicsTitle">
+                        <h4 class="ing-section-title" id="productSecBasicsTitle">Product</h4>
+                        <div class="ing-grid">
+                            <div class="field full">
+                                <div class="label-row"><label for="productNameInput">Product Name <span class="required" aria-hidden="true">*</span></label></div>
+                                <input type="text" id="productNameInput" maxlength="100" placeholder="e.g., Superstay Matte Ink Liquid Lipstick" autocomplete="off" aria-required="true">
+                            </div>
+                            <div class="field half">
+                                <div class="label-row"><label for="productBrandInput">Brand <span class="required" aria-hidden="true">*</span></label></div>
+                                <select id="productBrandInput" aria-required="true" aria-describedby="productBrandHint"></select>
+                                <div class="hint-row"><p class="field-hint" id="productBrandHint"></p></div>
+                            </div>
+                            <div class="field half">
+                                <div class="label-row"><label for="productTypeInput">Cosmetic Type <span class="required" aria-hidden="true">*</span></label></div>
+                                <select id="productTypeInput" aria-required="true" aria-describedby="productScopeHint"></select>
+                                <input type="text" id="productTypeOtherInput" maxlength="40" placeholder="Type the cosmetic type" autocomplete="off" aria-label="Cosmetic type, typed" style="display: none; margin-top: 8px;">
+                                <div class="hint-row"><p class="field-hint" id="productScopeHint"></p></div>
+                            </div>
+                            <div class="field full">
+                                <div class="label-row"><label for="productDescInput">Description</label></div>
+                                <textarea id="productDescInput" rows="2" maxlength="400" placeholder="One or two sentences about the product (optional)."></textarea>
+                            </div>
+                            <div class="field full">
+                                <div class="label-row"><label for="productImageInput">Product photo link</label></div>
+                                <input type="url" id="productImageInput" maxlength="300" placeholder="https://... (the bottle, tube or compact)" autocomplete="off" inputmode="url">
+                            </div>
+                            <div class="field full">
+                                <div class="label-row"><label for="productBarcodeInput">Barcode</label></div>
+                                <input type="text" id="productBarcodeInput" maxlength="20" placeholder="The digits under the barcode, e.g. 3600531652300" autocomplete="off" spellcheck="false" inputmode="numeric" aria-describedby="productBarcodeHint">
+                                <div class="hint-row"><p class="field-hint" id="productBarcodeHint">Optional. The app finds this product by its barcode at once, from a photo or a live scan. 6 to 14 digits; spaces are ignored. <span id="productBarcodeCheck"></span></p></div>
+                            </div>
+                            <div class="field full">
+                                <div class="label-row"><label for="productFdaInput">FDA registration number</label></div>
+                                <input type="text" id="productFdaInput" maxlength="40" placeholder="The number the FDA Philippines gave this product" autocomplete="off" spellcheck="false" aria-describedby="productFdaHint">
+                                <div class="hint-row"><p class="field-hint" id="productFdaHint">The notification number shown on verification.fda.gov.ph for this product. Letters, digits and . , # ( ) _ - /.</p></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="ing-section" id="productSecSources" aria-labelledby="productSecSourcesTitle">
+                        <h4 class="ing-section-title" id="productSecSourcesTitle">Sources</h4>
+                        <!-- official website, primary and secondary sources: drawn by productSources.js -->
+                        <div class="field sources-box" id="productSourcesBox"></div>
+                    </section>
+
+                    <section class="ing-section" id="productSecContents" aria-labelledby="productSecContentsTitle">
+                        <h4 class="ing-section-title" id="productSecContentsTitle">Ingredients and shades</h4>
+                        <div class="ing-grid">
+                            <div class="field full">
+                                <div class="label-row">
+                                    <label for="productIngredientsInput">Ingredients <span class="required" aria-hidden="true">*</span></label>
+                                    <span class="label-actions"><button type="button" class="row-btn" id="assistProductIngredientsBtn"><i data-icon="sparkle"></i>Assist with AI</button></span>
+                                </div>
+                                <div class="ing-search">
+                                    <input type="text" id="productIngredientSearch" role="combobox" aria-expanded="false" aria-controls="productIngredientResults" aria-autocomplete="list" autocomplete="off" aria-label="Search the ingredient library">
+                                    <ul id="productIngredientResults" class="ing-results" role="listbox" hidden></ul>
+                                </div>
+                                <div id="productIngredientPills" class="ing-pills" aria-live="polite"></div>
+                                <textarea id="productIngredientsInput" rows="3" placeholder="Or paste the whole list from the packaging, e.g. Dimethicone, Isododecane, Mica, Parfum" aria-describedby="productIngredientsHint" aria-required="true" style="margin-top: 8px;"></textarea>
+                                <div class="hint-row"><p class="field-hint" id="productIngredientsHint">Search above to pick from the library, or paste the list here, separated by commas (or one on each line).</p></div>
+                                <p class="review-note ai-product-note" id="productAiNote" role="status" aria-live="polite" hidden></p>
+                            </div>
+                            <div class="field full" role="group" aria-labelledby="productShadesLabel">
+                                <div class="label-row"><span class="label-text" id="productShadesLabel">Shades</span></div>
+                                <div class="shade-editor" id="productShadeEditor"></div>
+                                <div class="hint-row"><p class="field-hint">The colours of the product (lips, cheeks, eyes, face). AR Try-On shows these shades. Brands print a shade CODE on the pack (such as 119 or N20), not a colour: type it in the Code box next to the colour, so the app finds the colour from the code it reads on a scanned pack.</p></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="ing-section" id="productSecListing" aria-labelledby="productSecListingTitle">
+                        <h4 class="ing-section-title" id="productSecListingTitle">Listing</h4>
+                        <div class="ing-grid">
+                            <div class="field half">
+                                <div class="label-row"><label for="productStatusInput">Status</label></div>
+                                <select id="productStatusInput">
+                                    <option value="Active">Active</option>
+                                    <option value="Pending">Pending</option>
+                                    <option value="Inactive">Inactive</option>
+                                </select>
+                            </div>
+                            <div class="field half">
+                                <div class="label-row"><label for="productMinAgeInput">Minimum Age</label></div>
+                                <input type="number" id="productMinAgeInput" min="0" max="99" step="1" placeholder="0 = no age limit" aria-describedby="productMinAgeHint">
+                            </div>
+                            <p class="field-hint full" id="productMinAgeHint">The app does not recommend the product to younger users, and warns them if they scan it.</p>
+                        </div>
+                    </section>
                 </div>
 
-                <div class="form-row">
-                    <div class="field">
-                        <label for="productBrandInput">Brand <span class="required">*</span></label>
-                        <select id="productBrandInput"></select>
-                        <span class="field-hint" id="productBrandHint"></span>
+                <footer class="ing-foot">
+                    <p class="form-error" role="alert"></p>
+                    <div class="modal-actions">
+                        <button type="button" class="cancel-btn" data-close>Cancel</button>
+                        <button type="submit" id="saveProductBtn" class="save-btn">Save Product</button>
                     </div>
-                    <div class="field">
-                        <label for="productTypeInput">Cosmetic Type <span class="required">*</span></label>
-                        <select id="productTypeInput"></select>
-                        <input type="text" id="productTypeOtherInput" maxlength="40" placeholder="Type the cosmetic type" autocomplete="off" style="display: none;">
-                        <span class="field-hint" id="productScopeHint"></span>
-                    </div>
-                </div>
-
-                <div class="field">
-                    <label for="productDescInput">Description</label>
-                    <textarea id="productDescInput" rows="2" maxlength="400" placeholder="One or two sentences about the product (optional)."></textarea>
-                </div>
-
-                <div class="form-row">
-                    <div class="field">
-                        <label for="productImageInput">Product photo link</label>
-                        <input type="url" id="productImageInput" maxlength="300" placeholder="https://... (the bottle, tube or compact)" autocomplete="off" inputmode="url">
-                    </div>
-                    <div class="field">
-                        <label for="productFdaInput">FDA registration number</label>
-                        <input type="text" id="productFdaInput" maxlength="40" placeholder="The number the FDA Philippines gave this product" autocomplete="off" spellcheck="false">
-                        <span class="field-hint">The notification number shown on verification.fda.gov.ph for this product. Letters, digits and . , # ( ) _ - /.</span>
-                    </div>
-                </div>
-
-                <div class="field">
-                    <div class="field-heading">
-                        <label for="productIngredientsInput">Ingredients <span class="required">*</span></label>
-                        <button type="button" class="row-btn" id="assistProductIngredientsBtn"><i data-icon="sparkle"></i>Assist with AI</button>
-                    </div>
-                    <div class="ing-search">
-                        <input type="text" id="productIngredientSearch" role="combobox" aria-expanded="false" aria-controls="productIngredientResults" aria-autocomplete="list" autocomplete="off" aria-label="Search the ingredient library">
-                        <ul id="productIngredientResults" class="ing-results" role="listbox" hidden></ul>
-                    </div>
-                    <div id="productIngredientPills" class="ing-pills" aria-live="polite"></div>
-                    <textarea id="productIngredientsInput" rows="3" placeholder="Or paste the whole list from the packaging, e.g. Dimethicone, Isododecane, Mica, Parfum"></textarea>
-                    <span class="field-hint" id="productIngredientsHint">Search above to pick from the library, or paste the list here, separated by commas (or one on each line).</span>
-                    <p class="review-note ai-product-note" id="productAiNote" role="status" aria-live="polite" hidden></p>
-                </div>
-
-                <div class="field">
-                    <span class="field-label">Shades</span>
-                    <div class="shade-editor" id="productShadeEditor"></div>
-                    <span class="field-hint">The colours of the product (lips, cheeks, eyes, face). AR Try-On shows these shades. Brands print a shade CODE on the pack (such as 119 or N20), not a colour: type it in the Code box next to the colour, so the app finds the colour from the code it reads on a scanned pack.</span>
-                </div>
-
-                <div class="form-row">
-                    <div class="field">
-                        <label for="productMinAgeInput">Minimum Age</label>
-                        <input type="number" id="productMinAgeInput" min="0" max="99" step="1" placeholder="0 = no age limit">
-                        <span class="field-hint">The app does not recommend the product to younger users, and warns them if they scan it.</span>
-                    </div>
-                    <div class="field">
-                        <label for="productStatusInput">Status</label>
-                        <select id="productStatusInput">
-                            <option value="Active">Active</option>
-                            <option value="Pending">Pending</option>
-                            <option value="Inactive">Inactive</option>
-                        </select>
-                    </div>
-                </div>
-
-                <p class="form-error" role="alert"></p>
-
-                <div class="modal-actions">
-                    <button type="button" class="cancel-btn" data-close>Cancel</button>
-                    <button type="submit" id="saveProductBtn" class="save-btn">Save Product</button>
-                </div>
+                </footer>
             </form>
         </div>
     </div>

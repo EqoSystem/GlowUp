@@ -45,22 +45,28 @@ import {
 import { refreshRecommendabilityFlags } from "../_Shared/recommendabilityAdmin.js";
 import { openPlanDialog, openDuplicatesDialog } from "../_Shared/adminCleanup.js";
 import { mountShell, placeInHeader, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
-import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
+import { registerDataset, registerTileDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
-import { readAdminDocument, AI_TEXT_CHARACTERS } from "../_Shared/adminDocumentReader.js";
-import { parseImportText, pairShades, shadeCodeOf } from "../_Shared/importFormat.js";
+import { readAdminDocument, splitForAi } from "../_Shared/adminDocumentReader.js";
+import { startImport } from "../_Shared/importReview.js";
+import { parseImportText, pairShades, shadeCodeOf, ingredientsNotHere } from "../_Shared/importFormat.js";
 import { parseLabeledProducts } from "../_Shared/ingredientBlock.js";
 import { nearShade } from "../_Shared/listRules.js";
 import { mountIngredientPicker } from "../_Shared/adminIngredientPicker.js";
 import { openFacets } from "../_Shared/adminFacets.js";
+import { bindActions, bindButtons, comboFor } from "../_Shared/shortcuts.js";
 import { EXPORT_MAX_ROWS, EXPORT_FILE_PREFIX, toCsv, downloadCsv, today } from "../_Shared/adminExport.js";
-import { countPending, openSnapshotReview, finishSnapshot, APPROVED_DESCRIPTION } from "../_Shared/adminSnapshots.js";
+import { setPageSettings } from "../_Shared/adminSettingsMenu.js";
+import { mountSourceEditor, openApplyWindow } from "./productSources.js";
+import { wireWindow } from "../_Shared/adminWindow.js";
+import { applyRole, brandPageOf, groupByType, bulkAllowed } from "../_Shared/sourceEdit.js";
 import { gs1Hint, VERIFIED_BY_GS1 } from "../_Shared/gs1Hint.js";
 
 const OTHER_TYPE = "__other__";
 const NO_BRAND = "__none__";                // the group for products whose brand no longer exists
-const MAX_SHADES = 12;
+const MAX_SHADES = 100;               // no practical limit for a real range (foundations run to 40+); the database rule allows 100
+const SHADE_STRIP_FROM = 11;         // from 11 shades on, the shades sit in a box that scrolls up and down
 const MAX_TAGS = 10;                        // filter words kept on a product (tags), so a filter needs one cheap query and no join
 const BATCH_LIMIT = 400;                    // Firestore allows 500 writes in one batch
 const BRANDS_PER_PAGE = 10;                 // "Brands": this many brands at a time
@@ -83,6 +89,14 @@ const binPage = { page: 1, size: PRODUCTS_PER_PAGE };
 const closed = new Set();                   // brands whose products are folded away
 const moreShown = new Map();                // brand id -> how many of its products are shown
 let shownGroups = [];                       // the brands the table currently lists (all pages)
+// The two count tiles open their own view of the list (5 November 2026): null = the normal list, or
+//   { kind: "brands" }          only the brands; a click on one opens it
+//   { kind: "brand", id }       the products of one brand, A to Z, 10 per page
+//   { kind: "types" }           every product under its cosmetic type, A to Z, all on one page
+let drill = null;
+let keepDrill = false;                      // the organizer goes back to "All" because a tile asked for it
+const brandPage = { page: 1, size: PRODUCTS_PER_PAGE };
+let sourceEditor = null;                    // the sources box of the product form (productSources.js)
 
 let everyBrand = [];                        // every brand document, also the ones in the Recycle bin
 let everyProduct = [];
@@ -96,7 +110,6 @@ let binProducts = [];
 let curatedKeys = new Set();                // every name / technical name / alias in the Ingredient Curator
 let curatedList = [];                       // the same ingredients with their ids, for the picker of the product form: [{ id, name, techName, aliases }]
 let ingredientPicker = null;                // the picker of the product form (adminIngredientPicker.js)
-let snapshotsWaiting = null;                // products app users sent as a photo, waiting for review (null = not counted yet)
 let curatorKnown = false;
 let editingBrandId = null;
 let editingProductId = null;
@@ -105,6 +118,8 @@ let formShadeCodes = [];                    // the shade codes printed on the pa
 let assistedProductSources = [];
 let brandModal = null;
 let productModal = null;
+let brandWindow = { reset() {} };           // the section bar etc. of the two windows (set when the page starts)
+let productWindow = { reset() {} };
 let org = null;                             // folders, the Recycle bin, picking and dragging
 let openId = "";                            // the product whose details are open
 let quick = "";                             // a filter a helper switched on: "" | a key of QUICK
@@ -167,6 +182,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     brandModal = setupModal(el("addBrandModal"), () => { editingBrandId = null; });
     productModal = setupModal(el("productModal"), () => { editingProductId = null; });
+    brandWindow = wireWindow(el("addBrandModal"));          // section bar, focus that stays inside, the box that failed marked
+    productWindow = wireWindow(el("productModal"));
 
     org = createOrganizer({
         kind: "products", noun: "products", nounOne: "product", allLabel: "All",
@@ -180,37 +197,54 @@ document.addEventListener("DOMContentLoaded", async () => {
         renameFolder: (from, to) => refolder(from, to), deleteFolder: (name) => refolder(name, ""),
         selectionActions: () => [
             { label: "Assist with AI", className: "bar-main", tip: "Draft sourced ingredient lists and brand aliases for selected entries.", icon: icon("sparkle"), run: assistSelectedInventory },
-            { label: "Approve All", className: "bar-quiet", tip: "Approve only eligible selected entries after you confirm you have reviewed them.", run: approveSelectedInventory }
+            { label: "Approve All", className: "bar-quiet", tip: "Approve only eligible selected entries after you confirm you have reviewed them.", run: approveSelectedInventory },
+            { label: "Apply website or source", className: "bar-quiet", tip: "Give every selected product a web address, also those on other pages. You see how many change and confirm first.", icon: icon("layers"), run: applyToSelected }
         ],
-        onView: () => { fromFirstPage(); }
+        // one brand's view: "select all" means the whole brand, also the products on other pages
+        pickScope: () => (drill && drill.kind === "brand" && org.view.kind !== "bin" ? productsOf(drill.id).map((p) => "p:" + p.id) : null),
+        onView: () => { if (!keepDrill) drill = null; fromFirstPage(); }
     });
     setAssistPage("inventory");
     registerHelpers();
     el("inventoryAiDraftList").addEventListener("change", updateInventoryDraftApproval);
     el("inventoryApproveAllBtn").addEventListener("click", approveInventoryDrafts);
 
+    const askedFor = new URLSearchParams(window.location.search).get("q");
+    if (askedFor) el("inventorySearchInput").value = askedFor;                 // ?q=blush: the search comes back after a reload
+    wireSearchExtras();
     wireSearch(el("inventorySearchInput"), el("inventorySearchClear"), fromFirstPage);
     // the brand dropdown also says how the list is drawn: "All brands, grouped" or "All products, one list" (it replaced the
     // Brands / All products pills, which did the same job twice)
     el("brandFilterSelect").addEventListener("change", () => {
+        drill = null;
         const value = el("brandFilterSelect").value;
         view.mode = value === FLAT_LIST ? "all" : "brands";
         saveView();
         if (org.view.kind === "bin") org.show({ kind: "all" }); else fromFirstPage();
     });
     el("reviewFilterSelect").addEventListener("change", fromFirstPage);
+    document.querySelectorAll(".stat[data-drill]").forEach((tile) => tile.addEventListener("click", () => openDrill({ kind: tile.dataset.drill })));
+    el("brandPageSize").addEventListener("change", () => { brandPage.size = Number(el("brandPageSize").value) || PRODUCTS_PER_PAGE; brandPage.page = 1; renderInventory(); });
     document.querySelectorAll(".stat[data-show]").forEach((tile) => tile.addEventListener("click", () => {
         if (!tile.dataset.show) resetAllFilters();
         else showOnly(tile.dataset.show);
     }));
     el("addMenuBtn").addEventListener("click", (event) => openMenu(event.currentTarget, [
-        { label: "Brand", icon: "tag", description: "A new brand: name, category, market, status.", run: () => openBrandForm(null) },
-        { label: "Product", icon: "lipstick", description: "A make-up product of a listed brand.", disabled: brands.length === 0, run: () => openProductForm(null, brandFilterValue()) }
+        { label: "Brand", icon: "tag", description: "A new brand: name, category, market, status.", keys: comboFor("inventory.addBrand"), run: () => openBrandForm(null) },
+        { label: "Product", icon: "lipstick", description: "A make-up product of a listed brand.", keys: comboFor("inventory.addProduct"), disabled: brands.length === 0, run: () => openProductForm(null, brandFilterValue()) }
     ]));
-    el("moreMenuBtn").addEventListener("click", (event) => {
+    // keyboard shortcuts (shortcuts.js): the same handlers and the same conditions as the buttons and the Add menu
+    bindButtons({ "inventory.new": "#addMenuBtn", "inventory.import": "#chooseInventoryFileBtn", "inventory.filters": "#filterMenuBtn",
+        "inventory.approveDrafts": "#inventoryApproveAllBtn", "inventory.sort": "#sortMenuBtn" });
+    bindActions({
+        "inventory.addBrand": { run: () => openBrandForm(null) },
+        "inventory.addProduct": { run: () => openProductForm(null, brandFilterValue()), isAvailable: () => (brands.length === 0 ? "Add product: add a brand first. A product needs a listed brand." : true) }
+    });
+    // what was behind "..." here is listed in the settings window under "This page" (5 November 2026)
+    setPageSettings(() => {
         const allClosed = shownGroups.length > 0 && shownGroups.every((g) => closed.has(g.id));
         const outside = outsideCount();
-        openMenu(event.currentTarget, [
+        return [
             { label: allClosed ? "Open all brands" : "Close all brands", icon: "down", disabled: view.mode !== "brands" || org.view.kind === "bin", description: allClosed ? "Show every brand's products." : "Show the brands only.", run: () => { if (allClosed) closed.clear(); else shownGroups.forEach((g) => closed.add(g.id)); renderInventory(); } },
             { separator: true },
             { label: "Clean up", icon: "sparkle", description: "What is not make-up, what is there twice, kinds and names to put right. You see every change and apply one step at a time.", run: openCleanUp },
@@ -221,7 +255,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             { label: "Add the FDA Philippines catalogue", icon: "download", description: "Make-up that is on the FDA Philippines list of notified cosmetics. You see how many and confirm first.", run: importFdaCatalogue },
             { label: "Trim the FDA Philippines catalogue", icon: "undo", description: "Moves FDA-list products that are no longer in the catalogue, have no ingredient list and were never scanned to the Recycle bin.", run: trimFdaCatalogue },
             { label: `Remove what is not make-up (${outside})`, icon: "ban", danger: true, disabled: outside === 0, description: "Skin care, hair, body, nail and fragrance entries go to the Recycle bin. You see the list and confirm first.", run: removeOutOfScope }
-        ]);
+        ];
     });
     el("sortMenuBtn").addEventListener("click", (event) => openMenu(event.currentTarget, [{ heading: "Order of the list" }].concat(
         SORTS.map((s) => ({ label: s.label, checked: s.id === view.sort, run: () => { view.sort = s.id; saveView(); fromFirstPage(); } })))));
@@ -234,8 +268,19 @@ document.addEventListener("DOMContentLoaded", async () => {
         paintLayout();
     });
     paintLayout();
+    // a narrow list (a snapped or small window) draws products as cards by itself, so the table never needs a sideways scroll;
+    // it goes back to the chosen look when there is room again (two limits, so it cannot flicker).
+    // Opening Quick settings beside the page only makes the list narrower: the look stays as it was (9 November 2026).
+    if (window.ResizeObserver) new ResizeObserver(() => {
+        const width = el("inventoryHost").clientWidth;
+        if (width === 0) return;
+        if (document.documentElement.classList.contains("qs-open") && window.innerWidth >= 1024) return;
+        const narrow = width < NARROW_LIST_PX ? true : width > NARROW_LIST_PX + 40 ? false : listIsNarrow;
+        if (narrow !== listIsNarrow) { listIsNarrow = narrow; paintLayout(); }
+    }).observe(el("inventoryHost"));
     el("inventoryQuick").addEventListener("click", (event) => {
         const chip = event.target.closest("[data-clear]");
+        if (chip && chip.dataset.clear === "drill") { openDrill(drill && drill.kind === "brand" ? { kind: "brands" } : null); return; }
         if (chip && chip.dataset.clear === "brand") { setBrandChoice(""); return; }
         if (chip && chip.dataset.clear === "facets") facets = { type: "", status: "", facts: [] }; else quick = "";
         fromFirstPage();
@@ -259,6 +304,16 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
         });
     });
+    sourceEditor = mountSourceEditor({
+        host: el("productSourcesBox"),
+        sources: () => assistedProductSources,
+        setSources: (list) => { assistedProductSources = list; },
+        brand: () => brands.find((b) => b.id === el("productBrandInput").value) || null,
+        setError: (text) => setFormError(el("productForm"), text),
+        openApply: (ask) => openApply(ask)
+    });
+    el("productBrandInput").addEventListener("change", () => sourceEditor.paint());
+    el("productBarcodeInput").addEventListener("input", showBarcodeCheck);
     el("productNameInput").addEventListener("input", showScopeHint);
     el("productTypeOtherInput").addEventListener("input", showScopeHint);
     el("addBrandForm").addEventListener("submit", saveBrand);
@@ -303,21 +358,64 @@ document.addEventListener("DOMContentLoaded", async () => {
     onListsRefreshed(() => { if (!dialogIsOpen()) loadInventory(); });
     const firstLoad = loadInventory();
 
-    // Pending snapshot reviews: one count for the badge now; the snapshots themselves only when the window is opened
-    el("snapshotReviewBtn").addEventListener("click", openSnapshots);
-    countPending().then((n) => { snapshotsWaiting = n; paintSnapshotCount(); })
-        .catch((error) => { console.warn("Could not count the pending snapshots:", error); snapshotsWaiting = null; paintSnapshotCount(true); });
-    // the Dashboard's tile opens this page with ?snapshots=open: the window opens once the lists are here
-    if (new URLSearchParams(location.search).get("snapshots") === "open") firstLoad.then(openSnapshots);
+    // the Dashboard's "Add product" opens this page with ?add=product: the empty product form opens once the brands are here
+    if (new URLSearchParams(location.search).get("add") === "product") firstLoad.then(() => openProductForm(null));
 });
 
 const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) { /* private window */ } };
-function fromFirstPage() { pageState.page = 1; flatPage.page = 1; binPage.page = 1; renderInventory(); }
+function fromFirstPage() { pageState.page = 1; flatPage.page = 1; binPage.page = 1; brandPage.page = 1; renderInventory(); }
+
+/** A count tile (or the chip that goes back) chose a view of the list. Opening another brand starts on its page 1 with nothing selected. */
+function openDrill(next) {
+    const otherBrand = !!(drill && drill.kind === "brand" && !(next && next.kind === "brand" && next.id === drill.id));
+    drill = next;
+    el("reviewFilterSelect").value = "";
+    el("brandFilterSelect").value = "";
+    quick = "";
+    if (otherBrand) org.clear();
+    if (org.view.kind !== "all") { keepDrill = true; org.show({ kind: "all" }); keepDrill = false; }
+    else fromFirstPage();
+}
+
+/** The sources box or the selection bar asked to apply an address: the window, and what is kept on this page afterwards. */
+function openApply(ask) {
+    openApplyWindow({
+        ...ask,
+        brands: () => brands,
+        productsOf,
+        confirmWebsite: (url) => websiteFields(url, null),
+        onSaved: ({ role, url, written, brandId }) => {
+            written.forEach((change) => {
+                const product = everyProduct.find((p) => p.id === change.id);
+                if (product) product.sources = change.after;
+            });
+            // the form behind the window keeps what the admin typed, and gets what was just saved for this product
+            if (editingProductId && written.some((change) => change.id === editingProductId)) {
+                assistedProductSources = applyRole(assistedProductSources, role, url);
+                sourceEditor.paint();
+            }
+            const brand = brandId ? everyBrand.find((b) => b.id === brandId) : null;
+            if (brand) { brand.website = url; brand.websiteConfirmedAt = new Date(); sourceEditor.paint(); }
+            renderInventory();
+        }
+    });
+}
+
+/** "Apply website or source" in the bar: everything selected counts, also what is on other pages. */
+function applyToSelected(keys) {
+    const ids = keys.filter((key) => key.startsWith("p:")).map((key) => key.slice(2));
+    const first = products.find((p) => ids.includes(p.id));
+    if (!first) { notify("Select at least one product.", "error"); return; }
+    const brand = brands.find((b) => b.id === first.brandId);
+    if (!brand || !bulkAllowed(brand.name)) { notify("Applying to other products is not switched on for this brand yet.", "error"); return; }
+    openApply({ role: "primary", url: "", brandId: first.brandId, chosen: ids });
+}
 /** What a count tile (or a helper) narrows the list to: "" | "review" | "out". The same choice again shows everything. */
 function showOnly(value, keep) {
     const select = el("reviewFilterSelect");
     select.value = select.value === value && !keep ? "" : value;
     quick = "";
+    drill = null;
     if (org.view.kind === "bin") org.show({ kind: "all" }); else fromFirstPage();
 }
 /** A visible "Show all" action returns to the whole inventory, not just the current search or folder. */
@@ -339,6 +437,7 @@ const madeAt = (data) => { const made = toDate(data.createdAt); return made ? Ma
 const binFields = (data) => { const since = toDate(data.binnedAt); return { binned: data.binned === true, binnedAt: since ? since.getTime() : 0, statusBeforeBin: String(data.statusBeforeBin || ""), binnedWith: String(data.binnedWith || ""), binnedReason: String(data.binnedReason || "") }; };
 
 function renderIngredientSuggestions() {
+    datasetChanged("ingredientSuggestions");
     const panel = el("ingredientSuggestionsPanel");
     const list = el("ingredientSuggestionsList");
     const items = ingredientSuggestions.slice().sort((a, b) => a.productName.localeCompare(b.productName, undefined, { sensitivity: "base" }));
@@ -637,6 +736,7 @@ function fillBrandSelects() {
 }
 
 const INVENTORY_AI_DAILY_LIMIT = 40;
+const IMPORT_GROUP = 40;                      // imported records saved per database batch (an import itself has no limit)
 const INVENTORY_AI_LIMIT_KEY = "glowup.inventory.ai.daily";
 function inventoryAiCalls(add) {
     const today = new Date().toISOString().slice(0, 10);
@@ -647,12 +747,15 @@ function inventoryAiCalls(add) {
     return count;
 }
 
-async function askInventoryAi(payload) {
-    if (inventoryAiCalls(false) >= INVENTORY_AI_DAILY_LIMIT) throw new Error(`Assist with AI was used ${INVENTORY_AI_DAILY_LIMIT} times today in this browser. Try again tomorrow.`);
+/** countIt = false: a later part of one imported file (a whole file counts as ONE use of the day's limit). */
+async function askInventoryAi(payload, countIt = true, signal = null) {
+    if (countIt && inventoryAiCalls(false) >= INVENTORY_AI_DAILY_LIMIT) throw new Error(`Assist with AI was used ${INVENTORY_AI_DAILY_LIMIT} times today in this browser. Try again tomorrow.`);
     const user = auth.currentUser;
     if (!user) throw new Error("You are signed out. Sign in again.");
     const stop = new AbortController();
     const timer = setTimeout(() => stop.abort(), 75000);
+    const onCancel = () => stop.abort();                  // Cancel on the drop box stops the question at once
+    if (signal) signal.addEventListener("abort", onCancel);
     let answer;
     try {
         answer = await fetch("/api/assist-ingredient", {
@@ -660,10 +763,10 @@ async function askInventoryAi(payload) {
             headers: { "Content-Type": "application/json", Authorization: "Bearer " + (await user.getIdToken()) },
             body: JSON.stringify(payload)
         });
-    } finally { clearTimeout(timer); }
+    } finally { clearTimeout(timer); if (signal) signal.removeEventListener("abort", onCancel); }
     const body = await answer.json().catch(() => ({}));
     if (!answer.ok) throw new Error(body.error || `The AI could not be reached (error ${answer.status}).`);
-    inventoryAiCalls(true);
+    if (countIt) inventoryAiCalls(true);
     return body;
 }
 
@@ -845,6 +948,7 @@ async function assistProductIngredients() {
         if (body.draft.fdaVerifiedLink && /^https:\/\/([a-z0-9-]+\.)*fda\.gov\.ph\//i.test(body.draft.fdaVerifiedLink))
             sources.unshift(`FDA Philippines verification | ${body.draft.fdaVerifiedLink}`);
         assistedProductSources = Array.from(new Set(assistedProductSources.concat(sources))).slice(0, 10);
+        sourceEditor.paint();
         showIngredientSummary();
         note.innerHTML = `<b>AI draft only; nothing is saved yet.</b> Compare the list against the package before saving.`
             + (body.searched === false ? ` <b>${escapeHtml(body.model || "A backup AI")} answered without web search; it gave no source pages.</b>` : "")
@@ -858,78 +962,117 @@ async function assistProductIngredients() {
     }
 }
 
-async function importInventoryFile(file) {
-    const status = el("inventoryImportStatus"), choose = el("chooseInventoryFileBtn"), dropbox = el("inventoryDropBox"), flagsBox = el("inventoryImportFlags");
-    const report = (message, failed) => { status.textContent = message; status.classList.toggle("error", !!failed); };
-    setBusy(choose, true, "Analyzing...");
-    dropbox.disabled = true;
-    showImportFlags(flagsBox, []);
-    report(`Reading "${file.name}" in this browser...`, false);
-    try {
-        const documentText = await readAdminDocument(file, (message) => report(message, false));
-        // a file in the GlowUp import format is read as it is, with no AI; any other document is read by the AI as before
-        const keyed = parseImportText(documentText);
-        if (keyed.kind === "ingredients") { report("This file lists ingredients. Import it in the Ingredient Curator.", true); return; }
-        if (keyed.kind === "mixed") { report("This file mixes brands or products with ingredients. Split it into two files: brands and products here, ingredients in the Ingredient Curator.", true); return; }
-        if (keyed.kind === "inventory" && (keyed.draft.products.length > 40 || keyed.draft.brands.length > 40)) {
-            report(`This file has ${keyed.draft.products.length} products and ${keyed.draft.brands.length} brands. At most 40 of each can be imported at once: split the file.`, true);
-            return;
+/**
+ * The import drop box (importReview.js): read, then check every record in a window, then save. Nothing reaches the
+ * database before the admin has checked it and pressed Save.
+ */
+function importInventoryFile(file) {
+    showImportFlags(el("inventoryImportFlags"), []);
+    startImport({
+        dropbox: el("inventoryDropBox"), choose: el("chooseInventoryFileBtn"), status: el("inventoryImportStatus"), file,
+        read: (f, say) => readAdminDocument(f, say),
+        extract: extractInventory,
+        review: INVENTORY_REVIEW,
+        save: (draft, say) => saveInventoryDraft(draft, file.name, say)
+    });
+}
+
+const INVENTORY_REVIEW = {
+    title: "Check before saving",
+    lists: [
+        {
+            key: "products", label: "Products", nounOne: "product", noun: "products",
+            titleOf: (r) => [r.brandName, r.productName].filter(Boolean).join(": "),
+            noteOf: (r) => {
+                const scope = productScope(r.cosmeticType || "", r.productName || "");
+                if (scope === "out" || scope === "skincare") return "Not make-up: will not be saved";
+                const brand = everyBrand.find((b) => [b.name, ...b.aliases].some((n) => sameKey(n) === sameKey(r.brandName || "")));
+                if (brand && everyProduct.some((p) => p.brandId === brand.id && [p.name, ...p.aliases].some((n) => compactName(n) === compactName(r.productName || "")))) return "Already listed";
+                return "";
+            },
+            fields: [
+                { key: "brandName", label: "Brand" }, { key: "productName", label: "Product" }, { key: "cosmeticType", label: "Cosmetic type" },
+                { key: "ingredients", label: "Ingredients (one per line, in printed order)", kind: "lines", wide: true },
+                { key: "shades", label: "Shade colours (#RRGGBB, one per line)", kind: "lines" },
+                { key: "description", label: "Description", kind: "area" }
+            ]
+        },
+        {
+            key: "brands", label: "Brands", nounOne: "brand", noun: "brands",
+            titleOf: (r) => r.name,
+            noteOf: (r) => (everyBrand.some((b) => [b.name, ...b.aliases].some((n) => sameKey(n) === sameKey(r.name || ""))) ? "Already listed" : ""),
+            fields: [
+                { key: "name", label: "Brand" },
+                { key: "market", label: "Market", kind: "select", options: [["", "Not given"], ["Global", "Global"], ["Local", "Local"], ["Asia", "Asia"], ["Europe", "Europe"], ["North America", "North America"]] },
+                { key: "aliases", label: "Other names (one per line)", kind: "lines" }
+            ]
         }
-        let body;
-        if (keyed.kind === "inventory") {
-            report("Reading the file's own fields. No AI is used.", false);
-            body = { draft: keyed.draft, plain: true, notes: keyed.notes, message: keyed.notes.join(" ") };
-        } else {
-            // a document that labels each product ("Brand:", "Product:", "Ingredients:") is read here too, with no AI and no quota; only a document
-            // this cannot read goes to the AI
-            const labeled = parseLabeledProducts(documentText);
-            if (labeled.kind === "inventory" && labeled.draft.products.length > 40) {
-                report(`This file has ${labeled.draft.products.length} products. At most 40 can be imported at once: split the file.`, true);
-                return;
-            }
-            if (labeled.kind === "inventory") {
-                report("Reading the labelled Brand / Product / Ingredients lines. No AI is used.", false);
-                body = { draft: labeled.draft, plain: true, notes: labeled.notes, message: labeled.notes.join(" ") };
-            } else {
-                report("Asking the configured AI to extract brand and product fields. The file itself is not uploaded.", false);
-                body = await askInventoryAi({ mode: "import", documentText: documentText.slice(0, AI_TEXT_CHARACTERS) });
-            }
+    ]
+};
+
+/** What a file's text holds, for the check window: { draft: { products, brands }, notes, model, refused }. Nothing is saved here. */
+async function extractInventory(documentText, say, signal) {
+    // a file in the GlowUp import format is read as it is, with no AI; any other document is read by the AI
+    const keyed = parseImportText(documentText);
+    if (keyed.kind === "ingredients") return { refused: "This file lists only ingredients. " + ingredientsNotHere(keyed.draft.ingredients.length) };
+    if (keyed.kind === "mixed") return { refused: `This file mixes ${many(keyed.counts.inventory, "brand or product record", "brand or product records")} with ingredient records, so nothing was imported. ` + ingredientsNotHere(keyed.counts.ingredients) };
+    if (keyed.kind === "inventory") { say("Reading the file's own fields. No AI is used."); return { draft: keyed.draft, notes: keyed.notes.slice(0, 6), model: "" }; }
+    // a document that labels each product ("Brand:", "Product:", "Ingredients:") is read here too, with no AI and no quota
+    const labeled = parseLabeledProducts(documentText);
+    if (labeled.kind === "inventory") { say("Reading the labelled Brand / Product / Ingredients lines. No AI is used."); return { draft: labeled.draft, notes: labeled.notes.slice(0, 6), model: "" }; }
+    // no size limit: the AI reads the file in parts, one after the other; a part that fails is named, the others still count
+    const parts = splitForAi(documentText);
+    const found = { products: [], brands: [] }, failedParts = [];
+    let model = "", ingredientRecords = 0;
+    for (let i = 0; i < parts.length; i++) {
+        if (signal && signal.aborted) break;
+        say(parts.length > 1 ? `Asking the AI about part ${i + 1} of ${parts.length}. The file itself is not uploaded.` : "Asking the AI to pick out brands and products. The file itself is not uploaded.");
+        try {
+            const answer = await askInventoryAi({ mode: "import", documentText: parts[i] }, i === 0, signal);
+            found.products.push(...((answer.draft && answer.draft.products) || []));
+            found.brands.push(...((answer.draft && answer.draft.brands) || []));
+            ingredientRecords += Number(answer.ingredientRecords) || 0;
+            model = model || answer.model || "";
+        } catch (error) {
+            if (i === 0 || (signal && signal.aborted)) throw error;
+            failedParts.push(`part ${i + 1} (${error && error.name === "AbortError" ? "the AI took too long" : (error && error.message) || "it failed"})`);
         }
-        const records = body.draft && Array.isArray(body.draft.products) ? body.draft.products : [];
-        const brandRecords = body.draft && Array.isArray(body.draft.brands) ? body.draft.brands : [];
-        if (records.length === 0 && brandRecords.length === 0) {
-            report(body.message || "No product or brand records were found. Nothing was saved.", true);
-            return;
-        }
-        const result = await saveImportedProducts(records, brandRecords, file.name);
-        showImportFlags(flagsBox, result.flagged);
-        const flaggedOut = result.flagged.filter((f) => !f.saved).length;
-        if (result.savedProducts === 0 && result.savedBrands === 0 && result.suggestedLists === 0) {
-            report(`Nothing new was saved. ${result.skippedDuplicates} duplicate(s), ${flaggedOut} flagged as not make-up (see below), and ${result.skippedInvalid} incomplete record(s) were skipped.`, true);
-            if (flaggedOut) notify(`${many(flaggedOut, "record was", "records were")} flagged as skin care or not make-up and not saved.`, "warn");
-            return;
-        }
-        const provider = body.plain ? " Read straight from the file's fields, no AI." + (body.notes.length ? " " + body.notes.slice(0, 3).join(" ") + (body.notes.length > 3 ? ` (and ${body.notes.length - 3} more)` : "") : "")
-            : body.model ? ` Analyzed by ${body.model}.` : "";
-        const skipped = result.skippedDuplicates + result.skippedInvalid;
-        const summary = `Saved ${many(result.savedProducts, "product", "products")} as Pending for review`
-            + (result.savedBrands ? ` and ${many(result.savedBrands, "new brand", "new brands")}` : "")
-            + (result.suggestedLists ? `; ${many(result.suggestedLists, "ingredient list was", "ingredient lists were")} sent to the review queue for products that had none` : "")
-            + (flaggedOut ? `; ${flaggedOut} flagged as skin care or not make-up and NOT saved (see below)` : "")
-            + (skipped ? `; skipped ${skipped} duplicate or incomplete record(s)` : "")
-            + `. ${result.withFdaLink} product(s) included an FDA Philippines source link.${provider}`;
-        report(summary, false);
-        notify(summary, flaggedOut ? "warn" : "ok");
-        await loadInventory();
-    } catch (error) {
-        console.error("Importing the inventory file failed: ", error);
-        const reason = error && error.name === "AbortError" ? "The AI took too long." : (error && error.message) || "Something went wrong.";
-        report(`Import failed. ${reason} Nothing was saved unless a Firestore save completed.`, true);
-        notify(`The file was not imported. ${reason}`, "error");
-    } finally {
-        setBusy(choose, false);
-        dropbox.disabled = false;
     }
+    const notes = (failedParts.length ? [`Not read: ${failedParts.join("; ")}. Import the file again later for those parts; what is saved now is then skipped as a duplicate.`] : [])
+        .concat(ingredientRecords > 0 ? [ingredientsNotHere(ingredientRecords)] : []);
+    return { draft: found, notes, model: model || "the AI" };
+}
+
+/** Writes the checked records (NEW entries only, all Pending) in groups; answers what was saved. */
+async function saveInventoryDraft(draft, fileName, say) {
+    const records = Array.isArray(draft.products) ? draft.products : [], brandRecords = Array.isArray(draft.brands) ? draft.brands : [];
+    // no limit on records: saved in groups of IMPORT_GROUP, one database batch each, remembering what earlier groups added
+    const memory = { newBrands: new Map(), plannedProducts: new Set() };
+    const result = { savedProducts: 0, savedBrands: 0, suggestedLists: 0, skippedDuplicates: 0, skippedInvalid: 0, withFdaLink: 0, flagged: [] };
+    const groups = Math.max(Math.ceil(records.length / IMPORT_GROUP), Math.ceil(brandRecords.length / IMPORT_GROUP), 1);
+    for (let g = 0; g < groups; g++) {
+        if (groups > 1) say(`Saving group ${g + 1} of ${groups}...`);
+        const part = await saveImportedProducts(records.slice(g * IMPORT_GROUP, (g + 1) * IMPORT_GROUP), brandRecords.slice(g * IMPORT_GROUP, (g + 1) * IMPORT_GROUP), fileName, memory);
+        ["savedProducts", "savedBrands", "suggestedLists", "skippedDuplicates", "skippedInvalid", "withFdaLink"].forEach((k) => { result[k] += part[k]; });
+        result.flagged.push(...part.flagged);
+    }
+    showImportFlags(el("inventoryImportFlags"), result.flagged);
+    const flaggedOut = result.flagged.filter((f) => !f.saved).length;
+    const skipped = result.skippedDuplicates + result.skippedInvalid;
+    if (result.savedProducts === 0 && result.savedBrands === 0 && result.suggestedLists === 0) {
+        const nothing = `Nothing new was saved: ${result.skippedDuplicates} already listed, ${flaggedOut} not make-up (see below), ${result.skippedInvalid} incomplete.`;
+        notify(nothing, "warn");
+        return nothing;
+    }
+    const summary = `Saved ${many(result.savedProducts, "product", "products")} as Pending for review`
+        + (result.savedBrands ? ` and ${many(result.savedBrands, "new brand", "new brands")}` : "")
+        + (result.suggestedLists ? `; ${many(result.suggestedLists, "ingredient list was", "ingredient lists were")} sent to the review queue for products that had none` : "")
+        + (flaggedOut ? `; ${flaggedOut} not make-up and NOT saved (see below)` : "")
+        + (skipped ? `; skipped ${skipped} already listed or incomplete` : "")
+        + `. ${result.withFdaLink} with an FDA Philippines source link.`;
+    notify(summary, flaggedOut ? "warn" : "ok");
+    await loadInventory();
+    return summary;
 }
 
 /**
@@ -951,10 +1094,11 @@ function showImportFlags(box, flagged) {
  * one exception goes through the existing review queue: an existing product WITHOUT an ingredient list gets the imported
  * list as a suggestion (productIngredientSuggestions), which an admin applies or dismisses.
  */
-async function saveImportedProducts(records, brandRecords, fileName) {
+async function saveImportedProducts(records, brandRecords, fileName, memory) {
     const batch = writeBatch(db);
-    const newBrands = new Map();
-    const plannedProducts = new Set();
+    const kept = memory || { newBrands: new Map(), plannedProducts: new Set() };
+    const newBrands = new Map();                    // made by THIS group (written in its batch)
+    const plannedProducts = kept.plannedProducts;
     const flagged = [];
     const uid = auth.currentUser ? auth.currentUser.uid : "";
     let savedProducts = 0, skippedDuplicates = 0, skippedInvalid = 0, withFdaLink = 0, suggestedLists = 0, writes = 0;
@@ -967,6 +1111,7 @@ async function saveImportedProducts(records, brandRecords, fileName) {
         const ref = doc(collection(db, "brands"));
         const brand = { id: ref.id, name, ref };
         newBrands.set(sameKey(name), brand);
+        kept.newBrands.set(sameKey(name), brand);
         const data = {
             name, category: "Makeup", market: clean(info.market, 40) || "Global", status: "Pending", scans: 0,
             aliases: names(info.aliases, 60, 6).filter((alias) => sameKey(alias) !== sameKey(name)),
@@ -981,7 +1126,7 @@ async function saveImportedProducts(records, brandRecords, fileName) {
         return brand;
     };
 
-    records.slice(0, 40).forEach((record) => {
+    records.slice(0, IMPORT_GROUP).forEach((record) => {
         const brandName = clean(record.brandName, 60);
         const name = clean(record.productName, 100);
         const cosmeticType = clean(record.cosmeticType, 60);
@@ -995,7 +1140,7 @@ async function saveImportedProducts(records, brandRecords, fileName) {
 
         let brand = knownBrand(brandName);
         if (brand && brand.binned) { skippedDuplicates++; return; }
-        if (!brand) brand = newBrands.get(sameKey(brandName)) || addBrand(brandName, { market: record.brandMarket, aliases: record.brandAliases, logoUrl: record.brandLogoUrl, imageUrl: record.brandImageUrl, websiteSuggested: record.brandWebsiteSuggested });
+        if (!brand) brand = kept.newBrands.get(sameKey(brandName)) || addBrand(brandName, { market: record.brandMarket, aliases: record.brandAliases, logoUrl: record.brandLogoUrl, imageUrl: record.brandImageUrl, websiteSuggested: record.brandWebsiteSuggested });
 
         const ingredients = (Array.isArray(record.ingredients) ? record.ingredients : []).map((item) => String(item).trim().slice(0, 100)).filter(Boolean).slice(0, 80);
         const sources = Array.from(new Set((Array.isArray(record.sources) ? record.sources : []).filter((source) => /^https:\/\//i.test(String(source))))).slice(0, 10);
@@ -1042,10 +1187,10 @@ async function saveImportedProducts(records, brandRecords, fileName) {
     });
 
     // records about a brand only: a NEW brand at most (an existing brand is never changed by an import)
-    (Array.isArray(brandRecords) ? brandRecords : []).slice(0, 40).forEach((record) => {
+    (Array.isArray(brandRecords) ? brandRecords : []).slice(0, IMPORT_GROUP).forEach((record) => {
         const name = clean(record.name, 60);
         if (name.length < 2) { skippedInvalid++; return; }
-        if (knownBrand(name) || newBrands.has(sameKey(name))) { skippedDuplicates++; return; }
+        if (knownBrand(name) || kept.newBrands.has(sameKey(name))) { skippedDuplicates++; return; }
         addBrand(name, record);
     });
 
@@ -1142,6 +1287,7 @@ function paintStats() {
     });
     const show = org.view.kind === "bin" ? "" : el("reviewFilterSelect").value;
     document.querySelectorAll(".stat[data-show]").forEach((tile) => tile.classList.toggle("on", show !== "" && tile.dataset.show === show));
+    document.querySelectorAll(".stat[data-drill]").forEach((tile) => tile.classList.toggle("on", !!drill && org.view.kind !== "bin" && (tile.dataset.drill === drill.kind || (tile.dataset.drill === "brands" && drill.kind === "brand"))));
 }
 
 function paintToolbar() {
@@ -1156,6 +1302,14 @@ function paintToolbar() {
     el("inventoryQuick").innerHTML = (brandChosen && !inBin ? `<button type="button" class="filter-chip" data-clear="brand" data-tip="Showing one brand only. Click to show every brand again.">${escapeHtml(brandChosen.name || "Unnamed Brand")}${icon("x")}</button>` : "")
         + (quick && !inBin ? `<button type="button" class="filter-chip" data-clear="quick" data-tip="Showing only these products. Click to show all again.">${escapeHtml(QUICK[quick].label)}${icon("x")}</button>` : "")
         + (facetCount() > 0 && !inBin ? `<button type="button" class="filter-chip" data-clear="facets" data-tip="Filters are on. Click to switch them off.">Filters (${facetCount()})${icon("x")}</button>` : "");
+    if (!inBin && drill) {
+        const brand = drill.kind === "brand" ? brands.find((b) => b.id === drill.id) : null;
+        const label = drill.kind === "brand" ? "All brands" : drill.kind === "brands" ? "Brands" : "By type";
+        el("inventoryQuick").insertAdjacentHTML("afterbegin", `<button type="button" class="filter-chip" data-clear="drill" data-tip="${drill.kind === "brand" ? "Back to the list of brands." : "Back to the whole inventory."}">${drill.kind === "brand" ? icon("left") : ""}${label}${drill.kind === "brand" ? "" : icon("x")}</button>`);
+        if (brand) el("inventoryQuick").insertAdjacentHTML("beforeend", `<span class="drill-name">${escapeHtml(brand.name || "Unnamed Brand")}</span>`);
+    }
+    // a view has its own order (A to Z), so the Sort button has nothing to say there
+    el("sortMenuBtn").hidden = !!drill && !inBin;
     el("filterNow").textContent = facetCount() > 0 ? " " + facetCount() : "";
     el("filterMenuBtn").classList.toggle("on", facetCount() > 0);
 }
@@ -1165,6 +1319,8 @@ function renderInventory() {
     paintLayout();
     paintToolbar();
     if (org.view.kind === "bin") renderBin(); else renderList(org.view);
+    paintSearchStatus();
+    syncSearchUrl();
     org.refresh();
     refreshAssist();
     // the data panels (lists, grids, graphs) follow the same brand and folder
@@ -1176,80 +1332,22 @@ let lastFocus = "|";
 const pickBox = (label) => `<button type="button" class="pick" role="checkbox" aria-checked="false" aria-label="Select ${escapeHtml(label)}"></button>`;
 const pickAllBox = (what) => `<button type="button" class="pick" data-pick-all role="checkbox" aria-checked="false" aria-label="Select all shown" data-tip="Select every ${what} shown here."></button>`;
 
-// ----- pending snapshot reviews -----
-/** The badge on the Pending Snapshot Reviews button. */
-function paintSnapshotCount(failed) {
-    const count = el("snapshotCount"), hint = el("snapshotReviewHint");
-    count.classList.remove("skeleton");
-    count.textContent = failed ? "–" : String(snapshotsWaiting || 0);
-    el("snapshotReviewBtn").classList.toggle("has-waiting", (snapshotsWaiting || 0) > 0);
-    hint.textContent = failed ? "The count could not be read. Open it to look anyway."
-        : snapshotsWaiting > 0 ? `${many(snapshotsWaiting, "snapshot waits", "snapshots wait")}. One at a time: the photo next to what the AI read.`
-        : "Nothing is waiting. New photos from the app arrive here.";
+/** The hint under the Barcode box: whether the digits are a valid barcode (check digit) and where its number was issued. */
+function showBarcodeCheck() {
+    const note = el("productBarcodeCheck");
+    if (!note) return;
+    const text = el("productBarcodeInput").value.trim();
+    note.textContent = text ? (barcodeKey(text) ? gs1Hint(text).text : "Not a barcode yet: 6 to 14 digits.") : "";
 }
 
-/** The lists the review window works with: the ones this page already holds (no extra read). */
-const snapshotContext = () => ({
-    brands: everyBrand.map((b) => ({ id: b.id, name: b.name, aliases: b.aliases, binned: b.binned === true })),
-    products: everyProduct.map((p) => ({ id: p.id, brandId: p.brandId, name: p.name, aliases: p.aliases, ingredients: p.ingredients, binned: p.binned === true })),
-    library: curatedList
-});
-let snapshotInForm = null;            // { entry } while the Add Product form is open on a snapshot's values
-
-/** Opens the review window over this page. */
-function openSnapshots() {
-    openSnapshotReview({
-        context: snapshotContext,
-        onOpenForm: openSnapshotInForm,
-        onLoaded: (n) => { if (snapshotsWaiting === null || n > snapshotsWaiting) { snapshotsWaiting = n; paintSnapshotCount(); } },
-        onProcessed: () => { snapshotsWaiting = Math.max(0, (snapshotsWaiting || 1) - 1); paintSnapshotCount(); },
-        onClose: async (approved) => { if (approved > 0) await loadInventory(); }
-    });
-}
-
-/**
- * "Open in Add Product form": the brand is added first when it is new (after a question), then the SAME form as for a product added by
- * hand opens with the snapshot's values in it. Saving the form saves the product and closes the snapshot (see saveProduct).
- */
-async function openSnapshotInForm(entry, v) {
-    const key = compactName(v.brand);
-    let brand = key ? everyBrand.find((b) => !b.binned && [b.name, ...b.aliases].some((n) => compactName(n) === key)) : null;
-    if (!brand) {
-        if (!(await sure(`"${v.brand}" is not a brand in the inventory yet.\n\nAdd it as an Active brand and open the product form?`, "Add brand", false))) return;
-        try {
-            const created = await addDoc(collection(db, "brands"), {
-                name: v.brand, category: "Makeup", market: "Global", status: "Active", scans: 0, source: "snapshot", reviewed: true,
-                reviewedAt: serverTimestamp(), createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-            });
-            await loadInventory();
-            brand = everyBrand.find((b) => b.id === created.id) || null;
-        } catch (error) {
-            console.error("Error adding the brand of a snapshot: ", error);
-            notify("The brand was not added. " + describeError(error), "error");
-            return;
-        }
-        if (!brand) { notify("The brand was added, but the list did not show it yet. Reload the page and open the snapshot again.", "error"); return; }
-    }
-    if (brand.binned) { notify(`The brand "${brand.name}" is in the Recycle bin. Restore it first.`, "error"); return; }
-    openProductForm(null, brand.id);
-    el("productNameInput").value = v.name;
-    const known = COSMETIC_TYPES.find((t) => sameKey(t) === sameKey(v.kind));
-    el("productTypeInput").value = known ? known : OTHER_TYPE;
-    el("productTypeOtherInput").value = known ? "" : v.kind;
-    el("productDescInput").value = APPROVED_DESCRIPTION;
-    el("productIngredientsInput").value = v.ingredients.join(", ");
-    formShades = v.shade ? [v.shade] : [];
-    showOtherTypeBox(); showIngredientSummary(); renderShadeEditor();
-    const note = el("productAiNote");
-    note.textContent = "From an app user's photo. Pending approval, unverified, AI-generated: compare every field with the packaging before you save.";
-    note.hidden = false;
-    snapshotInForm = { entry };
-}
+/** Under this width the list is drawn as cards whatever the switch says (the table needs about 640 px). */
+const NARROW_LIST_PX = 600;
+let listIsNarrow = false;
 
 /** Rows or Cards on the inventory list (the switch in its title line). */
 function paintLayout() {
     // the Recycle bin keeps its table: cards are for products
-    el("inventoryHost").classList.toggle("as-cards", view.layout === "cards" && !(org && org.view.kind === "bin"));
+    el("inventoryHost").classList.toggle("as-cards", (view.layout === "cards" || listIsNarrow) && !(org && org.view.kind === "bin"));
     el("inventoryLayoutSwitch").querySelectorAll("[data-layout]").forEach((button) => {
         const on = button.dataset.layout === view.layout;
         button.classList.toggle("on", on);
@@ -1262,7 +1360,203 @@ function setPagers(state, total, noun) {
     renderPager(el("inventoryPagerTop"), state, total, renderInventory, noun);
 }
 
+// ---------------------------------------------------------------------------------------------
+// Search (Gmail style). The box searches EVERY listed product, on every page of the list: name, other names, brand, type,
+// barcode, description and ingredients; any letter case, parts of words. While you type (2+ letters) a drop-down offers Brands,
+// Products and Ingredients (5 each). The words are kept in the address (?q=), so Back and a reload keep the search.
+// ---------------------------------------------------------------------------------------------
+const SUGGEST_MAX = 5;
+let suggestItems = [];                      // the options in the drop-down: { kind, group, text, note?, brand?, product? }
+let suggestAt = -1;                         // the highlighted option, -1 = none
+let searchCount = null;                     // products found by the last search of the list (null = no search, or a view without a count)
+let nextPush = false;                       // the next address change is a step Back can return to (Enter, a suggestion, clear)
+
+/** The texts of a product the search looks in (ingredients are added by productMatches). */
+const productTexts = (p) => [p.name, ...p.aliases, p.cosmeticType, p.description, p.barcode, (brandOf(p) || {}).name || p.brandName];
+
+/** The ingredient that made a product match: the whole search first, then each word of it. "" when none. */
+function ingredientFor(p, typed) {
+    const list = p.ingredients || [];
+    const whole = list.find((name) => matchesSearch(typed, name));
+    if (whole) return whole;
+    for (const word of typed.split(/\s+/).filter((w) => w.length > 1)) {
+        const hit = list.find((name) => matchesSearch(word, name));
+        if (hit) return hit;
+    }
+    return "";
+}
+
+/** "contains: niacinamide" on a row that was found only through its ingredients. */
+function containsNote(p) {
+    const typed = el("inventorySearchInput").value;
+    if (!sameKey(typed) || matchesSearch(typed, productTexts(p))) return "";
+    const found = ingredientFor(p, typed);
+    return found ? `<span class="contains-note">contains: ${escapeHtml(found)}</span>` : "";
+}
+
+/** Keeps ?q= equal to the box. Typing replaces the address; Enter, a suggestion and clearing add a step for Back. */
+function syncSearchUrl() {
+    const url = new URL(window.location.href), typed = el("inventorySearchInput").value.trim();
+    if (typed) url.searchParams.set("q", typed); else url.searchParams.delete("q");
+    const push = nextPush;
+    nextPush = false;
+    if (url.href === window.location.href) return;
+    try { window.history[push ? "pushState" : "replaceState"](null, "", url); } catch (error) { /* an address that cannot change: the search still works */ }
+}
+
+/** "12 results for "blush"" with an X that clears the search. Hidden when nothing is searched. */
+function paintSearchStatus() {
+    const status = el("inventorySearchStatus"), typed = el("inventorySearchInput").value.trim();
+    const show = !!typed && searchCount !== null && org.view.kind !== "bin";
+    status.hidden = !show;
+    if (!show) return;
+    el("inventorySearchStatusText").textContent = searchCount === 0 ? `No results for "${typed}"` : `${many(searchCount, "result", "results")} for "${typed}"`;
+}
+
+function closeSuggest() {
+    const input = el("inventorySearchInput");
+    el("inventorySuggest").hidden = true;
+    suggestAt = -1;
+    input.setAttribute("aria-expanded", "false");
+    input.removeAttribute("aria-activedescendant");
+}
+
+function paintSuggestActive() {
+    const input = el("inventorySearchInput");
+    el("inventorySuggest").querySelectorAll("[role=option]").forEach((row, at) => {
+        const on = at === suggestAt;
+        row.classList.toggle("active", on);
+        row.setAttribute("aria-selected", String(on));
+        if (on) { input.setAttribute("aria-activedescendant", row.id); row.scrollIntoView({ block: "nearest" }); }
+    });
+    if (suggestAt < 0) input.removeAttribute("aria-activedescendant");
+}
+
+/** The drop-down for what is typed: up to 5 brands, 5 products, 5 ingredients; "No results" when there are none. */
+function openSuggest() {
+    const input = el("inventorySearchInput"), box = el("inventorySuggest"), typed = input.value.trim();
+    if (sameKey(typed).length < 2) { closeSuggest(); return; }
+    const listed = products.filter((p) => !isOut(p));
+    const foundBrands = brands.filter((b) => matchesSearch(typed, [b.name, ...b.aliases])).slice(0, SUGGEST_MAX)
+        .map((b) => ({ kind: "brand", group: "Brands", text: b.name, brand: b }));
+    const foundProducts = listed.filter((p) => matchesSearch(typed, [p.name, ...p.aliases, p.cosmeticType, (brandOf(p) || {}).name || p.brandName])).slice(0, SUGGEST_MAX)
+        .map((p) => ({ kind: "product", group: "Products", text: p.name || "Unnamed Product", note: (brandOf(p) || {}).name || p.brandName || "", product: p }));
+    const byIngredient = new Map();         // key -> { text, count }
+    listed.forEach((p) => (p.ingredients || []).forEach((name) => {
+        if (!matchesSearch(typed, name)) return;
+        const key = sameKey(name), row = byIngredient.get(key) || { text: name, count: 0 };
+        row.count++;
+        byIngredient.set(key, row);
+    }));
+    const foundIngredients = Array.from(byIngredient.values()).sort((a, b) => b.count - a.count || a.text.localeCompare(b.text)).slice(0, SUGGEST_MAX)
+        .map((row) => ({ kind: "ingredient", group: "Ingredients", text: row.text, note: many(row.count, "product", "products") }));
+    suggestItems = [...foundBrands, ...foundProducts, ...foundIngredients];
+    suggestAt = -1;
+    box.replaceChildren();
+    if (suggestItems.length === 0) {
+        const none = document.createElement("div");
+        none.className = "sug-none";
+        none.textContent = `No results for "${typed}"`;
+        box.appendChild(none);
+    } else {
+        let group = "";
+        suggestItems.forEach((item, at) => {
+            if (item.group !== group) {
+                group = item.group;
+                const head = document.createElement("div");
+                head.className = "sug-head";
+                head.textContent = group;
+                box.appendChild(head);
+            }
+            const row = document.createElement("div");
+            row.className = "sug-item";
+            row.id = "invSug" + at;
+            row.setAttribute("role", "option");
+            row.setAttribute("aria-selected", "false");
+            const name = document.createElement("span");
+            name.className = "sug-text";
+            name.textContent = item.text;
+            row.appendChild(name);
+            if (item.note) { const note = document.createElement("span"); note.className = "sug-note"; note.textContent = item.note; row.appendChild(note); }
+            row.addEventListener("mousedown", (event) => event.preventDefault());       // the box keeps the focus
+            row.addEventListener("click", () => chooseSuggestion(at));
+            box.appendChild(row);
+        });
+    }
+    box.hidden = false;
+    input.setAttribute("aria-expanded", "true");
+}
+
+/** A brand shows its products, an ingredient the products that contain it, a product opens (all by searching for it). */
+function chooseSuggestion(at) {
+    const item = suggestItems[at];
+    if (!item) return;
+    el("inventorySearchInput").value = item.text;
+    el("inventorySearchClear").hidden = false;
+    closeSuggest();
+    nextPush = true;
+    drill = null;
+    fromFirstPage();
+    if (item.kind === "product" && item.product && openId !== item.product.id) toggleDetails(item.product.id);
+}
+
+function wireSearchExtras() {
+    const input = el("inventorySearchInput"), box = el("inventorySuggest");
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-expanded", "false");
+    input.setAttribute("aria-controls", "inventorySuggest");
+    // these run BEFORE the box's own Enter / Esc handling (wireSearch), so they are added first
+    input.addEventListener("input", openSuggest);
+    input.addEventListener("keydown", (event) => {
+        const open = !box.hidden, count = suggestItems.length;
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            if (box.hidden) openSuggest();
+            if (suggestItems.length === 0) return;
+            suggestAt = event.key === "ArrowDown" ? (suggestAt + 1) % suggestItems.length : (suggestAt <= 0 ? suggestItems.length - 1 : suggestAt - 1);
+            paintSuggestActive();
+        } else if (event.key === "Enter") {
+            if (open && suggestAt >= 0 && suggestAt < count) { event.preventDefault(); event.stopImmediatePropagation(); chooseSuggestion(suggestAt); return; }
+            closeSuggest();
+            nextPush = true;
+        } else if (event.key === "Escape") {
+            if (open) { event.stopImmediatePropagation(); closeSuggest(); }          // the first Esc closes the drop-down, the next one clears the box
+            else if (input.value) nextPush = true;
+        }
+    });
+    input.addEventListener("blur", closeSuggest);
+    el("inventorySearchClear").addEventListener("click", () => { nextPush = true; closeSuggest(); });
+    el("inventorySearchStatusClear").addEventListener("click", () => {
+        input.value = "";
+        el("inventorySearchClear").hidden = true;
+        nextPush = true;
+        closeSuggest();
+        fromFirstPage();
+        input.focus();
+    });
+    // "/" anywhere on the page jumps to the box, unless you are already typing in a field or a dialog is open
+    document.addEventListener("keydown", (event) => {
+        if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey || event.defaultPrevented) return;
+        const target = event.target;
+        if (target && target.closest && target.closest("input, textarea, select, [contenteditable]:not([contenteditable=false])")) return;
+        if (dialogIsOpen()) return;
+        event.preventDefault();
+        input.focus();
+        input.select();
+    });
+    // Back / Forward: the box follows the address
+    window.addEventListener("popstate", () => {
+        input.value = new URLSearchParams(window.location.search).get("q") || "";
+        el("inventorySearchClear").hidden = input.value.length === 0;
+        closeSuggest();
+        drill = null;
+        fromFirstPage();
+    });
+}
+
 function renderList(now) {
+    searchCount = null;
     const body = el("inventoryTableBody");
     const typed = el("inventorySearchInput").value;
     const term = sameKey(typed);                            // "" when nothing is searched for
@@ -1271,7 +1565,7 @@ function renderList(now) {
     const folder = now.kind === "folder" ? now.name : "";
     const flat = view.mode === "all";
     const columns = flat ? 7 : 6;
-    el("inventoryTableHead").innerHTML = `<tr><th><span class="th-line">${pickAllBox("product")}Product</span></th>${flat ? "<th>Brand</th>" : ""}<th>Type</th><th>Shades</th><th class="text-right" data-tip="Scans the app recognised as this product.">Scans</th><th><span class="th-line">Status${statusGuide()}</span></th><th></th></tr>`;
+    el("inventoryTableHead").innerHTML = `<tr><th><span class="th-line">${pickAllBox("product")}Product</span></th>${flat ? "<th>Brand</th>" : ""}<th>Type</th><th class="shade-col">Shades</th><th class="text-right scan-col" data-tip="Scans the app recognised as this product.">Scans</th><th><span class="th-line">Status${statusGuide()}</span></th><th></th></tr>`;
 
     if (everyBrand.length === 0 && everyProduct.length === 0) {
         shownGroups = [];
@@ -1284,9 +1578,11 @@ function renderList(now) {
     const base = (p) => (show === "out" ? isOut(p) : !isOut(p)) && (!folder || sameKey(p.folder) === sameKey(folder))
         && (show !== "review" || waits(p)) && (!quick || QUICK[quick].test(p)) && facetOk(p);
     // Search: any letter case, with or without accents and punctuation, parts of words, several words in any order.
-    // A product is also found by its other names, its kind, its barcode and its brand ("maybelline lipstick").
-    const productMatches = (p) => matchesSearch(typed, [p.name, ...p.aliases, p.cosmeticType, p.description, p.barcode, (brandOf(p) || {}).name || p.brandName]);
+    // A product is also found by its other names, its kind, its barcode, its brand ("maybelline lipstick") and its ingredients.
+    const productMatches = (p) => matchesSearch(typed, [...productTexts(p), ...(p.ingredients || [])]);
     const brandMatches = (b) => !!b && matchesSearch(typed, [b.name, ...b.aliases, b.category, b.market]);
+    paintBrandPageSize();
+    if (drill && now.kind === "all") { renderDrill({ base, productMatches, brandMatches, term, typed }); return; }
     const order = sortNow().cmp;
     const html = [];
     let productsShown = 0;
@@ -1295,6 +1591,7 @@ function renderList(now) {
         shownGroups = [];
         const list = products.filter((p) => base(p) && (!brandFilter || p.brandId === brandFilter) && (!term || productMatches(p))).sort(order);
         productsShown = list.length;
+        searchCount = term ? productsShown : null;
         paginate(list, flatPage).forEach((p) => html.push(productRow(p, brandOf(p), true)));
         el("inventoryCountLine").textContent = list.length === 0 ? "" : many(list.length, "product", "products") + (folder ? ` in "${folder}"` : "");
         setPagers(flatPage, list.length, "products");
@@ -1328,6 +1625,7 @@ function renderList(now) {
         }
 
         shownGroups = groups;
+        searchCount = term ? productsShown : null;
         paginate(groups, pageState).forEach((group) => {
             const folded = !term && closed.has(group.id);           // a search always shows what it found
             html.push(folded ? group.head.replace('class="brand-row', 'class="brand-row closed') : group.head);
@@ -1341,13 +1639,60 @@ function renderList(now) {
         setPagers(pageState, groups.length, "brands");
     }
 
-    const nothing = term ? `Nothing here matches "${escapeHtml(typed)}".`
+    const nothing = term ? `No results for "${escapeHtml(typed)}".`
         : quick ? "No product like that. Click the chip above to show all again."
         : folder ? `"${escapeHtml(folder)}" is empty. Drag products onto its chip above.`
         : show === "review" ? "Nothing is waiting for review."
         : show === "out" ? "Every listed product is make-up."
         : "Nothing to show.";
     body.innerHTML = html.length > 0 ? html.join("") : `<tr><td colspan="${columns}" class="table-message">${nothing}</td></tr>`;
+}
+
+/** The size box beside the pager: only for one brand with more than 10 products. It keeps its value when it is hidden. */
+function paintBrandPageSize() {
+    const select = el("brandPageSize");
+    const count = drill && drill.kind === "brand" && org.view.kind !== "bin" ? productsOf(drill.id).filter((p) => !isOut(p)).length : 0;
+    select.hidden = !brandPageOf(new Array(count).fill({}), 1, brandPage.size).showSizes;
+    select.value = String(brandPage.size);
+}
+
+/** The views the two count tiles open. Search and Filters still narrow them; "base" is the same test as in the normal list. */
+function renderDrill({ base, productMatches, brandMatches, term, typed }) {
+    const body = el("inventoryTableBody"), head = el("inventoryTableHead");
+    shownGroups = [];
+    const nothing = (columns, text) => { body.innerHTML = `<tr><td colspan="${columns}" class="table-message">${text}</td></tr>`; };
+    if (drill.kind === "brands") {
+        head.innerHTML = `<tr><th colspan="6"><span class="th-line">${pickAllBox("brand")}Brand</span></th></tr>`;
+        const list = brands.filter((b) => !brandOut(b) && (!term || brandMatches(b))).sort(byName);
+        el("inventoryCountLine").textContent = many(list.length, "brand", "brands");
+        setPagers(pageState, list.length, "brands");
+        if (list.length === 0) { nothing(6, term ? `No brand matches "${escapeHtml(typed)}".` : "No brands yet."); return; }
+        body.innerHTML = paginate(list, pageState).map((b) => brandRow(b, productsOf(b.id).length, 6).replace('class="brand-row', 'class="brand-row closed')).join("");
+        return;
+    }
+    if (drill.kind === "brand") {
+        const brand = brands.find((b) => b.id === drill.id);
+        if (!brand) { openDrill({ kind: "brands" }); return; }
+        const whole = productsOf(brand.id).length;
+        head.innerHTML = `<tr><th><span class="th-line"><button type="button" class="pick" data-pick-all role="checkbox" aria-checked="false" aria-label="Select all ${whole} products in this brand" data-tip="Select all ${whole} products of this brand, also those on other pages."></button>Product <small class="muted">select all in brand: ${whole}</small></span></th><th>Type</th><th class="shade-col">Shades</th><th class="text-right scan-col">Scans</th><th>Status</th><th></th></tr>`;
+        const list = productsOf(brand.id).filter((p) => base(p) && (!term || productMatches(p)));
+        const page = brandPageOf(list, brandPage.page, brandPage.size);
+        brandPage.page = page.page;
+        el("inventoryCountLine").textContent = many(list.length, "product", "products");
+        setPagers(brandPage, page.total, "products");
+        const heading = brandRow(brand, whole, 6).replace('class="brand-row', 'class="brand-row drill-head');
+        const rows = page.rows.map((p) => productRow(p, brand, false));
+        body.innerHTML = heading + (rows.join("") || `<tr class="note-row"><td colspan="6" class="table-message">${term ? `Nothing in this brand matches "${escapeHtml(typed)}".` : "This brand has no products to show here."}</td></tr>`);
+        return;
+    }
+    head.innerHTML = `<tr><th><span class="th-line">${pickAllBox("product")}Product</span></th><th>Brand</th><th>Type</th><th class="shade-col">Shades</th><th class="text-right scan-col">Scans</th><th>Status</th><th></th></tr>`;
+    const groups = groupByType(products.filter((p) => base(p) && (!term || productMatches(p))));
+    const total = groups.reduce((sum, group) => sum + group.rows.length, 0);
+    el("inventoryCountLine").textContent = many(total, "product", "products");
+    setPagers(flatPage, 0, "products");                     // this view is one long list: no pager
+    if (total === 0) { nothing(7, term ? `Nothing here matches "${escapeHtml(typed)}".` : "Nothing to show."); return; }
+    body.innerHTML = groups.map((group) => `<tr class="type-row"><td colspan="7"><span class="type-name">${escapeHtml(group.label)}</span> <span class="muted small">${many(group.rows.length, "product", "products")}</span></td></tr>`
+        + group.rows.map((p) => productRow(p, brandOf(p), true)).join("")).join("");
 }
 
 /** The brands in the order the Sort button asks for (the orders that only fit products keep the brands A to Z). */
@@ -1404,7 +1749,7 @@ function productRow(p, brand, flat) {
 
     return `
         <tr class="product-row${isOut(p) ? " out-row" : ""}${open ? " open" : ""}" data-product="${escapeHtml(p.id)}" data-key="p:${escapeHtml(p.id)}" data-drag tabindex="0" aria-expanded="${open}">
-            <td class="name-cell"><div class="name-line">${pickBox(p.name || "product")}${toneDot(attentionOf(p, brand, !flat))}<span class="product-name">${escapeHtml(p.name || "Unnamed Product")}</span>${p.ingredients.length === 0 ? (isOut(p)
+            <td class="name-cell"><div class="name-line">${pickBox(p.name || "product")}${toneDot(attentionOf(p, brand, !flat))}<span class="product-name">${escapeHtml(p.name || "Unnamed Product")}</span>${containsNote(p)}${p.ingredients.length === 0 ? (isOut(p)
                 ? `<span class="chip warn ingredient-missing">${icon("alert")}<span>No ingredient list</span></span>`
                 : `<button type="button" class="chip warn ingredient-missing" data-act="assist-product" data-id="${escapeHtml(p.id)}" aria-label="No ingredient list. Find ingredients for ${escapeHtml(p.name || "product")} with AI." data-tip="Search the web for a draft ingredient list, then check it against the product package.">${icon("alert")}<span>No ingredient list</span><span class="ingredient-missing-cta">Find with AI</span></button>`) : ""}</div></td>
             ${flat ? `<td class="brand-ref">${escapeHtml(brand ? brand.name : (p.brandName || "–"))}</td>` : ""}
@@ -1665,7 +2010,7 @@ async function purgeFromBin(keys) {
 function showScopeHint() {
     const hint = el("productScopeHint");
     const type = el("productTypeInput").value === OTHER_TYPE ? el("productTypeOtherInput").value : el("productTypeInput").value;
-    if (!type.trim()) { hint.textContent = ""; return; }
+    if (!type.trim()) { hint.textContent = "Only make-up products are accepted, even from a brand that also sells skin care."; hint.className = "field-hint"; return; }
     const name = el("productNameInput").value, scope = productScope(type, name);
     hint.textContent = scope === "makeup" ? "Make-up: the app checks it and offers AR Try-On."
         : scope === "unclear" ? `The app cannot tell that this is make-up: ${scopeWords(type, name)}. It can only be saved as Pending, and the app hides it until its kind is clear.`
@@ -1756,7 +2101,7 @@ const brandNameOf = (product) => (everyBrand.find((b) => b.id === product.brandI
 
 function openDuplicates(startWith) {
     const when = (item) => (item.addedAt ? "added " + timeAgo(new Date(item.addedAt * 1000)) : "");
-    const origin = (item) => originLabel(item.source) || "Typed on this website";
+    const origin = (item) => originLabel(item.source) || "Origin not recorded";
     const sections = [
         {
             id: "products", label: "Products",
@@ -1844,7 +2189,7 @@ async function trimFdaCatalogue() {
         items: extra.slice(0, 12).map((p) => `${p.brandName}: ${p.name}`).concat(extra.length > 12 ? [`and ${extra.length - 12} more`] : []), confirmLabel: "Move them"
     }))) return;
     const brandIds = new Set(emptyBrands.map((b) => b.id));
-    org.toBin(emptyBrands.map((b) => "b:" + b.id).concat(extra.filter((p) => !brandIds.has(p.brandId)).map((p) => "p:" + p.id)));
+    org.toBin(emptyBrands.map((b) => "b:" + b.id).concat(extra.filter((p) => !brandIds.has(p.brandId)).map((p) => "p:" + p.id)), true);
 }
 
 async function importFdaCatalogue(byItself) {
@@ -1951,7 +2296,6 @@ function openBrandForm(brand) {
     editingBrandId = brand ? brand.id : null;
     el("brandModalTitle").textContent = brand ? "Edit Brand" : "Add New Brand";
     el("brandNameInput").value = brand ? brand.name : "";
-    el("brandCategoryInput").value = BRAND_CATEGORY;           // every brand is a make-up brand; saving one that had another category corrects it
     el("brandMarketInput").value = brand ? brand.market : "Global";
     el("brandStatusInput").value = brand && STATUSES.includes(brand.status) ? brand.status : "Active";
     el("brandLogoInput").value = brand ? brand.logoUrl : "";
@@ -1959,6 +2303,7 @@ function openBrandForm(brand) {
     paintWebsiteBox(brand);
     showReviewNote(el("brandReviewNote"), brand, "brand");
     brandModal.open();
+    brandWindow.reset();
 }
 
 async function saveBrand(event) {
@@ -2094,7 +2439,6 @@ function openProductForm(product, brandId) {
     el("productAiNote").hidden = true;
     el("productAiNote").textContent = "";
     editingProductId = product ? product.id : null;
-    snapshotInForm = null;
     assistedProductSources = product ? product.sources.slice() : [];
     el("productModalTitle").textContent = product ? "Edit Product" : "Add Product";
 
@@ -2111,6 +2455,8 @@ function openProductForm(product, brandId) {
     el("productIngredientsInput").value = product ? product.ingredients.join(", ") : "";
     el("productImageInput").value = product ? product.imageUrl : "";
     el("productFdaInput").value = product ? product.fdaNumber : "";
+    el("productBarcodeInput").value = product ? product.barcode : "";
+    showBarcodeCheck();
     el("productIngredientSearch").value = "";
     if (ingredientPicker) ingredientPicker.setNotes(product ? product.ingredientNotes : []);
     el("productMinAgeInput").value = product && product.minAge > 0 ? product.minAge : "";
@@ -2118,6 +2464,8 @@ function openProductForm(product, brandId) {
     formShades = product ? product.shades.slice() : [];
     formShadeCodes = product ? formShades.map((_, at) => (product.shadeCodes || [])[at] || "") : [];
     shadeAdding = false; shadeMessage = "";
+    sourceEditor.reset();
+    sourceEditor.paint();
 
     showOtherTypeBox();
     showBrandHint();
@@ -2125,6 +2473,7 @@ function openProductForm(product, brandId) {
     renderShadeEditor();
     showReviewNote(el("productReviewNote"), product, "product");
     productModal.open();
+    productWindow.reset();
 
     if (brands.length === 0) setFormError(form, "There are no brands yet. Close this, add a brand first, then add the brand's products.");
 }
@@ -2195,17 +2544,17 @@ function exportProductsCsv() {
 /** A new ingredient made from the product form: saved in the library at once, so the next product finds it too. */
 async function createIngredientFromPicker(fields) {
     const data = {
-        name: fields.name, techName: fields.techName, description: fields.description, aliases: [],
+        name: fields.name, description: fields.description, aliases: fields.aliases || [], classificationId: "", purpose: "",
         riskLevel: ["safe", "caution", "harmful"].includes(fields.riskLevel) ? fields.riskLevel : "",
         cautionNote: "", commonUses: "", minAge: 0, keyActive: false, umbrella: false, highlights: [],
         allergenTags: [], avoidForSkinTypes: [], goodForSkinTypes: [], avoidForConditions: [], goodForConditions: [],
         folder: "", createdAt: serverTimestamp(), updatedAt: serverTimestamp()
     };
     const made = await addDoc(collection(db, "ingredients"), data);
-    const entry = { id: made.id, name: data.name, techName: data.techName, aliases: [] };
+    const entry = { id: made.id, name: data.name, techName: "", aliases: data.aliases };
     curatedList.push(entry);
     curatedList.sort((a, b) => a.name.localeCompare(b.name));
-    [data.name, data.techName].forEach((n) => { const k = sameKey(n); if (k) curatedKeys.add(k); });
+    [data.name, ...data.aliases].forEach((n) => { const k = sameKey(n); if (k) curatedKeys.add(k); });
     curatorKnown = true;
     notify(`"${data.name}" is in the ingredient library now.`, "ok");
     return entry;
@@ -2259,26 +2608,29 @@ function renderShadeEditor() {
     const swatch = (shade) => `background:${escapeHtml(shade)}`;
     const items = formShades.map((shade, index) => `
         <span class="shade-item" data-index="${index}">
-            <label class="shade-swatch" style="${swatch(shade)}" title="Pick a colour"><input type="color" class="shade-picker" value="${escapeHtml(shade.toLowerCase())}" data-index="${index}" aria-label="Pick the colour of shade ${index + 1}"></label>
+            <label class="shade-swatch" style="${swatch(shade)}" ><input type="color" class="shade-picker" value="${escapeHtml(shade.toLowerCase())}" data-index="${index}" aria-label="Pick the colour of shade ${index + 1}"></label>
             <input type="text" class="shade-hex" value="${escapeHtml(shade)}" maxlength="22" spellcheck="false" autocomplete="off" data-index="${index}" aria-label="Hex code of shade ${index + 1}">
-            <input type="text" class="shade-code" value="${escapeHtml(formShadeCodes[index] || "")}" maxlength="16" spellcheck="false" autocomplete="off" placeholder="Code" data-index="${index}" title="The shade code printed on the pack, such as 119 or N20" aria-label="Shade code of shade ${index + 1}, as printed on the pack">
-            <button type="button" data-move="-1" data-index="${index}" title="Move earlier" aria-label="Move shade ${index + 1} earlier"${index === 0 ? " disabled" : ""}>‹</button>
-            <button type="button" data-move="1" data-index="${index}" title="Move later" aria-label="Move shade ${index + 1} later"${index === formShades.length - 1 ? " disabled" : ""}>›</button>
-            <button type="button" data-remove="${index}" title="Remove this shade" aria-label="Remove shade ${index + 1}">×</button>
+            <input type="text" class="shade-code" value="${escapeHtml(formShadeCodes[index] || "")}" maxlength="16" spellcheck="false" autocomplete="off" placeholder="Code" data-index="${index}" aria-label="Shade code of shade ${index + 1}, as printed on the pack">
+            <button type="button" data-move="-1" data-index="${index}" aria-label="Move shade ${index + 1} earlier"${index === 0 ? " disabled" : ""}>‹</button>
+            <button type="button" data-move="1" data-index="${index}" aria-label="Move shade ${index + 1} later"${index === formShades.length - 1 ? " disabled" : ""}>›</button>
+            <button type="button" data-remove="${index}" aria-label="Remove shade ${index + 1}">×</button>
         </span>`).join("");
     let tail;
     if (shadeAdding && formShades.length < MAX_SHADES) {
         tail = `<span class="shade-item shade-new">
-            <label class="shade-swatch" style="${swatch(shadeDraft)}" title="Pick a colour"><input type="color" class="shade-picker" id="newShadePicker" value="${escapeHtml(shadeDraft.toLowerCase())}" aria-label="Pick a colour for the new shade"></label>
+            <label class="shade-swatch" style="${swatch(shadeDraft)}" ><input type="color" class="shade-picker" id="newShadePicker" value="${escapeHtml(shadeDraft.toLowerCase())}" aria-label="Pick a colour for the new shade"></label>
             <input type="text" class="shade-hex" id="newShadeHex" value="${escapeHtml(shadeDraft)}" maxlength="22" spellcheck="false" autocomplete="off" placeholder="#C24B62" aria-label="Hex code of the new shade">
-            <input type="text" class="shade-code" id="newShadeCode" value="" maxlength="16" spellcheck="false" autocomplete="off" placeholder="Code" title="The shade code printed on the pack, such as 119 or N20" aria-label="Shade code of the new shade, as printed on the pack">
+            <input type="text" class="shade-code" id="newShadeCode" value="" maxlength="16" spellcheck="false" autocomplete="off" placeholder="Code" aria-label="Shade code of the new shade, as printed on the pack">
             <button type="button" class="row-btn" id="confirmShadeBtn">Add</button>
-            <button type="button" id="cancelShadeBtn" title="Cancel" aria-label="Cancel adding a shade">×</button>
+            <button type="button" id="cancelShadeBtn" aria-label="Cancel adding a shade">×</button>
         </span>`;
     } else if (formShades.length < MAX_SHADES) tail = `<button type="button" class="row-btn" id="addShadeBtn">${icon("plus")}Shade</button>`;
     else tail = `<span class="field-hint">A product can have up to ${MAX_SHADES} shades.</span>`;
     const note = shadeMessage ? `<span class="field-hint shade-msg" role="alert">${escapeHtml(shadeMessage)}</span>` : "";
-    el("productShadeEditor").innerHTML = items + tail + note;
+    // many shades: a box that scrolls up and down, so the form stays short; the add box stays below it
+    const strip = formShades.length >= SHADE_STRIP_FROM;
+    el("productShadeEditor").innerHTML = (strip ? `<div class="shade-strip" role="group" aria-label="${formShades.length} shades, scroll to see them all">${items}</div><span class="field-hint">${formShades.length} shades. Scroll the list to see them all.</span>` : items) + tail + note;
+    if (strip && shadeAdding) { const row = el("productShadeEditor").querySelector(".shade-strip"); if (row) row.scrollTop = row.scrollHeight; }
 }
 
 function addShadeFromDraft() {
@@ -2391,9 +2743,13 @@ async function saveProduct(event) {
     const status = el("productStatusInput").value;
     const { shades, codes: shadeCodes } = pairShades(formShades, formShadeCodes, MAX_SHADES);
     const imageUrl = cleanLink(el("productImageInput").value), fdaNumber = cleanFdaNumber(el("productFdaInput").value);
+    const barcodeText = el("productBarcodeInput").value.trim(), barcode = barcodeText ? barcodeKey(barcodeText) : "";
 
     if (imageUrl === null) { setFormError(form, "The photo link must be a web address that starts with https://"); el("productImageInput").focus(); return; }
     if (fdaNumber === null) { setFormError(form, "The FDA registration number may have letters, digits and . , # ( ) _ - / only (at most 40 characters)."); el("productFdaInput").focus(); return; }
+    if (barcodeText && !barcode) { setFormError(form, "A barcode is 6 to 14 digits (the number under the bars). Leave it empty if you do not have it."); el("productBarcodeInput").focus(); return; }
+    const sameCode = barcode ? everyProduct.find((p) => p.id !== editingProductId && !p.binned && barcodeKey(p.barcode) === barcode) : null;
+    if (sameCode) { setFormError(form, `The barcode ${barcode} is already on "${sameCode.name}" of ${brandNameOf(sameCode)}. A barcode belongs to one product.`); el("productBarcodeInput").focus(); return; }
     if (!name) { setFormError(form, "Type the product name."); el("productNameInput").focus(); return; }
     if (!brand) { setFormError(form, "Choose the brand."); el("productBrandInput").focus(); return; }
     if (!cosmeticType) { setFormError(form, "Choose the cosmetic type."); el("productTypeInput").focus(); return; }
@@ -2411,7 +2767,7 @@ async function saveProduct(event) {
     const notes = ingredientPicker ? ingredientPicker.getNotes() : [];
     const data = {
         name, brandId: brand.id, brandName: brand.name, cosmeticType, description,
-        ingredients, shades, minAge, status, imageUrl, fdaNumber,
+        ingredients, shades, minAge, status, imageUrl, fdaNumber, barcode,
         // the codes printed on the pack, at the same places as the shades: the app reads a code on a scanned pack and finds the colour (ShadeCode.cs)
         shadeCodes: shadeCodes.some(Boolean) ? shadeCodes : [],
         // light summaries kept on the product so that nothing needs a join: the links to the library, how many, and the words a filter uses
@@ -2434,18 +2790,6 @@ async function saveProduct(event) {
             const folder = org.view.kind === "folder" ? org.view.name : "";          // added while a folder is open: it goes into that folder
             const made = await addDoc(collection(db, "products"), { ...data, scans: 0, folder, createdAt: serverTimestamp() });
             notify(folder ? `Product added to "${folder}".` : "Product added.", "ok");
-            if (snapshotInForm) {
-                const waiting = snapshotInForm.entry;
-                snapshotInForm = null;
-                try {
-                    await finishSnapshot(waiting, made.id, { brand: brand.name, name, kind: cosmeticType, shade: shades[0] || "", ingredients }, snapshotContext());
-                    snapshotsWaiting = Math.max(0, (snapshotsWaiting || 1) - 1);
-                    paintSnapshotCount();
-                } catch (failure) {
-                    console.error("Closing the snapshot failed: ", failure);
-                    notify("The product was saved, but its snapshot was not closed. Open Pending Snapshot Reviews and reject it. " + describeError(failure), "error");
-                }
-            }
         }
         productModal.close();
         await loadInventory();
@@ -2564,6 +2908,13 @@ function toggleBrand(id) {
 
 function onTableClick(event) {
     const button = event.target.closest("button");
+    // the list of brands: a click on a brand opens its products (its own buttons keep working)
+    if (drill && drill.kind === "brands" && org.view.kind !== "bin") {
+        const row = event.target.closest("tr.brand-row");
+        if (row && (!button || button.dataset.act === "toggle")) { openDrill({ kind: "brand", id: row.dataset.brand }); return; }
+    }
+    // one brand's view: its heading stays open
+    if (drill && drill.kind === "brand" && event.target.closest("tr.brand-row") && (!button || button.dataset.act === "toggle")) return;
     if (!button) {
         // a click on a row itself: a product shows (or hides) its details, a brand opens or closes
         if (event.target.closest("a, .detail-box")) return;
@@ -2678,6 +3029,20 @@ function registerData() {
         el("brandFilterSelect").value = brand ? brand.id : "";
         if (org.view.kind === "bin") org.show({ kind: "all" }); else fromFirstPage();
     };
+
+    // "Show as" for the counts panel and the AI ingredient suggestions (12 November 2026)
+    registerTileDataset("inventoryCounts", {
+        label: "Counts", noun: "counts", nounOne: "count", valueNoun: "Number", selector: ".stat-row .stat", watch: ".stat-row",
+        map: (tile) => ({ title: ((tile.querySelector(".stat-title") || {}).textContent || tile.getAttribute("data-tip-title") || "").trim(), value: parseFloat(((tile.querySelector(".stat-value") || {}).textContent || "0").replace(/[^\d.]/g, "")) || 0, tone: "info" }),
+        open: (tile) => tile.click()
+    });
+    registerDataset("ingredientSuggestions", {
+        label: "AI ingredient suggestions", noun: "suggestions", nounOne: "suggestion",
+        items: () => ingredientSuggestions,
+        map: (s) => ({ id: s.id, title: s.productName || "Unnamed product", subtitle: s.brandName, meta: many(s.ingredients.length, "ingredient", "ingredients"), tone: "pink" }),
+        dimensions: [{ id: "brand", label: "Brand", of: (s) => s.brandName || null, none: "No brand" }],
+        measures: [{ id: "ingredients", label: "Ingredients found", noun: "ingredients", of: (s) => s.ingredients.length }]
+    });
 
     registerDataset("products", {
         label: "Products", noun: "products", nounOne: "product",

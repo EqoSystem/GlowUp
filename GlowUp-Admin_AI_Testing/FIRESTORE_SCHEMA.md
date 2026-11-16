@@ -11,7 +11,7 @@ The admin website and the mobile app use the same Firebase project (`glowup-admi
 | `productIngredientSuggestions` | App | Website (Brand & Product Inventory) | Web-found lists for existing products, pending admin review |
 | `ingredients` | Website (Ingredient Curator). The app adds ingredients its AI lookup finds, marked as not reviewed. | App, website | Ingredient explanations and safety details |
 | `config` (one document, `lists`) | Website (Ingredient Curator, "Edit list") | App, website | The editable Allergen Family, Highlights and Skin Conditions lists |
-| `pending_products`, `pending_product_images` | App (AI photo snapshot) | App users (entries only), website (Pending Snapshot Reviews) | Products the catalogue does not have, read by the AI from one photo, waiting for an admin |
+| `pending_products`, `pending_product_images`, `snapshot_quota` | Nobody since 11 November 2026 (feature removed) | Admins (read/delete old entries) | Old AI photo snapshots. Photos are now matched with the catalogue only; the rules refuse new entries |
 | `scanActivity` | App | Website (Dashboard) | One anonymous note per scan |
 | `allergenSuggestions`, `conditionSuggestions` | App | Website (Dashboard) | Items users typed in that were not on the app's lists |
 | `users/{uid}` and `users/{uid}/scans` | App | App (that user only) | A user's profile and scan history |
@@ -98,16 +98,31 @@ The app recognises a scan as a product by comparing ingredient lists: at least 4
 
 The app offers a product to a user only when all of these are true: the product is Active, its brand is Active, it has ingredients, the user is at least `minAge`, and the app's analysis of the ingredients comes out safe for that user's profile.
 
+### `ingredientClassifications/{id}`
+
+The classification list, managed by admins in the Ingredient Curator. Everyone can read it; only admins write it. `other` is the fallback: it can be renamed but never deleted.
+
+| Field | Type | Notes |
+|---|---|---|
+| `name` | text | 1 to 40 characters; no two the same, ignoring capitals and extra spaces (the website checks this). |
+| `createdAt`, `updatedAt` | time | |
+
+`ingredientClassificationsTest/{id}` has the same shape. Only admins read and write it; the website uses it on any address that is not the live site (a preview, localhost), so a preview can never change the real list.
+
 ### `ingredients/{id}`
 
 | Field | Type | Notes |
 |---|---|---|
-| `name` | text | The friendly name users read. |
-| `techName` | text | The name printed on labels. Scans are matched against it. |
+| `name` | text | Shown as "INCI name". Scans are matched against it and against `aliases`. |
+| `classificationId` | text | Document id in `ingredientClassifications`. Empty = "Needs classification"; the app then shows no badge. |
+| `purpose` | text | One line, at most 120 characters, on what it does in a product. Empty: the app shows no Purpose line. |
+| `techName` | text | OLD INCI field, removed by the one-time field change (its value moves into `aliases` when it differs from `name`). Only entries from the app's AI look-up still arrive with it. |
 | `description` | text | The user-friendly definition. |
-| `aliases` | list of text | Other spellings found on labels. |
+| `aliases` | list of text | Other spellings found on labels. The first one is shown as the common name. |
 | `riskLevel` | text | `safe`, `caution`, `harmful`, or empty to let the app decide. |
 | `cautionNote` | text | Finishes the sentence "It ...", for example `can clog pores`. |
+| `frequentUseAllergy` | text, optional | Who may react allergically when products with this ingredient are used often, one plain sentence (max 200). Written only when there is one, from a regulator's classification (ECHA C&L H317 or the EU fragrance allergen list). The app (from the next build) shows it on the ingredient card under "More about this ingredient", only when it is not empty and the ingredient is not in the Recycle bin. |
+| `purposeSourceUrl`, `definitionSourceUrl`, `chemicalSourceUrl`, `aliasesSourceUrl`, `cautionSourceUrl`, `commonlyUsedInSourceUrl` | text, optional | The one page that supports that box (Purpose, User-Friendly Definition, What the chemical is, Also Known As, Caution Note, Commonly Used In). Empty or one https address (max 600). Absent on older entries = no source; nothing to migrate. Rules: `sourceLinkOrEmpty`. The website shows "Sources: n of N fields". |
 | `commonUses` | text | For example `serums, moisturisers`. |
 | `minAge` | number | 0 means no limit. |
 | `keyActive` | yes/no | Shown as a highlighted chip in results. |
@@ -130,7 +145,9 @@ The allergen, skin type and condition ids must be spelled exactly. The website's
 - **Writes.** Public users and the app can read the catalogue; only admin accounts write it, and the app may only create Pending entries and add 1 to `scans`. The rules also refuse an admin write whose name is not text, whose lists are absurdly long, or whose `imageUrl` / `logoUrl` is not an https address.
 - **Not built:** image upload to Firebase Storage (Cloud Storage needs the Blaze plan on new projects, and no Storage rules exist), so pictures are stored as web addresses; a visual-similarity search (there is no vector search in Firestore: the metadata filters do that job).
 
-### `pending_products/{id}` (AI photo snapshots, waiting for an admin)
+### `pending_products/{id}` (AI photo snapshots) — REMOVED 11 November 2026
+
+The feature is gone: the app matches photos with the catalogue only, the website has no Pending Snapshot Reviews, `api/scan-snapshot.js` is deleted and the rules refuse new entries, photos and counters. What follows describes the old entries that may still exist (an admin can delete them in the Firebase console).
 
 **The app uses only the sender's own entry** (`createdByUid` = the signed-in account): anyone signed in can stage the first entry for a product, so another user's entry is unverified and is never used for a verdict on another phone. When a scanned product is not in `products`, the app offers to take ONE photo. The AI reads the brand, name, kind, shade and the printed ingredient list; the result is analysed at once and shown with a **PENDING APPROVAL** badge. The id is `snap_<brand>__<name>` (letters, digits and underscores), so every user who snaps the same product lands on the same entry. Kept apart from `products` so unverified user content never mixes with the curated catalogue.
 
@@ -205,7 +222,7 @@ Open Beauty Facts is an open database of product labels typed in by volunteers, 
 
 ### What kind of page a source is (shown, never stored)
 
-Every `sources` entry stays `page title | https://address`. The kind of page is **worked out when it is shown**, the same way in the app, on the website and in the Assist with AI server, so older entries are labelled too and nothing new is written to the database. Do not put the label into the stored text.
+A product's line titled `Official website` comes first: the Edit Product form writes it, and can apply it to a brand's other products (`_Shared/sourceEdit.js`). Next comes the primary source, then secondary and retailer sources, by position. Every `sources` entry stays `page title | https://address`. The kind of page is **worked out when it is shown**, the same way in the app, on the website and in the Assist with AI server, so older entries are labelled too and nothing new is written to the database. Do not put the label into the stored text.
 
 | Kind | Label shown | Which pages |
 |---|---|---|
@@ -215,7 +232,7 @@ Every `sources` entry stays `page title | https://address`. The kind of page is 
 | `reference` | Ingredient database | Personal Care Products Council, INCI Beauty, INCIDecoder, Paula's Choice dictionary, EWG, CosmeticsInfo |
 | `public` | Public list (anyone can edit) | Open Beauty Facts |
 | `retailer` | Retailer listing | Large shops by their whole address (watsons.com.ph, shopee.ph, lazada.com.ph, sephora.com, mercurydrug.com ...): `SOURCE_RETAILERS` / `ListSources.RetailerSites` |
-| `other` | Unverified site | Everything else, and every address that is not plain: a user name in front of the site (`https://fda.gov@evil.com`), a backslash, or letters outside a-z 0-9 . - in the site's name. Such addresses are also never shown as links. |
+| `other` | Other website | Everything else, and every address that is not plain: a user name in front of the site (`https://fda.gov@evil.com`), a backslash, or letters outside a-z 0-9 . - in the site's name. Such addresses are also never shown as links. |
 
 A search engine's pass-through address (Google's grounding link, `google.com/url`, `bing.com/ck`) is recognised by its own site, never by words elsewhere in the address; it is then labelled by its page title, and only when that title is a plain site name.
 

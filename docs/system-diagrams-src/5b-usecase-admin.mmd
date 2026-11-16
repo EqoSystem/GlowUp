@@ -1,0 +1,26 @@
+flowchart TD
+  %% ASSUMED: include/extend relationships and the AI secondary actor are an interpretive UML use-case reading of existing flows; not a literal source artifact
+  classDef actor fill:#fff,stroke:#333,stroke-width:1px
+  classDef uc fill:#f5f5f5,stroke:#333,stroke-width:1px
+
+  Admin[["Admin / curator"]]:::actor
+  GeminiA(("Gemini AI<br/>secondary actor")):::actor
+
+  subgraph SYS["GlowUp system boundary — admin-facing"]
+    direction LR
+    UC7(("Import catalogue file")):::uc
+    UC8(("Review pending brand/product")):::uc
+    UC9(("Curate ingredient entry")):::uc
+    UC10(("Approve pending AI snapshot")):::uc
+    UC11(("Assist with AI, draft text")):::uc
+    UC12(("Manage Recycle Bin / Archive")):::uc
+  end
+
+  Admin --> UC7
+  Admin --> UC8
+  Admin --> UC9
+  Admin --> UC10
+  Admin --> UC11
+  Admin --> UC12
+  UC11 -. include .-> GeminiA
+  UC9 -. include .-> UC11

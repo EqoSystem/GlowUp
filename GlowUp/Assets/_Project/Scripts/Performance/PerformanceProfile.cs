@@ -61,8 +61,12 @@ namespace GlowUp.Performance
         [Header("AR Try-On: which pipeline a phone gets (Settings > AR Try-On quality > Automatic)")]
         [Tooltip("Memory (RAM) at or above this many megabytes: the full pipeline (dense face mesh, blend shaders, light adaptation, mouth mask). A phone sold as 6 GB reports about 5500, so 5500 is the line for \"more than 6 GB\" phones.")]
         public int arHighMinMemoryMb = 5500;
-        [Tooltip("Memory below this many megabytes: the lighter pipeline (small overlay picture, one colour layer at a time, no light adaptation, frame-rate cap). A phone sold as 4 GB reports about 3700.")]
-        public int arLowBelowMemoryMb = 3800;
+        [Tooltip("Memory below this many megabytes: the lighter pipeline (small overlay picture, one colour layer at a time, no light adaptation, frame-rate cap). A phone sold as 4 GB reports 3500 to 3900, so 4500 puts every 4 GB phone on the lighter pipeline (phase 3B, 11 November 2026; was 3800).")]
+        public int arLowBelowMemoryMb = 4500;
+        [Tooltip("A processor with this many cores or fewer counts as low-end: the lighter pipeline whatever the memory (0 = not used)")]
+        public int arLowEndMaxCores = 4;
+        [Tooltip("A processor whose top speed is below this many MHz counts as low-end: the lighter pipeline (0 = not used; a phone that does not report its speed is not judged by it)")]
+        public int arLowEndBelowMhz = 1800;
         [Tooltip("A phone between the two limits gets: on = the full pipeline, off = the lighter one")]
         public bool arMidRangeGetsFullPipeline = true;
         [Tooltip("Graphics memory at or below this many megabytes counts as a weak graphics chip (0 = this check is not used). A weak chip gets the lighter pipeline whatever its RAM.")]

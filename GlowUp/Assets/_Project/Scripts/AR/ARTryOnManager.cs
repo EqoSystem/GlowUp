@@ -14,7 +14,6 @@ public class ARTryOnManager : MonoBehaviour
     [SerializeField] private GameObject arTryOnOverlayPanel;  // UI controls while in AR mode (e.g., "Back to Results")
     [SerializeField] private TMP_Text arStatusText;
 
-    private bool isArActive = false;
 
     void Start()
     {
@@ -26,7 +25,6 @@ public class ARTryOnManager : MonoBehaviour
     public void LaunchARTryOn()
     {
         Debug.Log("[ARTryOnManager] Activating AR Try-On module.");
-        isArActive = true;
 
         if (resultsPanel != null) resultsPanel.SetActive(false);
         if (arSessionObject != null) arSessionObject.SetActive(true);
@@ -41,7 +39,6 @@ public class ARTryOnManager : MonoBehaviour
     public void ExitARTryOn()
     {
         Debug.Log("[ARTryOnManager] Exiting AR Try-On module.");
-        isArActive = false;
 
         if (arSessionObject != null) arSessionObject.SetActive(false);
         if (arTryOnOverlayPanel != null) arTryOnOverlayPanel.SetActive(false);

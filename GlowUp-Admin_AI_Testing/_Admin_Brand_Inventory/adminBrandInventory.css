@@ -2,6 +2,28 @@
 
 /* ---- the table: a line per brand, then that brand's products; a product shows only its name, type, shades, scans and status ---- */
 .inventory-table { min-width: 640px; }
+/* FLUID (7 November 2026): the table never scrolls sideways. Under 720 px of list it drops its minimum width and its cells
+   wrap; under 600 px the products become cards (adminBrandInventory.js), and the Recycle bin view keeps the wrapping table. */
+#inventoryHost { container: invlist / inline-size; }
+@container invlist (max-width: 720px) {
+    .inventory-table { min-width: 0; }
+    .inventory-table .brand-about, .inventory-table .brand-meta, .inventory-table .shade-cell { white-space: normal; }
+    .inventory-table th, .inventory-table td { padding-inline: 8px; overflow-wrap: break-word; }
+    /* a brand heading: name, buttons and status wrap onto more lines instead of running past the edge */
+    .brand-line { flex-wrap: wrap; row-gap: 6px; min-width: 0; }
+    .brand-line .btn-group { flex-wrap: wrap; }
+}
+/* a list made narrow by Quick settings keeps its rows (it does not turn into cards): the Shades and Scans columns step aside so
+   the name, type, status and buttons keep their room; each product's details still show them (9 November 2026) */
+@container invlist (max-width: 620px) {
+    .inventory-table th.shade-col, .inventory-table th.scan-col,
+    .inventory-table tr.product-row > td.shade-cell, .inventory-table tr.product-row > td.scan-count { display: none; }
+    /* a long status ("Approved · Hidden (brand pending)") wraps inside its badge instead of pushing the table past the edge */
+    .inventory-table .status-badge { white-space: normal; text-align: left; line-height: 1.3; border-radius: 8px; }
+    .inventory-table .brand-meta { white-space: normal; }
+    .inventory-table .brand-line .row-btn, .inventory-table .brand-line .btn { white-space: normal; }
+}
+.as-cards .inventory-table tr.product-row > td.shade-cell, .as-cards .inventory-table tr.product-row > td.scan-count { display: block; }
 .brand-row { cursor: pointer; }
 .brand-row > td { background: var(--surface-2); padding-top: 7px; padding-bottom: 7px; }
 .brand-line { display: flex; align-items: center; gap: 10px; min-height: 32px; }
@@ -21,9 +43,9 @@
 .brand-toggle svg.ic { transition: transform .2s var(--ease); }
 .brand-row.closed .brand-toggle svg.ic { transform: rotate(-90deg); }
 .product-row > td { vertical-align: middle; }
-.name-line { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.name-line { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; min-width: 0; }
 .product-row .name-line { padding-left: 2px; }
-.product-name { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.product-name { font-weight: 600; flex: 1 1 10ch; min-width: min(7ch, 100%); overflow-wrap: break-word; }
 .ingredient-missing { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; font-size: var(--fs-xs); }
 .button.ingredient-missing, button.ingredient-missing { margin: 0; padding: 2px 9px; font-family: inherit; font-weight: 500; cursor: pointer; }
 .button.ingredient-missing:hover, button.ingredient-missing:hover { background: color-mix(in srgb, var(--warn) 22%, transparent); }
@@ -83,3 +105,51 @@
 .as-cards .inventory-table tr.product-row > td.scan-count::after { content: " scans"; color: var(--muted); font-size: var(--fs-xs); }
 .as-cards .inventory-table tr.product-row > td:last-child { margin-left: auto; }
 .as-cards .inventory-table tr.product-row .row-actions { opacity: 1; }
+
+/* ---- the views of the two count tiles (5 November 2026) ---- */
+.drill-name { font-weight: 650; }
+.brand-row.drill-head { cursor: default; }
+.brand-row.drill-head .brand-toggle { display: none; }
+.type-row > td { background: var(--surface-2); padding-top: 8px; padding-bottom: 8px; }
+.type-row .type-name { font-weight: 650; }
+#brandPageSize { flex: none; }
+th .th-line small { font-weight: 500; letter-spacing: 0; text-transform: none; margin-left: 6px; }
+.as-cards .inventory-table tbody > tr.type-row { grid-column: 1 / -1; }
+
+/* ---- the sources in the product form, and the window that applies them to other products ---- */
+.sources-box { display: flex; flex-direction: column; gap: 8px; }
+.source-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.source-row input[type=url] { flex: 1 1 260px; min-width: 0; }
+.source-row .source-fixed { flex: 1 1 260px; min-width: 0; color: var(--text-2); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.source-row .row-btn { white-space: nowrap; }
+.source-row .row-btn[disabled] { opacity: .55; cursor: not-allowed; }
+.apply-window { width: min(640px, calc(100vw - 32px)); }
+.apply-body { display: flex; flex-direction: column; gap: 12px; }
+.apply-all { font-size: var(--fs-sm); }
+.apply-list { display: flex; flex-direction: column; gap: 2px; max-height: min(320px, 40vh); overflow: auto; padding: 6px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
+.apply-item { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 5px 6px; border-radius: 6px; cursor: pointer; font-size: var(--fs-sm); }
+.apply-item:hover { background: color-mix(in srgb, var(--text) 6%, transparent); }
+.apply-item .apply-name { font-weight: 600; }
+.apply-item .apply-now { color: var(--muted); font-size: var(--fs-xs); overflow-wrap: anywhere; }
+.apply-count { font-size: var(--fs-sm); color: var(--text-2); }
+
+/* ---- Search: the drop-down under the box, the results line, the note on a row found by an ingredient ---- */
+.search-suggest {
+    position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 60; max-height: min(420px, 70vh); overflow: auto; padding: 6px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
+}
+.search-suggest[hidden] { display: none; }
+.sug-head { padding: 8px 10px 4px; font-size: var(--fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.sug-item { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 10px; border-radius: 8px; cursor: pointer; font-size: var(--fs-base); }
+.sug-item:hover, .sug-item.active { background: var(--surface-3); }
+.sug-item.active { outline: 2px solid var(--accent); outline-offset: -2px; }
+.sug-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sug-note { flex: none; color: var(--muted); font-size: var(--fs-sm); }
+.sug-none { padding: 12px 10px; color: var(--muted); font-size: var(--fs-sm); }
+.search-status { display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px 2px 10px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); font-size: var(--fs-sm); color: var(--text-2); }
+.search-status[hidden] { display: none; }
+.search-status-clear { display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
+.search-status-clear:hover { background: var(--surface-3); color: var(--text); }
+.search-status-clear:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.search-status-clear svg.ic { width: 12px; height: 12px; }
+.contains-note { margin-left: 8px; font-size: var(--fs-xs); color: var(--muted); font-style: italic; white-space: nowrap; }

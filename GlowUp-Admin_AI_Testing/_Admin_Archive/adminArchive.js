@@ -8,7 +8,9 @@ import {
     requireAdmin, wireSignOut, setupNavigationGuard, escapeHtml, asArray, timeAgo, formatWhen, notify, describeError, wireSearch, dialogIsOpen
 } from "../_Shared/adminCommon.js";
 import { matchesSearch } from "../_Shared/glowupRules.js";
-import { mountShell, paginate, renderPager, icon, BIN_ICON, askConfirm, hydrate } from "../_Shared/adminShell.js";
+import { mountShell, placeHeaderParts, paginate, renderPager, icon, BIN_ICON, askConfirm, hydrate } from "../_Shared/adminShell.js";
+import { bindButtons } from "../_Shared/shortcuts.js";
+import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { listArchive, restoreFromArchive, deleteFromArchive, daysLeft, expired, KEEP_DAYS, WARN_DAYS } from "../_Shared/adminArchive.js";
 
 const el = (id) => document.getElementById(id);
@@ -26,8 +28,18 @@ let loaded = false;
 const picked = new Set();
 const pager = { page: 1, size: 10 };
 
+// "Show as" for the list of archived entries (12 November 2026): what the tab shows, as a list, row, grid or graph
+registerDataset("archive", {
+    label: "Archived entries", noun: "entries", nounOne: "entry",
+    items: () => (loaded ? shownEntries() : []),
+    map: (x) => ({ id: x.id, title: nameOf(x), subtitle: kind, meta: leftWords(x).text, tone: leftWords(x).tone === "bad" ? "bad" : leftWords(x).tone === "warn" ? "warn" : "muted" }),
+    dimensions: [{ id: "who", label: "Removed by", of: (x) => x.deleted_by_email || null, none: "Unknown" }]
+});
+
 document.addEventListener("DOMContentLoaded", async () => {
     mountShell("archive");
+    bindButtons({ "archive.restore": "#archiveRestoreSelectedBtn", "archive.delete": "#archiveDeleteSelectedBtn" });      // keyboard shortcuts (shortcuts.js)
+    placeHeaderParts();                 // the same header as the Recycle Bin (New8.pdf)
     wireSignOut();
     setupNavigationGuard();
     try { const wanted = new URLSearchParams(location.search).get("show"); if (KINDS[wanted]) kind = wanted; } catch (error) { /* keep the first tab */ }
@@ -92,6 +104,7 @@ function paintTabs() {
 function render() {
     paintTabs();
     if (!loaded) return;
+    datasetChanged("archive");
     el("countIngredients").textContent = ofKind("ingredients").length || "";
     el("countBrands").textContent = ofKind("brands").length || "";
     el("countProducts").textContent = ofKind("products").length || "";

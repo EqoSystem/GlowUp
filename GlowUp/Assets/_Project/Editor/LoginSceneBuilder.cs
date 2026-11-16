@@ -55,7 +55,7 @@ namespace GlowUp.EditorTools
             // ----- wording -----
             SetText(title, "Glow Up"); SetText(subtitle, "Welcome!"); SetText(emailLabel, "Email:"); SetText(pwLabel, "Password:");
             SetText(forgot, "Forgot Password?"); SetText(signUp, "Sign Up"); SetText(signIn, "Log-In");
-            SetText(termsText, "Read the Privacy Policy and Terms before signing up");
+            SetText(termsText, "Read the Privacy Policy and Terms and Conditions before signing up.");
             if (fb != null)
             {
                 fb.text = "";

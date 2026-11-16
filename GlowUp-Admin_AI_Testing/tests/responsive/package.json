@@ -1,0 +1,7 @@
+{
+  "name": "glowup-admin-responsive-tests",
+  "private": true,
+  "type": "module",
+  "description": "Browser rig for tests/responsive.spec.js (uses the Chrome of this computer).",
+  "dependencies": { "playwright-core": "1.48.2" }
+}

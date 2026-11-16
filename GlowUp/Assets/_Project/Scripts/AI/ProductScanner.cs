@@ -161,7 +161,7 @@ public class ProductScanner : MonoBehaviour
                     {
                         if (scanStatusText != null && scanStatusText.text != "[WARNING] Camera appears to be blocked or covered!")
                         {
-                            scanStatusText.text = "[WARNING] Camera appears to be blocked or covered!";
+                            scanStatusText.text = "The camera seems to be covered. Check the lens.";
                         }
                     }
                     else
@@ -185,7 +185,7 @@ public class ProductScanner : MonoBehaviour
         if (!isTesseractReady)
         {
             Debug.LogWarning("[ProductScanner] Scan clicked, but Tesseract is still setting up.");
-            if (scanStatusText != null) scanStatusText.text = "Initializing OCR, please wait...";
+            if (scanStatusText != null) scanStatusText.text = "Getting the text reader ready, please wait...";
             return;
         }
 
@@ -199,7 +199,7 @@ public class ProductScanner : MonoBehaviour
         if (client == null)
         {
             Debug.LogError("[ProductScanner] GeminiApiClient is not initialized.");
-            if (scanStatusText != null) scanStatusText.text = "API client error.";
+            if (scanStatusText != null) scanStatusText.text = "Something went wrong. Please try again.";
             return;
         }
 
@@ -248,7 +248,7 @@ public class ProductScanner : MonoBehaviour
             Debug.LogWarning("[ProductScanner] FirestoreManager instance not found in scene.");
         }
 
-        if (scanStatusText != null) scanStatusText.text = "Analyzing ingredients with Gemini...";
+        if (scanStatusText != null) scanStatusText.text = "Analyzing ingredients...";
 
         // Handle cancellation tokens for ongoing requests
         scanCts?.Cancel();

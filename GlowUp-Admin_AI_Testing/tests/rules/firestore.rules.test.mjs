@@ -46,11 +46,14 @@ async function seed() {
         await setDoc(doc(db, "products/p1"), { name: "Example Lipstick", brandId: "b1", cosmeticType: "Lipstick", ingredients: ["Mica"], shades: ["#C24B62"], status: "Active", scans: 5 });
         await setDoc(doc(db, "ingredients/i1"), { name: "Mica", techName: "Mica", description: "A mineral", riskLevel: "safe" });
         await setDoc(doc(db, "config/lists"), { version: 1, allergens: [], conditions: [], highlights: [] });
+        await setDoc(doc(db, "ingredientClassifications/other"), { name: "Other" });
+        await setDoc(doc(db, "ingredientClassifications/binder"), { name: "Binder" });
         await setDoc(doc(db, "users/u1"), { firstName: "Test" });
         await setDoc(doc(db, "users/u1/scans/s1"), { productName: "x" });
         await setDoc(doc(db, "scanActivity/n1"), { productName: "x", status: "safe", scannedAtUnix: now });
         await setDoc(doc(db, "allergenSuggestions/g1"), { text: "nickel", uid: "u1", status: "pending", createdAtUnix: now });
         await setDoc(doc(db, "pending_products/snap_examplebrand__thing__u1"), { createdByUid: "u1", name: "Thing", brandName: "Examplebrand", isApproved: false });
+        await setDoc(doc(db, "pending_product_images/snap_examplebrand__thing__u1"), { createdByUid: "u1", jpegBase64: "AAAA", bytes: 3, createdAtUnix: 1 });
         await setDoc(doc(db, "pending_products/snap_examplebrand__thing__u2"), { createdByUid: "u2", name: "Thing", brandName: "Examplebrand", isApproved: false });
     });
 }
@@ -92,6 +95,25 @@ await can("an admin sets a brand's website and records themselves as the one who
 await cannot("config/lists with a field that is not allowed", () => setDoc(doc(adminDoc(), "config/lists"), { version: 2, allergens: [], conditions: [], highlights: [], extra: 1 }));
 await cannot("another config document", () => setDoc(doc(adminDoc(), "config/other"), { version: 1, allergens: [], conditions: [], highlights: [] }));
 await cannot("even an admin deletes config/lists", () => deleteDoc(doc(adminDoc(), "config/lists")));
+
+// ---- ingredient classifications: everyone reads, only an admin writes, "other" is never deleted
+await can("nobody signed in reads a classification", () => getDoc(doc(anon(), "ingredientClassifications/other")));
+await can("an admin adds a classification", () => setDoc(doc(adminDoc(), "ingredientClassifications/other"), { name: "Other" }));
+await can("an admin adds another classification", () => setDoc(doc(adminDoc(), "ingredientClassifications/binder"), { name: "Binder" }));
+await can("an admin renames the fallback", () => updateDoc(doc(adminDoc(), "ingredientClassifications/other"), { name: "Everything else" }));
+await cannot("even an admin deletes the fallback", () => deleteDoc(doc(adminDoc(), "ingredientClassifications/other")));
+await can("an admin deletes another classification", () => deleteDoc(doc(adminDoc(), "ingredientClassifications/binder")));
+await cannot("a classification with no name", () => setDoc(doc(adminDoc(), "ingredientClassifications/x"), { name: "" }));
+await cannot("a classification name that is too long", () => setDoc(doc(adminDoc(), "ingredientClassifications/x"), { name: "x".repeat(41) }));
+await cannot("a classification with a field that is not allowed", () => setDoc(doc(adminDoc(), "ingredientClassifications/x"), { name: "X", extra: 1 }));
+await cannot("a user adds a classification", () => setDoc(doc(user(), "ingredientClassifications/x"), { name: "X" }));
+await cannot("the app (anyone not an admin) reads the TEST list", () => getDoc(doc(user(), "ingredientClassificationsTest/other")));
+await can("an admin writes the TEST list", () => setDoc(doc(adminDoc(), "ingredientClassificationsTest/other"), { name: "Other" }));
+await can("an admin reads the TEST list", () => getDoc(doc(adminDoc(), "ingredientClassificationsTest/other")));
+await cannot("even an admin deletes the TEST fallback", () => deleteDoc(doc(adminDoc(), "ingredientClassificationsTest/other")));
+await cannot("a user writes the TEST list", () => setDoc(doc(user(), "ingredientClassificationsTest/x"), { name: "X" }));
+await cannot("nobody signed in adds a classification", () => setDoc(doc(anon(), "ingredientClassifications/x"), { name: "X" }));
+await cannot("a user deletes a classification", () => deleteDoc(doc(user(), "ingredientClassifications/other")));
 
 // ---------------------------------------------------------------------------------------------
 // 2. What the app itself may add: always Pending, always "not reviewed", always with the user's own id
@@ -188,52 +210,21 @@ await cannot("a user reads the proposals", () => getDoc(doc(user(), "productIngr
 await can("an admin reads the proposals", () => getDoc(doc(adminDoc(), "productIngredientSuggestions/s1")));
 
 // ---------------------------------------------------------------------------------------------
-// 6. Photo snapshots staged for an admin (pending_products)
+// 6. Photo snapshots: removed on 11 November 2026 (photos are matched with the catalogue only). Nobody stages any more; an admin
+//    may still read and delete what is left; the old daily counters are closed.
 // ---------------------------------------------------------------------------------------------
-const staged = (uid, brand, name) => {
-    const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
-    const key = `${slug(brand)}__${slug(name)}__${uid}`;
-    return { id: "snap_" + key, data: { name, brandName: brand, cosmeticType: "Foundation", shadeHex: "#E0B090", ingredients: ["Mica", "Talc"], key, status: "pending", source: "snapshot", isApproved: false,
-        hasImage: false, confidence: 0.8, model: "test", createdByUid: uid, createdAtUnix: now } };
-};
-{
-    const mine = staged("u1", "Newbrand", "Glow Tint");
-    await can("a user stages a product under their own id", () => setDoc(doc(user(), "pending_products/" + mine.id), mine.data));
-    await cannot("a user stages a product that is already approved", () => setDoc(doc(user(), "pending_products/" + mine.id), { ...mine.data, isApproved: true }));
-    await cannot("a user stages a product under someone else's id", () => setDoc(doc(other(), "pending_products/" + mine.id), mine.data));
-    await cannot("a user stages a hair product", () => { const s = staged("u1", "Newbrand", "Silk Shampoo"); return setDoc(doc(user(), "pending_products/" + s.id), { ...s.data, cosmeticType: "Shampoo" }); });
-    await cannot("a user stages a product whose id does not follow its names", () => setDoc(doc(user(), "pending_products/snap_wrong__name__u1"), { ...mine.data, key: "wrong__name__u1" }));
-    await cannot("nobody signed in stages a product", () => setDoc(doc(anon(), "pending_products/" + mine.id), mine.data));
-}
-await can("a user reads their own staged product", () => getDoc(doc(user(), "pending_products/snap_examplebrand__thing__u1")));
-await cannot("a user reads another user's staged product", () => getDoc(doc(user(), "pending_products/snap_examplebrand__thing__u2")));
-await can("a user asks for a staged product that does not exist (the answer is 'not found')", () => getDoc(doc(user(), "pending_products/snap_nobody__nothing__u1")));
-await cannot("a user lists the staged products", () => getDocs(query(collection(user(), "pending_products"))));
-await cannot("nobody signed in reads a staged product", () => getDoc(doc(anon(), "pending_products/snap_examplebrand__thing__u1")));
-await can("an admin reads any staged product", () => getDoc(doc(adminDoc(), "pending_products/snap_examplebrand__thing__u2")));
-await can("an admin lists the staged products", () => getDocs(query(collection(adminClaim(), "pending_products"))));
-await can("an admin approves a staged product", () => updateDoc(doc(adminDoc(), "pending_products/snap_examplebrand__thing__u1"), { isApproved: true }));
-await cannot("a user changes their staged product", () => updateDoc(doc(user(), "pending_products/snap_examplebrand__thing__u1"), { isApproved: true }));
-await cannot("a user deletes their staged product", () => deleteDoc(doc(user(), "pending_products/snap_examplebrand__thing__u1")));
-await cannot("a user reads a staged photo", () => getDoc(doc(user(), "pending_product_images/snap_examplebrand__thing__u1")));
-await can("an admin reads a staged photo", () => getDoc(doc(adminDoc(), "pending_product_images/snap_examplebrand__thing__u1")));
-
-// ---------------------------------------------------------------------------------------------
-// 7. Daily limits of the photo function (snapshot_quota)
-// ---------------------------------------------------------------------------------------------
-const mineToday = `u1_${day}`;
-await can("a user starts today's counter at 1", () => setDoc(doc(user(), "snapshot_quota/" + mineToday), { uid: "u1", day, count: 1, lastAt: serverTimestamp() }));
-await cannot("a counter that starts at 2", () => setDoc(doc(user(), "snapshot_quota/" + mineToday), { uid: "u1", day, count: 2, lastAt: serverTimestamp() }));
-await cannot("a counter of another user", () => setDoc(doc(other(), "snapshot_quota/" + mineToday), { uid: "u1", day, count: 1, lastAt: serverTimestamp() }));
-await cannot("a counter for another day", () => setDoc(doc(user(), "snapshot_quota/u1_20200101"), { uid: "u1", day: "20200101", count: 1, lastAt: serverTimestamp() }));
-await cannot("the shared counter on its own (it must move together with the user's own)", () => setDoc(doc(other(), "snapshot_quota/all_" + day), { day, count: 1 }));
-await can("both counters in one commit", async () => {
-    const db = other(), batch = writeBatch(db);
-    batch.set(doc(db, "snapshot_quota/u2_" + day), { uid: "u2", day, count: 1, lastAt: serverTimestamp() });
-    batch.set(doc(db, "snapshot_quota/all_" + day), { day, count: 1 });
-    await batch.commit();
-});
-await cannot("listing the counters", () => getDocs(query(collection(user(), "snapshot_quota"))));
+await cannot("a user stages a product (the feature is gone)", () => setDoc(doc(user(), "pending_products/snap_newbrand__glow_tint__u1"),
+    { name: "Glow Tint", brandName: "Newbrand", cosmeticType: "Foundation", ingredients: [], key: "newbrand__glow_tint__u1", status: "pending", source: "snapshot", isApproved: false, hasImage: false, createdByUid: "u1", createdAtUnix: now }));
+await can("a user asks for their own old entry (the live scan's look-up)", () => getDoc(doc(user(), "pending_products/snap_examplebrand__thing__u1")));
+await can("a user asks for an entry that does not exist (the answer is 'not found')", () => getDoc(doc(user(), "pending_products/snap_nobody__nothing__u1")));
+await cannot("a user reads another user's old entry", () => getDoc(doc(user(), "pending_products/snap_examplebrand__thing__u2")));
+await cannot("a user changes their old entry", () => updateDoc(doc(user(), "pending_products/snap_examplebrand__thing__u1"), { isApproved: true }));
+await can("an admin lists the old entries", () => getDocs(query(collection(adminClaim(), "pending_products"))));
+await can("an admin reads an old photo", () => getDoc(doc(adminDoc(), "pending_product_images/snap_examplebrand__thing__u1")));
+await cannot("a user reads their old photo", () => getDoc(doc(user(), "pending_product_images/snap_examplebrand__thing__u1")));
+await cannot("a user writes a photo", () => setDoc(doc(user(), "pending_product_images/snap_examplebrand__thing__u1"), { createdByUid: "u1", jpegBase64: "AAAA", bytes: 3, createdAtUnix: 1 }));
+await cannot("a user starts a daily photo counter", () => setDoc(doc(user(), "snapshot_quota/u1_20261111"), { uid: "u1", day: "20261111", count: 1, lastAt: serverTimestamp() }));
+await can("an admin deletes an old entry", () => deleteDoc(doc(adminDoc(), "pending_products/snap_examplebrand__thing__u2")));
 
 // ---------------------------------------------------------------------------------------------
 // 8. The Archive (added 29 October 2026, ARCHIVE_DESIGN.md): admins only, created once, never changed
@@ -262,6 +253,8 @@ const putEntry = () => env.withSecurityRulesDisabled((context) => setDoc(doc(con
 await can("an admin reads the Archive", async () => { await putEntry(); await getDocs(query(collection(adminDoc(), "archive"))); });
 await cannot("a plain user reads the Archive", async () => { await putEntry(); await getDoc(doc(user(), "archive/products__p1")); });
 await cannot("nobody signed in lists the Archive", () => getDocs(query(collection(anon(), "archive"))));
+await cannot("a plain user lists the Archive", async () => { await putEntry(); await getDocs(query(collection(user(), "archive"))); });
+await cannot("nobody signed in reads an archive entry", async () => { await putEntry(); await getDoc(doc(anon(), "archive/products__p1")); });
 await cannot("an admin changes an archive entry", async () => { await putEntry(); await updateDoc(doc(adminDoc(), "archive/products__p1"), { expires_at: in30() }); });
 await can("an admin deletes an archive entry (Delete now)", async () => { await putEntry(); await deleteDoc(doc(adminDoc(), "archive/products__p1")); });
 await cannot("a plain user deletes an archive entry", async () => { await putEntry(); await deleteDoc(doc(user(), "archive/products__p1")); });
@@ -276,6 +269,57 @@ await can("an admin restores: the original back, the entry gone (one batch)", as
 await can("an admin reads the purge log", () => getDocs(query(collection(adminDoc(), "archive_purge_log"))));
 await cannot("an admin writes the purge log", () => setDoc(doc(adminDoc(), "archive_purge_log/x"), { mode: "live" }));
 await cannot("a plain user reads the purge log", () => getDocs(query(collection(user(), "archive_purge_log"))));
+
+// bulk apply on the Inventory page: one batch that changes only the sources of the chosen products
+await can("an admin applies a source to products in one batch", async () => {
+    const db = adminDoc(), batch = writeBatch(db);
+    batch.update(doc(db, "products/p1"), { sources: ["Official website | https://example.com"], updatedAt: serverTimestamp() });
+    await batch.commit();
+});
+await cannot("a plain user applies a source", () => updateDoc(doc(user(), "products/p1"), { sources: ["Official website | https://example.com"] }));
+await cannot("nobody signed in applies a source", () => updateDoc(doc(anon(), "products/p1"), { sources: ["Official website | https://example.com"] }));
+await cannot("an admin applies more sources than the rule takes", () => updateDoc(doc(adminDoc(), "products/p1"), { sources: Array.from({ length: 41 }, (_, i) => "x | https://example.com/" + i) }));
+
+// ---- siteLayouts: the shared default layout of a page (9 November 2026) ----
+const shared = (uid) => ({ layout: { order: ["kpis"], styles: { kpis: { anim: "fade" } } }, appearance: { font: "inter" }, updatedAt: serverTimestamp(), updatedBy: uid });
+await can("an admin makes the dashboard's shared default", () => setDoc(doc(adminDoc(), "siteLayouts/dashboard"), shared("a1")));
+await can("an admin reads a shared default", () => getDoc(doc(adminDoc(), "siteLayouts/dashboard")));
+await cannot("a plain user reads a shared default", () => getDoc(doc(user(), "siteLayouts/dashboard")));
+await cannot("a plain user writes a shared default", () => setDoc(doc(user(), "siteLayouts/dashboard"), shared("u1")));
+await cannot("an admin writes one for a page that does not exist", () => setDoc(doc(adminDoc(), "siteLayouts/elsewhere"), shared("a1")));
+await cannot("an admin writes it in someone else's name", () => setDoc(doc(adminDoc(), "siteLayouts/dashboard"), shared("u1")));
+await cannot("a shared default with an extra field", () => setDoc(doc(adminDoc(), "siteLayouts/dashboard"), Object.assign(shared("a1"), { script: "x" })));
+await cannot("a shared default whose layout is not a map", () => setDoc(doc(adminDoc(), "siteLayouts/dashboard"), Object.assign(shared("a1"), { layout: "x" })));
+
+// ---- adminShortcuts: an admin's own keyboard shortcuts (9 November 2026) ----
+const keys = () => ({ items: { "inventory.addBrand": { keys: "Ctrl+Alt+KeyB", description: "Opens the Add brand form.", enabled: true } }, seeded: ["inventory.addBrand"], updatedAt: serverTimestamp() });
+await can("an admin saves their own shortcuts", () => setDoc(doc(adminDoc(), "adminShortcuts/a1"), keys()));
+await can("an admin reads their own shortcuts", () => getDoc(doc(adminDoc(), "adminShortcuts/a1")));
+await cannot("an admin reads another admin's shortcuts", () => getDoc(doc(adminDoc(), "adminShortcuts/a2")));
+await cannot("an admin writes another admin's shortcuts", () => setDoc(doc(adminDoc(), "adminShortcuts/a2"), keys()));
+// account deletion (12 November 2026): the profile is deleted only right after a fresh sign-in
+const fresh = () => env.authenticatedContext("u1", { auth_time: Math.floor(Date.now() / 1000) - 30 }).firestore();
+const stale = () => env.authenticatedContext("u1", { auth_time: Math.floor(Date.now() / 1000) - 3600 }).firestore();
+await can("the owner deletes the profile right after signing in again", () => deleteDoc(doc(fresh(), "users/u1")));
+await cannot("the owner deletes the profile on an old sign-in", () => deleteDoc(doc(stale(), "users/u1")));
+await cannot("another user deletes the profile", () => deleteDoc(doc(other(), "users/u1")));
+await can("the owner still updates the profile on an old sign-in", () => setDoc(doc(stale(), "users/u1"), { firstName: "Changed" }));
+await can("the owner deletes a scan (Recent Scans: Delete forever)", () => deleteDoc(doc(stale(), "users/u1/scans/s1")));
+// support reports from the app (Settings > Contact support); "Suggestion" added 11 November 2026
+const report = (category) => ({ uid: "u1", category, message: "Please add a shade finder", status: "new", appVersion: "1.0", device: "Pixel", createdAtUnix: now });
+await can("a report carries the sender's name", () => setDoc(doc(user(), "supportReports/r5"), Object.assign(report("Bug"), { userName: "Mark Azcueta" })));
+await cannot("a report with a name that is not text", () => setDoc(doc(user(), "supportReports/r6"), Object.assign(report("Bug"), { userName: 12 })));
+await can("a user sends a Suggestion report", () => setDoc(doc(user(), "supportReports/r1"), report("Suggestion")));
+await can("a user sends a Bug report", () => setDoc(doc(user(), "supportReports/r2"), report("Bug")));
+await cannot("a user sends a report of an unknown kind", () => setDoc(doc(user(), "supportReports/r3"), report("Spam")));
+await cannot("a user sends a report in someone else's name", () => setDoc(doc(other(), "supportReports/r4"), report("Suggestion")));
+await cannot("a user reads support reports", () => getDoc(doc(user(), "supportReports/r1")));
+
+await cannot("a plain user saves shortcuts (the 403 of the endpoint)", () => setDoc(doc(user(), "adminShortcuts/u1"), keys()));
+await cannot("a plain user reads shortcuts", () => getDoc(doc(user(), "adminShortcuts/u1")));
+await cannot("nobody signed in reads shortcuts", () => getDoc(doc(anon(), "adminShortcuts/a1")));
+await cannot("shortcuts with an extra field", () => setDoc(doc(adminDoc(), "adminShortcuts/a1"), Object.assign(keys(), { script: "x" })));
+await cannot("shortcuts whose items are not a map", () => setDoc(doc(adminDoc(), "adminShortcuts/a1"), Object.assign(keys(), { items: "x" })));
 
 await env.cleanup();
 console.log(`checks made: ${checks}`);

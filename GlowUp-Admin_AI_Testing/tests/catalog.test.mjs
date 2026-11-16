@@ -161,7 +161,7 @@ equal([use.get("i2"), use.get("i6"), use.get("i1")], [1, 1, undefined], "how man
 const before = JSON.stringify([brands, products, ingredients]);
 const plan = c.cleanupPlan(brands, products, ingredients, { threshold: 0.85 });
 equal(JSON.stringify([brands, products, ingredients]), before, "making a plan changes nothing in the lists it was given");
-equal(plan.steps.map((s) => s.id), ["notMakeup", "notMakeupCheck", "brands", "brandDuplicates", "productDuplicates", "types", "names", "ingredients"], "the steps, in order");
+equal(plan.steps.map((s) => s.id), ["notMakeup", "notMakeupCheck", "brands", "brandDuplicates", "productDuplicates", "types", "names", "definitions", "markdown", "safetyClaims", "joinedNames", "friendlyNames", "ingredients"], "the steps, in order");
 check(plan.steps.every((s) => s.changes.every((ch) => ch.action === "bin" || ch.action === "update")), "a plan never deletes: it only bins or updates");
 const step = (id) => plan.steps.find((s) => s.id === id).changes;
 equal(step("notMakeup").map((ch) => ch.docId).sort(), ["p8", "p9"], "clearly not make-up");

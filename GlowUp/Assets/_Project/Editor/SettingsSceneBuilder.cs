@@ -87,15 +87,20 @@ namespace GlowUp.EditorTools
             Kit.StyleInput(password, "Your password", ThemeRole.InputBackground);
             password.contentType = TMP_InputField.ContentType.Password;
             Kit.AddEye(password);
+            // accounts with both a password and Google can switch the way they confirm (12 November 2026); hidden for the others
+            Button switchMethod = A.LinkButton(deletePopup.box, "SwitchMethodButton", "Confirm with Google instead", 28, ThemeRole.AccentText);
+            A.TopStrip(switchMethod.transform, 394 + Kit.FieldHeight + 8, 56, 48, 48);
+            switchMethod.gameObject.SetActive(false);
             TextMeshProUGUI deleteMessage = A.Label(deletePopup.box, "DeleteMessageText", "", 29, ThemeRole.Warning, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            A.TopStrip(deleteMessage.transform, 546, 150, 48, 48);
+            A.TopStrip(deleteMessage.transform, 394 + Kit.FieldHeight + 72, 130, 48, 48);
+            A.ShrinkWrapped(deleteMessage, 22);
             Button deleteConfirm = A.PillButton(deletePopup.box, "ConfirmDeleteButton", "Delete My Account", 36, ThemeRole.Warning, ThemeRole.Background, IconFactory.Trash);
             A.BottomStrip(deleteConfirm.transform, 168, 108, 48, 48);
             Button deleteCancel = A.PillButton(deletePopup.box, "CancelDeleteButton", "Keep My Account", 36, ThemeRole.SurfaceAlt, ThemeRole.MainText);
             A.BottomStrip(deleteCancel.transform, 44, 108, 48, 48);
 
             // ---- privacy policy and terms ----
-            A.AppPopup legalPopup = A.Overlay(s, "LegalPanel", "Privacy Policy & Terms");
+            A.AppPopup legalPopup = A.Overlay(s, "LegalPanel", "Privacy Policy and Terms and Conditions");
             A.Fill(legalPopup.box, 40, 40, 40, 150);
             GameObject legalArea = A.Node(legalPopup.box, "TextArea");
             A.Fill(legalArea.transform, 36, 44, 30, 130);
@@ -110,32 +115,40 @@ namespace GlowUp.EditorTools
             // ---- contact support ----
             A.AppPopup supportPopup = A.Overlay(s, "SupportPanel", "Contact support");
             A.At(supportPopup.box, A.MC, new Vector2(0, 40), new Vector2(940, 1230));
-            TextMeshProUGUI supportIntro = A.Label(supportPopup.box, "IntroText", "Tell us what went wrong. Your message opens in your email app, ready to send.",
+            TextMeshProUGUI supportIntro = A.Label(supportPopup.box, "IntroText", "Tell us what went wrong. Your report goes straight to the GlowUp team.",
                                                    30, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             A.TopStrip(supportIntro.transform, 118, 88, 48, 48);
-            ChoiceTabs categoryTabs = Tabs(supportPopup.box, "CategoryTabs", new[] { "Bug", "Wrong scan result", "Other" }, 0, out _, 28);
-            A.TopStrip(categoryTabs.transform.parent, 222, 96, 48, 48);
-            TMP_InputField feedbackInput = SceneBuilderCore.MakeInput(supportPopup.box, "FeedbackInputField", "Describe what happened...", A.TC, Vector2.zero, new Vector2(840, 420));
-            A.TopStrip(feedbackInput.transform, 340, 420, 48, 48);
+            // phase 4 (11 November 2026): four kinds, Suggestion between Wrong scan result and Other, as two rows of two so every name fits
+            ChoiceTabs categoryTabs = TabsGrid(supportPopup.box, "CategoryTabs", new[] { "Bug", "Wrong scan result", "Suggestion", "Other" }, 0, 2, 28);
+            A.TopStrip(categoryTabs.transform.parent, 222, TwoRowTrack, 48, 48);
+            TMP_InputField feedbackInput = SceneBuilderCore.MakeInput(supportPopup.box, "FeedbackInputField", "Describe what happened...", A.TC, Vector2.zero, new Vector2(840, 360));
+            A.TopStrip(feedbackInput.transform, 222 + TwoRowTrack + 18, 360, 48, 48);
             Kit.StyleInput(feedbackInput, "Describe what happened...", ThemeRole.InputBackground);
             SmartScanSceneBuilder.MakeMultiLine(feedbackInput, 32);
             var feedbackBehaviour = SceneBuilderCore.Ensure<InputFieldBehaviour>(feedbackInput.gameObject);
             A.Set(feedbackBehaviour, "characterLimit", 1000);
             GameObject includeRow = A.Node(supportPopup.box, "IncludeLastScanRow");
-            A.TopStrip(includeRow.transform, 784, 84, 56, 56);
+            A.TopStrip(includeRow.transform, 222 + TwoRowTrack + 18 + 360 + 12, 84, 56, 56);
             A.HStack(includeRow, 20);
             TextMeshProUGUI includeLabel = A.Label(includeRow.transform, "Label", "Include my last scan (product and ingredients)", 30, ThemeRole.MainText, FontRole.Label,
                                                    TextAlignmentOptions.MidlineLeft, true);
             A.Size(includeLabel, -1, -1, 1);
             Toggle includeScan = Switch(includeRow.transform, "IncludeLastScanSwitch", true);
             TextMeshProUGUI supportMessage = A.Label(supportPopup.box, "FeedbackText", "", 28, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            A.TopStrip(supportMessage.transform, 886, 140, 48, 48);
+            A.TopStrip(supportMessage.transform, 222 + TwoRowTrack + 18 + 360 + 12 + 84 + 8, 140, 48, 48);
             Button supportSend = A.PillButton(supportPopup.box, "SendButton", "Send Report", 38, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Mail);
             A.BottomStrip(supportSend.transform, 44, 112, 48, 48);
 
             var support = Feature<SupportFeedbackForm>(features, "SupportFeedbackForm");
             A.Set(support, "panel", supportPopup.panel); A.Set(support, "categoryTabs", categoryTabs); A.Set(support, "messageInput", feedbackInput);
             A.Set(support, "includeLastScanToggle", includeScan); A.Set(support, "sendButton", supportSend); A.Set(support, "feedbackText", supportMessage);
+            // a form saved before phase 4 keeps its own words: the kinds and the two messages are brought up to date
+            var supportSo = new SerializedObject(support);
+            SerializedProperty kinds = supportSo.FindProperty("categoryNames");
+            string[] kindNames = { "Bug", "Wrong scan result", "Suggestion", "Other" };
+            if (kinds != null) { kinds.arraySize = kindNames.Length; for (int k = 0; k < kindNames.Length; k++) kinds.GetArrayElementAtIndex(k).stringValue = kindNames[k]; supportSo.ApplyModifiedPropertiesWithoutUndo(); }
+            SceneBuilderCore.ReplaceText(support, "msgSent", "Report sent. Thank you!", "Report sent. Thank you.");
+            SceneBuilderCore.ReplaceText(support, "msgNotSent", "Your report couldn't be sent. Check your connection and try again.", "The report could not be sent. Check your connection.");
 
             // =====================================================================================
             //  1. Appearance and performance
@@ -190,7 +203,7 @@ namespace GlowUp.EditorTools
             // =====================================================================================
             //  Sounds and motion: tap sounds, shake to change screen, the light round the screen edge
             // =====================================================================================
-            Transform sounds = TileSection(content, scroll, "SoundsMotionSection", "Sounds & Motion", "Tap and delete sounds, finger signs, edge light", IconFactory.Speaker, SettingsIconAnimator.Style.Pulse, 1);
+            Transform sounds = TileSection(content, scroll, "SoundsMotionSection", "Sounds & Motion", "Tap and delete sounds, edge light", IconFactory.Speaker, SettingsIconAnimator.Style.Pulse, 1);
             Toggle tapSounds = SwitchRow(sounds, "TapSoundsRow", "Tap sounds", "A short sound when you tap a button.", true);
             GameObject soundBlock = Block(sounds, "TapSoundBlock", 14);
             soundBlock.AddComponent<CanvasGroup>();
@@ -212,52 +225,12 @@ namespace GlowUp.EditorTools
             // the freezing sound when a scan is removed in Recent Scans (DeleteSoundPlayer in that scene); on until switched off
             PreferenceRow(sounds, "DeleteSoundRow", "Delete sound", "A freezing sound when you remove a scan in Recent Scans.", true, UiPreferenceToggle.Preference.DeleteSound);
             Divider(sounds);
-            // finger signs (FingerSignNavigator on UiServices) took the place of "wave to change screen"
-            Toggle signsToggle = PreferenceRow(sounds, "FingerSignsRow", "Finger signs",
-                "Hold 1 to 5 fingers up to the selfie camera to open a screen. Works on Home, Recent Scans, Settings and a result.", false, UiPreferenceToggle.Preference.FingerSigns);
-            // which screen each number opens, and how long a sign is held (the block fades while finger signs are switched off)
-            GameObject signBlock = Block(sounds, "FingerSignsBlock", 8);
-            signBlock.AddComponent<CanvasGroup>();
-            string[] signScreens = { "Home", "AI Smart Scan", "Recent Scans", "AR Try-On", "Settings" };
-            var signButtons = new Button[5];
-            var signLabels = new TextMeshProUGUI[5];
-            for (int i = 0; i < 5; i++)
-            {
-                GameObject signRow = Row(signBlock.transform, "Fingers" + (i + 1) + "Row", 92);
-                TextMeshProUGUI signTitle = A.Label(signRow.transform, "Title", (i + 1) + (i == 0 ? " finger" : " fingers"), 34, ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.Left);
-                A.Size(signTitle, -1, -1, 1);
-                Button pick = A.PillButton(signRow.transform, "ScreenButton", signScreens[i], 31, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Swap);
-                A.Size(pick, 430, 80);
-                A.Outline(pick.transform, ThemeRole.Accent, 80f);
-                signButtons[i] = pick; signLabels[i] = A.LabelOf(pick);
-            }
-            GameObject holdRow = Row(signBlock.transform, "HoldRow", 80);
-            TextMeshProUGUI holdTitle = A.Label(holdRow.transform, "Title", "Hold for", RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Left);
-            A.Size(holdTitle, 150, -1);
-            Slider hold = ArTryOnSceneBuilder.BuildSlider(holdRow.transform, "HoldSlider");
-            A.Size(hold, -1, 64, 1);
-            hold.minValue = UiPreferences.ShortestFingerHold; hold.maxValue = UiPreferences.LongestFingerHold; hold.value = 0.9f;
-            TextMeshProUGUI holdValue = A.Label(holdRow.transform, "ValueText", "0.9 s", RowCaption, ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.Right);
-            A.Size(holdValue, 110, -1);
-            TextMeshProUGUI signStatus = A.Label(signBlock.transform, "StatusText",
-                "On. Hold your hand up to the selfie camera, about 30 cm away, and keep the sign still. The picture stays on this phone.",
-                RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            // a short label: a link is one line and must fit inside the card (the starting order is what the five rows show after a tap)
-            Button signReset = A.LinkButton(signBlock.transform, "ResetButton", "Reset the five numbers", 28, ThemeRole.AccentText);
-            SceneBuilderCore.ReplaceText(A.LabelOf(signReset), "m_text", "<u>Reset the five numbers</u>", "<u>Back to how it was: 1 Home, 2 Scan, 3 Recent, 4 Try-On, 5 Settings</u>");
-            A.Size(signReset, -1, 56);
-            var signSettings = Feature<FingerSignSettings>(features, "FingerSignSettings");
-            Kit.SetArray(signSettings, "screenButtons", signButtons); Kit.SetArray(signSettings, "screenLabels", signLabels);
-            A.Set(signSettings, "holdSlider", hold); A.Set(signSettings, "holdValueText", holdValue);
-            A.Set(signSettings, "resetButton", signReset); A.Set(signSettings, "statusText", signStatus);
-            A.Set(signsToggle.GetComponent<UiPreferenceToggle>(), "onlyWhenOn", signBlock.GetComponent<CanvasGroup>());
-            Divider(sounds);
             PreferenceRow(sounds, "EdgeLightRow", "Edge light", "A light that runs round the edge of every screen.", true, UiPreferenceToggle.Preference.EdgeLight);
 
             // =====================================================================================
             //  Camera helpers: bright screen, flashlight, screen light
             // =====================================================================================
-            Transform cameraHelpers = TileSection(content, scroll, "CameraSection", "Camera Helpers", "Bright screen, flashlight, face light", IconFactory.CameraIcon, SettingsIconAnimator.Style.Spin, 2);
+            Transform cameraHelpers = TileSection(content, scroll, "CameraSection", "Camera Helpers", "Bright screen, flashlight, volume button", IconFactory.CameraIcon, SettingsIconAnimator.Style.Spin, 2);
             PreferenceRow(cameraHelpers, "ScanBrightRow", "Bright screen while scanning", "Full screen brightness in AI Smart Scan.", true, UiPreferenceToggle.Preference.ScanBrightScreen);
             Divider(cameraHelpers);
             PreferenceRow(cameraHelpers, "FlashlightRow", "Flashlight in the dark", "Offer the flashlight when the scanner finds it too dark.", true, UiPreferenceToggle.Preference.AutoFlashlight);
@@ -265,6 +238,15 @@ namespace GlowUp.EditorTools
             PreferenceRow(cameraHelpers, "TryOnBrightRow", "Bright screen in AR Try-On", "Full screen brightness while you try a product on.", true, UiPreferenceToggle.Preference.TryOnBrightScreen);
             Divider(cameraHelpers);
             PreferenceRow(cameraHelpers, "ScreenLightRow", "Face light in the dark", "A bright white frame on the screen lights your face.", true, UiPreferenceToggle.Preference.TryOnScreenLight);
+            // phase 2A (11 November 2026): what the phone's volume buttons do on AI Smart Scan (saved in UiPreferences.VolumeButton)
+            Divider(cameraHelpers);
+            GameObject volumeBlock = Block(cameraHelpers, "VolumeButtonBlock");
+            A.Label(volumeBlock.transform, "Title", "Volume keys", RowTitle, ThemeRole.MainText, FontRole.Label);
+            ChoiceTabs volumeTabs = TabsGrid(volumeBlock.transform, "VolumeButtonTabs", new[] { "Both keys", "Up: switch mode", "Down: trigger", "Off" }, 0, 2, 28);
+            TextMeshProUGUI volumeStatus = A.Label(volumeBlock.transform, "StatusText", "On AI Smart Scan: volume up switches between live scan and photo capture; volume down starts or pauses the scan, or takes the photo.",
+                                                   RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            var volumeSetting = Feature<VolumeButtonSetting>(features, "VolumeButtonSetting");
+            A.Set(volumeSetting, "tabs", volumeTabs); A.Set(volumeSetting, "statusText", volumeStatus);
 
             // =====================================================================================
             //  2. Account
@@ -386,7 +368,7 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.Ensure<AppVersionLabel>(version.gameObject).Apply();
             Divider(about);
             GameObject legalRow = Row(about, "LegalRow");
-            RowTexts(legalRow.transform, "Privacy Policy & Terms", "How your skin profile and scans are kept and used.");
+            RowTexts(legalRow.transform, "Privacy Policy and Terms and Conditions", "How your skin profile and scans are kept and used.");
             Button openLegal = A.PillButton(legalRow.transform, "OpenLegalButton", "Read", ButtonFont, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Document);
             A.Size(openLegal, 210, ButtonHeight);
             var openLegalAction = SceneBuilderCore.Ensure<OpenPanelButton>(openLegal.gameObject);
@@ -417,6 +399,7 @@ namespace GlowUp.EditorTools
             A.Set(accountActions, "passwordInput", password); A.Set(accountActions, "confirmDeleteButton", deleteConfirm);
             A.Set(accountActions, "confirmDeleteLabel", A.LabelOf(deleteConfirm)); A.Set(accountActions, "cancelDeleteButton", deleteCancel);
             A.Set(accountActions, "deleteMessageText", deleteMessage);
+            A.Set(accountActions, "passwordLabel", passwordLabel); A.Set(accountActions, "warningText", deleteWarning); A.Set(accountActions, "switchMethodButton", switchMethod);
 
             // ---- the page itself ----
             var controller = A.Controller<SettingsFlowController>("SettingsFlowController");
@@ -672,6 +655,45 @@ namespace GlowUp.EditorTools
         /// Pill tabs where one is chosen, on a soft track so the tabs that are not chosen still show on a white panel.
         /// Returns the ChoiceTabs (its parent is the track object to place or size).
         /// </summary>
+        const float TwoRowTrack = 8 + 80 + 8 + 80 + 8;
+
+        /// <summary>
+        /// Tabs in rows of `columns` (phase 4): a vertical layout group of horizontal rows, each tab sharing its row's width, so long names never
+        /// overlap. The ChoiceTabs works as with one row (its tabs are numbered left to right, row by row).
+        /// </summary>
+        static ChoiceTabs TabsGrid(Transform parent, string name, string[] captions, int selected, int columns, float fontSize)
+        {
+            int rows = Mathf.CeilToInt(captions.Length / (float)Mathf.Max(1, columns));
+            GameObject trackObject = A.Node(parent, name + "Track");
+            A.Size(trackObject.transform, -1, 8 + rows * 88);
+            A.Backdrop(trackObject.transform, ThemeRole.SurfaceAlt, 1f, 48f);
+            GameObject tabsObject = A.Node(trackObject.transform, name, typeof(ChoiceTabs));
+            A.Fill(tabsObject.transform, 8, 8, 8, 8);
+            A.VStack(tabsObject, 8, 0, 0, 0, 0, TextAnchor.MiddleCenter).childForceExpandHeight = true;
+            var buttons = new Button[captions.Length];
+            var labels = new TextMeshProUGUI[captions.Length];
+            for (int r = 0; r < rows; r++)
+            {
+                GameObject row = A.Node(tabsObject.transform, "Row" + (r + 1));
+                A.HStack(row, 8, 0, 0, 0, 0, TextAnchor.MiddleCenter, true).childForceExpandHeight = true;
+                for (int c = 0; c < columns; c++)
+                {
+                    int i = r * columns + c;
+                    if (i >= captions.Length) break;
+                    Button tab = A.PillButton(row.transform, "Tab" + (i + 1), captions[i], fontSize, ThemeRole.InputBackground, ThemeRole.MainText);
+                    A.Size(tab, 120, 80, 1);
+                    buttons[i] = tab; labels[i] = A.LabelOf(tab);
+                    A.Shrink(labels[i], fontSize * 0.7f);
+                    Object.DestroyImmediate(tab.GetComponent<ThemedGraphic>());
+                    Object.DestroyImmediate(labels[i].GetComponent<ThemedGraphic>());
+                }
+            }
+            var tabs = tabsObject.GetComponent<ChoiceTabs>();
+            Kit.SetArray(tabs, "tabs", buttons); Kit.SetArray(tabs, "labels", labels);
+            A.Set(tabs, "selectedIndex", Mathf.Clamp(selected, 0, captions.Length - 1));
+            return tabs;
+        }
+
         static ChoiceTabs Tabs(Transform parent, string name, string[] captions, int selected, out TextMeshProUGUI[] labels, float fontSize)
         {
             GameObject trackObject = A.Node(parent, name + "Track");

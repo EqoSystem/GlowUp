@@ -396,9 +396,21 @@ namespace GlowUp.EditorTools
             A.Fill(label.transform, 0, 0, 640, 0);
             A.ShrinkWrapped(label, 21);
 
-            GameObject row = A.Node(group.transform, "Swatches");
-            A.Fill(row.transform, 296, 0, 0, 0);
-            A.HStack(row, 16, 8, 0, 0, 0, TextAnchor.MiddleLeft);
+            // the swatches sit in a row that scrolls sideways when there are more than fit (a product can have many shades); the app adds
+            // a swatch for every shade beyond these. The view reaches a little above and below the group so the glowing ring is not cut off.
+            GameObject view = A.Node(group.transform, "SwatchScrollView", typeof(Image), typeof(RectMask2D));
+            A.Fill(view.transform, 296, -14, 0, -14);
+            view.GetComponent<Image>().color = new Color(1, 1, 1, 0);           // invisible, but a drag between swatches still moves the row
+            GameObject row = A.Node(view.transform, "Swatches");
+            var rowRect = (RectTransform)row.transform;
+            rowRect.anchorMin = new Vector2(0, 0); rowRect.anchorMax = new Vector2(0, 1); rowRect.pivot = new Vector2(0, 0.5f);
+            rowRect.anchoredPosition = Vector2.zero; rowRect.sizeDelta = Vector2.zero;
+            A.HStack(row, 16, 22, 22, 0, 0, TextAnchor.MiddleLeft);
+            SceneBuilderCore.Ensure<ContentSizeFitter>(row).horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var side = SceneBuilderCore.Ensure<SideScrollRect>(view);
+            side.content = rowRect; side.viewport = (RectTransform)view.transform;
+            side.horizontal = true; side.vertical = false;
+            side.movementType = ScrollRect.MovementType.Elastic; side.inertia = true; side.decelerationRate = 0.135f; side.scrollSensitivity = 30f;
             string[] samples = { "#C4696F", "#B5525C", "#D98880", "#A9454F", "#E0A18F", "#8E3B46" };
             var buttons = new ShadeButton[SwatchCount];
             for (int i = 0; i < SwatchCount; i++)

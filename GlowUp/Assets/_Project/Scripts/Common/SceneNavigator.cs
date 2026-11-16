@@ -77,6 +77,8 @@ namespace GlowUp.Common
         {
             if (string.IsNullOrEmpty(sceneName)) { Debug.LogWarning("SceneNavigator: no scene name given"); return; }
             if (ScreenTransition.IsBusy) return;                    // a change is already on its way
+            // AR Try-On needs a product (12 November 2026): without one it is not opened at all, the open screen says why
+            if (sceneName == SceneNames.ArTryOn && !TryOnGate.Allowed) { TryOnGate.RaiseBlocked(); return; }
             Remember(SceneManager.GetActiveScene().name, sceneName);
             Load(sceneName, enterFrom);
         }

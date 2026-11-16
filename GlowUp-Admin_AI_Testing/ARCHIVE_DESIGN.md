@@ -74,7 +74,7 @@ New collection `archive`, document id `{collection}__{id}` (for example `product
 ## 5. New schema elements and rule changes
 
 New: collection `archive` (fields above), collection `archive_purge_log` (`ranAt`, `mode`, `found`, `deleted`, `ids`, `capped`, `errors`).
-Existing rules changed: **none**. Rules ADDED (paste before the line `// anything not listed above is closed`):
+Existing rules changed: **none**. Rules ADDED (published on 5 November 2026 with `firebase deploy --only firestore:rules`; until then the Archive page answered "permission denied"):
 
 ```
     // ---- the Archive: entries that left the Recycle bin, kept 30 days, then deleted by the server job ----
@@ -106,5 +106,4 @@ Existing rules changed: **none**. Rules ADDED (paste before the line `// anythin
     }
 ```
 
-The repository's `firestore.rules` also holds UNPUBLISHED changes from 28 October 2026. To add only the Archive,
-paste the block above into the rules that are live now (Firebase console > Firestore > Rules) instead of publishing the whole file.
+That publish also brought the 28 October 2026 changes live: the admin custom claim, size limits on `scanActivity`, and `pending_products` readable only by its sender or an admin.

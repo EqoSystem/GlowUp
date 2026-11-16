@@ -1,5 +1,5 @@
 # Privacy Policy
-Last updated: 28 October 2026
+Last updated: 10 November 2026
 
 ## 1. Introduction
 GlowUp ("we", "our", or "us") respects your privacy and is committed to protecting your personal data. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application. Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the application.
@@ -26,15 +26,24 @@ Having accurate information permits us to provide you with a smooth, efficient, 
 - Communicate with you regarding account updates, security alerts, and support messages.
 
 ## 4. Camera, Scans, and AR Try-On
-GlowUp asks for permission to use your camera for three features: scanning a product and its ingredient list, previewing shades on your face with AR Try-On, and (only if you switch it on in Settings) finger signs, which change screen when you hold 1 to 5 fingers up to the selfie camera.
+GlowUp asks for permission to use your camera for two features: scanning a product and its ingredient list, and previewing shades on your face with AR Try-On.
 
-- The text on a product is read on your device. We do not record or store the live camera feed, and we keep no photos.
+- The text on a product is read on your device. We do not record or store the live camera feed. We keep a photo only when you choose to send one for a product that is not in our catalog yet (see "Product Photo Submissions" below).
 - For a scan, only the text that was read, the product's name and the result are kept and analysed. When you are online and the app cannot name the product by itself, a few still pictures of the PRODUCT you are holding (its front, back or bottom; four at most, once per scan) may be sent to our AI service provider so that the product can be recognised (see section 5). Those pictures are not saved by us.
 - So that the app knows a product again the next time you scan it, it keeps what its pack looks like as a set of numbers (not a picture; the picture cannot be rebuilt from them), together with any other name you typed for the product. These stay on your device only and are removed when you clear the app's data or uninstall the app.
 - For AR Try-On, the picture of your face is used only while the preview is on screen. It is not saved and it is never sent to us or to anyone else.
-- For finger signs, the selfie camera's picture is looked at on your device only, to count the fingers of the hand you hold up. It is not saved and it is never sent to us or to anyone else. Finger signs are off until you switch them on, and your phone shows its "camera in use" sign while they are on.
 
 You can withdraw camera permission at any time in your device settings. The scanning and try-on features will stop working until permission is given again, but you can still type ingredients in by hand.
+
+## Product Photo Submissions
+When a product you scan is not in our catalog yet, you can choose to take one photo of it and send it to us. Nothing is sent unless you tap "Use photo", and the app tells you before your first photo is sent that GlowUp will review it.
+
+- What is stored: the photo, cut on your device to the part that shows the product (the rest of the picture is discarded before anything is sent); the text the app read on the product; the product's brand, name, type and shade; the ingredient list and the web address of the page it came from, or the list printed on the pack; the time you sent it; and your account id.
+- Who sees it: GlowUp administrators, who review it in our admin portal. You can see your own photo; other app users cannot.
+- Why: to identify the product, to find its published ingredient list, and to add the product to our catalog after an administrator has checked it. Until then it is shown to you as "Unverified — pending review".
+- How it is processed: the cut photo and the text read on it are sent to our AI service provider only to recognise which product it is. The ingredient list is never written by the AI: it is taken from product pages our server opens (the brand's own website first, then retailers) or from the list printed on your pack. Ingredient data from the web may be incomplete.
+- How long it is kept: the photo is deleted when an administrator approves or rejects the entry. The product details stay in our catalog once approved; they carry no information about you. If you want your photo or entry removed earlier, contact us (section 12).
+- Where it is kept: in our Google Firebase database, protected by security rules that let only you and GlowUp administrators read the photo.
 
 ## 5. AI-Assisted Analysis
 Part of each analysis is produced automatically. When you are online, the following may be sent to our AI service provider: up to four still pictures of the product, the text read from it, the product's name, and ingredient names. This is used to recognise the product, to find its published ingredient list, and to describe ingredients that are not yet in our database. The product's name may also be sent to the FDA Philippines verification site to check whether the product is registered. When the camera read the product's barcode, that barcode (and nothing else) may be sent to Open Beauty Facts, a public list of cosmetics, to compare its ingredient list with the one the app has.
@@ -62,13 +71,21 @@ A few things are kept apart from your profile and are not removed by Delete My A
 GlowUp is not intended for children under 13 years of age, and we do not knowingly collect personal data from them. If you believe a child under 13 has created an account, please contact us so that we can remove it.
 
 ## 10. Your Rights and Choices
-Depending on where you live, you may have the right to see the personal data we hold about you, to correct it, to ask for it to be deleted, and to withdraw your consent. You can update your profile in the app at any time, and you can contact us for any other request.
+GlowUp follows the Data Privacy Act of 2012 (Republic Act No. 10173) of the Philippines. Under that law you have the right to be informed about how your personal data is used, to see the data we hold about you, to correct it, to object to its use, to ask for it to be deleted or blocked, to receive a copy of it, to be compensated for damage caused by misuse of it, and to withdraw your consent at any time. You can update your profile in the app, delete your account in Settings, and contact us for anything else. If you think your data was handled wrongly, you may also complain to the National Privacy Commission (privacy.gov.ph).
+
+Your skin type, skin tone, skin conditions and allergens are information about your health. The law treats such information as sensitive personal information, so we use it only with your clear consent. You give that consent with the second box on the page where you accept this policy, and you can withdraw it by deleting your account. Without that consent the app cannot compare products with your profile.
+
+Your data is stored with Google Firebase (Google Cloud), whose servers are outside the Philippines. Google keeps it under its own security and data protection terms.
+
+If a security breach puts your personal data at risk of serious harm, we will tell you and the National Privacy Commission within 72 hours of knowing about it, and say what happened and what you can do.
 
 ## 11. Changes to This Policy
 We may update this Privacy Policy from time to time. When we do, we will change the "Last updated" date at the top and, where the change is significant, tell you inside the app.
 
 ## 12. Contact Us
-If you have questions about this Privacy Policy, contact our support team at: [add your support email here]
+You can send a report from the app: Settings > Contact support. The report goes to the GlowUp team through our support dashboard, not by email. It contains the kind of report you chose (Bug, Wrong scan result or Other), your message, your account id, the app version and your phone model. Your last scan (the product, the result shown and the ingredients read) is included only when you switch on "Include my last scan". Only GlowUp administrators can read reports.
+
+If you have questions about this Privacy Policy, you can also contact our support team at: AdminGlowUpSupport@gmail.com
 
 
 # Terms and Conditions
@@ -112,7 +129,7 @@ When you suggest a skin condition, allergen, ingredient, or product, you allow u
 The GlowUp name, logo, source code, design elements, and underlying software are the intellectual property of the developers. You may not copy, modify, distribute, or reverse-engineer any portion of this application without express written permission.
 
 ## 11. Third-Party Services
-GlowUp relies on services operated by other companies, including Google Firebase and, if you choose to use them, sign-in services such as Google or Facebook. Your use of those services is also subject to their own terms and privacy policies.
+GlowUp relies on services operated by other companies, including Google Firebase and, if you choose to use them, the Google sign-in service. Your use of those services is also subject to their own terms and privacy policies.
 
 ## 12. Suspension and Termination
 You may stop using GlowUp at any time. We may suspend or close an account that breaks these terms or that puts the service or other users at risk.
@@ -127,7 +144,7 @@ We may update these Terms and Conditions from time to time. If you continue to u
 These terms are governed by the laws of the country in which the operator of GlowUp is established, without affecting any consumer protection rights you have under the law of the country where you live.
 
 ## 16. Contact
-Questions about these Terms and Conditions can be sent to: [add your support email here]
+To report a problem, use Settings > Contact support in the app: your report is received by the GlowUp team through the support dashboard (see section 12 of the Privacy Policy for what a report contains). Questions about these Terms and Conditions can also be sent to: AdminGlowUpSupport@gmail.com
 
 ## 17. Credits
 - The sound played when a scan is removed in Recent Scans is "Teeth Chattering - Sound Effect", as shared by the YouTube channel Sound Library (youtube.com/watch?v=enz7eXF5IUo). Its original creator is not known.

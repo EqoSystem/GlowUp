@@ -99,7 +99,7 @@ namespace GlowUp.EditorTools
 
             // ---- "Confirm your email": the pop-up that waits until the link in the message was tapped ----
             OverlayPanel confirmPanel = BuildConfirmEmailPanel(ct, out TextMeshProUGUI confirmMessage, out TextMeshProUGUI confirmStatus,
-                                                               out Button confirmedButton, out Button sendAgainButton, out Button changeEmailButton);
+                                                               out Button confirmedButton, out Button sendAgainButton, out Button changeEmailButton, out Button openGmailButton);
 
             // ---- controller ----
             var go = SceneBuilderCore.EnsureRoot("OnboardingStep1FlowController");
@@ -117,6 +117,7 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(ctl, "confirmPanel", confirmPanel);
             SceneBuilderCore.SetField(ctl, "confirmMessageText", confirmMessage); SceneBuilderCore.SetField(ctl, "confirmStatusText", confirmStatus);
             SceneBuilderCore.SetField(ctl, "confirmedButton", confirmedButton);
+            SceneBuilderCore.SetField(ctl, "openGmailButton", openGmailButton);
             SceneBuilderCore.SetField(ctl, "sendAgainButton", sendAgainButton); SceneBuilderCore.SetField(ctl, "sendAgainLabel", AppKit.LabelOf(sendAgainButton));
             SceneBuilderCore.SetField(ctl, "changeEmailButton", changeEmailButton); SceneBuilderCore.SetField(ctl, "useAnotherEmailButton", useAnotherEmail);
             // "Use another email?" is asked with the same pop-up as "Leave sign-up?"
@@ -149,13 +150,13 @@ namespace GlowUp.EditorTools
         /// off in the Hierarchy: tick it active to see and style it.
         /// </summary>
         static OverlayPanel BuildConfirmEmailPanel(Transform canvas, out TextMeshProUGUI message, out TextMeshProUGUI status,
-                                                   out Button confirmed, out Button sendAgain, out Button changeEmail)
+                                                   out Button confirmed, out Button sendAgain, out Button changeEmail, out Button openGmail)
         {
             Transform old = Loose(canvas, "ConfirmEmailPanel");
             if (old != null) Object.DestroyImmediate(old.gameObject);
 
             AppKit.AppPopup p = AppKit.Overlay(new AppKit.AppScreen { canvas = canvas }, "ConfirmEmailPanel", "Confirm your email");
-            AppKit.At(p.box, AppKit.MC, new Vector2(0, 40), new Vector2(900, 940));
+            AppKit.At(p.box, AppKit.MC, new Vector2(0, 40), new Vector2(900, 1056));        // 116 taller than before: room for "Open Gmail"
 
             Image disc = AppKit.Panel(p.box, "MailDisc", ThemeRole.SurfaceAlt, 1f, 120f);
             AppKit.At(disc.transform, AppKit.TC, new Vector2(0, -128), new Vector2(120, 120));
@@ -172,6 +173,9 @@ namespace GlowUp.EditorTools
             AppKit.TopStrip(status.transform, 478, 96, 48, 48);
             AppKit.ShrinkWrapped(status, 21);
 
+            // a shortcut only: the user taps it to open the Gmail app (nothing opens by itself; checking the mail another way still works)
+            openGmail = AppKit.PillButton(p.box, "OpenGmailButton", "Open Gmail", 32, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Mail);
+            AppKit.BottomStrip(openGmail.transform, 360, 100, 48, 48);
             confirmed = AppKit.PillButton(p.box, "ConfirmedButton", "I have confirmed", 36, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Check);
             AppKit.BottomStrip(confirmed.transform, 232, 116, 48, 48);
             sendAgain = AppKit.PillButton(p.box, "SendAgainButton", "Send again", 32, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Mail);

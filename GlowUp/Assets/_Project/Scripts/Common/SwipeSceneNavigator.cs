@@ -165,6 +165,11 @@ namespace GlowUp.Common
             int target = TargetIndex(dx);
             bool far = Mathf.Abs(dx) >= commitDistance;
             bool fast = Mathf.Abs(velocity) >= commitSpeed && Mathf.Abs(dx) >= startDistance * 2f && Mathf.Sign(velocity) == Mathf.Sign(dx);
+            if (target >= 0 && (far || fast) && !Suppressed && swipeRow[target] == SceneNames.ArTryOn && !TryOnGate.Allowed)
+            {
+                TryOnGate.RaiseBlocked();                                           // no product to try on: the screen springs back and says why
+                target = -1;
+            }
             if (target >= 0 && (far || fast) && !Suppressed)
             {
                 if (tabBar != null) tabBar.Commit(SlotOf(target));

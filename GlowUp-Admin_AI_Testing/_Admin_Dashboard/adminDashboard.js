@@ -18,15 +18,26 @@ import {
     requireAdmin, wireSignOut, setupNavigationGuard, escapeHtml, asArray, toWholeNumber, timeAgo, formatWhen, startOfTodayUnix,
     notify, describeError, toneBadge
 } from "../_Shared/adminCommon.js";
-import { mountShell, paginate, renderPager, icon } from "../_Shared/adminShell.js";
-import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
+import { mountShell, paginate, renderPager, icon, askConfirm } from "../_Shared/adminShell.js";
+import { bindButtons } from "../_Shared/shortcuts.js";
+import { registerDataset, registerTileDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
 import { setPanelQuiet, setPanelSummary } from "../_Shared/adminFold.js";
+import { openAuditLog } from "../_Shared/adminAuditLog.js";
 
 const RECENT_ITEMS = 120;             // how many recent scans are fetched (the list, the grid and the graphs all use them)
 const PAGE_SIZE = 8;                  // how many rows a panel shows at a time
 const activityPage = { page: 1, size: PAGE_SIZE };
 const suggestionPage = { page: 1, size: PAGE_SIZE };
+// the support reports are shown in one panel for each kind (12 November 2026); an unknown kind goes with "Other". `prefix` names the panel's parts
+// (<prefix>List, <prefix>Pager, <prefix>Empty, <prefix>ClearAll ...); the Bug panel keeps the old id "support".
+const SUPPORT_KINDS = [
+    { prefix: "support", dataset: "supportBug", label: "Bug reports", category: "Bug", title: "bug reports", none: "No new bug reports.", page: { page: 1, size: PAGE_SIZE } },
+    { prefix: "supportWrong", dataset: "supportWrong", label: "Wrong scan results", category: "Wrong scan result", title: "wrong scan results", none: "No new wrong scan results.", page: { page: 1, size: PAGE_SIZE } },
+    { prefix: "supportOther", dataset: "supportOther", label: "Other reports", category: "Other", title: "other reports", none: "No new reports.", page: { page: 1, size: PAGE_SIZE } }
+];
+const kindOf = (category) => (SUPPORT_KINDS.find((k) => k.category === category) || SUPPORT_KINDS[2]);
+let supportReports = [];              // [{ id, category, message, uid, appVersion, device, createdAtUnix, lastScan }]
 let recentScans = [];
 const TOP_BRANDS = 5;
 const TODAY_LIMIT = 200;              // the live "today" listener reads at most this many scans; the exact total comes from one count
@@ -37,7 +48,9 @@ let exactToday = null;                // its answer (null = not asked yet, or th
 const el = (id) => document.getElementById(id);
 let stopToday = null;                 // switches the "today" listener off (it is restarted when the date changes)
 let todayStart = 0;
-let suggestions = [];                 // [{ id, collection, kind, text, createdAtUnix }]
+let suggestions = [];                 // [{ id, collection, kind, text, createdAtUnix, lastScan }]
+let appSuggestions = [];              // "Suggestion" reports from the app's Contact support (11 November 2026): shown in Suggestions, not in Support reports
+let typedSuggestions = [];            // allergen / skin condition suggestions
 let allBrands = [];                   // [{ id, name, category, status, scans }]
 let todayResults = { safe: 0, caution: 0, harmful: 0 };
 let activityFilter = "";              // "" | "safe" | "caution" | "harmful" | "flagged": what the activity list is narrowed to
@@ -46,6 +59,8 @@ let openScanId = "";                  // the scan whose details are open in the 
 let scansToday = null, flaggedToday = 0;
 let waitingInventory = null, waitingIngredients = null;
 let suggestionsLoaded = false;
+// which helper lines have their data (or know it failed): until then a helper answers null and shows a loading shape
+let todayAnswered = false, activityAnswered = false, brandsAnswered = false;
 const many = (n, one, more) => `${n} ${n === 1 ? one : more}`;
 
 const STATUS_NAMES = { safe: "Safe", caution: "Use with care", harmful: "Harmful" };
@@ -56,6 +71,9 @@ const INVENTORY_PAGE = "../_Admin_Brand_Inventory/adminBrandInventory.html";
 document.addEventListener("DOMContentLoaded", async () => {
     registerData();                   // before the page frame: a saved layout may hold panels that show this data
     mountShell("dashboard");
+    bindButtons({ "dashboard.activityLog": "#auditLogTile", "dashboard.addProduct": 'a.tile[href*="add=product"]' });      // keyboard shortcuts (shortcuts.js)
+    const auditTile = document.getElementById("auditLogTile");
+    if (auditTile) auditTile.addEventListener("click", openAuditLog);
     setAssistPage("dashboard");
     registerHelpers();
     wireSignOut();
@@ -67,8 +85,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     watchScansToday();
     watchRecentActivity();
     loadSuggestions();
+    loadSupportReports();
     loadReviewQueue();
     el("suggestionList").addEventListener("click", onSuggestionClick);
+    el("suggestionClearAll").addEventListener("click", clearAllSuggestions);
+    SUPPORT_KINDS.forEach((kind) => {
+        el(kind.prefix + "ClearAll").addEventListener("click", () => clearAllSupportReports(kind));
+        el(kind.prefix + "List").addEventListener("click", onSupportClick);
+    });
 
     // things that answer a click
     const press = (node, run) => { node.addEventListener("click", (event) => { if (!event.target.closest(".guide-badge")) run(event); }); node.addEventListener("keydown", (event) => { if (event.key === "Enter" && event.target === node) run(event); }); };
@@ -94,7 +118,6 @@ function setMetric(id, value, title) {
     if (!box) return;
     box.classList.remove("skeleton");
     box.textContent = value;
-    box.title = title || "";
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -108,11 +131,14 @@ async function loadCatalogueCounts() {
         allBrands = snapshot.docs.filter((d) => d.data().binned !== true).map((d) => ({ id: d.id, name: d.data().name || "Unnamed Brand", category: d.data().category || "", status: String(d.data().status || "Active"), scans: toWholeNumber(d.data().scans) }));
         setMetric("totalBrandsCount", allBrands.length);
         allBrands.sort((a, b) => b.scans - a.scans || a.name.localeCompare(b.name));
+        brandsAnswered = true;
         renderTopBrands(allBrands);
         datasetChanged("topBrands");
         refreshAssist("brands");
     } catch (error) {
         console.error("Error counting brands: ", error);
+        brandsAnswered = true;
+        refreshAssist("brands");
         setMetric("totalBrandsCount", "–", describeError(error));
         showEmpty("topBrands", "Could not load the brands.", true);
     }
@@ -145,7 +171,7 @@ function renderTopBrands(brands) {
     list.innerHTML = ranked.map((b, i) => `
         <li class="rank-item can-open" data-brand="${escapeHtml(b.id)}">
             <span class="rank-number">${i + 1}</span>
-            <span class="rank-name">${escapeHtml(b.name)}</span>
+            <span class="rank-name" title="${escapeHtml(b.name)}">${escapeHtml(b.name)}</span>
             <span class="rank-value">${b.scans} ${b.scans === 1 ? "scan" : "scans"}</span>
         </li>`).join("");
 }
@@ -173,6 +199,8 @@ async function loadReviewQueue() {
         return Math.max(0, all.data().count - binned.data().count);
     };
 
+    // the loading shape at the top of Quick actions holds the place of the first tile; it goes when a tile shows or all counts answered
+    const shapeGone = () => { const shape = el("reviewTilesLoading"); if (shape) shape.remove(); };
     try {
         const [brandCount, productCount] = await Promise.all([waiting("brands"), waiting("products")]);
         waitingInventory = brandCount + productCount;
@@ -181,6 +209,7 @@ async function loadReviewQueue() {
             if (productCount > 0) parts.push(many(productCount, "product", "products"));
             if (brandCount > 0) parts.push(many(brandCount, "brand", "brands"));
             el("reviewInventoryTitle").textContent = parts.join(" and ") + " waiting for review";
+            shapeGone();
             el("reviewInventoryTile").style.display = "";
         }
     } catch (error) {
@@ -191,25 +220,15 @@ async function loadReviewQueue() {
         waitingIngredients = ingredientCount;
         if (ingredientCount > 0) {
             el("reviewIngredientsTitle").textContent = many(ingredientCount, "AI-found ingredient", "AI-found ingredients") + " waiting for review";
+            shapeGone();
             el("reviewIngredientsTile").style.display = "";
         }
     } catch (error) {
         console.warn("Could not count the ingredients waiting for review: ", error);
     }
-    // products app users sent as a photo (pending_products): one count query, 1 read
-    let waitingSnapshots = 0;
-    try {
-        const snapshots = await getCountFromServer(query(collection(db, "pending_products"), where("isApproved", "==", false)));
-        waitingSnapshots = snapshots.data().count;
-        if (waitingSnapshots > 0) {
-            el("reviewSnapshotsTitle").textContent = many(waitingSnapshots, "product photo", "product photos") + " waiting for review";
-            el("reviewSnapshotsTile").style.display = "";
-        }
-    } catch (error) {
-        console.warn("Could not count the photos waiting for review: ", error);           // the tile simply stays hidden
-    }
+    shapeGone();
     // with nothing waiting, only the two shortcuts are left (the menu on the left has them too): the panel folds to one line
-    const waitingNow = (waitingInventory || 0) + (waitingIngredients || 0) + waitingSnapshots;
+    const waitingNow = (waitingInventory || 0) + (waitingIngredients || 0);
     setPanelQuiet("actions", waitingNow === 0, waitingNow === 0 ? "Nothing is waiting for review" : `${many(waitingNow, "entry waits", "entries wait")} for review`);
 }
 
@@ -241,6 +260,7 @@ function watchScansToday() {
             results[status === "safe" || status === "harmful" ? status : "caution"]++;
         });
         todayResults = results;
+        todayAnswered = true;
         scansToday = capped && exactToday !== null ? exactToday : snapshot.size;
         flaggedToday = flagged;
         renderResults(results);
@@ -250,6 +270,8 @@ function watchScansToday() {
         setMetric("flaggedAllergensCount", flagged, "Scans today in which one of the user's own allergens was found" + (capped ? " (among the latest " + TODAY_LIMIT + ")" : ""));
     }, (error) => {
         console.error("Error watching today's scans: ", error);
+        todayAnswered = true;
+        refreshAssist("numbers");
         setMetric("totalScansCount", "–", describeError(error));
         setMetric("flaggedAllergensCount", "–", describeError(error));
     });
@@ -264,7 +286,7 @@ function renderResults(results) {
     el("resultBar").innerHTML = total === 0 ? "" : Object.keys(names).filter((k) => results[k] > 0)
         .map((k) => `<span class="${k}" data-status="${k}" style="flex-grow:${results[k]}" data-tip-title="${results[k]} scans" data-tip="${names[k]}"></span>`).join("");
     el("resultLegend").innerHTML = Object.keys(names).map((k) =>
-        `<li data-status="${k}" class="${activityFilter === k ? "on" : ""}"><span class="activity-dot ${k}"></span>${names[k]}<span class="num">${results[k]}${total > 0 ? ` <span class="muted small">${Math.round(results[k] * 100 / total)}%</span>` : ""}</span></li>`).join("");
+        `<li data-status="${k}" class="${activityFilter === k ? "on" : ""}"><span class="legend-name ${k}">${names[k]}</span><span class="num">${results[k]}${total > 0 ? ` <span class="muted small">${Math.round(results[k] * 100 / total)}%</span>` : ""}</span></li>`).join("");
 }
 
 /** Narrows the activity list to one result (or to scans with an allergen match). The same choice again shows everything. */
@@ -292,6 +314,7 @@ function watchRecentActivity() {
     const recent = query(collection(db, "scanActivity"), orderBy("scannedAtUnix", "desc"), limit(RECENT_ITEMS));
     onSnapshot(recent, (snapshot) => {
         recentScans = snapshot.docs.map((d) => Object.assign({ id: d.id }, d.data()));
+        activityAnswered = true;
         datasetChanged("activity");
         refreshAssist("activity");
         refreshAssist("numbers");
@@ -304,6 +327,8 @@ function watchRecentActivity() {
         renderActivity();
     }, (error) => {
         console.error("Error watching recent activity: ", error);
+        activityAnswered = true;
+        refreshAssist("activity");
         showEmpty("activity", "Could not load the activity.", true);
         el("activityEmptyHint").textContent = describeError(error);
     });
@@ -349,21 +374,24 @@ async function loadSuggestions() {
         { name: "allergenSuggestions", kind: "Allergen" },
         { name: "conditionSuggestions", kind: "Skin condition" }
     ];
-    suggestions = [];
+    typedSuggestions = [];
     let failed = null;
     for (const source of sources) {
         try {
             const snapshot = await getDocs(query(collection(db, source.name), where("status", "==", "pending")));
-            snapshot.forEach((d) => suggestions.push({
+            snapshot.forEach((d) => typedSuggestions.push({
                 id: d.id, collection: source.name, kind: source.kind,
-                text: d.data().text || "", createdAtUnix: toWholeNumber(d.data().createdAtUnix)
+                text: d.data().text || "", createdAtUnix: toWholeNumber(d.data().createdAtUnix), lastScan: null
             }));
         } catch (error) {
             console.error(`Error loading ${source.name}: `, error);
             failed = error;
         }
     }
+    suggestions = typedSuggestions.concat(appSuggestions);
     if (failed && suggestions.length === 0) {
+        suggestionsLoaded = true;
+        refreshAssist("suggestions");
         showEmpty("suggestion", "Could not load the suggestions.", true);
         el("suggestionEmptyHint").textContent = describeError(failed);
         return;
@@ -373,6 +401,7 @@ async function loadSuggestions() {
 
 function renderSuggestions() {
     suggestionsLoaded = true;
+    el("suggestionClearAll").hidden = suggestions.length === 0;
     datasetChanged("suggestions");
     refreshAssist("suggestions");
     setPanelQuiet("suggestions", suggestions.length === 0, suggestions.length === 0 ? "Nothing waiting" : `${many(suggestions.length, "suggestion waits", "suggestions wait")} for review`);
@@ -386,8 +415,9 @@ function renderSuggestions() {
         <li class="suggestion-item">
             <div class="suggestion-main">
                 <span class="suggestion-text">${escapeHtml(s.text || "(empty)")}</span>
-                <span class="chip ${s.kind === "Allergen" ? "warn" : "pink"}">${escapeHtml(s.kind)}</span>
-                <span class="small muted">${escapeHtml(timeAgo(s.createdAtUnix))}</span>
+                <span class="chip ${s.kind === "Allergen" ? "warn" : s.kind === "App suggestion" ? "good" : "pink"}">${escapeHtml(s.kind)}</span>
+                <span class="small muted">${s.from ? escapeHtml(s.from) + " · " : ""}${escapeHtml(formatWhen(s.createdAtUnix))} · ${escapeHtml(timeAgo(s.createdAtUnix))}</span>
+                ${lastScanDetails(s.lastScan)}
             </div>
             <div class="suggestion-actions btn-group">
                 <button class="icon-btn small row-btn approve" data-action="reviewed" data-id="${escapeHtml(s.id)}" data-collection="${escapeHtml(s.collection)}" aria-label="Mark reviewed" data-tip-title="Mark reviewed" data-tip="You have dealt with it, for example added it to the Ingredient Curator." data-tip-preview="It leaves this list.">${icon("check")}</button>
@@ -404,13 +434,178 @@ async function onSuggestionClick(event) {
     const status = button.getAttribute("data-action");
     button.disabled = true;
     try {
-        await updateDoc(doc(db, collectionName, id), { status, reviewedAt: serverTimestamp() });
+        // an app suggestion is a support report: it closes the way reports do (handled / dismissed, handledAt)
+        if (collectionName === "supportReports") await updateDoc(doc(db, collectionName, id), { status: status === "reviewed" ? "handled" : status, handledAt: serverTimestamp() });
+        else await updateDoc(doc(db, collectionName, id), { status, reviewedAt: serverTimestamp() });
         suggestions = suggestions.filter((s) => !(s.id === id && s.collection === collectionName));
+        if (collectionName === "supportReports") appSuggestions = appSuggestions.filter((s) => s.id !== id);
+        else typedSuggestions = typedSuggestions.filter((s) => !(s.id === id && s.collection === collectionName));
         renderSuggestions();
         notify(status === "reviewed" ? "Marked as reviewed." : "Suggestion dismissed.", "ok");
     } catch (error) {
         console.error("Error updating suggestion: ", error);
         notify("The suggestion was not updated. " + describeError(error), "error");
+        button.disabled = false;
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Support reports sent from the app (Settings > Contact support). Only admins can read them (firestore.rules: supportReports).
+// ---------------------------------------------------------------------------------------------
+async function loadSupportReports() {
+    try {
+        const snapshot = await getDocs(query(collection(db, "supportReports"), where("status", "==", "new")));
+        supportReports = [];
+        appSuggestions = [];
+        snapshot.forEach((d) => {
+            const data = d.data();
+            const lastScan = data.lastScan && typeof data.lastScan === "object" ? data.lastScan : null;
+            if (String(data.category || "") === "Suggestion") {
+                // the app's Suggestion kind belongs in the Suggestions panel (for review), not among the support reports
+                appSuggestions.push({ id: d.id, collection: "supportReports", kind: "App suggestion", text: String(data.message || ""), createdAtUnix: toWholeNumber(data.createdAtUnix), lastScan, from: senderText({ userName: String(data.userName || "").trim(), uid: String(data.uid || "") }) });
+                return;
+            }
+            supportReports.push({
+                id: d.id, category: String(data.category || "Other"), message: String(data.message || ""), uid: String(data.uid || ""), userName: String(data.userName || "").trim(),
+                appVersion: String(data.appVersion || ""), device: String(data.device || ""), createdAtUnix: toWholeNumber(data.createdAtUnix),
+                lastScan
+            });
+        });
+        renderSupportReports();
+        suggestions = typedSuggestions.concat(appSuggestions);
+        if (suggestionsLoaded) renderSuggestions();
+    } catch (error) {
+        console.error("Error loading supportReports: ", error);
+        SUPPORT_KINDS.forEach((kind) => {
+            showEmpty(kind.prefix, "Could not load the reports.", true);
+            el(kind.prefix + "EmptyHint").textContent = describeError(error);
+        });
+    }
+}
+
+function renderSupportReports() {
+    SUPPORT_KINDS.forEach((kind) => renderSupportKind(kind));
+}
+
+function renderSupportKind(kind) {
+    const mine = supportReports.filter((r) => kindOf(r.category) === kind);
+    datasetChanged(kind.dataset);
+    el(kind.prefix + "ClearAll").hidden = mine.length === 0;
+    setPanelQuiet(kind.prefix, mine.length === 0, mine.length === 0 ? "No new reports" : many(mine.length, "new report", "new reports"));
+    if (mine.length === 0) { showEmpty(kind.prefix, kind.none, false); return; }
+    mine.sort((a, b) => b.createdAtUnix - a.createdAtUnix);
+    el(kind.prefix + "Empty").style.display = "none";
+    const list = el(kind.prefix + "List");
+    list.style.display = "";
+    renderPager(el(kind.prefix + "Pager"), kind.page, mine.length, () => renderSupportKind(kind), "reports");
+    const tone = (c) => (c === "Bug" ? "bad" : c === "Wrong scan result" ? "warn" : "pink");
+    list.innerHTML = paginate(mine, kind.page).map((r) => {
+        const scan = lastScanDetails(r.lastScan);
+        return `<li class="suggestion-item support-item">
+            <div class="suggestion-main">
+                <span class="chip ${tone(r.category)}">${escapeHtml(r.category)}</span>
+                <span class="small muted">${escapeHtml(formatWhen(r.createdAtUnix))} · ${escapeHtml(timeAgo(r.createdAtUnix))} · ${senderHtml(r)}${r.appVersion ? " · app " + escapeHtml(r.appVersion) : ""}</span>
+                <p class="support-message">${escapeHtml(r.message)}</p>
+                ${scan}
+            </div>
+            <div class="suggestion-actions btn-group">
+                <button class="icon-btn small row-btn approve" data-action="handled" data-id="${escapeHtml(r.id)}" aria-label="Mark handled">${icon("check")}</button>
+                <button class="icon-btn small row-btn danger" data-action="dismissed" data-id="${escapeHtml(r.id)}" aria-label="Dismiss">${icon("x")}</button>
+            </div>
+        </li>`;
+    }).join("");
+}
+
+/**
+ * WHO SENT IT. The name is written by the sender's own app, so it is shown only as "name given by the sender" NEXT TO the account id, which
+ * the database checks (the rules make the id the sender's own). Never the name alone, and groups are made by account, not by name.
+ */
+function senderText(r) {
+    const account = "account " + String(r.uid || "").slice(0, 8);
+    return r.userName ? `${r.userName} (${account})` : account;
+}
+function senderHtml(r) {
+    const account = "account " + escapeHtml(String(r.uid || "").slice(0, 8));
+    return r.userName ? `<b title="Name given by the sender">${escapeHtml(r.userName)}</b> <span class="muted">(${account})</span>` : account;
+}
+
+/** The optional last scan a report or app suggestion carries, folded (empty when there is none). */
+function lastScanDetails(scan) {
+    if (!scan) return "";
+    return `<details class="support-scan"><summary>Last scan: ${escapeHtml([scan.product, scan.brand].filter(Boolean).join(" · ") || "(no name)")}</summary>
+            <p class="small">Result: ${escapeHtml(scan.result || "-")}. ${escapeHtml(scan.summary || "")}</p>
+            <p class="small muted">Ingredients read: ${escapeHtml(scan.ingredients || "-")}</p></details>`;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Clear all (12 November 2026): beside the fold arrow of Suggestions and of Support reports. Nothing is deleted: every item waiting in
+// the list is marked dismissed (the same as its own X), in batches of at most 400 writes, after a confirmation that defaults to Cancel.
+// ---------------------------------------------------------------------------------------------
+async function dismissAll(items, fields) {
+    for (let i = 0; i < items.length; i += 400) {
+        const batch = writeBatch(db);
+        items.slice(i, i + 400).forEach((item) => batch.update(doc(db, item.collection, item.id), fields(item)));
+        await batch.commit();
+    }
+}
+
+async function clearAllSuggestions() {
+    if (suggestions.length === 0) return;
+    const ok = await askConfirm({
+        title: "Clear all suggestions?", danger: true, confirmLabel: "Clear all",
+        message: `All ${suggestions.length} suggestions leave this list (they are marked dismissed, not deleted).`
+    });
+    if (!ok) return;
+    const button = el("suggestionClearAll");
+    button.disabled = true;
+    try {
+        await dismissAll(suggestions, (item) => item.collection === "supportReports"
+            ? { status: "dismissed", handledAt: serverTimestamp() }
+            : { status: "dismissed", reviewedAt: serverTimestamp() });
+        const count = suggestions.length;
+        suggestions = []; typedSuggestions = []; appSuggestions = [];
+        renderSuggestions();
+        notify(`${count} suggestions cleared.`, "ok");
+    } catch (error) {
+        console.error("Error clearing suggestions: ", error);
+        notify("The suggestions were not cleared. " + describeError(error), "error");
+    } finally { button.disabled = false; }
+}
+
+async function clearAllSupportReports(kind) {
+    const mine = supportReports.filter((r) => kindOf(r.category) === kind);
+    if (mine.length === 0) return;
+    const ok = await askConfirm({
+        title: `Clear all ${kind.title}?`, danger: true, confirmLabel: "Clear all",
+        message: `All ${mine.length} ${kind.title} leave this list (they are marked dismissed, not deleted).`
+    });
+    if (!ok) return;
+    const button = el(kind.prefix + "ClearAll");
+    button.disabled = true;
+    try {
+        await dismissAll(mine.map((r) => ({ id: r.id, collection: "supportReports" })), () => ({ status: "dismissed", handledAt: serverTimestamp() }));
+        supportReports = supportReports.filter((r) => kindOf(r.category) !== kind);
+        renderSupportReports();
+        notify(`${mine.length} ${kind.title} cleared.`, "ok");
+    } catch (error) {
+        console.error("Error clearing support reports: ", error);
+        notify("The reports were not cleared. " + describeError(error), "error");
+    } finally { button.disabled = false; }
+}
+
+async function onSupportClick(event) {
+    const button = event.target.closest("button[data-action]");
+    if (!button) return;
+    const id = button.getAttribute("data-id"), status = button.getAttribute("data-action");
+    button.disabled = true;
+    try {
+        await updateDoc(doc(db, "supportReports", id), { status, handledAt: serverTimestamp() });
+        supportReports = supportReports.filter((r) => r.id !== id);
+        renderSupportReports();
+        notify(status === "handled" ? "Marked as handled." : "Report dismissed.", "ok");
+    } catch (error) {
+        console.error("Error updating support report: ", error);
+        notify("The report was not updated. " + describeError(error), "error");
         button.disabled = false;
     }
 }
@@ -423,6 +618,7 @@ function registerHelpers() {
     const hourName = (hour) => new Date(2000, 0, 1, hour).toLocaleTimeString(undefined, { hour: "numeric" });
 
     registerAssist("numbers", () => {
+        if (!todayAnswered) return null;
         if (scansToday === null) return [];
         // (a helper only speaks when it adds something: "no scans yet" beside a tile that says 0 was the same thing twice)
         const lines = [];
@@ -444,6 +640,7 @@ function registerHelpers() {
     });
 
     registerAssist("activity", () => {
+        if (!activityAnswered) return null;
         const total = recentScans.length;
         if (total === 0) return [];
         const lines = [];
@@ -462,7 +659,8 @@ function registerHelpers() {
     // (the sum of what waits, the share of each result). Their folded line carries the short version instead.
 
     registerAssist("suggestions", () => {
-        if (!suggestionsLoaded || suggestions.length === 0) return [];
+        if (!suggestionsLoaded) return null;
+        if (suggestions.length === 0) return [];
         const allergens = suggestions.filter((s) => s.kind === "Allergen").length, conditions = suggestions.length - allergens;
         const parts = [];
         if (allergens > 0) parts.push(many(allergens, "allergen", "allergens"));
@@ -471,15 +669,8 @@ function registerHelpers() {
         return [{ tone: "info", text: `${parts.join(" and ")} suggested by app users.` + (Number.isFinite(oldest) ? ` Oldest: ${timeAgo(oldest)}.` : ""), label: "Curator", run: () => { window.location.href = "../_Admin_Ingredient_Curator/adminIngredientCurator.html"; }, tip: "Add what is useful to the Ingredient Curator, then mark the suggestion reviewed." }];
     });
 
-    registerAssist("brands", () => {
-        if (allBrands.length === 0) return [];
-        const total = allBrands.reduce((sum, b) => sum + b.scans, 0);
-        const lines = [];
-        if (total > 0) lines.push({ text: `${allBrands[0].name} has ${percent(allBrands[0].scans, total)}% of all brand scans.` });
-        const never = allBrands.filter((b) => b.scans === 0).length;
-        if (never > 0) lines.push({ text: `${many(never, "brand was", "brands were")} never scanned yet.`, label: "Inventory", run: () => { window.location.href = INVENTORY_PAGE; } });
-        return lines;
-    });
+    // "Most scanned brands" has no helper line (removed 7 November 2026 at the owner's request): its list already shows
+    // each brand's scans, and brands never scanned show 0.
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -542,6 +733,38 @@ function registerData() {
                 notify(`${rows.length} suggestion${rows.length === 1 ? "" : "s"} dismissed.`, "ok");
             } catch (error) { throw new Error(describeError(error)); }
         }
+    });
+
+    // the three kinds of support report, each a data set of its own, so each panel has "Show as" (12 November 2026)
+    SUPPORT_KINDS.forEach((kind) => registerDataset(kind.dataset, {
+        label: kind.label, noun: kind.title, nounOne: kind.title.replace(/s$/, ""),
+        items: () => supportReports.filter((r) => kindOf(r.category) === kind),
+        map: (r) => ({ id: r.id, title: r.message || "(empty)", subtitle: senderText(r), meta: timeAgo(r.createdAtUnix), tone: r.category === "Bug" ? "bad" : r.category === "Wrong scan result" ? "warn" : "pink" }),
+        dimensions: [
+            { id: "who", label: "Sender (by account)", of: (r) => r.uid ? "account " + r.uid.slice(0, 8) : "unknown" },
+            { id: "version", label: "App version", of: (r) => r.appVersion || null, none: "Unknown" }
+        ],
+        removedWord: "dismissed", foreverLabel: "Dismiss for good", removeNote: "They leave this list for everyone who uses the admin site.",
+        remove: async (rows) => {
+            try {
+                await dismissAll(rows.map((r) => ({ id: r.id, collection: "supportReports" })), () => ({ status: "dismissed", handledAt: serverTimestamp() }));
+                supportReports = supportReports.filter((r) => !rows.includes(r));
+                renderSupportReports();
+                notify(`${rows.length} ${rows.length === 1 ? kind.title.replace(/s$/, "") : kind.title} dismissed.`, "ok");
+            } catch (error) { throw new Error(describeError(error)); }
+        }
+    }));
+
+    // the number tiles and the shortcut tiles (read from the page's own tiles)
+    registerTileDataset("numbers", {
+        label: "Numbers", noun: "numbers", nounOne: "number", valueNoun: "Number", selector: ".kpi-row .kpi", watch: ".kpi-row",
+        map: (tile) => ({ title: (tile.querySelector(".kpi-title") || {}).textContent || "", value: parseFloat(((tile.querySelector(".kpi-value") || {}).textContent || "0").replace(/[^\d.]/g, "")) || 0, valueLabel: "", tone: "info" }),
+        open: (tile) => tile.click()
+    });
+    registerTileDataset("quickActions", {
+        label: "Quick actions", noun: "shortcuts", nounOne: "shortcut", selector: ".tile-stack a.tile, .tile-stack button.tile", watch: ".tile-stack",
+        map: (tile) => ({ title: tile.getAttribute("data-tip-title") || tile.textContent.trim(), subtitle: tile.classList.contains("review") ? "waiting for review" : "", value: 1, tone: tile.classList.contains("review") ? "info" : "muted" }),
+        open: (tile) => tile.click()
     });
 
     registerDataset("topBrands", {

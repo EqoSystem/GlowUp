@@ -28,6 +28,21 @@ namespace GlowUp.Data
         public string model = "";
         public string createdByUid = "";
         public long createdAtUnix;
+        // 7 November 2026: what the phone's own reader found (only lines that read as real words), and where the list came from.
+        // The AI only names the product; the list is cut from a real page by the server ("page") or read from the pack ("printed").
+        public string ocrText = "", ocrBrand = "";
+        public string ingredientsFrom = "none";                // "page" | "printed" | "none" (the rules allow only these)
+        public string ingredientSourceUrl = "";                // https page the list was cut from ("" when none)
+        public string ingredientSourceKind = "";               // "official" (the brand's own site) | "retailer" | "other" | ""
+        // 11 November 2026: the web search result's facts, for the admin's form (the rules check each: short text, https links or "")
+        public string market = "Global";
+        public string description = "";                       // at most 300 characters
+        public string shadeCode = "";                         // the shade code or name printed on the pack, at most 30
+        public int minimumAge;                                // as the maker states it; 0 = not stated (at most 18)
+        public string brandWebsite = "", brandLogoUrl = "", brandImageUrl = "", productPhotoUrl = "", productPageUrl = "";
+        public string primarySourceUrl = "", primarySourceKind = "";     // kind: "official" | "unverified" | ""
+        public string secondarySourceUrl = "";                // an e-commerce retailer
+        public string thirdSourceUrl = "", thirdSourceKind = "";         // kind: "official" | "retailer" | "other" | ""
     }
 
     /// <summary>The photo of a staged product, in its own document so that phones never download it (only admins read it).</summary>
@@ -47,6 +62,8 @@ namespace GlowUp.Data
         public string id = "", name = "", brandName = "", cosmeticType = "", shadeHex = "", model = "";
         public string createdByUid = "";         // who sent it: only the sender's own entry is ever used for a verdict
         public List<string> ingredients = new List<string>();
+        public List<string> sourceUrls = new List<string>();   // the list's page first: shown as "Unverified source · site"
+        public string ingredientsFrom = "";
         public bool isApproved;
         public long savedAtUnix;
     }
@@ -179,7 +196,8 @@ namespace GlowUp.Data
             var kept = new PendingProductData
             {
                 id = id, name = record.name, brandName = record.brandName, cosmeticType = record.cosmeticType, shadeHex = record.shadeHex,
-                model = record.model, createdByUid = uid ?? "", ingredients = new List<string>(record.ingredients), isApproved = false, savedAtUnix = Now
+                model = record.model, createdByUid = uid ?? "", ingredients = new List<string>(record.ingredients), isApproved = false, savedAtUnix = Now,
+                sourceUrls = new List<string>(record.sourceUrls ?? new List<string>()), ingredientsFrom = record.ingredientsFrom ?? ""
             };
             Keep(kept);
             return kept;

@@ -21,7 +21,9 @@ import {
 } from "../_Shared/adminCommon.js";
 import { matchesSearch } from "../_Shared/glowupRules.js";
 import { moveToArchive, KEEP_DAYS } from "../_Shared/adminArchive.js";
-import { mountShell, paginate, renderPager, icon, BIN_ICON, askConfirm, hydrate, setBinCount, addRefreshDataButton } from "../_Shared/adminShell.js";
+import { mountShell, placeHeaderParts, paginate, renderPager, icon, BIN_ICON, askConfirm, hydrate, setBinCount, addRefreshDataButton } from "../_Shared/adminShell.js";
+import { bindButtons } from "../_Shared/shortcuts.js";
+import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 
 const el = (id) => document.getElementById(id);
 const many = (n, one, more) => `${n} ${n === 1 ? one : more}`;
@@ -38,9 +40,19 @@ let loaded = false;
 const picked = new Set();              // ids picked on the tab that is shown
 const pager = { page: 1, size: 10 };
 
+// "Show as" for the list of removed entries (12 November 2026): what the tab shows, as a list, row, grid or graph
+registerDataset("bin", {
+    label: "Removed entries", noun: "entries", nounOne: "entry",
+    items: () => (loaded ? shownEntries() : []),
+    map: (x) => ({ id: x.id, title: nameOf(x), subtitle: kind, meta: x.binnedAt ? timeAgo(new Date(x.binnedAt)) : "not noted", tone: "muted" }),
+    dimensions: [{ id: "why", label: "Reason", of: (x) => x.binnedReason || null, none: "No reason noted" }]
+});
+
 document.addEventListener("DOMContentLoaded", async () => {
     mountShell("bin");
-    addRefreshDataButton(el("binTools"));      // the one Refresh data button of the site, beside the Archive button
+    bindButtons({ "bin.restore": "#restoreSelectedBtn", "bin.archive": "#archiveSelectedBtn", "bin.delete": "#deleteSelectedBtn" });      // keyboard shortcuts (shortcuts.js)
+    // the one Refresh data button of the site goes in front of the Archive button, in the header (New8.pdf)
+    addRefreshDataButton(placeHeaderParts());
     wireSignOut();
     setupNavigationGuard();
     el("binStatusGuide").innerHTML = statusGuide();
@@ -128,6 +140,7 @@ function paintTabs() {
 function render() {
     paintTabs();
     if (!loaded) return;
+    datasetChanged("bin");
     el("countIngredients").textContent = binned("ingredients").length || "";
     el("countBrands").textContent = binned("brands").length || "";
     el("countProducts").textContent = binned("products").length || "";

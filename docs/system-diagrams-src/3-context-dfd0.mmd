@@ -1,0 +1,22 @@
+flowchart LR
+  %% ASSUMED: external-system boundary grouped as one process per DFD Level 0 convention; each external entity is grounded in docs/FIRESTORE_SCHEMA.md and api/*.js
+  U[["Mobile app user"]]
+  AD[["Admin / curator"]]
+  AI(("Gemini AI API"))
+  FDA(("FDA Philippines portal"))
+  OBF(("Open Beauty Facts"))
+  CRON(("Vercel daily cron"))
+
+  SYS((GlowUp System))
+
+  U -- scan photo, profile, allergens --> SYS
+  SYS -- result, AR preview, scan history --> U
+  AD -- catalogue edits, approvals, imports --> SYS
+  SYS -- dashboards, pending queues, review data --> AD
+  SYS -- recognition / draft requests --> AI
+  AI -- candidate names, drafted text --> SYS
+  SYS -- verification query --> FDA
+  FDA -- legality status --> SYS
+  SYS -- catalogue lookup --> OBF
+  OBF -- product/ingredient data --> SYS
+  CRON -- daily trigger --> SYS

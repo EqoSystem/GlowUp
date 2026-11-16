@@ -107,14 +107,21 @@ namespace GlowUp.AR
         [Tooltip("The phone's question about the camera comes when the screen has been on show this long. Asked in the very first moment, it stood over a screen that was not drawn yet.")]
         [SerializeField] private float askAfterSeconds = 0.4f;
         [Tooltip("After the camera question closes, wait until the app is in front again for this long before the AR camera opens (opening it while the app is still coming back can leave a black screen)")]
-        [Min(0f)] [SerializeField] private float settleAfterPermissionSeconds = 0.8f;
+        [Min(0f)] [SerializeField] private float settleAfterPermissionSeconds = 1.5f;
         [Tooltip("The longest wait for Google's check of AR support; after that the guided preview is used")]
         [Min(2f)] [SerializeField] private float availabilityTimeoutSeconds = 10f;
         [Tooltip("The longest wait for the install of Google's AR service (the time the app is away does not count)")]
         [Min(10f)] [SerializeField] private float installTimeoutSeconds = 120f;
 
+        [Header("Yaw fade")]
+        [Tooltip("Overlay stays at full opacity below this head yaw angle (degrees)")]
+        [Range(0f, 90f)] [SerializeField] private float fadeStartYaw = 35f;
+        [Tooltip("Overlay fades to zero opacity at this head yaw angle and beyond (degrees)")]
+        [Range(0f, 90f)] [SerializeField] private float fadeEndYaw = 65f;
+
         [Header("Wording")]
         [SerializeField] private string msgChecking = "Getting the camera ready...";
+        [SerializeField] private string msgLiveNextTime = "Camera allowed. Live face tracking starts the next time you open AR Try-On.";
         [SerializeField] private string msgInstalling = "Live try-on needs Google Play Services for AR. Follow the steps on screen.";
         [SerializeField] private string msgStarting = "Starting live try-on...";
         [SerializeField] private string msgLookingForFace = "Looking for your face. Hold the phone in front of you.";
@@ -142,9 +149,14 @@ namespace GlowUp.AR
         Vector2Int originalGuidedCameraSize;
         bool hasOriginalGuidedCameraSize;
         const int GuidedCameraWidth = 960, GuidedCameraHeight = 540;
+        /// <summary>Head yaw relative to the AR camera (degrees, positive = face turned right). Valid only while IsLive.</summary>
+        public float HeadYaw { get; private set; }
+        /// <summary>Head pitch relative to the AR camera (degrees, positive = face tilted up). Valid only while IsLive.</summary>
+        public float HeadPitch { get; private set; }
+        /// <summary>Head roll relative to the AR camera (degrees, positive = face rolled right). Valid only while IsLive.</summary>
+        public float HeadRoll { get; private set; }
 
         const string GuardName = "ar-live-tracking";
-        static bool reloadedAfterPermission;
         bool guarding;
         float liveSince;
         Coroutine blackWatch;
@@ -282,7 +294,7 @@ namespace GlowUp.AR
             Say(msgChecking);
 
             // 1. the camera permission: one clear question before anything opens the camera
-            bool allowed = true;
+            bool allowed = true, firstAllow = false;
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (!Permission.HasUserAuthorizedPermission(Permission.Camera))
             {
@@ -305,17 +317,12 @@ namespace GlowUp.AR
                 }
                 allowed = granted;
                 // The phone pauses and resumes the app around its question. Opening the AR camera in the middle of that has left a black screen
-                // with the camera light on (reported on phones, 2026-10-26). So after a first "allow" the screen is simply loaded again: the
-                // camera is then already allowed, no question, no pause, a clean start. Once per app run.
-                if (granted && !reloadedAfterPermission)
-                {
-                    reloadedAfterPermission = true;
-                    Debug.Log("[GlowUp] AR Try-On: the camera was just allowed; loading the screen again for a clean start.");
-                    routine = null;
-                    if (quality != null) quality.EndSession();
-                    UnityEngine.SceneManagement.SceneManager.LoadScene(UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
-                    yield break;
-                }
+                // with the camera light on and a dead back key (reported on phones, 2026-10-26 and 2026-11-11, right after the first "allow"
+                // when the user came straight from sign-up). The earlier cure, loading the screen again, made it worse: the new screen started
+                // the AR camera in its very first frames, while the app was still coming back to the front. Now the first "allow" never starts
+                // live tracking in the same visit: the screen waits until the app is in front again (below) and then uses the guided preview, which
+                // follows the face with the ordinary camera; the next visit starts live tracking normally.
+                firstAllow = granted;
                 // the question has just closed: the app is still coming back to the front. Opening the AR camera in that moment can leave a
                 // black screen until the app is restarted, so wait until the app is in front again and has had a moment to draw.
                 float settled = 0f, front = 0f;
@@ -324,6 +331,12 @@ namespace GlowUp.AR
                     front += Time.unscaledDeltaTime;
                     if (Application.isFocused) settled += Time.unscaledDeltaTime;
                     yield return null;
+                }
+                if (firstAllow)
+                {
+                    Debug.Log("[GlowUp] AR Try-On: the camera was just allowed; the guided preview is used for this visit (live tracking next time).");
+                    UseGuidedPreview("the camera was just allowed: the phone is still coming back from its question", msgLiveNextTime);
+                    yield break;
                 }
             }
 #endif
@@ -693,6 +706,7 @@ namespace GlowUp.AR
             if (wantBrow != usingBrow) { if (wantBrow) browMask.BeginSession(makeup); else browMask.EndSession(); usingBrow = wantBrow; }
             if (wantSmooth != usingSmooth) { if (wantSmooth) meshSmoother.BeginSession(); else meshSmoother.EndSession(); usingSmooth = wantSmooth; }
             if (makeup != null) makeup.UseGloss = makeup.HasGloss && (quality == null || quality.MovingHighlight);
+            if (makeup != null) makeup.UsePigment = quality == null || !quality.IsLight;     // phase 3A: the lighter pipeline skips the pigment pass's cost
         }
 
         void StopHelpers()
@@ -789,11 +803,38 @@ namespace GlowUp.AR
             trackedNow = seen; heldNow = holding;
             RedressWhenLayerChanged();
 
+            // head angles (yaw/pitch/roll) relative to the AR camera
+            ComputeHeadAngles(tracked, arCamera, out float yaw, out float pitch, out float roll);
+            HeadYaw = yaw; HeadPitch = pitch; HeadRoll = roll;
+
+            // yaw fade: ease overlay to 0 as |yaw| exceeds fadeStartYaw → fadeEndYaw
+            if (makeup != null)
+            {
+                float prevPresence = makeup.Presence;
+                float yawT = Mathf.Clamp01(Mathf.InverseLerp(fadeStartYaw, fadeEndYaw, Mathf.Abs(yaw)));
+                float yawMult = tracked != null ? 1f - Mathf.SmoothStep(0f, 1f, yawT) : 1f;
+                makeup.Presence = Mathf.Min(makeup.Presence, yawMult);
+                if (Mathf.Abs(makeup.Presence - prevPresence) > 0.2f)
+                    Debug.Log($"[AR] Presence jump {prevPresence:F2}→{makeup.Presence:F2}  yaw={yaw:F1}  tracking={(seen ? "Tracking" : holding ? "Held" : "Lost")}");
+            }
+
             string say = hasFace ? msgTracking
                 : holding ? msgFaceHeld
                 : usingLight && lightAdapter.LowLight ? lightAdapter.LowLightMessage
                 : msgLookingForFace;
             if (say != lastSaid || !saidAnything) { lastSaid = say; hadFace = hasFace; Say(say); }
+        }
+
+        /// <summary>Head angles (degrees) relative to the AR camera. All zero when face looks straight at camera. Yaw: +right, Pitch: +up, Roll: +right-tilt.</summary>
+        static void ComputeHeadAngles(ARFace face, Camera cam, out float yaw, out float pitch, out float roll)
+        {
+            yaw = pitch = roll = 0f;
+            if (face == null || cam == null) return;
+            Quaternion rel = Quaternion.Inverse(cam.transform.rotation) * face.transform.rotation;
+            Vector3 e = rel.eulerAngles;
+            yaw   = e.y > 180f ? e.y - 360f : e.y;
+            pitch = e.x > 180f ? e.x - 360f : e.x;
+            roll  = e.z > 180f ? e.z - 360f : e.z;
         }
 
         void Say(string message)

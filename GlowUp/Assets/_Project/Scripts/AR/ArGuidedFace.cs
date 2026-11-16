@@ -54,6 +54,17 @@ namespace GlowUp.AR
         [Tooltip("The dark-room hint comes after this many seconds")]
         [Min(0f)] [SerializeField] private float darkHintAfter = 2.5f;
 
+        [Header("Pigment (phase 3A, 11 November 2026)")]
+        [Tooltip("On = a thin layer of the shade itself lies over the tint. The tint alone can at most double the skin's own colour, so a pale or "
+               + "light shade on darker skin stayed dark and looked painted; the pigment carries it. Off in the lighter AR pipeline (one draw less per part).")]
+        [SerializeField] private bool pigmentLayer = true;
+        [Tooltip("How much of the shade itself covers the face (foundation): 0 = tint only")]
+        [Range(0f, 0.6f)] [SerializeField] private float pigmentFace = 0.18f;
+        [Tooltip("How much of the shade itself covers cheeks, eyes, lips and brows")]
+        [Range(0f, 0.6f)] [SerializeField] private float pigmentParts = 0.22f;
+        [Tooltip("Extra pigment for a shade much lighter than the skin under it (the tint cannot lighten that far)")]
+        [Range(0f, 0.6f)] [SerializeField] private float pigmentForLighter = 0.3f;
+
         [Header("Wording")]
         [SerializeField] private string msgLoading = "Getting face finding ready...";
         [SerializeField] private string msgLooking = "Looking for your face. Hold the phone in front of you.";
@@ -109,6 +120,7 @@ namespace GlowUp.AR
         Vector2[] meshUvs;
         int[] meshTriangles;
 
+        ArGuidedFaceLayer[] pigments;                 // phase 3A: the thin layer of the shade itself over each tint (null in the lighter pipeline)
         readonly Vector3[] raw = new Vector3[Points];
         readonly OneEuroVertexFilter filter = new OneEuroVertexFilter();
         readonly Vector3[] shown = new Vector3[Points];
@@ -205,7 +217,7 @@ namespace GlowUp.AR
             running = false;
             if (reader != null) { reader.Close(); reader = null; }
             if (root != null) { Destroy(root.gameObject); root = null; }
-            layers = null; highlight = null; local = null;
+            layers = null; highlight = null; local = null; pigments = null;
             Release(colourMasks); Release(highlightMasks); colourMasks = highlightMasks = null;
             if (materials != null) foreach (Material m in materials) if (m != null) Destroy(m);
             materials = null;
@@ -333,10 +345,14 @@ namespace GlowUp.AR
             layers = new ArGuidedFaceLayer[GuidedFaceShapes.LayerCount];
             materials = new Material[GuidedFaceShapes.LayerCount];
             local = new Vector3[GuidedFaceShapes.LayerCount + 1][];
+            bool withPigment = pigmentLayer && !(quality != null && quality.IsLight);
+            pigments = withPigment ? new ArGuidedFaceLayer[GuidedFaceShapes.LayerCount] : null;
             for (int layer = 0; layer < GuidedFaceShapes.LayerCount; layer++)
             {
                 materials[layer] = blend != null ? new Material(blend) { name = "Guided face " + names[layer] } : null;
                 layers[layer] = MakeLayer(names[layer], colourMasks[layer], materials[layer]);
+                // the pigment lies right over its tint, with the same feathered mask (the default UI material: an ordinary see-through colour)
+                if (withPigment) pigments[layer] = MakeLayer(names[layer] + " Pigment", colourMasks[layer], null);
                 local[layer] = new Vector3[Points];
             }
             // the highlight ADDS light through its own shader (a grey film of white paint made the face look like a ghost); the finish sets how sharp it is
@@ -423,8 +439,19 @@ namespace GlowUp.AR
                     points[i] = toLayer.MultiplyPoint3x4(new Vector3(p.x, p.y, 0f));
                 }
                 layer.SetPoints(points);
+                if (pigments != null && l < GuidedFaceShapes.LayerCount && pigments[l] != null && pigments[l].enabled) pigments[l].SetPoints(points);
             }
             meshUpdateMilliseconds = (Stopwatch.GetTimestamp() - start) * 1000f / Stopwatch.Frequency;
+        }
+
+        /// <summary>
+        /// The thin layer of the shade itself (phase 3A): the shade's colour, with a share of the layer's strength. A shade much lighter than the
+        /// skin under it gets more, because the tint under it can at most double the skin's colour (GuidedPigment.Share).
+        /// </summary>
+        Color PigmentColour(int layer, Color shade, Color skin)
+        {
+            float share = GuidedPigment.Share(shade, skin, layer == GuidedFaceShapes.Face ? pigmentFace : pigmentParts, pigmentForLighter);
+            return new Color(shade.r, shade.g, shade.b, Mathf.Clamp01(shade.a * share));
         }
 
         /// <summary>Each layer takes the colour ArFaceMakeup works out (part, shade, strength, finish, presence); the highlight the finish's shine.</summary>
@@ -435,11 +462,14 @@ namespace GlowUp.AR
             {
                 Color c = makeup.LayerColour(l);
                 bool on = c.a > 0.004f && presence > 0.001f;
+                ArGuidedFaceLayer pigment = pigments != null ? pigments[l] : null;
+                if (pigment != null && pigment.enabled != on) pigment.enabled = on;
                 if (layers[l].enabled != on) { layers[l].enabled = on; if (on) { skinSent[l] = Color.clear; DrawPoints(); } }     // switched on: a fresh stencil copy needs the skin colour again
                 if (!on) continue;
                 layers[l].color = c;
                 // the camera view has a Mask, so the UI draws a stencil COPY of the material: the skin colour goes to that copy too
                 Color skin = makeup.SkinUnderFor(l);
+                if (pigment != null) pigment.color = PigmentColour(l, c, skin);
                 if (materials[l] != null && !Same(skinSent[l], skin))
                 {
                     skinSent[l] = skin;

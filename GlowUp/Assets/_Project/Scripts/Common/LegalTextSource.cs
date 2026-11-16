@@ -24,6 +24,9 @@ namespace GlowUp.Common
 
         void Awake() { Apply(); }
 
+        // every Privacy Policy / Terms screen gets the round "Back to top" button on the scroll area this text sits in (7 November 2026)
+        void Start() { BackToTopButton.Attach(GetComponentInParent<UnityEngine.UI.ScrollRect>()); }
+
         protected override void ApplyPalette(ThemeProfile.Palette p)
         {
             titleColor = p.heading;

@@ -64,6 +64,12 @@ namespace GlowUp.Onboarding
         /// </summary>
         public static bool Locked;
 
+        /// <summary>
+        /// Set while a page of the sign-up is only being READ (the Terms page opened from the log-in page): the X then simply opens this
+        /// scene, with no "Leave sign-up?" question, because there is no sign-up to leave. Null = the normal question.
+        /// </summary>
+        public static string PlainExitScene;
+
         static OnboardingLeaveGuard current;
         float keyboardSeenAt = -10f;
 
@@ -90,6 +96,7 @@ namespace GlowUp.Onboarding
         public void Ask()
         {
             if (Locked) return;
+            if (!string.IsNullOrEmpty(PlainExitScene)) { SceneNavigator.Go(PlainExitScene); return; }
             if (confirm == null) { LeaveNow(loginScene); return; }
             if (OnboardingSession.Retake) confirm.Ask(retakeTitle, retakeMessage, leaveLabel, () => LeaveNow(loginScene), true, stayLabel);
             else confirm.Ask(title, OnboardingSession.Social ? socialMessage : message, leaveLabel, () => LeaveNow(loginScene), true, stayLabel);

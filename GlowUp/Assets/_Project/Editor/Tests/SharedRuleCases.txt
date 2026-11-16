@@ -162,6 +162,7 @@ sourcekind | https://skin.harvard.edu/x | | medical
 sourcekind | https://www.nature.com/articles/x | https://www.naturerepublic.com | medical
 sourcekind | INCIDecoder \u007c https://incidecoder.com/ingredients/niacinamide | | reference
 sourcekind | http://www.ewg.org/skindeep/x | | reference
+sourcekind | https://cosmileeurope.eu/inci/detail/5/1-2-hexanediol/ | | reference
 sourcekind | https://www.paulaschoice.com/ingredient-dictionary/x | | reference
 sourcekind | Open Beauty Facts \u007c https://world.openbeautyfacts.org/product/4800000000000 | | public
 # the maker: ONLY the brand's confirmed website and the pages under it. A name match alone is never enough.
@@ -201,4 +202,4 @@ sourcelabel | maker | Manufacturer's own site
 sourcelabel | reference | Ingredient database
 sourcelabel | public | Public list (anyone can edit)
 sourcelabel | retailer | Retailer listing
-sourcelabel | other | Unverified site
+sourcelabel | other | Other website

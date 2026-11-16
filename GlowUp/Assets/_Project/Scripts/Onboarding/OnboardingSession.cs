@@ -20,6 +20,7 @@ namespace GlowUp.Onboarding
         public static string SkinType = "", SkinTone = "";
         public static List<string> SkinConditions = new List<string>();
         public static List<string> Allergens = new List<string>();
+        public static bool HealthConsent;             // the second box on the Terms page was ticked: set just before the profile is saved, never persisted
         public static string Password = "";           // never persisted
         // Items the user typed that were not in the lists. Sent to the database for review after the account exists.
         public static List<string> CustomConditions = new List<string>();
@@ -40,6 +41,9 @@ namespace GlowUp.Onboarding
         /// profile. Kept in memory only (the login page sets it again if the app was closed in between).
         /// </summary>
         public static bool Social;
+
+        /// <summary>Said on the sign-up steps after a Google sign-in: Google gives only a name and an email, so everything else is asked here.</summary>
+        public const string SocialReminder = "You signed in with Google. Please fill in every field in these steps. Google does not share your age or birthday, so you will be asked for it on the last step.";
 
         /// <summary>
         /// The account this sign-up already has, by its id ("" = none yet). Since 12 October 2026 the account is made on
@@ -110,6 +114,9 @@ namespace GlowUp.Onboarding
             PlayerPrefs.SetString(Prefix + "Allergens", string.Join("|", Allergens));
             PlayerPrefs.SetString(Prefix + "Account", AccountUid ?? "");
             PlayerPrefs.SetInt(Prefix + "AccountMadeHere", AccountMadeHere ? 1 : 0);
+            // a quiz retake is remembered too: after a restart it is still ONLY the quiz (Steps 2 to 4), never the account steps
+            PlayerPrefs.SetInt(Prefix + "Retake", Retake ? 1 : 0);
+            PlayerPrefs.SetString(Prefix + "RetakeReturn", RetakeReturnScene ?? "");
             PlayerPrefs.Save();
         }
 
@@ -128,6 +135,8 @@ namespace GlowUp.Onboarding
             Allergens = Split(PlayerPrefs.GetString(Prefix + "Allergens", ""));
             AccountUid = PlayerPrefs.GetString(Prefix + "Account", AccountUid ?? "");
             AccountMadeHere = PlayerPrefs.GetInt(Prefix + "AccountMadeHere", AccountMadeHere ? 1 : 0) == 1;
+            Retake = PlayerPrefs.GetInt(Prefix + "Retake", Retake ? 1 : 0) == 1;
+            RetakeReturnScene = PlayerPrefs.GetString(Prefix + "RetakeReturn", RetakeReturnScene ?? "");
         }
 
         public static void Clear()
@@ -136,7 +145,7 @@ namespace GlowUp.Onboarding
             FirstName = MiddleName = LastName = Username = Email = BirthdayIso = SkinType = SkinTone = Password = "";
             Age = 0; SkinConditions = new List<string>(); Allergens = new List<string>();
             CustomConditions = new List<string>(); CustomAllergens = new List<string>();
-            foreach (var k in new[] { "First", "Middle", "Last", "User", "Email", "Birthday", "Age", "Type", "Tone", "Cond", "Allergens", "Account", "AccountMadeHere" })
+            foreach (var k in new[] { "First", "Middle", "Last", "User", "Email", "Birthday", "Age", "Type", "Tone", "Cond", "Allergens", "Account", "AccountMadeHere", "Retake", "RetakeReturn" })
                 PlayerPrefs.DeleteKey(Prefix + k);
             PlayerPrefs.Save();
         }
@@ -154,7 +163,8 @@ namespace GlowUp.Onboarding
             username = Username, email = Email, birthday = BirthdayIso, age = Age,
             skinType = SkinType, skinTone = SkinTone,
             skinConditions = new List<string>(SkinConditions), knownAllergens = new List<string>(Allergens),
-            termsAccepted = true, createdAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds()
+            termsAccepted = true, createdAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            healthConsentAtUnix = HealthConsent ? DateTimeOffset.UtcNow.ToUnixTimeSeconds() : 0
         };
     }
 }

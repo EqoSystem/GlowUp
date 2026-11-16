@@ -54,6 +54,8 @@ namespace GlowUp.Dashboard
         [SerializeField] private string msgNoneComplete = "We're still building recommendations for you.";
         [Tooltip("The small line under the heading that says what a recommendation means. Optional.")]
         [SerializeField] private TextMeshProUGUI recommendationsNoteText;
+        [Tooltip("The small \"i\" at the end of \"Recommended for you\": the note (not medical advice ...) is inside its bubble")]
+        [SerializeField] private HelpBadge recommendationsBadge;
         [SerializeField] private string noteStandard = "No ingredients flagged for your profile. This is not medical advice.";
         [Tooltip("The same line for a user who saved a skin condition")]
         [SerializeField] private string noteWithCondition = "No ingredients flagged for your profile. This is not medical advice: ask a dermatologist about a flare-up.";
@@ -217,11 +219,10 @@ namespace GlowUp.Dashboard
                 recommendationsEmptyText.text = msgNoneComplete;
             }
             // what a recommendation means, and does not mean: said under the heading when there is something to show
-            if (recommendationsNoteText != null)
-            {
-                recommendationsNoteText.gameObject.SetActive(cards.Count > 0);
-                recommendationsNoteText.text = ProductScope.HasSkinCondition(who) ? noteWithCondition : noteStandard;
-            }
+            // 12 November 2026: the line is no longer printed under the heading; it is inside the small "i" at the end of "Recommended for you"
+            string note = ProductScope.HasSkinCondition(who) ? noteWithCondition : noteStandard;
+            if (recommendationsNoteText != null) { recommendationsNoteText.text = note; recommendationsNoteText.gameObject.SetActive(false); }
+            if (recommendationsBadge != null) { recommendationsBadge.Message = note; recommendationsBadge.gameObject.SetActive(cards.Count > 0); }
         }
 
         // one row open at a time, so the list stays calm

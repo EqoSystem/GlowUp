@@ -1,7 +1,7 @@
 // The parts every admin page is built from (no database code in here; the Refresh data button only calls adminStore.js):
 //   icons            - one set of thin-line icons, drawn as SVG (no emoji, no picture files)
 //   theme            - light / dark / system, remembered on this computer; "system" follows the computer's setting
-//   mountShell       - the sidebar (with its flowing highlight and the settings window behind the logo) and the top bar (title)
+//   mountShell       - the sidebar (with its flowing highlight; the logo is a plain badge) and the top bar (title)
 //   guides           - the small "i" badges and the pop-up that explains a control
 //   tile animation   - the lift, pixel sweep and glowing outline of the mobile app's tiles, on every button and tile
 //   menus, dialogs   - one small pop-up menu and two dialogs (confirm, type a name) used by every page
@@ -9,9 +9,14 @@
 //
 // The display layouts (arranging panels, panel kinds, fonts and colours) live in adminLayouts.js;
 // the data panels (lists, grids, graphs) in adminWidgets.js.
+import { catchFailures } from "./quietConsole.js";      // first: no debug output on the live site, failures become a toast
 import { initLayouts, applyAppearance } from "./adminLayouts.js";
 import { refreshData, refreshWait } from "./adminStore.js";   // only for the "Refresh data" button
 import { mountSettingsMenu } from "./adminSettingsMenu.js";
+import { startShortcuts, keyChips } from "./shortcuts.js";
+import { ariaKeys } from "./shortcutKeys.js";
+
+catchFailures((text) => toast(text, "error"));
 
 // ---------------------------------------------------------------------------------------------
 // Icons
@@ -24,6 +29,7 @@ const ICONS = {
     logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
     moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+    gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
     sliders: '<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
@@ -59,6 +65,7 @@ const ICONS = {
     split: '<rect x="3" y="5" width="7" height="14" rx="1.5"/><rect x="14" y="5" width="7" height="14" rx="1.5"/>',
     tabs: '<rect x="3" y="8" width="18" height="12" rx="2"/><path d="M3 8V6a2 2 0 0 1 2-2h5v4"/>',
     undo: '<path d="M4 9h10a6 6 0 0 1 0 12H8"/><path d="M8 5L4 9l4 4"/>',
+    redo: '<path d="M20 9H10a6 6 0 0 0 0 12h6"/><path d="M16 5l4 4-4 4"/>',
     bulb: '<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.5.4.8 1 .8 1.6V16h5.4v-.5c0-.6.3-1.2.8-1.6A6 6 0 0 0 12 3z"/>',
     ban: '<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',
     save: '<path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h7V3M8 21v-7h8v7"/>',
@@ -72,6 +79,8 @@ const ICONS = {
     folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/>',
     folderPlus: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z"/><path d="M12 11v6M9 14h6"/>',
     sort: '<path d="M7 5v14M4 16l3 3 3-3"/><path d="M13 7h8M13 12h6M13 17h4"/>',
+    play: '<path d="M8 5.5v13l11-6.5z"/>',
+    keyboard: '<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6.5 10h.01M10 10h.01M13.5 10h.01M17 10h.01M6.5 14h.01M17 14h.01M9.5 14h5"/>',
     sparkle: '<path d="M11 3l1.9 5.1L18 10l-5.1 1.9L11 17l-1.9-5.1L4 10l5.1-1.9z"/><path d="M18.5 15l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z"/>',
     up: '<path d="M6 15l6-6 6 6"/>',
     archive: '<rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9"/><path d="M10 13h4"/>',
@@ -83,7 +92,7 @@ const ICONS = {
 export const BIN_ICON = '<svg class="ic bin-ic" viewBox="0 0 24 24" aria-hidden="true"><g class="bin-lid"><path d="M4 7h16"/><path d="M9 7V4h6v3"/></g><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg>';
 
 /**
- * A page has (re)loaded part of the Recycle bin: the settings menu behind the logo counts the whole bin again, from the
+ * A page has (re)loaded part of the Recycle bin: the Quick settings panel (when open) counts the whole bin again, from the
  * lists this browser keeps (adminSettingsMenu.js). The page's own number is not needed: it holds only its own part.
  */
 export function setBinCount() {
@@ -237,6 +246,26 @@ export function placeInHeader(searchSelector, actionsId) {
     if (actions && tools) tools.insertBefore(actions, tools.firstChild);
 }
 
+/**
+ * The header of the Recycle Bin and the Archive: the tabs and the search beside the title, and the page's buttons at the far right.
+ * The parts wait in the page's <div data-header-parts hidden>. Call it right after mountShell. Returns the header.
+ */
+export function placeHeaderParts() {
+    const bar = document.querySelector("main.main-content > header.topbar");
+    const holder = document.querySelector("[data-header-parts]");
+    if (!bar || !holder) return bar;
+    const tools = bar.querySelector(".topbar-tools");
+    bar.classList.add("has-search", "has-tabs");
+    holder.querySelectorAll(":scope > .header-tabs, :scope > .search-container").forEach((part) => bar.insertBefore(part, tools));
+    const end = holder.querySelector(":scope > [data-header-end]");
+    if (end) {                                  // the page's buttons go before the Quick settings gear, which stays at the far right
+        const gear = tools.querySelector(".quick-gear");
+        if (gear) gear.before(...end.childNodes); else tools.append(...end.childNodes);
+    }
+    holder.remove();
+    return bar;
+}
+
 export function mountShell(page) {
     const main = document.querySelector("main.main-content");
     document.body.classList.add("app");
@@ -248,9 +277,10 @@ export function mountShell(page) {
     const sidebar = document.querySelector("aside.sidebar");
     const topbar = main.querySelector("header.topbar");
     wireNavDrop(sidebar.querySelector(".nav-links"));
-    // the top bar keeps only the page's own tools (search, Add, More: placeInHeader). Layout and style, the Recycle bin,
-    // the Archive, light / dark / system and Sign Out are in the settings menu behind the GlowUp logo (adminSettingsMenu.js).
-    topbar.querySelector(".topbar-tools").innerHTML = "";
+    // the top bar keeps the page's own tools (search, Add: placeInHeader) and, at the far right, the Quick settings gear. Layout and
+    // style, the Recycle bin and light / dark / system are in the panel it opens (adminSettingsMenu.js).
+    const tools = topbar.querySelector(".topbar-tools");
+    tools.innerHTML = "";
     followSystemTheme();
 
     const bar =document.createElement("div");
@@ -261,9 +291,10 @@ export function mountShell(page) {
     topbar.insertAdjacentElement("afterend", bar);
 
     hydrate(document);
-    mountSettingsMenu();                        // the window first: initLayouts puts the Layout & Style controls into it
+    mountSettingsMenu(tools);                   // the gear first (the panel itself is built on its first open): initLayouts puts the Layout & Style controls into its holder
     initLayouts(page);
     watchForNewControls();
+    startShortcuts(page);                       // keyboard shortcuts of this page (shortcuts.js)
 }
 
 /**
@@ -296,7 +327,8 @@ function wireNavDrop(list) {
     });
     list.addEventListener("mouseleave", () => place(home));
     list.addEventListener("focusout", () => { if (!list.contains(document.activeElement)) place(home); });
-    window.addEventListener("resize", () => place(home, true));
+    let placeQueued = 0;
+    window.addEventListener("resize", () => { if (!placeQueued) placeQueued = requestAnimationFrame(() => { placeQueued = 0; place(home, true); }); }, { passive: true });
 }
 
 /** Icons, guide badges and the tile animation for everything inside `root` (call it after filling a list). */
@@ -567,11 +599,17 @@ function showTip(target) {
     pop.style.top = Math.max(8, top) + "px";
 }
 export function hideTip() { if (pop) pop.classList.remove("show"); }
-document.addEventListener("mouseover", (event) => { const t = event.target.closest && event.target.closest("[data-tip]"); if (t) showTip(t); });
-document.addEventListener("mouseout", (event) => { const t = event.target.closest && event.target.closest("[data-tip]"); if (t && !t.contains(event.relatedTarget)) hideTip(); });
-document.addEventListener("focusin", (event) => { const t = event.target.closest && event.target.closest("[data-tip]"); if (t) showTip(t); });
+// A control with a label or an icon gets no hover label (5 November 2026): its aria-label is for screen readers. The "i" badges keep theirs: it is all they do.
+const CONTROL = "button, a, select, input, textarea, label, [role=button]";
+const tipOf = (node) => {
+    const t = node.closest && node.closest("[data-tip]");
+    return t && (t.classList.contains("guide-badge") || !t.closest(CONTROL)) ? t : null;
+};
+document.addEventListener("mouseover", (event) => { const t = tipOf(event.target); if (t) showTip(t); });
+document.addEventListener("mouseout", (event) => { const t = tipOf(event.target); if (t && !t.contains(event.relatedTarget)) hideTip(); });
+document.addEventListener("focusin", (event) => { const t = tipOf(event.target); if (t) showTip(t); });
 document.addEventListener("focusout", hideTip);
-document.addEventListener("scroll", hideTip, true);
+document.addEventListener("scroll", hideTip, { capture: true, passive: true });
 document.addEventListener("pointerdown", hideTip, true);
 
 // ---------------------------------------------------------------------------------------------
@@ -590,7 +628,9 @@ export function playSweep(control) {
     void control.offsetWidth;                    // lets the animation start again on a quick second press
     control.classList.add("fx-run");
 }
-document.addEventListener("pointerdown", (event) => { playSweep(event.target.closest && event.target.closest(".fx")); });
+/** Only what answers a click gets the pixel sweep (9 November 2026): a control, or a card the page made clickable (its pointer is a hand). */
+const answersClick = (control) => !!control && (control.matches("button, a[href], [role=button], input, select, summary, label") || getComputedStyle(control).cursor === "pointer");
+document.addEventListener("pointerdown", (event) => { const control = event.target.closest && event.target.closest(".fx"); if (answersClick(control)) playSweep(control); });
 document.addEventListener("animationend", (event) => { if (event.animationName === "fx-glow") event.target.classList.remove("fx-run"); });
 
 // Moving to another page: this page stays as it is until the next one is there (no loading cover in between). The
@@ -630,7 +670,11 @@ export function flip(elements, change, duration = 280) {
 export function toast(message, kind = "info", action) {
     let host = document.getElementById("toastHost");
     if (!host) { host = document.createElement("div"); host.id = "toastHost"; host.className = "toast-host"; host.setAttribute("aria-live", "polite"); document.body.appendChild(host); }
+    // the same message already on screen is not shown twice: it stays a little longer instead (no pile of equal toasts)
+    const same = Array.from(host.children).find((t) => t.dataset.text === message && t.dataset.kind === kind && !action);
+    if (same) { clearTimeout(Number(same.dataset.timer)); same.dataset.timer = String(window.setTimeout(() => same.remove(), kind === "error" ? 8000 : 3500)); return; }
     const box = document.createElement("div");
+    box.dataset.text = message; box.dataset.kind = kind;
     box.className = "toast " + kind;
     const text = document.createElement("span");
     text.textContent = message;
@@ -642,7 +686,7 @@ export function toast(message, kind = "info", action) {
         box.appendChild(button);
     }
     host.appendChild(box);
-    window.setTimeout(() => box.remove(), kind === "error" ? 8000 : action ? 7000 : 3500);
+    box.dataset.timer = String(window.setTimeout(() => box.remove(), kind === "error" ? 8000 : action ? 7000 : 3500));
 }
 
 let openMenuEl = null, closeOpenMenu = null;
@@ -677,6 +721,7 @@ export function openMenu(anchor, items) {
         text.appendChild(label);
         if (item.description) { const more = document.createElement("small"); more.textContent = item.description; text.appendChild(more); }
         button.appendChild(text);
+        if (item.keys) { button.appendChild(keyChips(item.keys, "kb-hint")); button.setAttribute("aria-keyshortcuts", ariaKeys(item.keys)); }   // its keyboard shortcut, as chips (no hover label)
         if (item.checked) button.insertAdjacentHTML("beforeend", icon("check", "menu-check"));
         button.addEventListener("click", () => { closeMenu(); if (item.run) item.run(); });
         menu.appendChild(button);
@@ -739,7 +784,8 @@ export function dialogFrame(title, onDismiss) {
 
 /**
  * "Are you sure?" as a proper dialog. Resolves true when confirmed.
- * options = { title, message, items: [names], confirmLabel, danger }
+ * options = { title, message, items: [names], confirmLabel, danger, inline }
+ * inline = true: the question and its buttons stand on ONE row (title left, Cancel and the answer right), for a question with no more words (Sign out?).
  */
 export function askConfirm(options) {
     return new Promise((resolve) => {
@@ -755,9 +801,10 @@ export function askConfirm(options) {
         }
         const actions = document.createElement("div");
         actions.className = "modal-actions";
-        actions.style.marginTop = "18px";
+        if (options.inline) frame.box.classList.add("confirm-inline");
+        else actions.style.marginTop = "18px";
         const cancel = document.createElement("button");
-        cancel.type = "button"; cancel.className = "cancel-btn"; cancel.textContent = "Cancel";
+        cancel.type = "button"; cancel.className = "cancel-btn"; cancel.textContent = options.cancelLabel || "Cancel";
         const ok = document.createElement("button");
         ok.type = "button"; ok.className = options.danger ? "btn danger solid" : "save-btn"; ok.textContent = options.confirmLabel || "Confirm";
         cancel.addEventListener("click", () => done(false));
@@ -818,7 +865,7 @@ export function renderPager(host, state, total, onChange, noun = "items") {
     host.innerHTML = `<span class="pager-range">${from}-${to} of ${total} ${esc(noun)}</span>
         <span class="btn-group">
             <button type="button" class="icon-btn" data-go="-1" aria-label="Previous page"${state.page <= 1 ? " disabled" : ""}>${icon("left")}</button>
-            <span class="page-now">Page ${state.page} of ${pages}</span>
+            <span class="page-now"><span class="page-long">Page ${state.page} of ${pages}</span><span class="page-short">${state.page}/${pages}</span></span>
             <button type="button" class="icon-btn" data-go="1" aria-label="Next page"${state.page >= pages ? " disabled" : ""}>${icon("right")}</button>
         </span>`;
     host.onclick = (event) => {

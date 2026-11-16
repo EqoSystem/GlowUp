@@ -32,9 +32,14 @@ namespace GlowUp.Onboarding
             GetComponent<Button>().onClick.AddListener(() => Clicked?.Invoke(this));
         }
 
+        /// <summary>The card that turns over to explain the choice (added at run time by the page that wants it; null = none).</summary>
+        public FlipCardTile Flip;
+
         public void SetSelected(bool selected, bool animate = true)
         {
+            bool was = IsSelected;
             IsSelected = selected;
+            if (Flip != null) Flip.SetSelected(selected, was, animate);
             if (animator != null) { if (animate) animator.SetSelected(selected); else animator.SetSelected(selected); }
         }
 

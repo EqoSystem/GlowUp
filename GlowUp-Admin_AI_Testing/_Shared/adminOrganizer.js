@@ -88,14 +88,28 @@ export function createOrganizer(spec) {
         if (view.kind === "folder" && !folders().some((name) => same(name, view.name))) view = { kind: "all", name: "" };
         return view;
     };
-    const show = (next) => {
+    /**
+     * Shows a view. The Recycle bin and a folder are places of their own (docs/NAVIGATION_RULES.md, 9 November 2026): going
+     * there from the whole list adds a step to the browser's history, so the browser's Back (and the Back button the shelf
+     * shows there) returns to the whole list. `fromHistory` = it is the browser's Back itself: nothing is added.
+     */
+    const show = (next, fromHistory) => {
+        const was = view.kind;
         view = next && next.kind === "bin" ? { kind: "bin", name: "" }
             : next && next.kind === "folder" && cleanFolder(next.name) ? { kind: "folder", name: folders().find((name) => same(name, next.name)) || cleanFolder(next.name) }
             : { kind: "all", name: "" };
+        if (!fromHistory) {
+            const ours = history.state && history.state.glowupView === spec.kind;
+            try {
+                if (was === "all" && view.kind !== "all") history.pushState({ glowupView: spec.kind }, "");
+                else if (was !== "all" && view.kind === "all" && ours) history.back();
+            } catch (error) { /* history not available: the Back button still works */ }
+        }
         selected.clear();
         anchor = null;
         spec.onView();
     };
+    window.addEventListener("popstate", () => { if (view.kind !== "all") show({ kind: "all" }, true); });
 
     // ---------------------------------------------------------------------------------------------
     // What happens to entries (the page saves; this says what happened and offers Undo)
@@ -117,7 +131,23 @@ export function createOrganizer(spec) {
         } catch (error) { fail(error, "Moving"); refresh(); }
     }
 
-    async function toBin(keys) {
+    /**
+     * Every removal asks first (9 November 2026): from a row's button, the selection bar, the Delete key, a drag onto the
+     * bin or a data panel. `asked` = the caller has already asked with its own, more exact question.
+     * Escape, the backdrop or Cancel mean: keep them.
+     */
+    async function toBin(keys, asked) {
+        if (!keys || keys.length === 0) return;
+        if (!asked) {
+            const names = keys.map((key) => spec.titleOf(key) || "(no name)");
+            const one = keys.length === 1;
+            const sure = await askConfirm({
+                title: one ? `Delete "${names[0]}"?` : `Delete ${many(keys.length)}?`,
+                message: (one ? "It goes" : "They go") + " to the Recycle bin and leave the lists the app uses. " + (one ? "It" : "They") + " can be restored from the Recycle bin until deleted forever.",
+                items: one ? null : names, confirmLabel: "Move to Recycle bin", danger: true
+            });
+            if (!sure) { refresh(); return; }
+        }
         try {
             const done = await spec.bin(keys);
             forgetPicked(keys);
@@ -186,7 +216,7 @@ export function createOrganizer(spec) {
             {
                 label: "Delete folder", icon: "trash", danger: true, description: "Its entries stay in the list. Only the folder goes.", run: async () => {
                     const inside = spec.count({ kind: "folder", name });
-                    if (inside > 0 && !(await askConfirm({ title: `Delete the folder "${name}"?`, message: `Its ${many(inside)} stay in the list. Only the folder goes.`, confirmLabel: "Delete folder", danger: true }))) return;
+                    if (!(await askConfirm({ title: `Delete the folder "${name}"?`, message: inside > 0 ? `Its ${many(inside)} stay in the list. Only the folder goes.` : "It is empty. Only the folder goes.", confirmLabel: "Delete folder", danger: true }))) return;
                     try {
                         await spec.deleteFolder(name);
                         forget(name);
@@ -206,6 +236,9 @@ export function createOrganizer(spec) {
     const pickable = (el) => !!el.querySelector(".pick");
     const pickAllBox = () => (spec.panel || spec.host).querySelector("[data-pick-all]");
 
+    /** Every key "select all" covers: what the page says (also rows on other pages), else the rows on screen. */
+    const allKeys = () => (spec.pickScope && spec.pickScope()) || entries().filter(pickable).map((el) => el.dataset.key);
+
     function decorate() {
         let seen = 0, picked = 0;
         entries().forEach((el) => {
@@ -218,6 +251,8 @@ export function createOrganizer(spec) {
         });
         spec.host.classList.toggle("picking", selected.size > 0);
         const all = pickAllBox();
+        const scope = spec.pickScope && spec.pickScope();
+        if (scope) { seen = scope.length; picked = scope.filter((key) => selected.has(key)).length; }
         if (all) { all.setAttribute("aria-checked", seen > 0 && picked === seen ? "true" : picked > 0 ? "mixed" : "false"); all.disabled = seen === 0; }
     }
 
@@ -236,7 +271,7 @@ export function createOrganizer(spec) {
         decorate(); paintBar();
     }
     function pickAll() {
-        const keys = entries().filter(pickable).map((el) => el.dataset.key);
+        const keys = allKeys();
         const every = keys.length > 0 && keys.every((key) => selected.has(key));
         keys.forEach((key) => { if (every) selected.delete(key); else selected.add(key); });
         decorate(); paintBar();
@@ -311,6 +346,14 @@ export function createOrganizer(spec) {
             BIN_ICON, now.kind === "bin" ? "Recycle bin" : "", inBin > 0 ? inBin : null), "end");
         // low-key on purpose: only the small bin (and a number when something is in it) until it is opened, pointed at, or something is dragged
         kids[kids.length - 1].setAttribute("aria-label", "Recycle bin" + (inBin > 0 ? ", " + inBin + " inside" : ", empty"));
+        // inside the Recycle bin or a folder: a Back icon right after the bin, so the way out is plain (the browser's Back does the same)
+        if (now.kind !== "all") {
+            const back = document.createElement("button");
+            back.type = "button"; back.className = "icon-btn shelf-back"; back.dataset.view = "all";
+            back.setAttribute("aria-label", `Back to all ${spec.noun}`);
+            back.innerHTML = icon("left");
+            put(back, "end");
+        }
         const hosts = { lead: shelf, add: spec.shelfAdd || shelf, end: spec.shelfEnd || shelf };
         new Set(Object.values(hosts)).forEach((host) => host.replaceChildren(...kids.filter((node) => hosts[slot.get(node) || "lead"] === host)));
     }

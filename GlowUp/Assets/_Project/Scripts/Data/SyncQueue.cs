@@ -215,7 +215,7 @@ namespace GlowUp.Data
         }
 
         /// <summary>Minimal flat JSON -> dictionary (strings, numbers, bools, string arrays).</summary>
-        static Dictionary<string, object> JsonToDict(string json)
+        internal static Dictionary<string, object> JsonToDict(string json)
         {
             var parsed = MiniJson.Deserialize(json) as Dictionary<string, object>;
             return parsed ?? new Dictionary<string, object>();

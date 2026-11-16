@@ -30,14 +30,29 @@ namespace GlowUp.Common
         void Awake()
         {
             pill = GetComponent<LiquidTabBar>();
+            // the screen's card keeps clear of the camera hole through the ONE safe-area system (Assets/SafeAreaFix, 12 November 2026);
+            // the earlier SafeAreaFitter on this card only is no longer added (it would apply the inset twice)
             if (recentButton != null) recentButton.onClick.AddListener(() => { if (current != Tab.Recent) Open(recentScene, 0); });
             if (scanButton != null) scanButton.onClick.AddListener(() => { if (current != Tab.Scan) Open(scanScene, 1); });
             if (tryOnButton != null) tryOnButton.onClick.AddListener(() =>
             {
                 if (current == Tab.TryOn) return;
                 ScanSession.TryOn = null;            // from the bar, Try On always starts by choosing a saved product
+                if (!TryOnGate.Allowed) { SayNeedsProduct(); return; }     // no saved product yet: the bar's pill stays where it is
                 Open(tryOnScene, 2);
             });
+            TryOnGate.Blocked += SayNeedsProduct;    // a swipe or another button asked for AR Try-On without a product
+        }
+
+        void OnDestroy() { TryOnGate.Blocked -= SayNeedsProduct; }
+
+        void SayNeedsProduct()
+        {
+            if (this == null || !isActiveAndEnabled) return;
+            if (pill != null) pill.Release();
+            // big and in the middle of the screen, always on screen for at least 1.5 seconds (the owner, 12 November 2026)
+            ScreenNotice notice = ScreenNotice.On(transform, GetComponentInChildren<TMPro.TMP_Text>(true));
+            if (notice != null) notice.ShowCentre(TryOnGate.Message, "Scan now", () => Open(scanScene, 1));
         }
 
         /// <summary>

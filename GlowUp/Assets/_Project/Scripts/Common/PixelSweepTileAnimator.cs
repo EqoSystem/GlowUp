@@ -73,9 +73,14 @@ namespace GlowUp.Common
                 }
         }
 
+        bool calm;
+        /// <summary>Calm: no square sweep, and a steady (not pulsing) outline while selected.</summary>
+        public void Calm() { calm = true; pulseDepth = 0f; outlineFadeSeconds = Mathf.Min(outlineFadeSeconds, 0.15f); if (cellContainer != null) cellContainer.gameObject.SetActive(false); }
+
         public void SetSelected(bool value)
         {
             selected = value;
+            if (calm) return;
             // Performance Mode: the pixel sweep is skipped (the outline still shows the choice)
             if (value && isActiveAndEnabled && !GlowUp.Performance.PerformanceSettings.ReduceEffects) { StopAllCoroutines(); StartCoroutine(Sweep()); }
         }

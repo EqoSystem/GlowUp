@@ -27,6 +27,7 @@ namespace GlowUp.AppSettings
 
         void Start()
         {
+            UiWording.Retitle("Privacy Policy & Terms", UiWording.LegalTitle);           // one name everywhere (10 November 2026), without rebuilding the scene
             if (list != null) list.verticalNormalizedPosition = 1f;
         }
 

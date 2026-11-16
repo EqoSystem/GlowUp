@@ -1,4 +1,5 @@
 // Admin login. Signs in with Firebase Authentication, then opens the dashboard.
+import "../_Shared/quietConsole.js";                 // first: no debug output on the live site
 import { auth } from "../_Database/firebase-console.js";
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { DASHBOARD_PAGE, REQUIRE_ADMIN_RECORD, isAdmin } from "../_Shared/adminCommon.js";
@@ -25,16 +26,41 @@ document.addEventListener("DOMContentLoaded", () => {
         eye.classList.toggle("on", show);
         eye.setAttribute("aria-pressed", String(show));
         eye.setAttribute("aria-label", show ? "Hide the password" : "Show the password");
-        eye.title = show ? "Hide the password" : "Show the password";
     };
     if (eye) {
         eye.addEventListener("click", () => { showPassword(passwordInput.type === "password"); passwordInput.focus(); });
         loginForm.addEventListener("submit", () => showPassword(false));
     }
 
-    function say(text) {
+    // When the form is sent, the dots in the password box suddenly become a long row, so someone looking over the shoulder cannot count
+    // the characters. Only a picture is laid over the box: the real value stays in the input (password managers and sign-in read it).
+    // The long row goes away as soon as the box is used again (typing, or the eye).
+    const passwordBox = passwordInput.parentElement;
+    let lengthCover = null;
+    const hideLengthCover = () => { if (lengthCover) { lengthCover.remove(); lengthCover = null; passwordBox.classList.remove("length-hidden"); } };
+    const hidePasswordLength = () => {
+        hideLengthCover();
+        const style = getComputedStyle(passwordInput);
+        lengthCover = document.createElement("span");
+        lengthCover.className = "password-length-cover";
+        lengthCover.setAttribute("aria-hidden", "true");
+        lengthCover.textContent = String.fromCharCode(8226).repeat(60);
+        lengthCover.style.fontSize = style.fontSize;
+        lengthCover.style.fontFamily = style.fontFamily;
+        lengthCover.style.paddingLeft = style.paddingLeft;
+        passwordBox.append(lengthCover);
+        passwordBox.classList.add("length-hidden");
+    };
+    passwordInput.addEventListener("input", hideLengthCover);
+    if (eye) eye.addEventListener("click", hideLengthCover);
+
+    // a message goes away by itself after 1.5 seconds (the "signed out" note passes its own time, 2 seconds)
+    let messageTimer = 0;
+    function say(text, seconds = 1.5) {
+        window.clearTimeout(messageTimer);
         message.textContent = text || "";
         message.style.display = text ? "block" : "none";
+        if (text) messageTimer = window.setTimeout(() => { if (message.textContent === text) say(""); }, seconds * 1000);
     }
 
     function setButton(enabled, label) {
@@ -53,6 +79,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // sent back here by an admin page because the account is not in the admins list
     if (new URLSearchParams(window.location.search).get("denied")) say(NOT_ADMIN);
+    if (new URLSearchParams(window.location.search).get("idle")) {
+        // the "signed out" note goes by itself after 7 seconds (9 November 2026), unless another message has replaced it meanwhile
+        const idleNote = "You were signed out after 30 minutes without activity. Sign in again to continue.";
+        say(idleNote, 2);
+        // the address loses "?idle=1", so a reload does not show the note again
+        try { history.replaceState(null, "", window.location.pathname + window.location.hash); } catch (error) { /* keep the address */ }
+    }
 
     // already signed in (for example the page was reopened): go straight to the dashboard
     onAuthStateChanged(auth, async (user) => {
@@ -69,6 +102,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const password = passwordInput.value;
         if (email === "" || password === "") { say("Enter your email and your password."); return; }
 
+        hidePasswordLength();
         signingIn = true;
         say("");
         setButton(false, "Signing in...");

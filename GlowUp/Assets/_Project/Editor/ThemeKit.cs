@@ -34,11 +34,15 @@ namespace GlowUp.EditorTools
                 OnboardingKit.EnsureFocusBorder(f.gameObject);
             }
             foreach (var d in Object.FindObjectsOfType<TMP_Dropdown>(true)) OnboardingKit.EnsureFocusBorder(d.gameObject);
+            KeyboardKit.Ensure();                   // a scene with a text field gets the ONE keyboard avoider (the field and its badges stay above the keyboard)
             RoundShapes();
             UiEffectsKit.FinishScene();             // tap sounds, screen change, edge light, the tile animation on onboarding buttons
             AddPressFeedback();
             AssignTypography();
             ThemePreview.Apply(false);
+            // the ONE safe-area structure (Assets/SafeAreaFix, 12 November 2026): background on the canvas, the card inside SafeAreaRoot
+            foreach (GameObject go in UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects())
+                if (go.TryGetComponent(out Canvas canvas)) GlowUp.SafeAreaFix.SafeAreaStructure.Convert(canvas, false, null, null);
         }
 
         /// <summary>Canvas width is fixed at 1080 and the height follows the phone (1920 to 2400+).</summary>
@@ -124,7 +128,9 @@ namespace GlowUp.EditorTools
                     if (b.TryGetComponent(out ButtonPressFeedback punch)) Object.DestroyImmediate(punch);
                     continue;
                 }
-                if (b.GetComponentInParent<BottomActionBar>(true) != null)  // the bottom bar: no tap animation at all (the brief of 11 October 2026)
+                bool scanControls = false;                                  // the scan screen's row of controls: colour only (phase 1B, 11 November 2026)
+                for (Transform t = b.transform.parent; t != null; t = t.parent) if (t.name == "ControlBar") { scanControls = true; break; }
+                if (b.GetComponentInParent<BottomActionBar>(true) != null || scanControls)  // the bottom bar: no tap animation at all (the brief of 11 October 2026)
                 {
                     if (b.TryGetComponent(out ButtonPressFeedback old)) Object.DestroyImmediate(old);
                     continue;

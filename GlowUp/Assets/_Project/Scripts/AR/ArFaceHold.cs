@@ -20,7 +20,7 @@ namespace GlowUp.AR
     {
         [Header("Keeping a lost face")]
         [Tooltip("Seconds the make-up stays fully shown after the face was lost")]
-        [Min(0f)] [SerializeField] private float holdSeconds = 0.5f;
+        [Min(0f)] [SerializeField] private float holdSeconds = 0.2f;
         [Tooltip("Seconds the make-up then takes to fade out")]
         [Min(0.05f)] [SerializeField] private float fadeSeconds = 0.6f;
         [Tooltip("Seconds the make-up takes to fade in when the face is found again")]

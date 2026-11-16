@@ -14,6 +14,7 @@ namespace GlowUp.Data
         public List<string> skinConditions = new List<string>();
         public List<string> knownAllergens = new List<string>();
         public bool termsAccepted;
+        public long healthConsentAtUnix;        // when the user agreed (second box on the Terms page) that their skin and allergy details are kept; 0 = not given
         public string theme = "light";
         public long createdAtUnix;
 
@@ -51,8 +52,12 @@ namespace GlowUp.Data
     public class IngredientData
     {
         public string id, name, techName, description;
+        public string classificationId;          // the document id in 'ingredientClassifications' (see ClassificationRepository); "" = none yet: no badge is shown
+        public string purpose;                   // one line on what it does in a product; "" = none yet: no line is shown
+        public string chemicalDescription;       // what the substance is, technically
         public string riskLevel;                 // "safe" | "caution" | "harmful"
         public string cautionNote;               // short reason shown when the ingredient is flagged
+        public string frequentUseAllergy;        // one plain sentence: this ingredient can cause an allergic reaction (a regulator's classification); "" = none: no line is shown
         public string commonUses;                // what kinds of product it is used in
         public int minAge;
         public bool keyActive;                   // worth highlighting as a chip

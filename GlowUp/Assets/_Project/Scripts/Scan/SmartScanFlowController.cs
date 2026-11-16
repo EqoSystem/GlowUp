@@ -85,6 +85,12 @@ namespace GlowUp.Scan
         [SerializeField] private TextMeshProUGUI lookUpLabel;
         [SerializeField] private string lookUpIdleLabel = "Look it up";
         [SerializeField] private string lookUpWorkingLabel = "Looking it up...";
+        [Tooltip("New13 item 2: the block with the ingredient list and Look it up, at the bottom of the camera view. Hidden until a scan or a photo found no list.")]
+        [SerializeField] private GameObject listHelp;
+        [Tooltip("The hint on the camera picture: it moves up above the list block while that block shows")]
+        [SerializeField] private RectTransform guideHint;
+        [Tooltip("The \"Is this ...?\" banner on the camera picture: it moves up above the list block too")]
+        [SerializeField] private RectTransform questionBanner;
 
         [Header("AI photo fallback: a product the catalogue does not have")]
         [Tooltip("The Scan Snapshot object (its own object in the Hierarchy, with every number and word in its Inspector)")]
@@ -93,8 +99,19 @@ namespace GlowUp.Scan
         [SerializeField] private bool offerSnapshotOnCatalogMiss = true;
         [Tooltip("On = when the scan is stuck and no product has been named, the photo pop-up is offered once")]
         [SerializeField] private bool offerSnapshotWhenStuck = true;
-        [Tooltip("The camera button on the scan screen: a photo of the product is sent to the web search. It appears when the scan takes long.")]
+        [Tooltip("New13 item 1: the round button at the RIGHT of the control bar. Live mode: the camera (take a photo). Photo mode: the live-scan frame (back to live scanning).")]
         [SerializeField] private Button photoButton;
+        [Tooltip("The camera icon of that button (live mode)")]
+        [SerializeField] private GameObject cameraModeIcon;
+        [Tooltip("The live-scan icon of that button (photo mode)")]
+        [SerializeField] private GameObject liveModeIcon;
+        [Tooltip("Said when the button is held (it has no words of its own)")]
+        [SerializeField] private string photoModeName = "Take a photo";
+        [SerializeField] private string liveModeName = "Back to live scan";
+        [Tooltip("The name under that button (phase 1B, 11 November 2026): it says what a tap does now. Empty = no name shown")]
+        [SerializeField] private TMPro.TextMeshProUGUI modeCaption;
+        [SerializeField] private string photoModeCaption = "Photo";
+        [SerializeField] private string liveModeCaption = "Live scan";
         [Tooltip("The photo button appears after the scan has run this many seconds without finishing")]
         [Min(1f)] [SerializeField] private float photoButtonAfterSeconds = 6f;
         [SerializeField] private string msgPhotoHint = "Slow or read wrong? Tap the camera button to take a photo of the product.";
@@ -105,6 +122,10 @@ namespace GlowUp.Scan
         [Header("Recognising a product without the AI")]
         [Tooltip("The pop-up \"Is it one of these?\" with its search box")]
         [SerializeField] private ScanShortlistView shortlist;
+        [Tooltip("The optional Barcode card (11 November 2026): opens when the product could not be told from the pack but a barcode is there")]
+        [SerializeField] private ScanBarcodeCardView barcodeCard;
+        [Tooltip("In Type it in: opens the Barcode card")]
+        [SerializeField] private Button manualBarcodeButton;
         [SerializeField] private string shortlistTitle = "Is it one of these?";
         [SerializeField] private string shortlistMessage = "We are not sure which product this is. Tap it, or type its name.";
         [SerializeField] private string shortlistNoneLabel = "None of these";
@@ -135,7 +156,7 @@ namespace GlowUp.Scan
         [Tooltip("On = a product the AI named that is NOT in the app's lists is then checked on the web: a web search looks for it by its words and by what the pack looks like, says how its brand and its name are really written, and brings its published ingredient list in the same answer.")]
         [SerializeField] private bool aiChecksTheWeb = true;
         [SerializeField] private string msgWebChecking = "Found it. Checking it on the web...";
-        [SerializeField] private string msgAiUnavailable = "The Firebase catalogue had no match, and GlowUp's AI web lookup is not configured on this device. Type the product in or try again later.";
+        [SerializeField] private string msgAiUnavailable = "Not in our catalog yet, and product pages can't be checked right now. Type the product in, or try again later.";
         [SerializeField] private string msgWebNoMatch = "The web search could not verify this exact product and ingredient list. Check the label or type the product in.";
         [Tooltip("Said once when the AI sees that the cap is on and no shade can be seen")]
         [SerializeField] private string msgCapOn = "The cap is on, so the shade cannot be seen. Take it off if you can, or show the shade label.";
@@ -233,7 +254,7 @@ namespace GlowUp.Scan
         [SerializeField] private string hintGlare = "Tilt slightly, there is glare";
         [SerializeField] private string hintBlurry = "Move a little back so the text is sharp";
         [SerializeField] private string hintFront = "Show the front: the brand and the product's name";
-        [SerializeField] private string hintIngredients = "Checking GlowUp's Firebase catalogue for the ingredient list.";
+        [SerializeField] private string hintIngredients = "Checking our catalog for the ingredient list.";
         [SerializeField] private string hintIngredientsMore = "Tap Look it up to retry the catalogue search.";
         [SerializeField] private string hintCodes = "Show the barcode (on the bottom or the back)";
         [SerializeField] private string hintShade = "Show the shade's name or number";
@@ -265,8 +286,8 @@ namespace GlowUp.Scan
         [Tooltip("The AI has been asked as often as it may be in one visit of this screen")]
         [SerializeField] private string msgAiLimit = "The AI has been asked as often as it may be for now. Type the product's name, or tap Finish anyway.";
         [SerializeField] private string msgNeedList = "The ingredient list is not read yet. Show it to the camera, or tap Look it up.";
-        [SerializeField] private string msgStalled = "Not getting further? Tap Start over, or type the product in instead.";
-        [SerializeField] private string msgPauseReset = "The scan was paused for a while, so it was put back to the start.";
+        [SerializeField] private string msgStalled = "Not getting further? Tap Start over, or tap Type it in.";
+        [SerializeField] private string msgPauseReset = "The scan was paused for a while, so it was put back to the start. Double-tap the screen to wake the camera.";
         [SerializeField] private string msgDifferentProduct = "That is a different product: a new scan was started for it.";
         [SerializeField] private string msgSameAgain = "Scanning the same product again. Its name is kept.";
         [SerializeField] private string msgStartedOver = "Ready for a new product.";
@@ -275,14 +296,21 @@ namespace GlowUp.Scan
         [Tooltip("Nothing was typed that names a product or an ingredient")]
         [SerializeField] private string msgManualNothing = "Type the product's name (its brand helps), or its ingredient list.";
         [Tooltip("{0} = the product as typed")]
-        [SerializeField] private string msgManualLooking = "Looking for {0}...";
+        [SerializeField] private string msgManualLooking = "Searching for {0}\u2026";
         [Tooltip("{0} = the product as it is sold")]
-        [SerializeField] private string msgManualNoList = "Found {0}, but no trustworthy page shows its ingredient list. Type the list from the pack.";
+        [SerializeField] private string msgManualNoList = "Couldn't find an ingredient list \u2014 you can type it in below.";
         [SerializeField] private string msgLookUpNeedsName = "Show the front of the product first, so we know which product to look up.";
         [SerializeField] private string msgLookingUp = "Looking up this product's ingredient list...";
-        [SerializeField] private string msgFirebaseMiss = "No matching product was found in GlowUp's Firebase catalogue. Re-align the brand and product name, or type the product in.";
-        [SerializeField] private string msgFirebaseNoIngredients = "GlowUp found this product, but its ingredient list is not saved in the catalogue yet.";
-        [SerializeField] private string msgFirebaseUnavailable = "GlowUp's product catalogue could not be reached. Check your connection and try again.";
+        [SerializeField] private string msgFirebaseMiss = "Not in our catalog yet. Check the brand and product name, or type the product in.";
+        [SerializeField] private string msgFirebaseNoIngredients = "We know this product, but its ingredient list isn't saved yet \u2014 you can type it in below.";
+        [SerializeField] private string msgFirebaseUnavailable = "Our catalog couldn't be reached. Check your connection and try again.";
+        [Tooltip("The typed product is not in the catalogue: said while product pages are checked")]
+        [SerializeField] private string msgCheckingOnline = "Not in our catalog yet. Checking product pages online\u2026";
+        [Tooltip("A list was found on a product page for the typed product")]
+        [SerializeField] private string msgFoundOnline = "Found ingredient list \u00B7 Unverified source";
+        [SerializeField] private string msgNeedBrand = "Add the brand too, so we can find the right product.";
+        [Tooltip("The Analyse button of the type-it-in sheet while it looks the product up (shorter words when they do not fit)")]
+        [SerializeField] private string analyseBusyLabel = "Searching\u2026";
         [SerializeField] private string msgNoListFound = "No trustworthy ingredient list was found for this product. Scan the list or type it in.";
         [Tooltip("No list was found: the FDA Philippines list is asked, so the user at least learns whether the product is registered")]
         [SerializeField] private string msgNoListCheckingFda = "No ingredient list found yet. Checking the FDA Philippines list...";
@@ -385,19 +413,44 @@ namespace GlowUp.Scan
         ProductAiAdvisor.IngredientLookup webList;        // a confirmed source-backed list, kept until the scan can use it
         readonly CapShadeWatch capWatch = new CapShadeWatch();
 
+        // Multi-frame candidate ranking & token pooling
+        readonly object tokenLock = new object();
+        readonly Dictionary<string, int> pooledTokens = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        bool poolDirty = false;
+        List<ProductData> cachedBrandProducts = null;
+        string brandLoadingFor = "";
+        bool brandLoading = false;
+        bool loggedMatchSummary = false;
+        int frameScanIndex = 0;
+        float scanStartTime = 0f;
+        float nextTimeoutCheck = 1.0f;
+        bool shortlistShownForTimeout = false;
+        bool lastFrameWasRotated = false;
+        float nextRankTime = 0f;
+        int[] rotatedPixels = null;
+
         bool ProductKnown => identity.productName.Length > 0 || (identity.brandName.Length > 0 && identity.cosmeticType.Length > 0);
 
         void Awake()
         {
+            PlainWording();
             if (holdButton != null) { holdButton.ScanStarted += OnScanStarted; holdButton.ScanPaused += OnScanPaused; }
             if (finishButton != null) finishButton.onClick.AddListener(OnFinishTapped);
             if (startOverButton != null) startOverButton.onClick.AddListener(OnStartOverTapped);
             if (sameProductButton != null) sameProductButton.onClick.AddListener(() => { ClosePanel(startOverPanel); StartOver(true, msgSameAgain); });
             if (differentProductButton != null) differentProductButton.onClick.AddListener(() => { ClosePanel(startOverPanel); StartOver(false, msgStartedOver); });
             if (manualEntryButton != null) manualEntryButton.onClick.AddListener(OpenManual);
-            if (photoButton != null) { photoButton.onClick.AddListener(OnPhotoButton); photoButton.gameObject.SetActive(false); }
-            if (snapshot != null) { snapshot.Analysed += OnSnapshotAnalysed; snapshot.NameOnly += OnSnapshotNameOnly; }
+            if (photoButton != null)
+            {
+                photoButton.onClick.AddListener(OnPhotoButton);
+                modeHint = LongPressHint.On(photoButton.gameObject, photoModeName, statusText);
+            }
+            if (listHelp != null) listHelp.SetActive(false);
+            if (snapshot != null) { snapshot.Analysed += OnSnapshotAnalysed; snapshot.NameOnly += OnSnapshotNameOnly; snapshot.TypeItIn += OpenManual; snapshot.CaptureModeRequested += EnterPhotoMode; snapshot.CatalogMatches += ShowPhotoMatches; }
             if (manualAnalyseButton != null) manualAnalyseButton.onClick.AddListener(AnalyseManual);
+            if (manualBarcodeButton != null) manualBarcodeButton.onClick.AddListener(() => { if (manualPanel != null) manualPanel.Hide(); OpenBarcodeCard(""); });
+            if (barcodeCard != null) { barcodeCard.FindRequested += OnBarcodeFind; barcodeCard.PhotoRequested += OnBarcodePhoto; }
+            if (snapshot != null) snapshot.BarcodeUnknown += key => OpenBarcodeCard(key);
             if (lookUpButton != null) lookUpButton.onClick.AddListener(LookUp);
             if (backButton != null) backButton.onClick.AddListener(() => { StopCamera(); SceneNavigator.Go(backScene); });
             if (cameraFeed != null) cameraFeed.Started += OnCameraStarted;
@@ -463,9 +516,14 @@ namespace GlowUp.Scan
             catch (Exception e) { Debug.LogWarning("Scan: brands and products could not be loaded: " + e.Message); }
         }
 
+        // phase 2A: the volume buttons belong to this screen only while it is shown, and only when Settings gives them a job
+        void OnEnable() { VolumeKeyInput.SetActive(UiPreferences.VolumeKey != UiPreferences.VolumeKeys.Off); }
+        void OnDisable() { VolumeKeyInput.SetActive(false); }
+        void OnApplicationFocus(bool focused) { VolumeKeyInput.SetActive(focused && isActiveAndEnabled && UiPreferences.VolumeKey != UiPreferences.VolumeKeys.Off); }
+
         void OnDestroy()
         {
-            if (snapshot != null) { snapshot.Analysed -= OnSnapshotAnalysed; snapshot.NameOnly -= OnSnapshotNameOnly; }
+            if (snapshot != null) { snapshot.Analysed -= OnSnapshotAnalysed; snapshot.NameOnly -= OnSnapshotNameOnly; snapshot.TypeItIn -= OpenManual; snapshot.CaptureModeRequested -= EnterPhotoMode; snapshot.CatalogMatches -= ShowPhotoMatches; }
             if (cameraFeed != null) cameraFeed.Started -= OnCameraStarted;
             if (holdButton != null) { holdButton.ScanStarted -= OnScanStarted; holdButton.ScanPaused -= OnScanPaused; }
         }
@@ -496,6 +554,7 @@ namespace GlowUp.Scan
             if (stage != Stage.Starting) return;
             if (!ok)
             {
+                photoAfterCameraStarts = false;
                 stage = Stage.Idle;
                 if (holdButton != null) holdButton.LetGo();
                 PaintButtonState();
@@ -505,10 +564,12 @@ namespace GlowUp.Scan
             if (idlePlaceholder != null) idlePlaceholder.SetActive(false);
             if (guide != null) guide.SetState(ScanGuideOverlay.State.Searching);
             stage = Stage.Scanning;
+            ResetScanRankingState();
             if (!readCounterStarted) { readCounterStarted = true; ReadCounter.NewScan(); }
             nextLook = 0f; pausedFor = 0f; sinceProgress = 0f;
             PaintButtonState();
             ShowGuidance();
+            if (photoAfterCameraStarts) { photoAfterCameraStarts = false; EnterPhotoMode(); }
         }
 
         void StopCamera()
@@ -549,25 +610,242 @@ namespace GlowUp.Scan
             if (!Mathf.Approximately(t.localScale.x, size)) t.localScale = Vector3.one * size;
         }
 
-        /// <summary>The camera button shows while a scan has run for a while without finishing (wrong or slow): it takes ONE photo for the web search.</summary>
+        /// <summary>
+        /// The mode switch at the right of the control bar (New13 item 1, 10 November 2026). It is always in its slot (so nothing shifts),
+        /// usable while the screen is not busy: in live mode it shows the camera (take a photo), in photo mode the live-scan frame. It is
+        /// dimmed, not hidden, while it cannot be used. Also runs the list block (ShowListHelp).
+        /// </summary>
         void ShowPhotoButtonIfSlow()
         {
+            ShowListHelp();
             if (photoButton == null || snapshot == null) return;
-            bool want = stage == Stage.Scanning && scanningFor >= photoButtonAfterSeconds && !snapshot.IsOpen;
-            if (want == photoButton.gameObject.activeSelf) return;
-            photoButton.gameObject.SetActive(want);
-            if (want && !photoHintSaid) { photoHintSaid = true; Say(msgPhotoHint); }
+            bool usable = (stage == Stage.Scanning || stage == Stage.Idle) && !snapshot.IsOpen && !snapshot.PreviewOpen && !PopupOpen;
+            if (!photoButton.gameObject.activeSelf) photoButton.gameObject.SetActive(true);
+            if (photoButton.interactable != usable) photoButton.interactable = usable;
+            if (cameraModeIcon != null && cameraModeIcon.activeSelf == photoMode) cameraModeIcon.SetActive(!photoMode);
+            if (liveModeIcon != null && liveModeIcon.activeSelf != photoMode) liveModeIcon.SetActive(photoMode);
+            if (modeHint != null) modeHint.words = photoMode ? liveModeName : photoModeName;
+            if (modeCaption != null)
+            {
+                string caption = photoMode ? liveModeCaption : photoModeCaption;
+                if (modeCaption.text != caption) modeCaption.text = caption;
+            }
+            if (stage == Stage.Scanning && !photoMode && !photoHintSaid) { photoHintSaid = true; Say(msgPhotoHint); }
+        }
+
+        LongPressHint modeHint;
+        bool photoAfterCameraStarts;                  // the camera button was tapped before the camera ran: photo mode once it runs
+
+        /// <summary>
+        /// VOLUME UP (owner's rule, 12 November 2026): switches between live scan and photo capture, as the Photo / Live scan button does.
+        /// </summary>
+        void VolumeUpPressed()
+        {
+            if (PopupOpen || stage == Stage.Recognising || stage == Stage.Leaving) return;
+            if (snapshot != null && (snapshot.IsOpen || snapshot.PreviewOpen)) return;
+            if (photoMode) { ExitPhotoMode(); return; }
+            if (photoButton != null && photoButton.interactable) OnPhotoButton();
+        }
+
+        /// <summary>
+        /// VOLUME DOWN, the trigger (Settings > Camera Helpers > "Volume keys"): the same as a tap on the screen's main button, and nothing while
+        /// that button cannot be used (a pop-up is open, the screen is busy). In photo capture the capture button, otherwise the scan button
+        /// (it also wakes a sleeping camera).
+        /// </summary>
+        void VolumeButtonPressed()
+        {
+            if (PopupOpen || stage == Stage.Recognising || stage == Stage.Leaving) return;
+            if (snapshot != null && (snapshot.IsOpen || snapshot.PreviewOpen)) return;
+            // the chosen key does what the screen's main button does NOW: in photo mode it takes the photo, otherwise it starts / pauses the live scan
+            if (photoMode) { if (shutter != null && shutter.isActiveAndEnabled && shutter.interactable) shutter.onClick.Invoke(); }
+            else if (holdButton != null && holdButton.isActiveAndEnabled) holdButton.Toggle();
+        }
+
+        // ---------------------------------------------------------------------------------------
+        //  A sleeping camera (the scan was paused for a while: the camera went off and the white idle picture shows) wakes with a double tap
+        //  anywhere on the camera picture (11 November 2026). A tap on a button of the picture (flashlight, lock, sun) is not counted.
+        // ---------------------------------------------------------------------------------------
+        float lastTapAt = -10f;
+        Vector2 lastTapPoint;
+
+        void WakeByDoubleTap()
+        {
+            if (stage != Stage.Idle || photoMode || PopupOpen || cameraFeed == null || cameraFeed.Viewport == null) return;
+            bool began = false; Vector2 at = Vector2.zero;
+            if (Input.touchCount > 0) { Touch t = Input.GetTouch(0); if (t.phase == TouchPhase.Began) { began = true; at = t.position; } }
+            else if (Input.GetMouseButtonDown(0)) { began = true; at = Input.mousePosition; }
+            if (!began) return;
+            Canvas canvas = cameraFeed.Viewport.GetComponentInParent<Canvas>();
+            Camera ui = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay ? canvas.worldCamera : null;
+            if (!RectTransformUtility.RectangleContainsScreenPoint(cameraFeed.Viewport, at, ui) || TappedAButton(at)) { lastTapAt = -10f; return; }
+            float limit = (Screen.dpi > 0f ? Screen.dpi : 160f) * 0.4f;                  // the two taps are about 1 cm apart at most
+            if (Time.unscaledTime - lastTapAt < 0.4f && (at - lastTapPoint).sqrMagnitude < limit * limit)
+            {
+                lastTapAt = -10f;
+                if (holdButton != null && holdButton.isActiveAndEnabled) holdButton.Toggle();      // the same as tapping the scan button: the camera wakes
+                return;
+            }
+            lastTapAt = Time.unscaledTime; lastTapPoint = at;
+        }
+
+        static readonly List<UnityEngine.EventSystems.RaycastResult> wakeHits = new List<UnityEngine.EventSystems.RaycastResult>();
+        static bool TappedAButton(Vector2 at)
+        {
+            var events = UnityEngine.EventSystems.EventSystem.current;
+            if (events == null) return false;
+            wakeHits.Clear();
+            events.RaycastAll(new UnityEngine.EventSystems.PointerEventData(events) { position = at }, wakeHits);
+            foreach (var hit in wakeHits) if (hit.gameObject != null && hit.gameObject.GetComponentInParent<Button>() != null) return true;
+            return false;
         }
 
         void OnPhotoButton()
         {
+            if (modeHint != null && modeHint.ConsumeHold()) return;        // the hold said the button's name; it is not a tap
+            if (snapshot == null) return;
+            if (photoMode) { ExitPhotoMode(); return; }
+            if (stage == Stage.Scanning) { EnterPhotoMode(); return; }
+            if (stage == Stage.Idle)
+            {
+                // the camera is off: switch it on for the photo (no live scanning in between)
+                photoAfterCameraStarts = true;
+                stage = Stage.Starting;
+                Say(msgStarting);
+                PaintButtonState();
+                if (cameraFeed != null) cameraFeed.StartCamera(); else OnCameraStarted(false, "No camera view in this scene.");
+            }
+        }
+
+        // ---------------------------------------------------------------------------------------
+        //  The ingredient list block (New13 item 2): hidden by default, shown after a scan or a photo that found no list (a failure
+        //  message was said, or the scan got stuck), and while a look-up runs. While it shows, the hint and the "Is this ...?" banner on
+        //  the camera picture move up above it, so they never cover each other. The type-it-in sheet has its own look-up (Analyse).
+        // ---------------------------------------------------------------------------------------
+        bool listHelpWanted;
+        float guideHintRestY = float.NaN, questionRestY = float.NaN;
+
+        /// <summary>The messages after which the list block is offered.</summary>
+        bool IsNoListMessage(string message) =>
+            !string.IsNullOrEmpty(message) && (message == msgNoListFound || message == msgWebNoMatch || message == msgAiUnavailable || message == msgStalled
+                || message.StartsWith(msgNoListButFda.Split('{')[0], StringComparison.Ordinal) || (snapshot != null && message == msgSnapshotStuck));
+
+        void ShowListHelp()
+        {
+            if (listHelp == null) return;
+            bool show = (listHelpWanted || lookingUp) && ingredientText == null && !photoMode && stage != Stage.Leaving && stage != Stage.Recognising;
+            if (listHelp.activeSelf != show) listHelp.SetActive(show);
+            float lift = show ? ((RectTransform)listHelp.transform).rect.height + 24f : 0f;
+            Lift(guideHint, ref guideHintRestY, lift);
+            Lift(questionBanner, ref questionRestY, lift);
+        }
+
+        static void Lift(RectTransform rt, ref float restY, float by)
+        {
+            if (rt == null) return;
+            if (float.IsNaN(restY)) restY = rt.anchoredPosition.y;
+            float y = restY + by;
+            if (!Mathf.Approximately(rt.anchoredPosition.y, y)) rt.anchoredPosition = new Vector2(rt.anchoredPosition.x, y);
+        }
+
+        // ---------------------------------------------------------------------------------------
+        //  PHOTO MODE (10 November 2026): live scanning pauses, every pop-up is closed so the camera is fully visible, and a capture
+        //  button takes the live-scan button's place. Nothing is captured until it is tapped. A small "Live scan" button (and the phone's
+        //  back key) returns to live scanning. The photo goes through the same chain: text read in the user's box -> catalogue matches
+        //  -> online look-up -> typing it in.
+        // ---------------------------------------------------------------------------------------
+        [Header("Photo mode")]
+        [SerializeField] private string msgPhotoModeHint = "Frame the front of the pack, then tap capture.";
+        [SerializeField] private string liveScanLabel = "Live scan";
+        [SerializeField] private string photoMatchesMessageCatalogue = "Tap your product. If it is not here, choose None of these, then type it in.";
+
+        bool photoMode;
+        Button shutter;
+
+        void EnterPhotoMode()
+        {
             if (snapshot == null || stage != Stage.Scanning) return;
-            if (holdButton != null) holdButton.LetGo();        // reading pauses while the pop-up is open
-            snapshot.Offer(msgPhotoOffer, identity.brandName, identity.productName);
+            if (holdButton != null) holdButton.LetGo();                 // reading pauses
+            photoMode = true;
+            BuildShutter();
+            if (holdButton != null) holdButton.gameObject.SetActive(false);
+            if (shutter != null) shutter.gameObject.SetActive(true);
+            Say(msgPhotoModeHint);
+        }
+
+        void ExitPhotoMode()
+        {
+            if (!photoMode) return;
+            photoMode = false;
+            if (shutter != null) shutter.gameObject.SetActive(false);
+            if (holdButton != null) holdButton.gameObject.SetActive(true);
+            Say("");
+        }
+
+        /// <summary>The capture button: a round button in the live-scan button's place, with the camera button's own icon.</summary>
+        void BuildShutter()
+        {
+            if (shutter != null || holdButton == null) return;
+            var place = (RectTransform)holdButton.transform;
+            GlowUp.Theme.ThemeProfile.Palette p = RuntimeTheme.Palette;
+            Image round = RuntimeUiKit.Box(place.parent, "CaptureButton", p.buttonFill);
+            round.sprite = RuntimeIcons.Circle; round.type = Image.Type.Simple; round.preserveAspect = true; round.raycastTarget = true;
+            var rt = round.rectTransform;
+            rt.anchorMin = place.anchorMin; rt.anchorMax = place.anchorMax; rt.pivot = place.pivot;
+            rt.anchoredPosition = place.anchoredPosition;
+            float side = Mathf.Max(132f, Mathf.Min(place.rect.width, place.rect.height));
+            rt.sizeDelta = new Vector2(side, side);
+            rt.SetSiblingIndex(place.GetSiblingIndex() + 1);
+            Image ring = RuntimeUiKit.Icon(rt, "Ring", RuntimeIcons.Circle, p.surface, side * 0.78f);
+            Image core = RuntimeUiKit.Icon(rt, "Core", RuntimeIcons.Circle, p.buttonFill, side * 0.66f);
+            Sprite camera = null;
+            if (cameraModeIcon != null && cameraModeIcon.TryGetComponent(out Image modeIcon)) camera = modeIcon.sprite;
+            if (camera == null && photoButton != null) foreach (Image i in photoButton.GetComponentsInChildren<Image>(true)) if (i.gameObject != photoButton.gameObject && i.sprite != null) { camera = i.sprite; break; }
+            if (camera != null) RuntimeUiKit.Icon(rt, "Camera", camera, p.buttonText, side * 0.36f);
+            shutter = round.gameObject.AddComponent<Button>();
+            shutter.targetGraphic = round;
+            shutter.onClick.AddListener(() => { if (snapshot != null) snapshot.CaptureNow(); });
+            _ = ring; _ = core;
+            // back to live scanning is the mode switch at the right of the bar (New13 item 1): no "Live scan" pill over the text any more
+            shutter.gameObject.SetActive(false);
+        }
+
+        /// <summary>The text in the user's box matched catalogue products: the same pick list as the live scan uses.</summary>
+        void ShowPhotoMatches(List<ScanShortlist.Entry> entries)
+        {
+            OpenShortlist(shortlistTitle, photoMatchesMessageCatalogue, shortlistNoneLabel,
+                () => { ExitPhotoMode(); if (snapshot != null) snapshot.MatchesAnswered(true, knownProduct); },
+                () => { if (snapshot != null) snapshot.MatchesAnswered(false); },
+                entries);
+        }
+
+        /// <summary>
+        /// The phone's back key on this screen (it had none before 10 November 2026): it closes the top-most thing first - "Check your
+        /// photo" (back to photo mode), then a pop-up, then photo mode - and only then leaves the screen as the Back arrow does.
+        /// </summary>
+        void BackKey()
+        {
+            if (snapshot != null && snapshot.PreviewOpen) { snapshot.ClosePreviewByBack(); return; }
+            if (barcodeCard != null && barcodeCard.IsOpen) { barcodeCard.Hide(); return; }
+            if (shortlist != null && shortlist.IsOpen) { shortlist.Hide(); if (snapshot != null) snapshot.MatchesAnswered(true); return; }
+            if (manualPanel != null && manualPanel.IsOpen) { manualPanel.Hide(); return; }
+            if (startOverPanel != null && startOverPanel.IsOpen) { startOverPanel.Hide(); return; }
+            if (snapshot != null && snapshot.IsOpen) { snapshot.Close(); return; }
+            if (photoMode) { ExitPhotoMode(); return; }
+            StopCamera();
+            SceneNavigator.Go(backScene);
         }
 
         void Update()
         {
+            if (Input.GetKeyDown(KeyCode.Escape)) { BackKey(); return; }
+            UiPreferences.VolumeKeys keys = UiPreferences.VolumeKey;
+            if (keys != UiPreferences.VolumeKeys.Off)
+            {
+                VolumeKeyInput.Take(out int up, out int down);
+                if (up > 0 && keys != UiPreferences.VolumeKeys.Down) VolumeUpPressed();
+                if (down > 0 && keys != UiPreferences.VolumeKeys.Up) VolumeButtonPressed();
+            }
+            WakeByDoubleTap();
             if (stage != Stage.Scanning) return;
             TakeEarlyBarcode();                              // fast early barcode / QR recognition
             if (stage != Stage.Scanning) return;
@@ -580,7 +858,10 @@ namespace GlowUp.Scan
             {
                 // PAUSE, DON'T RESET: the ring keeps what it has. Only a long pause puts the scan back to the start
                 // (the time a pop-up is open does not count: the user is reading or typing).
-                if (!PopupOpen) pausedFor += Time.unscaledDeltaTime;
+                // New13 item 8: photo mode pauses live reading too, and this timer then switched the camera off after 30 s ("The scan was
+                // paused for a while..."): the next capture was black. Photo mode and its "Check your photo" card do not count as a pause.
+                bool photoBusy = photoMode || (snapshot != null && snapshot.PreviewOpen);
+                if (!PopupOpen && !photoBusy) pausedFor += Time.unscaledDeltaTime;
                 if (pausedFor > pauseResetSeconds)
                 {
                     bool hadSomething = evidence.Pictures > 0;
@@ -592,6 +873,7 @@ namespace GlowUp.Scan
             }
             pausedFor = 0f;
             sinceProgress += Time.unscaledDeltaTime;
+            UpdateRankingFlow();
             if (!stalledSaid && sinceProgress > stallSeconds)
             {
                 stalledSaid = true; stuckTipTimer = 0f; stuckTipIndex = 0; Say(msgStalled); ShowButtons();
@@ -667,8 +949,26 @@ namespace GlowUp.Scan
             }
             if (sentCloseLook) { closeLooksSent++; lastEnlarge = enlarge; }
             sentSharpness = measure.sharpness; sentAt = Time.unscaledTime;
-            readingOut = sentCloseLook ? reader.Read(closePixels, closeW, closeH, false, OnReaderAnswer)             // a block of text: no barcode is looked for
-                                       : reader.Read(pixels, pixelsW, pixelsH, wantBarcodeNow, OnReaderAnswer, OnEarlyBarcode);
+
+            frameScanIndex++;
+            bool rotateThisFrame = !sentCloseLook && (frameScanIndex % 3 == 0);
+            if (rotateThisFrame)
+            {
+                int rotDegrees = (frameScanIndex % 6 == 0) ? 90 : 270;
+                int[] sendPixels = (rotDegrees == 90)
+                    ? RotatePixels90(pixels, pixelsW, pixelsH, ref rotatedPixels)
+                    : RotatePixels270(pixels, pixelsW, pixelsH, ref rotatedPixels);
+                int sendW = pixelsH;
+                int sendH = pixelsW;
+                lastFrameWasRotated = true;
+                readingOut = reader.Read(sendPixels, sendW, sendH, false, OnReaderAnswerRotated);
+            }
+            else
+            {
+                lastFrameWasRotated = false;
+                readingOut = sentCloseLook ? reader.Read(closePixels, closeW, closeH, false, OnReaderAnswer)             // a block of text: no barcode is looked for
+                                           : reader.Read(pixels, pixelsW, pixelsH, wantBarcodeNow, OnReaderAnswer, OnEarlyBarcode);
+            }
         }
 
         /// <summary>Shows where the text tracer is, and tells the focus helper to focus there (on the text, not just the middle of the frame).</summary>
@@ -702,7 +1002,24 @@ namespace GlowUp.Scan
         void OnReaderAnswer(FrameReading reading, string problem)
         {
             if (problem != null) Debug.LogWarning("[Scan] Could not read this picture: " + problem);
+            if (reading != null && reading.lines != null)
+            {
+                PoolTokensFromLines(reading.lines);
+            }
             lock (answerLock) { answerReading = reading ?? new FrameReading(); answerWaiting = true; }
+        }
+
+        void OnReaderAnswerRotated(FrameReading reading, string problem)
+        {
+            if (problem != null) Debug.LogWarning("[Scan] Could not read rotated picture: " + problem);
+            if (reading != null)
+            {
+                reading.isRotated = true;
+                if (reading.lines != null)
+                {
+                    PoolTokensFromLines(reading.lines);
+                }
+            }
         }
 
         // called on the barcode reader's thread as soon as a barcode/QR code is found (10-25ms)
@@ -760,6 +1077,7 @@ namespace GlowUp.Scan
         /// <summary>A picture was read: what does it show, and what does it do for the ring?</summary>
         void OnReading(FrameReading reading)
         {
+            if (reading == null || reading.isRotated) return;
             // a close look showed one part of the frame: its places become places of the frame, like every other reading's
             bool closeLook = sentCloseLook;
             if (closeLook) TextTracer.ToFrame(reading, sentPart);
@@ -974,6 +1292,7 @@ namespace GlowUp.Scan
         /// <summary>A message in the place of the status line. While scanning it stays until the status changes (a part of the ring fills, the button is pressed or let go).</summary>
         void Say(string message)
         {
+            if (IsNoListMessage(message)) listHelpWanted = true;
             if (statusText != null) statusText.text = message;
             shownStatus = null;
             messageOver = stage == Stage.Scanning ? StatusNow() : null;
@@ -981,6 +1300,7 @@ namespace GlowUp.Scan
 
         void ResetChecklist()
         {
+            listHelpWanted = false;
             foreach (ScanCheckItem item in new[] { productCheck, brandCheck, typeCheck, shadeCheck, ingredientsCheck }) if (item != null) item.SetPending();
             if (shadeSwatch != null) shadeSwatch.gameObject.SetActive(false);
         }
@@ -1038,10 +1358,30 @@ namespace GlowUp.Scan
         /// <summary>The product of the inventory whose whole name stands in this text (words in any order, small reading mistakes forgiven), or null.</summary>
         static ProductData ProductIn(string text)
         {
-            if (string.IsNullOrWhiteSpace(text)) return null;
+            string query = (text ?? "").Replace('\r', ' ').Replace('\n', '|');
+            ProductIndex index = ProductRepository.Index;
+            Debug.Log("[MATCH] local-query text=\"" + query + "\" candidates in catalogue=" + index.Count);
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                Debug.Log("[MATCH] local-final=reject reason=empty-query bestNearMiss=none");
+                return null;
+            }
             // the kind read on the pack ("Foundation") chooses between products that share a name and differ in kind
-            List<ProductIndex.Candidate> found = ProductRepository.Index.InText(text, 1, ProductScope.TypeFromLabel(text));
-            return found.Count > 0 && found[0].exactName && found[0].score >= ProductIndex.Sure ? found[0].product : null;
+            List<ProductIndex.Candidate> found = index.InText(text, index.Count, ProductScope.TypeFromLabel(text));
+            foreach (ProductIndex.Candidate candidate in found)
+                Debug.Log("[MATCH] local-candidate id=\"" + candidate.product.id + "\" name=\"" + candidate.product.name
+                    + "\" brand=\"" + candidate.product.brandName + "\" score=" + candidate.score.ToString("0.000")
+                    + " bestField=product.name brandVisible=" + candidate.brandAgrees + " exactName=" + candidate.exactName);
+
+            ProductIndex.Candidate best = found.Count > 0 ? found[0] : null;
+            bool accepted = best != null && best.exactName && best.score >= ProductIndex.Sure;
+            Debug.Log(accepted
+                ? "[MATCH] local-final=accept id=\"" + best.product.id + "\" name=\"" + best.product.name
+                    + "\" score=" + best.score.ToString("0.000") + " bestField=product.name"
+                : "[MATCH] local-final=reject bestNearMiss=" + (best != null
+                    ? "\"" + best.product.name + "\" score=" + best.score.ToString("0.000") + " bestField=product.name"
+                    : "none"));
+            return accepted ? best.product : null;
         }
 
         void ReadPrimaryIdentityFromOcr()
@@ -1105,10 +1445,28 @@ namespace GlowUp.Scan
         {
             try
             {
+                Debug.Log("[MATCH] firebase-query brand=\"" + brand + "\" name=\"" + name + "\" kind=\"" + identity.cosmeticType + "\"");
                 // the kind read on the pack ("Foundation") chooses between products that share this name
                 ProductData product = ProductRepository.Index.Exact(brand, name, identity.cosmeticType);
                 List<ProductData> sameName = ProductRepository.Index.SameNameDifferentKind(brand, name, identity.cosmeticType);
-                if (sameName.Count > 1) { AskWhichKind(sameName); return; }
+                if (product != null)
+                {
+                    string field = TextKey.Compact(name) == TextKey.Compact(product.name) ? "product.name" : "product.alias";
+                    Debug.Log("[MATCH] local-exact-candidate id=\"" + product.id + "\" name=\"" + product.name
+                        + "\" score=1.000 bestField=" + field + " brandAgrees=true");
+                }
+                foreach (ProductData candidate in sameName)
+                {
+                    string field = TextKey.Compact(name) == TextKey.Compact(candidate.name) ? "product.name" : "product.alias";
+                    Debug.Log("[MATCH] kind-candidate id=\"" + candidate.id + "\" name=\"" + candidate.name
+                        + "\" type=\"" + candidate.cosmeticType + "\" score=1.000 bestField=" + field);
+                }
+                if (sameName.Count > 1)
+                {
+                    Debug.Log("[MATCH] final=ambiguous-kind candidates=" + sameName.Count + " query=\"" + brand + " " + name + "\"");
+                    AskWhichKind(sameName);
+                    return;
+                }
                 if (product == null || product.ingredients == null || product.ingredients.Count == 0)
                 {
                     ProductData current = await ProductRepository.FindByBrandAndNameAsync(brand, name, identity.cosmeticType);
@@ -1121,6 +1479,7 @@ namespace GlowUp.Scan
                     ShowIdentity();
                     if (HasStoredList(product))
                     {
+                        Debug.Log("[MATCH] final=accept source=catalogue id=\"" + product.id + "\" name=\"" + product.name + "\"");
                         UseLookedUpList(product.ingredients, ListPagesOf(product), "inventory", false);
                         return;
                     }
@@ -1136,10 +1495,17 @@ namespace GlowUp.Scan
 
                 if (await SearchWebAfterCatalogueMiss(brand, name, scan)) return;
                 if (this != null && scan == scanNumber && stage == Stage.Scanning)
+                {
+                    if (product == null)
+                        Debug.Log("[MATCH] no-match branch=FirebaseProductLookup query=\"" + brand + " " + name
+                            + "\" bestNearMiss=see preceding [MATCH] local/server candidate logs");
+                    else
+                        Debug.Log("[MATCH] final=product-found-without-ingredients id=\"" + product.id + "\" name=\"" + product.name + "\"");
                     Say(!ConnectivityMonitor.Online ? msgFirebaseUnavailable
                         : AiCanLook ? msgWebNoMatch
                         : !ProductAiAdvisor.Available ? msgAiUnavailable
                         : product == null ? msgFirebaseMiss : msgFirebaseNoIngredients);
+                }
                 if (product == null && offerSnapshotOnCatalogMiss && this != null && scan == scanNumber && stage == Stage.Scanning) OfferSnapshot(null);
             }
             catch (Exception e)
@@ -1155,6 +1521,9 @@ namespace GlowUp.Scan
 
         async Task<bool> SearchWebAfterCatalogueMiss(string brand, string name, int scan)
         {
+            // Gemini photo upload disabled for product recognition: return false to prevent photo upload fallback
+            return false;
+#pragma warning disable CS0162
             if (!aiRecognisesProduct || !aiChecksTheWeb || !ConnectivityMonitor.Online || !ProductAiAdvisor.Available
                 || !AiBudget.CanLookUp || stage != Stage.Scanning || scan != scanNumber)
                 return false;
@@ -1312,6 +1681,7 @@ namespace GlowUp.Scan
                 if (match.list == null || !match.list.found || match.list.sources == null || match.list.sources.Count == 0)
                     return false;
 
+                if (showInManualPanel) ManualStatus(StatusMessage.Kind.Success, msgFoundOnline);
                 identity.productName = match.productName.Trim();
                 identity.brandName = match.brandName.Trim();
                 if (!string.IsNullOrWhiteSpace(match.cosmeticType)) identity.cosmeticType = match.cosmeticType.Trim();
@@ -1458,7 +1828,585 @@ namespace GlowUp.Scan
             UseLookedUpList(knownProduct.ingredients, ListPagesOf(knownProduct), "inventory", false);
         }
 
-        bool PopupOpen => (shortlist != null && shortlist.IsOpen) || (startOverPanel != null && startOverPanel.IsOpen) || (manualPanel != null && manualPanel.IsOpen)
+        // ---------------------------------------------------------------------------------------
+        // Candidate Ranking, Token Pooling & Smart Scan Multi-Frame Matching
+        // ---------------------------------------------------------------------------------------
+        struct ScoredCandidate
+        {
+            public ProductData product;
+            public float score;
+            public int distinctiveMatches;
+        }
+
+        static readonly HashSet<string> GenericTypeWords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "foundation", "powder", "concealer", "lipstick", "mascara", "blush", "bronzer",
+            "primer", "highlighter", "contour", "eyeliner", "eyeshadow"
+        };
+
+        static bool IsGenericTypeWord(string w) => GenericTypeWords.Contains(w);
+
+        static readonly char[] TokenDelimiters = new char[] { ' ', '\t', '\r', '\n', '-', '/', '.', ',', ':', ';', '(', ')', '"' };
+
+        void PoolTokensFromLines(IEnumerable<FrameReading.Line> lines)
+        {
+            if (lines == null) return;
+            lock (tokenLock)
+            {
+                foreach (FrameReading.Line line in lines)
+                {
+                    if (line == null || string.IsNullOrWhiteSpace(line.text)) continue;
+                    string[] rawTokens = line.text.Split(TokenDelimiters, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (string raw in rawTokens)
+                    {
+                        string norm = TextKey.Normalize(raw);
+                        if (norm.Length < 2) continue;
+                        if (pooledTokens.TryGetValue(norm, out int count))
+                        {
+                            pooledTokens[norm] = count + 1;
+                        }
+                        else
+                        {
+                            pooledTokens[norm] = 1;
+                        }
+                        poolDirty = true;
+                    }
+                }
+            }
+        }
+
+        void ResetScanRankingState()
+        {
+            lock (tokenLock)
+            {
+                pooledTokens.Clear();
+                poolDirty = false;
+            }
+            cachedBrandProducts = null;
+            brandLoadingFor = "";
+            brandLoading = false;
+            loggedMatchSummary = false;
+            frameScanIndex = 0;
+            scanStartTime = Time.unscaledTime;
+            nextTimeoutCheck = 1.0f;
+            shortlistShownForTimeout = false;
+            lastFrameWasRotated = false;
+            nextRankTime = 0f;
+        }
+
+        static int[] RotatePixels90(int[] src, int w, int h, ref int[] dst)
+        {
+            int len = w * h;
+            if (dst == null || dst.Length < len) dst = new int[len];
+            int newW = h;
+            for (int y = 0; y < h; y++)
+            {
+                int srcRow = y * w;
+                int dstCol = h - 1 - y;
+                for (int x = 0; x < w; x++)
+                {
+                    dst[x * newW + dstCol] = src[srcRow + x];
+                }
+            }
+            return dst;
+        }
+
+        static int[] RotatePixels270(int[] src, int w, int h, ref int[] dst)
+        {
+            int len = w * h;
+            if (dst == null || dst.Length < len) dst = new int[len];
+            int newW = h;
+            for (int y = 0; y < h; y++)
+            {
+                int srcRow = y * w;
+                for (int x = 0; x < w; x++)
+                {
+                    int dstY = w - 1 - x;
+                    dst[dstY * newW + y] = src[srcRow + x];
+                }
+            }
+            return dst;
+        }
+
+        bool TokenMatchesWord(string targetWord, Dictionary<string, int> tokens)
+        {
+            if (string.IsNullOrEmpty(targetWord) || tokens == null || tokens.Count == 0) return false;
+            string normTarget = TextKey.Normalize(targetWord);
+            if (normTarget.Length < 2) return false;
+
+            if (tokens.TryGetValue(normTarget, out int exactCount) && exactCount >= 1) return true;
+
+            int maxDist = normTarget.Length >= 6 ? 2 : (normTarget.Length >= 4 ? 1 : 0);
+            if (maxDist == 0) return false;
+
+            foreach (var kvp in tokens)
+            {
+                if (kvp.Value < 2) continue; // fuzzy matches (edit distance > 0) need count >= 2
+                string token = kvp.Key;
+                if (Math.Abs(token.Length - normTarget.Length) > maxDist) continue;
+                int dist = ProductIndex.Levenshtein(token, normTarget);
+                if (dist > 0 && dist <= maxDist) return true;
+            }
+            return false;
+        }
+
+        List<string> FindCandidateBrandNames(Dictionary<string, int> tokens)
+        {
+            var candidates = new List<string>();
+            if (!string.IsNullOrWhiteSpace(identity.brandName))
+            {
+                candidates.Add(identity.brandName.Trim());
+            }
+
+            if (tokens == null || tokens.Count == 0 || brands == null) return candidates;
+
+            foreach (BrandData b in brands)
+            {
+                if (b == null || string.IsNullOrWhiteSpace(b.name)) continue;
+                string bName = b.name.Trim();
+                if (candidates.Count > 0 && string.Equals(bName, candidates[0], StringComparison.OrdinalIgnoreCase)) continue;
+
+                string[] words = TextKey.Normalize(bName).Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                bool brandMatched = false;
+                foreach (string w in words)
+                {
+                    if (w.Length < 3) continue;
+                    if (w == "cosmetics" || w == "beauty" || w == "paris" || w == "york" || w == "london") continue;
+
+                    if (TokenMatchesWord(w, tokens))
+                    {
+                        brandMatched = true;
+                        break;
+                    }
+                }
+
+                if (!brandMatched && b.aliases != null)
+                {
+                    foreach (string alias in b.aliases)
+                    {
+                        if (string.IsNullOrWhiteSpace(alias)) continue;
+                        string[] aWords = TextKey.Normalize(alias).Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                        foreach (string aw in aWords)
+                        {
+                            if (aw.Length < 3) continue;
+                            if (aw == "cosmetics" || aw == "beauty" || aw == "paris" || aw == "york" || aw == "london") continue;
+                            if (TokenMatchesWord(aw, tokens))
+                            {
+                                brandMatched = true;
+                                break;
+                            }
+                        }
+                        if (brandMatched) break;
+                    }
+                }
+
+                if (brandMatched)
+                {
+                    candidates.Add(bName);
+                    if (candidates.Count >= 2) break; // max 2 candidate brands
+                }
+            }
+            return candidates;
+        }
+
+        async void CheckAndWarmBrandCandidates()
+        {
+            if (brandLoading || stage != Stage.Scanning) return;
+            Dictionary<string, int> snapshot;
+            lock (tokenLock)
+            {
+                if (pooledTokens.Count == 0 && string.IsNullOrWhiteSpace(identity.brandName)) return;
+                snapshot = new Dictionary<string, int>(pooledTokens);
+            }
+
+            List<string> candidateBrands = FindCandidateBrandNames(snapshot);
+            if (candidateBrands.Count == 0) return;
+            string brandKey = string.Join("|", candidateBrands);
+            if (brandKey == brandLoadingFor) return;
+
+            brandLoading = true;
+            brandLoadingFor = brandKey;
+            int forScan = scanNumber;
+            try
+            {
+                var allProducts = new List<ProductData>();
+                foreach (string bName in candidateBrands)
+                {
+                    List<ProductData> prods = await ProductRepository.ProductsOfBrand(bName);
+                    if (prods != null) allProducts.AddRange(prods);
+                }
+
+                if (forScan != scanNumber || brandLoadingFor != brandKey || stage != Stage.Scanning) return;
+
+                var deduped = new List<ProductData>();
+                var seenIds = new HashSet<string>();
+                var seenNames = new HashSet<string>();
+                foreach (ProductData p in allProducts)
+                {
+                    if (p == null) continue;
+                    if (!ProductScope.IsMakeup(p.cosmeticType, p.name)) continue;
+                    if (!string.IsNullOrEmpty(p.id))
+                    {
+                        if (seenIds.Add(p.id)) deduped.Add(p);
+                    }
+                    else
+                    {
+                        string norm = TextKey.Normalize(p.name);
+                        if (!string.IsNullOrEmpty(norm) && seenNames.Add(norm)) deduped.Add(p);
+                    }
+                }
+                cachedBrandProducts = deduped;
+                Debug.Log($"[SMART_SCAN_MATCH] Brands tried: [{string.Join(", ", candidateBrands)}] loaded {deduped.Count} candidates");
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[SMART_SCAN_MATCH] Error warming brand candidates: " + e.Message);
+            }
+            finally
+            {
+                brandLoading = false;
+            }
+        }
+
+        static Dictionary<string, int> ComputeShadeMatchCounts(List<ProductData> candidates, Dictionary<string, int> tokens)
+        {
+            var counts = new Dictionary<string, int>();
+            if (candidates == null || tokens == null) return counts;
+            foreach (ProductData p in candidates)
+            {
+                if (p == null || p.shadeCodes == null) continue;
+                var seenCodes = new HashSet<string>();
+                foreach (string rawCode in p.shadeCodes)
+                {
+                    if (string.IsNullOrWhiteSpace(rawCode)) continue;
+                    string norm = TextKey.Normalize(rawCode);
+                    if (norm.Length < 2 || !seenCodes.Add(norm)) continue;
+                    if (tokens.TryGetValue(norm, out int cnt) && cnt >= 1)
+                    {
+                        if (counts.TryGetValue(norm, out int c)) counts[norm] = c + 1;
+                        else counts[norm] = 1;
+                    }
+                }
+            }
+            return counts;
+        }
+
+        ScoredCandidate ScoreCandidate(ProductData p, Dictionary<string, int> tokens, Dictionary<string, int> shadeCounts)
+        {
+            if (p == null) return new ScoredCandidate { product = p, score = 0f, distinctiveMatches = 0 };
+
+            string[] nameWords = TextKey.Normalize(p.name).Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            int distMatches;
+            float bestWordScore = ScoreWordSet(nameWords, tokens, out distMatches);
+
+            if (p.aliases != null)
+            {
+                foreach (string alias in p.aliases)
+                {
+                    if (string.IsNullOrWhiteSpace(alias)) continue;
+                    string[] aliasWords = TextKey.Normalize(alias).Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    int aliasDist;
+                    float aliasScore = ScoreWordSet(aliasWords, tokens, out aliasDist);
+                    if (aliasScore > bestWordScore)
+                    {
+                        bestWordScore = aliasScore;
+                        distMatches = aliasDist;
+                    }
+                }
+            }
+
+            float shadeBonus = 0f;
+            if (p.shadeCodes != null)
+            {
+                foreach (string rawCode in p.shadeCodes)
+                {
+                    if (string.IsNullOrWhiteSpace(rawCode)) continue;
+                    string norm = TextKey.Normalize(rawCode);
+                    if (shadeCounts.TryGetValue(norm, out int sc) && sc == 1)
+                    {
+                        shadeBonus = 0.15f;
+                        break;
+                    }
+                }
+            }
+
+            float finalScore = Mathf.Clamp01(bestWordScore + shadeBonus);
+            return new ScoredCandidate { product = p, score = finalScore, distinctiveMatches = distMatches };
+        }
+
+        float ScoreWordSet(string[] words, Dictionary<string, int> tokens, out int distinctiveMatches)
+        {
+            distinctiveMatches = 0;
+            if (words == null || words.Length == 0) return 0f;
+            float totalWeight = 0f;
+            float matchedWeight = 0f;
+            foreach (string w in words)
+            {
+                if (w.Length < 2) continue;
+                bool isGeneric = IsGenericTypeWord(w);
+                float wWeight = isGeneric ? 0.4f : 1.0f;
+                totalWeight += wWeight;
+                if (TokenMatchesWord(w, tokens))
+                {
+                    matchedWeight += wWeight;
+                    if (!isGeneric) distinctiveMatches++;
+                }
+            }
+            return totalWeight > 0f ? (matchedWeight / totalWeight) : 0f;
+        }
+
+        bool SiblingConditionMet(ProductData topProduct, Dictionary<string, int> tokens, Dictionary<string, int> shadeCounts, List<ProductData> allCandidates)
+        {
+            if (topProduct == null) return false;
+
+            if (topProduct.shadeCodes != null)
+            {
+                foreach (string rawCode in topProduct.shadeCodes)
+                {
+                    if (string.IsNullOrWhiteSpace(rawCode)) continue;
+                    string norm = TextKey.Normalize(rawCode);
+                    if (shadeCounts.TryGetValue(norm, out int sc) && sc == 1)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            string[] topWords = TextKey.Normalize(topProduct.name).Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var topDistinctive = new HashSet<string>();
+            foreach (string w in topWords)
+            {
+                if (w.Length >= 2 && !IsGenericTypeWord(w)) topDistinctive.Add(w);
+            }
+
+            var sharedWords = new HashSet<string>();
+            bool hasSiblings = false;
+
+            if (allCandidates != null)
+            {
+                foreach (ProductData other in allCandidates)
+                {
+                    if (other == null || other == topProduct || (!string.IsNullOrEmpty(topProduct.id) && other.id == topProduct.id)) continue;
+                    string[] otherWords = TextKey.Normalize(other.name).Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    var common = new HashSet<string>();
+                    foreach (string w in otherWords)
+                    {
+                        if (topDistinctive.Contains(w)) common.Add(w);
+                    }
+                    if (common.Count >= 2)
+                    {
+                        hasSiblings = true;
+                        foreach (string w in common) sharedWords.Add(w);
+                    }
+                }
+            }
+
+            if (!hasSiblings) return true;
+
+            var candidateWords = new HashSet<string>(topDistinctive);
+            if (topProduct.aliases != null)
+            {
+                foreach (string alias in topProduct.aliases)
+                {
+                    if (string.IsNullOrWhiteSpace(alias)) continue;
+                    string[] aWords = TextKey.Normalize(alias).Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (string aw in aWords)
+                    {
+                        if (aw.Length >= 2 && !IsGenericTypeWord(aw)) candidateWords.Add(aw);
+                    }
+                }
+            }
+
+            foreach (string w in candidateWords)
+            {
+                if (!sharedWords.Contains(w))
+                {
+                    if (TokenMatchesWord(w, tokens))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        void RankAndMatchCandidates()
+        {
+            if (stage != Stage.Scanning || cachedBrandProducts == null || cachedBrandProducts.Count == 0) return;
+
+            Dictionary<string, int> tokenSnapshot;
+            lock (tokenLock)
+            {
+                tokenSnapshot = new Dictionary<string, int>(pooledTokens);
+            }
+
+            var shadeCounts = ComputeShadeMatchCounts(cachedBrandProducts, tokenSnapshot);
+            var scored = new List<ScoredCandidate>();
+
+            foreach (ProductData p in cachedBrandProducts)
+            {
+                if (!ProductScope.IsMakeup(p.cosmeticType, p.name)) continue;
+                scored.Add(ScoreCandidate(p, tokenSnapshot, shadeCounts));
+            }
+
+            scored.Sort((a, b) => b.score.CompareTo(a.score));
+            if (scored.Count == 0) return;
+
+            if (scored.Count == 1)
+            {
+                if (scored[0].score >= 0.75f && scored[0].distinctiveMatches >= 2)
+                {
+                    AutoAcceptCandidate(scored[0].product, scored, "ONE_CANDIDATE_HIGH_SCORE");
+                    return;
+                }
+            }
+            else
+            {
+                float topScore = scored[0].score;
+                float runnerUpScore = scored[1].score;
+                float margin = topScore - runnerUpScore;
+
+                if (topScore >= 0.60f && margin >= 0.10f && SiblingConditionMet(scored[0].product, tokenSnapshot, shadeCounts, cachedBrandProducts))
+                {
+                    AutoAcceptCandidate(scored[0].product, scored, "TOP_SCORE_WITH_MARGIN");
+                    return;
+                }
+            }
+        }
+
+        void AutoAcceptCandidate(ProductData candidate, List<ScoredCandidate> scored, string reason)
+        {
+            if (candidate == null || stage != Stage.Scanning) return;
+            LogMatchSummary(scored, "AUTO_ACCEPT_" + reason);
+            Adopt(candidate);
+            if (!string.IsNullOrWhiteSpace(candidate.cosmeticType))
+            {
+                identity.cosmeticType = candidate.cosmeticType.Trim();
+            }
+            bool[] filled = evidence.ProductKnown();
+            ShowProgress(filled);
+            ShowIdentity();
+            if (HasStoredList(candidate))
+            {
+                UseLookedUpList(candidate.ingredients, ListPagesOf(candidate), "inventory", false);
+            }
+            else
+            {
+                MaybeCheckTheWeb();
+            }
+        }
+
+        void UpdateRankingFlow()
+        {
+            if (stage != Stage.Scanning) return;
+
+            CheckAndWarmBrandCandidates();
+
+            if (poolDirty && Time.unscaledTime >= nextRankTime)
+            {
+                nextRankTime = Time.unscaledTime + 0.25f;
+                poolDirty = false;
+                RankAndMatchCandidates();
+            }
+
+            float elapsedScan = Time.unscaledTime - scanStartTime;
+            if (elapsedScan >= nextTimeoutCheck && elapsedScan <= 8.5f && !shortlistShownForTimeout)
+            {
+                nextTimeoutCheck += 1.0f;
+                if (elapsedScan >= 3.0f)
+                {
+                    bool shown = TryShowTimeoutShortlist();
+                    if (shown)
+                    {
+                        shortlistShownForTimeout = true;
+                    }
+                    else if (elapsedScan >= 8.0f)
+                    {
+                        Say(msgStalled);
+                        ShowButtons();
+                        shortlistShownForTimeout = true;
+                    }
+                }
+            }
+        }
+
+        bool TryShowTimeoutShortlist()
+        {
+            if (stage != Stage.Scanning || PopupOpen || cachedBrandProducts == null || cachedBrandProducts.Count == 0) return false;
+
+            Dictionary<string, int> tokenSnapshot;
+            lock (tokenLock)
+            {
+                tokenSnapshot = new Dictionary<string, int>(pooledTokens);
+            }
+
+            var shadeCounts = ComputeShadeMatchCounts(cachedBrandProducts, tokenSnapshot);
+            var scored = new List<ScoredCandidate>();
+
+            foreach (ProductData p in cachedBrandProducts)
+            {
+                if (!ProductScope.IsMakeup(p.cosmeticType, p.name)) continue;
+                scored.Add(ScoreCandidate(p, tokenSnapshot, shadeCounts));
+            }
+
+            scored.Sort((a, b) => b.score.CompareTo(a.score));
+            return ShowCandidateShortlist(scored);
+        }
+
+        bool ShowCandidateShortlist(List<ScoredCandidate> scored)
+        {
+            if (stage != Stage.Scanning || PopupOpen || shortlist == null) return false;
+            var entries = new List<ScanShortlist.Entry>();
+            foreach (var sc in scored)
+            {
+                if (sc.score < 0.25f || sc.product == null) continue;
+                ScanShortlist.Entry entry = ScanShortlist.Of(sc.product);
+                entry.score = sc.score;
+                entry.byText = true;
+                entries.Add(entry);
+                if (entries.Count >= 3) break;
+            }
+            if (entries.Count == 0) return false;
+
+            LogMatchSummary(scored, "TIMEOUT_SHORTLIST_PROMPT");
+            OpenShortlist("Is this ...?", "We found these potential matches. Confirm your product:", shortlistNoneLabel, ContinueScanning, () => { }, entries);
+            return true;
+        }
+
+        void LogMatchSummary(List<ScoredCandidate> scored, string outcome)
+        {
+            if (loggedMatchSummary) return;
+            loggedMatchSummary = true;
+
+            string brandStr = string.IsNullOrEmpty(identity.brandName) ? "(none)" : identity.brandName;
+            string tokensStr;
+            lock (tokenLock)
+            {
+                var topTokens = new List<string>();
+                foreach (var kvp in pooledTokens)
+                {
+                    topTokens.Add(kvp.Key + ":" + kvp.Value);
+                    if (topTokens.Count >= 30) break;
+                }
+                tokensStr = string.Join(", ", topTokens);
+            }
+
+            var candList = new List<string>();
+            if (scored != null)
+            {
+                for (int i = 0; i < Math.Min(scored.Count, 5); i++)
+                {
+                    var sc = scored[i];
+                    candList.Add((sc.product != null ? sc.product.name : "unknown") + "=" + sc.score.ToString("0.000"));
+                }
+            }
+            string candsStr = string.Join("; ", candList);
+
+            Debug.Log("[SMART_SCAN_MATCH] Outcome=" + outcome + " Brand=" + brandStr + " Tokens=[" + tokensStr + "] Candidates=[" + candsStr + "]");
+        }
+
+        bool PopupOpen => (barcodeCard != null && barcodeCard.IsOpen) || (shortlist != null && shortlist.IsOpen) || (startOverPanel != null && startOverPanel.IsOpen) || (manualPanel != null && manualPanel.IsOpen)
                           || (snapshot != null && snapshot.IsOpen);
 
         /// <summary>
@@ -1597,7 +2545,9 @@ namespace GlowUp.Scan
             barcode = ""; lastColour = "";
             shadeCandidate = lockedShade = ""; shadeStableCount = 0; photoHintSaid = false;
             declined.Clear(); shortlistAnswered = false; detailsAnswered = false; frontChecked = "";
+            nearBarcodesFor = "";
             scanNumber++;
+            ResetScanRankingState();
             ReadCounter.NewScan();
             fault = FrameQuality.Fault.None; blurrySkips = 0; differentSeen = 0; sinceProgress = 0f; stalledSaid = false; pausedFor = 0f;
             finishUnnamed = false; lookingUp = false; lookupRequested = false; shownStatus = null; messageOver = null; lastHint = "";
@@ -2245,6 +3195,7 @@ namespace GlowUp.Scan
 
         void OnSnapshotAnalysed(ProductData listed, PendingProductData staged)
         {
+            ExitPhotoMode();
             if (stage == Stage.Leaving || stage == Stage.Recognising) return;
             if (listed != null)
             {
@@ -2275,7 +3226,7 @@ namespace GlowUp.Scan
             if (!string.IsNullOrEmpty(staged.cosmeticType)) identity.cosmeticType = staged.cosmeticType;
             if (identity.shadeHex.Length == 0 && !string.IsNullOrEmpty(staged.shadeHex)) identity.shadeHex = staged.shadeHex;
             ShowIdentity();
-            UseLookedUpList(staged.ingredients, new List<string>(), "pending", false);
+            UseLookedUpList(staged.ingredients, new List<string>(staged.sourceUrls ?? new List<string>()), "pending", staged.ingredientsFrom == "page");
         }
 
         void UseLookedUpList(List<string> ingredients, List<string> from, string kind, bool webBacked)
@@ -2295,11 +3246,123 @@ namespace GlowUp.Scan
         // ---------------------------------------------------------------------------------------
         //  Typing the product in
         // ---------------------------------------------------------------------------------------
+        // ---------------------------------------------------------------------------------------
+        //  The Barcode card (11 November 2026)
+        // ---------------------------------------------------------------------------------------
+        string barcodeCardShownFor = "";          // the live scan's barcode the card was already offered for (once per barcode)
+        string barcodeToLearn = "";               // the number the user is naming a product for
+
+        /// <summary>Opens the optional Barcode card (the number may be "" when the user types it).</summary>
+        void OpenBarcodeCard(string key)
+        {
+            if (barcodeCard == null || stage == Stage.Leaving || stage == Stage.Recognising) return;
+            ExitPhotoMode();
+            if (holdButton != null) holdButton.LetGo();
+            barcodeCard.Show(key);
+        }
+
+        [Tooltip("The Barcode card while Open Beauty Facts is asked")]
+        [SerializeField] private string msgBarcodeLookingUp = "Looking the barcode up on Open Beauty Facts…";
+
+        /// <summary>
+        /// "Find product": 1. the catalogue's Barcode field and what this phone learned; 2. Open Beauty Facts (a free public database,
+        /// no daily limit; only the number is sent): its name, brand and ingredient list go to the usual analysis, and the scan adds the
+        /// product to the catalogue as Pending with this barcode, so an admin reviews it on the website; 3. the user names the product.
+        /// </summary>
+        // ---------------------------------------------------------------------------------------
+        //  A BARCODE READ ONLY PARTLY (phase 2B, 11 November 2026): the number under the bars, read as text, is checked; a complete
+        //  number with the right check digit that the catalogue knows is the product. A number that is incomplete or has a wrong check
+        //  digit offers the catalogue products with the NEAREST barcodes as a list to pick from: it is never taken by itself.
+        // ---------------------------------------------------------------------------------------
+        [Header("A barcode read only partly")]
+        [SerializeField] private string msgBarcodeUnclear = "The barcode was only partly read. Pick your product, or choose None of these.";
+        string nearBarcodesFor = "";
+
+        /// <summary>Opens "Is it one of these?" with the catalogue products whose barcodes are nearest to `read`. False = none is near.</summary>
+        bool OfferNearBarcodes(string read, Action noneOfThese)
+        {
+            List<BarcodeFuzzy.Near> near = BarcodeFuzzy.Nearest(read, BarcodeFuzzy.BarcodesOf(ProductRepository.Index.Products));
+            if (near.Count == 0) return false;
+            var entries = new List<ScanShortlist.Entry>();
+            var seen = new HashSet<string>();
+            foreach (BarcodeFuzzy.Near n in near)
+            {
+                ProductData p = n.product;
+                var entry = new ScanShortlist.Entry { product = p, productName = p.name ?? "", brandName = p.brandName ?? "", cosmeticType = p.cosmeticType ?? "", score = n.score, byText = true };
+                if (seen.Add(entry.Key)) entries.Add(entry);
+            }
+            nearBarcodesFor = read;
+            Debug.Log("[Barcode] partly read (" + read.Length + " digits): " + entries.Count + " nearest catalogue product(s) offered");
+            OpenShortlist(shortlistTitle, msgBarcodeUnclear, shortlistNoneLabel, () => { nearBarcodesFor = ""; }, () => noneOfThese?.Invoke(), entries);      // after None, the same number is not offered again
+            return true;
+        }
+
+        async void OnBarcodeFind(string key, string typedName)
+        {
+            ProductData found = PhotoBarcode.Find(key);
+            if (found != null) { barcodeCard.Hide(); barcode = key; OnSnapshotAnalysed(found, null); return; }
+            // phase 2B: an incomplete number, or one with a wrong check digit: the nearest catalogue barcodes first (the user picks)
+            if (typedName.Length == 0 && !BarcodeFuzzy.IsValidGtin(key) && nearBarcodesFor != key)
+            {
+                string number = key;
+                barcodeCard.Hide();
+                if (OfferNearBarcodes(number, () => { if (barcodeCard != null) { barcodeCard.Show(number); barcodeCard.AskForName(); } })) return;
+                barcodeCard.Show(number);
+            }
+            if (typedName.Length == 0 && OpenBeautyFacts.Enabled && ConnectivityMonitor.Online)
+            {
+                barcodeCard.Say(msgBarcodeLookingUp);
+                OpenBeautyFacts.Result there = await OpenBeautyFacts.Find(key);
+                if (this == null || barcodeCard == null || !barcodeCard.IsOpen || stage == Stage.Leaving) return;
+                IngredientTextParser.ParsedList list = there != null && there.found ? IngredientTextParser.Read(there.ingredientText) : null;
+                if (list != null && list.inOrder.Count >= 3)
+                {
+                    barcodeCard.Hide();
+                    barcode = key;                                   // the finished scan keeps the number (the catalogue's Pending entry gets it)
+                    if (identity.productName.Length == 0) identity.productName = there.productName ?? "";
+                    if (identity.brandName.Length == 0) identity.brandName = there.brandName ?? "";
+                    ShowIdentity();
+                    UseLookedUpList(new List<string>(list.inOrder), new List<string> { there.Source }, "web", true);
+                    return;
+                }
+            }
+            if (typedName.Length == 0) { barcodeCard.AskForName(); return; }
+            List<ScanShortlist.Entry> matches = ScanShortlist.Typed(ProductRepository.Index, typedName, "");
+            if (matches == null || matches.Count == 0) { barcodeCard.NameNotFound(); return; }
+            barcodeCard.Hide();
+            barcodeToLearn = key;
+            OpenShortlist(shortlistTitle, photoMatchesMessageCatalogue, shortlistNoneLabel,
+                () =>
+                {
+                    ExitPhotoMode();
+                    if (knownProduct != null && PhotoBarcodeMemory.Learn(barcodeToLearn, knownProduct)) Debug.Log("[PhotoBarcode] learned " + barcodeToLearn + " for " + knownProduct.name);
+                    barcodeToLearn = "";
+                },
+                () => { barcodeToLearn = ""; OpenManual(); },
+                matches);
+        }
+
+        /// <summary>"Photograph the barcode": photo mode, whose photo step reads the bars first.</summary>
+        void OnBarcodePhoto()
+        {
+            if (barcodeCard != null) barcodeCard.Hide();
+            if (stage == Stage.Scanning) EnterPhotoMode();
+        }
+
         void OpenManual()
         {
+            ExitPhotoMode();
             if (stage == Stage.Leaving || stage == Stage.Recognising || manualPanel == null) return;
             if (holdButton != null) holdButton.LetGo();
-            if (manualFeedbackText != null) manualFeedbackText.text = "";
+            // the live scan read a barcode but no product is known: the Barcode card is offered first (once for each barcode)
+            string liveKey = MlKitBarcodeReader.Key(barcode);
+            if (barcodeCard != null && liveKey.Length > 0 && knownProduct == null && barcodeCardShownFor != liveKey && !barcodeCard.IsOpen)
+            {
+                barcodeCardShownFor = liveKey;
+                OpenBarcodeCard(liveKey);
+                return;
+            }
+            ManualStatus(StatusMessage.Kind.Info, "");
             // what the scan already found is filled in, so the user only types what is missing
             if (manualProductInput != null && string.IsNullOrWhiteSpace(manualProductInput.text)) manualProductInput.text = identity.productName;
             if (manualBrandInput != null && string.IsNullOrWhiteSpace(manualBrandInput.text)) manualBrandInput.text = identity.brandName;
@@ -2325,7 +3388,66 @@ namespace GlowUp.Scan
 
         bool manualBusy;
 
-        void ManualSay(string message) { if (manualFeedbackText != null) manualFeedbackText.text = message ?? ""; }
+        List<string> knownBrandNames;
+        List<string> KnownBrandNames()
+        {
+            if (knownBrandNames != null) return knownBrandNames;
+            knownBrandNames = new List<string>();
+            try
+            {
+                foreach (BrandData b in BrandRepository.All()) if (!string.IsNullOrWhiteSpace(b.name) && !knownBrandNames.Contains(b.name)) knownBrandNames.Add(b.name);
+                foreach (ProductData p in ProductRepository.Every.Products) if (!string.IsNullOrWhiteSpace(p.brandName) && !knownBrandNames.Contains(p.brandName)) knownBrandNames.Add(p.brandName);
+            }
+            catch (Exception e) { Debug.LogWarning("Scan: the brand list is not available: " + e.Message); }
+            return knownBrandNames;
+        }
+
+        void ManualSay(string message) => ManualStatus(StatusMessage.Kind.Info, StatusMessage.Plain(message));
+
+        StatusMessage manualStatus;
+        /// <summary>The sheet's line as the app's status message: Info, Progress (spinner), Error or Success (7 November 2026).</summary>
+        void ManualStatus(StatusMessage.Kind kind, string message)
+        {
+            if (manualFeedbackText == null) return;
+            if (manualStatus == null) manualStatus = StatusMessage.Wrap(manualFeedbackText);
+            if (string.IsNullOrEmpty(message)) manualStatus.Hide(); else manualStatus.Show(kind, message);
+        }
+
+        string analyseIdleWords;
+        /// <summary>The Analyse button: the spinner inside it and not pressable while the product is looked up.</summary>
+        void ManualBusy(bool on)
+        {
+            if (manualAnalyseButton == null) return;
+            TMP_Text label = manualAnalyseButton.GetComponentInChildren<TMP_Text>(true);
+            if (analyseIdleWords == null) analyseIdleWords = label != null ? label.text : "";
+            ButtonBusy.Set(manualAnalyseButton, label, on, on ? analyseBusyLabel : analyseIdleWords);
+        }
+
+        /// <summary>
+        /// Words a scene saved in an older build may still name the database, the text reader or the AI service: users never read
+        /// those (7 November 2026). A saved sentence with such a word is replaced by today's plain one; any other wording is kept.
+        /// </summary>
+        void PlainWording()
+        {
+            string Plain(string current, string replacement)
+            {
+                if (string.IsNullOrWhiteSpace(current)) return replacement;
+                foreach (string word in new[] { "Firebase", "Firestore", "OCR", "API", "Gemini" })
+                    if (current.IndexOf(word, StringComparison.Ordinal) >= 0) return replacement;
+                return current;
+            }
+            msgAiUnavailable = Plain(msgAiUnavailable, "Not in our catalog yet, and product pages can't be checked right now. Type the product in, or try again later.");
+            hintIngredients = Plain(hintIngredients, "Checking our catalog for the ingredient list.");
+            msgFirebaseMiss = Plain(msgFirebaseMiss, "Not in our catalog yet. Check the brand and product name, or type the product in.");
+            msgFirebaseNoIngredients = Plain(msgFirebaseNoIngredients, "We know this product, but its ingredient list isn't saved yet \u2014 you can type it in below.");
+            msgFirebaseUnavailable = Plain(msgFirebaseUnavailable, "Our catalog couldn't be reached. Check your connection and try again.");
+            if (msgManualLooking == "Looking for {0}...") msgManualLooking = "Searching for {0}\u2026";
+            if (msgManualNoList == "Found {0}, but no trustworthy page shows its ingredient list. Type the list from the pack.") msgManualNoList = "Couldn't find an ingredient list \u2014 you can type it in below.";
+            if (msgFirebaseNoIngredients == "GlowUp found this product, but its ingredient list is not saved in the catalogue yet.")
+                msgFirebaseNoIngredients = "We know this product, but its ingredient list isn't saved yet \u2014 you can type it in below.";
+            if (msgFirebaseUnavailable == "GlowUp's product catalogue could not be reached. Check your connection and try again.")
+                msgFirebaseUnavailable = "Our catalog couldn't be reached. Check your connection and try again.";
+        }
 
         /// <summary>
         /// "Analyse" on the type-it-in pop-up. The app works out WHAT was typed (TypedEntry): an ingredient list is analysed
@@ -2357,29 +3479,36 @@ namespace GlowUp.Scan
         async void ManualLookUp(string product, string brand, string kind)
         {
             manualBusy = true;
-            if (manualAnalyseButton != null) manualAnalyseButton.interactable = false;
-            string shown = ((brand.Length > 0 && product.IndexOf(brand, StringComparison.OrdinalIgnoreCase) < 0 ? brand + " " : "") + product).Trim();
-            ManualSay(string.Format(msgManualLooking, shown));
+            ManualBusy(true);
+            // the brand as the catalogue spells it ("Maybelline Newyork" = "Maybelline New York"), the product name in medium weight
+            string niceBrand = BrandNameNormalizer.Normalize(brand, KnownBrandNames());
+            string shown = ((niceBrand.Length > 0 && product.IndexOf(niceBrand, StringComparison.OrdinalIgnoreCase) < 0 ? niceBrand + " " : "") + product).Trim();
+            ManualStatus(StatusMessage.Kind.Progress, string.Format(msgManualLooking, "<b>" + StatusMessage.Plain(shown) + "</b>"));
             try
             {
                 ProductData listed = InventoryProductFor(product, brand);          // the app's own product list (also offline)
                 if (!HasStoredList(listed)) listed = ProductIn(shown) ?? listed;      // brand and name typed in one go
                 if (HasStoredList(listed)) { UseTypedProduct(listed, kind); return; }
 
-                if (brand.Length < 2) { ManualSay("Enter both the product name and brand to search GlowUp's Firebase catalogue."); return; }
+                if (brand.Length < 2) { ManualStatus(StatusMessage.Kind.Info, msgNeedBrand); return; }
                 ProductData fromFirebase = await ProductRepository.FindByBrandAndNameAsync(brand, product);
                 if (this == null || stage == Stage.Leaving) return;
                 if (manualPanel != null && !manualPanel.IsOpen) return;
                 if (fromFirebase == null)
                 {
+                    ManualStatus(StatusMessage.Kind.Progress, msgCheckingOnline);
                     if (await SearchTypedProductOnWeb(product, brand, kind, true)) return;
-                    ManualSay(string.Format(msgManualNoList, shown));
+                    if (this == null) return;
+                    if (manualStatus == null || !manualStatus.Visible || manualStatus.Text.text.IndexOf("Checking", StringComparison.Ordinal) >= 0)
+                        ManualStatus(StatusMessage.Kind.Error, string.Format(msgManualNoList, StatusMessage.Plain(shown)));
                     return;
                 }
                 if (fromFirebase.ingredients == null || fromFirebase.ingredients.Count == 0)
                 {
+                    ManualStatus(StatusMessage.Kind.Progress, msgCheckingOnline);
                     if (await SearchTypedProductOnWeb(product, brand, kind, true)) return;
-                    ManualSay(msgFirebaseNoIngredients);
+                    if (this == null) return;
+                    ManualStatus(StatusMessage.Kind.Error, msgFirebaseNoIngredients);
                     return;
                 }
                 if (kind.Length > 0 && ProductScope.Judge(kind, product).IsNotMakeup)
@@ -2395,12 +3524,12 @@ namespace GlowUp.Scan
             catch (Exception e)
             {
                 Debug.LogWarning("Scan: looking a typed product up failed: " + e.Message);
-                if (this != null) ManualSay(msgFirebaseUnavailable);
+                if (this != null) ManualStatus(StatusMessage.Kind.Error, msgFirebaseUnavailable);
             }
             finally
             {
                 manualBusy = false;
-                if (this != null && manualAnalyseButton != null) manualAnalyseButton.interactable = true;
+                if (this != null) ManualBusy(false);
             }
         }
 

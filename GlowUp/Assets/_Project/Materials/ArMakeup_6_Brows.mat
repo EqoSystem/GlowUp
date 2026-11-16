@@ -35,6 +35,7 @@ Material:
     m_Floats:
     - _Feather: 0.6
     - _MouthOpen: 0
+    - _Pigment: 0
     m_Colors:
     - _BaseColor: {r: 0.35, g: 0.25, b: 0.2, a: 0}
     - _SkinBase: {r: 0.74, g: 0.52, b: 0.4699999, a: 1}

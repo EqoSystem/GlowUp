@@ -193,7 +193,33 @@ export function pickKeeper(items) {
         || (Number(a.addedAt) || 0) - (Number(b.addedAt) || 0) || text(a.id).localeCompare(text(b.id)))[0];
 }
 
+/**
+ * Which ingredient entry to keep. The one whose NAME is the INCI name wins: a name that another member of the group gives as its label name
+ * (its techName, the part before any brackets or slash: "AQUA (WATER)" says Aqua is the INCI name) is the INCI name, and a name that only
+ * stands in brackets or after a slash ("Water") is the everyday name, which becomes an alias of the INCI entry. Without that evidence the
+ * usual choice (most trusted, ...) decides.
+ */
+export function pickIngredientKeeper(items) {
+    const key = (value) => normalizeName(text(value).replace(/\s*\([^)]*\)\s*/g, " "));
+    const inci = new Set(), everyday = new Set();
+    items.forEach((item) => {
+        const parts = text(item.techName).split(/\s+\/\s+/).map((part) => part.trim()).filter(Boolean);
+        if (parts.length > 0) inci.add(key(parts[0]));
+        parts.slice(1).forEach((part) => everyday.add(key(part)));
+        text(item.techName).replace(/\(([^)]+)\)/g, (match, inner) => { everyday.add(normalizeName(inner)); return match; });
+    });
+    const evidence = (item) => { const k = normalizeName(item.name); return everyday.has(k) && !inci.has(k) ? -1 : inci.has(k) ? 1 : 0; };
+    // trust first (a checked entry is never passed over for an AI copy), then which name is the INCI name, then the usual choice
+    const trusted = Math.max(...items.map(trustOf));
+    const equals = items.filter((item) => trustOf(item) === trusted);
+    const best = Math.max(...equals.map(evidence));
+    return pickKeeper(equals.filter((item) => evidence(item) === best));
+}
+
 // puts things that are linked to each other into groups ("a is like b" and "b is like c" make one group of three)
+/** True when an admin told the system these two entries are DIFFERENT ingredients (`differentFrom` = ids, kept on the entry that was saved). */
+export const markedDifferent = (a, b) => list(a.differentFrom).includes(b.id) || list(b.differentFrom).includes(a.id);
+
 function groupsOf(items, links) {
     const parent = new Map(items.map((item) => [item, item]));
     const find = (item) => { while (parent.get(item) !== item) { parent.set(item, parent.get(parent.get(item))); item = parent.get(item); } return item; };
@@ -279,11 +305,11 @@ export function ingredientDuplicates(ingredients) {
         [ingredient.name, ingredient.techName].concat(list(ingredient.aliases)).forEach((name) => {
             const key = normalizeName(name);
             if (key.length < 2 || key.startsWith("hidden ")) return;
-            if (byKey.has(key) && byKey.get(key) !== ingredient) links.push([byKey.get(key), ingredient]); else byKey.set(key, ingredient);
+            if (byKey.has(key) && byKey.get(key) !== ingredient) { if (!markedDifferent(byKey.get(key), ingredient)) links.push([byKey.get(key), ingredient]); } else byKey.set(key, ingredient);
         });
     });
     return groupsOf(items, links).map((group) => {
-        const keep = pickKeeper(group);
+        const keep = pickIngredientKeeper(group);
         return {
             reason: "The same name, label name or other spelling", items: group, keep,
             // the most likely mistake: an entry the AI made although a trusted entry was there already
@@ -298,24 +324,82 @@ export function ingredientDuplicates(ingredients) {
  * Answers [{ reason, items[], keep, alike }].
  */
 export function ingredientLookalikes(ingredients, threshold) {
+    const scan = lookalikeScan(ingredients, threshold);
+    while (!scan.next().done) { /* the whole search at once (tests, tools); a page uses ingredientLookalikesAsync */ }
+    return scan.result();
+}
+
+/**
+ * The same answer as ingredientLookalikes, but the work is cut into slices of about 12 ms and the page is given back between them, so it
+ * stays alive (a spinner turns, a bar fills, the page scrolls). `onProgress(done, total)` is called after each slice; `cancelled()` returning
+ * true stops the search and resolves null. Resolves to the same list of groups.
+ */
+export async function ingredientLookalikesAsync(ingredients, threshold, options) {
+    const { onProgress, cancelled, sliceMs } = Object.assign({ sliceMs: 12 }, options || {});
+    const scan = lookalikeScan(ingredients, threshold);
+    for (;;) {
+        const started = Date.now();
+        let step;
+        do { step = scan.next(); } while (!step.done && Date.now() - started < sliceMs);
+        if (step.done) break;
+        if (onProgress) onProgress(step.value.done, step.value.total);
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        if (cancelled && cancelled()) return null;
+    }
+    if (onProgress) onProgress(1, 1);
+    return scan.result();
+}
+
+/** How many entries a search of `ingredients` looks at (the Recycle bin is not searched). */
+export const lookalikeCount = (ingredients) => live(ingredients).length;
+
+/**
+ * Whether two names (already normalised, as namesOf gives them) are at least `limit` alike, and how alike. Exactly the rule of similarity():
+ * the better of "same letters" and "same words". Only the slow part, counting letter changes, is skipped when the lengths alone already make the
+ * letters too different, which is true for almost every pair. Returns 0 when the pair is below the limit.
+ */
+function alikeAtLeast(x, y, limit) {
+    if (x.k === y.k || x.c === y.c || x.sq === y.sq) return 1;
+    let best = 0;
+    const longest = Math.max(x.c.length, y.c.length);
+    if (1 - Math.abs(x.c.length - y.c.length) / longest >= limit) best = 1 - editDistance(x.c, y.c) / longest;      // the letters can only be alike when the lengths are
+    let shared = 0;
+    x.w.forEach((word) => { if (y.w.has(word)) shared++; });
+    best = Math.max(best, (2 * shared) / (x.w.size + y.w.size));
+    return best >= limit ? best : 0;
+}
+
+/** What alikeAtLeast needs of a normalised name, made once per name and not once per pair. */
+const prepared = (key) => ({ k: key, c: key.replace(/ /g, ""), sq: squashKey(key), w: new Set(key.split(" ")) });
+
+/** The search as a generator: it yields { done, total } after every entry it has compared with the later ones, and result() has the groups. */
+function lookalikeScan(ingredients, threshold) {
     const limit = typeof threshold === "number" ? threshold : 0.93;
     const items = live(ingredients);
     const same = new Map();                       // entries that are already one sure group are not listed again
     ingredientDuplicates(items).forEach((group, index) => group.items.forEach((ingredient) => same.set(ingredient, index)));
     const namesOf = (ingredient) => [ingredient.name, ingredient.techName].map(normalizeName).filter((key) => key.length >= 3 && !key.startsWith("hidden "));
+    const names = items.map((ingredient) => namesOf(ingredient).map(prepared));      // made once, not again for every pair
     const links = [], alikeOf = new Map();
-    for (let a = 0; a < items.length; a++)
-        for (let b = a + 1; b < items.length; b++) {
-            if (same.has(items[a]) && same.get(items[a]) === same.get(items[b])) continue;
-            let best = 0;
-            namesOf(items[a]).forEach((x) => namesOf(items[b]).forEach((y) => { best = Math.max(best, similarity(x, y)); }));
-            if (best < limit) continue;
-            links.push([items[a], items[b]]);
-            alikeOf.set(items[a], Math.max(alikeOf.get(items[a]) || 0, best)); alikeOf.set(items[b], Math.max(alikeOf.get(items[b]) || 0, best));
+    let finished = null;
+    function* run() {
+        for (let a = 0; a < items.length; a++) {
+            for (let b = a + 1; b < items.length; b++) {
+                if (same.has(items[a]) && same.get(items[a]) === same.get(items[b])) continue;
+                let best = 0;
+                names[a].forEach((x) => names[b].forEach((y) => { best = Math.max(best, alikeAtLeast(x, y, limit)); }));
+                if (best < limit || markedDifferent(items[a], items[b])) continue;
+                links.push([items[a], items[b]]);
+                alikeOf.set(items[a], Math.max(alikeOf.get(items[a]) || 0, best)); alikeOf.set(items[b], Math.max(alikeOf.get(items[b]) || 0, best));
+            }
+            yield { done: a + 1, total: items.length };
         }
-    return groupsOf(items, links).map((group) => ({
-        reason: "Names that are nearly the same", items: group, keep: pickKeeper(group), alike: Math.min(...group.map((ingredient) => alikeOf.get(ingredient) || 0))
-    }));
+        finished = groupsOf(items, links).map((group) => ({
+            reason: "Names that are nearly the same", items: group, keep: pickIngredientKeeper(group), alike: Math.min(...group.map((ingredient) => alikeOf.get(ingredient) || 0))
+        }));
+    }
+    const generator = run();
+    return { next: () => generator.next(), result: () => finished || [] };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -384,7 +468,7 @@ export function mergeProducts(keep, others) {
         if (donor) { changes.ingredients = list(donor.ingredients).slice(); if (list(donor.sources).length > 0) changes.sources = uniqueNames(list(keep.sources).concat(list(donor.sources)), []); }
     }
     if (!barcodeKey(keep.barcode)) { const donor = others.find((other) => barcodeKey(other.barcode)); if (donor) changes.barcode = text(donor.barcode); }
-    const shades = Array.from(new Set(list(keep.shades).concat(...others.map((other) => list(other.shades))))).slice(0, 12);
+    const shades = Array.from(new Set(list(keep.shades).concat(...others.map((other) => list(other.shades))))).slice(0, 100);
     if (shades.length !== list(keep.shades).length) changes.shades = shades;
     return { keepChanges: changes, bin: others.map((other) => ({ item: other, reason: `The same product as "${text(keep.name)}": merged into it.` })) };
 }
@@ -411,7 +495,13 @@ export function mergeBrands(keep, others, products) {
  */
 export function mergeIngredients(keep, others) {
     const changes = {};
-    const aliases = uniqueNames(list(keep.aliases).concat(...others.map((other) => [other.name, other.techName].concat(list(other.aliases)))), [keep.name, keep.techName]);
+    const base = (value) => text(value).replace(/\s*\([^)]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
+    const tidy = (value) => {      // "AQUA (WATER)" under the entry Aqua: only "Water" is new
+        const brackets = [];
+        text(value).replace(/\(([^)]+)\)/g, (match, inner) => { brackets.push(inner.trim()); return match; });
+        return normalizeName(base(value)) === normalizeName(keep.name) && brackets.length > 0 ? brackets : [value];
+    };
+    const aliases = uniqueNames(list(keep.aliases).concat(...others.map((other) => [other.name, other.techName].concat(list(other.aliases)).flatMap(tidy))), [keep.name, keep.techName, base(keep.techName)]);
     if (aliases.length !== list(keep.aliases).length) changes.aliases = aliases.slice(0, 30);
     return { keepChanges: changes, bin: others.map((other) => ({ item: other, reason: `The same ingredient as "${text(keep.name)}": merged into it.` })) };
 }
@@ -419,6 +509,148 @@ export function mergeIngredients(keep, others) {
 // ---------------------------------------------------------------------------------------------
 //  5. The clean-up: every change it would make, as a list (a dry run). Nothing is written here.
 // ---------------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------------
+//  Definitions that belong to another ingredient, and sentences that call an ingredient safe
+// ---------------------------------------------------------------------------------------------
+/**
+ * Entries found on 6 November 2026 whose definition is a copy of ANOTHER ingredient's. Each has the entry's name, a mark that is in the wrong
+ * text (so a definition that was corrected since is left alone, and running the step twice does nothing) and the new plain-words definition.
+ */
+export const DEFINITION_FIXES = [
+    { name: "D&C Red 21 Al Lake / CI 45380", wrong: /candelilla/i, marker: "it is the text of Candelilla Wax",
+      to: "A red colorant (an aluminium lake of the dye eosin, also called D&C Red 21) that gives products a bright pink to red colour." },
+    { name: "TRIETHANOLAMINE", wrong: /synthetic polymer used to thicken/i, marker: "it is the text of Acrylates/C10-30 Alkyl Acrylate Crosspolymer",
+      to: "A pH adjuster that balances the acidity of a formula and helps some thickening polymers work." },
+    { name: "TITANIUM DIOXIDE", wrong: /metallic element/i, marker: "it is the text of Aluminum",
+      to: "A white mineral pigment that makes products opaque and lightens colours. It is also used as a sunscreen filter." }
+];
+
+/** [{ ingredient, to, marker }] for the entries whose definition is still the wrong one. */
+export function definitionFixes(ingredients) {
+    const out = [];
+    list(ingredients).forEach((ingredient) => {
+        if (!ingredient) return;
+        const fix = DEFINITION_FIXES.find((entry) => normalizeName(entry.name) === normalizeName(ingredient.name) && entry.wrong.test(text(ingredient.description)));
+        if (fix) out.push({ ingredient, to: fix.to, marker: fix.marker });
+    });
+    return out;
+}
+
+// ---------------------------------------------------------------------------------------------
+//  Names typed as "INCI name / everyday name" in the one name box
+// ---------------------------------------------------------------------------------------------
+// Only " / " WITH spaces joins two names. A slash inside a name ("PEG/PPG-18/18 Dimethicone", "Acrylates/C10-30 Alkyl Acrylate Crosspolymer") is part of it.
+const JOINER = /\s+\/\s+/;
+const withoutBrackets = (value) => text(value).replace(/\s*\([^)]*\)\s*/g, " ").replace(/\s+/g, " ").trim();
+const bracketed = (value) => { const found = []; text(value).replace(/\(([^)]+)\)/g, (m, inner) => { found.push(inner.trim()); return m; }); return found; };
+const splitJoined = (value) => text(value).split(JOINER).map((part) => part.trim()).filter((part) => part.length > 0);
+
+/**
+ * What one entry with joined names becomes: { name, techName, aliases, classificationId?, from } or null when it has no joined name or the
+ * joined name is broken (a part of one or two characters, "2-Dihydroxyhexane / 1": a person must look at it).
+ *   - the INCI name is the entry's own techName when that is ONE name (it is what the label says), else the first part that is not a kind of
+ *     ingredient ("Solvent / Isododecane" is Isododecane, kind Solvent); when the techName is joined too the first part is taken and the row
+ *     says it was a guess (`guess`), so a person looks at it
+ *   - every other part, and every name the entry already had, becomes an alias (a part that is a classification's name becomes the
+ *     classification instead, only when the entry has none)
+ * `classifications` = [{ id, name }].
+ */
+export function splitJoinedName(ingredient, classifications) {
+    const nameParts = splitJoined(ingredient.name);
+    if (nameParts.length < 2 || nameParts.some((part) => part.replace(/[^a-z0-9]/gi, "").length < 3)) return null;
+    const kinds = list(classifications);
+    const kindOf = (word) => kinds.find((kind) => normalizeName(kind.name) === normalizeName(word));
+    const techParts = splitJoined(ingredient.techName);
+    let inci = "", guess = false;
+    if (techParts.length === 1 && withoutBrackets(techParts[0]).length >= 3) inci = withoutBrackets(techParts[0]);
+    else {
+        const pool = techParts.length > 1 ? techParts : nameParts;
+        inci = pool.find((part) => !kindOf(part)) || pool[0];
+        guess = techParts.length > 1 || techParts.length === 0 ? true : false;
+        inci = withoutBrackets(inci) || inci;
+    }
+    const everyName = nameParts.concat(techParts, bracketed(ingredient.techName), ...list(ingredient.aliases).map(splitJoined));
+    let classificationId = "";
+    const names = [];
+    everyName.forEach((part) => {
+        const kind = kindOf(part);
+        if (kind && normalizeName(part) !== normalizeName(inci)) { if (!text(ingredient.classificationId) && !classificationId) classificationId = kind.id; return; }
+        names.push(part);
+    });
+    const aliases = uniqueNames(names, [inci]).slice(0, 30);
+    const result = { name: inci, techName: inci, aliases, guess, from: text(ingredient.name) };
+    if (classificationId) result.classificationId = classificationId;
+    return result;
+}
+
+/**
+ * Entries whose NAME is an everyday name while their own label name (techName) is another, single name: "Water" with label name "AQUA (WATER)",
+ * "Avocado Oil" with "Persea Gratissima Oil". The name becomes the INCI name and the old name an alias. Returns [{ ingredient, to }].
+ * Joined names are left to joinedNameFixes, and so are entries whose label name is only the name with something added in brackets.
+ */
+export function friendlyNameFixes(ingredients) {
+    const out = [];
+    live(ingredients).forEach((ingredient) => {
+        const name = text(ingredient.name).trim(), tech = text(ingredient.techName).trim();
+        if (!name || !tech || JOINER.test(name) || JOINER.test(tech)) return;
+        const inci = withoutBrackets(tech);
+        if (inci.replace(/[^a-z0-9]/gi, "").length < 3 || normalizeName(inci) === normalizeName(withoutBrackets(name))) return;
+        const aliases = uniqueNames(list(ingredient.aliases).concat([name], bracketed(tech)), [inci]).slice(0, 30);
+        out.push({ ingredient, to: { name: inci, techName: inci, aliases, from: name } });
+    });
+    return out;
+}
+
+/** [{ ingredient, to }] for every listed entry whose name is two or more names joined with " / ". */
+export function joinedNameFixes(ingredients, classifications) {
+    const out = [];
+    live(ingredients).forEach((ingredient) => {
+        const to = splitJoinedName(ingredient, classifications);
+        if (to) out.push({ ingredient, to });
+    });
+    return out;
+}
+
+// a sentence that is only a claim about the ingredient's own safety
+const SAFETY_SENTENCE = /\b(is|are)\s+(completely\s+|very\s+|generally\s+|considered\s+|widely\s+|fully\s+)?safe\b|\bsafe\s+(for|to)\s+(cosmetic|use|skin|all|most|everyday|daily|sensitive)|non-?toxic|\b(is|are|and|completely|totally)\s+harmless\b|\bnot harmful\b/i;
+// "A safe, mineral-based pigment" -> "A mineral-based pigment"
+const SAFETY_ADJECTIVE = /\b(a|an|the)\s+(safe|non-?toxic|harmless),?\s+/i;
+
+/**
+ * The definition without the claims that the ingredient is safe. Returns { to, removed[] }, or null when nothing was taken out or what is left would
+ * be too short to be a definition (such an entry is left for a person).
+ */
+export function withoutSafetyClaims(description) {
+    const original = text(description).trim();
+    const removed = [];
+    const kept = [];
+    original.split(/(?<=[.!?])\s+/).forEach((sentence) => {
+        // a claim about the PRODUCT stays ("keeps products fresh and safe to use", "turns UV into harmless heat"): only the ingredient's own safety is taken out
+        const aboutTheProduct = /\b(keeps?|keeping|helps?\s+keep|ensur\w*|remain\w*|stay\w*|protects?)\b[^.]{0,60}\bsafe\b|harmless\s+heat/i.test(sentence);
+        if (!aboutTheProduct && SAFETY_SENTENCE.test(sentence)) { removed.push(sentence.trim()); return; }
+        const adjective = sentence.match(SAFETY_ADJECTIVE);
+        if (adjective) {
+            removed.push(adjective[0].trim());
+            kept.push(sentence.replace(SAFETY_ADJECTIVE, (match, article) => article[0].toUpperCase() === article[0] ? article + " " : article + " "));
+            return;
+        }
+        kept.push(sentence);
+    });
+    const to = kept.join(" ").replace(/\s+/g, " ").trim();
+    if (removed.length === 0 || to.length < 40 || to === original) return null;
+    return { to, removed };
+}
+
+/** [{ ingredient, to, removed[] }] for every listed entry whose definition makes a safety claim. */
+export function safetyClaimFixes(ingredients) {
+    const out = [];
+    live(ingredients).forEach((ingredient) => {
+        const fix = withoutSafetyClaims(ingredient.description);
+        if (fix) out.push({ ingredient, to: fix.to, removed: fix.removed });
+    });
+    return out;
+}
+
 /**
  * The whole clean-up as a list of steps. Each step: { id, title, why, careful, changes[] } (careful = a person should
  * look at every row before it is applied), each change:
@@ -514,6 +746,39 @@ export function cleanupPlan(brands, products, ingredients, options) {
         "The brand is stored separately, so a name that repeats it is found less well and reads double in lists. The old name is kept as an alias, so a search for it still finds the product.",
         () => nameFixes(P, B).map((fix) => update("products", fix.product, { name: fix.to, aliases: uniqueNames(list(fix.product.aliases).concat([fix.from]), [fix.to]) },
             `"${fix.from}" becomes "${fix.to}".`)));
+
+    // --- 8a. a definition that belongs to ANOTHER ingredient (found by comparing the live data on 6 November 2026)
+    step("definitions", "Definitions that describe another ingredient",
+        "Each of these entries carries the description of a different ingredient (a copy that was never changed). The new text is a short plain-words definition written for the step; read it, correct it if you know better, and tick the rows you accept. Nothing is ticked at first.",
+        () => definitionFixes(I).map((fix) => update("ingredients", fix.ingredient, { description: fix.to }, `Its definition describes another ingredient (${fix.marker}). It becomes: "${fix.to}"`)), true);
+
+    // --- 8a2. markdown stars that were pasted into a definition
+    step("markdown", "Stray ** marks are taken out of definitions",
+        "Some definitions were pasted with ** around words (a way of writing bold text). The app and the website show text as it is, so the users see the stars. Only the stars are taken out.",
+        () => live(I).filter((ingredient) => /\*\*/.test(text(ingredient.description)))
+            .map((ingredient) => update("ingredients", ingredient, { description: text(ingredient.description).replace(/\*\*/g, "") }, "The ** marks around words are taken out.")));
+
+    // --- 8b. sentences that call an ingredient safe
+    step("safetyClaims", "Sentences that call an ingredient safe",
+        "GlowUp never counts an entry nobody has checked as proof that an ingredient is safe, so a definition must not say it is. Only the claim is taken out (\"It is safe for cosmetic use.\", \"A safe, mineral-based pigment\" becomes \"A mineral-based pigment\"). \"Helps keep products safe from bacteria\" is about the product and stays. Nothing is ticked at first.",
+        () => safetyClaimFixes(I).map((fix) => update("ingredients", fix.ingredient, { description: fix.to }, `Takes out: ${fix.removed.map((r) => `"${r}"`).join(", ")}`)), true);
+
+    // --- 8c. "Aqua / Water" typed into the one name box: the INCI name stays, the other names become aliases. Runs BEFORE the duplicates step, so
+    //         "Aqua / Water" and "Water" are then seen as the same ingredient and merged there.
+    step("joinedNames", "Joined names are split: the INCI name stays, the other names become Also known as",
+        "Many entries were typed as \"INCI name / everyday name\" in the one name box (\"Aqua / Water\", \"Dimethicone / Silicone Oil\"). The name box holds only the INCI name; the other names go to Also known as, so every spelling still finds the ingredient. A name that is a kind of ingredient (\"Solvent\") becomes the classification when the entry has none. Where the entry gave no single label name, the first name was taken: the row says so, please check those. Nothing is ticked at first.",
+        () => joinedNameFixes(I, options && options.classifications).map((fix) => {
+            const fields = { name: fix.to.name, techName: fix.to.techName, aliases: fix.to.aliases };
+            if (fix.to.classificationId) fields.classificationId = fix.to.classificationId;
+            const aliasLine = fix.to.aliases.length > 0 ? ` Also known as: ${fix.to.aliases.join(", ")}.` : "";
+            return update("ingredients", fix.ingredient, fields, `"${fix.to.from}" becomes "${fix.to.name}".${aliasLine}${fix.to.guess ? " (The first name was taken as the INCI name: check it.)" : ""}${fix.to.classificationId ? " The kind of ingredient is set from the name." : ""}`);
+        }), true);
+
+    // --- 8d. an everyday name in the name box ("Water") while the label name is another ("AQUA (WATER)"): the INCI name takes its place
+    step("friendlyNames", "Everyday names are moved to Also known as, and the INCI name takes their place",
+        "These entries carry an everyday name in the name box (\"Water\", \"Avocado Oil\") while their own label name is another one (\"AQUA (WATER)\", \"Persea Gratissima Oil\"). The name box holds the INCI name, so the label name becomes the name and the everyday name an alias: a scan of either finds the ingredient. The label name is only a good INCI name if it was typed right, so look at each row. Where an entry for the INCI name exists already, the duplicates step merges them. Nothing is ticked at first.",
+        () => friendlyNameFixes(I).map((fix) => update("ingredients", fix.ingredient, { name: fix.to.name, techName: fix.to.techName, aliases: fix.to.aliases },
+            `"${fix.to.from}" is an everyday name: "${fix.to.name}" becomes the name, and "${fix.to.from}" is kept under Also known as.`)), true);
 
     // --- 8. ingredient entries
     step("ingredients", "Ingredient entries that are not ingredients, or are there twice, go to the Recycle bin",

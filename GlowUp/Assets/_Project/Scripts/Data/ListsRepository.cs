@@ -95,6 +95,16 @@ namespace GlowUp.Data
         static List<ListItem> ConditionItems { get { FromPhone(); return holder != null && holder.conditions.Count > 0 ? holder.conditions : BuiltInConditions(); } }
         static List<ListItem> HighlightItems { get { FromPhone(); return holder != null && holder.highlights.Count > 0 ? holder.highlights : BuiltInHighlights(); } }
 
+        /// <summary>The words for an allergen family id ("fragrance" -> "Fragrance / Parfum"); the id itself when the list does not know it.</summary>
+        public static string AllergenLabel(string id) => LabelIn(AllergenItems, id);
+        /// <summary>The words for a highlight id; the id itself when the list does not know it.</summary>
+        public static string HighlightLabel(string id) => LabelIn(HighlightItems, id);
+        static string LabelIn(List<ListItem> items, string id)
+        {
+            ListItem found = items.FirstOrDefault(i => string.Equals(i.id, id, StringComparison.OrdinalIgnoreCase));
+            return found != null && !string.IsNullOrWhiteSpace(found.label) ? found.label : id;
+        }
+
         /// <summary>The allergen families to offer (not retired), in the admin's order.</summary>
         public static List<string> AllergenLabels() => AllergenItems.Where(i => !i.retired && !string.IsNullOrWhiteSpace(i.label)).Select(i => i.label).ToList();
 

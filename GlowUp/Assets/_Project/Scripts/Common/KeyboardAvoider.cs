@@ -30,7 +30,7 @@ namespace GlowUp.Common
 
         [Header("Room (canvas units: the canvas is 1080 wide)")]
         [Tooltip("Space between the keyboard's top edge and the lowest thing that must be seen")]
-        [Min(0f)] [SerializeField] private float gapAboveKeyboard = 28f;
+        [Min(0f)] [SerializeField] private float gapAboveKeyboard = 16f;
         [Tooltip("Room kept under a field that has no KeyboardKeepVisible list, for a small badge or check line under it")]
         [Min(0f)] [SerializeField] private float spaceBelowField = 64f;
         [Tooltip("The field's top never goes higher than this far under the screen's top (slide only; the header and back button stay usable)")]
@@ -137,6 +137,7 @@ namespace GlowUp.Common
             if (field == null || registered.Contains(field)) return;
             registered.Add(field);
             if (hideAndroidTypingBar) field.shouldHideMobileInput = true;
+            if (field.GetComponent<InputCaretTouch>() == null) field.gameObject.AddComponent<InputCaretTouch>();   // tap places the caret, long press selects
             field.onSelect.AddListener(OnSelect);
             field.onDeselect.AddListener(OnDeselect);
         }
@@ -304,7 +305,8 @@ namespace GlowUp.Common
         {
             if (shiftTarget != null && field.transform.IsChildOf(shiftTarget)) return shiftTarget;
             Transform t = field.transform;
-            while (t.parent != null && t.parent != canvasRect) t = t.parent;
+            // the canvas child, or the child of the safe-area root (the root itself is placed by the safe area, never slid)
+            while (t.parent != null && t.parent != canvasRect && t.parent.GetComponent<GlowUp.SafeAreaFix.SafeAreaRoot>() == null) t = t.parent;
             return t as RectTransform;
         }
 

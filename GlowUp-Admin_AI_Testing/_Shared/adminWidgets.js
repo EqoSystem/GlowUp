@@ -62,6 +62,38 @@ export function registerDataset(id, spec) {
     datasets.set(id, Object.assign({ id, ready: false, label: id, noun: "items", nounOne: "item" }, spec));
 }
 
+/**
+ * A data set made from TILES ALREADY ON THE PAGE (numbers, shortcuts, counts), so every panel can offer "Show as" (12 November 2026).
+ * registerTileDataset("numbers", { label, noun, nounOne, selector: ".kpi", watch: ".kpi-row", map: (tile) => ({ title, value, valueLabel, subtitle, tone }), open: (tile) => tile.click() })
+ * The tiles are read when the panel is drawn; a change inside `watch` (a number counting up, a tile that appears) draws it again.
+ */
+export function registerTileDataset(id, spec) {
+    const shown = (el) => !el.hidden && el.style.display !== "none" && !el.closest("[hidden]") && !el.classList.contains("sk");
+    const tiles = () => Array.from(document.querySelectorAll(spec.selector)).filter(shown);
+    const ids = new Map();
+    registerDataset(id, {
+        label: spec.label, noun: spec.noun, nounOne: spec.nounOne, countRows: false,
+        items: tiles,
+        map: (el) => {
+            const item = spec.map(el);
+            const key = item.title || "tile";
+            if (!ids.has(el)) ids.set(el, id + ":" + key + ":" + ids.size);
+            item.id = ids.get(el);
+            return item;
+        },
+        dimensions: [{ id: "item", label: spec.label, of: (el) => spec.map(el).title }],
+        measures: [{ id: "value", label: spec.valueNoun || "Number", noun: spec.valueNoun || "number", of: (el) => Number(spec.map(el).value) || 0 }],
+        open: spec.open
+    });
+    const host = spec.watch ? document.querySelector(spec.watch) : null;
+    if (host && window.MutationObserver) {
+        let timer = 0;
+        new MutationObserver(() => { clearTimeout(timer); timer = setTimeout(() => datasetChanged(id), 150); })
+            .observe(host, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["style", "hidden", "class"] });
+    }
+    setTimeout(() => datasetChanged(id), 0);
+}
+
 /** Call after the data of a set was loaded or changed: every panel that shows it is drawn again. */
 export function datasetChanged(id) {
     const d = datasets.get(id);
@@ -165,11 +197,11 @@ export function mountWidget(panel, config) {
         if (menu) menu.parentNode.insertBefore(pager, menu); else if (head) head.appendChild(pager);
         w = { panel, body, pager, wanted: null, config: null, page: { page: 1, size: LIST_SIZE }, selected: new Set(), shaking: false, width: 0 };
         // a graph is drawn for the width it has: draw it again when the panel is resized
-        w.watcher = new ResizeObserver(() => {
-            const width = Math.round(body.clientWidth);
+        w.watcher = new ResizeObserver((entries) => {
+            const width = Math.round(entries[entries.length - 1].contentRect.width);
             if (!w.config || Math.abs(width - w.width) < 12 || w.config.view !== "graph") { w.width = width; return; }
-            w.width = width;
-            render(w, true);                       // only its size changed: draw it again without the entrance animation
+            clearTimeout(w.redraw);                // 100 ms after the last change: a drag of the window draws it once, not per pixel
+            w.redraw = setTimeout(() => { w.width = Math.round(body.clientWidth); render(w, true); }, 100);
         });
         w.watcher.observe(body);
         mounted.set(panel, w);

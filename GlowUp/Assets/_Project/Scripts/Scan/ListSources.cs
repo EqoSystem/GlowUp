@@ -192,7 +192,7 @@ namespace GlowUp.Scan
         /// <summary>Ingredient databases and consumer references: they explain an ingredient, they are not peer-reviewed.</summary>
         public static readonly string[] References =
         {
-            "personalcarecouncil.org", "incibeauty.com", "incidecoder.com", "paulaschoice.com", "ewg.org", "cosmeticsinfo.org"
+            "personalcarecouncil.org", "incibeauty.com", "incidecoder.com", "paulaschoice.com", "ewg.org", "cosmeticsinfo.org", "cosmileeurope.eu"
         };
 
         /// <summary>Public lists that anybody can edit.</summary>
@@ -220,7 +220,7 @@ namespace GlowUp.Scan
 
         static readonly Regex GovSite = new Regex(@"\.gov(\.[a-z]{2})?$"), EduSite = new Regex(@"\.edu(\.[a-z]{2})?$");
         // only a PLAIN address is labelled: http(s), a host of a-z 0-9 . - only (no user name, no other letters), an optional
-        // port, and printable ASCII after it. Anything else (a backslash, "user@", look-alike letters) is an Unverified site.
+        // port, and printable ASCII after it. Anything else (a backslash, "user@", look-alike letters) is an Other website.
         static readonly Regex StrictAddress = new Regex("^https?://([a-z0-9.-]+)(?::[0-9]{1,5})?([/?#][!-~]*)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         static readonly Regex SiteNameOnly = new Regex("^[a-z0-9.-]+$");
         const char Backslash = (char)92;
@@ -306,7 +306,7 @@ namespace GlowUp.Scan
                 case KindReference: return "Ingredient database";
                 case KindPublic: return "Public list (anyone can edit)";
                 case KindRetailer: return "Retailer listing";
-                default: return "Unverified site";
+                default: return "Other website";
             }
         }
 

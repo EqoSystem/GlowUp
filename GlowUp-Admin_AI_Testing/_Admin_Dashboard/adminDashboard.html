@@ -45,7 +45,7 @@
         <div class="board">
 
             <!-- the five numbers -->
-            <section class="panel bare" data-panel="numbers" data-label="Numbers" data-w="8">
+            <section class="panel bare" data-panel="numbers" data-label="Numbers" data-w="8" data-source="numbers">
                 <div class="kpi-row">
                     <!-- one tile = one number: its icon, the number and ONE label side by side. What a tile does on a click, and
                          what its number means, is in the tip of the tile itself (no extra badges). -->
@@ -73,20 +73,32 @@
             </section>
 
             <!-- what to do next -->
-            <section class="panel" data-panel="actions" data-label="Quick actions" data-w="4">
+            <section class="panel" data-panel="actions" data-label="Quick actions" data-w="4" data-source="quickActions">
                 <div class="panel-head">
                     <h3 class="panel-title">Quick actions</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Quick actions" data-tip="Shortcuts to the work that is waiting. A blue tile only appears when something needs review.">i</button>
+                    <button type="button" class="guide-badge" data-tip-title="Quick actions" data-tip="Shortcuts to tasks: what waits for review (a blue tile, only when something waits), adding, cleaning up and the Recycle bin. The pages themselves are in the menu on the left.">i</button>
                 </div>
                 <!-- only what WAITS gets a full tile. The two shortcuts stand side by side as small buttons: the menu on the
                      left has them too. What a tile opens is in its own tip (no badge beside every tile). -->
                 <div class="tile-stack">
+                    <div class="sk sk-review-tile" id="reviewTilesLoading" aria-hidden="true"></div>
                     <a id="reviewInventoryTile" style="display: none;" href="../_Admin_Brand_Inventory/adminBrandInventory.html?show=review" class="tile review" data-tip-title="Inventory waiting for review" data-tip="Products and brands the app added from scans, or that were imported. The app does not use them until you approve them." data-tip-preview="Opens the inventory showing only these entries."><i data-icon="inbox"></i><span class="tile-title" id="reviewInventoryTitle">Waiting for review</span><i data-icon="right"></i></a>
                     <a id="reviewIngredientsTile" style="display: none;" href="../_Admin_Ingredient_Curator/adminIngredientCurator.html?show=review" class="tile review" data-tip-title="Ingredients waiting for review" data-tip="Ingredients the app's AI lookup found. Until you approve one, the app uses its warnings but never counts it as proof of safety." data-tip-preview="Opens the Ingredient Curator showing only these entries."><i data-icon="inbox"></i><span class="tile-title" id="reviewIngredientsTitle">Waiting for review</span><i data-icon="right"></i></a>
-                    <a id="reviewSnapshotsTile" style="display: none;" href="../_Admin_Brand_Inventory/adminBrandInventory.html?snapshots=open" class="tile review" data-tip-title="Photos waiting for review" data-tip="Products app users sent as a photo because the catalogue did not have them. Users see the AI's reading marked PENDING APPROVAL until you approve it." data-tip-preview="Opens the review window in Brand &amp; Product Inventory."><i data-icon="camera"></i><span class="tile-title" id="reviewSnapshotsTitle">Photos waiting for review</span><i data-icon="right"></i></a>
+                    <!-- tasks, not pages: the menu on the left already opens the pages themselves -->
                     <div class="tile-pair">
-                        <a href="../_Admin_Brand_Inventory/adminBrandInventory.html" class="tile small" data-tip-title="Brands &amp; products" data-tip="Add or edit brands and the make-up and face products listed under them." data-tip-preview="Opens the Brand &amp; Product Inventory."><i data-icon="box"></i><span class="tile-title">Brands &amp; products</span></a>
-                        <a href="../_Admin_Ingredient_Curator/adminIngredientCurator.html" class="tile small" data-tip-title="Ingredients" data-tip="Write what each ingredient is in plain words and tell the app how to judge it." data-tip-preview="Opens the Ingredient Curator."><i data-icon="flask"></i><span class="tile-title">Ingredients</span></a>
+                        <a href="../_Admin_Brand_Inventory/adminBrandInventory.html?add=product" class="tile small" data-tip-title="Add product" data-tip="Opens the empty product form straight away." data-tip-preview="In Brand &amp; Product Inventory."><i data-icon="plus"></i><span class="tile-title">Add product</span></a>
+                        <a href="../_Admin_Ingredient_Curator/adminIngredientCurator.html?add=1" class="tile small" data-tip-title="Add ingredient" data-tip="Opens the empty ingredient form straight away." data-tip-preview="In the Ingredient Curator."><i data-icon="plus"></i><span class="tile-title">Add ingredient</span></a>
+                    </div>
+                    <div class="tile-pair">
+                        <a href="../_Admin_Ingredient_Curator/adminIngredientCurator.html?cleanup=1" class="tile small" data-tip-title="Clean up ingredients" data-tip="Joined names, everyday names, duplicates and stray marks. You see every change and apply one step at a time." data-tip-preview="Opens the Clean up steps in the Ingredient Curator."><i data-icon="sparkle"></i><span class="tile-title">Clean up ingredients</span></a>
+                        <a href="../_Admin_Ingredient_Curator/adminIngredientCurator.html?duplicates=1" class="tile small" data-tip-title="Find duplicates" data-tip="Ingredient entries that explain the same ingredient. Choose which one to keep and merge." data-tip-preview="Opens Find duplicates in the Ingredient Curator."><i data-icon="layers"></i><span class="tile-title">Find duplicates</span></a>
+                    </div>
+                    <div class="tile-pair">
+                        <a href="../_Admin_Ingredient_Curator/adminIngredientCurator.html?show=products" class="tile small" data-tip-title="Not explained yet" data-tip="Ingredients that listed products name but the Ingredient Curator has no entry for. The app falls back to its built-in knowledge for them." data-tip-preview="Opens the Ingredient Curator showing only these."><i data-icon="flask"></i><span class="tile-title">Not explained yet</span></a>
+                        <button type="button" id="auditLogTile" class="tile small" data-tip-title="Admin activity log" data-tip="Who changed what on this website, newest first. Records cannot be edited or deleted." data-tip-preview="Opens the log in a window."><i data-icon="list"></i><span class="tile-title">Activity log</span></button>
+                    </div>
+                    <div class="tile-pair">
+                        <a href="../_Admin_Recycle_Bin/adminRecycleBin.html" class="tile small" data-tip-title="Recycle bin" data-tip="Entries that were removed or merged. Restore them, or remove them for good." data-tip-preview="Opens the Recycle bin."><i data-icon="trash"></i><span class="tile-title">Recycle bin</span></a>
                     </div>
                 </div>
             </section>
@@ -101,7 +113,7 @@
                     <div class="pager" id="activityPager"></div>
                 </div>
                 <ul class="activity-list" id="activityList" style="display: none;"></ul>
-                <div class="empty-state loading" id="activityEmpty"><div class="sk-list"><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div></div>
+                <div class="empty-state loading" id="activityEmpty"><div class="sk-list"><div class="sk-line-row one"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i></span><i class="sk sk-pill"></i><i class="sk sk-time"></i></div><div class="sk-line-row one"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i></span><i class="sk sk-pill"></i><i class="sk sk-time"></i></div><div class="sk-line-row one"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i></span><i class="sk sk-pill"></i><i class="sk sk-time"></i></div><div class="sk-line-row one"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i></span><i class="sk sk-pill"></i><i class="sk sk-time"></i></div><div class="sk-line-row one"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i></span><i class="sk sk-pill"></i><i class="sk sk-time"></i></div><div class="sk-line-row one"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i></span><i class="sk sk-pill"></i><i class="sk sk-time"></i></div><div class="sk-line-row one"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i></span><i class="sk sk-pill"></i><i class="sk sk-time"></i></div><div class="sk-line-row one"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i></span><i class="sk sk-pill"></i><i class="sk sk-time"></i></div></div>
                     <p class="empty-message" id="activityEmptyMessage">Loading activity...</p>
                     <span class="empty-hint" id="activityEmptyHint">Scans appear here once app users start scanning.</span>
                 </div>
@@ -114,17 +126,16 @@
                     <button type="button" class="guide-badge" data-tip-title="Today's results" data-tip="How today's scans were judged for the people who made them." data-tip-preview="Click a colour: the activity list shows only those scans.">i</button>
                 </div>
                 <div class="result-bar" id="resultBar"><span class="skeleton" style="flex:1"></span></div>
-                <ul class="result-legend" id="resultLegend"></ul>
+                <ul class="result-legend" id="resultLegend"><li class="sk-legend" aria-hidden="true"><i class="sk sk-dot"></i><i class="sk sk-text w45"></i><i class="sk sk-time"></i></li><li class="sk-legend" aria-hidden="true"><i class="sk sk-dot"></i><i class="sk sk-text w45"></i><i class="sk sk-time"></i></li><li class="sk-legend" aria-hidden="true"><i class="sk sk-dot"></i><i class="sk sk-text w45"></i><i class="sk sk-time"></i></li></ul>
             </section>
 
             <!-- most scanned brands -->
             <section class="panel" data-panel="brands" data-label="Most scanned brands" data-w="4" data-source="topBrands">
                 <div class="panel-head">
                     <h3 class="panel-title">Most scanned brands</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Most scanned brands" data-tip="A brand's count goes up each time the app finds its name on a scanned label." data-tip-preview="Click a brand to open it in the inventory.">i</button>
                 </div>
                 <ul class="rank-list" id="topBrandsList" style="display: none;"></ul>
-                <div class="empty-state loading" id="topBrandsEmpty"><div class="sk-list"><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div></div>
+                <div class="empty-state loading" id="topBrandsEmpty"><div class="sk-list"><div class="sk-line-row rank"><i class="sk sk-rank"></i><span><i class="sk sk-text w50"></i></span><i class="sk sk-time"></i></div><div class="sk-line-row rank"><i class="sk sk-rank"></i><span><i class="sk sk-text w50"></i></span><i class="sk sk-time"></i></div><div class="sk-line-row rank"><i class="sk sk-rank"></i><span><i class="sk sk-text w50"></i></span><i class="sk sk-time"></i></div><div class="sk-line-row rank"><i class="sk sk-rank"></i><span><i class="sk sk-text w50"></i></span><i class="sk sk-time"></i></div><div class="sk-line-row rank"><i class="sk sk-rank"></i><span><i class="sk sk-text w50"></i></span><i class="sk sk-time"></i></div></div>
                     <p class="empty-message" id="topBrandsEmptyMessage">Loading brands...</p>
                     <span class="empty-hint">No brand has been scanned yet.</span>
                 </div>
@@ -135,14 +146,62 @@
             <section class="panel" data-panel="suggestions" data-label="Suggestions" data-w="8" data-source="suggestions">
                 <div class="panel-head">
                     <h3 class="panel-title">Suggestions</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Suggestions from app users" data-tip="Allergens and skin conditions users typed in because they were not on the app's lists." data-tip-preview="Mark one reviewed after you dealt with it, or dismiss it.">i</button>
+                    <button type="button" class="guide-badge" data-tip-title="Suggestions from app users" data-tip="Allergens and skin conditions users typed in because they were not on the app's lists, and ideas sent from the app's Contact support (Suggestion)." data-tip-preview="Mark one reviewed after you dealt with it, or dismiss it.">i</button>
                     <span class="spacer"></span>
                     <div class="pager" id="suggestionPager"></div>
+                    <button type="button" class="btn small ghost clear-all-btn" id="suggestionClearAll" hidden>Clear all</button>
                 </div>
                 <ul class="suggestion-list" id="suggestionList" style="display: none;"></ul>
-                <div class="empty-state loading" id="suggestionEmpty"><div class="sk-list"><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div></div>
+                <div class="empty-state loading" id="suggestionEmpty"><div class="sk-list"><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div></div>
                     <p class="empty-message" id="suggestionEmptyMessage">Loading suggestions...</p>
                     <span class="empty-hint" id="suggestionEmptyHint">Nothing to review right now.</span>
+                </div>
+            </section>
+
+            <!-- Contact support (12 November 2026): reports sent from the app's Settings > Contact support (Firestore "supportReports"), one panel for each kind.
+                 "Suggestion" reports are in the Suggestions panel above. The id "support" is kept for the Bug panel, so saved layouts still find it. -->
+            <section class="panel" data-panel="support" data-label="Bug reports" data-w="8" data-source="supportBug">
+                <div class="panel-head">
+                    <h3 class="panel-title">Bug reports</h3>
+                    <button type="button" class="guide-badge" data-tip-title="Bug reports" data-tip="Bugs that users reported from the app's Contact support." data-tip-preview="Mark one handled when you dealt with it, or dismiss it.">i</button>
+                    <span class="spacer"></span>
+                    <div class="pager" id="supportPager"></div>
+                    <button type="button" class="btn small ghost clear-all-btn" id="supportClearAll" hidden>Clear all</button>
+                </div>
+                <ul class="suggestion-list support-list" id="supportList" style="display: none;"></ul>
+                <div class="empty-state loading" id="supportEmpty"><div class="sk-list"><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div></div>
+                    <p class="empty-message" id="supportEmptyMessage">Loading reports...</p>
+                    <span class="empty-hint" id="supportEmptyHint">Bug reports from the app's Contact support show here.</span>
+                </div>
+            </section>
+
+            <section class="panel" data-panel="supportWrong" data-label="Wrong scan results" data-w="8" data-source="supportWrong">
+                <div class="panel-head">
+                    <h3 class="panel-title">Wrong scan results</h3>
+                    <button type="button" class="guide-badge" data-tip-title="Wrong scan results" data-tip="Scan results that users said were wrong, with their last scan when they attached it." data-tip-preview="Mark one handled when you dealt with it, or dismiss it.">i</button>
+                    <span class="spacer"></span>
+                    <div class="pager" id="supportWrongPager"></div>
+                    <button type="button" class="btn small ghost clear-all-btn" id="supportWrongClearAll" hidden>Clear all</button>
+                </div>
+                <ul class="suggestion-list support-list" id="supportWrongList" style="display: none;"></ul>
+                <div class="empty-state loading" id="supportWrongEmpty"><div class="sk-list"><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div></div>
+                    <p class="empty-message" id="supportWrongEmptyMessage">Loading reports...</p>
+                    <span class="empty-hint" id="supportWrongEmptyHint">Wrong scan results reported from the app show here.</span>
+                </div>
+            </section>
+
+            <section class="panel" data-panel="supportOther" data-label="Other reports" data-w="8" data-source="supportOther">
+                <div class="panel-head">
+                    <h3 class="panel-title">Other reports</h3>
+                    <button type="button" class="guide-badge" data-tip-title="Other reports" data-tip="Any other message users sent from the app's Contact support." data-tip-preview="Mark one handled when you dealt with it, or dismiss it.">i</button>
+                    <span class="spacer"></span>
+                    <div class="pager" id="supportOtherPager"></div>
+                    <button type="button" class="btn small ghost clear-all-btn" id="supportOtherClearAll" hidden>Clear all</button>
+                </div>
+                <ul class="suggestion-list support-list" id="supportOtherList" style="display: none;"></ul>
+                <div class="empty-state loading" id="supportOtherEmpty"><div class="sk-list"><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div></div>
+                    <p class="empty-message" id="supportOtherEmptyMessage">Loading reports...</p>
+                    <span class="empty-hint" id="supportOtherEmptyHint">Other messages from the app's Contact support show here.</span>
                 </div>
             </section>
         </div>

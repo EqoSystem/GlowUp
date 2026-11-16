@@ -20,7 +20,7 @@ health information is **sensitive personal information**, which as a rule may be
 | Scan history | `users/{uid}/scans`, and on the phone | the user only | The label text and up to four photos **of the product** may be sent to recognise it; never the profile |
 | Anonymous scan note | `scanActivity` | admins | Holds no user id, name or e-mail: product, verdict, counts, whether an allergen matched (yes/no) |
 | Allergens / conditions the user typed that are not on the lists | `allergenSuggestions`, `conditionSuggestions` with the user's **account id** | admins | No |
-| Product photo snapshot | `pending_products` (+ photo in `pending_product_images`) with the sender's account id | the sender and admins (since 28 October 2026, rules not yet published) | The one photo goes to the AI through `api/scan-snapshot.js` |
+| Product photo snapshot | `pending_products` (+ photo in `pending_product_images`) with the sender's account id, the cleaned text read on the phone, the list's page and kind | the sender (own photo) and admins (rules of 7 November 2026) | Only the crop around the product leaves the phone. The AI only names the product; the ingredient list is cut from fetched pages by the server or read from the pack. The photo is deleted when an admin approves or rejects the entry. Firebase Storage is NOT used (it needs the paid Blaze plan; the project stays on the free plan): the photo is a Firestore document of at most 80 KB. Policy section "Product Photo Submissions". |
 | Face picture in AR Try-On, selfie camera for finger signs | not stored | nobody | No (processed on the phone) |
 
 No analytics or crash-reporting SDK was found in the app (no Firebase Analytics, Crashlytics or Unity Analytics calls), so no health field goes to an analytics service.

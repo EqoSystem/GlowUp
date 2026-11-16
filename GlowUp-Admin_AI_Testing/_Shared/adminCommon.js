@@ -96,19 +96,16 @@ export function requireAdmin() {
             document.documentElement.classList.remove("auth-pending", "auth-stuck", "frame-first");
             document.querySelectorAll(".brand-loader, .auth-stuck-box").forEach((box) => box.remove());
             showSignedInAs(user);
+            watchIdle();
             if (!resolved) { resolved = true; resolve(user); }
         });
     });
 }
 
-function showSignedInAs(user) {
-    const footer = document.querySelector(".sidebar-footer");
-    if (!footer) return;
-    // the line is in the frame already (empty), so the Sign Out link below it does not jump when the name arrives
-    let line = footer.querySelector(".signed-in-as");
-    if (!line) { line = document.createElement("p"); line.className = "signed-in-as"; footer.insertBefore(line, footer.firstChild); }
-    line.textContent = user.email || "Signed in";
-    line.title = user.email || "";
+// The admin's e-mail address is never shown on the pages (someone looking at the screen, or a screenshot, must not see which account
+// runs the site). Any old line for it is taken away.
+function showSignedInAs() {
+    document.querySelectorAll(".signed-in-as").forEach((line) => line.remove());
 }
 
 /**
@@ -121,13 +118,29 @@ export function wireSignOut() {
         link.dataset.wired = "1";
         link.addEventListener("click", (event) => { event.preventDefault(); confirmSignOut(); });
     });
-    // Sign Out in the settings menu behind the logo (adminSettingsMenu.js) asks through this event: the same question, the same steps
-    if (!signOutEventWired) { signOutEventWired = true; document.addEventListener("glowup:sign-out", confirmSignOut); }
 }
-let signOutEventWired = false;
+
+// An admin page left open is signed out after IDLE_MINUTES without a click, key or scroll, so an unattended computer does not
+// leave the database open to whoever sits down at it. Every open tab counts its own quiet time.
+const IDLE_MINUTES = 30;
+let idleWatched = false;
+function watchIdle() {
+    if (idleWatched) return;
+    idleWatched = true;
+    let last = Date.now();
+    const awake = () => { last = Date.now(); };
+    ["pointerdown", "keydown", "wheel", "touchstart", "scroll"].forEach((name) => window.addEventListener(name, awake, { passive: true, capture: true }));
+    window.setInterval(async () => {
+        if (Date.now() - last < IDLE_MINUTES * 60 * 1000) return;
+        remember(false);
+        clearStore();
+        try { await signOut(auth); } catch (error) { console.error("Sign out failed:", error); }
+        window.location.replace(LOGIN_PAGE + "?idle=1");
+    }, 30 * 1000);
+}
 
 async function confirmSignOut() {
-    const sure = await askConfirm({ title: "Sign out?", message: "You will need your e-mail and password to come back in.", confirmLabel: "Sign out", danger: true });
+    const sure = await askConfirm({ title: "Sign out?", confirmLabel: "Sign out", danger: true, inline: true });
     if (!sure) return;
     remember(false);
     clearStore();                    // the lists this tab kept belong to the signed-in admin
@@ -227,7 +240,7 @@ export function formatWhen(value) {
     return date.toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-/** "just now", "5 min ago", "3 h ago", otherwise the date. */
+/** Short: "just now", "5 min ago", "3 h ago", "2 d ago" (under a week), "Nov 5" (this year), "Nov 5, 2025". formatWhen gives the full one. */
 export function timeAgo(value) {
     const date = toDate(value);
     if (!date) return "";
@@ -235,7 +248,9 @@ export function timeAgo(value) {
     if (seconds < 60) return "just now";
     if (seconds < 3600) return Math.floor(seconds / 60) + " min ago";
     if (seconds < 86400) return Math.floor(seconds / 3600) + " h ago";
-    return formatWhen(date);
+    if (seconds < 7 * 86400) return Math.floor(seconds / 86400) + " d ago";
+    const sameYear = date.getFullYear() === new Date().getFullYear();
+    return date.toLocaleDateString("en-US", sameYear ? { month: "short", day: "numeric" } : { month: "short", day: "numeric", year: "numeric" });
 }
 
 /** Unix seconds of today's midnight on this computer. */

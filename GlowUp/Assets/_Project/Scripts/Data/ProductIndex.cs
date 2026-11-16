@@ -493,5 +493,36 @@ namespace GlowUp.Data
             string id = "scan_" + brand;
             return id.Length > 90 ? id.Substring(0, 90) : id;
         }
+
+        /// <summary>Two-row Levenshtein distance: 0 allocations on 2D arrays, mobile friendly.</summary>
+        public static int Levenshtein(string s, string t)
+        {
+            if (string.IsNullOrEmpty(s)) return string.IsNullOrEmpty(t) ? 0 : t.Length;
+            if (string.IsNullOrEmpty(t)) return s.Length;
+
+            int n = s.Length;
+            int m = t.Length;
+            int[] prev = new int[m + 1];
+            int[] curr = new int[m + 1];
+
+            for (int j = 0; j <= m; j++) prev[j] = j;
+
+            for (int i = 1; i <= n; i++)
+            {
+                curr[0] = i;
+                char sc = s[i - 1];
+                for (int j = 1; j <= m; j++)
+                {
+                    int cost = (sc == t[j - 1]) ? 0 : 1;
+                    int del = prev[j] + 1;
+                    int ins = curr[j - 1] + 1;
+                    int sub = prev[j - 1] + cost;
+                    int min = del < ins ? del : ins;
+                    curr[j] = sub < min ? sub : min;
+                }
+                int[] tmp = prev; prev = curr; curr = tmp;
+            }
+            return prev[m];
+        }
     }
 }

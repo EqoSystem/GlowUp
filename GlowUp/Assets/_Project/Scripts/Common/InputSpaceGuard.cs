@@ -33,8 +33,13 @@ namespace GlowUp.Common
             if (value.IndexOf(' ') < 0 && value.IndexOf(' ') < 0) return;
             string clean = value.Replace(" ", "").Replace(" ", "");
             int caret = field.caretPosition;
+            // the space was typed at the caret: the caret goes back by the spaces that stood before it (it used to stay one place too far)
+            int removedBefore = 0;
+            for (int i = 0; i < Mathf.Min(caret, value.Length); i++) if (value[i] == ' ' || value[i] == '\u00A0') removedBefore++;
+            int placed = Mathf.Clamp(caret - removedBefore, 0, clean.Length);
             field.SetTextWithoutNotify(clean);
-            field.caretPosition = Mathf.Min(caret, clean.Length);
+            field.caretPosition = placed;
+            InputCaretTouch.KeepCaret(field, placed);      // the phone keyboard's own box is told too, or the caret jumped to the start
             field.onValueChanged.Invoke(clean);        // let other listeners validate the cleaned text
             Show();
         }

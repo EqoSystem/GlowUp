@@ -32,6 +32,8 @@ namespace GlowUp.EditorTools
         public const float Pad = 40;                        // space between the card edge and its content
         public const float HeaderBottom = 160;              // first free unit under the back button / title row
         public const float BarBottom = 28, BarHeight = 176; // the bottom action bar
+        // the line its icons stand on (above the bar's middle) and the size of the pink pill behind one of them. Phase 1D (11 November 2026):
+        // the pill is 100 (was 108) and stands 8 units under the bar's top edge and 14 above the labels, at rest and while it moves.
         public const float BarIconY = 30, BarPill = 100;
         public const float AboveBar = BarBottom + BarHeight + 20;
 
@@ -538,6 +540,7 @@ namespace GlowUp.EditorTools
             Kit.SetArray(liquid, "slots", new Object[] { recent.transform, scan.transform, tryOn.transform });
             Kit.SetArray(liquid, "slotIcons", new Object[] { recent.targetGraphic, scan.targetGraphic, tryOn.targetGraphic });
             Set(liquid, "current", pillSlot);
+            Set(liquid, "restWidth", pill); Set(liquid, "restHeight", pill);
 
             var view = SceneBuilderCore.Ensure<BottomActionBar>(bar.gameObject);
             Set(view, "recentButton", recent); Set(view, "scanButton", scan); Set(view, "tryOnButton", tryOn);
@@ -556,7 +559,8 @@ namespace GlowUp.EditorTools
             var ic = Icon(go.transform, "Icon", icon, 60, underPill ? ThemeRole.ButtonText : ThemeRole.MainText);
             ic.rectTransform.anchoredPosition = new Vector2(0, BarIconY);
             var text = Label(go.transform, "Label", label, 26, isCurrent ? ThemeRole.Heading : ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.Center);
-            BottomStrip(text.transform, 12, 40, 0, 0);
+            BottomStrip(text.transform, 14, 40, 8, 8);
+            Shrink(text, 20);                                    // a longer word gets smaller, never runs into the next slot
             var b = go.GetComponent<Button>(); b.targetGraphic = ic;
             b.transition = Selectable.Transition.None;          // no tap animation on the bar: the screen simply changes
             return b;
@@ -765,29 +769,74 @@ namespace GlowUp.EditorTools
             //  so the legend said the same thing a second time)
             var listArea = Node(p.box, "ListArea");
             Fill(listArea.transform, 32, 300, 32, 176);
-            ScrollRect scroll = Scroll(listArea.transform, "IngredientScrollView", out RectTransform content, 14, 0, 22, 4, 24);
+            ScrollRect scroll = Scroll(listArea.transform, "IngredientScrollView", out RectTransform content, 24, 0, 22, 4, 24);   // 24: closed cards read as separate items
 
             // ---- the pattern row ----
             var row = Node(content, "IngredientRowTemplate");
             VStack(row, 6, 26, 26, 18, 20);
             Backdrop(row.transform, ThemeRole.InputBackground, 1f, 40f);
             Outline(row.transform, ThemeRole.SurfaceAlt, 40f);
-            var nameText = Label(row.transform, "NameText", "Niacinamide  <size=80%>(Vitamin B3)</size>", 36, ThemeRole.MainText, FontRole.Heading,
+            // the top line: the INCI name (with the first alias in brackets) and, on the right, the classification in ONE neutral style
+            var topLine = Node(row.transform, "TopLine");
+            HStack(topLine, 12, 0, 0, 0, 0, TextAnchor.UpperLeft);
+            var nameText = Label(topLine.transform, "NameText", "Niacinamide  <size=80%>(Vitamin B3)</size>", 36, ThemeRole.MainText, FontRole.Heading,
                                  TextAlignmentOptions.TopLeft, true);
+            Size(nameText, 0, -1, 1);                                            // the name takes what the badge leaves over, and wraps
+            var badge = Node(topLine.transform, "ClassificationBadge");
+            HStack(badge, 0, 16, 16, 6, 6, TextAnchor.MiddleCenter);
+            Backdrop(badge.transform, ThemeRole.SurfaceAlt, 1f, 24f);
+            var badgeText = Label(badge.transform, "ClassificationText", "Humectant", 23, ThemeRole.SecondaryText, FontRole.Label, TextAlignmentOptions.Center);
             var levelLine = Node(row.transform, "LevelLine");
             HStack(levelLine, 12);
             var dot = RawPanel(levelLine.transform, "LevelDot", new Color32(94, 127, 75, 255), 20f);
             Size(dot, 22, 22);
             var levelText = RawLabel(levelLine.transform, "LevelText", "Not flagged", 28, new Color32(94, 127, 75, 255), FontRole.Label);
-            var description = Label(row.transform, "DescriptionText", "A form of vitamin B3 that helps even out skin tone and supports the skin barrier.",
-                                    29, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            var uses = Label(row.transform, "UsesText", "Used in: serums, moisturisers, toners", 27, ThemeRole.SecondaryText, FontRole.Body,
-                             TextAlignmentOptions.TopLeft, true);
+            var purpose = Label(row.transform, "PurposeText", "Purpose: Helps even out skin tone and supports the skin barrier.",
+                                28, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);   // same size as the status, never the loudest line
             var reason = RawLabel(row.transform, "ReasonText", "For you: this is where the reason shows when an ingredient is flagged for your skin.",
                                   28, new Color32(169, 116, 28, 255), FontRole.Label, TextAlignmentOptions.TopLeft, true);
+
+            // the fold at the bottom of the card: closed by default; each row has its own
+            var fold = Node(row.transform, "Fold");
+            VStack(fold, 6);
+            var foldToggle = Node(fold.transform, "FoldToggle", typeof(Image), typeof(Button));
+            var foldTouch = foldToggle.GetComponent<Image>();
+            foldTouch.color = new Color(1, 1, 1, 0);                             // invisible, but the whole line can be tapped
+            foldToggle.GetComponent<Button>().targetGraphic = foldTouch;
+            HStack(foldToggle, 10);
+            Size(foldToggle.transform, -1, 56);
+            Label(foldToggle.transform, "FoldLabel", "More about this ingredient", 27, ThemeRole.SecondaryText, FontRole.Label);
+            var foldArrow = Icon(foldToggle.transform, "FoldArrow", IconFactory.ChevronDown, 28, ThemeRole.SecondaryText);
+            Size(foldArrow, 28, 28);
+            var foldBody = Node(fold.transform, "FoldBody", typeof(RectMask2D));
+            VStack(foldBody, 8, 0, 0, 2, 4);
+            TextMeshProUGUI Fact(string objectName, string sample) => Label(foldBody.transform, objectName, sample, 27, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            var description = Fact("DescriptionText", "<b>What it is:</b> A form of vitamin B3 that helps even out skin tone and supports the skin barrier.");
+            var aliasesText = Fact("AliasesText", "<b>Also known as:</b> Nicotinamide, Vitamin B3");
+            var chemical = Fact("ChemicalText", "<b>What the chemical is:</b> The amide form of vitamin B3.");
+            var uses = Fact("UsesText", "<b>Commonly used in:</b> serums, moisturisers, toners");
+            var highlights = Fact("HighlightsText", "<mark=#8C7F7F33> Key active </mark>  <mark=#8C7F7F33> Umbrella term </mark>");
+            var allergen = Fact("AllergenText", "<b>Allergen family:</b> Fragrance / Parfum");
+            var caution = Fact("CautionText", "<b>Caution:</b> It can clog pores.");
+            var sourceText = Label(foldBody.transform, "SourceText", "Source: GlowUp ingredient list (checked by the GlowUp team)", 25, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            var sourceLink = Node(foldBody.transform, "SourceLink", typeof(Image), typeof(Button));
+            var linkTouch = sourceLink.GetComponent<Image>();
+            linkTouch.color = new Color(1, 1, 1, 0);
+            sourceLink.GetComponent<Button>().targetGraphic = linkTouch;
+            HStack(sourceLink, 0);
+            Size(sourceLink.transform, -1, 52);
+            Label(sourceLink.transform, "SourceLinkLabel", "Open the source", 26, ThemeRole.ButtonFill, FontRole.Label);
+            foldBody.SetActive(false);                                           // opens when "More about this ingredient" is tapped; tick it active to see and restyle it
+            var expand = SceneBuilderCore.Ensure<ExpandableSection>(fold);
+            Set(expand, "toggleButton", foldToggle.GetComponent<Button>()); Set(expand, "arrow", foldArrow.rectTransform); Set(expand, "body", foldBody);
+            SceneBuilderCore.SetField(expand, "animateSeconds", 0.2f);
+
             var rowView = SceneBuilderCore.Ensure<IngredientRowView>(row);
             Set(rowView, "nameText", nameText); Set(rowView, "levelDot", dot); Set(rowView, "levelText", levelText);
+            Set(rowView, "classificationBadge", badge); Set(rowView, "classificationText", badgeText); Set(rowView, "purposeText", purpose);
             Set(rowView, "descriptionText", description); Set(rowView, "usesText", uses); Set(rowView, "reasonText", reason);
+            Set(rowView, "fold", fold); Set(rowView, "aliasesText", aliasesText); Set(rowView, "chemicalText", chemical); Set(rowView, "highlightsText", highlights);
+            Set(rowView, "allergenText", allergen); Set(rowView, "cautionText", caution); Set(rowView, "sourceText", sourceText); Set(rowView, "sourceLinkButton", sourceLink.GetComponent<Button>());
 
             // ---- footer: see a specialist ----
             var advice = Label(p.box, "DermatologistAdviceText",
