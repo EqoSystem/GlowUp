@@ -45,6 +45,7 @@ namespace GlowUp.EditorTools
 
         public static void Save(Scene s)
         {
+            TouchTargets.Apply(s);   // 48 dp touch areas, look unchanged (16 November 2026)
             EditorSceneManager.MarkSceneDirty(s);
             EditorSceneManager.SaveScene(s);
         }

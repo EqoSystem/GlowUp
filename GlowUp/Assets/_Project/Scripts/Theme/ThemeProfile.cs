@@ -21,7 +21,7 @@ namespace GlowUp.Theme
     public class ThemeProfile : ScriptableObject
     {
         /// <summary>Bump when the default palette changes so the scene builders re-apply it once.</summary>
-        public const int CurrentPaletteVersion = 5;
+        public const int CurrentPaletteVersion = 6;   // 6: Information, Border and Disabled tokens (16 November 2026)
         [HideInInspector] public int paletteVersion;
 
         [System.Serializable]
@@ -46,6 +46,13 @@ namespace GlowUp.Theme
             public Color gold = new Color32(184, 138, 59, 255);
             [Tooltip("Pink that stays readable as small text (links, selected labels)")]
             public Color accentText = new Color32(176, 74, 105, 255);
+            // colour guideline §5 and §11 (16 November 2026): Information, Border and Disabled tokens, light and dark
+            [Tooltip("Information (helpful notices, Info messages): blue, readable as text")]
+            public Color info = new Color32(58, 106, 150, 255);
+            [Tooltip("Thin borders and dividers between neutral surfaces")]
+            public Color border = new Color32(205, 187, 184, 255);
+            [Tooltip("Disabled controls and their labels (muted, still distinguishable)")]
+            public Color disabled = new Color32(163, 149, 154, 255);
         }
 
         [Header("Light Mode - white dominates, pink for actions, gold for details")]
@@ -97,7 +104,10 @@ namespace GlowUp.Theme
             caution = Hex("#946312"),          // amber: 5.0 : 1
             warning = Hex("#B5472F"),          // brick: 5.2 : 1
             gold = Hex("#B88A3B"),             // gold highlights
-            accentText = Hex("#B04A69")        // deep rose: 5.0 : 1 on the background
+            accentText = Hex("#B04A69"),       // deep rose: 5.0 : 1 on the background
+            info = Hex("#3A6A96"),             // information blue: 5.5 : 1 on the background, 4.9 : 1 on cards
+            border = Hex("#CDBBB8"),           // warm gray dividers
+            disabled = Hex("#A3959A")          // muted warm gray (disabled controls are exempt from the text ratio)
         };
 
         public static Palette DarkDefault() => new Palette
@@ -118,7 +128,10 @@ namespace GlowUp.Theme
             caution = Hex("#E0A94F"),
             warning = Hex("#E57A68"),
             gold = Hex("#D4AF70"),             // gold highlights
-            accentText = Hex("#E3A1B1")
+            accentText = Hex("#E3A1B1"),
+            info = Hex("#8DB7E0"),             // information blue: 7.9 : 1 on the background, 6.8 : 1 on cards
+            border = Hex("#55474B"),
+            disabled = Hex("#7A6C70")
         };
 
         static Color Hex(string hex) => ColorUtility.TryParseHtmlString(hex, out var c) ? c : Color.magenta;

@@ -71,3 +71,6 @@ GlowUp-Admin/
 tools/LiveScanGolden/bin/
 tools/LiveScanGolden/obj/
 tools/__pycache__/
+
+# screenshots written by the responsive test rig
+GlowUp-Admin_AI_Testing/tests/responsive/*.png

@@ -251,7 +251,7 @@ namespace GlowUp.Common
         public float SecondsFor(Kind kind) => Mathf.Max(1f, kind == Kind.Error || kind == Kind.Warning ? errorSeconds : showSeconds);
 
         static Color ToneOf(Kind kind, ThemeProfile.Palette p) =>
-            kind == Kind.Error ? p.warning : kind == Kind.Warning ? p.caution : kind == Kind.Success ? p.success : p.accentText;
+            kind == Kind.Error ? p.warning : kind == Kind.Warning ? p.caution : kind == Kind.Success ? p.success : p.info;   // Information: the blue info token (colour guideline §5)
 
         static bool Reduced => GlowUp.Performance.PerformanceSettings.ReduceEffects;
 
