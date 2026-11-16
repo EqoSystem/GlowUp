@@ -260,10 +260,15 @@ namespace GlowUp.EditorTools
             A.Label(volumeBlock.transform, "Title", "Volume keys", RowTitle, ThemeRole.MainText, FontRole.Label);
             // New17: one On / Off choice; the line under it says what the three key actions do
             ChoiceTabs volumeTabs = Tabs(volumeBlock.transform, "VolumeButtonTabs", new[] { "On", "Off" }, 0, out _, 32);
-            TextMeshProUGUI volumeStatus = A.Label(volumeBlock.transform, "StatusText", "On AI Smart Scan: volume down = photo capture, volume up = live scan, both keys together = take the photo or start / pause the scan.",
+            // New20: the user chooses what volume + does (volume − does the other); shown only while the keys are on
+            GameObject volumeUpRow = Block(volumeBlock.transform, "VolumeUpChoice", 8);
+            A.Label(volumeUpRow.transform, "Title", "Volume + chooses", RowCaption, ThemeRole.MainText, FontRole.Label);
+            ChoiceTabs volumeUpTabs = Tabs(volumeUpRow.transform, "VolumeUpTabs", new[] { "Photo capture", "Live scan" }, 0, out _, 30);
+            TextMeshProUGUI volumeStatus = A.Label(volumeBlock.transform, "StatusText", UiPreferences.VolumeKeysLine(true),
                                                    RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             var volumeSetting = Feature<VolumeButtonSetting>(features, "VolumeButtonSetting");
             A.Set(volumeSetting, "tabs", volumeTabs); A.Set(volumeSetting, "statusText", volumeStatus);
+            A.Set(volumeSetting, "upTabs", volumeUpTabs); A.Set(volumeSetting, "upRow", volumeUpRow);
 
             // =====================================================================================
             //  2. Account

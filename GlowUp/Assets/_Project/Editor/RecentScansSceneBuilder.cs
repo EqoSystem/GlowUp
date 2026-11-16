@@ -156,6 +156,14 @@ namespace GlowUp.EditorTools
                 deleteSoundObject.ApplyModifiedPropertiesWithoutUndo();
             }
             if (deleteClip == null) Debug.LogWarning("[GlowUp] Assets/_Project/Audio/Delete_FreezingCold.mp3 was not found: removing a scan stays silent until a clip is set on DeleteSoundPlayer.");
+            // New20: the piece is cut HERE, in the Editor, and saved as a small WAV that is always loaded; the phone plays it as it is
+            // (its own run-time cut needed AudioClip.GetData and gave silence on Android). The ringer no longer silences it.
+            deleteSoundObject.Update();
+            AudioClip readyPiece = DeleteSoundPiece.Make(deleteSoundObject, deleteSoundObject.FindProperty("clip").objectReferenceValue as AudioClip);
+            deleteSoundObject.FindProperty("readyPiece").objectReferenceValue = readyPiece;
+            deleteSoundObject.FindProperty("quietWhenPhoneIsSilent").boolValue = false;
+            deleteSoundObject.ApplyModifiedPropertiesWithoutUndo();
+            DeleteSoundPiece.KeepLoaded("Assets/_Project/Audio/Delete_Drop_Made.wav");
             A.Set(controller, "deleteSound", deleteSound);
             A.Set(controller, "selectButton", select); A.Set(controller, "selectionBar", selectionBar); A.Set(controller, "selectionText", selectionText);
             A.Set(controller, "selectAllButton", selectAll); A.Set(controller, "cancelSelectionButton", cancelSelection);

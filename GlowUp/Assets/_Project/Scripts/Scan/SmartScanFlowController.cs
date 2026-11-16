@@ -115,10 +115,10 @@ namespace GlowUp.Scan
         [Tooltip("The photo button appears after the scan has run this many seconds without finishing")]
         [Min(1f)] [SerializeField] private float photoButtonAfterSeconds = 6f;
         [SerializeField] private string msgPhotoHint = "Slow or read wrong? Tap the camera button to take a photo of the product.";
-        [Tooltip("Toast when volume down chooses photo capture")]
-        [SerializeField] private string volumePhotoToast = "Photo capture. Press both volume keys to take the photo.";
-        [Tooltip("Toast when volume up chooses live scanning")]
-        [SerializeField] private string volumeLiveToast = "Live scan. Press both volume keys to start or pause.";
+        [Tooltip("Toast when a volume key chooses photo capture (New20: the same key again takes the photo)")]
+        [SerializeField] private string volumePhotoChosen = "Photo capture. Press the same volume key again to take the photo.";
+        [Tooltip("Toast when a volume key chooses live scanning (New20: the same key again starts or pauses it)")]
+        [SerializeField] private string volumeLiveChosen = "Live scan. Press the same volume key again to start or pause.";
         [SerializeField] private string msgPhotoOffer = "Not reading it right? Take a photo of the product: GlowUp's AI searches the web for it.";
         [SerializeField] private string msgSnapshotStuck = "Not getting further? Take one photo of the pack and the AI will read it.";
         [SerializeField] private string msgFoundStagedOwn = "Found it among the products you sent. It is waiting for an admin's approval.";
@@ -641,10 +641,13 @@ namespace GlowUp.Scan
         bool photoAfterCameraStarts;                  // the camera button was tapped before the camera ran: photo mode once it runs
 
         // ---------------------------------------------------------------------------------------
-        //  VOLUME KEYS (New17, Settings > Camera Helpers > "Volume keys" on): volume DOWN chooses photo capture, volume UP chooses live
-        //  scanning, and BOTH keys pressed together (within VolumeChordSeconds) do the chosen mode's action (take the photo / start or
-        //  pause the scan). A single press waits that short moment for the other key before it counts as a mode choice.
-        //  Keys are read through GlowUpVolumeKeys.java, only on this screen and only while the setting is on.
+        //  VOLUME KEYS (Settings > Camera Helpers > "Volume keys" on). New20, the owner's rules of 17 November 2026:
+        //    - each key chooses a mode; which one is the user's choice (UiPreferences.VolumeUpTakesPhoto; default + = photo capture,
+        //      − = live scan);
+        //    - pressing the key of the mode that is already on is the trigger (take the photo / start or pause the live scan);
+        //    - BOTH keys together (within VolumeChordSeconds) open "Type it in"; both again close it.
+        //  A single press waits that short moment for the other key before it counts. Keys are read through GlowUpVolumeKeys.java, only on
+        //  this screen and only while the setting is on.
         // ---------------------------------------------------------------------------------------
         const float VolumeChordSeconds = 0.3f;
         float volumeUpAt = -1f, volumeDownAt = -1f;
@@ -658,14 +661,31 @@ namespace GlowUp.Scan
             if (volumeUpAt >= 0f && volumeDownAt >= 0f && Mathf.Abs(volumeUpAt - volumeDownAt) <= VolumeChordSeconds)
             {
                 volumeUpAt = volumeDownAt = -1f;
-                VolumeButtonPressed();                       // both together: the action of the mode that is chosen
+                ToggleTypeIn();                              // both together: Type it in opens, or closes when it is open
                 return;
             }
-            if (volumeUpAt >= 0f && now - volumeUpAt > VolumeChordSeconds) { volumeUpAt = -1f; ChooseScanMode(false); }
-            if (volumeDownAt >= 0f && now - volumeDownAt > VolumeChordSeconds) { volumeDownAt = -1f; ChooseScanMode(true); }
+            bool upTakesPhoto = UiPreferences.VolumeUpTakesPhoto;
+            if (volumeUpAt >= 0f && now - volumeUpAt > VolumeChordSeconds) { volumeUpAt = -1f; VolumeKeyMode(upTakesPhoto); }
+            if (volumeDownAt >= 0f && now - volumeDownAt > VolumeChordSeconds) { volumeDownAt = -1f; VolumeKeyMode(!upTakesPhoto); }
         }
 
-        /// <summary>Volume down = photo capture, volume up = live scanning (nothing happens when that mode is already on, or the screen is busy).</summary>
+        /// <summary>One key: its mode is chosen, or, when that mode is already on, the screen's main button is pressed (New20).</summary>
+        void VolumeKeyMode(bool photo)
+        {
+            if (photo == photoMode) VolumeButtonPressed();
+            else ChooseScanMode(photo);
+        }
+
+        /// <summary>Both keys: "Type it in" opens; when it is open, it closes (what was typed stays in its boxes).</summary>
+        void ToggleTypeIn()
+        {
+            if (manualPanel != null && manualPanel.IsOpen) { manualPanel.Hide(); return; }
+            if (PopupOpen || stage == Stage.Recognising || stage == Stage.Leaving) return;
+            if (snapshot != null && (snapshot.IsOpen || snapshot.PreviewOpen)) return;
+            OpenManual();
+        }
+
+        /// <summary>Chooses photo capture or live scanning (nothing happens when that mode is already on, or the screen is busy).</summary>
         void ChooseScanMode(bool photo)
         {
             if (PopupOpen || stage == Stage.Recognising || stage == Stage.Leaving) return;
@@ -673,11 +693,11 @@ namespace GlowUp.Scan
             if (photo == photoMode) return;
             if (photo) { if (photoButton == null || !photoButton.interactable) return; OnPhotoButton(); }
             else ExitPhotoMode();
-            FormalToast.OnScreen(transform, statusText)?.Show(FormalToast.Kind.Info, photo ? volumePhotoToast : volumeLiveToast);
+            FormalToast.OnScreen(transform, statusText)?.Show(FormalToast.Kind.Info, photo ? volumePhotoChosen : volumeLiveChosen);
         }
 
         /// <summary>
-        /// VOLUME DOWN, the trigger (Settings > Camera Helpers > "Volume keys"): the same as a tap on the screen's main button, and nothing while
+        /// The trigger (New20: the key of the mode already on): the same as a tap on the screen's main button, and nothing while
         /// that button cannot be used (a pop-up is open, the screen is busy). In photo capture the capture button, otherwise the scan button
         /// (it also wakes a sleeping camera).
         /// </summary>

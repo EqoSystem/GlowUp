@@ -116,6 +116,18 @@ namespace GlowUp.Common
             set { PlayerPrefs.SetInt("GlowUp.Camera.VolumeKeys", (int)value); Save(); }
         }
 
+        /// <summary>
+        /// New20 (owner, 17 November 2026): which key chooses which mode on AI Smart Scan. True (the default) = volume + is photo capture and
+        /// volume − is live scan; false = the other way round. Pressing the key of the mode already on is the trigger (take the photo /
+        /// start or pause the scan); both keys together open "Type it in", and both again close it.
+        /// </summary>
+        public static bool VolumeUpTakesPhoto { get => Get("GlowUp.Camera.VolumeUpTakesPhoto", true); set => Set("GlowUp.Camera.VolumeUpTakesPhoto", value); }
+
+        /// <summary>What one key does, as the settings line and the scan screen say it.</summary>
+        public static string VolumeKeysLine(bool upTakesPhoto) =>
+            (upTakesPhoto ? "Volume + = photo capture, volume − = live scan." : "Volume + = live scan, volume − = photo capture.") +
+            " Press the same key again to take the photo or start / pause the scan. Both keys together open or close Type it in.";
+
         static bool Get(string key, bool fallback) => PlayerPrefs.GetInt(key, fallback ? 1 : 0) == 1;
         static void Set(string key, bool value) { PlayerPrefs.SetInt(key, value ? 1 : 0); Save(); }
         static void Save() { PlayerPrefs.Save(); Changed?.Invoke(); }

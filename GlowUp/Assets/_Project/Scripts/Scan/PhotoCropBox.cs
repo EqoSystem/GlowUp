@@ -25,7 +25,29 @@ namespace GlowUp.Scan
         // Phase 1C (11 November 2026): the app's own colours instead of blue: a cream veil outside, a gold edge on a deep rose rim
         // (3:1 or more on light and dark photos), a soft rose glow and gold corner handles.
         readonly RectTransform[] outside = new RectTransform[4];
-        public static Color OutsideTint { get { Color c = RuntimeTheme.Palette.background; c.a = 0.62f; return c; } }
+        // New20: the veil is the app's Rose Mist tinted with its brand pink (light), or the charcoal background tinted with it (dark), instead
+        // of the cream page colour, which turned a muddy grey over a photo. Strong enough to show what is left out, light enough to see it.
+        public static Color OutsideTint
+        {
+            get
+            {
+                ThemeProfile.Palette p = RuntimeTheme.Palette;
+                Color c = RuntimeTheme.IsDark ? RuntimeTheme.Mix(p.background, p.accent, 0.28f) : RuntimeTheme.Mix(p.surfaceAlt, p.accent, 0.32f);
+                c.a = RuntimeTheme.IsDark ? 0.74f : 0.70f;
+                return c;
+            }
+        }
+        /// <summary>The dim behind a card laid over a screen: a deep rose made from the palette (New20), not a fixed colour.</summary>
+        public static Color ScreenDim
+        {
+            get
+            {
+                ThemeProfile.Palette p = RuntimeTheme.Palette;
+                Color c = RuntimeTheme.Mix(RuntimeTheme.IsDark ? p.background : p.heading, p.accentText, 0.22f);
+                c.a = 0.62f;
+                return c;
+            }
+        }
         public static Color EdgeLight { get { Color c = RuntimeTheme.Palette.gold; c.a = 1f; return c; } }
         public static readonly Color EdgeRim = new Color32(74, 30, 46, 220);               // deep rose: the gold line reads on a light photo too
         static Color EdgeGlowColor { get { Color c = RuntimeTheme.Palette.accent; c.a = 0.40f; return c; } }

@@ -347,10 +347,12 @@ namespace GlowUp.EditorTools
                 A.At(save.transform, A.BL, new Vector2(edge - 2, edge), new Vector2(128, buttonHeight));
                 Button tryOn = TileButton(visual.transform, "TryOnButton", "Try On", IconFactory.Sparkle, true);
                 A.At(tryOn.transform, A.BL, new Vector2(edge + 134, edge), new Vector2(158, buttonHeight));
-                Button ai = TileButton(visual.transform, "AiButton", "AI", IconFactory.Ai, false);
-                A.At(ai.transform, A.BR, new Vector2(-edge + 2, edge), new Vector2(104, buttonHeight));
+                // New20: "Result" in place of "AI". The product is already checked against the user's skin profile, so the tap
+                // opens its AI Smart Scan Result (the same screen a scan ends on) instead of asking the AI again.
+                Button result = TileButton(visual.transform, "ResultButton", "Result", IconFactory.Document, false);
+                A.At(result.transform, A.BR, new Vector2(-edge + 2, edge), new Vector2(104, buttonHeight));
                 A.Set(view, "saveButton", save); A.Set(view, "saveLabel", A.LabelOf(save));
-                A.Set(view, "tryOnButton", tryOn); A.Set(view, "aiButton", ai);
+                A.Set(view, "tryOnButton", tryOn); A.Set(view, "resultButton", result);
                 A.Set(view, "staysSelected", true);              // the tapped recommendation keeps its glowing outline
             }
 

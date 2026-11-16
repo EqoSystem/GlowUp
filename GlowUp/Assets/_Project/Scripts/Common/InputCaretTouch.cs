@@ -113,6 +113,7 @@ namespace GlowUp.Common
             if (field.isFocused && Time.unscaledTime - focusedAt < 0.6f && textAtFocus.Length >= 2 && string.IsNullOrEmpty(field.text))
             {
                 string back = textAtFocus;
+                PasteGuard.AllowNextChange(field);                    // the app puts the text back: not a paste
                 field.text = back;                                    // with the change event: the page's own checks see the text again
                 TouchScreenKeyboard kb = Keyboard();
                 if (kb != null && kb.active) { kb.text = back; if (kb.canSetSelection) kb.selection = new RangeInt(back.Length, 0); }

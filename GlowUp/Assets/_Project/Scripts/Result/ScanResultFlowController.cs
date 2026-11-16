@@ -194,14 +194,15 @@ namespace GlowUp.Result
         readonly List<GameObject> chips = new List<GameObject>();
         readonly List<GameObject> alternativeRows = new List<GameObject>();
         readonly List<GameObject> sourceLinks = new List<GameObject>();
+        readonly Stack<ScanRecord> cameFrom = new Stack<ScanRecord>();     // the products an alternative was opened from (New20)
 
         void Awake()
         {
             if (chipTemplate != null) chipTemplate.gameObject.SetActive(false);
             if (alternativeTileTemplate != null) alternativeTileTemplate.gameObject.SetActive(false);
             if (sourceLinkTemplate != null) sourceLinkTemplate.gameObject.SetActive(false);
-            if (backButton != null) backButton.onClick.AddListener(() => SceneNavigator.Go(string.IsNullOrEmpty(ScanSession.ResultBackScene) ? defaultBackScene : ScanSession.ResultBackScene));
-            if (scanAnotherButton != null) scanAnotherButton.onClick.AddListener(() => { if (scanAgainPanel != null && record != null) scanAgainPanel.Show(); else StartNewScan(); });
+            if (backButton != null) backButton.onClick.AddListener(GoBack);
+            if (scanAnotherButton != null) scanAnotherButton.onClick.AddListener(() => { if (scanAgainPanel != null && record != null && cameFrom.Count == 0) scanAgainPanel.Show(); else StartNewScan(); });   // an alternative on show was never scanned: nothing to replace
             if (sameProductButton != null) sameProductButton.onClick.AddListener(() => ScanAgain(true));
             if (differentProductButton != null) differentProductButton.onClick.AddListener(() => ScanAgain(false));
             if (tryOnButton != null) tryOnButton.onClick.AddListener(() => { ScanSession.TryOn = record; SceneNavigator.Go(tryOnScene); });
@@ -617,7 +618,8 @@ namespace GlowUp.Result
                 tile.Bind(alt, p.name, p.brandName, p.cosmeticType, typeIcons != null ? typeIcons.For(p.cosmeticType) : null);
                 tile.SetTryOnAvailable(ProductScope.CanTryOn(alt));                 // AR Try-On is for make-up only
                 tile.TryOnClicked += t => { ScanSession.TryOn = t.Data as ScanRecord; SceneNavigator.Go(tryOnScene); };
-                tile.AiClicked += t => { if (aiPanel != null) aiPanel.Show(t.Data as ScanRecord); };
+                tile.AiClicked += t => { if (aiPanel != null) aiPanel.Show(t.Data as ScanRecord); };   // tiles built before New20
+                tile.Clicked += t => OpenAlternative(t.Data as ScanRecord);                            // New20: the "Result" button
                 tile.SaveClicked += t =>
                 {
                     if (t.Data is ScanRecord saved && string.IsNullOrEmpty(saved.id)) ScanHistoryRepository.Add(saved);
@@ -630,6 +632,43 @@ namespace GlowUp.Result
                 alternativesEmptyText.gameObject.SetActive(alternativeRows.Count == 0);
                 alternativesEmptyText.text = msgNoAlternatives;
             }
+        }
+
+        /// <summary>
+        /// New20: "Result" on an alternative opens ITS AI Smart Scan Result on this same screen. The alternative was already
+        /// checked against the user's skin profile (ProductRecommender), so nothing is asked again. The product the user came
+        /// from is kept: Back (the arrow, or the phone's Back key) returns to it before it leaves the screen.
+        /// </summary>
+        void OpenAlternative(ScanRecord alternative)
+        {
+            if (alternative == null) return;
+            if (alternativesPanel != null && alternativesPanel.IsOpen) alternativesPanel.Hide();
+            if (record != null) cameFrom.Push(record);
+            ShowRecord(alternative);
+        }
+
+        void ShowRecord(ScanRecord shown)
+        {
+            record = shown;
+            Show();
+            ShowShades();
+            ScrollRect page = nameText != null ? nameText.GetComponentInParent<ScrollRect>() : null;
+            if (page != null) { page.StopMovement(); page.verticalNormalizedPosition = 1f; }    // the new result is read from its top
+        }
+
+        /// <summary>Back: first the product the user opened an alternative from, then the screen before the result.</summary>
+        void GoBack()
+        {
+            if (cameFrom.Count > 0) { ShowRecord(cameFrom.Pop()); return; }
+            SceneNavigator.Go(string.IsNullOrEmpty(ScanSession.ResultBackScene) ? defaultBackScene : ScanSession.ResultBackScene);
+        }
+
+        void Update()
+        {
+            // the phone's Back key does what the arrow does while an alternative is shown; pop-ups close themselves first
+            if (cameFrom.Count == 0 || !Input.GetKeyDown(KeyCode.Escape)) return;
+            if (alternativesPanel != null && alternativesPanel.IsOpen) return;
+            GoBack();
         }
 
         // ---------------------------------------------------------------------------------------

@@ -49,10 +49,11 @@ namespace GlowUp.Common
                 foreach (char c in value) if (char.IsLetterOrDigit(c) && c < 128) sb.Append(c);
                 if (sb.ToString() != value) { field.SetTextWithoutNotify(sb.ToString()); value = sb.ToString(); }
             }
-            // Block paste: a single event that grows the text by more than 1 char is a paste.
-            if (blockPaste && value.Length - lastValid.Length > 1)
+            // Block paste: only a change that adds more than fast typing can in one frame (PasteGuard). Before, 2 letters typed
+            // quickly were undone and then came back from the keyboard's hidden box (letters vanishing on the password fields).
+            if (blockPaste && PasteGuard.IsPaste(field, lastValid, value))
             {
-                field.SetTextWithoutNotify(lastValid);
+                PasteGuard.Undo(field, lastValid);
                 return;
             }
             lastValid = value;

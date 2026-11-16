@@ -44,6 +44,8 @@ namespace GlowUp.AppSettings
 
         [Header("Outcome Messages")]
         [SerializeField] private string msgSuccess = "Report sent. Thank you for helping us improve GlowUp.";
+        [Tooltip("The green toast shown low on the screen after a report is sent")]
+        [SerializeField] private string msgSentToast = "Report Sent!";
         [SerializeField] private string msgValidation = "Please choose a category and describe what happened.";
         [SerializeField] private string msgFailure = "We couldn't send your report. Please try again.";
         [SerializeField] private string msgTimeout = "No connection right now. Your report will be sent when you're back online.";
@@ -281,21 +283,18 @@ namespace GlowUp.AppSettings
 
                     { }
 
-                    // SUCCESS OUTCOME
-                    ShowCenteredPopup(
-                        "Success",
-                        msgSuccess,
-                        "OK",
-                        autoCloseSuccessSeconds,
-                        onClosed: () =>
-                        {
-                            // Clear form fields
-                            if (messageInput != null) messageInput.text = "";
-                            if (categoryTabs != null) categoryTabs.Select(0, false);
-                            currentReportDocId = null; // Generate a fresh ID for the next report
-                            if (panel != null && panel.IsOpen) panel.Hide();
-                        }
-                    );
+                    // SUCCESS OUTCOME (New20): the form closes and a green toast low on the screen says "Report Sent!".
+                    // The centre popup stays as the fallback when the toast layer cannot be made.
+                    void ClearForm()
+                    {
+                        if (messageInput != null) messageInput.text = "";
+                        if (categoryTabs != null) categoryTabs.Select(0, false);
+                        currentReportDocId = null; // Generate a fresh ID for the next report
+                        if (panel != null && panel.IsOpen) panel.Hide();
+                    }
+                    ScreenNotice toast = Application.isFocused ? ScreenNotice.On(transform, sendLabel != null ? sendLabel : feedbackText) : null;
+                    if (toast != null) { ClearForm(); toast.ShowBottom(msgSentToast); }
+                    else ShowCenteredPopup("Success", msgSuccess, "OK", autoCloseSuccessSeconds, onClosed: ClearForm);
                 }
             }
             catch (Exception ex)

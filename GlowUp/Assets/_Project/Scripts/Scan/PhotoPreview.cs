@@ -55,7 +55,7 @@ namespace GlowUp.Scan
             layer.overrideSorting = true; layer.sortingOrder = 5000;
             preview.root.AddComponent<GraphicRaycaster>();
             var dim = preview.root.AddComponent<Image>();
-            dim.color = new Color32(43, 27, 33, 158);                   // a warm deep rose dim (not black or blue): blocks the screen behind it
+            dim.color = PhotoCropBox.ScreenDim;                         // a deep rose dim from the palette (not black or blue): blocks the screen behind it
             var outside = preview.root.AddComponent<Button>();          // a tap beside the card closes it
             outside.transition = Selectable.Transition.None;
             outside.onClick.AddListener(() => preview.Closed?.Invoke());

@@ -52,7 +52,8 @@ namespace GlowUp.Auth
 
         void OnChanged(string v)
         {
-            if (blockCopyPaste && v.Length - lastValid.Length > 1) { field.SetTextWithoutNotify(lastValid); return; }
+            // fast typing can bring 2 or 3 letters in one frame: only a real paste is undone (PasteGuard), keyboard included
+            if (blockCopyPaste && GlowUp.Common.PasteGuard.IsPaste(field, lastValid, v)) { GlowUp.Common.PasteGuard.Undo(field, lastValid); return; }
             lastValid = v;
         }
 

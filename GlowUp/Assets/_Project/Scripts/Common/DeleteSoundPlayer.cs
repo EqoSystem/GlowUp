@@ -36,6 +36,10 @@ namespace GlowUp.Common
         [Tooltip("Tick this to play the app's own sound in place of the one above. Listen to both first: click each file in Assets/_Project/Audio.")]
         [SerializeField] private bool useOwnSound = false;
 
+        [Tooltip("New20: the piece of Clip, cut AHEAD of time by the Recent Scans scene builder (Audio/Delete_FreezingCold_Piece.wav, always loaded). " +
+                 "On the phone it is played as it is: cutting the piece at run time needs AudioClip.GetData, which gave silence on Android.")]
+        [SerializeField] private AudioClip readyPiece;
+
         [Tooltip("The short sound of the DROP: played once when the row (or the group) is let go inside the remove area. Made by Audio/Source~/make_drop_sound.py.")]
         [SerializeField] private AudioClip dropClip;
         [Range(0f, 1f)] [SerializeField] private float dropVolume = 1f;
@@ -70,8 +74,10 @@ namespace GlowUp.Common
         [SerializeField] private bool followSoundVolumeSetting = true;
 
         [Header("Behaviour")]
-        [Tooltip("No sound while the phone is on silent or vibrate (Android)")]
-        [SerializeField] private bool quietWhenPhoneIsSilent = true;
+        [Tooltip("No sound while the phone's RINGER is on silent or vibrate (Android). Off since New20 (the scene builder sets it): the ringer " +
+                 "is not the media volume, and with the bell muted but the media volume up the sound was never heard. Like the tap sounds, it " +
+                 "now follows the media volume and the switch in Settings > Sounds & Motion.")]
+        [SerializeField] private bool quietWhenPhoneIsSilent = false;
 
         /// <summary>The recording the piece is cut from: the app's own sound when that is chosen (and there), otherwise the other one.</summary>
         AudioClip Chosen => useOwnSound && ownClip != null ? ownClip : clip;
@@ -81,6 +87,7 @@ namespace GlowUp.Common
         bool carrying, shaking, looping;
         float carryFade = -1f;
         AudioClip piece;                // the short, ready-made piece that is played
+        bool pieceIsAsset;              // the piece is an asset (the ready piece, or the whole clip as the last resort): never destroyed
         float endsAt = -1f;
 
         /// <summary>True from the start of the sound until it has ended.</summary>
@@ -171,22 +178,40 @@ namespace GlowUp.Common
         void Prepare()
         {
             if (!UiPreferences.DeleteSound) { Release(); return; }
+            if (dropClip != null && dropClip.loadState == AudioDataLoadState.Unloaded) dropClip.LoadAudioData();   // ready before the first drop
+            if (piece != null) return;
+            // 1. the piece cut ahead of time: played as it is (New20; the run-time cut below gave silence on Android)
+            if (!useOwnSound && readyPiece != null)
+            {
+                if (readyPiece.loadState == AudioDataLoadState.Unloaded) readyPiece.LoadAudioData();
+                piece = readyPiece; pieceIsAsset = true;
+                return;
+            }
             AudioClip clip = Chosen;
-            if (piece != null || clip == null) return;
+            if (clip == null) return;
+            // 2. cut the piece here (the earlier way; still used for "Use Own Sound")
             try
             {
                 bool wasLoaded = clip.loadState == AudioDataLoadState.Loaded;
-                if (!wasLoaded && !clip.LoadAudioData()) { { } return; }
-                var all = new float[clip.samples * clip.channels];
-                bool read = clip.GetData(all, 0);
-                if (!wasLoaded) clip.UnloadAudioData();                 // the whole file is not needed any more
-                if (!read) { { } return; }
-                float[] cut = Cut(all, clip.channels, clip.frequency, skipSilenceAtStart, startAtSeconds, playSeconds, fadeOutSeconds, loudestPoint, mostGain);
-                if (cut.Length == 0) return;
-                piece = AudioClip.Create("DeleteSoundPiece", cut.Length / clip.channels, clip.channels, clip.frequency, false);
-                piece.SetData(cut, 0);
+                if (wasLoaded || clip.LoadAudioData())
+                {
+                    var all = new float[clip.samples * clip.channels];
+                    bool read = clip.loadState == AudioDataLoadState.Loaded && clip.GetData(all, 0);
+                    float[] cut = read ? Cut(all, clip.channels, clip.frequency, skipSilenceAtStart, startAtSeconds, playSeconds, fadeOutSeconds, loudestPoint, mostGain) : new float[0];
+                    if (cut.Length > 0)
+                    {
+                        if (!wasLoaded) clip.UnloadAudioData();             // the whole file is not needed any more
+                        piece = AudioClip.Create("DeleteSoundPiece", cut.Length / clip.channels, clip.channels, clip.frequency, false);
+                        piece.SetData(cut, 0);
+                        pieceIsAsset = false;
+                        return;
+                    }
+                }
             }
-            catch (System.Exception e) { { } piece = null; }
+            catch (System.Exception) { piece = null; }
+            // 3. the last resort: the whole recording, played as it is. A longer sound is better than none at all.
+            if (clip.loadState == AudioDataLoadState.Unloaded) clip.LoadAudioData();
+            piece = clip; pieceIsAsset = true;
         }
 
         void Release()
@@ -195,8 +220,8 @@ namespace GlowUp.Common
             if (source != null) source.loop = false;
             carrying = false; looping = false; carryFade = -1f;
             endsAt = -1f;
-            if (piece != null) Destroy(piece);
-            piece = null;
+            if (piece != null && !pieceIsAsset) Destroy(piece);           // an asset (ready piece, whole clip) is never destroyed
+            piece = null; pieceIsAsset = false;
         }
 
         /// <summary>
