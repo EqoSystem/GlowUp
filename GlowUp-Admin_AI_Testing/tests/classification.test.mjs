@@ -88,6 +88,8 @@ equal(migrationWaits(documents.slice(4), list), false, "with the list and nothin
 
 
 equal(collectionFor("glowup-admin-snowy.vercel.app"), "ingredientClassifications", "the live site uses the real list");
+equal(collectionFor("glowupapp.xyz"), "ingredientClassifications", "the production domain uses the real list");
+equal(isTestHost("www.glowupapp.xyz"), false, "the www domain is live too");
 equal(collectionFor("glowup-admin-test.vercel.app"), "ingredientClassificationsTest", "a preview uses the test list");
 equal(collectionFor("localhost"), "ingredientClassificationsTest", "localhost uses the test list");
 equal(collectionFor(""), "ingredientClassificationsTest", "an unknown address uses the test list");

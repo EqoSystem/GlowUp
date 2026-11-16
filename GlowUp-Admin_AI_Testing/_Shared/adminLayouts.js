@@ -967,7 +967,6 @@ const COLOUR_FIELDS = [
     { key: "border", label: "Outline", token: "--border" },
     { key: "shadow", label: "Shadow", token: "", def: "#000000" }
 ];
-const WIDTHS = [[12, "Whole width"], [9, "Three quarters"], [8, "Two thirds"], [6, "Half"], [4, "One third"], [3, "One quarter"]];
 
 async function openStyleDialog(id) {
     if (!(await ensureProfile())) return;
@@ -984,39 +983,41 @@ async function openStyleDialog(id) {
     const hasCards = !!panel.querySelector(".kpi-row, .stat-row");
     const isMember = panel.classList.contains("member");
     const opt = (list, value) => list.map((o) => `<option value="${esc(o.id)}"${o.id === (value || "") ? " selected" : ""}>${esc(o.label)}</option>`).join("");
-    const width = Number(before.w) || 12;
-    const widthOptions = WIDTHS.some(([w]) => w === width) ? WIDTHS : WIDTHS.concat([[width, `${width} of 12 columns`]]);
+    // the column span is no longer chosen here (New17): the panel keeps the span it already has, so no saved layout moves
+    const width = Math.min(12, Math.max(2, Number(before.w) || 12));
+    // a long explanation sits behind a small "i" at the end of its title (tap, keyboard focus or hover), not under it
+    const tip = (text, label) => `<span class="info-slot" data-info="${esc(text)}" data-info-label="${esc(label)}"></span>`;
+    const head = (title, text) => `<div class="sd-section-head"><span class="form-section-title">${title}</span>${text ? tip(text, "About " + title.replace(/<[^>]*>/g, "")) : ""}</div>`;
+    const matchingPanels = [...document.querySelectorAll(".board .panel[data-panel]")]
+        .filter((p) => p !== panel && p.querySelector(".kpi-row, .stat-row") && ownTexts(p).labels.length > 0);
 
     const overlay = document.createElement("div");
     overlay.className = "modal-overlay style-overlay";
     overlay.style.display = "flex";
     overlay.innerHTML = `
         <div class="modal-content style-dialog" role="dialog" aria-modal="true" aria-labelledby="sdTitle">
-            <h3 id="sdTitle">Style and text: ${esc(labelOf(id))}</h3>
-            <p class="modal-intro">Changes show on the panel at once. Nothing here moves a panel out of the page's grid, so panels never overlap or leave holes, on any screen.</p>
+            <div class="sd-section-head sd-title-head"><h3 id="sdTitle">Style and text: ${esc(labelOf(id))}</h3>${tip("Changes show on the panel at once. Nothing here moves a panel out of the page's grid, so panels never overlap or leave holes, on any screen.", "About this window")}</div>
             <form class="modal-form" novalidate>
                 <div class="form-section"${isMember ? " hidden" : ""}>
-                    <span class="form-section-title">Size</span>
+                    ${head("Size", `Empty = automatic. A pixel width can only make the panel narrower than the room it has on the page, never wider, so panels never overlap. On a tablet a narrow panel takes half the width and on a phone every panel takes the whole width: pixel sizes apply on wide screens only. Height ${LIMITS.heightMin} to ${LIMITS.heightMax}, width ${LIMITS.widthMin} to ${LIMITS.widthMax} pixels; a panel taller than its content scrolls inside.`)}
                     <div class="form-row">
-                        <div class="field"><label for="sdWidth">Width</label><select id="sdWidth">${widthOptions.map(([w, l]) => `<option value="${w}"${w === width ? " selected" : ""}>${esc(l)} (${w}/12)</option>`).join("")}</select></div>
                         <div class="field"><label for="sdWidthPx">Width (pixels)</label><input type="number" id="sdWidthPx" inputmode="numeric" min="${LIMITS.widthMin}" max="${LIMITS.widthMax}" step="10" placeholder="Automatic" value="${before.wpx || ""}"><span class="field-error" id="sdWidthPxErr" role="alert" hidden></span></div>
                         <div class="field"><label for="sdHeight">Height (pixels)</label><input type="number" id="sdHeight" inputmode="numeric" min="${LIMITS.heightMin}" max="${LIMITS.heightMax}" step="10" placeholder="Automatic" value="${before.h ? parseInt(before.h, 10) : ""}"><span class="field-error" id="sdHeightErr" role="alert" hidden></span></div>
                     </div>
-                    <span class="field-hint">Empty = automatic. The columns set the room the panel has; a pixel width can only make it narrower than that room, never wider, so panels never overlap. On a tablet a narrow panel takes half the width and on a phone every panel takes the whole width: pixel sizes apply on wide screens only. Height ${LIMITS.heightMin} to ${LIMITS.heightMax}, width ${LIMITS.widthMin} to ${LIMITS.widthMax} pixels; a panel taller than its content scrolls inside.</span>
                 </div>
 
                 <div class="form-section">
-                    <span class="form-section-title">Cards inside</span>
-                    <div class="field"><label for="sdOrient">Orientation</label><select id="sdOrient"${hasCards ? "" : " disabled"}>${opt(ORIENTS, style.orient)}</select>
-                    <span class="field-hint">${hasCards ? "Side by side or one under the other. A panel is never turned at an angle: a turned panel would cover the ones next to it." : "This panel has no row of cards. To show its list as a row, grid or graph, use its ... menu > Show as."}</span></div>
+                    ${head("Cards inside", hasCards ? "Side by side or one under the other. A panel is never turned at an angle: a turned panel would cover the ones next to it." : "This panel has no row of cards. To show its list as a row, grid or graph, use its ... menu > Show as.")}
+                    <div class="field"><label for="sdOrient">Orientation</label><select id="sdOrient"${hasCards ? "" : " disabled"}>${opt(ORIENTS, style.orient)}</select></div>
                 </div>
 
                 <div class="form-section">
-                    <span class="form-section-title">Text</span>
-                    <p class="field-hint">Only the text this panel already has can be changed here (its title and its card labels); nothing new is added to the panel. Names and numbers from the database are never changed.</p>
+                    ${head("Text", "Only the text this panel already has can be changed here (its title and its card labels); nothing new is added to the panel. Names and numbers from the database are never changed.")}
                     <div class="field"${own.title === null ? " hidden" : ""}><label for="sdTitleText">Title</label><input type="text" id="sdTitleText" maxlength="${LIMITS.title}" autocomplete="off" placeholder="${esc(own.title || "")}" value="${esc(named ? labelOf(id) : texts.title || "")}">
                         <span class="field-hint">${named ? "This panel's own name." : "Empty = the page's own title."}</span></div>
-                    <div class="field" id="sdLabelsField"${own.labels.length ? "" : " hidden"}><span class="field-label">Card labels</span>
+                    <div class="field" id="sdLabelsField"${own.labels.length ? "" : " hidden"}><div class="sd-section-head"><span class="field-label">Card labels</span>${tip(`Empty text = the page's own label (shown greyed). Size ${LIMITS.labelSizeMin} to ${LIMITS.labelSizeMax} pixels; the label wraps inside its card and never overlaps. The look (size, style, align) can be shared: every card of this panel, and every other panel on this page that has a row of cards. The words of each label stay its own.`, "About card labels")}</div>
+                        <label class="check"><input type="checkbox" id="sdSameLook" checked> <span>Same look on every card of this panel</span></label>
+                        <label class="check"${matchingPanels.length ? "" : " hidden"}><input type="checkbox" id="sdMatchPanels"> <span>Also on the ${matchingPanels.length} other panel${matchingPanels.length === 1 ? "" : "s"} with cards on this page</span></label>
                         <div class="label-rows" id="sdLabels">${own.labels.slice(0, LIMITS.labels).map((label, i) => {
                             const look = (texts.labelStyles && texts.labelStyles[i]) || {};
                             return `<div class="label-row">
@@ -1027,33 +1028,29 @@ async function openStyleDialog(id) {
                                     <div class="field"><label for="sdLabelAlign${i}">Align</label><select id="sdLabelAlign${i}" data-label-align="${i}">${opt(LABEL_ALIGNS, look.align)}</select></div>
                                 </div>
                             </div>`;
-                        }).join("")}</div>
-                        <span class="field-hint">Empty text = the page's own label (shown greyed). Size ${LIMITS.labelSizeMin} to ${LIMITS.labelSizeMax} pixels; the label wraps inside its card and never overlaps.</span></div>
+                        }).join("")}</div></div>
                 </div>
 
                 <div class="form-section">
-                    <span class="form-section-title">Font</span>
+                    ${head("Font", "Text never gets smaller than 12 pixels, so it stays readable on phones.")}
                     <div class="form-row">
                         <div class="field"><label for="sdFont">Font</label><select id="sdFont"><option value="">Same as the page</option>${FONTS.filter((f) => f.id).map((f) => `<option value="${esc(f.id)}"${f.id === style.font ? " selected" : ""}>${esc(f.label)}</option>`).join("")}</select></div>
                         <div class="field"><label for="sdScale">Text size: <span id="sdScaleText"></span></label><input type="range" id="sdScale" min="${LIMITS.scaleMin}" max="${LIMITS.scaleMax}" step="0.05" value="${style.scale || 1}"></div>
                     </div>
-                    <span class="field-hint">Text never gets smaller than 12 pixels, so it stays readable on phones.</span>
                 </div>
 
                 <div class="form-section">
-                    <span class="form-section-title">Colours for ${esc(theme)} mode</span>
+                    ${head(`Colours for ${esc(theme)} mode`, "Colours are kept for each mode on its own: switch to the other mode to set its colours.")}
                     <div class="colour-row" id="sdColours"></div>
                     <span class="field-hint contrast-note" id="sdContrast"></span>
-                    <span class="field-hint">Colours are kept for each mode on its own: switch to the other mode to set its colours.</span>
                 </div>
 
                 <div class="form-section">
-                    <span class="form-section-title">Shadow</span>
+                    ${head("Shadow", "The shadow's colour is the \"Shadow\" colour above (black when you leave it on the page colour). It is kept for each mode on its own.")}
                     <div class="form-row">
                         <div class="field"><label for="sdShadow">Panel shadow</label><select id="sdShadow">${opt(SHADOWS, style.shadow)}</select></div>
                         <div class="field"><label for="sdCardShadow">Cards inside</label><select id="sdCardShadow">${opt(SHADOWS, style.cardShadow)}</select></div>
                     </div>
-                    <span class="field-hint">The shadow's colour is the "Shadow" colour above (black when you leave it on the page colour). It is kept for each mode on its own.</span>
                 </div>
 
                 <div class="form-section">
@@ -1097,7 +1094,6 @@ async function openStyleDialog(id) {
     };
     const sizeNow = () => {
         if (isMember) return;
-        panel.style.setProperty("--w", q("#sdWidth").value);
         const size = readSize();
         if (size.ok) applyPixelSize(panel, size.w, size.h);
         labelSize(panel);
@@ -1177,7 +1173,6 @@ async function openStyleDialog(id) {
     q("[data-close]").addEventListener("click", tryClose);
 
     const setStyle = (key, value) => { if (value === "" || value === undefined || value === null) delete style[key]; else style[key] = value; show(); };
-    q("#sdWidth").addEventListener("change", sizeNow);
     q("#sdHeight").addEventListener("change", sizeNow);
     q("#sdWidthPx").addEventListener("change", sizeNow);
     q("#sdOrient").addEventListener("change", (event) => setStyle("orient", event.target.value));
@@ -1226,7 +1221,18 @@ async function openStyleDialog(id) {
         textFrame = requestAnimationFrame(() => { textFrame = 0; show(); });
     };
     q("#sdTitleText").addEventListener("input", textInput);
-    overlay.querySelectorAll("[data-label-index], [data-label-size], [data-label-style], [data-label-align]").forEach((input) => { input.addEventListener("input", textInput); input.addEventListener("change", textInput); });
+    overlay.querySelectorAll("[data-label-index]").forEach((input) => { input.addEventListener("input", textInput); });
+    // a card's look (size, style, align) is copied to every card of this panel while "Same look on every card" is on
+    const LOOK_KEYS = ["data-label-size", "data-label-style", "data-label-align"];
+    const shareLook = (event) => {
+        const box = event.target;
+        if (q("#sdSameLook") && q("#sdSameLook").checked) {
+            const key = LOOK_KEYS.find((k) => box.hasAttribute(k));
+            overlay.querySelectorAll(`[${key}]`).forEach((other) => { if (other !== box) other.value = box.value; });
+        }
+        textInput();
+    };
+    overlay.querySelectorAll("[data-label-size], [data-label-style], [data-label-align]").forEach((input) => { input.addEventListener("input", shareLook); input.addEventListener("change", shareLook); });
     q("#sdReset").addEventListener("click", () => {
         dirty = true;
         style = {}; texts = {};
@@ -1253,7 +1259,19 @@ async function openStyleDialog(id) {
 
 
         if (!isMember) {
-            page.size[id] = { w: Math.min(12, Math.max(2, Number(q("#sdWidth").value) || 12)), h: size.h, wpx: size.w };
+            page.size[id] = { w: width, h: size.h, wpx: size.w };
+        }
+        // "Also on the other panels with cards": the first card's look goes to every card of each matching panel (their words stay theirs)
+        const matchBox = q("#sdMatchPanels");
+        if (matchBox && matchBox.checked && cleanT.labelStyles) {
+            const look = cleanT.labelStyles["0"] || Object.values(cleanT.labelStyles)[0];
+            matchingPanels.forEach((other) => {
+                const otherId = other.dataset.panel, count = Math.min(ownTexts(other).labels.length, LIMITS.labels);
+                const labelStyles = {};
+                for (let i = 0; i < count; i++) labelStyles[i] = Object.assign({}, look);
+                const merged = cleanTexts(Object.assign({}, page.texts[otherId] || {}, { labelStyles }));
+                if (Object.keys(merged).length) page.texts[otherId] = merged; else delete page.texts[otherId];
+            });
         }
         saved = true;
         close();

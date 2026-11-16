@@ -9,7 +9,8 @@ export const COLLECTION = "ingredientClassifications";
 
 
 export const TEST_COLLECTION = "ingredientClassificationsTest";
-export const LIVE_HOSTS = ["glowup-admin-snowy.vercel.app", "glowup-admin-portal.firebaseapp.com", "glowup-admin-portal.web.app"];
+// glowupapp.xyz is the production domain (an alias of the same Vercel project): without it the live site ran as a test copy
+export const LIVE_HOSTS = ["glowupapp.xyz", "www.glowupapp.xyz", "glowup-admin-snowy.vercel.app","glowup-admin-portal.firebaseapp.com", "glowup-admin-portal.web.app"];
 export const isTestHost = (hostname) => !LIVE_HOSTS.includes(String(hostname || "").toLowerCase());
 export const collectionFor = (hostname) => (isTestHost(hostname) ? TEST_COLLECTION : COLLECTION);
 

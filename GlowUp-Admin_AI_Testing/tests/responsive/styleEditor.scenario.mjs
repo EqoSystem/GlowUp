@@ -22,6 +22,15 @@ try {
     ok(await page.locator(".panel.style-target").count() === 1, "the panel being styled is marked");
 
     ok(await page.locator("#sdSubtitle, #sdNote").count() === 0, "the panel editor has no box that would ADD text (subtitle, note)");
+    ok(await page.locator("#sdWidth").count() === 0 && await page.locator("#sdWidthPx").count() === 1 && await page.locator("#sdHeight").count() === 1, "only Width (pixels) and Height (pixels) are offered");
+    ok(await page.locator(".style-dialog .form-section > .field-hint:not(.contrast-note):not(#sdMotionHint)").count() === 0, "long helper text sits in the section titles' i, not under them");
+    const tipCount = await page.locator(".style-dialog .sd-section-head .info-badge").count();
+    ok(tipCount >= 5, "the section titles carry an i (" + tipCount + ")");
+    await page.locator(".style-dialog .sd-section-head .info-badge").nth(1).click();
+    await page.waitForTimeout(250);
+    const tipBox = await page.evaluate(() => { const p = document.getElementById("infoPop"); if (!p || getComputedStyle(p).visibility === "hidden" || getComputedStyle(p).display === "none") return null; const r = p.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, w: innerWidth, h: innerHeight }; });
+    ok(tipBox && tipBox.l >= 0 && tipBox.r <= tipBox.w && tipBox.t >= 0 && tipBox.b <= tipBox.h, "a tapped i opens inside the window " + JSON.stringify(tipBox));
+    await page.keyboard.press("Escape");
     await page.selectOption("#sdAnim", "zoom");
     await page.selectOption("#sdEdge", "always");
     await page.fill("#sdTitleText", "Latest scans");
@@ -109,7 +118,8 @@ try {
     await page.waitForSelector(".style-dialog", { state: "detached" });
     const kept = await page.evaluate(() => { const d = JSON.parse(localStorage.getItem("glowup.layouts.v1")).profiles[0].pages.dashboard; return { size: d.size && d.size.numbers, ls: d.texts.numbers.labelStyles }; });
     ok(kept.size && kept.size.wpx === 420 && kept.size.h === 240 && kept.ls && kept.ls[0].align === "center", "size and label look are kept " + JSON.stringify(kept));
-
+    ok(kept.ls && Object.keys(kept.ls).length > 1 && Object.values(kept.ls).every((l) => l.align === "center" && l.size === 20 && l.style === "bold"), "the look went to every card of the panel " + JSON.stringify(kept.ls));
+    ok(kept.size && Number(kept.size.w) >= 2, "the panel keeps its column span (the Width list is gone, nothing moved) " + JSON.stringify(kept.size));
     for (const width of [1440, 1024, 800, 600, 375]) {
         await page.setViewportSize({ width, height: 900 });
         await page.reload(); await settle();

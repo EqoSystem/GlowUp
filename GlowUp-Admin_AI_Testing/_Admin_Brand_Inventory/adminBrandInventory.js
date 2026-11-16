@@ -2297,6 +2297,15 @@ function openBrandForm(brand) {
     el("brandModalTitle").textContent = brand ? "Edit Brand" : "Add New Brand";
     el("brandNameInput").value = brand ? brand.name : "";
     el("brandMarketInput").value = brand ? brand.market : "Global";
+    // the suggestions also offer every market already used by a listed brand (for example "Philippines" from the FDA list)
+    const marketList = el("brandMarketOptions");
+    const offered = new Set([...marketList.options].map((o) => o.value.toLowerCase()));
+    everyBrand.map((b) => String(b.market || "").trim()).filter((m) => m && !offered.has(m.toLowerCase())).forEach((m) => {
+        offered.add(m.toLowerCase());
+        const option = document.createElement("option");
+        option.value = m;
+        marketList.appendChild(option);
+    });
     el("brandStatusInput").value = brand && STATUSES.includes(brand.status) ? brand.status : "Active";
     el("brandLogoInput").value = brand ? brand.logoUrl : "";
     el("brandImageInput").value = brand ? brand.imageUrl : "";

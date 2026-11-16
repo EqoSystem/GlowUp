@@ -88,13 +88,13 @@ export const NOTE_PLACES = [
 ];
 export const LIMITS = { title: 40, subtitle: 120, note: 300, label: 40, labels: 12, scaleMin: 0.85, scaleMax: 1.25, radiusMax: 24, labelSizeMin: 12, labelSizeMax: 28, widthMin: 240, widthMax: 2400, heightMin: 120, heightMax: 1400 };
 export const LABEL_FONT_STYLES = [
-    { id: "", label: "Same as the page" },
+    { id: "", label: "Page default" },
     { id: "bold", label: "Bold" },
     { id: "italic", label: "Italic" },
     { id: "bolditalic", label: "Bold italic" }
 ];
 export const LABEL_ALIGNS = [
-    { id: "", label: "Same as the page" },
+    { id: "", label: "Page default" },
     { id: "left", label: "Left" },
     { id: "center", label: "Centre" },
     { id: "right", label: "Right" }
