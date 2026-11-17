@@ -147,6 +147,8 @@ namespace GlowUp.Scan
                 if (!Application.HasUserAuthorization(UserAuthorization.WebCam)) { Started?.Invoke(false, "Camera permission is needed."); yield break; }
             }
 #endif
+            // another camera user (the finger signs, the AR camera) may have just let go: the phone needs a moment to really close it
+            if (GlowUp.Common.CameraHandover.WaitLeft() > 0f) yield return GlowUp.Common.CameraHandover.WaitUntilFree();
             WebCamDevice[] devices = WebCamTexture.devices;
             if (devices == null || devices.Length == 0) { Started?.Invoke(false, "No camera was found on this device."); yield break; }
 
@@ -221,7 +223,7 @@ namespace GlowUp.Scan
         {
             StopAllCoroutines();
             bool wasOpen = cam != null;
-            if (cam != null) { if (cam.isPlaying) cam.Stop(); Destroy(cam); cam = null; }
+            if (cam != null) { if (cam.isPlaying) cam.Stop(); Destroy(cam); cam = null; GlowUp.Common.CameraHandover.Released(); }
             if (display != null) display.texture = null;
             lastAngle = -1; steadyPrevious = null; refocusUntil = 0f;
             priorFrameTimestamp = 0f; FrameRateEstimate = 0f; FrameSequence = 0; LastFrameTimestamp = 0f;

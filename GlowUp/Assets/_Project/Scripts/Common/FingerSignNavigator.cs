@@ -224,6 +224,7 @@ namespace GlowUp.Common
                 if (cam.isPlaying) cam.Stop();
                 Destroy(cam);
                 cam = null;
+                CameraHandover.Released();                  // the phone closes the camera a moment later: AR Try-On waits for that
             }
             Forget();
         }

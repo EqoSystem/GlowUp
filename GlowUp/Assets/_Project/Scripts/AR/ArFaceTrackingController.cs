@@ -294,6 +294,9 @@ namespace GlowUp.AR
                 yield break;
             }
             Say(msgChecking);
+            // the dashboard's finger signs (or the scanner) may have just let go of the front camera: the phone needs a moment to really
+            // close it. Opening it before that left the AR picture black (dashboard > scan > result > dashboard > AR Try-On, 17 Nov 2026).
+            if (CameraHandover.WaitLeft() > 0f) yield return CameraHandover.WaitUntilFree();
 
             // 1. the camera permission: one clear question before anything opens the camera
             bool allowed = true, firstAllow = false;
@@ -555,6 +558,7 @@ namespace GlowUp.AR
                 if (faceManager != null) faceManager.facesChanged -= OnFacesChanged;
                 if (cameraManager != null) cameraManager.frameReceived -= OnFrame;
             }
+            if (sessionObject != null && sessionObject.activeSelf) CameraHandover.Released();      // the AR camera closes a moment later: the next camera user waits
             if (originObject != null) originObject.SetActive(false);
             if (sessionObject != null) sessionObject.SetActive(false);
             if (arCamera != null) arCamera.targetTexture = null;
