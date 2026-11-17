@@ -165,6 +165,8 @@ namespace GlowUp.AR
         {
             if (cameraFeed != null) cameraFeed.Started -= OnCameraStarted;
             if (liveTracking != null) { liveTracking.ModeDecided -= OnModeDecided; liveTracking.FollowsFaceChanged -= RefreshAreaTabs; }
+            // 17 Nov 2026 (owner): the product is forgotten on leaving AR Try-On, so the next visit needs a product chosen again
+            ScanSession.TryOn = null;
         }
         void StopCamera()
         {
