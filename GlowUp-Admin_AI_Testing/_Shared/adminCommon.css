@@ -393,7 +393,10 @@ body.layout-editing .board > .panel .panel-fold-btn { pointer-events: auto; }
 
 html.qs-open .board > .panel[data-qs-grow] { grid-column: span var(--qs-span) !important; }
 @container board (max-width: 639px) {
-    .board > .panel { grid-column: 1 / -1 !important; }
+    /* phone: every panel takes the whole width. :not(#_) lifts this above the compact-board rules above
+       (html:not(.qs-open) .board > .panel is more specific): before 17 Nov 2026 a desktop layout with half-width panels
+       stayed two columns of ~150 px on a phone, and titles, buttons and rows collided. */
+    .board > .panel:not(#_) { grid-column: 1 / -1 !important; }
     .panel.group[data-group="side"] > .panel-inner > .group-body { grid-template-columns: minmax(0, 1fr); }
 }
 
@@ -2156,6 +2159,8 @@ body:has(> :is(#addIngredientModal, #addBrandModal, #productModal)[style*="flex"
 .confirm-words > .modal-intro { margin: 4px 0 0; color: var(--muted); }
 .modal-actions button.has-ic { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; }
 @media (max-width: 480px) {
+    /* phone: the title stands on its own line above the two buttons, centred over them (Sign out?, 17 Nov 2026) */
+    .modal-content.confirm-inline > h3 { flex: 1 1 100%; text-align: center; }
     .modal-content.confirm-inline > .modal-actions { flex: 1 1 100%; display: flex; gap: 10px; }
     .modal-content.confirm-inline > .modal-actions > button.has-ic { flex: 1 1 0; }
 }
@@ -2200,7 +2205,7 @@ html.sb-collapsed.sb-hover .sidebar { width: var(--nav-w); box-shadow: var(--sha
 .main-content > .topbar {
     position: fixed; z-index: 950; top: 0; left: 0; right: 0; height: var(--header-h);
     display: flex; align-items: center; gap: 0; padding: 0;
-    background: color-mix(in srgb, var(--bg) 95%, transparent); border-bottom: 1px solid var(--border);
+    background: var(--bg); border-bottom: 1px solid var(--border);      /* solid: on a phone the page text showed through the header (17 Nov 2026) */
 }
 .topbar-leading { width: var(--rail-w); height: 100%; flex: 0 0 var(--rail-w); display: grid; place-items: center; }
 .topbar .menu-btn { width: var(--icon-box); height: var(--icon-box); padding: 0; flex: none; display: grid; place-items: center; border-radius: var(--radius-sm); }
@@ -2223,6 +2228,26 @@ html.sb-mobile-open body::after { content: ""; position: fixed; z-index: 899; in
     html.sb-mobile-open .sidebar .label { display: inline-block !important; visibility: visible !important; }
     .main-content { margin-left: 0; }
     .topbar-controls { gap: 8px; }
+}
+/* Phone (17 Nov 2026): menu, logo and name on the first row; the search with the page's buttons (Add, settings) on a second row
+   across the whole width. One row squeezed the search under the name and the buttons scrolled out of sight sideways.
+   pageFrame.js measures the taller header into --header-h, so the page starts under it. */
+@media (max-width: 600px) {
+    .main-content > .topbar:has(> .topbar-controls > .search-container) { height: 116px; align-items: flex-start; }
+    .main-content > .topbar:has(> .topbar-controls > .search-container) > :is(.topbar-leading, .brand-home) { height: 60px; }
+    .topbar-controls:has(> .search-container) { top: 60px; bottom: auto; height: 56px; left: var(--gutter); right: var(--gutter); padding-bottom: 6px; }
+    .topbar-controls > .search-container, .topbar.has-tabs .topbar-controls > .search-container { flex: 1 1 auto; min-width: 120px; max-width: none; }
+    /* a page with tabs too (Recycle Bin, Archive): the tabs take the second row, the search and buttons the third */
+    .main-content > .topbar.has-tabs:has(> .topbar-controls > .search-container) { height: 164px; }
+    .topbar.has-tabs .topbar-controls:has(> .search-container) { height: 104px; flex-wrap: wrap; align-content: flex-start; row-gap: 8px; overflow: visible; }
+    .topbar.has-tabs .topbar-controls > .header-tabs { flex: 1 1 100%; }
+    .topbar.has-tabs .topbar-controls > .search-container { flex: 1 1 0; min-width: 96px; }   /* the search gives way so the buttons stay on its row */
+    .topbar.has-tabs .topbar-controls > .header-tabs .seg { flex: 1 1 0; }
+}
+/* the narrowest phones: a header link (Archive, Recycle bin) shows its icon only; the word stays in the page for screen readers */
+@media (max-width: 360px) {
+    .topbar.has-tabs .topbar-controls a.btn { font-size: 0; gap: 0; min-width: 44px; padding-inline: 12px; }
+    .topbar.has-tabs .topbar-controls a.btn svg.ic { width: 18px; height: 18px; }
 }
 @media (prefers-reduced-motion: reduce) {
     html.sb-ready .main-content, .sidebar, html.sb-mobile-open .sidebar, .topbar-controls { transition: none !important; }

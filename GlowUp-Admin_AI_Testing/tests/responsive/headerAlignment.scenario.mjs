@@ -107,14 +107,17 @@ try {
         const controls = r(document.querySelector(".topbar-controls"));
         return {
             brandRight: brand.right,
+            brandBottom: brand.bottom,
             controlsLeft: controls.left,
+            controlsTop: controls.top,
             controlsRight: controls.right,
             clientWidth: document.querySelector(".topbar-controls").clientWidth,
             scrollWidth: document.querySelector(".topbar-controls").scrollWidth
         };
     });
-    ok(mobile.controlsLeft >= mobile.brandRight + 15, "mobile: controls do not overlap the brand");
-    ok(mobile.controlsRight <= 375 && mobile.scrollWidth >= mobile.clientWidth, "mobile: controls remain within a horizontally scrollable header group");
+    // 17 Nov 2026: on a phone the search and the buttons have their own row under the brand (no sideways scrolling any more)
+    ok(mobile.controlsLeft >= mobile.brandRight + 15 || mobile.controlsTop >= mobile.brandBottom - 1, "mobile: controls do not overlap the brand");
+    ok(mobile.controlsRight <= 375 && mobile.scrollWidth <= mobile.clientWidth + 1, "mobile: every header control fits in view, nothing scrolls sideways");
     await page.click("#menuBtn");
     await page.waitForTimeout(220);
     const mobileOpen = await page.evaluate(() => ({
@@ -123,7 +126,7 @@ try {
         labelVisible: getComputedStyle(document.querySelector("#sidebarNav .label")).visibility === "visible"
     }));
     ok(mobileOpen.open && mobileOpen.sidebarVisible && mobileOpen.labelVisible, "mobile: opening the menu reveals the labeled off-canvas navigation");
-    await page.mouse.click(350, 100);
+    await page.mouse.click(350, 400);                // on the dimmed page beside the menu (y 100 is the header's second row now)
     await page.waitForTimeout(20);
     ok(!await page.evaluate(() => document.documentElement.classList.contains("sb-mobile-open")), "mobile: tapping the backdrop closes the off-canvas navigation");
     await page.click("#menuBtn");
