@@ -63,6 +63,8 @@ namespace GlowUp.Auth
         [SerializeField] private string msgEnterEmail = "Please enter your email address.";
         [SerializeField] private string msgEnterPassword = "Please enter your password.";
         [SerializeField] private string msgBadCredentials = "Email or password is incorrect.";
+        [SerializeField] private string msgNotRegistered = "This email is not registered. Check it, or tap Sign Up.";
+        [SerializeField] private string msgWrongPassword = "Password is incorrect.";
         [SerializeField] private string msgProfileNotLoaded = "You are signed in, but your profile could not be loaded. Check the internet connection and tap Log-In again.";
         [Tooltip("How long to wait for the sign-in service before checking the email and password on this phone instead (seconds)")]
         [SerializeField] private float signInWaitSeconds = 20f;
@@ -230,7 +232,15 @@ namespace GlowUp.Auth
                     }
                     catch (Exception e)
                     {
-                        if (!TaskLimits.IsNetworkProblem(e)) { Fail(msgBadCredentials); return; }
+                        if (!TaskLimits.IsNetworkProblem(e))
+                        {
+                            // 17 Nov 2026 (owner): an email with no account says so, instead of "Email or password is incorrect".
+                            // Firebase tells the two apart (UserNotFound / WrongPassword) only while its "email enumeration protection"
+                            // is off; with it on, both come back as InvalidCredential and the general message stays.
+                            AuthError why = AuthErrorOf(e);
+                            Fail(why == AuthError.UserNotFound ? msgNotRegistered : why == AuthError.WrongPassword ? msgWrongPassword : msgBadCredentials);
+                            return;
+                        }
                         { }
                     }
                 }
