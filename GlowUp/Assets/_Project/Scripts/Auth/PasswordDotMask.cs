@@ -26,6 +26,7 @@ namespace GlowUp.Auth
         const float RapidSeconds = 0.18f;               // keys closer together than this count as rapid typing
         float lastChangeAt = -10f;
         float shownAlpha = 1f;
+        Color shownColor = Color.white;                 // the real text's colour while it is visible (never read while it is hidden)
 
         /// <summary>Makes a password field show dots. Safe to call more than once.</summary>
         public static void ApplyTo(TMP_InputField field)
@@ -67,14 +68,20 @@ namespace GlowUp.Auth
             TMP_Text real = field.textComponent;
             if (real == null) return;
             if (overlay == null) Build(real);
-            overlay.font = real.font; overlay.fontSize = real.fontSize; overlay.color = real.color;
+            // The colour to draw the picture in is remembered while the real text is VISIBLE. While a reveal is already showing, the real
+            // text is transparent (alpha 0): copying its colour made the picture transparent too, so from the second or third letter on
+            // both were invisible for the whole second ("at 3 characters the text goes missing for a second and goes back", 17 Nov 2026).
+            if (hideAt < 0f)
+            {
+                shownAlpha = real.alpha > 0.01f ? real.alpha : 1f;
+                shownColor = real.color; shownColor.a = shownAlpha;
+            }
+            overlay.font = real.font; overlay.fontSize = real.fontSize; overlay.color = shownColor;
             overlay.alignment = real.alignment; overlay.fontStyle = real.fontStyle;
             overlay.text = new string(Dot, value.Length - 1) + value[value.Length - 1];
             overlay.ForceMeshUpdate();
             // a text longer than the box scrolls inside the field: the picture could stand in the wrong place, so no reveal then
             if (overlay.preferredWidth > real.rectTransform.rect.width) { Hide(); return; }
-            // never remember 0: PasswordLengthMask may have hidden the text already, and restoring 0 would leave the box blank for good
-            if (hideAt < 0f) shownAlpha = real.alpha > 0.01f ? real.alpha : 1f;
             real.alpha = 0f;
             overlay.gameObject.SetActive(true);
             hideAt = Time.unscaledTime + revealSeconds;
