@@ -23,6 +23,8 @@ namespace GlowUp.Auth
         TextMeshProUGUI overlay;
         int lastLength;
         float hideAt = -1f;
+        const float RapidSeconds = 0.18f;               // keys closer together than this count as rapid typing
+        float lastChangeAt = -10f;
         float shownAlpha = 1f;
 
         /// <summary>Makes a password field show dots. Safe to call more than once.</summary>
@@ -56,7 +58,12 @@ namespace GlowUp.Auth
             value = value ?? "";
             bool oneMoreAtEnd = value.Length == lastLength + 1 && field.stringPosition >= value.Length;
             lastLength = value.Length;
-            if (!oneMoreAtEnd || !Masked || revealSeconds <= 0f) { Hide(); return; }
+            // rapid typing (17 Nov 2026): no reveal while letters come faster than RapidSeconds apart. Swapping the picture and the real
+            // dots on every key made letters seem to vanish and come back; the field's own dots show the true count at once.
+            float now = Time.unscaledTime;
+            bool rapid = now - lastChangeAt < RapidSeconds;
+            lastChangeAt = now;
+            if (!oneMoreAtEnd || !Masked || revealSeconds <= 0f || rapid) { Hide(); return; }
             TMP_Text real = field.textComponent;
             if (real == null) return;
             if (overlay == null) Build(real);

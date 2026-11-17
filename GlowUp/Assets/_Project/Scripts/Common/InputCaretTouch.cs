@@ -154,6 +154,10 @@ namespace GlowUp.Common
             syncKeyboardText = false;
 
             // 4. the keyboard moved its own caret (space-bar swipe): the field follows
+            // NOT for a hidden password (17 Nov 2026): the phone's secure keyboard box reports its caret late during fast typing; copying
+            // that old caret (or an old selected range) onto the field made the next letters land in the wrong place or replace letters,
+            // so characters went missing. It happened only with the eye closed. A hidden password has no visible caret to swipe anyway.
+            if (field.inputType == TMP_InputField.InputType.Password) { lastText = field.text; return; }
             if (keyboard == null || !keyboard.active || !keyboard.canGetSelection) return;
             RangeInt now = keyboard.selection;
             // typing changes the text AND the keyboard's caret: that is the field's business, not a caret move of the user
