@@ -132,6 +132,7 @@ namespace GlowUp.Onboarding
             if (birthday != null) birthday.DateChanged += OnBirthday;
             if (continueButton != null) continueButton.onClick.AddListener(OnContinue);
             DisabledTapRelay.On(continueButton, OnContinue);         // a tap on the greyed Continue names the field that needs correcting
+            TapThroughShift.On(continueButton);                      // the first tap after typing closes the keyboard and the page slides: that tap still counts
             if (backButton != null) backButton.onClick.AddListener(OnBack);
             if (age != null) { age.readOnly = true; age.interactable = false; }
             // any real mail domain may sign up now (12 October 2026); the verifier says when a checked domain has its answer

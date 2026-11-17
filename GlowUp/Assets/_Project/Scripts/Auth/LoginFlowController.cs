@@ -92,6 +92,12 @@ namespace GlowUp.Auth
             if (emailInput != null) emailInput.onValueChanged.AddListener(value => { if (string.IsNullOrEmpty(value) && passwordInput != null && !string.IsNullOrEmpty(passwordInput.text)) passwordInput.text = ""; });
 
             Hook(signInButton, SignIn); Hook(forgotPasswordButton, ForgotPassword); Hook(signUpButton, SignUp);
+            // 17 Nov 2026: the first tap after typing closes the keyboard and the card slides back under the finger, so the click was lost
+            // (the tap sound played, nothing happened, the second tap worked). These buttons also take a tap the page moved under.
+            TapThroughShift.On(signInButton); TapThroughShift.On(forgotPasswordButton); TapThroughShift.On(signUpButton);
+            // the two text links are about 23 dp high: their tappable area is made taller than their words (to about 45 dp)
+            foreach (Button link in new[] { forgotPasswordButton, signUpButton })
+                if (link != null && link.targetGraphic != null) link.targetGraphic.raycastPadding = new Vector4(0f, -30f, 0f, -30f);
             Hook(resetSendButton, SendReset);
             Hook(resetCancelButton, () => { if (resetPanel != null) resetPanel.Hide(); });
             if (resetEmailInput != null) resetEmailInput.onValueChanged.AddListener(_ => SayReset(""));        // a message goes once the user types again
