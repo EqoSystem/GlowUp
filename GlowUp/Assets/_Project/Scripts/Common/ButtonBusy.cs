@@ -13,7 +13,7 @@ namespace GlowUp.Common
     /// </summary>
     public static class ButtonBusy
     {
-        class State { public float fontSize; public bool autoSize; public Vector4 margin; public RectTransform spinner; public ColorBlock colors; public bool colorsKept; }
+        class State { public float fontSize; public bool autoSize; public Vector4 margin; public RectTransform spinner; public ColorBlock colors; public bool colorsKept; public List<GameObject> hidden = new List<GameObject>(); }
         static readonly Dictionary<TMP_Text, State> states = new Dictionary<TMP_Text, State>();
         const float Gap = 16f;
 
@@ -43,6 +43,45 @@ namespace GlowUp.Common
                 button.colors = look;
                 button.interactable = !busy && interactable;
             }
+            // A pill button keeps its icon and label side by side in one centred row (the "Take photo" button of the scanner). The spinner
+            // then takes the ICON's place in that row, as a row member of its own: nothing is worked out by hand, so it can never lie on top
+            // of the words (17 Nov 2026: "Identifying..." had the spinner over its first letters, the camera icon still showing).
+            HorizontalLayoutGroup row = label.transform.parent != null ? label.transform.parent.GetComponent<HorizontalLayoutGroup>() : null;
+            if (row != null)
+            {
+                foreach (GameObject kept in state.hidden) if (kept != null) kept.SetActive(true);
+                state.hidden.Clear();
+                if (!busy)
+                {
+                    state.spinner.gameObject.SetActive(false);
+                    if (words != null) label.text = words;
+                    LayoutRebuilder.ForceRebuildLayoutImmediate((RectTransform)row.transform);
+                    return;
+                }
+                foreach (Transform child in row.transform)
+                    if (child != label.transform && child != state.spinner && child.gameObject.activeSelf) { state.hidden.Add(child.gameObject); }
+                foreach (GameObject icon in state.hidden) icon.SetActive(false);
+                float spin = Mathf.Round(Mathf.Max(label.fontSize, 28f) * 1.05f);
+                if (state.spinner.parent != row.transform) state.spinner.SetParent(row.transform, false);
+                state.spinner.SetSiblingIndex(label.transform.GetSiblingIndex());           // left of the words
+                state.spinner.anchorMin = state.spinner.anchorMax = new Vector2(0.5f, 0.5f);
+                state.spinner.sizeDelta = new Vector2(spin, spin);
+                LayoutElement spinnerSize = state.spinner.GetComponent<LayoutElement>();
+                if (spinnerSize == null) spinnerSize = state.spinner.gameObject.AddComponent<LayoutElement>();
+                spinnerSize.minWidth = spinnerSize.preferredWidth = spin; spinnerSize.minHeight = spinnerSize.preferredHeight = spin;
+                state.spinner.GetComponent<Image>().color = label.color;
+                state.spinner.gameObject.SetActive(true);
+                string text = words ?? "";
+                float widest = row.padding.horizontal + spin + row.spacing + label.GetPreferredValues(text).x;
+                RectTransform rowRect = (RectTransform)row.transform;
+                if (!string.IsNullOrEmpty(shortWords) && widest > rowRect.rect.width && rowRect.rect.width > 0f) text = shortWords;
+                label.text = text;
+                label.overflowMode = TextOverflowModes.Overflow;
+                label.enableWordWrapping = false;
+                LayoutRebuilder.ForceRebuildLayoutImmediate(rowRect);
+                return;
+            }
+
             if (!busy)
             {
                 state.spinner.gameObject.SetActive(false);
