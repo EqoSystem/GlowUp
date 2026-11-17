@@ -161,6 +161,8 @@ namespace GlowUp.AR
         float liveSince;
         Coroutine blackWatch;
         int recoveries;                              // restarts after the app came back to an empty screen (at most 2 per visit)
+        int liveRetries;                             // live starts tried again after a first failure (at most 1 per visit)
+        [SerializeField] private string msgLiveFailed = "Live tracking could not start ({0}). Using the guided preview.";
         bool guidedAfterFirstAllow;                  // the camera was allowed a moment ago and the guided preview was chosen: no live restart this visit
 
         RenderTexture picture, beforePicture;
@@ -183,6 +185,7 @@ namespace GlowUp.AR
         {
             if (routine != null || IsLive) return;
             recoveries = 0;
+            liveRetries = 0;
             guidedAfterFirstAllow = false;
             lastCameraFrameAt = lastFaceUpdateAt = previousCameraFrameAt = estimatedCameraFps = 0f;
             routine = StartCoroutine(Run());
@@ -395,8 +398,20 @@ namespace GlowUp.AR
             {
                 string why = frames < 3 ? "the AR camera did not start in time" : !frontCamera ? "the phone did not give AR the front camera" : "the phone has no face tracking";
                 StopLive();
+                // One more try (17 Nov 2026): after the camera was used earlier in the same app session (the scanner, the finger signs) the
+                // first AR start can fail while the phone is still closing that camera, and works a moment later. A phone with no face
+                // tracking at all is not retried.
+                if (canTrackFaces && liveRetries < 1)
+                {
+                    liveRetries++;
+                    EndGuard();
+                    yield return new WaitForSecondsRealtime(0.6f);
+                    yield return CameraHandover.WaitUntilFree();
+                    routine = StartCoroutine(Run());
+                    yield break;
+                }
                 yield return null; yield return null;           // give the phone a moment to hand the camera back
-                UseGuidedPreview(why);
+                UseGuidedPreview(why, string.Format(msgLiveFailed, why));
                 yield break;
             }
 
@@ -433,8 +448,17 @@ namespace GlowUp.AR
                 blackWatch = null;
                 EndGuard();
                 StopLive();
+                if (liveRetries < 1 && routine == null && isActiveAndEnabled)
+                {
+                    // one more try (see Run): the first AR start after the camera was used elsewhere can stay black and work a moment later
+                    liveRetries++;
+                    yield return new WaitForSecondsRealtime(0.6f);
+                    yield return CameraHandover.WaitUntilFree();
+                    routine = StartCoroutine(Run());
+                    yield break;
+                }
                 yield return null; yield return null;           // give the phone a moment to hand the camera back
-                UseGuidedPreview("the live picture stayed black");
+                UseGuidedPreview("the live picture stayed black", string.Format(msgLiveFailed, "the live picture stayed black"));
                 yield break;
             }
             blackWatch = null;
