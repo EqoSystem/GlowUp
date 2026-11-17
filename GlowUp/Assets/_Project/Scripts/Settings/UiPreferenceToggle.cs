@@ -14,7 +14,7 @@ namespace GlowUp.AppSettings
     public class UiPreferenceToggle : MonoBehaviour
     {
         // new choices go at the END of this list: the scenes remember a choice by its place in it.
-        // ShakeToNavigate and AirGestures are features that were removed: their places stay so the others keep theirs.
+        // ShakeToNavigate, AirGestures and FingerSigns are features that were removed: their places stay so the others keep theirs.
         public enum Preference { TapSounds, ShakeToNavigate, EdgeLight, ScanBrightScreen, TryOnBrightScreen, AutoFlashlight, TryOnScreenLight, AirGestures, FingerSigns, DeleteSound }
 
         [SerializeField] private Preference preference = Preference.TapSounds;
@@ -40,7 +40,7 @@ namespace GlowUp.AppSettings
                     case Preference.TapSounds: return UiPreferences.TapSounds;
                     case Preference.ShakeToNavigate: return false;              // removed feature
                     case Preference.AirGestures: return false;                  // removed feature
-                    case Preference.FingerSigns: return UiPreferences.FingerSigns;
+                    case Preference.FingerSigns: return false;                  // removed feature
                     case Preference.DeleteSound: return UiPreferences.DeleteSound;
                     case Preference.EdgeLight: return UiPreferences.BorderLight;
                     case Preference.ScanBrightScreen: return UiPreferences.ScanBrightScreen;
@@ -56,7 +56,7 @@ namespace GlowUp.AppSettings
                     case Preference.TapSounds: UiPreferences.TapSounds = value; break;
                     case Preference.ShakeToNavigate: break;                     // removed feature
                     case Preference.AirGestures: break;                         // removed feature
-                    case Preference.FingerSigns: UiPreferences.FingerSigns = value; break;
+                    case Preference.FingerSigns: break;                          // removed feature
                     case Preference.DeleteSound: UiPreferences.DeleteSound = value; break;
                     case Preference.EdgeLight: UiPreferences.BorderLight = value; break;
                     case Preference.ScanBrightScreen: UiPreferences.ScanBrightScreen = value; break;

@@ -126,11 +126,11 @@ namespace GlowUp.EditorTools
         const string BarcodeLine = "    implementation 'com.google.mlkit:barcode-scanning:17.2.0' // GlowUp: the phone's own barcode reader for the scan screen " +
                                    "(GlowUpBarcodeReader.java). Kept outside the Android Resolver block on purpose.";
 
-        // The hand finder of the finger signs. This exact version is chosen on purpose: later versions (0.10.13 and up) bring a
+        // The MediaPipe library of the guided face finder. This exact version is chosen on purpose: later versions (0.10.13 and up) bring a
         // newer "protobuf" library than Firebase's database works with. Do not raise it without checking that.
         const string HandLibrary = "com.google.mediapipe:tasks-vision";
         const string HandLine = "    implementation('com.google.mediapipe:tasks-vision:0.10.11') { exclude group: 'com.google.auto.value', module: 'auto-value' } " +
-                                "// GlowUp: the phone's own hand finder for finger signs (GlowUpHandReader.java). Kept outside the Android Resolver block on purpose.";
+                                "// GlowUp: the phone's own face finder for the guided AR Try-On (GlowUpFaceReader.java). Kept outside the Android Resolver block on purpose.";
 
         /// <summary>Builds for ARMv7 + ARM64 and keeps the Gradle template right. Adds a note only for what it changed.</summary>
         public static bool SetArchitectures(List<string> notes)

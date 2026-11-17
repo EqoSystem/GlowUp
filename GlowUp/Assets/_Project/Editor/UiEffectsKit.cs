@@ -80,15 +80,6 @@ namespace GlowUp.EditorTools
                     clips.GetArrayElementAtIndex(i).objectReferenceValue = AssetDatabase.LoadAssetAtPath<AudioClip>(AudioFolder + SoundFiles[i] + ".wav");
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
-            // the old "shake to change screen" and the finger signs (1 to 5 fingers held up to the selfie camera) are gone; what an earlier build left is removed
-            var shake = root.GetComponent<ShakeNavigator>();
-            if (shake != null) Object.DestroyImmediate(shake);
-            var oldSigns = root.GetComponent<FingerSignNavigator>();
-            if (oldSigns != null) Object.DestroyImmediate(oldSigns);
-            var oldIndicator = root.GetComponent<FingerSignIndicator>();
-            if (oldIndicator != null) Object.DestroyImmediate(oldIndicator);
-            Transform oldSignCanvas = root.transform.Find("FingerSignCanvas");
-            if (oldSignCanvas != null) Object.DestroyImmediate(oldSignCanvas.gameObject);
             var transition = SceneBuilderCore.Ensure<ScreenTransition>(root);
 
             // ---- the sheet that covers the screen during a change (rebuilt each time) ----

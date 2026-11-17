@@ -44,10 +44,6 @@ namespace GlowUp.EditorTools
             Transform card = s.card;
             PerformanceProfile performanceProfile = EnsurePerformanceProfile();
             GameObject features = SceneBuilderCore.EnsureRoot(FeaturesRootName);
-            // New17: finger signs are not part of the Settings page. An older build left an object with no rows or buttons
-            // wired to it; it is removed here (the FingerSignSettings script itself stays in the project).
-            Transform oldSignSettings = features.transform.Find("FingerSignSettings");
-            if (oldSignSettings != null) Object.DestroyImmediate(oldSignSettings.gameObject);
 
             // ---- the scrolling list ----
             GameObject listArea = A.Node(card, "SettingsArea");
