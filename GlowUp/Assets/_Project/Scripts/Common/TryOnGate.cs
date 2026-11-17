@@ -12,7 +12,8 @@ namespace GlowUp.Common
     /// </summary>
     public static class TryOnGate
     {
-        public const string Message = "Scan a product first, then tap Try On on its result or in Recent Scans.";
+        // 17 Nov 2026 (owner): say where a product comes from: a scan (new users), Recommended for You on the dashboard, or an Alternative on a scan result
+        public const string Message = "Try On needs a product. Scan one, or pick one from Recommended for You on the dashboard, or from the Alternatives on a scan result.";
 
         /// <summary>Raised when AR Try-On was refused (the screen that is open shows the message).</summary>
         public static event Action Blocked;
