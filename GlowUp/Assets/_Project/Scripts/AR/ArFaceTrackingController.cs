@@ -161,6 +161,7 @@ namespace GlowUp.AR
         float liveSince;
         Coroutine blackWatch;
         int recoveries;                              // restarts after the app came back to an empty screen (at most 2 per visit)
+        bool guidedAfterFirstAllow;                  // the camera was allowed a moment ago and the guided preview was chosen: no live restart this visit
 
         RenderTexture picture, beforePicture;
         ARCameraBackground background;
@@ -182,6 +183,7 @@ namespace GlowUp.AR
         {
             if (routine != null || IsLive) return;
             recoveries = 0;
+            guidedAfterFirstAllow = false;
             lastCameraFrameAt = lastFaceUpdateAt = previousCameraFrameAt = estimatedCameraFps = 0f;
             routine = StartCoroutine(Run());
         }
@@ -334,6 +336,11 @@ namespace GlowUp.AR
                 }
                 if (firstAllow)
                 {
+                    // 17 Nov 2026 (black screen after the first "allow", a new user): the phone can report "in front again" more than once
+                    // after its question. A later report found nothing playing YET (the guided camera needs a moment) and started live
+                    // tracking through OnApplicationFocus: Google's AR camera and the guided camera then fought over the one lens and the
+                    // screen stayed black until the app was restarted. After the first "allow" nothing may start live tracking in this visit.
+                    guidedAfterFirstAllow = true;
                     { }
                     UseGuidedPreview("the camera was just allowed: the phone is still coming back from its question", msgLiveNextTime);
                     yield break;
@@ -449,6 +456,7 @@ namespace GlowUp.AR
         {
 #if UNITY_ANDROID && !UNITY_EDITOR
             if (!focus || routine != null || IsLive || !isActiveAndEnabled || recoveries >= 2) return;
+            if (guidedAfterFirstAllow) return;                 // the guided camera is opening: a second camera user would leave a black screen
             if (guidedCamera != null && guidedCamera.IsPlaying) return;
             if (!Permission.HasUserAuthorizedPermission(Permission.Camera)) return;
             recoveries++;
