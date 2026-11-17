@@ -37,9 +37,9 @@ namespace GlowUp.Common
             if (tryOnButton != null) tryOnButton.onClick.AddListener(() =>
             {
                 if (current == Tab.TryOn) return;
-                ScanSession.TryOn = null;            // from the bar, Try On always starts by choosing a saved product
-                if (!TryOnGate.Allowed) { SayNeedsProduct(); return; }     // no saved product yet: the bar's pill stays where it is
-                Open(tryOnScene, 2);
+                // from the bar there is no product chosen yet: Try On says where to pick one (17 Nov 2026), the bar's pill stays where it is
+                ScanSession.TryOn = null;
+                SayNeedsProduct();
             });
             TryOnGate.Blocked += SayNeedsProduct;    // a swipe or another button asked for AR Try-On without a product
         }

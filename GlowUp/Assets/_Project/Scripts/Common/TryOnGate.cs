@@ -13,21 +13,17 @@ namespace GlowUp.Common
     public static class TryOnGate
     {
         // 17 Nov 2026 (owner): say where a product comes from: a scan (new users), Recommended for You on the dashboard, or an Alternative on a scan result
-        public const string Message = "Try On needs a product. Scan one, or pick one from Recommended for You on the dashboard, or from the Alternatives on a scan result.";
+        public const string Message = "Try On needs a product. Scan one, or pick one from Recent Scans, Recommended for You on the dashboard, or the Alternatives on a scan result.";
 
         /// <summary>Raised when AR Try-On was refused (the screen that is open shows the message).</summary>
         public static event Action Blocked;
 
-        /// <summary>True when there is a product to try on: one chosen, or a saved scan to choose from.</summary>
-        public static bool Allowed
-        {
-            get
-            {
-                if (ScanSession.TryOn != null) return true;
-                try { return ScanHistoryRepository.Active().Count > 0; }
-                catch (Exception) { return true; }               // the history cannot be read: do not lock the user out
-            }
-        }
+        /// <summary>
+        /// True only when a product was chosen (17 Nov 2026, owner: Try On exists to preview a certain product, so it never opens without one,
+        /// even for a user who has saved scans). The product is chosen on a scan result, in Recent Scans, in Recommended for You or in the
+        /// Alternatives; each of those sets ScanSession.TryOn before it opens AR Try-On.
+        /// </summary>
+        public static bool Allowed => ScanSession.TryOn != null;
 
         /// <summary>Tells the open screen that AR Try-On was refused.</summary>
         public static void RaiseBlocked()
