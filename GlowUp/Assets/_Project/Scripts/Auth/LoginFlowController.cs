@@ -358,13 +358,21 @@ namespace GlowUp.Auth
 
         void SignUp()
         {
+            if (ScreenTransition.IsBusy || signUpOpening) return;         // one tap is enough: a second tap used to queue another load
             OnboardingSession.Social = false;
             // "Sign Up" always starts a sign-up of its own: an account left in the draft by an earlier, abandoned one is not taken over
             // (nobody is signed in to it here; Step 1 would notice that too)
             if (OnboardingSession.HasAccount) OnboardingSession.ForgetAccount();
             ContextualHintController.MarkNewUser(true);
+            // The sign-up screen is the biggest one and nothing covers the change, so the log-in page used to stand still for a moment
+            // after the tap and looked frozen (17 Nov 2026). The button answers at once: a spinner and "Opening...".
+            signUpOpening = true;
+            if (signUpButton != null) ButtonBusy.Set(signUpButton, signUpButton.GetComponentInChildren<TMP_Text>(true), true, msgOpeningSignUp);
             SceneNavigator.Go(onboardingScene);
         }
+
+        bool signUpOpening;
+        [SerializeField] private string msgOpeningSignUp = "Opening...";
 
         bool socialBusy;
 
