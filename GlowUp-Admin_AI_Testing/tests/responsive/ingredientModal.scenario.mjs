@@ -34,8 +34,12 @@ async function layoutProblems(page) {
             const w = Math.min(x.right, y.right) - Math.max(x.left, y.left), h = Math.min(x.bottom, y.bottom) - Math.max(x.top, y.top);
             if (w > 1 && h > 1) problems.push(`overlap: ${a.id || a.className || a.tagName}:"${(a.textContent || "").trim().slice(0, 20)}" and ${b.id || b.className || b.tagName}:"${(b.textContent || "").trim().slice(0, 20)}"`);
         }
-        const foot = modal.querySelector(".ing-foot").getBoundingClientRect(), head = modal.querySelector(".ing-nav").getBoundingClientRect();
+        // New21: the window slides in (about 0.4 s, 9 animations). Measuring the footer once during that slide made whole
+        // columns of fields read "under the footer" on some runs. Finish the motion, then measure the footer per field.
+        document.getAnimations().forEach((a) => { try { a.finish(); } catch (e) { } });
+        let foot = modal.querySelector(".ing-foot").getBoundingClientRect(), head = modal.querySelector(".ing-nav").getBoundingClientRect();
         for (const node of list) {
+            foot = modal.querySelector(".ing-foot").getBoundingClientRect(); head = modal.querySelector(".ing-nav").getBoundingClientRect();
             node.scrollIntoView({ block: "center" });
             const r = rect(node);
             if (r.bottom > foot.top + 1 && !node.closest(".ing-foot") && !node.closest(".ing-head, .ing-nav")) { node.scrollIntoView({ block: "nearest" }); }
@@ -241,9 +245,12 @@ try {
         let backwards = 0;
         for (let i = 1; i < inBody.length; i++) if (inBody[i].top < inBody[i - 1].top - 8 && inBody[i].where === "body") backwards++;
         ok(backwards <= 8, `the tab order follows the page top to bottom (${backwards} small jumps back, from boxes sharing a row or the wrap round)`);
+        // New21: after 90 Tabs the focus can sit inside an open list (how many controls there are depends on how fast the
+        // Sources rows load), and Esc then rightly closes that list first. Put the focus on the window itself, then check.
+        await page.click(".ing-head h3");
         await page.keyboard.press("Escape");
-        await page.waitForTimeout(200);
-        ok(await page.evaluate(() => getComputedStyle(document.getElementById("addIngredientModal")).display === "none"), "Esc closes the window");
+        const closed = await page.waitForFunction(() => getComputedStyle(document.getElementById("addIngredientModal")).display === "none", null, { timeout: 2000 }).then(() => true, () => false);
+        ok(closed, "Esc closes the window");
         ok(errors.filter((e) => !/404/.test(e)).length === 0, "no page errors in the behaviour checks " + errors.join("; "));
         await page.context().close();
     }

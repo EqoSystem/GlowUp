@@ -24,7 +24,8 @@ export async function launch() {
 }
 
 
-export async function openPage(browser, key, { theme = "light", width = 1440, height = 900, lat = { auth: 0, read: 0 }, go = true, touch = false } = {}) {
+export async function openPage(browser, key, { theme = "light", width = 1440, height = 900, lat = { auth: 0, read: 0 }, go = true, touch = false, pageHeaders = null } = {}) {
+    // pageHeaders: extra response headers for the HTML pages (the CSP test serves the real vercel.json policy).
     // touch: a phone context (pointer: coarse), so touch-only CSS such as the 44 px targets applies.
     const ctx = await browser.newContext({ viewport: { width, height }, colorScheme: theme || "dark", ...(touch ? { hasTouch: true, isMobile: true } : {}) });
     await ctx.addInitScript(({ seed, signedIn, theme, lat }) => {
@@ -42,7 +43,7 @@ export async function openPage(browser, key, { theme = "light", width = 1440, he
             if (url.pathname.startsWith("/api/")) return route.fulfill({ status: 404, body: "{}" });
             const file = path.join(SITE, decodeURIComponent(url.pathname));
             if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) return route.fulfill({ status: 404, body: "not found" });
-            return route.fulfill({ status: 200, contentType: TYPES[path.extname(file)] || "application/octet-stream", body: fs.readFileSync(file), headers: { "cache-control": "no-store" } });
+            return route.fulfill({ status: 200, contentType: TYPES[path.extname(file)] || "application/octet-stream", body: fs.readFileSync(file), headers: { "cache-control": "no-store", ...(pageHeaders && path.extname(file) === ".html" ? pageHeaders : {}) } });
         }
         return route.abort();
     });
