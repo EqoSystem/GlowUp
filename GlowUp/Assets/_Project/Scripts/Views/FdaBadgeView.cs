@@ -160,7 +160,7 @@ namespace GlowUp.Views
             Sprite s = state == PhFdaVerification.Registered ? registeredIcon : state == PhFdaVerification.Expired ? expiredIcon
                      : state == PhFdaVerification.Similar ? similarIcon : state == PhFdaVerification.None ? noneIcon
                      : state == Checking && checkingIcon != null ? checkingIcon : unavailableIcon;
-            if (iconBackground != null) { iconBackground.color = c; if (icon != null) icon.color = Color.white; }
+            if (iconBackground != null) { iconBackground.color = c; if (icon != null) icon.color = ContrastInk.On(c); }   // New21: readable on light fills too
             else if (icon != null) icon.color = c;
             if (icon != null && s != null) icon.sprite = s;
         }

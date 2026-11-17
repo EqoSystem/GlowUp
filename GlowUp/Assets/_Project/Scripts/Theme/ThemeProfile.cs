@@ -21,7 +21,7 @@ namespace GlowUp.Theme
     public class ThemeProfile : ScriptableObject
     {
         /// <summary>Bump when the default palette changes so the scene builders re-apply it once.</summary>
-        public const int CurrentPaletteVersion = 6;   // 6: Information, Border and Disabled tokens (16 November 2026)
+        public const int CurrentPaletteVersion = 7;   // 6: Information, Border and Disabled tokens (16 November 2026); 7: New21 AA on Rose Mist (17 November 2026)
         [HideInInspector] public int paletteVersion;
 
         [System.Serializable]
@@ -98,14 +98,14 @@ namespace GlowUp.Theme
             buttonText = Hex("#241A1C"),       // near-black on pink: 5.2 : 1 (white would be 3.3 : 1)
             inputBackground = Hex("#FAF7F2"),  // Pearl White
             inputText = Hex("#3A2F2E"),
-            inputPlaceholder = Hex("#7D6C6C"), // 4.6 : 1 on Pearl White
+            inputPlaceholder = Hex("#6A5C5C"), // New21: 4.6 : 1 on every light surface, Rose Mist included
             accent = Hex("#D98EA0"),           // Dusty Rose: borders, glow, selected states
-            success = Hex("#4F7240"),          // sage: 5.3 : 1 as text, 5.5 : 1 under white text
-            caution = Hex("#946312"),          // amber: 5.0 : 1
-            warning = Hex("#B5472F"),          // brick: 5.2 : 1
+            success = Hex("#47673A"),          // sage (New21): 4.6 : 1 or more on every light surface
+            caution = Hex("#805610"),          // amber (New21): 4.6 : 1 or more on every light surface
+            warning = Hex("#A4402A"),          // brick (New21): 4.6 : 1 or more on every light surface
             gold = Hex("#B88A3B"),             // gold highlights
-            accentText = Hex("#B04A69"),       // deep rose: 5.0 : 1 on the background
-            info = Hex("#3A6A96"),             // information blue: 5.5 : 1 on the background, 4.9 : 1 on cards
+            accentText = Hex("#9C425D"),       // deep rose (New21): 4.6 : 1 or more on every light surface
+            info = Hex("#35628A"),             // information blue (New21): 4.6 : 1 or more on every light surface
             border = Hex("#CDBBB8"),           // warm gray dividers
             disabled = Hex("#A3959A")          // muted warm gray (disabled controls are exempt from the text ratio)
         };
@@ -126,7 +126,7 @@ namespace GlowUp.Theme
             accent = Hex("#D98EA0"),
             success = Hex("#8DB56B"),
             caution = Hex("#E0A94F"),
-            warning = Hex("#E57A68"),
+            warning = Hex("#E78675"),          // New21: 4.6 : 1 on input fields too
             gold = Hex("#D4AF70"),             // gold highlights
             accentText = Hex("#E3A1B1"),
             info = Hex("#8DB7E0"),             // information blue: 7.9 : 1 on the background, 6.8 : 1 on cards

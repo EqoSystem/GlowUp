@@ -56,7 +56,7 @@ namespace GlowUp.Views
         {
             Color c = level == "good" ? goodColor : level == "caution" ? cautionColor : level == "bad" ? badColor : unknownColor;
             Sprite s = level == "good" ? goodIcon : level == "caution" ? cautionIcon : level == "bad" ? badIcon : unknownIcon;
-            if (iconBackground != null) { iconBackground.color = c; if (icon != null) icon.color = Color.white; }
+            if (iconBackground != null) { iconBackground.color = c; if (icon != null) icon.color = ContrastInk.On(c); }   // New21: readable on light fills too
             else if (icon != null) icon.color = c;
             if (icon != null && s != null) icon.sprite = s;
         }

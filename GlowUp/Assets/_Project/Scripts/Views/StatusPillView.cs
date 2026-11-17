@@ -49,9 +49,8 @@ namespace GlowUp.Views
         void Paint()
         {
             Color c = status == "safe" ? safeColor : status == "harmful" ? harmfulColor : cautionColor;
-            // white text on darker pills, dark text on lighter ones
-            float luminance = 0.299f * c.r + 0.587f * c.g + 0.114f * c.b;
-            Color text = luminance > 0.55f ? darkText : Color.white;
+            // white text on darker pills, dark text on lighter ones: whichever has the higher WCAG contrast (New21)
+            Color text = ContrastInk.On(c, darkText);
             if (background != null) background.color = c;
             if (label != null)
             {

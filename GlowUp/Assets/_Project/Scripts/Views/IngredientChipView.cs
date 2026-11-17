@@ -55,11 +55,12 @@ namespace GlowUp.Views
 
         void Paint()
         {
-            if (dot != null) dot.color = level == "safe" ? safeColor : level == "caution" ? cautionColor : level == "harmful" ? harmfulColor : unknownColor;
+            Color fill = level == "safe" ? safeColor : level == "caution" ? cautionColor : level == "harmful" ? harmfulColor : unknownColor;
+            if (dot != null) dot.color = fill;
             if (icon == null) return;
             Sprite s = level == "safe" ? safeIcon : level == "caution" ? cautionIcon : level == "harmful" ? harmfulIcon : unknownIcon;
             if (s != null) icon.sprite = s;
-            icon.color = Color.white;
+            icon.color = ContrastInk.On(fill);   // New21: white on dark fills, dark ink on the light dark-mode fills
         }
     }
 }
