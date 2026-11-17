@@ -105,6 +105,9 @@ namespace GlowUp.EditorTools
             foreach (string gone in new[] { "PrivacyPolicyLink", "TermsAndConditionsLink" })
             { var old = Kit.Loose(ct, gone); if (old != null) Object.DestroyImmediate(old.gameObject); }
 
+            // The links are the texts themselves. An old, invisible child Button left inside "SignUpPromptText" (400 wide, no click action)
+            // lay on top of the link and took every tap: Sign Up did nothing (17 Nov 2026). Such children are removed.
+            RemoveInnerButtons(forgot); RemoveInnerButtons(signUp);
             var forgotBtn = MakeClickable(forgot); var signUpBtn = MakeClickable(signUp);
             Button signInBtn = signIn != null ? SceneBuilderCore.Ensure<Button>(signIn.gameObject) : null;
             if (signInBtn != null) Kit.ClearClicks(signInBtn);          // the old LoginController click skipped real authentication
@@ -367,6 +370,14 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(field, "m_Text", "");
             if (field.textComponent != null) { field.textComponent.text = ""; EditorUtility.SetDirty(field.textComponent); }
             if (field.placeholder != null) { field.placeholder.gameObject.SetActive(true); field.placeholder.enabled = true; }
+        }
+
+        /// <summary>Destroys child objects of a text link that carry their own Button (only when the link has its own text).</summary>
+        static void RemoveInnerButtons(Transform link)
+        {
+            if (link == null || link.GetComponent<TextMeshProUGUI>() == null) return;
+            foreach (Button inner in link.GetComponentsInChildren<Button>(true))
+                if (inner.transform != link) Object.DestroyImmediate(inner.gameObject);
         }
 
         static Button MakeClickable(Transform t)

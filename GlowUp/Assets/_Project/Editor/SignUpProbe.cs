@@ -115,6 +115,11 @@ namespace GlowUp.EditorTools
                 // what a finger on the link would hit: the objects under its centre, top first
                 var rect = (RectTransform)button.transform;
                 var canvas = button.GetComponentInParent<Canvas>().rootCanvas;
+                // the batch screen is 640x480, the page is a tall phone page: shrink the canvas so the link is on the screen and a real
+                // pointer test (raycast + press + release + click) is possible
+                var scaler = canvas.GetComponent<CanvasScaler>();
+                if (scaler != null) { scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize; scaler.scaleFactor = 0.18f; }
+                Canvas.ForceUpdateCanvases();
                 Camera cam = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
                 var corners = new Vector3[4]; rect.GetWorldCorners(corners);
                 Vector2 low = RectTransformUtility.WorldToScreenPoint(cam, corners[0]), high = RectTransformUtility.WorldToScreenPoint(cam, corners[2]);
@@ -150,7 +155,32 @@ namespace GlowUp.EditorTools
                         Say(string.Format("  hit at {0:P0} across the link: {1}", spot, names.Length == 0 ? "NOTHING" : names.ToString()));
                     }
                 pressedAt = now; pressFrame = Time.frameCount;
-                button.onClick.Invoke();
+                bool real = false;
+                if (es != null)
+                {
+                    // a REAL tap at the middle of the link: what the event system hands to the press, release and click
+                    var mid = new Vector2((low.x + high.x) * 0.5f, (low.y + high.y) * 0.5f);
+                    var ped = new UnityEngine.EventSystems.PointerEventData(es) { position = mid, button = UnityEngine.EventSystems.PointerEventData.InputButton.Left };
+                    var hits = new System.Collections.Generic.List<UnityEngine.EventSystems.RaycastResult>();
+                    es.RaycastAll(ped, hits);
+                    if (hits.Count > 0)
+                    {
+                        var go = hits[0].gameObject;
+                        ped.pointerCurrentRaycast = ped.pointerPressRaycast = hits[0];
+                        ped.pointerEnter = go;
+                        var target = UnityEngine.EventSystems.ExecuteEvents.ExecuteHierarchy(go, ped, UnityEngine.EventSystems.ExecuteEvents.pointerDownHandler);
+                        ped.pointerPress = target != null ? target : UnityEngine.EventSystems.ExecuteEvents.GetEventHandler<UnityEngine.EventSystems.IPointerClickHandler>(go);
+                        ped.rawPointerPress = go; ped.pressPosition = mid;
+                        UnityEngine.EventSystems.ExecuteEvents.Execute(ped.pointerPress, ped, UnityEngine.EventSystems.ExecuteEvents.pointerUpHandler);
+                        var clicked = UnityEngine.EventSystems.ExecuteEvents.GetEventHandler<UnityEngine.EventSystems.IPointerClickHandler>(go);
+                        bool same = clicked == ped.pointerPress;
+                        if (same) UnityEngine.EventSystems.ExecuteEvents.Execute(clicked, ped, UnityEngine.EventSystems.ExecuteEvents.pointerClickHandler);
+                        Say("REAL tap: top hit " + PathOf(go.transform) + "; press target " + (ped.pointerPress != null ? ped.pointerPress.name : "none") + "; click handler " + (clicked != null ? clicked.name : "none") + "; same object: " + same);
+                        real = true;
+                    }
+                    else Say("REAL tap: the pointer hit NOTHING at the middle of the link");
+                }
+                if (!real) button.onClick.Invoke();
                 Say("pressed Sign Up; transition busy now: " + ScreenTransition.IsBusy + ", button interactable now: " + button.interactable);
                 stage = 1;
                 return;
