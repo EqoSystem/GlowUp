@@ -18,6 +18,7 @@ The admin website and the mobile app use the same Firebase project (`glowup-admi
 | `admins/{uid}` | You, by hand in the Firebase console | Rules, website | Which accounts are admins |
 | `archive` | Website (Recycle Bin: Move to Archive; Archive page) and the purge job (`api/archive-purge.js`) | Website (admins only) | Entries that left the Recycle bin, kept 30 days, then deleted. Added 2026-10-29, see `ARCHIVE_DESIGN.md` |
 | `archive_purge_log` | The purge job only | Website (admins only) | One record per run of the purge job (dry run or live) |
+| `adminLayouts/{uid}` | Website (Layout & Style), that admin only | Website, that admin only | The admin's named layouts, so they show on every device. Fields: `store` (layouts as JSON text, at most 900,000 characters), `savedAt` (ms number), `updatedAt` (server time). Added 2026-11-17 |
 
 ## Fields
 

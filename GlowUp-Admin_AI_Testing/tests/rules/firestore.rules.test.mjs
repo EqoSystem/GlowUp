@@ -292,6 +292,19 @@ await cannot("a shared default with an extra field", () => setDoc(doc(adminDoc()
 await cannot("a shared default whose layout is not a map", () => setDoc(doc(adminDoc(), "siteLayouts/dashboard"), Object.assign(shared("a1"), { layout: "x" })));
 
 
+const layouts = (extra = {}) => ({ store: JSON.stringify({ active: "default", profiles: [{ id: "echo1", name: "Echo" }] }), savedAt: 1763370000000, updatedAt: serverTimestamp(), ...extra });
+await can("an admin saves their own layouts", () => setDoc(doc(adminDoc(), "adminLayouts/a1"), layouts()));
+await can("an admin reads their own layouts", () => getDoc(doc(adminDoc(), "adminLayouts/a1")));
+await cannot("an admin reads another admin's layouts", () => getDoc(doc(adminDoc(), "adminLayouts/a2")));
+await cannot("an admin writes another admin's layouts", () => setDoc(doc(adminDoc(), "adminLayouts/a2"), layouts()));
+await cannot("a plain user saves layouts", () => setDoc(doc(user(), "adminLayouts/u1"), layouts()));
+await cannot("nobody signed in reads layouts", () => getDoc(doc(anon(), "adminLayouts/a1")));
+await cannot("layouts with an extra field", () => setDoc(doc(adminDoc(), "adminLayouts/a1"), layouts({ script: "x" })));
+await cannot("layouts that are not text", () => setDoc(doc(adminDoc(), "adminLayouts/a1"), layouts({ store: { profiles: [] } })));
+await cannot("layouts larger than the rule takes", () => setDoc(doc(adminDoc(), "adminLayouts/a1"), layouts({ store: "x".repeat(900001) })));
+await cannot("layouts with a made-up save time", () => setDoc(doc(adminDoc(), "adminLayouts/a1"), layouts({ updatedAt: new Date(0) })));
+
+
 const keys = () => ({ items: { "inventory.addBrand": { keys: "Ctrl+Alt+KeyB", description: "Opens the Add brand form.", enabled: true } }, seeded: ["inventory.addBrand"], updatedAt: serverTimestamp() });
 await can("an admin saves their own shortcuts", () => setDoc(doc(adminDoc(), "adminShortcuts/a1"), keys()));
 await can("an admin reads their own shortcuts", () => getDoc(doc(adminDoc(), "adminShortcuts/a1")));

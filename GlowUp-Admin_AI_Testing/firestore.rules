@@ -432,6 +432,19 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
     }
 
+    // ---- saved layouts (Layout & Style): one document per admin, only that admin reads or writes it ----
+    // ADDED on 17 November 2026 (personalLayouts.js) so a layout made on one device ("Echo") shows on every device the admin
+    // signs in on. `store` is the layouts as JSON text; the website cleans what it reads (adminLayouts.js cleanStore).
+    match /adminLayouts/{uid} {
+      allow read, delete: if isAdmin() && request.auth.uid == uid;
+      allow create, update: if isAdmin() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['store', 'savedAt', 'updatedAt'])
+        && request.resource.data.store is string
+        && request.resource.data.store.size() <= 900000
+        && request.resource.data.savedAt is int
+        && request.resource.data.updatedAt == request.time;
+    }
+
     // ---- the Archive: entries that left the Recycle bin, kept 30 days, then deleted by the server job ----
     // Admins only. An entry is created once (id "<collection>__<id>"), never changed; the job deletes it after expires_at.
     // ADDED on 29 October 2026 (ARCHIVE_DESIGN.md), published on 5 November 2026.

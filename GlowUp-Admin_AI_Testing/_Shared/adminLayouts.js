@@ -25,8 +25,13 @@ import { rowsFor, ROW_UNIT } from "./layoutRules.js";
 import { setFoldPage, foldButton, FOLD_PARTS, paintFold, toggleFold, foldedNow, anyFoldChoice, forgetFoldChoices } from "./adminFold.js";
 import { ANIMATIONS, ANIMATION_FRAMES, TRANSITIONS, EDGES, BUTTON_FX, SHADOWS, ORIENTS, LABEL_FONT_STYLES, LABEL_ALIGNS, readPixels, LIMITS, cleanStyle, cleanTexts, cleanPanelMap, contrast, applyPanelStyle, applyPanelTexts, ownTexts } from "./componentStyle.js";
 import { SHARED_PAGES, cachedShared, readShared, writeShared, clearShared } from "./sharedLayouts.js";
+import { signedInUid, readPersonal, writePersonal } from "./personalLayouts.js";
+import { mergeLayouts } from "./layoutSync.js";
 
 const LAYOUT_KEY = "glowup.layouts.v1";
+// 17 Nov 2026: the layouts also live in the admin's own database copy (adminLayouts/{uid}), so every device gets them.
+const SAVED_AT_KEY = "glowup.layouts.savedAt";        // when this browser last changed its layouts
+const MET_KEY = "glowup.layouts.synced.";             // + uid: this browser has synced with that admin's copy before
 
 
 const POSITIONS_VERSION = 7;
@@ -106,15 +111,61 @@ function cleanStore(saved) {
     if (!clean.profiles.some((p) => p.id === clean.active)) clean.active = "default";
     return clean;
 }
-function loadStore() {
-    try { store = cleanStore(JSON.parse(localStorage.getItem(LAYOUT_KEY) || "null")); } catch (error) { console.warn("Saved layouts could not be read: ", error); }
+function migratePositions(s) {
     let moved = false;
-    store.profiles.forEach((profile) => Object.keys(profile.pages).forEach((key) => {
+    s.profiles.forEach((profile) => Object.keys(profile.pages).forEach((key) => {
         const saved = profile.pages[key];
         if (saved.ver < POSITIONS_VERSION) { saved.order = []; saved.size = {}; saved.ver = POSITIONS_VERSION; moved = true; }
     }));
-    if (moved) saveStore();
+    return moved;
+}
+function loadStore() {
+    try { store = cleanStore(JSON.parse(localStorage.getItem(LAYOUT_KEY) || "null")); } catch (error) { console.warn("Saved layouts could not be read: ", error); }
+    if (migratePositions(store)) saveStore();
     lastSaved = JSON.stringify(store);
+}
+
+// ---- the admin's own copy in the database (every device) ----
+let syncUid = "", pushTimer = 0, lastSync = 0;
+const localSavedAt = () => { try { return Number(localStorage.getItem(SAVED_AT_KEY)) || 0; } catch (error) { return 0; } };
+function stampLocal(at) { try { localStorage.setItem(SAVED_AT_KEY, String(at)); } catch (error) {                       } }
+function schedulePush() {
+    if (!syncUid) return;
+    window.clearTimeout(pushTimer);
+    pushTimer = window.setTimeout(pushNow, 1200);
+}
+function pushNow() {
+    window.clearTimeout(pushTimer); pushTimer = 0;
+    if (!syncUid) return;
+    writePersonal(syncUid, JSON.stringify(store), localSavedAt() || Date.now()).catch((error) => console.warn("The layouts could not be saved to the database: ", error));
+}
+async function syncPersonal() {
+    try {
+        const uid = await signedInUid();
+        if (!uid) return;
+        lastSync = Date.now();
+        const remote = await readPersonal(uid);
+        syncUid = uid;
+        let met = false;
+        try { met = localStorage.getItem(MET_KEY + uid) === "1"; } catch (error) {                       }
+        const theirs = remote ? cleanStore(remote.store) : null;
+        if (theirs) migratePositions(theirs);
+        const merged = mergeLayouts(store, localSavedAt(), theirs, remote ? remote.savedAt : 0, !met);
+        if (merged.apply && !editing) {
+            store = cleanStore(merged.store);
+            lastSaved = JSON.stringify(store);
+            try { localStorage.setItem(LAYOUT_KEY, lastSaved); } catch (error) {                       }
+            stampLocal(merged.savedAt);
+            applyLayout();
+        } else if (merged.apply && editing) { stampLocal(Date.now()); merged.push = true; }     // being arranged right now: this browser's copy wins
+        if (merged.push) { if (!localSavedAt()) stampLocal(Date.now()); pushNow(); }
+        try { localStorage.setItem(MET_KEY + uid, "1"); } catch (error) {                       }
+    } catch (error) { console.warn("The layouts in the database could not be read: ", error); }
+}
+if (typeof window !== "undefined") {
+    // back on this tab after working on another device: look again (at most every 30 seconds)
+    window.addEventListener("focus", () => { if (syncUid && Date.now() - lastSync > 30000) syncPersonal(); });
+    window.addEventListener("pagehide", () => { if (pushTimer) pushNow(); });
 }
 
 
@@ -128,6 +179,7 @@ const undoStack = [], redoStack = [];
 let lastSaved = null, lastStep = 0;
 function saveStore() {
     const now = JSON.stringify(store);
+    if (now !== lastSaved) { stampLocal(Date.now()); schedulePush(); }
     if (lastSaved !== null && now !== lastSaved) {
         if (undoStack.length === 0 || Date.now() - lastStep > UNDO_MERGE_MS) { undoStack.push(lastSaved); if (undoStack.length > UNDO_MOST) undoStack.shift(); }
         lastStep = Date.now();
@@ -144,6 +196,7 @@ function restoreStore(json, message) {
     lastSaved = JSON.stringify(store);
     lastStep = 0;
     try { localStorage.setItem(LAYOUT_KEY, lastSaved); } catch (error) {                       }
+    stampLocal(Date.now()); schedulePush();
     applyLayout();
     paintUndo();
     if (message) toast(message, "ok");
@@ -284,6 +337,7 @@ export function initLayouts(page) {
         setShared(data);
         if (JSON.stringify(shared) !== before && !activeProfile()) applyLayout(); else paintDrawer();
     }).catch((error) => console.warn("The shared default layout could not be read: ", error)).finally(ready);
+    syncPersonal();                                          // layouts made on another device (17 Nov 2026)
     byId("addPanelBtn").addEventListener("click", () => openPanelDialog(null));
     byId("doneArrangingBtn").addEventListener("click", () => setEditing(false));
     wireBoard();
@@ -1515,7 +1569,7 @@ function buildDrawer() {
     if (!host) return;
     host.innerHTML = `
         <div class="drawer-section first">
-            <h4>${icon("user")}Layout ${guideBadge("Layouts", "One sign-in, several people: pick your name to get your own arrangement, panels, font and colours. Up to " + MAX_PROFILES + " layouts are kept in this browser.", "Default layout is what every admin starts from: the page's own arrangement, or the one an admin made the default for everyone (... > Make this the default for everyone).")}</h4>
+            <h4>${icon("user")}Layout ${guideBadge("Layouts", "One sign-in, several people: pick your name to get your own arrangement, panels, font and colours. Up to " + MAX_PROFILES + " layouts are kept with your account, so they show on every device you sign in on.", "Default layout is what every admin starts from: the page's own arrangement, or the one an admin made the default for everyone (... > Make this the default for everyone).")}</h4>
             <div class="drawer-row">
                 <select id="profileSelect" aria-label="Layout"></select>
                 <button type="button" class="icon-btn small" id="profileMenuBtn" aria-label="Layout options" aria-haspopup="menu">${icon("more")}</button>

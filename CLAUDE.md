@@ -20,6 +20,7 @@ Make-up scanner app (Unity) plus an admin website. Both share one Firestore data
 - `scanActivity`: anonymous, no user id. status safe|caution|harmful, scannedAtUnix, counts.
 - `allergenSuggestions`, `conditionSuggestions`: app creates, admins read.
 - `users/{uid}` and `users/{uid}/scans`: that user only. `admins/{uid}`: set by hand in the console.
+- `adminLayouts/{uid}`: that admin's named layouts (store JSON text, savedAt, updatedAt), synced across devices.
 - The app may only create Pending/unreviewed entries and add 1 to `scans`. Make-up and face products only.
 
 ## Rules
