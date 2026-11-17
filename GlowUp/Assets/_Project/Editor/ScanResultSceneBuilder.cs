@@ -269,6 +269,7 @@ namespace GlowUp.EditorTools
             A.Fill(alternativesArea.transform, 32, 40, 32, 218);
             AppTiles.GridScroll(alternativesArea.transform, "AlternativesScrollView", out RectTransform alternativesContent);
             ProductTileView alternativeTemplate = AppTiles.ProductTile(alternativesContent, "AlternativeTileTemplate", AppTiles.TileKind.Dashboard);
+            AppTiles.IconOnlySaveAndResult(alternativeTemplate);           // icons only for Save and Result: no cut-off labels (17 Nov 2026)
             TextMeshProUGUI alternativesEmpty = A.Label(alternativesArea.transform, "AlternativesEmptyText",
                 "No make-up products matched your profile yet. Scan another product to check it.", 34, ThemeRole.SecondaryText, FontRole.Body,
                 TextAlignmentOptions.Center, true);

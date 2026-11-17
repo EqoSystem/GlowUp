@@ -371,6 +371,37 @@ namespace GlowUp.EditorTools
             return view;
         }
 
+        /// <summary>
+        /// 17 November 2026 (Alternatives pop-up): "Save" and "Result" show only their icons (plus and document), in round 66-unit
+        /// buttons at the two bottom corners, and "Try On" takes the room between them, so no label is cut off on a narrow tile.
+        /// The label objects stay (hidden): the controller may still write "Saved" into Save's label, and that state shows as the
+        /// greyed, untappable button.
+        /// </summary>
+        public static void IconOnlySaveAndResult(ProductTileView tile)
+        {
+            const float size = 66, edge = 18, gap = 10;
+            foreach (Button b in tile.GetComponentsInChildren<Button>(true))
+            {
+                if (b.name == "SaveButton" || b.name == "ResultButton")
+                {
+                    bool left = b.name == "SaveButton";
+                    A.At(b.transform, left ? A.BL : A.BR, new Vector2(left ? edge : -edge, edge), new Vector2(size, size));
+                    TextMeshProUGUI label = A.LabelOf(b);
+                    if (label != null) label.gameObject.SetActive(false);
+                    Transform content = b.transform.Find("Content");
+                    if (content != null) A.Fill(content);                                  // the icon sits in the middle of the round button
+                    Transform icon = content != null ? content.Find("Icon") : null;
+                    if (icon != null) A.Size(icon, 34, 34);
+                }
+                else if (b.name == "TryOnButton")
+                {
+                    var rt = (RectTransform)b.transform;
+                    rt.anchorMin = new Vector2(0, 0); rt.anchorMax = new Vector2(1, 0); rt.pivot = new Vector2(0.5f, 0);
+                    rt.offsetMin = new Vector2(edge + size + gap, edge); rt.offsetMax = new Vector2(-(edge + size + gap), edge + size);
+                }
+            }
+        }
+
         /// <summary>A small round-ended button that sits on a product tile.</summary>
         static Button TileButton(Transform tile, string name, string label, Sprite icon, bool primary)
         {

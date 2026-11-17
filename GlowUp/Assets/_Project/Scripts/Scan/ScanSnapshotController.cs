@@ -316,6 +316,9 @@ namespace GlowUp.Scan
         /// <summary>True while "Check your photo" is open (the scan screen's back key closes it first).</summary>
         public bool PreviewOpen => preview != null && preview.IsOpen;
         public void ClosePreviewByBack() { if (PreviewOpen) BackToCapture(); }
+        /// <summary>Volume keys on "Check your photo": + presses Use photo, − presses Retake (taps on the buttons, nothing more).</summary>
+        public void PressUseByKey() { if (PreviewOpen) preview.PressUse(); }
+        public void PressRetakeByKey() { if (PreviewOpen) preview.PressRetake(); }
 
         FormalToast toast;
         void Toast(string words, FormalToast.Kind kind = FormalToast.Kind.Error)

@@ -338,6 +338,10 @@ namespace GlowUp.Onboarding
             {
                 var prt = (RectTransform)policyScroll.transform;
                 if (prt.anchorMin.y < prt.anchorMax.y) prt.offsetMax = new Vector2(prt.offsetMax.x, -Mathf.Max(y, 300f));
+                // reading only (17 Nov 2026): the boxes and Continue are hidden, so the document fills the card down to its bottom edge,
+                // with the same room below as at its sides (no empty band under the text)
+                if (readOnly && prt.anchorMin.y < prt.anchorMax.y && prt.anchorMin.y <= 0.001f)
+                    prt.offsetMin = new Vector2(prt.offsetMin.x, Mathf.Max(Mathf.Abs(prt.offsetMin.x), 40f));
             }
         }
     }

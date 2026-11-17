@@ -43,7 +43,7 @@ namespace GlowUp.Auth
             row.fontSize = real.fontSize;
             row.color = real.color;
             row.text = new string(field.asteriskChar, RowLength);
-            shownAlpha = real.color.a;
+            shownAlpha = real.color.a > 0.01f ? real.color.a : 1f;   // never remember 0 (PasswordDotMask may have hidden the text)
             row.gameObject.SetActive(true);
             real.alpha = 0f;                                  // the real asterisks (their number is the password's length) are hidden
             field.DeactivateInputField();                     // and so is the caret, which stands at the real length

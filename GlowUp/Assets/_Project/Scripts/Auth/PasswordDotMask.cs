@@ -66,7 +66,8 @@ namespace GlowUp.Auth
             overlay.ForceMeshUpdate();
             // a text longer than the box scrolls inside the field: the picture could stand in the wrong place, so no reveal then
             if (overlay.preferredWidth > real.rectTransform.rect.width) { Hide(); return; }
-            if (hideAt < 0f) shownAlpha = real.alpha;
+            // never remember 0: PasswordLengthMask may have hidden the text already, and restoring 0 would leave the box blank for good
+            if (hideAt < 0f) shownAlpha = real.alpha > 0.01f ? real.alpha : 1f;
             real.alpha = 0f;
             overlay.gameObject.SetActive(true);
             hideAt = Time.unscaledTime + revealSeconds;

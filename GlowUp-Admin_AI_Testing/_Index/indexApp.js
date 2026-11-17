@@ -53,6 +53,10 @@ document.addEventListener("DOMContentLoaded", () => {
     };
     passwordInput.addEventListener("input", hideLengthCover);
     if (eye) eye.addEventListener("click", hideLengthCover);
+    // Highlighting the password (drag, double-click, Ctrl+A) shows the real dots and the highlight: the cover would hide them.
+    const selectionMade = () => passwordInput.selectionStart !== passwordInput.selectionEnd;
+    passwordInput.addEventListener("select", hideLengthCover);
+    document.addEventListener("selectionchange", () => { if (lengthCover && document.activeElement === passwordInput && selectionMade()) hideLengthCover(); });
 
 
     let messageTimer = 0;

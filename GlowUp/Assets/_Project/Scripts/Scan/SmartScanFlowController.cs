@@ -658,10 +658,20 @@ namespace GlowUp.Scan
             float now = Time.unscaledTime;
             if (up > 0) volumeUpAt = now;
             if (down > 0) volumeDownAt = now;
+            // "Check your photo" open (17 Nov 2026, an addition only): + = Use photo, − = Retake, both = close the card.
+            // The same short wait for the other key applies; the flow below is untouched while the card is shut.
+            bool checking = snapshot != null && snapshot.PreviewOpen;
             if (volumeUpAt >= 0f && volumeDownAt >= 0f && Mathf.Abs(volumeUpAt - volumeDownAt) <= VolumeChordSeconds)
             {
                 volumeUpAt = volumeDownAt = -1f;
+                if (checking) { snapshot.ClosePreviewByBack(); return; }
                 ToggleTypeIn();                              // both together: Type it in opens, or closes when it is open
+                return;
+            }
+            if (checking)
+            {
+                if (volumeUpAt >= 0f && now - volumeUpAt > VolumeChordSeconds) { volumeUpAt = -1f; snapshot.PressUseByKey(); }
+                if (volumeDownAt >= 0f && now - volumeDownAt > VolumeChordSeconds) { volumeDownAt = -1f; snapshot.PressRetakeByKey(); }
                 return;
             }
             bool upTakesPhoto = UiPreferences.VolumeUpTakesPhoto;

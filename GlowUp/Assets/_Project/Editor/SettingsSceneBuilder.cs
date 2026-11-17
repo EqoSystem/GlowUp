@@ -256,18 +256,17 @@ namespace GlowUp.EditorTools
             PreferenceRow(cameraHelpers, "ScreenLightRow", "Face light in the dark", "A bright white frame on the screen lights your face.", true, UiPreferenceToggle.Preference.TryOnScreenLight);
             // phase 2A (11 November 2026): what the phone's volume buttons do on AI Smart Scan (saved in UiPreferences.VolumeButton)
             Divider(cameraHelpers);
-            GameObject volumeBlock = Block(cameraHelpers, "VolumeButtonBlock");
-            A.Label(volumeBlock.transform, "Title", "Volume keys", RowTitle, ThemeRole.MainText, FontRole.Label);
-            // New17: one On / Off choice; the line under it says what the three key actions do
-            ChoiceTabs volumeTabs = Tabs(volumeBlock.transform, "VolumeButtonTabs", new[] { "On", "Off" }, 0, out _, 32);
-            // New20: the user chooses what volume + does (volume − does the other); shown only while the keys are on
-            GameObject volumeUpRow = Block(volumeBlock.transform, "VolumeUpChoice", 8);
-            A.Label(volumeUpRow.transform, "Title", "Volume + chooses", RowCaption, ThemeRole.MainText, FontRole.Label);
+            // 17 November 2026: On / Off is a switch row like the four rows above it (same title, caption and switch), not a pair of tabs
+            Toggle volumeSwitch = SwitchRow(cameraHelpers, "VolumeButtonRow", "Volume keys", "Use the volume keys on AI Smart Scan.", true);
+            // New20: the user chooses what volume + does (volume − does the other); shown only while the keys are on, with the line
+            // that says what each key does under its own tabs
+            GameObject volumeUpRow = Block(cameraHelpers, "VolumeUpChoice", 10);
+            A.Label(volumeUpRow.transform, "Title", "Action Buttons", RowCaption, ThemeRole.MainText, FontRole.Label);
             ChoiceTabs volumeUpTabs = Tabs(volumeUpRow.transform, "VolumeUpTabs", new[] { "Photo capture", "Live scan" }, 0, out _, 30);
-            TextMeshProUGUI volumeStatus = A.Label(volumeBlock.transform, "StatusText", UiPreferences.VolumeKeysLine(true),
+            TextMeshProUGUI volumeStatus = A.Label(volumeUpRow.transform, "StatusText", UiPreferences.VolumeKeysLine(true),
                                                    RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             var volumeSetting = Feature<VolumeButtonSetting>(features, "VolumeButtonSetting");
-            A.Set(volumeSetting, "tabs", volumeTabs); A.Set(volumeSetting, "statusText", volumeStatus);
+            A.Set(volumeSetting, "onSwitch", volumeSwitch); A.Set(volumeSetting, "statusText", volumeStatus);
             A.Set(volumeSetting, "upTabs", volumeUpTabs); A.Set(volumeSetting, "upRow", volumeUpRow);
 
             // =====================================================================================

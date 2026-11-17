@@ -14,8 +14,10 @@ namespace GlowUp.AppSettings
     /// </summary>
     public class VolumeButtonSetting : MonoBehaviour
     {
-        [Tooltip("Tab 0 = On, tab 1 = Off")]
+        [Tooltip("Tab 0 = On, tab 1 = Off (scenes built before 17 November 2026; a newer scene uses the switch below)")]
         [SerializeField] private ChoiceTabs tabs;
+        [Tooltip("17 November 2026: On / Off is a switch like every other row of Camera Helpers")]
+        [SerializeField] private UnityEngine.UI.Toggle onSwitch;
         [SerializeField] private TextMeshProUGUI statusText;
         [Tooltip("New20: what volume + does. Tab 0 = photo capture, tab 1 = live scan (volume − does the other)")]
         [SerializeField] private ChoiceTabs upTabs;
@@ -29,6 +31,7 @@ namespace GlowUp.AppSettings
         void Awake()
         {
             if (tabs != null) tabs.Changed += index => UiPreferences.VolumeKey = index == 0 ? UiPreferences.VolumeKeys.Both : UiPreferences.VolumeKeys.Off;
+            if (onSwitch != null) onSwitch.onValueChanged.AddListener(on => UiPreferences.VolumeKey = on ? UiPreferences.VolumeKeys.Both : UiPreferences.VolumeKeys.Off);
             if (upTabs != null) upTabs.Changed += index => UiPreferences.VolumeUpTakesPhoto = index == 0;
         }
 
@@ -41,6 +44,7 @@ namespace GlowUp.AppSettings
             bool on = UiPreferences.VolumeKey != UiPreferences.VolumeKeys.Off;
             bool upPhoto = UiPreferences.VolumeUpTakesPhoto;
             if (tabs != null) tabs.Select(on ? 0 : OffIndex);
+            if (onSwitch != null && onSwitch.isOn != on) onSwitch.SetIsOnWithoutNotify(on);
             if (upTabs != null) upTabs.Select(upPhoto ? 0 : 1);
             if (upRow != null && upRow.activeSelf != on) upRow.SetActive(on);
             if (statusText != null) statusText.text = on ? UiPreferences.VolumeKeysLine(upPhoto) : offEffect;

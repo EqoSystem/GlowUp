@@ -146,6 +146,17 @@ namespace GlowUp.Scan
             root.SetActive(true);
         }
 
+        /// <summary>The same as a tap on "Use photo" (volume +). Nothing while it cannot be pressed (busy, hidden).</summary>
+        public void PressUse() { Press(useButton); }
+
+        /// <summary>The same as a tap on "Retake" (volume −); while the photo is read that button reads "Not now" and does that.</summary>
+        public void PressRetake() { Press(retakeButton); }
+
+        static void Press(Button button)
+        {
+            if (button != null && button.isActiveAndEnabled && button.interactable) button.onClick.Invoke();
+        }
+
         public void Hide()
         {
             if (root == null) return;
