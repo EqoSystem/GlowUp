@@ -296,7 +296,10 @@ namespace GlowUp.EditorTools
             Reparent(t, parent);
             var rt = (RectTransform)t;
             rt.anchorMin = new Vector2(left ? 0f : 0.5f, 1); rt.anchorMax = new Vector2(left ? 0.5f : 1f, 1); rt.pivot = new Vector2(0.5f, 1);
-            rt.offsetMin = new Vector2(left ? Kit.PadX + 8 : 0, -y - h); rt.offsetMax = new Vector2(left ? 0 : -(Kit.PadX + 8), -y);
+            // The tap area is 48 dp tall (96 units) but the text stays exactly where it was: the box grows 18 units up and down around
+            // the old 60-unit row, and the text is middle-aligned, so the page looks the same (17 Nov 2026: Sign Up was hard to hit).
+            const float grow = 18f;
+            rt.offsetMin = new Vector2(left ? Kit.PadX + 8 : 0, -y - h - grow); rt.offsetMax = new Vector2(left ? 0 : -(Kit.PadX + 8), -y + grow);
             var tmp = t.GetComponent<TextMeshProUGUI>();
             if (tmp != null)
             {

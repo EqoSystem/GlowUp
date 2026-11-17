@@ -374,17 +374,35 @@ namespace GlowUp.Auth
 
         void SignUp()
         {
-            if (ScreenTransition.IsBusy || signUpOpening) return;         // one tap is enough: a second tap used to queue another load
-            OnboardingSession.Social = false;
-            // "Sign Up" always starts a sign-up of its own: an account left in the draft by an earlier, abandoned one is not taken over
-            // (nobody is signed in to it here; Step 1 would notice that too)
-            if (OnboardingSession.HasAccount) OnboardingSession.ForgetAccount();
-            ContextualHintController.MarkNewUser(true);
-            // The sign-up screen is the biggest one and nothing covers the change, so the log-in page used to stand still for a moment
-            // after the tap and looked frozen (17 Nov 2026). The button answers at once: a spinner and "Opening...".
+            if (signUpOpening) return;                                    // one tap is enough: a second tap used to queue another load
             signUpOpening = true;
-            if (signUpButton != null) ButtonBusy.Set(signUpButton, signUpButton.GetComponentInChildren<TMP_Text>(true), true, msgOpeningSignUp);
-            SceneNavigator.Go(onboardingScene);
+            // Each preparation step is guarded: an error in one of them (storage on a phone) used to stop the whole tap with nothing shown
+            // (17 Nov 2026: "Sign Up does nothing"). The screen opens whatever happens to them.
+            try
+            {
+                OnboardingSession.Social = false;
+                // "Sign Up" always starts a sign-up of its own: an account left in the draft by an earlier, abandoned one is not taken over
+                if (OnboardingSession.HasAccount) OnboardingSession.ForgetAccount();
+            }
+            catch (Exception e) { Debug.LogWarning("Sign Up: draft reset failed: " + e.Message); }
+            try { ContextualHintController.MarkNewUser(true); } catch (Exception e) { Debug.LogWarning("Sign Up: hint flag failed: " + e.Message); }
+            try { if (signUpButton != null) ButtonBusy.Set(signUpButton, signUpButton.GetComponentInChildren<TMP_Text>(true), true, msgOpeningSignUp); }
+            catch (Exception e) { Debug.LogWarning("Sign Up: busy look failed: " + e.Message); }
+            StartCoroutine(OpenSignUp());
+        }
+
+        /// <summary>Opens the sign-up screen; when the normal change is refused or does not start (a stuck cover), loads it directly.</summary>
+        System.Collections.IEnumerator OpenSignUp()
+        {
+            string from = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+            try { SceneNavigator.Go(onboardingScene); } catch (Exception e) { Debug.LogWarning("Sign Up: Go failed: " + e.Message); }
+            float until = Time.unscaledTime + 1.5f;
+            while (Time.unscaledTime < until) yield return null;
+            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == from && !ScreenTransition.IsBusy && !string.IsNullOrEmpty(onboardingScene))
+            {
+                Debug.LogWarning("Sign Up: the change did not start; loading the screen directly");
+                UnityEngine.SceneManagement.SceneManager.LoadScene(onboardingScene);
+            }
         }
 
         bool signUpOpening;
