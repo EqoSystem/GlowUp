@@ -62,5 +62,5 @@
 
 .menu-badge {
     flex: none; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center;
-    font-size: 12px; font-weight: 700; line-height: 1; color: #fff; background: var(--bad);
+    font-size: 12px; font-weight: 700; line-height: 1; color: var(--bad-ink); background: var(--bad);
 }

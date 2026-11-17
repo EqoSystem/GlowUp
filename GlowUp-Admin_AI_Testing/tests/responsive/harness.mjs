@@ -24,8 +24,9 @@ export async function launch() {
 }
 
 
-export async function openPage(browser, key, { theme = "light", width = 1440, height = 900, lat = { auth: 0, read: 0 }, go = true } = {}) {
-    const ctx = await browser.newContext({ viewport: { width, height }, colorScheme: theme || "dark" });
+export async function openPage(browser, key, { theme = "light", width = 1440, height = 900, lat = { auth: 0, read: 0 }, go = true, touch = false } = {}) {
+    // touch: a phone context (pointer: coarse), so touch-only CSS such as the 44 px targets applies.
+    const ctx = await browser.newContext({ viewport: { width, height }, colorScheme: theme || "dark", ...(touch ? { hasTouch: true, isMobile: true } : {}) });
     await ctx.addInitScript(({ seed, signedIn, theme, lat }) => {
         window.__SEED = seed; window.__LAT = lat; window.__SIGNED_IN = signedIn;
         if (theme) { try { localStorage.setItem("glowup.theme", theme); } catch (e) { } }

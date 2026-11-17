@@ -48,7 +48,7 @@
     --border: #2b2b35;
     --text: #f2f1f4;
     --text-2: #b9b6c0;
-    --muted: #8b8894;
+    --muted: #928f9a;                   /* New21: 4.5:1 on surface-3 too */
     --accent: #e0668a;
     --accent-ink: #1a0d12;
     --accent-text: #f08fab;
@@ -58,6 +58,7 @@
     --ok: #4ccf9a;
     --warn: #f0b545;
     --bad: #f27272;
+    --bad-ink: #1a0d0d;                 /* New21: text on a red fill, 6.7:1 */
     --info: #86b7f7;
     --shadow: 0 4px 14px rgba(0, 0, 0, .28);
     --overlay: rgba(0, 0, 0, .62);
@@ -75,15 +76,18 @@
     --border: #e3d8d9;
     --text: #2b2426;
     --text-2: #554a4d;
-    --muted: #7a6d70;
+    /* New21 (WCAG 2.2 AA): every text and status colour reaches 4.5:1 on every surface, the darkest (surface-3) included.
+       tests/tokens.contrast.test.mjs reads this block and fails if a shade slips back. */
+    --muted: #6c6163;
     --accent: #c9456d;
     --accent-ink: #ffffff;
     --accent-text: #b03a5e;
-    --gold: #94702c;
-    --ok: #1f8a5f;
-    --warn: #9a6a08;
-    --bad: #c23a3a;
-    --info: #2f6fbe;
+    --gold: #7e5f25;
+    --ok: #19714e;
+    --warn: #865c07;
+    --bad: #b33535;
+    --bad-ink: #ffffff;
+    --info: #2a64ac;
     --shadow: 0 3px 10px rgba(80, 40, 50, .08);
     --overlay: rgba(40, 25, 30, .42);
     --zone: rgba(38, 26, 31, .9);
@@ -292,7 +296,7 @@ html.resizing *, html.resizing *::before, html.resizing *::after { transition: n
 .bin-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .bin-badge {
     position: absolute; top: -6px; right: -6px; min-width: 19px; height: 19px; padding: 0 4px; border-radius: 999px; display: grid; place-items: center;
-    font-size: 12px; font-weight: 700; line-height: 1; color: #fff; background: var(--accent); border: 2px solid var(--bg);
+    font-size: 12px; font-weight: 700; line-height: 1; color: var(--accent-ink); background: var(--accent); border: 2px solid var(--bg);
 }
 .bin-badge[hidden] { display: none; }
 .topbar-tools { display: flex; align-items: center; gap: 8px; }
@@ -406,7 +410,7 @@ html.qs-open .board > .panel[data-qs-grow] { grid-column: span var(--qs-span) !i
 .btn.ghost { background: transparent; }
 .btn.danger, .row-btn.danger, .danger-btn { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
 .btn.danger:hover, .row-btn.danger:hover { background: color-mix(in srgb, var(--bad) 14%, transparent); }
-.btn.danger.solid { background: var(--bad); border-color: var(--bad); color: #fff; }
+.btn.danger.solid { background: var(--bad); border-color: var(--bad); color: var(--bad-ink); }
 .btn.danger.solid:hover { background: color-mix(in srgb, var(--bad) 86%, #000); }
 /* dark theme: white on the light red is 2.8:1, dark ink on it passes AA (16 November 2026) */
 :root:not([data-theme="light"]) .btn.danger.solid { color: var(--accent-ink); }
@@ -1264,7 +1268,7 @@ button.tile.small { width: auto; }
 .info-badge[data-tone="warn"] { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 55%, transparent); }
 .info-badge[data-count]::after {
     content: attr(data-count); position: absolute; top: -8px; right: -10px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px;
-    display: grid; place-items: center; font-size: 12px; font-weight: 700; line-height: 1; color: #fff; background: var(--accent);
+    display: grid; place-items: center; font-size: 12px; font-weight: 700; line-height: 1; color: var(--accent-ink); background: var(--accent);
 }
 .info-pop {
     position: fixed; z-index: 5000; width: max-content; max-width: min(340px, calc(100vw - 16px)); padding: 10px 12px; border-radius: var(--radius-sm);
@@ -1303,7 +1307,7 @@ button.tile.small { width: auto; }
 .count-badge { min-width: 24px; height: 22px; padding: 0 7px; border-radius: 999px; display: inline-grid; place-items: center; font-size: var(--fs-xs); font-weight: 700;
     font-variant-numeric: tabular-nums; background: var(--surface-3); color: var(--text-2); }
 .snapshots-chip.has-waiting { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
-.snapshots-chip.has-waiting .count-badge { background: var(--accent); color: #fff; }
+.snapshots-chip.has-waiting .count-badge { background: var(--accent); color: var(--accent-ink); }
 
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 
@@ -1327,7 +1331,7 @@ button.tile.small { width: auto; }
 .iw-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 .iw-title { flex: 1; min-width: 0; font-size: var(--fs-base); font-weight: 650; }
 .iw-count { min-width: 20px; padding: 1px 7px; border-radius: 999px; text-align: center; font-size: var(--fs-xs); font-weight: 700; color: var(--text-2); background: var(--surface-3); }
-.info-window[data-serious="1"] .iw-count { color: #fff; background: var(--bad); }
+.info-window[data-serious="1"] .iw-count { color: var(--bad-ink); background: var(--bad); }
 .iw-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
 .iw-row { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--border); border-left: 3px solid transparent; }
 .iw-row:last-child { border-bottom: 0; }
@@ -1431,7 +1435,7 @@ button.ing-pill-name { cursor: pointer; text-decoration: underline dotted; }
 .snapshots-text small { font-size: var(--fs-xs); color: var(--muted); line-height: 1.4; }
 .snapshots-count { flex: none; min-width: 34px; height: 30px; padding: 0 10px; border-radius: 999px; display: grid; place-items: center; font-weight: 700; font-variant-numeric: tabular-nums;
     background: var(--surface-3); color: var(--text-2); }
-.snapshots-open.has-waiting .snapshots-count { background: var(--accent); color: #fff; }
+.snapshots-open.has-waiting .snapshots-count { background: var(--accent); color: var(--accent-ink); }
 
 
 body.snapx-open { overflow: hidden; }
@@ -2267,3 +2271,19 @@ html.sb-mobile-open body::after { content: ""; position: fixed; z-index: 899; in
 .chip { max-width: 100%; flex-shrink: 0; white-space: normal; overflow-wrap: break-word; word-break: normal; text-align: left; border-radius: 14px; }
 /* inside a table cell a chip may shrink and break a long word: a table would otherwise grow wider than a phone screen */
 td .chip { flex-shrink: 1; overflow-wrap: anywhere; }
+
+/* New21 (responsive guideline 9): on a touch screen every control is at least 44 x 44 CSS px. A mouse keeps the
+   compact sizes. Text controls grow; small glyphs (tick boxes, the "?" badge, the brand fold arrow) keep their look
+   and get an invisible 44 px touch area around them instead, so rows and headers do not change shape.
+   Checked by tests/responsive/guidelines.scenario.mjs. */
+@media (pointer: coarse) {
+    .icon-btn, .icon-btn.small, .btn, .btn.small, .primary-btn, .row-btn, .seg, .folder-chip, .tile.small,
+    .assist-next, .assist-x, .password-eye, .text-link, .brand-home, .menu-btn,
+    .search-input, .toolbar-select, select, input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]) { min-height: 44px; }
+    .icon-btn, .icon-btn.small, .folder-chip.add, .assist-x, .password-eye, .menu-btn, #sortMenuBtn, #filterMenuBtn { min-width: 44px; }
+    summary { min-height: 44px; padding-block: 12px; }   /* keeps its open/closed triangle */
+    .search-input { min-width: 44px; }
+    .text-link { display: inline-flex; align-items: center; }
+    .pick, .guide-badge, .brand-toggle { position: relative; }
+    .pick::before, .guide-badge::before, .brand-toggle::before { content: ""; position: absolute; inset: -13px; }
+}
