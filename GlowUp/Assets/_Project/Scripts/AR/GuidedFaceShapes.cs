@@ -52,7 +52,9 @@ namespace GlowUp.AR
                     // the skin of the face: the oval, with its edge pulled in and softened (no colour on the hairline or the background),
                     // without the eyes, the lips and the brows
                     var oval = Fill(n, uvs, crossings, FaceOval);
-                    oval = Erode(oval, n, Mathf.Max(1, n / 64));
+                    // 18 Nov 2026: pulled in far enough that the soft edge (2 x n / 40) ends INSIDE the face mesh; before, the fade ran past the mesh's edge
+                    // and was cut off there, a hard line across the forehead (the "filter overlay" look on the owner's phone)
+                    oval = Erode(oval, n, Mathf.Max(1, n / 20));
                     var eyes = Fill(n, uvs, crossings, EyeOne, EyeTwo);
                     var holes = Union(Dilate(eyes, n, Mathf.Max(1, n / 85)),
                                       Dilate(Fill(n, uvs, crossings, LipsOuter), n, Mathf.Max(1, n / 128)),

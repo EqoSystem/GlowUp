@@ -15,6 +15,7 @@ namespace GlowUp.AR
         Texture mask;
         Vector3[] points;
         Vector2[] uvs;
+        Vector2[] cameraUvs;
         int[] triangles;
 
         public override Texture mainTexture => mask != null ? mask : s_WhiteTexture;
@@ -27,6 +28,13 @@ namespace GlowUp.AR
             triangles = meshTriangles;
             raycastTarget = false;
             SetMaterialDirty();
+            SetVerticesDirty();
+        }
+
+        /// <summary>The camera picture's coordinates of every point (second texture coordinate), for a layer that reads the picture (skin smoothing).</summary>
+        public void SetCameraUvs(Vector2[] cameraPictureUvs)
+        {
+            cameraUvs = cameraPictureUvs;
             SetVerticesDirty();
         }
 
@@ -50,7 +58,11 @@ namespace GlowUp.AR
             vh.Clear();
             if (points == null || uvs == null || triangles == null || points.Length < uvs.Length) return;
             Color32 c = color;
-            for (int i = 0; i < uvs.Length; i++) vh.AddVert(points[i], c, uvs[i]);
+            for (int i = 0; i < uvs.Length; i++)
+            {
+                if (cameraUvs != null && cameraUvs.Length >= uvs.Length) vh.AddVert(points[i], c, uvs[i], cameraUvs[i], Vector4.zero, Vector4.zero, Vector3.back, new Vector4(1f, 0f, 0f, -1f));
+                else vh.AddVert(points[i], c, uvs[i]);
+            }
             for (int t = 0; t + 2 < triangles.Length; t += 3) vh.AddTriangle(triangles[t], triangles[t + 1], triangles[t + 2]);
         }
     }

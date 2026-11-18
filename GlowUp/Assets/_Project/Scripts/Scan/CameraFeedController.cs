@@ -85,6 +85,8 @@ namespace GlowUp.Scan
         public bool IsFrontCamera { get; private set; }
         /// <summary>The view the picture fills (UprightArgb with no frame gives exactly what is inside it).</summary>
         public RectTransform Viewport => viewport;
+        /// <summary>The RawImage that shows the camera (the skin smoothing reads its picture and its texture coordinates).</summary>
+        public RawImage Display => display;
         /// <summary>True when the picture is shown like a mirror (the selfie camera): a point of the upright picture is turned round left to right on screen.</summary>
         public bool ShowsMirrored => IsFrontCamera && mirrorFrontCamera;
         /// <summary>Raised once: true + "" when the camera is running, false + reason when it cannot start.</summary>

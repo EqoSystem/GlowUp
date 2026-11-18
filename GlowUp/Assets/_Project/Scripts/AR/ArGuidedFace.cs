@@ -116,6 +116,16 @@ namespace GlowUp.AR
         Texture2D[] colourMasks, highlightMasks;
         Material[] materials;
         Material shineMaterial;
+        // skin smoothing for foundation (18 Nov 2026): the camera picture under the face mask, softened but edge-keeping, drawn under the tint
+        ArGuidedFaceLayer smoothLayer;
+        Material smoothMaterial;
+        Vector2[] cameraUvs;
+        Texture smoothTextureSent;
+        [Header("Skin smoothing (foundation, concealer, powder)")]
+        [Tooltip("On = the skin under foundation is smoothed (blemishes and pores fade, edges stay sharp). Full pipeline only.")]
+        [SerializeField] private bool smoothSkin = true;
+        [Tooltip("How much of the smoothed skin replaces the real one at full foundation strength")]
+        [Range(0f, 1f)] [SerializeField] private float smoothMax = 0.5f;
         float shineSharpSent = -1f, shineSparkleSent = -1f;
         readonly Color[] skinSent = new Color[GuidedFaceShapes.LayerCount];
         Vector2[] meshUvs;
@@ -223,6 +233,8 @@ namespace GlowUp.AR
             if (materials != null) foreach (Material m in materials) if (m != null) Destroy(m);
             materials = null;
             if (shineMaterial != null) Destroy(shineMaterial);
+            if (smoothMaterial != null) Destroy(smoothMaterial);
+            smoothLayer = null; smoothMaterial = null; smoothTextureSent = null;
             shineMaterial = null;
             ShowOldGuide(true);
             if (makeup != null) { makeup.Presence = 1f; makeup.SkinAdapt = 0f; makeup.ShineGain = 1f; if (prepared) makeup.SetBrowMask(null); }
@@ -347,6 +359,16 @@ namespace GlowUp.AR
             materials = new Material[GuidedFaceShapes.LayerCount];
             local = new Vector3[GuidedFaceShapes.LayerCount + 1][];
             // 18 Nov 2026: both pipelines build the pigment; the lighter one shows it only on the part being tried on (see Colour)
+            // the smoothing layer first, so everything else is drawn over it
+            Shader smooth = smoothSkin ? Shader.Find("GlowUp/UiSkinSmooth") : null;
+            if (smooth != null && feed != null && feed.Display != null)
+            {
+                smoothMaterial = new Material(smooth) { name = "Guided face smoothing" };
+                smoothLayer = MakeLayer("Face Smoothing", colourMasks[GuidedFaceShapes.Face], smoothMaterial);
+                cameraUvs = new Vector2[Points];
+                Canvas canvas = root.GetComponentInParent<Canvas>();
+                if (canvas != null) canvas.rootCanvas.additionalShaderChannels |= AdditionalCanvasShaderChannels.TexCoord1;      // the camera picture\'s coordinates
+            }
             bool withPigment = pigmentLayer;
             pigments = withPigment ? new ArGuidedFaceLayer[GuidedFaceShapes.LayerCount] : null;
             for (int layer = 0; layer < GuidedFaceShapes.LayerCount; layer++)
@@ -442,8 +464,56 @@ namespace GlowUp.AR
                 }
                 layer.SetPoints(points);
                 if (pigments != null && l < GuidedFaceShapes.LayerCount && pigments[l] != null && pigments[l].enabled) pigments[l].SetPoints(points);
+                if (l == GuidedFaceShapes.Face && smoothLayer != null && smoothLayer.enabled) DrawSmoothing(points, layer);
             }
             meshUpdateMilliseconds = (Stopwatch.GetTimestamp() - start) * 1000f / Stopwatch.Frequency;
+        }
+
+        /// <summary>
+        /// The smoothing layer takes the face's points and, for each, where the camera picture is: the point goes to the camera image's own
+        /// coordinates (its rotation and mirror are in its transform) and from there to the texture's coordinates through the image's uvRect,
+        /// the way the RawImage draws its picture.
+        /// </summary>
+        void DrawSmoothing(Vector3[] pointsInLayer, ArGuidedFaceLayer like)
+        {
+            RawImage image = feed.Display;
+            if (image == null || cameraUvs == null) return;
+            Matrix4x4 toImage = image.rectTransform.worldToLocalMatrix * like.rectTransform.localToWorldMatrix;
+            Rect rect = image.rectTransform.rect, uv = image.uvRect;
+            for (int i = 0; i < Points; i++)
+            {
+                Vector3 p = toImage.MultiplyPoint3x4(pointsInLayer[i]);
+                float nx = (p.x - rect.xMin) / Mathf.Max(1f, rect.width), ny = (p.y - rect.yMin) / Mathf.Max(1f, rect.height);
+                cameraUvs[i] = new Vector2(uv.x + nx * uv.width, uv.y + ny * uv.height);
+            }
+            smoothLayer.SetPoints(pointsInLayer);
+            smoothLayer.SetCameraUvs(cameraUvs);
+        }
+
+        /// <summary>Skin smoothing follows the foundation: on while the face layer is on (full pipeline), its strength the foundation's strength.</summary>
+        void UpdateSmoothing()
+        {
+            if (smoothLayer == null || smoothMaterial == null) return;
+            RawImage image = feed.Display;
+            bool full = !(quality != null && quality.IsLight);
+            Color face = makeup.LayerColour(GuidedFaceShapes.Face);
+            bool on = full && image != null && image.texture != null && face.a > 0.004f && presence > 0.001f && layers[GuidedFaceShapes.Face].enabled;
+            if (smoothLayer.enabled != on) { smoothLayer.enabled = on; if (on) { smoothTextureSent = null; DrawPoints(); } }
+            if (!on) return;
+            smoothLayer.color = new Color(1f, 1f, 1f, Mathf.Clamp01(face.a / Mathf.Max(0.05f, MakeupQuality.SolidOpacity(MakeupQuality.Face)) * smoothMax));
+            // the camera view has a Mask, so the UI draws a stencil COPY of the material: what is set goes to that copy too
+            Material drawn = smoothLayer.materialForRendering;
+            Texture picture = image.texture;
+            float faceWidth = Mathf.Abs(shown[GuidedFaceShapes.FaceSideOne].x - shown[GuidedFaceShapes.FaceSideTwo].x);
+            float radius = Mathf.Clamp(faceWidth * Mathf.Min(picture.width, picture.height) * 0.0055f, 1.5f, 4.5f);
+            if (!ReferenceEquals(smoothTextureSent, picture))
+            {
+                smoothTextureSent = picture;
+                smoothMaterial.SetTexture("_CamTex", picture);
+                if (drawn != null && drawn != smoothMaterial) drawn.SetTexture("_CamTex", picture);
+            }
+            smoothMaterial.SetFloat("_RadiusPx", radius);
+            if (drawn != null && drawn != smoothMaterial) drawn.SetFloat("_RadiusPx", radius);
         }
 
         /// <summary>
@@ -481,6 +551,7 @@ namespace GlowUp.AR
                     if (drawn != null && drawn != materials[l]) drawn.SetColor(SkinBaseId, skin);
                 }
             }
+            UpdateSmoothing();
             int active = makeup.ShownLayer;
             float strength = 0f;
             if (active >= 0 && active < GuidedFaceShapes.LayerCount && active != GuidedFaceShapes.Brows && highlightMasks[active] != null)
@@ -497,7 +568,7 @@ namespace GlowUp.AR
             {
                 Color tint = makeup.HighlightTint;
                 // 18 Nov 2026: foundation's satin / glossy light was too faint to tell from matte on the owner's phone: its glow is stronger
-                float glow = active == GuidedFaceShapes.Face ? 0.95f : 0.5f;
+                float glow = MakeupQuality.Glow(active);
                 highlight.color = new Color(tint.r, tint.g, tint.b, Mathf.Clamp01(strength * glow));
                 ShapeShine();
             }
@@ -516,6 +587,8 @@ namespace GlowUp.AR
                 case "metallic": sharp = 1.1f; sparkle = Mathf.Clamp01(choices.FinishGlitter * 0.5f); break;
                 default: sharp = 1f; break;
             }
+            // 18 Nov 2026: no glitter dots on foundation (they read as a phone filter, not as make-up); a softer sprinkle on the other parts
+            sparkle = makeup.ShownLayer == GuidedFaceShapes.Face ? 0f : sparkle * 0.6f;
             if (Mathf.Approximately(sharp, shineSharpSent) && Mathf.Approximately(sparkle, shineSparkleSent)) return;
             shineSharpSent = sharp; shineSparkleSent = sparkle;
             shineMaterial.SetFloat("_Sharpness", sharp); shineMaterial.SetFloat("_Sparkle", sparkle);

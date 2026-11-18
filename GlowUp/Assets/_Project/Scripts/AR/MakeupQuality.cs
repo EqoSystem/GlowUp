@@ -24,14 +24,15 @@ namespace GlowUp.AR
         // opacity at full strength: face and cheeks blend, eyes / lips / brows read as solid product
         static readonly float[] Solid = { 0.40f, 0.62f, 0.75f, 0.90f, 0.80f };
         // how much of the shade itself lies over the tint (the tint can only double the skin's colour)
-        static readonly float[] PigmentShare = { 0.06f, 0.28f, 0.36f, 0.42f, 0.38f };
+        static readonly float[] PigmentShare = { 0.06f, 0.14f, 0.28f, 0.32f, 0.30f };
 
         /// <summary>The least opacity layer `layer` reaches at full strength.</summary>
         public static float SolidOpacity(int layer) => layer >= 0 && layer < Solid.Length ? Solid[layer] : 0f;
 
         /// <summary>Foundation, concealer and powder keep the skin's own light and texture: a pale shade must never be painted over darker skin as a flat
-        /// cream (a chalky mask, seen on the owner's phone 18 Nov 2026), so the face gets no extra pigment for a lighter shade.</summary>
-        public static float ExtraForLighter(int layer, float configured) => layer == Face ? 0f : configured;
+        /// cream (a chalky mask, seen on the owner's phone 18 Nov 2026), so the face gets no extra pigment for a lighter shade and every other part at most
+        /// 0.15. The same lesson, applied to cheeks, eyes, lips and brows.</summary>
+        public static float ExtraForLighter(int layer, float configured) => layer == Face ? 0f : Mathf.Min(configured, 0.15f);
 
         /// <summary>The least pigment share of layer `layer`.</summary>
         public static float Pigment(int layer) => layer >= 0 && layer < PigmentShare.Length ? PigmentShare[layer] : 0f;
@@ -49,6 +50,9 @@ namespace GlowUp.AR
 
         /// <summary>True when layer `layer` gets its pigment on this pipeline (`shownLayer` = the part being tried on).</summary>
         public static bool PigmentOn(int layer, int shownLayer, ArTier tier) => tier == ArTier.Full || layer == shownLayer;
+
+        /// <summary>How strong the finish's glow is on layer `layer` (the glow of foundation was too faint to tell satin or glossy from matte).</summary>
+        public static float Glow(int layer) => layer == Face ? 0.95f : layer == Cheeks ? 0.8f : layer == Eyes ? 0.7f : layer == Lips ? 0.7f : 0.5f;
 
         /// <summary>One line for the Settings page: what the make-up looks like on this pipeline.</summary>
         public static string Describe(ArTier tier) => tier == ArTier.Full
