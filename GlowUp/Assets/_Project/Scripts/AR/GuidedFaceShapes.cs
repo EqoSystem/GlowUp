@@ -80,7 +80,8 @@ namespace GlowUp.AR
                     // the lips are a ring: the inside of the mouth stays bare, so teeth and tongue are never painted when the mouth opens
                     var outer = Fill(n, uvs, crossings, LipsOuter);
                     var inner = Fill(n, uvs, crossings, LipsInner);
-                    var ring = Soften(Subtract(Dilate(outer, n, Mathf.Max(1, n / 256)), inner), n, Mathf.Max(1, n / 128));
+                    // a CLEAN edge on the lip line (quality target, 18 Nov 2026): no growing past the lip, only a one-pixel soft rim
+                    var ring = Soften(Subtract(outer, inner), n, 1);
                     return Subtract(ring, inner);
                 }
                 case Brows:
@@ -111,8 +112,8 @@ namespace GlowUp.AR
                     Blob(shape, n, Vector2.Lerp(Uv(uvs, 386), Uv(uvs, 282), 0.3f), 0.03f, 0.015f);
                     break;
                 case Lips:
-                    Blob(shape, n, Vector2.Lerp(Uv(uvs, 14), Uv(uvs, 17), 0.45f), 0.04f, 0.012f);     // the middle of the lower lip
-                    Blob(shape, n, Vector2.Lerp(Uv(uvs, 13), Uv(uvs, 0), 0.55f), 0.025f, 0.007f);     // a smaller one on the upper lip
+                    Blob(shape, n, Vector2.Lerp(Uv(uvs, 14), Uv(uvs, 17), 0.45f), 0.05f, 0.016f);     // the middle of the lower lip
+                    Blob(shape, n, Vector2.Lerp(Uv(uvs, 13), Uv(uvs, 0), 0.55f), 0.03f, 0.009f);     // a smaller one on the upper lip
                     break;
             }
             return Multiply(shape, ColourMask(layer, n, uvs));

@@ -94,6 +94,8 @@ namespace GlowUp.AR
         [SerializeField] private bool usePigment = true;
         [Range(0f, 0.6f)] [SerializeField] private float pigmentFace = 0.18f;
         [Range(0f, 0.6f)] [SerializeField] private float pigmentParts = 0.22f;
+        [Tooltip("Pigment for the lips: a solid lipstick colour with the lip lines still showing (18 November 2026)")]
+        [Range(0f, 0.7f)] [SerializeField] private float pigmentLips = 0.42f;
         [Range(0f, 0.6f)] [SerializeField] private float pigmentForLighter = 0.3f;
         bool skinBaseInit;
 
@@ -256,7 +258,7 @@ namespace GlowUp.AR
                 if (i < 3 && layer.HasProperty("_SkinBase")) layer.SetColor("_SkinBase", skinBaseNow);
                 // phase 3A: the thin layer of the shade itself (the shader's second pass); more for a shade the tint cannot lighten to
                 if (layer.HasProperty(PigmentId))
-                    layer.SetFloat(PigmentId, usePigment ? GuidedPigment.Share(shown[i], i < 3 ? skinBaseNow : SkinUnderFor(i), i == 0 ? pigmentFace : pigmentParts, pigmentForLighter) : 0f);
+                    layer.SetFloat(PigmentId, usePigment ? GuidedPigment.Share(shown[i], i < 3 ? skinBaseNow : SkinUnderFor(i), i == 0 ? pigmentFace : i == 3 ? pigmentLips : pigmentParts, pigmentForLighter) : 0f);
                 if (on) { active = i; activeShare = full > 0.001f ? Mathf.Clamp01(shown[i].a / full) : 0f; }
             }
 

@@ -119,8 +119,11 @@ namespace GlowUp.AR
             if (part == ShadeAdvisor.Eyes) return eyesMax;
             if (part == ShadeAdvisor.Face) return faceMax;
             if (part == ShadeAdvisor.Brows) return browsMax;
-            return lipsMax;
+            return Mathf.Max(lipsMax, LipsSolidOpacity);       // 18 Nov 2026: a lipstick is solid like the retail try-ons, whatever the scene has saved
         }
+
+        /// <summary>The least opacity a lip colour reaches at full strength (a scene may hold an older, weaker value).</summary>
+        public const float LipsSolidOpacity = 0.9f;
 
         void Update() { Paint(false); }
 

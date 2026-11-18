@@ -62,6 +62,8 @@ namespace GlowUp.AR
         [Range(0f, 0.6f)] [SerializeField] private float pigmentFace = 0.18f;
         [Tooltip("How much of the shade itself covers cheeks, eyes, lips and brows")]
         [Range(0f, 0.6f)] [SerializeField] private float pigmentParts = 0.22f;
+        [Tooltip("How much of the shade itself covers the LIPS: a lipstick is a solid colour with the lip lines still showing (18 November 2026, quality target: retail try-on apps)")]
+        [Range(0f, 0.7f)] [SerializeField] private float pigmentLips = 0.42f;
         [Tooltip("Extra pigment for a shade much lighter than the skin under it (the tint cannot lighten that far)")]
         [Range(0f, 0.6f)] [SerializeField] private float pigmentForLighter = 0.3f;
 
@@ -450,7 +452,7 @@ namespace GlowUp.AR
         /// </summary>
         Color PigmentColour(int layer, Color shade, Color skin)
         {
-            float share = GuidedPigment.Share(shade, skin, layer == GuidedFaceShapes.Face ? pigmentFace : pigmentParts, pigmentForLighter);
+            float share = GuidedPigment.Share(shade, skin, layer == GuidedFaceShapes.Face ? pigmentFace : layer == GuidedFaceShapes.Lips ? pigmentLips : pigmentParts, pigmentForLighter);
             return new Color(shade.r, shade.g, shade.b, Mathf.Clamp01(shade.a * share));
         }
 
