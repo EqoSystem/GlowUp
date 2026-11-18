@@ -23,7 +23,29 @@ namespace GlowUp.Common
         /// even for a user who has saved scans). The product is chosen on a scan result, in Recent Scans, in Recommended for You or in the
         /// Alternatives; each of those sets ScanSession.TryOn before it opens AR Try-On.
         /// </summary>
-        public static bool Allowed => ScanSession.TryOn != null;
+        /// 18 Nov 2026 (owner): a user who has scanned a product may open Try On with it. When nothing was chosen, the latest scan (this
+        /// session's result, else the newest saved scan) that AR Try-On can show becomes the product, so a new user's first scan is never blocked.
+        public static bool Allowed
+        {
+            get
+            {
+                if (ScanSession.TryOn == null) ScanSession.TryOn = LatestScan();
+                return ScanSession.TryOn != null;
+            }
+        }
+
+        /// <summary>The newest scanned make-up AR Try-On can show (null = none).</summary>
+        static ScanRecord LatestScan()
+        {
+            try
+            {
+                if (ScanSession.Current != null && ProductScope.CanTryOn(ScanSession.Current)) return ScanSession.Current;
+                foreach (ScanRecord saved in ScanHistoryRepository.Active())
+                    if (saved != null && ProductScope.CanTryOn(saved)) return saved;
+            }
+            catch (Exception e) { { } }
+            return null;
+        }
 
         /// <summary>Tells the open screen that AR Try-On was refused.</summary>
         public static void RaiseBlocked()

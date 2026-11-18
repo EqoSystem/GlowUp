@@ -37,9 +37,11 @@ namespace GlowUp.Common
             if (tryOnButton != null) tryOnButton.onClick.AddListener(() =>
             {
                 if (current == Tab.TryOn) return;
-                // from the bar there is no product chosen yet: Try On says where to pick one (17 Nov 2026), the bar's pill stays where it is
+                // 18 Nov 2026 (owner): from the bar, Try On opens with the latest scanned make-up (TryOnGate picks it). Only a user who has
+                // scanned nothing it can show hears where to pick one; the bar's pill then stays where it is.
                 ScanSession.TryOn = null;
-                SayNeedsProduct();
+                if (TryOnGate.Allowed) Open(tryOnScene, 2);
+                else SayNeedsProduct();
             });
             TryOnGate.Blocked += SayNeedsProduct;    // a swipe or another button asked for AR Try-On without a product
         }
