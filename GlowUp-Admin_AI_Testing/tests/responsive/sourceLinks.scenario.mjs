@@ -55,11 +55,11 @@ try {
         const geo = await page.evaluate(() => {
             const box = document.getElementById("ingredientPurposeInput").getBoundingClientRect(), src = document.getElementById("ingredientPurposeInputSource").getBoundingClientRect();
             const hint = document.querySelector("#ingredientPurposeInput ~ .hint-row").getBoundingClientRect();
-            return { beside: src.left >= box.right, topDiff: Math.abs(src.top - box.top), under: src.top >= box.bottom - 1 && src.bottom <= hint.top + 1, srcH: src.height, wide: document.querySelector(".ing-modal").getBoundingClientRect().width >= 640 };
+            return { beside: src.left >= box.right, topDiff: Math.abs(src.top - box.top), under: src.top >= box.bottom - 1 && src.bottom <= hint.top + 1, srcH: src.height / (() => { const g = document.createElement("div"); g.style.cssText = "position:absolute;visibility:hidden;width:calc(1000 * var(--u));height:1px"; document.body.appendChild(g); const u = g.getBoundingClientRect().width / 1000; g.remove(); return u; })(), wide: document.querySelector(".ing-modal").getBoundingClientRect().width >= 640 };
         });
         if (geo.wide) ok(geo.beside && geo.topDiff < 2, `${label}: wide window - the source box is beside the box, top-aligned (diff ${geo.topDiff})`);
         else ok(geo.under, `${label}: narrow window - the source box is under the box and above the hint`);
-        ok(Math.abs(geo.srcH - 40) < 1.5, `${label}: the source box is 40 px high`);
+        ok(Math.abs(geo.srcH - 40) < 1.5, `${label}: the source box is 40 units high`);
         ok(await page.evaluate(() => document.getElementById("ingredientDescInputSource").getBoundingClientRect().height < 45), `${label}: beside a text area it stays one line (not stretched)`);
 
         ok(/Sources: 0 of 0 fields/.test(await page.textContent("#ingredientSourceCount")), `${label}: header chip: no box has a value yet`);

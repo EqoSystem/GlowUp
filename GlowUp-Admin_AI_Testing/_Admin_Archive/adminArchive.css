@@ -1,9 +1,9 @@
 
-.days-left { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; font-size: var(--fs-sm); color: var(--text-2); }
-.days-left svg.ic { width: 15px; height: 15px; }
+.days-left { display: inline-flex; align-items: center; gap: calc(6 * var(--u)); white-space: nowrap; font-size: var(--fs-sm); color: var(--text-2); }
+.days-left svg.ic { width: calc(15 * var(--u)); height: calc(15 * var(--u)); }
 .days-left.warn { color: var(--warn); font-weight: 650; }
 .days-left.bad { color: var(--bad); font-weight: 650; }
 .archive-table tr.left-warn td, .archive-table tr.left-bad td { background: color-mix(in srgb, var(--warn) 7%, transparent); }
-#archiveBar { display: flex; align-items: center; gap: 8px; }
+#archiveBar { display: flex; align-items: center; gap: calc(8 * var(--u)); }
 #archiveBar[hidden] { display: none; }
 @container panel (max-width: 700px) { .archive-table th:nth-child(4), .archive-table td:nth-child(4) { display: none; } }

@@ -22,64 +22,64 @@ body.login-page::before {
 .topbar.login-top { justify-content: space-between; background: color-mix(in srgb, var(--paper) 86%, transparent); }
 .login-brand { padding: 0; }
 .login-brand .brand-title { font-size: var(--fs-md); font-weight: 700; line-height: 1.15; letter-spacing: .1px; }
-.login-tools { display: flex; gap: 8px; margin-left: auto; }
-.login-main { display: grid; place-items: center; padding: 16px var(--gutter) 24px; min-width: 0; }
+.login-tools { display: flex; gap: calc(8 * var(--u)); margin-left: auto; }
+.login-main { display: grid; place-items: center; padding: calc(16 * var(--u)) var(--gutter) calc(24 * var(--u)); min-width: 0; }
 .login-card {
-    width: min(380px, 100%); padding: clamp(22px, 6vw, 32px) clamp(18px, 5vw, 28px); border-radius: calc(var(--radius) + 4px); text-align: center;
+    width: min(calc(380 * var(--u)), 100%); padding: clamp(calc(22 * var(--u)), 6vw, calc(32 * var(--u))) clamp(calc(18 * var(--u)), 5vw, calc(28 * var(--u))); border-radius: calc(var(--radius) + calc(4 * var(--u))); text-align: center;
     background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); animation: pop-in .25s ease-out both;
     transition: border-color .25s, box-shadow .25s;
 }
 .login-card:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
 .login-card h1 { font-size: var(--fs-lg); font-weight: 700; margin: 0; line-height: 1.25; }
-.subtitle { font-size: var(--fs-sm); color: var(--muted); margin: 2px 0 22px; }
-#login-form { display: flex; flex-direction: column; gap: 14px; text-align: left; }
+.subtitle { font-size: var(--fs-sm); color: var(--muted); margin: calc(2 * var(--u)) 0 calc(22 * var(--u)); }
+#login-form { display: flex; flex-direction: column; gap: calc(14 * var(--u)); text-align: left; }
 .login-message { margin: 0; }
-.login-btn { width: 100%; padding: 12px 16px; font-size: var(--fs-base); }
-.footer-note { font-size: var(--fs-xs); color: var(--muted); margin-top: 18px; line-height: 1.6; }
+.login-btn { width: 100%; padding: calc(12 * var(--u)) calc(16 * var(--u)); font-size: var(--fs-base); }
+.footer-note { font-size: var(--fs-xs); color: var(--muted); margin-top: calc(18 * var(--u)); line-height: 1.6; }
 
 
 .text-link {
     display: inline; padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: var(--accent-text); cursor: pointer;
-    text-decoration: none; text-underline-offset: 2px; border-radius: 3px;
+    text-decoration: none; text-underline-offset: calc(2 * var(--u)); border-radius: calc(3 * var(--u));
 }
 .text-link:hover, .text-link:focus-visible { text-decoration: underline; }
-.text-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.text-link:focus-visible { outline: calc(2 * var(--u)) solid var(--accent); outline-offset: calc(2 * var(--u)); }
 
 
 .terms-dialog {
     margin: auto; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); background: var(--surface);
-    width: min(640px, calc(100vw - 32px)); max-width: none; max-height: min(760px, calc(100vh - 32px)); max-height: min(760px, calc(100dvh - 32px));
+    width: min(calc(640 * var(--u)), calc(100vw - calc(32 * var(--u)))); max-width: none; max-height: min(calc(760 * var(--u)), calc(100vh - calc(32 * var(--u)))); max-height: min(calc(760 * var(--u)), calc(100dvh - calc(32 * var(--u))));
     box-shadow: var(--shadow); overflow: hidden;
 }
 .terms-dialog[open] { animation: pop-in .22s var(--ease); }
 .terms-dialog::backdrop { background: var(--overlay); }
 html:has(.terms-dialog[open]) { overflow: hidden; }
 .terms-box { display: flex; flex-direction: column; max-height: inherit; }
-.terms-head { padding: 20px clamp(16px, 4vw, 24px) 12px; border-bottom: 1px solid var(--border); }
+.terms-head { padding: calc(20 * var(--u)) clamp(calc(16 * var(--u)), 4vw, calc(24 * var(--u))) calc(12 * var(--u)); border-bottom: 1px solid var(--border); }
 .terms-head h2 { font-size: var(--fs-md); font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
-.terms-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px clamp(16px, 4vw, 24px) 20px; font-size: var(--fs-sm); line-height: 1.6; color: var(--text-2); text-align: left; overflow-wrap: anywhere; }
-.terms-body:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.terms-body h3 { margin: 16px 0 4px; font-size: var(--fs-base); font-weight: 650; color: var(--text); }
-.terms-body ul { margin: 4px 0 0 20px; display: flex; flex-direction: column; gap: 3px; }
-.terms-foot { display: flex; justify-content: flex-end; padding: 12px clamp(16px, 4vw, 24px) 16px; border-top: 1px solid var(--border); }
+.terms-body { flex: 1; min-height: 0; overflow-y: auto; padding: calc(16 * var(--u)) clamp(calc(16 * var(--u)), 4vw, calc(24 * var(--u))) calc(20 * var(--u)); font-size: var(--fs-sm); line-height: 1.6; color: var(--text-2); text-align: left; overflow-wrap: anywhere; }
+.terms-body:focus-visible { outline: calc(2 * var(--u)) solid var(--accent); outline-offset: calc(-2 * var(--u)); }
+.terms-body h3 { margin: calc(16 * var(--u)) 0 calc(4 * var(--u)); font-size: var(--fs-base); font-weight: 650; color: var(--text); }
+.terms-body ul { margin: calc(4 * var(--u)) 0 0 calc(20 * var(--u)); display: flex; flex-direction: column; gap: calc(3 * var(--u)); }
+.terms-foot { display: flex; justify-content: flex-end; padding: calc(12 * var(--u)) clamp(calc(16 * var(--u)), 4vw, calc(24 * var(--u))) calc(16 * var(--u)); border-top: 1px solid var(--border); }
 @media (prefers-reduced-motion: reduce) { .terms-dialog[open] { animation: none; } }
 
 
 .password-box { position: relative; display: flex; }
-.password-box input { flex: 1; min-width: 0; padding-right: 46px; }
+.password-box input { flex: 1; min-width: 0; padding-right: calc(46 * var(--u)); }
 
 .password-box.length-hidden input { color: transparent; caret-color: transparent; text-shadow: none; -webkit-text-fill-color: transparent; }
 .password-length-cover {
-    position: absolute; top: 0; bottom: 0; left: 0; right: 46px; display: flex; align-items: center; overflow: hidden; white-space: nowrap; pointer-events: none;
+    position: absolute; top: 0; bottom: 0; left: 0; right: calc(46 * var(--u)); display: flex; align-items: center; overflow: hidden; white-space: nowrap; pointer-events: none;
     font: inherit; letter-spacing: 1px; color: var(--text); box-sizing: border-box;
 }
 .password-eye {
-    position: absolute; right: 6px; top: 50%; translate: 0 -50%; width: 34px; height: 34px; display: grid; place-items: center;
-    border: 0; border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer;
+    position: absolute; right: calc(6 * var(--u)); top: 50%; translate: 0 -50%; width: calc(34 * var(--u)); height: calc(34 * var(--u)); display: grid; place-items: center;
+    border: 0; border-radius: calc(8 * var(--u)); background: transparent; color: var(--muted); cursor: pointer;
 }
 .password-eye:hover, .password-eye.on { color: var(--text); }
-.password-eye:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.password-eye svg.ic { width: 20px; height: 20px; }
+.password-eye:focus-visible { outline: calc(2 * var(--u)) solid var(--accent); outline-offset: 1px; }
+.password-eye svg.ic { width: calc(20 * var(--u)); height: calc(20 * var(--u)); }
 
 .password-eye .eye-open { display: none; }
 .password-eye.on .eye-open { display: block; }

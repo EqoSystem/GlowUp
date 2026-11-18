@@ -1,10 +1,10 @@
 
 
 
-.ingredients-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; align-items: start; }
+.ingredients-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(250 * var(--u)), 1fr)); gap: calc(12 * var(--u)); align-items: start; }
 .ingredients-list > .empty-state { grid-column: 1 / -1; }
 .ingredient-card {
-    display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: var(--radius-sm); min-width: 0; cursor: pointer;
+    display: flex; flex-direction: column; gap: calc(4 * var(--u)); padding: calc(12 * var(--u)) calc(14 * var(--u)); border-radius: var(--radius-sm); min-width: 0; cursor: pointer;
     background: var(--surface-2); border: 1px solid var(--border); transition: transform .16s var(--ease), box-shadow .2s, border-color .2s, background-color .2s;
 }
 .ingredient-card.needs-review { border-color: color-mix(in srgb, var(--info) 50%, transparent); }
@@ -12,36 +12,36 @@
 .ingredient-card.open.fx:hover { transform: none; }
 .ingredient-card.open:focus-visible { outline: none; }
 .ingredient-card.is-picked { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--surface-2)); animation: neon 1.7s ease-in-out infinite; }
-.card-head { display: flex; align-items: center; gap: 9px; min-height: 30px; }
+.card-head { display: flex; align-items: center; gap: calc(9 * var(--u)); min-height: calc(30 * var(--u)); }
 .card-head h4 { font-size: var(--fs-base); font-weight: 650; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ingredient-card.open .card-head h4 { white-space: normal; overflow-wrap: anywhere; font-size: var(--fs-md); }
 .card-head .spacer { flex: 1; }
-.ingredient-tech { font-size: var(--fs-sm); color: var(--muted); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 45px; }
+.ingredient-tech { font-size: var(--fs-sm); color: var(--muted); font-style: italic; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: calc(45 * var(--u)); }
 .ingredient-card.open .ingredient-tech { white-space: normal; overflow-wrap: anywhere; }
 
-.card-sub { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.card-sub { display: flex; align-items: center; gap: calc(6 * var(--u)); min-width: 0; }
 .card-sub .ingredient-tech { flex: 1; min-width: 0; }
 .card-sub .status-badge { flex: none; }
-.ingredient-card .detail-box { margin-top: 10px; }
-.ingredient-card .pick { margin-right: -2px; }
-.panel-head > .pick { margin-right: 2px; }
-.table-foot { display: flex; align-items: center; gap: 12px; }
+.ingredient-card .detail-box { margin-top: calc(10 * var(--u)); }
+.ingredient-card .pick { margin-right: calc(-2 * var(--u)); }
+.panel-head > .pick { margin-right: calc(2 * var(--u)); }
+.table-foot { display: flex; align-items: center; gap: calc(12 * var(--u)); }
 .table-foot .spacer { flex: 1; }
 @container panel (max-width: 620px) { .ingredients-list { grid-template-columns: 1fr; } }
 .ingredient-card.from-product { border-style: dashed; }
-.ingredient-card.from-product .ingredient-tech { font-style: normal; padding-left: 18px; }
-.suggestion-list { display: grid; gap: 12px; }
-.suggestion-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: var(--surface-2); }
-.suggestion-card .field { display: grid; gap: 6px; margin: 12px 0; }
+.ingredient-card.from-product .ingredient-tech { font-style: normal; padding-left: calc(18 * var(--u)); }
+.suggestion-list { display: grid; gap: calc(12 * var(--u)); }
+.suggestion-card { border: 1px solid var(--line); border-radius: calc(12 * var(--u)); padding: calc(14 * var(--u)); background: var(--surface-2); }
+.suggestion-card .field { display: grid; gap: calc(6 * var(--u)); margin: calc(12 * var(--u)) 0; }
 .suggestion-card .field textarea { width: 100%; }
-.suggestion-card [data-draft-reviewed] { margin-right: 6px; }
+.suggestion-card [data-draft-reviewed] { margin-right: calc(6 * var(--u)); }
 
 
-.ingredients-list.as-rows { grid-template-columns: 1fr; gap: 6px; }
+.ingredients-list.as-rows { grid-template-columns: 1fr; gap: calc(6 * var(--u)); }
 
 
 .ingredients-list { container: inglist / inline-size; }
-.as-rows .ingredient-card:not(.open) { flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 14px; padding: 7px 14px; }
+.as-rows .ingredient-card:not(.open) { flex-direction: row; align-items: center; flex-wrap: nowrap; gap: calc(14 * var(--u)); padding: calc(7 * var(--u)) calc(14 * var(--u)); }
 .as-rows .ingredient-card:not(.open) > .card-head { display: contents; }
 .as-rows .ingredient-card:not(.open) .pick { order: 0; flex: none; }
 .as-rows .ingredient-card:not(.open) .ingredient-name { order: 1; flex: 1 1 34%; min-width: 0; }
@@ -50,47 +50,47 @@
 .as-rows .ingredient-card:not(.open) .row-actions { order: 3; flex: none; }
 .as-rows .ingredient-card:not(.open) .ingredient-tech { padding-left: 0; }
 @container inglist (max-width: 620px) {
-    .as-rows .ingredient-card:not(.open) { flex-wrap: wrap; row-gap: 2px; }
+    .as-rows .ingredient-card:not(.open) { flex-wrap: wrap; row-gap: calc(2 * var(--u)); }
     .as-rows .ingredient-card:not(.open) .ingredient-name { flex: 1 1 60%; }
     .as-rows .ingredient-card:not(.open) .card-sub { flex: 1 1 100%; order: 3; }
     .as-rows .ingredient-card:not(.open) .row-actions { order: 2; }
 
-    .as-rows .ingredient-card:not(.open) .card-sub { flex-wrap: wrap; row-gap: 4px; }
+    .as-rows .ingredient-card:not(.open) .card-sub { flex-wrap: wrap; row-gap: calc(4 * var(--u)); }
 }
 
 
-[data-panel="list"] > .panel-inner > .panel-head.wraps { column-gap: 6px; }
+[data-panel="list"] > .panel-inner > .panel-head.wraps { column-gap: calc(6 * var(--u)); }
 #ingredientQuick:empty { display: none; }
-[data-panel="list"] .panel-head .table-tools .btn { padding-inline: 9px; }
-#ingredientPagerTop .btn-group { padding: 2px; }
-#ingredientPagerTop .icon-btn { width: 26px; height: 26px; }
+[data-panel="list"] .panel-head .table-tools .btn { padding-inline: calc(9 * var(--u)); }
+#ingredientPagerTop .btn-group { padding: calc(2 * var(--u)); }
+#ingredientPagerTop .icon-btn { width: calc(26 * var(--u)); height: calc(26 * var(--u)); }
 #ingredientPagerTop .page-now { min-width: 0; }
 #ingredientPagerTop .pager-range { display: none; }
 
 [data-panel="list"] > .panel-inner > .panel-head > .head-end { position: relative; }
-[data-panel="list"] > .panel-inner > .panel-head > .head-end > .panel-menu-btn { position: absolute; right: 100%; margin-right: 4px; z-index: 2; }
+[data-panel="list"] > .panel-inner > .panel-head > .head-end > .panel-menu-btn { position: absolute; right: 100%; margin-right: calc(4 * var(--u)); z-index: 2; }
 @media (max-width: 1400px) { [data-panel="list"] #sortNow { display: none; } }
 
 @media (min-width: 1024px) and (max-width: 1279px) { html:not(.sb-collapsed) #ingredientShelfAdd .folder-chip { font-size: 0; gap: 0; } }
 
 
 .class-cell { flex: none; display: inline-flex; }
-.as-rows .ingredient-card:not(.open) .class-cell { flex: 0 0 190px; }
+.as-rows .ingredient-card:not(.open) .class-cell { flex: 0 0 calc(190 * var(--u)); }
 .lists-row.class-row { grid-template-columns: minmax(0, 1fr) auto; }
 .class-row-name { min-width: min(7ch, 100%); overflow-wrap: anywhere; font-size: var(--fs-base); }
-.migration-lines { margin: 0 0 10px; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-base); }
+.migration-lines { margin: 0 0 calc(10 * var(--u)); padding-left: calc(20 * var(--u)); display: flex; flex-direction: column; gap: calc(6 * var(--u)); font-size: var(--fs-base); }
 
 
-.test-banner { flex: none; display: flex; align-items: center; gap: 12px; margin: 12px var(--gutter) 0; padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--warn, #d9a441); background: color-mix(in srgb, var(--warn, #d9a441) 16%, var(--surface)); color: var(--text); font-size: var(--fs-sm); line-height: 1.4; }
+.test-banner { flex: none; display: flex; align-items: center; gap: calc(12 * var(--u)); margin: calc(12 * var(--u)) var(--gutter) 0; padding: calc(8 * var(--u)) calc(12 * var(--u)); border-radius: var(--radius-sm); border: 1px solid var(--warn, #d9a441); background: color-mix(in srgb, var(--warn, #d9a441) 16%, var(--surface)); color: var(--text); font-size: var(--fs-sm); line-height: 1.4; }
 .test-banner-text { flex: 1 1 auto; min-width: 0; margin: 0; overflow-wrap: anywhere; }
-.test-banner-close { flex: none; min-height: 32px; padding: 0 12px; border-radius: var(--radius-sm); border: 1px solid var(--border, currentColor); background: transparent; color: inherit; font: inherit; cursor: pointer; }
-@media (max-width: 767px) { .test-banner { flex-wrap: wrap; } .test-banner-close { min-height: 44px; min-width: 44px; } }
+.test-banner-close { flex: none; min-height: calc(32 * var(--u)); padding: 0 calc(12 * var(--u)); border-radius: var(--radius-sm); border: 1px solid var(--border, currentColor); background: transparent; color: inherit; font: inherit; cursor: pointer; }
+@media (max-width: 767px) { .test-banner { flex-wrap: wrap; } .test-banner-close { min-height: calc(44 * var(--u)); min-width: calc(44 * var(--u)); } }
 
 
-.scan-status { margin: 4px 0 10px; color: var(--text); }
-.scan-track { height: 8px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
-.scan-fill { height: 100%; width: 100%; border-radius: 999px; background: var(--accent); transform: scaleX(0); transform-origin: left center; transition: transform .12s linear; }
-.scan-inline { padding: 18px 8px; }
+.scan-status { margin: calc(4 * var(--u)) 0 calc(10 * var(--u)); color: var(--text); }
+.scan-track { height: calc(8 * var(--u)); border-radius: calc(999 * var(--u)); background: var(--surface-3); overflow: hidden; }
+.scan-fill { height: 100%; width: 100%; border-radius: calc(999 * var(--u)); background: var(--accent); transform: scaleX(0); transform-origin: left center; transition: transform .12s linear; }
+.scan-inline { padding: calc(18 * var(--u)) calc(8 * var(--u)); }
 
 @container inglist (max-width: 620px) { .as-rows .ingredient-card:not(.open) .class-cell { flex: 0 1 auto; max-width: 100%; } }
 

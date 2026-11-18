@@ -1,18 +1,18 @@
 
-.tab-count { margin-left: 2px; padding: 0 7px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 600; background: color-mix(in srgb, currentColor 16%, transparent); }
+.tab-count { margin-left: calc(2 * var(--u)); padding: 0 calc(7 * var(--u)); border-radius: calc(999 * var(--u)); font-size: var(--fs-xs); font-weight: 600; background: color-mix(in srgb, currentColor 16%, transparent); }
 .tab-count:empty { display: none; }
-#binTabs .seg { gap: 7px; }
-.bin-table .pick-col { width: 42px; }
+#binTabs .seg { gap: calc(7 * var(--u)); }
+.bin-table .pick-col { width: calc(42 * var(--u)); }
 .bin-table td { vertical-align: middle; }
 .bin-table .bin-name { font-weight: 600; overflow-wrap: anywhere; }
 .bin-table .row-sub { font-weight: 400; }
-.bin-table .bin-why { color: var(--text-2); font-size: var(--fs-sm); max-width: 360px; }
+.bin-table .bin-why { color: var(--text-2); font-size: var(--fs-sm); max-width: calc(360 * var(--u)); }
 .bin-table .bin-when { white-space: nowrap; color: var(--text-2); font-size: var(--fs-sm); }
 .bin-table tr.is-picked td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
 
-.bin-table .row-actions { opacity: 1; display: flex; gap: 6px; justify-content: flex-end; }
+.bin-table .row-actions { opacity: 1; display: flex; gap: calc(6 * var(--u)); justify-content: flex-end; }
 .bin-table .row-btn { white-space: nowrap; }
-#binBar { display: flex; align-items: center; gap: 8px; }
+#binBar { display: flex; align-items: center; gap: calc(8 * var(--u)); }
 #binBar[hidden] { display: none; }
 @container panel (max-width: 700px) { .bin-table th:nth-child(4), .bin-table td:nth-child(4) { display: none; } }
 
