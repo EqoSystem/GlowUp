@@ -73,7 +73,8 @@ namespace GlowUp.AR
                     FaceMaskPainter.FillPolygon(lids, n, LidPolygon(uvs, n, UpperLidOne, BrowLowerOne, 0.55f), crossings);
                     FaceMaskPainter.FillPolygon(lids, n, LidPolygon(uvs, n, UpperLidTwo, BrowLowerTwo, 0.55f), crossings);
                     var eyes = Fill(n, uvs, crossings, EyeOne, EyeTwo);
-                    return Subtract(Soften(lids, n, Mathf.Max(1, n / 85)), eyes);
+                    // 18 Nov 2026: a cleaner lid edge (was n / 85), like eyeshadow in the retail try-ons
+                    return Subtract(Soften(lids, n, Mathf.Max(1, n / 128)), eyes);
                 }
                 case Lips:
                 {
@@ -85,7 +86,8 @@ namespace GlowUp.AR
                     return Subtract(ring, inner);
                 }
                 case Brows:
-                    return Soften(Dilate(Fill(n, uvs, crossings, BrowOne, BrowTwo), n, Mathf.Max(1, n / 128)), n, Mathf.Max(1, n / 85));
+                    // 18 Nov 2026: brow hairs end crisply (soft rim was n / 85, which smudged the brow into the skin)
+                    return Soften(Dilate(Fill(n, uvs, crossings, BrowOne, BrowTwo), n, Mathf.Max(1, n / 256)), n, Mathf.Max(1, n / 170));
                 default:
                     return new float[n * n];
             }

@@ -45,7 +45,8 @@ namespace GlowUp.AppSettings
             ArTier tier = ArQualitySettings.Tier;
             string why = ArQualitySettings.Choice != ArQualityChoice.Automatic ? whyChosen : ArQualitySettings.FoundSlow ? whySlow : whyAutomatic;
             statusText.text = string.Format(statusFormat, ArQualitySettings.DescribeDevice(), tier == ArTier.Full ? fullName : lightName, why)
-                              + "\n" + (tier == ArTier.Full ? fullEffect : lightEffect);
+                              + "\n" + (tier == ArTier.Full ? fullEffect : lightEffect)
+                              + "\n" + GlowUp.AR.MakeupQuality.Describe(tier);       // 18 Nov 2026: what the make-up looks like on this pipeline
         }
     }
 }

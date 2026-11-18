@@ -1,4 +1,5 @@
 using System;
+using GlowUp.Performance;
 using GlowUp.Scan;
 using UnityEngine;
 using UnityEngine.UI;
@@ -62,8 +63,6 @@ namespace GlowUp.AR
         [Range(0f, 0.6f)] [SerializeField] private float pigmentFace = 0.18f;
         [Tooltip("How much of the shade itself covers cheeks, eyes, lips and brows")]
         [Range(0f, 0.6f)] [SerializeField] private float pigmentParts = 0.22f;
-        [Tooltip("How much of the shade itself covers the LIPS: a lipstick is a solid colour with the lip lines still showing (18 November 2026, quality target: retail try-on apps)")]
-        [Range(0f, 0.7f)] [SerializeField] private float pigmentLips = 0.42f;
         [Tooltip("Extra pigment for a shade much lighter than the skin under it (the tint cannot lighten that far)")]
         [Range(0f, 0.6f)] [SerializeField] private float pigmentForLighter = 0.3f;
 
@@ -347,7 +346,8 @@ namespace GlowUp.AR
             layers = new ArGuidedFaceLayer[GuidedFaceShapes.LayerCount];
             materials = new Material[GuidedFaceShapes.LayerCount];
             local = new Vector3[GuidedFaceShapes.LayerCount + 1][];
-            bool withPigment = pigmentLayer && !(quality != null && quality.IsLight);
+            // 18 Nov 2026: both pipelines build the pigment; the lighter one shows it only on the part being tried on (see Colour)
+            bool withPigment = pigmentLayer;
             pigments = withPigment ? new ArGuidedFaceLayer[GuidedFaceShapes.LayerCount] : null;
             for (int layer = 0; layer < GuidedFaceShapes.LayerCount; layer++)
             {
@@ -452,7 +452,7 @@ namespace GlowUp.AR
         /// </summary>
         Color PigmentColour(int layer, Color shade, Color skin)
         {
-            float share = GuidedPigment.Share(shade, skin, layer == GuidedFaceShapes.Face ? pigmentFace : layer == GuidedFaceShapes.Lips ? pigmentLips : pigmentParts, pigmentForLighter);
+            float share = GuidedPigment.Share(shade, skin, Mathf.Max(layer == GuidedFaceShapes.Face ? pigmentFace : pigmentParts, MakeupQuality.Pigment(layer)), pigmentForLighter);
             return new Color(shade.r, shade.g, shade.b, Mathf.Clamp01(shade.a * share));
         }
 
@@ -465,7 +465,8 @@ namespace GlowUp.AR
                 Color c = makeup.LayerColour(l);
                 bool on = c.a > 0.004f && presence > 0.001f;
                 ArGuidedFaceLayer pigment = pigments != null ? pigments[l] : null;
-                if (pigment != null && pigment.enabled != on) pigment.enabled = on;
+                bool pigmentOn = on && MakeupQuality.PigmentOn(l, makeup.ShownLayer, quality != null && quality.IsLight ? ArTier.Light : ArTier.Full);
+                if (pigment != null && pigment.enabled != pigmentOn) { pigment.enabled = pigmentOn; if (pigmentOn) DrawPoints(); }
                 if (layers[l].enabled != on) { layers[l].enabled = on; if (on) { skinSent[l] = Color.clear; DrawPoints(); } }     // switched on: a fresh stencil copy needs the skin colour again
                 if (!on) continue;
                 layers[l].color = c;

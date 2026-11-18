@@ -115,15 +115,12 @@ namespace GlowUp.AR
         /// <summary>The strongest opacity allowed for a part of the face (the Inspector values above).</summary>
         public float MaxOpacityFor(string part)
         {
-            if (part == ShadeAdvisor.Cheeks) return cheeksMax;
-            if (part == ShadeAdvisor.Eyes) return eyesMax;
-            if (part == ShadeAdvisor.Face) return faceMax;
-            if (part == ShadeAdvisor.Brows) return browsMax;
-            return Mathf.Max(lipsMax, LipsSolidOpacity);       // 18 Nov 2026: a lipstick is solid like the retail try-ons, whatever the scene has saved
+            float saved = part == ShadeAdvisor.Cheeks ? cheeksMax : part == ShadeAdvisor.Eyes ? eyesMax : part == ShadeAdvisor.Face ? faceMax
+                        : part == ShadeAdvisor.Brows ? browsMax : lipsMax;
+            // 18 Nov 2026: every cosmetic type at least as solid as MakeupQuality says, whatever the scene has saved
+            int layer = MakeupQuality.LayerOf(part);
+            return Mathf.Max(saved, MakeupQuality.SolidOpacity(layer < 0 ? MakeupQuality.Lips : layer));
         }
-
-        /// <summary>The least opacity a lip colour reaches at full strength (a scene may hold an older, weaker value).</summary>
-        public const float LipsSolidOpacity = 0.9f;
 
         void Update() { Paint(false); }
 
@@ -136,10 +133,11 @@ namespace GlowUp.AR
                 glitterNow = Mathf.Lerp(glitterNow, look.glitter, t); brightenNow = Mathf.Lerp(brightenNow, look.brighten, t);
             }
             bool has = shade.a > 0.01f;
-            shownLips = Color.Lerp(shownLips, Target(has && area == ShadeAdvisor.Lips, lipsMax), t);
-            shownCheeks = Color.Lerp(shownCheeks, Target(has && area == ShadeAdvisor.Cheeks, cheeksMax), t);
-            shownEyes = Color.Lerp(shownEyes, Target(has && area == ShadeAdvisor.Eyes, eyesMax), t);
-            shownFace = Color.Lerp(shownFace, Target(has && area == ShadeAdvisor.Face, faceMax), t);
+            float lipsTop = MaxOpacityFor(ShadeAdvisor.Lips), cheeksTop = MaxOpacityFor(ShadeAdvisor.Cheeks), eyesTop = MaxOpacityFor(ShadeAdvisor.Eyes), faceTop = MaxOpacityFor(ShadeAdvisor.Face);
+            shownLips = Color.Lerp(shownLips, Target(has && area == ShadeAdvisor.Lips, lipsTop), t);
+            shownCheeks = Color.Lerp(shownCheeks, Target(has && area == ShadeAdvisor.Cheeks, cheeksTop), t);
+            shownEyes = Color.Lerp(shownEyes, Target(has && area == ShadeAdvisor.Eyes, eyesTop), t);
+            shownFace = Color.Lerp(shownFace, Target(has && area == ShadeAdvisor.Face, faceTop), t);
             if (lips != null) lips.color = shownLips;
             if (cheekLeft != null) cheekLeft.color = shownCheeks;
             if (cheekRight != null) cheekRight.color = shownCheeks;
@@ -148,8 +146,8 @@ namespace GlowUp.AR
             if (faceTint != null) faceTint.color = shownFace;
 
             // the highlight and the sparkle follow the shape they sit on
-            Extra(0, shownLips.a, lipsMax); Extra(1, shownCheeks.a, cheeksMax); Extra(2, shownCheeks.a, cheeksMax);
-            Extra(3, shownEyes.a, eyesMax); Extra(4, shownEyes.a, eyesMax); Extra(5, shownFace.a, faceMax);
+            Extra(0, shownLips.a, lipsTop); Extra(1, shownCheeks.a, cheeksTop); Extra(2, shownCheeks.a, cheeksTop);
+            Extra(3, shownEyes.a, eyesTop); Extra(4, shownEyes.a, eyesTop); Extra(5, shownFace.a, faceTop);
         }
 
         Color Target(bool active, float max)

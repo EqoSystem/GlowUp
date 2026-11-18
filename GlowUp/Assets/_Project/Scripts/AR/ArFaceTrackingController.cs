@@ -742,7 +742,9 @@ namespace GlowUp.AR
             if (wantBrow != usingBrow) { if (wantBrow) browMask.BeginSession(makeup); else browMask.EndSession(); usingBrow = wantBrow; }
             if (wantSmooth != usingSmooth) { if (wantSmooth) meshSmoother.BeginSession(); else meshSmoother.EndSession(); usingSmooth = wantSmooth; }
             if (makeup != null) makeup.UseGloss = makeup.HasGloss && (quality == null || quality.MovingHighlight);
-            if (makeup != null) makeup.UsePigment = quality == null || !quality.IsLight;     // phase 3A: the lighter pipeline skips the pigment pass's cost
+            // 18 Nov 2026: the pigment is on for both pipelines, so a budget phone gets the same solid colour. The lighter pipeline
+            // draws only the part being tried on (DrawOnlyShownLayer), so this costs it one pass, not five.
+            if (makeup != null) makeup.UsePigment = true;
         }
 
         void StopHelpers()
