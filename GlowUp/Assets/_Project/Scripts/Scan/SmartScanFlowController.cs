@@ -765,6 +765,13 @@ namespace GlowUp.Scan
             if (modeHint != null && modeHint.ConsumeHold()) return;        // the hold said the button's name; it is not a tap
             if (snapshot == null) return;
             if (photoMode) { ExitPhotoMode(); return; }
+            StartPhotoMode();
+        }
+
+        /// <summary>Photo mode on: at once while the camera runs, or after the camera has been started (it was off).</summary>
+        void StartPhotoMode()
+        {
+            if (snapshot == null) return;
             if (stage == Stage.Scanning) { EnterPhotoMode(); return; }
             if (stage == Stage.Idle)
             {
@@ -3346,7 +3353,7 @@ namespace GlowUp.Scan
             }
             nearBarcodesFor = read;
             { }
-            OpenShortlist(shortlistTitle, msgBarcodeUnclear, shortlistNoneLabel, () => { nearBarcodesFor = ""; }, () => noneOfThese?.Invoke(), entries);      // after None, the same number is not offered again
+            OpenShortlist(shortlistTitle, msgBarcodeUnclear, shortlistNoneLabel, () => { nearBarcodesFor = ""; ResultIfListed(); }, () => noneOfThese?.Invoke(), entries);      // after None, the same number is not offered again
             return true;
         }
 
@@ -3390,16 +3397,28 @@ namespace GlowUp.Scan
                     ExitPhotoMode();
                     if (knownProduct != null && PhotoBarcodeMemory.Learn(barcodeToLearn, knownProduct)) { }
                     barcodeToLearn = "";
+                    ResultIfListed();
                 },
                 () => { barcodeToLearn = ""; OpenManual(); },
                 matches);
+        }
+
+        /// <summary>
+        /// 18 Nov 2026 (owner): after the user picked or recognised a product from a barcode, a product whose list is in the catalogue goes
+        /// straight to the result scan. Before, the screen went back to the scan with nothing happening.
+        /// </summary>
+        void ResultIfListed()
+        {
+            ProductData picked = knownProduct;
+            if (HasStoredList(picked)) OnSnapshotAnalysed(picked, null);
         }
 
         /// <summary>"Photograph the barcode": photo mode, whose photo step reads the bars first.</summary>
         void OnBarcodePhoto()
         {
             if (barcodeCard != null) barcodeCard.Hide();
-            if (stage == Stage.Scanning) EnterPhotoMode();
+            // 18 Nov 2026: also when the camera is off (Idle): it is started and photo mode follows (before, nothing happened then)
+            if (!photoMode) StartPhotoMode();
         }
 
         void OpenManual()

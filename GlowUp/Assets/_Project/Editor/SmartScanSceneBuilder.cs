@@ -373,7 +373,7 @@ namespace GlowUp.EditorTools
 
             // ---- type-it-in pop-up (for labels the camera cannot read) ----
             A.AppPopup manual = A.Overlay(s, "ManualEntryPanel", "Type it in");
-            A.TopStrip(manual.box, 110, 1240, 40, 40);
+            A.TopStrip(manual.box, 110, 1380, 40, 40);          // 18 Nov 2026: taller, so the feedback lines (up to 3) never reach Cancel / Analyse
             TextMeshProUGUI manualHint = A.Label(manual.box, "ManualHintText", "No pack at hand? Type the product's name: GlowUp looks its ingredient list up. Or type the list yourself.",
                                                  27, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             A.TopStrip(manualHint.transform, 116, 76, 48, 48);
@@ -408,7 +408,7 @@ namespace GlowUp.EditorTools
             A.TopStrip(manualBarcode.transform, 896, 96, 48, 48);
             A.Outline(manualBarcode.transform, ThemeRole.Accent, 96f);
             TextMeshProUGUI manualFeedback = A.Label(manual.box, "ManualFeedbackText", "", 28, ThemeRole.Warning, FontRole.Body, TextAlignmentOptions.Center, true);
-            A.TopStrip(manualFeedback.transform, 1000, 76, 48, 48);       // one or two short lines that say what to do next
+            A.TopStrip(manualFeedback.transform, 1004, 140, 48, 48);      // up to three short lines that say what to do next; ends at 1144, the buttons start at 1216
             A.ShrinkWrapped(manualFeedback, 22);
             Button manualCancel = A.PillButton(manual.box, "CancelButton", "Cancel", 38, ThemeRole.SurfaceAlt, ThemeRole.MainText);
             A.BottomStrip(manualCancel.transform, 44, 120, 48, 512);

@@ -151,13 +151,12 @@ namespace GlowUp.EditorTools
             }
             else
             {
-                // 18 Nov 2026 (owner): the same buttons as the Alternatives pop-up: Save (icon only) | Try On | Result (icon only).
-                // Result opens the product's AI Smart Scan Result, as it does on an alternative.
-                Button save = RowButton(buttons.transform, "SaveButton", "Save", IconFactory.Plus, false, 0f);
-                Button tryOn = RowButton(buttons.transform, "TryOnButton", "Try On", IconFactory.Sparkle, true, 1f);
-                Button result = RowButton(buttons.transform, "ResultButton", "Result", IconFactory.Document, false, 0f);
-                IconOnly(save); IconOnly(result);
-                buttons.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = false;
+                // Save | Try On | Result, each with its icon AND its word (owner, 18 Nov 2026: the icon-only version looked broken).
+                // The three share the row's width, so nothing overlaps. Result opens the product's AI Smart Scan Result.
+                Button save = RowButton(buttons.transform, "SaveButton", "Save", IconFactory.Plus, false, 1f);
+                Button tryOn = RowButton(buttons.transform, "TryOnButton", "Try On", IconFactory.Sparkle, true, 1.15f);
+                Button result = RowButton(buttons.transform, "ResultButton", "Result", IconFactory.Document, false, 1f);
+                buttons.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = true;
                 A.Set(view, "saveButton", save); A.Set(view, "saveLabel", A.LabelOf(save));
                 A.Set(view, "tryOnButton", tryOn); A.Set(view, "resultButton", result); A.Set(view, "aiButton", (Button)null);
             }
