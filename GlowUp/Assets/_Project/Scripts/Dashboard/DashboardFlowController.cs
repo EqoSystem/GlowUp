@@ -207,7 +207,8 @@ namespace GlowUp.Dashboard
                 tile.SetTryOnAvailable(GlowUp.Scan.ProductScope.CanTryOn(tile.Data as ScanRecord));
                 tile.TryOnClicked += OnTryOn;
                 tile.SaveClicked += OnSave;
-                tile.AiClicked += t => { if (aiPanel != null) aiPanel.Show(t.Data as ScanRecord); };
+                tile.AiClicked += t => { if (aiPanel != null) aiPanel.Show(t.Data as ScanRecord); };   // rows built before 18 Nov 2026
+                tile.Clicked += OnResult;                                                              // the "Result" button
                 tile.DrawerOpening += CloseOtherDrawers;
                 tiles.Add(tile);
                 cards.Add(tile.gameObject);
@@ -235,6 +236,15 @@ namespace GlowUp.Dashboard
         {
             ScanSession.TryOn = tile.Data as ScanRecord;
             SceneNavigator.Go(tryOnScene);
+        }
+
+        /// <summary>"Result": opens this product's AI Smart Scan Result (already checked against the user's profile); Back returns here.</summary>
+        void OnResult(ProductTileView tile)
+        {
+            if (!(tile.Data is ScanRecord record)) return;
+            ScanSession.Current = record;
+            ScanSession.ResultBackScene = SceneNames.Dashboard;
+            SceneNavigator.Go(SceneNames.AiResult);
         }
 
         void OnSave(ProductTileView tile)

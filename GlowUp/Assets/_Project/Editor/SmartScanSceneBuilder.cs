@@ -383,10 +383,12 @@ namespace GlowUp.EditorTools
             Kit.StyleInput(manualProduct, "Product name", ThemeRole.InputBackground);
             A.Set(SceneBuilderCore.Ensure<InputFieldBehaviour>(manualProduct.gameObject), "characterLimit", 80);
 
-            TMP_InputField manualBrand = SceneBuilderCore.MakeInput(manual.box, "ManualBrandField", "Brand", A.TC, Vector2.zero, new Vector2(390, 104));
+            // the brand is chosen from the saved brands, not typed (18 Nov 2026); the list opens over the pop-up on its own layer and a tap outside closes it
+            TMP_Dropdown manualBrand = Kit.MakeDropdown(manual.box, "ManualBrandDropdown", Vector2.zero, new Vector2(390, 104), 32);
             A.TopStrip(manualBrand.transform, 320, 104, 48, 512);
-            Kit.StyleInput(manualBrand, "Brand", ThemeRole.InputBackground);
-            A.Set(SceneBuilderCore.Ensure<InputFieldBehaviour>(manualBrand.gameObject), "characterLimit", 60);
+            manualBrand.ClearOptions();
+            manualBrand.AddOptions(new System.Collections.Generic.List<string> { "Brand" });          // the saved brands are added by the controller
+            manualBrand.RefreshShownValue();
 
             TMP_Dropdown manualType = Kit.MakeDropdown(manual.box, "ManualTypeDropdown", Vector2.zero, new Vector2(440, 104), 32);
             A.TopStrip(manualType.transform, 320, 104, 512, 48);
@@ -479,7 +481,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "manualEntryButton", manualEntry); A.Set(controller, "photoButton", photoFallback); A.Set(controller, "backButton", s.back);
             A.Set(controller, "statusText", status);
             A.Set(controller, "manualPanel", manual.panel); A.Set(controller, "manualInput", manualInput);
-            A.Set(controller, "manualProductInput", manualProduct); A.Set(controller, "manualBrandInput", manualBrand); A.Set(controller, "manualTypeDropdown", manualType);
+            A.Set(controller, "manualProductInput", manualProduct); A.Set(controller, "manualBrandDropdown", manualBrand); A.Set(controller, "manualTypeDropdown", manualType);
             A.Set(controller, "manualAnalyseButton", manualAnalyse); A.Set(controller, "manualFeedbackText", manualFeedback);
             A.Set(controller, "barcodeCard", barView); A.Set(controller, "manualBarcodeButton", manualBarcode);
 

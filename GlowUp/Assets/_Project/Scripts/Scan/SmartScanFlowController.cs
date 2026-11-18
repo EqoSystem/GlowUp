@@ -331,7 +331,9 @@ namespace GlowUp.Scan
         [SerializeField] private TMP_InputField manualInput;
         [Tooltip("Optional boxes for what the camera or the AI could not tell")]
         [SerializeField] private TMP_InputField manualProductInput;
-        [SerializeField] private TMP_InputField manualBrandInput;
+        [Tooltip("18 Nov 2026 (owner): the brand is CHOSEN from the saved brands (website / database), not typed")]
+        [SerializeField] private TMP_Dropdown manualBrandDropdown;
+        [SerializeField] private string manualBrandNone = "Brand";
         [SerializeField] private TMP_Dropdown manualTypeDropdown;
         [Tooltip("The first choice of the kind list, meaning: not chosen")]
         [SerializeField] private string manualTypeNone = "Cosmetic type";
@@ -872,7 +874,15 @@ namespace GlowUp.Scan
         void ShowPhotoMatches(List<ScanShortlist.Entry> entries)
         {
             OpenShortlist(shortlistTitle, photoMatchesMessageCatalogue, shortlistNoneLabel,
-                () => { ExitPhotoMode(); if (snapshot != null) snapshot.MatchesAnswered(true, knownProduct); },
+                () =>
+                {
+                    ExitPhotoMode();
+                    ProductData picked = knownProduct;
+                    if (snapshot != null) snapshot.MatchesAnswered(true, picked);
+                    // 18 Nov 2026 (owner): a product the user picked that already has its list in the catalogue goes straight to the
+                    // result. Before, the live scan went on ("Checking our catalog for the ingredient list") for a list already known.
+                    if (HasStoredList(picked)) OnSnapshotAnalysed(picked, null);
+                },
                 () => { if (snapshot != null) snapshot.MatchesAnswered(false); },
                 entries);
         }
@@ -3408,7 +3418,8 @@ namespace GlowUp.Scan
             ManualStatus(StatusMessage.Kind.Info, "");
             // what the scan already found is filled in, so the user only types what is missing
             if (manualProductInput != null && string.IsNullOrWhiteSpace(manualProductInput.text)) manualProductInput.text = identity.productName;
-            if (manualBrandInput != null && string.IsNullOrWhiteSpace(manualBrandInput.text)) manualBrandInput.text = identity.brandName;
+            if (manualBrandDropdown != null && TypedBrand().Length == 0) SetBrand(identity.brandName);
+            else FillBrandList(TypedBrand());
             if (manualTypeDropdown != null)
             {
                 var options = new List<string> { manualTypeNone };
@@ -3430,6 +3441,31 @@ namespace GlowUp.Scan
         }
 
         bool manualBusy;
+
+        /// <summary>The brand chosen in the list ("" = none chosen).</summary>
+        string TypedBrand()
+        {
+            if (manualBrandDropdown == null || manualBrandDropdown.value <= 0 || manualBrandDropdown.value >= manualBrandDropdown.options.Count) return "";
+            return manualBrandDropdown.options[manualBrandDropdown.value].text.Trim();
+        }
+
+        /// <summary>Fills the brand list with the saved brands (A to Z) and chooses `select` (added to the list when the catalogue lacks it).</summary>
+        void FillBrandList(string select)
+        {
+            if (manualBrandDropdown == null) return;
+            var names = new List<string>(KnownBrandNames());
+            names.RemoveAll(n => string.IsNullOrWhiteSpace(n));
+            if (!string.IsNullOrWhiteSpace(select) && !names.Exists(n => string.Equals(n, select, StringComparison.OrdinalIgnoreCase))) names.Add(select.Trim());
+            names.Sort(StringComparer.OrdinalIgnoreCase);
+            var options = new List<string> { manualBrandNone };
+            options.AddRange(names);
+            manualBrandDropdown.ClearOptions(); manualBrandDropdown.AddOptions(options);
+            int at = string.IsNullOrWhiteSpace(select) ? 0 : options.FindIndex(o => string.Equals(o, select.Trim(), StringComparison.OrdinalIgnoreCase));
+            manualBrandDropdown.SetValueWithoutNotify(Mathf.Max(0, at));
+            manualBrandDropdown.RefreshShownValue();
+        }
+
+        void SetBrand(string brand) { FillBrandList(brand ?? ""); }
 
         List<string> knownBrandNames;
         List<string> KnownBrandNames()
@@ -3501,7 +3537,7 @@ namespace GlowUp.Scan
             if (manualBusy || stage == Stage.Leaving) return;
             string text = manualInput != null ? manualInput.text : "";
             string typedName = manualProductInput != null ? manualProductInput.text.Trim() : "";
-            string typedBrand = manualBrandInput != null ? manualBrandInput.text.Trim() : "";
+            string typedBrand = TypedBrand();
             string typedType = manualTypeDropdown != null && manualTypeDropdown.value > 0 ? manualTypeDropdown.options[manualTypeDropdown.value].text : "";
 
             TypedEntry.Reading typed = TypedEntry.Understand(text);
@@ -3560,7 +3596,7 @@ namespace GlowUp.Scan
                     return;
                 }
                 if (manualProductInput != null) manualProductInput.text = fromFirebase.name;
-                if (manualBrandInput != null) manualBrandInput.text = fromFirebase.brandName;
+                SetBrand(fromFirebase.brandName);
                 if (kind.Length > 0 && string.IsNullOrWhiteSpace(fromFirebase.cosmeticType)) fromFirebase.cosmeticType = kind;
                 UseTypedProduct(fromFirebase, kind);
             }

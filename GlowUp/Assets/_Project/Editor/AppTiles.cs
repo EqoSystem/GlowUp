@@ -151,17 +151,33 @@ namespace GlowUp.EditorTools
             }
             else
             {
-                Button save = RowButton(buttons.transform, "SaveButton", "Save", IconFactory.Plus, false, 1f);
-                Button tryOn = RowButton(buttons.transform, "TryOnButton", "Try On", IconFactory.Sparkle, true, 1.3f);
-                Button ai = RowButton(buttons.transform, "AiButton", "AI", IconFactory.Ai, false, 0.8f);
+                // 18 Nov 2026 (owner): the same buttons as the Alternatives pop-up: Save (icon only) | Try On | Result (icon only).
+                // Result opens the product's AI Smart Scan Result, as it does on an alternative.
+                Button save = RowButton(buttons.transform, "SaveButton", "Save", IconFactory.Plus, false, 0f);
+                Button tryOn = RowButton(buttons.transform, "TryOnButton", "Try On", IconFactory.Sparkle, true, 1f);
+                Button result = RowButton(buttons.transform, "ResultButton", "Result", IconFactory.Document, false, 0f);
+                IconOnly(save); IconOnly(result);
+                buttons.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = false;
                 A.Set(view, "saveButton", save); A.Set(view, "saveLabel", A.LabelOf(save));
-                A.Set(view, "tryOnButton", tryOn); A.Set(view, "aiButton", ai);
+                A.Set(view, "tryOnButton", tryOn); A.Set(view, "resultButton", result); A.Set(view, "aiButton", (Button)null);
             }
 
             A.Set(view, "actions", actionsRect); A.Set(view, "actionsGroup", actions.GetComponent<CanvasGroup>());
             A.Set(view, "rowLayout", rowLayout); A.Set(view, "chevron", chevronRect);
             A.Set(view, "closedHeight", RowHeight); A.Set(view, "actionsHeight", RowActionsHeight);
             return view;
+        }
+
+        /// <summary>A row button that shows only its icon, in a round 70-unit button. The label object stays (hidden): "Saved" can still be written into it.</summary>
+        static void IconOnly(Button b)
+        {
+            TextMeshProUGUI label = A.LabelOf(b);
+            if (label != null) label.gameObject.SetActive(false);
+            Transform content = b.transform.Find("Content");
+            if (content != null) A.Fill(content);
+            Transform icon = content != null ? content.Find("Icon") : null;
+            if (icon != null) A.Size(icon, 36, 36);
+            A.Size(b, 70, 70, 0f);
         }
 
         /// <summary>A button of an open row: they share the row's width (`share` = how much of it this one takes).</summary>
