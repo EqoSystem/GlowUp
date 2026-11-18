@@ -24,10 +24,14 @@ namespace GlowUp.AR
         // opacity at full strength: face and cheeks blend, eyes / lips / brows read as solid product
         static readonly float[] Solid = { 0.40f, 0.62f, 0.75f, 0.90f, 0.80f };
         // how much of the shade itself lies over the tint (the tint can only double the skin's colour)
-        static readonly float[] PigmentShare = { 0.20f, 0.28f, 0.36f, 0.42f, 0.38f };
+        static readonly float[] PigmentShare = { 0.06f, 0.28f, 0.36f, 0.42f, 0.38f };
 
         /// <summary>The least opacity layer `layer` reaches at full strength.</summary>
         public static float SolidOpacity(int layer) => layer >= 0 && layer < Solid.Length ? Solid[layer] : 0f;
+
+        /// <summary>Foundation, concealer and powder keep the skin's own light and texture: a pale shade must never be painted over darker skin as a flat
+        /// cream (a chalky mask, seen on the owner's phone 18 Nov 2026), so the face gets no extra pigment for a lighter shade.</summary>
+        public static float ExtraForLighter(int layer, float configured) => layer == Face ? 0f : configured;
 
         /// <summary>The least pigment share of layer `layer`.</summary>
         public static float Pigment(int layer) => layer >= 0 && layer < PigmentShare.Length ? PigmentShare[layer] : 0f;

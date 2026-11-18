@@ -452,7 +452,7 @@ namespace GlowUp.AR
         /// </summary>
         Color PigmentColour(int layer, Color shade, Color skin)
         {
-            float share = GuidedPigment.Share(shade, skin, Mathf.Max(layer == GuidedFaceShapes.Face ? pigmentFace : pigmentParts, MakeupQuality.Pigment(layer)), pigmentForLighter);
+            float share = GuidedPigment.Share(shade, skin, Mathf.Max(layer == GuidedFaceShapes.Face ? 0f : pigmentParts, MakeupQuality.Pigment(layer)), MakeupQuality.ExtraForLighter(layer, pigmentForLighter));
             return new Color(shade.r, shade.g, shade.b, Mathf.Clamp01(shade.a * share));
         }
 
@@ -496,7 +496,9 @@ namespace GlowUp.AR
             if (shineOn)
             {
                 Color tint = makeup.HighlightTint;
-                highlight.color = new Color(tint.r, tint.g, tint.b, Mathf.Clamp01(strength * 0.5f));
+                // 18 Nov 2026: foundation's satin / glossy light was too faint to tell from matte on the owner's phone: its glow is stronger
+                float glow = active == GuidedFaceShapes.Face ? 0.95f : 0.5f;
+                highlight.color = new Color(tint.r, tint.g, tint.b, Mathf.Clamp01(strength * glow));
                 ShapeShine();
             }
         }

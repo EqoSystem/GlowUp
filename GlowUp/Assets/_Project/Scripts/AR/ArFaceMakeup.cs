@@ -256,7 +256,7 @@ namespace GlowUp.AR
                 if (i < 3 && layer.HasProperty("_SkinBase")) layer.SetColor("_SkinBase", skinBaseNow);
                 // phase 3A: the thin layer of the shade itself (the shader's second pass); more for a shade the tint cannot lighten to
                 if (layer.HasProperty(PigmentId))
-                    layer.SetFloat(PigmentId, usePigment ? GuidedPigment.Share(shown[i], i < 3 ? skinBaseNow : SkinUnderFor(i), Mathf.Max(i == 0 ? pigmentFace : pigmentParts, MakeupQuality.Pigment(i)), pigmentForLighter) : 0f);   // 18 Nov 2026: per cosmetic type
+                    layer.SetFloat(PigmentId, usePigment ? GuidedPigment.Share(shown[i], i < 3 ? skinBaseNow : SkinUnderFor(i), Mathf.Max(i == 0 ? 0f : pigmentParts, MakeupQuality.Pigment(i)), MakeupQuality.ExtraForLighter(i, pigmentForLighter)) : 0f);   // 18 Nov 2026: per cosmetic type
                 if (on) { active = i; activeShare = full > 0.001f ? Mathf.Clamp01(shown[i].a / full) : 0f; }
             }
 
