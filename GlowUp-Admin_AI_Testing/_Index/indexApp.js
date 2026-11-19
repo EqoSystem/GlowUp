@@ -4,6 +4,7 @@ import { auth } from "../_Database/firebase-console.js";
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { DASHBOARD_PAGE, REQUIRE_ADMIN_RECORD, isAdmin } from "../_Shared/adminCommon.js";
 import { mountThemeToggle, hydrate, dialogFrame } from "../_Shared/adminShell.js";
+import { createLockout, mmss, LOCK_MS } from "./loginLockout.js";
 
 console.log("GlowUp Admin Login Portal Initialized.");
 
@@ -72,9 +73,39 @@ document.addEventListener("DOMContentLoaded", () => {
         if (label) loginBtn.textContent = label;
     }
 
+    // ---- lock-out: 3 wrong passwords for one e-mail lock it for 5 minutes and recommend "Forgot password?" ----
+    const safeStorage = { getItem: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } }, setItem: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { } } };
+    const lockout = createLockout(safeStorage);
+    const LOCK_MINUTES = Math.round(LOCK_MS / 60000);
+    let lockTimer = 0;
+    const forgotLinkEl = document.getElementById("forgotLink");
+    const lockText = (ms) => `Too many wrong passwords. Log-in is locked for this email for ${mmss(ms)}. Use Forgot password? to choose a new password.`;
+    function showLock(email) {
+        window.clearInterval(lockTimer);
+        lockTimer = 0;
+        const tick = () => {
+            const left = lockout.remaining(email);
+            if (left <= 0 || usernameInput.value.trim().toLowerCase() !== email.toLowerCase()) {
+                window.clearInterval(lockTimer); lockTimer = 0;
+                if (forgotLinkEl) forgotLinkEl.classList.remove("recommend");
+                if (left <= 0) say("");
+                validateForm();
+                return false;
+            }
+            say(lockText(left), Math.ceil(left / 1000) + 1);
+            setButton(false, "Locked " + mmss(left));
+            return true;
+        };
+        if (forgotLinkEl) forgotLinkEl.classList.add("recommend");
+        if (tick()) lockTimer = window.setInterval(tick, 1000);
+    }
+    const credentialError = (error) => { const c = error && error.code ? String(error.code) : ""; return c.includes("invalid-credential") || c.includes("wrong-password") || c.includes("invalid-login-credentials"); };
+
     function validateForm() {
         if (signingIn) return;
-        setButton(usernameInput.value.trim() !== "" && passwordInput.value !== "", "Log in");
+        const email = usernameInput.value.trim();
+        if (email && lockout.remaining(email) > 0) { if (!lockTimer) showLock(email); return; }
+        setButton(email !== "" && passwordInput.value !== "", "Log in");
     }
 
     // Clearing the email also clears the password, so a typed password never stays behind for the next person.
@@ -118,6 +149,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const email = usernameInput.value.trim();
         const password = passwordInput.value;
         if (email === "" || password === "") { say("Enter your email and your password."); return; }
+        if (lockout.remaining(email) > 0) { showLock(email); return; }
 
         hidePasswordLength();
         signingIn = true;
@@ -129,12 +161,23 @@ document.addEventListener("DOMContentLoaded", () => {
                 await signOut(auth);
                 throw { code: "glowup/not-admin" };
             }
+            lockout.clear(email);
             console.log("Admin logged in successfully:", userCredential.user.email);
             window.location.href = DASHBOARD_PAGE;
         } catch (error) {
             console.error("Login failed:", error && error.code ? error.code : error);
-            say(explain(error));
             signingIn = false;
+            if (credentialError(error)) {
+                const result = lockout.fail(email);
+                if (result.lockedMs > 0) { showLock(email); return; }
+                if (result.left === 1) {
+                    if (forgotLinkEl) forgotLinkEl.classList.add("recommend");
+                    say(`${explain(error)} 1 try left before log-in is locked for ${LOCK_MINUTES} minutes. Forgot your password? Use Forgot password?.`, 8);
+                    validateForm();
+                    return;
+                }
+            }
+            say(explain(error));
             validateForm();
         }
     });

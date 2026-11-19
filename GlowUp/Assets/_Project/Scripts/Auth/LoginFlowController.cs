@@ -65,6 +65,11 @@ namespace GlowUp.Auth
         [SerializeField] private string msgBadCredentials = "Email or password is incorrect.";
         [SerializeField] private string msgNotRegistered = "This email is not registered. Check it, or tap Sign Up.";
         [SerializeField] private string msgWrongPassword = "Password is incorrect.";
+        [Tooltip("After 3 wrong passwords for one email ({0} = minutes:seconds left)")]
+        [SerializeField] private string msgLocked = "Too many wrong passwords. Log-In is locked for this email for {0}. Tap Forgot Password to choose a new password.";
+        [Tooltip("After the 2nd wrong password ({0} = the usual message)")]
+        [SerializeField] private string msgOneTryLeft = "{0} 1 try left before Log-In is locked for 5 minutes. Forgot your password?";
+        [SerializeField] private string msgForgotLink = "Forgot Password";
         [SerializeField] private string msgProfileNotLoaded = "You are signed in, but your profile could not be loaded. Check the internet connection and tap Log-In again.";
         [Tooltip("How long to wait for the sign-in service before checking the email and password on this phone instead (seconds)")]
         [SerializeField] private float signInWaitSeconds = 20f;
@@ -220,6 +225,7 @@ namespace GlowUp.Auth
             string pw = passwordInput != null ? passwordInput.text : "";
             if (email.Length == 0) { Fail(msgEnterEmail); return; }
             if (pw.Length == 0) { Fail(msgEnterPassword); return; }
+            if (LoginLockout.Remaining(email) > TimeSpan.Zero) { ShowLocked(email); return; }
             if (passwordMask != null) passwordMask.Mask();
             if (signInButton != null) signInButton.interactable = false;
 
@@ -244,7 +250,9 @@ namespace GlowUp.Auth
                             // Firebase tells the two apart (UserNotFound / WrongPassword) only while its "email enumeration protection"
                             // is off; with it on, both come back as InvalidCredential and the general message stays.
                             AuthError why = AuthErrorOf(e);
-                            Fail(why == AuthError.UserNotFound ? msgNotRegistered : why == AuthError.WrongPassword ? msgWrongPassword : msgBadCredentials);
+                            string said = why == AuthError.UserNotFound ? msgNotRegistered : why == AuthError.WrongPassword ? msgWrongPassword : msgBadCredentials;
+                            if (why == AuthError.UserNotFound) Fail(said);          // no account: not a password guess, nothing is counted
+                            else WrongPassword(email, said);
                             return;
                         }
                         { }
@@ -255,6 +263,7 @@ namespace GlowUp.Auth
                 {
                     // signed in: nothing after this point may send the user back with "wrong password"
                     UserProfileRepository.OfflineEmail = null;
+                    LoginLockout.Clear(email);
                     OfflineCredentialStore.Remember(email, pw);        // Argon2id verifier for later offline use (runs in the background)
                     SavedAccounts.Remember(email);                     // only the email: it is offered under the email field next time
                     UserProfileData profile = null;
@@ -282,13 +291,15 @@ namespace GlowUp.Auth
                 {
                     if (this == null) return;
                     UserProfileRepository.OfflineEmail = email;         // the copy of this person's profile on the device is used
+                    LoginLockout.Clear(email);
                     SavedAccounts.Remember(email);
                     SceneNavigator.Go(dashboardScene);
                 }
-                else Fail(OfflineCredentialStore.HasCredential(email) ? msgBadCredentials : msgOfflineNoRecord);
+                else if (OfflineCredentialStore.HasCredential(email)) WrongPassword(email, msgBadCredentials);
+                else Fail(msgOfflineNoRecord);
             }
             catch (Exception e) { { } Fail(msgBadCredentials); }
-            finally { if (this != null && signInButton != null) signInButton.interactable = true; }
+            finally { if (this != null && signInButton != null && lockedEmail == null) signInButton.interactable = true; }
         }
 
         /// <summary>
@@ -464,6 +475,62 @@ namespace GlowUp.Auth
 
         void Fail(string m) { Show(m, errorColor); ContextualHintController.Instance?.ReportValidationError(); }
 
+        // ---------------------------------------------------------------------------------------
+        //  Lock-out (20 November 2026): 3 wrong passwords for one email lock Log-In for that email for 5 minutes (LoginLockout).
+        //  The 2nd wrong password warns; the lock says how long and offers Forgot Password. While locked, the Log-In button is grey
+        //  and counts down; typing another email unlocks the button for that email.
+        // ---------------------------------------------------------------------------------------
+        string lockedEmail;
+        float nextLockTick;
+        TextMeshProUGUI signInLabel;
+        string signInLabelText;
+
+        void WrongPassword(string email, string said)
+        {
+            LoginLockout.Result r = LoginLockout.Fail(email);
+            if (r.locked > TimeSpan.Zero) { ShowLocked(email); return; }
+            if (r.left == 1) { ErrorWithForgotLink(string.Format(msgOneTryLeft, said)); return; }
+            Fail(said);
+        }
+
+        void ShowLocked(string email)
+        {
+            lockedEmail = email;
+            nextLockTick = 0f;
+            ErrorWithForgotLink(string.Format(msgLocked, LoginLockout.MinSec(LoginLockout.Remaining(email))));
+            TickLock();
+        }
+
+        void ErrorWithForgotLink(string m)
+        {
+            FormalToast box = Toast();
+            if (box == null) { Fail(m); return; }
+            box.Show(FormalToast.Kind.Error, StatusMessage.Plain(m), msgForgotLink, ForgotPassword);
+            ContextualHintController.Instance?.ReportValidationError();
+        }
+
+        void TickLock()
+        {
+            if (lockedEmail == null) return;
+            if (signInLabel == null && signInButton != null)
+            {
+                signInLabel = signInButton.GetComponentInChildren<TextMeshProUGUI>(true);
+                if (signInLabel != null) signInLabelText = signInLabel.text;
+            }
+            string typed = emailInput != null ? emailInput.text.Trim() : "";
+            TimeSpan left = LoginLockout.Remaining(lockedEmail);
+            if (left <= TimeSpan.Zero || !string.Equals(typed, lockedEmail, StringComparison.OrdinalIgnoreCase)) { EndLock(); return; }
+            if (signInButton != null) signInButton.interactable = false;
+            if (signInLabel != null) signInLabel.text = "Locked " + LoginLockout.MinSec(left);
+        }
+
+        void EndLock()
+        {
+            lockedEmail = null;
+            if (signInButton != null) signInButton.interactable = true;
+            if (signInLabel != null && signInLabelText != null) signInLabel.text = signInLabelText;
+        }
+
         /// <summary>A sign-in with Google that did not finish: a friendly message with a "Try again" link (never a raw error page).</summary>
         void FailWithRetry(string m, string name)
         {
@@ -507,6 +574,7 @@ namespace GlowUp.Auth
 
         void Update()
         {
+            if (lockedEmail != null && Time.unscaledTime >= nextLockTick) { nextLockTick = Time.unscaledTime + 0.5f; TickLock(); }
             if (feedbackText == null) return;
             string written = feedbackText.text ?? "";
             if (written.Length == 0 || written == mirrored) { if (feedbackText.gameObject.activeSelf) feedbackText.gameObject.SetActive(false); return; }
