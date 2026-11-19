@@ -85,7 +85,7 @@ We may update this Privacy Policy from time to time. When we do, we will change 
 ## 12. Contact Us
 You can send a report from the app: Settings > Contact support. The report goes to the GlowUp team through our support dashboard, not by email. It contains the kind of report you chose (Bug, Wrong scan result or Other), your message, your account id, the app version and your phone model. Your last scan (the product, the result shown and the ingredients read) is included only when you switch on "Include my last scan". Only GlowUp administrators can read reports.
 
-If you have questions about this Privacy Policy, you can also contact our support team at: AdminGlowUpSupport@gmail.com
+If you have questions about this Privacy Policy, you can also contact our support team at: GlowUpAdminSupport@gmail.com
 
 
 # Terms and Conditions
@@ -144,7 +144,7 @@ We may update these Terms and Conditions from time to time. If you continue to u
 These terms are governed by the laws of the country in which the operator of GlowUp is established, without affecting any consumer protection rights you have under the law of the country where you live.
 
 ## 16. Contact
-To report a problem, use Settings > Contact support in the app: your report is received by the GlowUp team through the support dashboard (see section 12 of the Privacy Policy for what a report contains). Questions about these Terms and Conditions can also be sent to: AdminGlowUpSupport@gmail.com
+To report a problem, use Settings > Contact support in the app: your report is received by the GlowUp team through the support dashboard (see section 12 of the Privacy Policy for what a report contains). Questions about these Terms and Conditions can also be sent to: GlowUpAdminSupport@gmail.com
 
 ## 17. Credits
 - The sound played when a scan is removed in Recent Scans is "Teeth Chattering - Sound Effect", as shared by the YouTube channel Sound Library (youtube.com/watch?v=enz7eXF5IUo). Its original creator is not known.
