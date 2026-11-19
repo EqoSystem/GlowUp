@@ -1,9 +1,9 @@
 
 import "../_Shared/quietConsole.js";
 import { auth } from "../_Database/firebase-console.js";
-import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { DASHBOARD_PAGE, REQUIRE_ADMIN_RECORD, isAdmin } from "../_Shared/adminCommon.js";
-import { mountThemeToggle, hydrate } from "../_Shared/adminShell.js";
+import { mountThemeToggle, hydrate, dialogFrame } from "../_Shared/adminShell.js";
 
 console.log("GlowUp Admin Login Portal Initialized.");
 
@@ -85,6 +85,15 @@ document.addEventListener("DOMContentLoaded", () => {
     passwordInput.addEventListener("input", validateForm);
     validateForm();
 
+    // "Forgot password?": Firebase e-mails a link for choosing a new password. Admin rights are not touched by it (they
+    // come from the "admins" list), and the answer never says whether an e-mail belongs to an admin.
+    const forgotLink = document.getElementById("forgotLink");
+    if (forgotLink) forgotLink.addEventListener("click", () => openResetDialog({
+        typed: usernameInput.value.trim(),
+        onSent: (email) => { usernameInput.value = email; validateForm(); },
+        onClosed: (sent) => (sent ? passwordInput : forgotLink).focus()
+    }));
+
 
     if (new URLSearchParams(window.location.search).get("denied")) say(NOT_ADMIN);
     if (new URLSearchParams(window.location.search).get("idle")) {
@@ -142,4 +151,125 @@ function explain(error) {
     if (code.includes("too-many-requests")) return "Too many attempts. Wait a few minutes and try again.";
     if (code.includes("network-request-failed")) return "No internet connection. Check it and try again.";
     return "Sign-in failed. " + (error && error.message ? error.message : "Please try again.");
+}
+
+
+const RESET_TIMEOUT_MS = 20000;
+const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Sends the reset e-mail; the link's "Continue" leads back to this login page when Firebase allows that address. */
+async function sendReset(email) {
+    const back = { url: new URL("../_Index/index.html", window.location.href).href };
+    try { await sendPasswordResetEmail(auth, email, back); }
+    catch (error) {
+        const code = error && error.code ? String(error.code) : "";
+        if (!code.includes("continue-uri") && !code.includes("unauthorized-domain")) throw error;
+        await sendPasswordResetEmail(auth, email);          // the login address is not on Firebase's list: send the plain link
+    }
+}
+
+function withTimeout(promise, ms) {
+    let timer = 0;
+    const late = new Promise((_, reject) => { timer = window.setTimeout(() => reject({ code: "glowup/timeout" }), ms); });
+    return Promise.race([promise, late]).finally(() => window.clearTimeout(timer));
+}
+
+function resetProblem(error) {
+    const code = error && error.code ? String(error.code) : "";
+    if (code.includes("invalid-email") || code.includes("missing-email")) return "That does not look like an email address.";
+    if (code.includes("network-request-failed")) return "No internet connection. Check it and press Send link again.";
+    if (code.includes("too-many-requests")) return "Too many requests. Wait a few minutes and try again.";
+    if (code === "glowup/timeout") return "This is taking too long. Check the connection and press Send link again.";
+    return "The link could not be sent. Press Send link to try again.";
+}
+
+// An unknown e-mail gets the same answer as a known one, so the page never tells who has an account.
+const looksSent = (error) => { const code = error && error.code ? String(error.code) : ""; return code.includes("user-not-found") || code.includes("invalid-credential"); };
+
+function openResetDialog({ typed, onSent, onClosed }) {
+    let sending = false, sent = false, closed = false;
+    const close = () => { if (closed) return; closed = true; frame.close(); onClosed(sent); };
+    // Escape and a click beside the box close it, except while the link is being sent (Cancel always works)
+    const frame = dialogFrame("Reset your password", () => { if (!sending) close(); });
+    frame.box.classList.add("reset-dialog");
+    const heading = frame.box.querySelector("h3");
+    heading.id = "resetTitle";
+    frame.box.setAttribute("aria-labelledby", "resetTitle");
+
+    const intro = document.createElement("p");
+    intro.className = "modal-intro";
+    intro.textContent = "Enter the email of your admin account. We will send it a link to choose a new password.";
+
+    const form = document.createElement("form");
+    form.className = "modal-form";
+    form.noValidate = true;
+    const field = document.createElement("div");
+    field.className = "field";
+    const label = document.createElement("label");
+    label.textContent = "Email";
+    const input = document.createElement("input");
+    input.type = "email"; input.id = "resetEmail"; input.maxLength = 254; input.autocomplete = "username"; input.placeholder = "Admin email";
+    input.value = EMAIL_SHAPE.test(typed || "") ? typed : "";
+    label.htmlFor = input.id;
+    field.append(label, input);
+    const problem = document.createElement("p");
+    problem.className = "form-error";
+    problem.setAttribute("role", "alert");
+    const actions = document.createElement("div");
+    actions.className = "modal-actions";
+    const cancel = document.createElement("button");
+    cancel.type = "button"; cancel.className = "cancel-btn"; cancel.textContent = "Cancel";
+    const send = document.createElement("button");
+    send.type = "submit"; send.className = "save-btn"; send.textContent = "Send link";
+    actions.append(cancel, send);
+    form.append(field, problem, actions);
+    frame.box.append(intro, form);
+
+    const showProblem = (text) => { problem.textContent = text || ""; problem.style.display = text ? "block" : "none"; };
+    input.addEventListener("input", () => showProblem(""));
+    cancel.addEventListener("click", close);
+
+    const showSent = (email) => {
+        sent = true;
+        onSent(email);
+        intro.remove(); form.remove();
+        const note = document.createElement("p");
+        note.className = "reset-sent";
+        note.setAttribute("role", "status");
+        const who = document.createElement("strong");
+        who.textContent = email;
+        note.append("If ", who, " belongs to an admin account, a link to choose a new password is on its way. Check the inbox and the spam folder, then log in with the new password.");
+        const done = document.createElement("div");
+        done.className = "modal-actions reset-actions";
+        const back = document.createElement("button");
+        back.type = "button"; back.className = "save-btn"; back.textContent = "Back to log in";
+        back.addEventListener("click", close);
+        done.append(back);
+        frame.box.append(note, done);
+        back.focus();
+    };
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (sending) return;
+        const email = input.value.trim();
+        if (!EMAIL_SHAPE.test(email)) { showProblem(email === "" ? "Enter the email of your admin account." : "That does not look like an email address."); input.focus(); return; }
+        sending = true;
+        showProblem("");
+        send.disabled = true; send.textContent = "Sending..."; input.readOnly = true;
+        try {
+            await withTimeout(sendReset(email), RESET_TIMEOUT_MS);
+            if (!closed) showSent(email);
+        } catch (error) {
+            if (closed) return;
+            if (looksSent(error)) { showSent(email); return; }
+            console.error("Password reset failed:", error && error.code ? error.code : error);
+            showProblem(resetProblem(error));
+        } finally {
+            sending = false;
+            if (!sent && !closed) { send.disabled = false; send.textContent = "Send link"; input.readOnly = false; }
+        }
+    });
+
+    (input.value ? send : input).focus();
 }

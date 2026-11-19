@@ -45,6 +45,14 @@ body.login-page::before {
 .text-link:hover, .text-link:focus-visible { text-decoration: underline; }
 .text-link:focus-visible { outline: calc(2 * var(--u)) solid var(--accent); outline-offset: calc(2 * var(--u)); }
 
+/* "Forgot password?" under the password box: a 44 px tap area that overlaps the gap around it, so the card does not grow. */
+.forgot-row { display: flex; justify-content: flex-end; margin: calc(-6 * var(--u)) 0 calc(-14 * var(--u)); }
+.forgot-link { display: inline-flex; align-items: center; min-height: calc(44 * var(--u)); padding: 0 calc(2 * var(--u)); font-size: var(--fs-sm); }
+.reset-dialog .modal-form { margin-top: calc(12 * var(--u)); }
+.reset-dialog .reset-sent { font-size: var(--fs-sm); color: var(--text-2); line-height: 1.55; margin-top: calc(10 * var(--u)); overflow-wrap: anywhere; }
+.reset-dialog .reset-sent strong { color: var(--text); }
+.reset-dialog .reset-actions { margin-top: calc(18 * var(--u)); }
+
 
 .terms-dialog {
     margin: auto; padding: 0; border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); background: var(--surface);

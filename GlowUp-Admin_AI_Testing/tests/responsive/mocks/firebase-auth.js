@@ -18,3 +18,10 @@ export async function signOut() { auth.currentUser = null; listeners.forEach((cb
 export const setPersistence = async () => { };
 export const browserSessionPersistence = {};
 export const browserLocalPersistence = {};
+// Password reset: window.__RESET_ERROR = an error code makes it fail; window.__RESET_HANG = true never answers; each request is noted.
+export async function sendPasswordResetEmail(a, email, settings) {
+    window.__RESET_CALLS = (window.__RESET_CALLS || []).concat([{ email, url: settings && settings.url }]);
+    if (window.__RESET_HANG) return new Promise(() => { });
+    await new Promise((r) => setTimeout(r, LAT()));
+    if (window.__RESET_ERROR) { const e = new Error("reset"); e.code = window.__RESET_ERROR; throw e; }
+}
