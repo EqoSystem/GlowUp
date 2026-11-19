@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   detectOnFirstLaunch: 1
   modeWhenNotDetected: 1
-  lowMemoryMb: 3072
+  lowMemoryMb: 4096
   lowProcessorCores: 4
   lowProcessorMhz: 1900
   lowGraphicsMemoryMb: 1024

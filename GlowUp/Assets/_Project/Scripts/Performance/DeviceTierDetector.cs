@@ -27,6 +27,21 @@ namespace GlowUp.Performance
             }
         }
 
+        /// <summary>
+        /// The rule, apart from the phone so a test can feed it numbers. Memory at or below the profile's line is enough on its
+        /// own (a 4 GB phone lagged in High Quality although its processor looked fine); the other checks need `checksNeededForLowEnd`.
+        /// </summary>
+        public static void Judge(ref Report r, PerformanceProfile profile)
+        {
+            r.lowChecks = 0;
+            bool lowMemory = r.memoryMb > 0 && r.memoryMb <= profile.lowMemoryMb;
+            if (lowMemory) r.lowChecks++;
+            if (r.processorCores > 0 && r.processorCores <= profile.lowProcessorCores) r.lowChecks++;
+            if (r.processorMhz > 0 && r.processorMhz <= profile.lowProcessorMhz) r.lowChecks++;
+            if (r.graphicsMemoryMb > 0 && r.graphicsMemoryMb <= profile.lowGraphicsMemoryMb) r.lowChecks++;
+            r.suggested = lowMemory || r.lowChecks >= Mathf.Max(1, profile.checksNeededForLowEnd) ? GraphicsMode.Performance : GraphicsMode.HighQuality;
+        }
+
         public static Report Inspect(PerformanceProfile profile)
         {
             var r = new Report
@@ -43,12 +58,7 @@ namespace GlowUp.Performance
                 return r;
             }
 
-            if (r.memoryMb <= profile.lowMemoryMb) r.lowChecks++;
-            if (r.processorCores > 0 && r.processorCores <= profile.lowProcessorCores) r.lowChecks++;
-            if (r.processorMhz > 0 && r.processorMhz <= profile.lowProcessorMhz) r.lowChecks++;
-            if (r.graphicsMemoryMb > 0 && r.graphicsMemoryMb <= profile.lowGraphicsMemoryMb) r.lowChecks++;
-
-            r.suggested = r.lowChecks >= Mathf.Max(1, profile.checksNeededForLowEnd) ? GraphicsMode.Performance : GraphicsMode.HighQuality;
+            Judge(ref r, profile);
             return r;
         }
     }

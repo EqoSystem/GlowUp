@@ -41,8 +41,8 @@ namespace GlowUp.Performance
         public GraphicsMode modeWhenNotDetected = GraphicsMode.HighQuality;
 
         [Header("A phone counts as low-end when enough of these checks are true")]
-        [Tooltip("Memory (RAM) at or below this many megabytes. 3072 = 3 GB.")]
-        public int lowMemoryMb = 3072;
+        [Tooltip("Memory (RAM) at or below this many megabytes: ON ITS OWN enough to count as low-end. A phone sold as 4 GB reports 3500 to 3900, so 4096 puts every 4 GB phone in Performance Mode (19 November 2026: a 4 GB phone lagged from the log-in screen in High Quality; was 3072 and needed a second check).")]
+        public int lowMemoryMb = 4096;
         [Tooltip("Processor cores at or below this number")]
         public int lowProcessorCores = 4;
         [Tooltip("Processor speed at or below this many MHz (ignored when the phone does not report it)")]

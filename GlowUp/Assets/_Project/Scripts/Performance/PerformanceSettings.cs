@@ -52,7 +52,17 @@ namespace GlowUp.Performance
             Device = DeviceTierDetector.Inspect(Profile);
 
             ModeChosenByUser = PlayerPrefs.GetInt(ModeChosenKey, 0) == 1;
-            if (PlayerPrefs.HasKey(ModeKey)) Mode = (GraphicsMode)Mathf.Clamp(PlayerPrefs.GetInt(ModeKey), 0, 1);
+            if (PlayerPrefs.HasKey(ModeKey))
+            {
+                Mode = (GraphicsMode)Mathf.Clamp(PlayerPrefs.GetInt(ModeKey), 0, 1);
+                // a mode the APP chose (not the user) follows the current rule: a phone judged by an older rule is judged again
+                if (!ModeChosenByUser && Profile.detectOnFirstLaunch && Mode != Device.suggested)
+                {
+                    Mode = Device.suggested;
+                    PlayerPrefs.SetInt(ModeKey, (int)Mode);
+                    PlayerPrefs.Save();
+                }
+            }
             else
             {
                 // first launch on this phone: choose for the user

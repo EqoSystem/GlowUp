@@ -76,7 +76,8 @@ namespace GlowUp.Common
             centreWords.enableWordWrapping = true; centreWords.fontStyle = FontStyles.Bold;
             button = RuntimeUiKit.Pill(cardRt, "ActionButton", "", p.buttonFill, p.buttonText, buttonFont);
             buttonWords = button.GetComponentInChildren<TextMeshProUGUI>();
-            button.onClick.AddListener(() => { if (!CentreAllowsClosing()) return; var run = onButton; CloseCentre(); run?.Invoke(); });
+            // the button answers at once: only a tap on the dim area waits for the 1.5 seconds (19 Nov 2026: "Scan now" needed several taps)
+            button.onClick.AddListener(() => { if (!centreOpen) return; var run = onButton; CloseCentre(); run?.Invoke(); });
             centre.gameObject.SetActive(false);
 
             // ---- the bottom toast ----
@@ -97,7 +98,7 @@ namespace GlowUp.Common
             bottom.gameObject.SetActive(false);
         }
 
-        /// <summary>The big notice in the middle of the screen. `buttonWords` + `action` add one button (it also waits for the 1.5 seconds).</summary>
+        /// <summary>The big notice in the middle of the screen. `buttonWords` + `action` add one button (it answers at once; only a tap beside the card waits for the 1.5 seconds).</summary>
         public void ShowCentre(string message, string buttonLabel = null, Action action = null)
         {
             if (centre == null) return;
