@@ -19,12 +19,23 @@ namespace GlowUp.EditorTools
         const string LauncherManifestPath = "Assets/Plugins/Android/LauncherManifest.xml";
         const string Libraries = "com.google.mediapipe.tasks.vision,com.google.mediapipe.tasks.core";
 
+        // Finger signs (brought back 19 November 2026) use the same library with a hand model (Google MediaPipe Hand Landmarker, 7.8 MB).
+        public const string HandModelPath = "Assets/StreamingAssets/hand_landmarker.task";
+        public const string HandModelAddress = "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task";
+
         /// <summary>Puts right what is not. `notes` gets one line per change or problem (none when everything was right).</summary>
         public static bool Apply(List<string> notes)
         {
             notes = notes ?? new List<string>();
+            bool ready = true;
+            if (!File.Exists(HandModelPath))
+            {
+                ready = false;
+                notes.Add("- Finger signs: the hand model is missing. Download " + HandModelAddress + " and save it as " + HandModelPath +
+                          ". Without it the app still builds, but finger signs stay off and the Settings page says why.");
+            }
             ArFaceTrackingSetup.FixGradleTemplate(notes);
-            return EnsureLauncherManifest(notes);
+            return EnsureLauncherManifest(notes) && ready;
         }
 
         /// <summary>The launcher manifest must tell the build that the library's "Android 7.0" is looked after by the app itself.</summary>

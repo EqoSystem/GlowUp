@@ -80,6 +80,11 @@ namespace GlowUp.EditorTools
                     clips.GetArrayElementAtIndex(i).objectReferenceValue = AssetDatabase.LoadAssetAtPath<AudioClip>(AudioFolder + SoundFiles[i] + ".wav");
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
+            // finger signs (1 to 5 fingers held up to the selfie camera), brought back 19 November 2026. The navigator does nothing
+            // until the user switches finger signs on in Settings > Sounds & Motion.
+            var signs = SceneBuilderCore.Ensure<FingerSignNavigator>(root);
+            SceneBuilderCore.SetField(signs, "indicator", BuildFingerSignIndicator(root));
+
             var transition = SceneBuilderCore.Ensure<ScreenTransition>(root);
 
             // ---- the sheet that covers the screen during a change (rebuilt each time) ----
@@ -148,6 +153,78 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(transition, "markGroup", markGroup);
             canvasObject.SetActive(false);
             return root;
+        }
+
+        /// <summary>
+        /// The small sign at the top of the screen that shows which finger sign the camera sees ("3  Hold for Recent Scans").
+        /// It is rebuilt each time and left switched off: the app switches it on while a sign is seen.
+        /// </summary>
+        static FingerSignIndicator BuildFingerSignIndicator(GameObject root)
+        {
+            Transform old = root.transform.Find("FingerSignCanvas");
+            if (old != null) Object.DestroyImmediate(old.gameObject);
+            var canvasObject = new GameObject("FingerSignCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler));     // no raycaster: it never takes a tap
+            canvasObject.layer = LayerMask.NameToLayer("UI");
+            canvasObject.transform.SetParent(root.transform, false);
+            var canvas = canvasObject.GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay; canvas.sortingOrder = 450;       // above the screens and pop-ups, under the screen change
+            var scaler = canvasObject.GetComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize; scaler.referenceResolution = new Vector2(1080, 1920);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight; scaler.matchWidthOrHeight = 0f;
+
+            var sign = Child(canvasObject.transform, "Sign", typeof(Image), typeof(CanvasGroup));
+            var signRect = (RectTransform)sign.transform;
+            signRect.anchorMin = signRect.anchorMax = signRect.pivot = new Vector2(0.5f, 1f);
+            signRect.anchoredPosition = new Vector2(0, -86); signRect.sizeDelta = new Vector2(640, 124);
+            var signImage = sign.GetComponent<Image>(); signImage.raycastTarget = false;
+            OnboardingKit.StyleRounded(signImage); OnboardingKit.SetRadius(signImage, 124f);
+            SceneBuilderCore.Themed(sign, ThemeRole.Surface);
+            var group = sign.GetComponent<CanvasGroup>(); group.blocksRaycasts = false; group.interactable = false;
+
+            var outline = Child(sign.transform, "Outline", typeof(Image));
+            Stretch(outline.transform, 0, 0, 0, 0);
+            var outlineImage = outline.GetComponent<Image>(); outlineImage.sprite = IconFactory.PillOutline; outlineImage.type = Image.Type.Sliced; outlineImage.raycastTarget = false;
+            OnboardingKit.SetRadius(outlineImage, 124f);
+            SceneBuilderCore.Themed(outline, ThemeRole.Gold);
+
+            // the ring that fills while the sign is held, with the number of fingers in it
+            var track = Child(sign.transform, "RingTrack", typeof(Image));
+            var trackRect = (RectTransform)track.transform;
+            trackRect.anchorMin = trackRect.anchorMax = trackRect.pivot = new Vector2(0f, 0.5f);
+            trackRect.anchoredPosition = new Vector2(18, 0); trackRect.sizeDelta = new Vector2(92, 92);
+            var trackImage = track.GetComponent<Image>(); trackImage.sprite = IconFactory.RingThin; trackImage.preserveAspect = true; trackImage.raycastTarget = false;
+            SceneBuilderCore.Themed(track, ThemeRole.SurfaceAlt);
+            var ring = Child(track.transform, "Ring", typeof(Image));
+            Stretch(ring.transform, 0, 0, 0, 0);
+            var ringImage = ring.GetComponent<Image>(); ringImage.sprite = IconFactory.RingThin; ringImage.preserveAspect = true; ringImage.raycastTarget = false;
+            ringImage.type = Image.Type.Filled; ringImage.fillMethod = Image.FillMethod.Radial360; ringImage.fillOrigin = (int)Image.Origin360.Top; ringImage.fillClockwise = true;
+            ringImage.fillAmount = 0.6f;
+            SceneBuilderCore.Themed(ring, ThemeRole.ButtonFill);
+            TextMeshProUGUI count = SignText(track.transform, "CountText", "3", 48, ThemeRole.Heading, FontRole.Heading, TextAlignmentOptions.Center);
+            Stretch(count.transform, 0, 0, 0, 0);
+
+            TextMeshProUGUI screen = SignText(sign.transform, "ScreenText", "Hold for Recent Scans", 36, ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.MidlineLeft);
+            Stretch(screen.transform, 132, 0, 30, 0);
+            screen.enableWordWrapping = false; screen.enableAutoSizing = true; screen.fontSizeMax = 36; screen.fontSizeMin = 24; screen.overflowMode = TextOverflowModes.Ellipsis;
+
+            var indicator = SceneBuilderCore.Ensure<FingerSignIndicator>(root);
+            SceneBuilderCore.SetField(indicator, "signObject", canvasObject);
+            SceneBuilderCore.SetField(indicator, "group", group);
+            SceneBuilderCore.SetField(indicator, "countText", count);
+            SceneBuilderCore.SetField(indicator, "screenText", screen);
+            SceneBuilderCore.SetField(indicator, "ring", ringImage);
+            canvasObject.SetActive(false);
+            return indicator;
+        }
+
+        static TextMeshProUGUI SignText(Transform parent, string name, string text, float size, ThemeRole colour, FontRole font, TextAlignmentOptions align)
+        {
+            var go = Child(parent, name, typeof(TextMeshProUGUI));
+            var t = go.GetComponent<TextMeshProUGUI>();
+            t.text = text; t.fontSize = size; t.alignment = align; t.enableWordWrapping = false; t.raycastTarget = false; t.richText = false;
+            SceneBuilderCore.Themed(go, colour);
+            var themedFont = SceneBuilderCore.Ensure<ThemedFont>(go); themedFont.Role = font; themedFont.KeepRole = true;
+            return t;
         }
 
         /// <summary>A shadow that fades away from one side of the screen-change sheet (it sits just outside the sheet).</summary>
