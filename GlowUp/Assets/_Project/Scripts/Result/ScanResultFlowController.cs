@@ -271,7 +271,7 @@ namespace GlowUp.Result
             if (tryOnButton != null) tryOnButton.interactable = has && ProductScope.CanTryOn(record);      // AR Try-On is for make-up only
             if (allIngredientsButton != null) allIngredientsButton.interactable = has;
             if (fdaVerificationButton != null) fdaVerificationButton.interactable = has;
-            if (renameButton != null) renameButton.gameObject.SetActive(has);
+            if (renameButton != null) renameButton.gameObject.SetActive(false);     // New22: users may not edit product names or details
             if (saferAlternativesButton != null) saferAlternativesButton.gameObject.SetActive(has && IsFlagged(record));
             if (!has)
             {

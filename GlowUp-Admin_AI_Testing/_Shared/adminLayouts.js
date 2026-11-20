@@ -496,11 +496,48 @@ function fitOn() {
 let fitWatcher = null, fitQueued = 0;
 
 
+// Fold placement (New22, 20 November 2026). Panels are read in rows the way the layout fills them (widths adding up to 12).
+// A panel takes the columns of the folded panels to its right in its row ("Needs your attention" slides over the folded
+// Import box and gives the space back when it opens). The folded bars themselves go to the right-hand column (CSS), where
+// they line up one under the other (the dashboard's report panels stack under Most scanned). Wide boards only (CSS).
+function foldFill(panels) {
+    const rows = [];
+    let row = [], used = 0;
+    panels.filter((p) => !p.classList.contains("is-hidden") && p.offsetParent !== null).forEach((panel) => {
+        const w = Math.min(12, Math.max(1, Number(panel.style.getPropertyValue("--w")) || 12));
+        if (used + w > 12 && row.length) { rows.push(row); row = []; used = 0; }
+        row.push({ panel, w }); used += w;
+    });
+    if (row.length) rows.push(row);
+    // where each panel really starts (the grid may have moved it): a panel only grows into columns that are to its right
+    const b = board(), style = getComputedStyle(b), box = b.getBoundingClientRect();
+    const left = box.left + parseFloat(style.paddingLeft), gap = parseFloat(style.columnGap) || 16;
+    const column = (box.right - parseFloat(style.paddingRight) - left + gap) / 12;
+    const startOf = (panel) => (column > 0 ? Math.max(0, Math.round((panel.getBoundingClientRect().left - left) / column)) : 0);
+    const want = new Map();
+    rows.forEach((r) => r.forEach((item, i) => {
+        if (item.panel.classList.contains("folded")) return;
+        let span = item.w;
+        for (let j = i + 1; j < r.length && r[j].panel.classList.contains("folded"); j++) span += r[j].w;
+        span = Math.min(span, 12 - startOf(item.panel));
+        if (span > item.w) want.set(item.panel, span);
+    }));
+    panels.forEach((panel) => {
+        const span = want.get(panel);
+        if (span) {
+            if (panel.style.getPropertyValue("--fold-span") !== String(span)) panel.style.setProperty("--fold-span", String(span));
+            if (!panel.hasAttribute("data-fold-fill")) panel.setAttribute("data-fold-fill", "");
+        } else if (panel.hasAttribute("data-fold-fill")) { panel.removeAttribute("data-fold-fill"); panel.style.removeProperty("--fold-span"); }
+    });
+}
+
 function fitNow() {
     const b = board();
     if (!b) return;
     const on = fitOn();
     const panels = topPanels();
+    if (!document.body.classList.contains("layout-editing")) foldFill(panels);
+    else panels.forEach((panel) => { panel.removeAttribute("data-fold-fill"); panel.style.removeProperty("--fold-span"); });
     if (b.classList.contains("fit") !== on) b.classList.toggle("fit", on);
     if (on) {
         b.style.setProperty("--row-unit", ROW_UNIT + "px");

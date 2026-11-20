@@ -94,3 +94,70 @@ html:has(.terms-dialog[open]) { overflow: hidden; }
 .password-eye .eye-open { display: none; }
 .password-eye.on .eye-open { display: block; }
 .password-eye.on .eye-closed { display: none; }
+
+
+/* ---- Sign Up (20 November 2026): "Create Admin Account" and the live "Check Your Email" card ---- */
+/* The cards are views of one page; only one is shown. Moving forward slides in from the right, Back from the left. */
+.login-card[hidden] { display: none; }
+.login-card.card-in { animation: card-in .32s var(--ease) both; }
+.login-card.card-back { animation: card-back .32s var(--ease) both; }
+@keyframes card-in { from { opacity: 0; transform: translateX(calc(18 * var(--u))); } to { opacity: 1; transform: none; } }
+@keyframes card-back { from { opacity: 0; transform: translateX(calc(-18 * var(--u))); } to { opacity: 1; transform: none; } }
+
+/* "Sign Up" left, "Forgot password?" right, on the row under the password box */
+.forgot-row { justify-content: space-between; gap: calc(8 * var(--u)); }
+.signup-link { gap: calc(6 * var(--u)); }
+.signup-link svg.ic { width: calc(17 * var(--u)); height: calc(17 * var(--u)); }
+
+.signup-card, .check-card { position: relative; }
+.card-back { position: absolute; top: calc(12 * var(--u)); left: calc(12 * var(--u)); width: calc(40 * var(--u)); height: calc(40 * var(--u)); border-color: transparent; background: transparent; color: var(--accent-text); }
+.card-back:hover { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.card-back:focus-visible { outline: calc(2 * var(--u)) solid var(--accent); outline-offset: calc(2 * var(--u)); }
+.card-back svg.ic { width: calc(22 * var(--u)); height: calc(22 * var(--u)); transition: transform .2s var(--ease); }
+.card-back:hover svg.ic { transform: translateX(calc(-2 * var(--u))); }
+
+.card-badge { display: inline-grid; place-items: center; width: calc(58 * var(--u)); height: calc(58 * var(--u)); margin: 0 auto calc(6 * var(--u)); color: var(--accent); }
+.card-badge svg { width: 100%; height: 100%; fill: color-mix(in srgb, var(--accent) 14%, transparent); stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.signup-card .subtitle { margin-bottom: calc(18 * var(--u)); }
+
+.signup-form { display: flex; flex-direction: column; gap: calc(12 * var(--u)); text-align: left; }
+.signup-form input[aria-invalid="true"] { border-color: var(--bad); }
+.pw-rules { list-style: none; margin: calc(2 * var(--u)) 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(150 * var(--u)), 1fr)); gap: calc(2 * var(--u)) calc(12 * var(--u)); }
+.pw-rule { display: flex; align-items: center; gap: calc(6 * var(--u)); margin: 0; font-size: var(--fs-xs); line-height: 1.5; color: var(--muted); transition: color .2s; }
+.pw-rule svg.ic { width: calc(14 * var(--u)); height: calc(14 * var(--u)); stroke-width: 2.4; opacity: .35; transition: opacity .2s, transform .25s var(--ease); }
+.pw-rule.met { color: var(--ok); }
+.pw-rule.met svg.ic { opacity: 1; transform: scale(1.12); }
+.pw-match[hidden] { display: none; }
+.pw-match:not(.met) { color: var(--warn); }
+.pw-match:not(.met) svg.ic { opacity: 0; width: 0; }
+
+.agree-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0 calc(4 * var(--u)); font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5; }
+.agree-row input { accent-color: var(--accent); width: calc(18 * var(--u)); height: calc(18 * var(--u)); margin: 0 calc(4 * var(--u)) 0 0; cursor: pointer; flex: none; }
+.agree-row label { cursor: pointer; }
+.agree-row .text-link { font-size: inherit; }
+
+/* Check Your Email: an envelope with a tick; the tick turns into the answer (confirmed, approved, declined) */
+.check-card h1:focus { outline: none; }
+.mail-badge { position: relative; display: block; width: calc(70 * var(--u)); height: calc(58 * var(--u)); margin: 0 auto calc(10 * var(--u)); color: var(--accent); }
+.mail-badge svg.mail { width: 100%; height: 100%; fill: color-mix(in srgb, var(--accent) 12%, var(--surface)); stroke: currentColor; stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; }
+.mail-tick { position: absolute; right: calc(-4 * var(--u)); bottom: calc(-2 * var(--u)); width: calc(28 * var(--u)); height: calc(28 * var(--u)); display: grid; place-items: center; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 calc(3 * var(--u)) var(--surface); transition: background-color .3s; }
+.mail-tick svg { width: calc(17 * var(--u)); height: calc(17 * var(--u)); fill: none; stroke: var(--accent-ink); stroke-width: 2.8; stroke-linecap: round; stroke-linejoin: round; }
+.check-card[data-state="confirmed"] .mail-tick, .check-card[data-state="approved"] .mail-tick { background: var(--ok); animation: tick-pop .45s var(--ease); }
+.check-card[data-state="confirmed"] .mail-tick svg, .check-card[data-state="approved"] .mail-tick svg { stroke: var(--surface); }
+.check-card[data-state="declined"] .mail-tick { background: var(--bad); }
+.check-card[data-state="declined"] .mail-tick svg { stroke: var(--bad-ink); }
+@keyframes tick-pop { 0% { transform: scale(.6); } 60% { transform: scale(1.18); } 100% { transform: none; } }
+.check-lead { margin: calc(10 * var(--u)) 0 0; font-size: var(--fs-sm); color: var(--text-2); }
+.check-lead[hidden] { display: none; }
+.check-email { margin: calc(2 * var(--u)) 0 0; overflow-wrap: anywhere; }
+.check-email strong { font-size: var(--fs-md); color: var(--text); }
+.check-text { margin: calc(12 * var(--u)) 0 calc(14 * var(--u)); font-size: var(--fs-sm); line-height: 1.55; color: var(--text-2); overflow-wrap: anywhere; }
+.check-note { display: flex; align-items: flex-start; justify-content: center; gap: calc(8 * var(--u)); padding: calc(12 * var(--u)) calc(14 * var(--u)); border-radius: var(--radius-sm); text-align: left; font-size: var(--fs-sm); line-height: 1.5; color: var(--text-2); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent); }
+.check-note svg.ic { flex: none; margin-top: calc(2 * var(--u)); color: var(--accent-text); }
+.check-actions { display: flex; flex-direction: column; align-items: stretch; gap: calc(8 * var(--u)); margin-top: calc(16 * var(--u)); }
+.check-actions [hidden] { display: none; }
+.check-back { align-self: center; display: inline-flex; align-items: center; min-height: calc(44 * var(--u)); padding: 0 calc(6 * var(--u)); font-size: var(--fs-sm); }
+@media (prefers-reduced-motion: reduce) { .login-card.card-in, .login-card.card-back, .check-card .mail-tick { animation: none; } }
+
+/* the card slide must never widen the page, even for a frame */
+.login-main { overflow-x: clip; }

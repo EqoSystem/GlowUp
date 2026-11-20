@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en" class="auth-pending">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GlowUp Admin - User Management</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="../_Shared/assets/glowup-icon-32.png">
+    <script>
+        (function () {
+            var t = null;
+            try { t = localStorage.getItem("glowup.theme"); } catch (e) { }
+            if (t !== "light" && t !== "dark") t = "light";
+            document.documentElement.dataset.theme = t;
+        })();
+        setTimeout(function () {
+            if (document.documentElement.classList.contains("auth-pending")) document.documentElement.classList.add("auth-stuck");
+        }, 10000);
+    </script>
+
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js">
+    <link rel="modulepreload" href="../_Database/firebase-console.js">
+    <link rel="modulepreload" href="../_Shared/adminCommon.js">
+    <link rel="modulepreload" href="../_Shared/adminStore.js">
+    <link rel="modulepreload" href="../_Shared/adminShell.js">
+    <link rel="stylesheet" href="../_Shared/adminCommon.css">
+    <link rel="stylesheet" href="../_Shared/adminSettingsMenu.css">
+    <link rel="stylesheet" href="../_Admin_User_Management/adminUserManagement.css">
+</head>
+<body>
+
+    <main class="main-content" data-title="User Management" data-subtitle="Manage all registered users of GlowUp.">
+
+        <script src="../_Shared/pageFrame.js"></script>
+
+        <div data-header-parts hidden>
+            <div class="segmented header-tabs" id="userTabs" role="tablist" aria-label="Which users to show">
+                <button type="button" class="seg" role="tab" data-tab="all">All Users <span class="tab-count" id="tabAll"></span></button>
+                <button type="button" class="seg" role="tab" data-tab="active">Active <span class="tab-count" id="tabActive"></span></button>
+                <button type="button" class="seg" role="tab" data-tab="archived">Archived <span class="tab-count" id="tabArchived"></span></button>
+                <button type="button" class="seg" role="tab" data-tab="bin">Recycle Bin <span class="tab-count" id="tabBin"></span></button>
+            </div>
+            <div class="search-container">
+                <i data-icon="search"></i>
+                <input type="text" placeholder="Search by name, email or UID" class="search-input" id="userSearchInput" autocomplete="off" aria-label="Search users by name, email or UID">
+                <button type="button" class="search-clear" id="userSearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
+            </div>
+        </div>
+
+        <div class="board">
+
+            <section class="panel bare" data-panel="heading" data-label="Heading" data-w="12" data-no-fold>
+                <div class="um-heading">
+                    <span class="um-heading-icon"><i data-icon="user"></i></span>
+                    <div class="um-heading-text">
+                        <h2 class="um-title">User Management</h2>
+                        <p class="um-subtitle">Manage all registered users of GlowUp.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel bare" data-panel="numbers" data-label="Numbers" data-w="12">
+                <div class="kpi-row um-kpis" id="userKpis">
+                    <div class="kpi" id="kpiAll" role="button" tabindex="0" data-tab="all">
+                        <span class="kpi-icon"><i data-icon="user"></i></span>
+                        <span class="kpi-text"><span class="kpi-value skeleton" id="kpiAllValue">00</span><span class="kpi-title">Total Users</span><span class="kpi-delta" id="kpiAllWeek"></span></span>
+                    </div>
+                    <div class="kpi" id="kpiActive" role="button" tabindex="0" data-tab="active">
+                        <span class="kpi-icon"><i data-icon="check"></i></span>
+                        <span class="kpi-text"><span class="kpi-value skeleton" id="kpiActiveValue">00</span><span class="kpi-title">Active Users</span><span class="kpi-delta" id="kpiActiveWeek"></span></span>
+                    </div>
+                    <div class="kpi" id="kpiArchived" role="button" tabindex="0" data-tab="archived">
+                        <span class="kpi-icon"><i data-icon="archive"></i></span>
+                        <span class="kpi-text"><span class="kpi-value skeleton" id="kpiArchivedValue">00</span><span class="kpi-title">Archived Users</span><span class="kpi-delta" id="kpiArchivedWeek"></span></span>
+                    </div>
+                    <div class="kpi" id="kpiBin" role="button" tabindex="0" data-tab="bin">
+                        <span class="kpi-icon"><i data-icon="trash"></i></span>
+                        <span class="kpi-text"><span class="kpi-value skeleton" id="kpiBinValue">00</span><span class="kpi-title">In Recycle Bin</span><span class="kpi-delta" id="kpiBinWeek"></span></span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="panel" data-panel="list" data-label="Users" data-w="12" data-no-fold>
+                <div class="panel-head">
+                    <button type="button" class="pick" id="userPickAll" role="checkbox" aria-checked="false" aria-label="Select every user shown on this page"></button>
+                    <h3 class="panel-title" id="userTitle">All Users</h3>
+                    <span class="panel-count" id="userCountLine"></span>
+                    <span class="spacer"></span>
+                    <div class="um-tools">
+                        <button type="button" class="btn" id="userFilterBtn" aria-haspopup="dialog" aria-expanded="false"><i data-icon="sliders"></i><span class="um-btn-text">Filter</span></button>
+                        <button type="button" class="btn" id="userExportBtn"><i data-icon="download"></i><span class="um-btn-text">Export</span></button>
+                    </div>
+                </div>
+
+                <div class="w-bar sel-bar" id="userBar" hidden>
+                    <b id="userBarCount">0 selected</b>
+                    <span class="spacer"></span>
+                    <button type="button" class="btn" id="barRestore" hidden><i data-icon="undo"></i>Restore</button>
+                    <button type="button" class="btn" id="barArchive" hidden><i data-icon="archive"></i>Move to Archive</button>
+                    <button type="button" class="btn" id="barBin" hidden><i data-icon="trash"></i>Delete to Recycle Bin</button>
+                    <button type="button" class="btn danger" id="barPurge" hidden><i data-icon="trash"></i>Delete permanently</button>
+                    <button type="button" class="btn" id="barClear">Cancel</button>
+                </div>
+
+                <div class="table-container">
+                    <table class="admin-table user-table">
+                        <thead>
+                            <tr><th class="pick-col"></th><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Joined At</th><th>Last Active</th><th class="um-actions-head">Actions</th></tr>
+                        </thead>
+                        <tbody id="userTableBody">
+                            <tr><td colspan="8"><div class="sk-list"><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div></div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty-state um-empty" id="userEmpty" hidden>
+                    <svg class="um-empty-art" viewBox="0 0 120 90" aria-hidden="true"><circle cx="48" cy="34" r="16"/><path d="M18 78c3-17 15-26 30-26s27 9 30 26"/><circle cx="88" cy="40" r="10"/><path d="M72 70c3-9 9-14 16-14 5 0 9 2 12 6"/><path d="M96 22l6-6M104 30h8M96 14v-6"/></svg>
+                    <p class="empty-message" id="userEmptyMessage">No users here.</p>
+                    <span class="empty-hint" id="userEmptyHint"></span>
+                </div>
+                <div class="table-foot um-foot">
+                    <label class="um-size" for="userPageSize">Rows per page
+                        <select id="userPageSize"><option value="10">10</option><option value="25">25</option><option value="50">50</option></select>
+                    </label>
+                    <span class="spacer"></span>
+                    <div class="pager" id="userPager"></div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script type="module" src="../_Admin_User_Management/adminUserManagement.js"></script>
+</body>
+</html>

@@ -27,6 +27,7 @@ namespace GlowUp.Common
         public const string AiResult = "AiSmartAnalysisResultScene";
         public const string ArTryOn = "ARTryOnScene";
         public const string Settings = "SettingsScene";
+        public const string Notifications = "NotificationsScene";
     }
 
     /// <summary>

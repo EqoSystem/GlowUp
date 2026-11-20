@@ -31,14 +31,14 @@ try {
         const cover = await page.textContent(".password-length-cover");
         ok(cover.length >= 40, `${width}px: the cover is a long row (${cover.length} dots), not 5`);
         ok(await page.inputValue("#password") === "abc12", `${width}px: the real value stays in the input`);
-        const box = await page.locator(".password-box").boundingBox(), row = await page.locator(".password-length-cover").boundingBox();
+        const box = await page.locator("#login-form .password-box").boundingBox(), row = await page.locator(".password-length-cover").boundingBox();
         const eye = await page.locator("#passwordEye").boundingBox();
         ok(row.x + row.width <= eye.x + 1, `${width}px: the row of dots ends before the eye (no overlap)`);
         ok(row.width <= box.width + 1, `${width}px: the row stays inside the box`);
         ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `${width}px: no sideways scroll`);
         await page.fill("#password", "");
         await page.press("#password", "Enter");
-        const note = page.locator(".login-message");
+        const note = page.locator("#loginMessage");
         ok(await note.isVisible(), `${width}px: the message shows`);
         await page.waitForTimeout(2200);
         ok(!(await note.isVisible()), `${width}px: the message is gone after 1.5 seconds`);

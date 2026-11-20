@@ -194,7 +194,9 @@ namespace GlowUp.Views
         public void SetTryOnAvailable(bool available) { if (tryOnButton != null) tryOnButton.interactable = available; }
 
         /// <summary>The small pencil (shown while the tiles shake).</summary>
-        public void ShowRename(bool show) { if (renameButton != null) renameButton.gameObject.SetActive(show); }
+        // New22 (20 November 2026): users may not change a product's name or details, so the pencil never shows. Product data is
+        // corrected by the admins on the website. The button stays in the scenes (no rebuild needed) but is kept hidden.
+        public void ShowRename(bool show) { if (renameButton != null) renameButton.gameObject.SetActive(false); }
 
         public void ToggleDrawer() { SetDrawer(!DrawerOpen); }
 

@@ -103,9 +103,57 @@ service cloud.firestore {
     // ---- who is an admin -------------------------------------------------------------------
     // Created and removed only by hand in the Firebase console. An account may look up its own
     // entry (the website does this when "REQUIRE_ADMIN_RECORD" is switched on).
+    // ADDED on 20 November 2026 (admin sign-up): an admin may also ADD an admin, but only by approving that person's own
+    // request in "adminRequests" (pending, e-mail confirmed), in the same batch that marks the request approved. Nobody can
+    // add themself, and changing or removing an admin is still done by hand in the console.
     match /admins/{uid} {
       allow read: if isOwner(uid);
-      allow write: if false;
+      allow create: if isAdmin()
+        && uid != request.auth.uid
+        && exists(/databases/$(database)/documents/adminRequests/$(uid))
+        && get(/databases/$(database)/documents/adminRequests/$(uid)).data.status == 'pending'
+        && get(/databases/$(database)/documents/adminRequests/$(uid)).data.emailVerified == true
+        && request.resource.data.keys().hasOnly(['email', 'name', 'approvedBy', 'approvedAt'])
+        && request.resource.data.email == get(/databases/$(database)/documents/adminRequests/$(uid)).data.email
+        && request.resource.data.name is string && request.resource.data.name.size() <= 80
+        && request.resource.data.approvedBy == request.auth.uid
+        && request.resource.data.approvedAt == request.time;
+      allow update, delete: if false;
+    }
+
+    // ---- requests for admin access (the login page's "Sign Up"), ONE document per account: adminRequests/{uid} ----
+    // ADDED on 20 November 2026. Signing up never makes anyone an admin: the person's own account writes a pending request,
+    // and an existing admin approves it (see admins above) or declines it (deletes the request).
+    // - the owner creates it (pending, own e-mail, not already an admin) and may later only switch emailVerified to true,
+    //   and only when the sign-in token says the e-mail is confirmed;
+    // - an admin reads every request, marks one approved in the batch that adds the admin, or deletes it.
+    match /adminRequests/{uid} {
+      allow get: if isOwner(uid) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(uid)
+        && !exists(/databases/$(database)/documents/admins/$(uid))
+        && request.resource.data.keys().hasOnly(['name', 'email', 'status', 'emailVerified', 'createdAt'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 80
+        && request.resource.data.email == request.auth.token.get('email', '')
+        && request.resource.data.email.size() > 3
+        && request.resource.data.status == 'pending'
+        && (request.resource.data.emailVerified == false
+            || (request.resource.data.emailVerified == true && request.auth.token.get('email_verified', false) == true))
+        && request.resource.data.createdAt == request.time;
+      allow update: if (isOwner(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['emailVerified'])
+          && request.resource.data.emailVerified == true
+          && request.auth.token.get('email_verified', false) == true)
+        || (isAdmin()
+          && uid != request.auth.uid
+          && resource.data.status == 'pending'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'decidedBy', 'decidedAt'])
+          && request.resource.data.status == 'approved'
+          && request.resource.data.decidedBy == request.auth.uid
+          && request.resource.data.decidedAt == request.time
+          && existsAfter(/databases/$(database)/documents/admins/$(uid)));
+      allow delete: if isAdmin() || isOwner(uid);
     }
 
     // What an admin may write to the catalogue (brands, products, ingredients). The website's own forms keep to this already;
@@ -307,12 +355,60 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ---- each app user's own data -----------------------------------------------------------
+    // CHANGED on 20 November 2026 (User Management page; the project owner chose full access for admins): an admin may READ every
+    // users/{uid} (profile and skin profile) and may change only the fields the admin site manages. The app's own writes are
+    // merges of the profile fields, so they never touch these. A user cannot set or change them (no self-unban, no self-role), and
+    // a banned user cannot write their profile. The scans below stay private to the user. Permanent delete removes the profile
+    // document only: the Firebase sign-in account and the scans sub-collection stay (no Cloud Functions on the free tier).
+    function userAdminFields() { return ['status', 'statusBefore', 'role', 'inBin', 'statusChangedAt', 'statusChangedBy']; }
+    function userBanned(uid) {
+      return exists(/databases/$(database)/documents/users/$(uid))
+        && get(/databases/$(database)/documents/users/$(uid)).data.get('status', '') == 'banned';
+    }
+    function userPhotoOk() {
+      return request.resource.data.get('photoData', '') is string
+        && request.resource.data.get('photoData', '').size() <= 200100
+        && (request.resource.data.get('photoData', '') == '' || request.resource.data.get('photoData', '').matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$'));
+    }
+    function adminUserChange() {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName', 'username'].concat(userAdminFields()))
+        && request.resource.data.get('role', 'user') in ['user', 'admin']
+        && request.resource.data.get('status', 'active') in ['active', 'archived', 'banned', 'deleted']
+        && (request.resource.data.get('statusChangedBy', request.auth.uid) == request.auth.uid)
+        && request.resource.data.get('fullName', '') is string && request.resource.data.get('fullName', '').size() <= 100
+        && request.resource.data.get('username', '') is string && request.resource.data.get('username', '').size() <= 50;
+    }
     match /users/{uid} {
-      allow read, create, update: if isOwner(uid);
-      allow delete: if isOwner(uid) && recentLogin();       // only during account deletion, right after a fresh sign-in
+      allow read: if isOwner(uid) || isAdmin();
+      // photoData (New22): the app's profile picture, a small JPEG as text (the app sends about 20 KB); capped here
+      allow create: if isOwner(uid) && !request.resource.data.keys().hasAny(userAdminFields()) && userPhotoOk();
+      allow update: if (isOwner(uid) && !userBanned(uid) && userPhotoOk()
+                        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(userAdminFields()))
+                    || (isAdmin() && uid != request.auth.uid && adminUserChange());
+      allow delete: if (isOwner(uid) && recentLogin())       // only during account deletion, right after a fresh sign-in
+                    || (isAdmin() && uid != request.auth.uid && resource.data.get('status', '') == 'deleted');   // permanent delete from the Recycle Bin
 
       match /scans/{scanId} {
         allow read, write: if isOwner(uid);
+      }
+
+      // ---- the user's notifications (New22, 20 November 2026): an admin's reply to a report. Only admins create one;
+      // the user reads it, marks it read, or deletes it, and nobody else sees it ----
+      match /notifications/{noteId} {
+        allow read, delete: if isOwner(uid);
+        allow update: if isOwner(uid)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+          && request.resource.data.read is bool;
+        allow create: if isAdmin()
+          && request.resource.data.keys().hasOnly(['kind', 'title', 'body', 'reportId', 'read', 'createdAt', 'createdBy'])
+          && request.resource.data.kind in ['reply']
+          && request.resource.data.title is string && request.resource.data.title.size() >= 1 && request.resource.data.title.size() <= 80
+          && request.resource.data.body is string && request.resource.data.body.size() >= 1 && request.resource.data.body.size() <= 500
+          && request.resource.data.get('reportId', '') is string && request.resource.data.get('reportId', '').size() <= 100
+          && request.resource.data.read == false
+          && request.resource.data.createdBy == request.auth.uid
+          && request.resource.data.createdAt == request.time;
       }
     }
 
@@ -410,7 +506,7 @@ service cloud.firestore {
     match /siteLayouts/{pageKey} {
       allow read, delete: if isAdmin();
       allow create, update: if isAdmin()
-        && pageKey in ['dashboard', 'inventory', 'curator', 'bin', 'archive']
+        && pageKey in ['dashboard', 'inventory', 'curator', 'bin', 'archive', 'users']
         && request.resource.data.keys().hasOnly(['layout', 'appearance', 'updatedAt', 'updatedBy'])
         && request.resource.data.layout is map
         && request.resource.data.appearance is map
@@ -473,6 +569,43 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow write: if false;
     }
+
+    // ---- announcements to every app user (New22, 20 November 2026): maintenance notices, app updates, product changes ----
+    // Any signed-in user reads them (the app's Notifications screen); only admins write them, in a fixed shape.
+    match /announcements/{noteId} {
+      allow read: if signedIn();
+      allow delete: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['kind', 'title', 'body', 'startsAt', 'endsAt', 'createdAt', 'createdBy'])
+        && request.resource.data.kind in ['maintenance', 'update', 'product']
+        && request.resource.data.title is string && request.resource.data.title.size() >= 1 && request.resource.data.title.size() <= 80
+        && request.resource.data.body is string && request.resource.data.body.size() <= 300
+        && (request.resource.data.get('startsAt', null) == null || request.resource.data.get('startsAt', null) is timestamp)
+        && (request.resource.data.get('endsAt', null) == null || request.resource.data.get('endsAt', null) is timestamp)
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+      allow update: if false;
+    }
+
+    // ---- Maintenance Mode (New22, 20 November 2026): ONE document, systemConfig/maintenanceMode ----
+    // Everyone may read it, also before signing in (the app's log-in screen must know it). Only admins write it, in a fixed shape.
+    // Ending maintenance when scheduledEnd passes is done by any open admin tab (no Cloud Functions on the free tier).
+    match /systemConfig/{docId} {
+      allow get: if docId == 'maintenanceMode';
+      allow list, delete: if false;
+      allow create, update: if isAdmin() && docId == 'maintenanceMode'
+        && request.resource.data.keys().hasOnly(['isActive', 'scheduledStart', 'scheduledEnd', 'bannerTitle', 'customMessage', 'notifyUsers', 'notifiedAt', 'updatedBy', 'updatedAt'])
+        && request.resource.data.isActive is bool
+        && request.resource.data.notifyUsers is bool
+        && (request.resource.data.scheduledStart == null || request.resource.data.scheduledStart is timestamp)
+        && (request.resource.data.scheduledEnd == null || request.resource.data.scheduledEnd is timestamp)
+        && (request.resource.data.notifiedAt == null || request.resource.data.notifiedAt is timestamp)
+        && request.resource.data.bannerTitle is string && request.resource.data.bannerTitle.size() <= 80
+        && request.resource.data.customMessage is string && request.resource.data.customMessage.size() <= 300
+        && request.resource.data.updatedBy == request.auth.uid
+        && request.resource.data.updatedAt == request.time;
+    }
+
 
     // anything not listed above is closed
   }

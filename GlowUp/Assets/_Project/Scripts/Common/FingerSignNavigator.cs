@@ -100,10 +100,22 @@ namespace GlowUp.Common
 
         // A screen that uses the camera itself (the scanner, AR Try-On) must find it free: the selfie camera is let go of
         // as soon as a screen change starts, before the next screen wakes up, and stays closed until that screen is there.
+        // New22 (20 November 2026), the flicker on a screen change: closing and opening the camera blocks the app for a moment,
+        // and it used to happen twice on EVERY change (closed when the change started, opened again on the next screen). Now the
+        // camera stays open when the next screen also listens for finger signs; it is let go only before a screen that may use
+        // the camera itself (the scanner, AR Try-On) or does not listen.
         void OnLeaving(string nextScene)
         {
+            Forget();
+            if (Listens(nextScene)) return;
             StopCamera();
             startAfter = Time.unscaledTime + 3f;
+        }
+
+        bool Listens(string scene)
+        {
+            foreach (string s in activeScenes) if (s == scene) return true;
+            return false;
         }
 
         void OnSceneLoaded(Scene scene, LoadSceneMode mode)
@@ -135,7 +147,9 @@ namespace GlowUp.Common
                 Problem = cameraRefusedText;
                 return;
             }
-            bool wanted = UiPreferences.FingerSigns && Application.isFocused && !ScreenTransition.IsBusy && !noCamera && !readerFailed
+            // during a screen change the camera keeps running (no stop and start, no flicker); signs are simply not read
+            if (ScreenTransition.IsBusy) { Forget(); return; }
+            bool wanted = UiPreferences.FingerSigns && Application.isFocused && !noCamera && !readerFailed
                        && IsActiveScene() && CameraAllowed() && ReaderReady();
             if (!wanted) { if (cam != null) StopCamera(); startAfter = Mathf.Max(startAfter, Time.unscaledTime + startDelaySeconds); return; }
             if (cam == null) { if (Time.unscaledTime >= startAfter) StartCamera(); return; }
@@ -364,7 +378,7 @@ namespace GlowUp.Common
             if (indicator != null) indicator.Confirm();
             if (ScreenTransition.IsBusy || string.IsNullOrEmpty(scene) || !IsActiveScene()) return;
             if (playSound && UiSoundPlayer.Instance != null) UiSoundPlayer.Instance.PlayTap();
-            StopCamera();                                   // the next screen may need the camera itself
+            if (!Listens(scene)) StopCamera();              // the next screen may need the camera itself; otherwise it stays open
             SceneNavigator.Go(scene);
         }
     }

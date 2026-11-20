@@ -37,6 +37,7 @@ import { matchesSearch, normalizeName, evidenceProblem } from "../_Shared/glowup
 import { auth } from "../_Database/firebase-console.js";
 import { cleanupPlan, ingredientDuplicates, ingredientLookalikesAsync, lookalikeCount, ingredientIssues, mergeIngredients } from "../_Shared/glowupCatalog.js";
 import { openPlanDialog, openDuplicatesDialog, showScan } from "../_Shared/adminCleanup.js";
+import { attachCounters } from "../_Shared/charLimit.js";
 import { mountShell, placeInHeader, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
 import { bindButtons } from "../_Shared/shortcuts.js";
 import { readAdminDocument, splitForAi } from "../_Shared/adminDocumentReader.js";
@@ -519,7 +520,8 @@ function wirePurposeAndClassification() {
         if (made) { fillClassFilter(); renderIngredients(); }
     });
 }
-function paintPurposeCount() { paintLimited(); }
+let paintNameCount = () => { };           // the name field's counter (charLimit.js); no auto height on a one-line box
+function paintPurposeCount() { paintLimited(); paintNameCount(); }
 
 
 
@@ -528,6 +530,7 @@ function paintPurposeCount() { paintLimited(); }
 const LIMITED_IDS = ["ingredientPurposeInput", "ingredientCautionInput", "ingredientUsesInput", "ingredientAliasesInput", "ingredientDescInput", "ingredientChemInput", "ingredientSourcesInput"];
 let limitedWidth = 0;
 function wireLimited() {
+    paintNameCount = attachCounters(["ingredientNameInput"]);
     LIMITED_IDS.forEach((id) => {
         const box = el(id), field = box.closest(".field");
         if (!field || box.dataset.limitedWired) return;

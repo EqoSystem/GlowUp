@@ -176,7 +176,7 @@ await cannot("another user reads a profile", () => getDoc(doc(other(), "users/u1
 await cannot("another user writes a profile", () => setDoc(doc(other(), "users/u1"), { firstName: "Hacked" }));
 await cannot("another user reads someone's scans", () => getDoc(doc(other(), "users/u1/scans/s1")));
 await cannot("nobody signed in reads a profile", () => getDoc(doc(anon(), "users/u1")));
-await cannot("an admin reads a user's profile", () => getDoc(doc(adminDoc(), "users/u1")));
+await can("an admin reads a user's profile (User Management, 20 November 2026: the owner chose full access; this was REFUSED before)", () => getDoc(doc(adminDoc(), "users/u1")));
 await cannot("an admin reads a user's scans", () => getDoc(doc(adminClaim(), "users/u1/scans/s1")));
 
 
@@ -333,6 +333,130 @@ await cannot("a plain user reads shortcuts", () => getDoc(doc(user(), "adminShor
 await cannot("nobody signed in reads shortcuts", () => getDoc(doc(anon(), "adminShortcuts/a1")));
 await cannot("shortcuts with an extra field", () => setDoc(doc(adminDoc(), "adminShortcuts/a1"), Object.assign(keys(), { script: "x" })));
 await cannot("shortcuts whose items are not a map", () => setDoc(doc(adminDoc(), "adminShortcuts/a1"), Object.assign(keys(), { items: "x" })));
+
+// ---- admin sign-up (20 November 2026): a request, approved by an existing admin ----
+const asker = (verified = false, email = "new@example.com") => env.authenticatedContext("n1", { email, email_verified: verified }).firestore();
+const askerOther = () => env.authenticatedContext("n2", { email: "two@example.com", email_verified: true }).firestore();
+const request = (extra) => Object.assign({ name: "New Admin", email: "new@example.com", status: "pending", emailVerified: false, createdAt: serverTimestamp() }, extra || {});
+const seedRequest = async (data) => {
+    await seed();
+    await env.withSecurityRulesDisabled(async (context) => { await setDoc(doc(context.firestore(), "adminRequests/n1"), Object.assign({ name: "New Admin", email: "new@example.com", status: "pending", emailVerified: false, createdAt: Timestamp.now() }, data || {})); });
+};
+async function canAfter(what, prepare, operation) { checks++; await prepare(); const error = await attempt(operation); if (error) failures.push(`should be ALLOWED: ${what}\n      ${String(error.message || error).split("\n")[0]}`); }
+async function cannotAfter(what, prepare, operation) { checks++; await prepare(); const error = await attempt(operation); if (!error) failures.push(`should be REFUSED: ${what}`); }
+const approve = (db, extraAdmin, extraRequest) => {
+    const batch = writeBatch(db);
+    batch.set(doc(db, "admins/n1"), Object.assign({ email: "new@example.com", name: "New Admin", approvedBy: "a1", approvedAt: serverTimestamp() }, extraAdmin || {}));
+    batch.update(doc(db, "adminRequests/n1"), Object.assign({ status: "approved", decidedBy: "a1", decidedAt: serverTimestamp() }, extraRequest || {}));
+    return batch.commit();
+};
+
+await can("a new account sends its own admin request", () => setDoc(doc(asker(), "adminRequests/n1"), request()));
+await can("a confirmed account sends a request marked confirmed", () => setDoc(doc(asker(true), "adminRequests/n1"), request({ emailVerified: true })));
+await cannot("a request marked confirmed while the e-mail is not", () => setDoc(doc(asker(false), "adminRequests/n1"), request({ emailVerified: true })));
+await cannot("a request for someone else's account", () => setDoc(doc(askerOther(), "adminRequests/n1"), request()));
+await cannot("a request with another e-mail than the account's", () => setDoc(doc(asker(), "adminRequests/n1"), request({ email: "boss@example.com" })));
+await cannot("a request that is already approved", () => setDoc(doc(asker(), "adminRequests/n1"), request({ status: "approved" })));
+await cannot("a request with an extra field", () => setDoc(doc(asker(), "adminRequests/n1"), request({ role: "owner" })));
+await cannot("a request with a one-letter name", () => setDoc(doc(asker(), "adminRequests/n1"), request({ name: "A" })));
+await cannot("a request with a made-up time", () => setDoc(doc(asker(), "adminRequests/n1"), request({ createdAt: new Date(0) })));
+await cannot("nobody signed in sends a request", () => setDoc(doc(anon(), "adminRequests/n1"), request()));
+await cannot("an admin sends a request for themself", () => setDoc(doc(env.authenticatedContext("a1", { email: "new@example.com" }).firestore(), "adminRequests/a1"), request()));
+await canAfter("the owner reads their own request", seedRequest, () => getDoc(doc(asker(), "adminRequests/n1")));
+await cannotAfter("another account reads the request", seedRequest, () => getDoc(doc(askerOther(), "adminRequests/n1")));
+await cannotAfter("a plain user lists requests", seedRequest, () => getDocs(collection(asker(), "adminRequests")));
+await canAfter("an admin lists requests", seedRequest, () => getDocs(collection(adminDoc(), "adminRequests")));
+await canAfter("the owner marks the e-mail confirmed once it is", seedRequest, () => updateDoc(doc(asker(true), "adminRequests/n1"), { emailVerified: true }));
+await cannotAfter("the owner marks it confirmed while it is not", seedRequest, () => updateDoc(doc(asker(false), "adminRequests/n1"), { emailVerified: true }));
+await cannotAfter("the owner approves their own request", seedRequest, () => updateDoc(doc(asker(true), "adminRequests/n1"), { status: "approved" }));
+await cannotAfter("the owner adds themself to admins", () => seedRequest({ emailVerified: true }), () => setDoc(doc(asker(true), "admins/n1"), { email: "new@example.com", name: "New Admin", approvedBy: "n1", approvedAt: serverTimestamp() }));
+await canAfter("the owner withdraws their request", seedRequest, () => deleteDoc(doc(asker(), "adminRequests/n1")));
+await canAfter("an admin approves a confirmed request (admin added + request approved in one batch)", () => seedRequest({ emailVerified: true }), () => approve(adminDoc()));
+await cannotAfter("an admin approves a request whose e-mail is not confirmed", seedRequest, () => approve(adminDoc()));
+await cannotAfter("an admin adds an admin with no request", seed, () => setDoc(doc(adminDoc(), "admins/n1"), { email: "new@example.com", name: "New Admin", approvedBy: "a1", approvedAt: serverTimestamp() }));
+await cannotAfter("an admin adds an admin with another e-mail than the request", () => seedRequest({ emailVerified: true }), () => approve(adminDoc(), { email: "x@example.com" }));
+await cannotAfter("an approval in someone else's name", () => seedRequest({ emailVerified: true }), () => approve(adminDoc(), { approvedBy: "a9" }, { decidedBy: "a9" }));
+await cannotAfter("an admin marks a request approved without adding the admin", () => seedRequest({ emailVerified: true }), () => updateDoc(doc(adminDoc(), "adminRequests/n1"), { status: "approved", decidedBy: "a1", decidedAt: serverTimestamp() }));
+await cannotAfter("an approval of an already approved request", () => seedRequest({ emailVerified: true, status: "approved" }), () => approve(adminDoc()));
+await canAfter("an admin declines a request (deletes it)", seedRequest, () => deleteDoc(doc(adminDoc(), "adminRequests/n1")));
+await cannotAfter("a plain user deletes someone else's request", seedRequest, () => deleteDoc(doc(askerOther(), "adminRequests/n1")));
+await cannotAfter("an admin removes another admin from the website", seed, () => deleteDoc(doc(adminDoc(), "admins/a1")));
+await cannotAfter("a request when the account is already an admin", async () => { await seed(); await env.withSecurityRulesDisabled(async (c) => setDoc(doc(c.firestore(), "admins/n1"), { note: "x" })); }, () => setDoc(doc(asker(), "adminRequests/n1"), request()));
+
+// ---- User Management (20 November 2026): admins read every profile and change only the managed fields ----
+const seedUsers = async (extra) => {
+    await seed();
+    await env.withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore();
+        await setDoc(doc(db, "users/u2"), Object.assign({ fullName: "Other User", email: "other@example.com", skinType: "Dry", createdAt: Timestamp.now() }, extra || {}));
+        await setDoc(doc(db, "users/a1"), { fullName: "Admin Self", email: "admin@example.com" });
+    });
+};
+const bin = (extra) => Object.assign({ status: "deleted", inBin: true, statusBefore: "active", statusChangedAt: serverTimestamp(), statusChangedBy: "a1" }, extra || {});
+await canAfter("an admin reads another user's profile", seedUsers, () => getDoc(doc(adminDoc(), "users/u2")));
+await canAfter("an admin lists all users", seedUsers, () => getDocs(collection(adminDoc(), "users")));
+await cannotAfter("a plain user reads another user's profile", seedUsers, () => getDoc(doc(user(), "users/u2")));
+await cannotAfter("a plain user lists the users", seedUsers, () => getDocs(collection(user(), "users")));
+await cannotAfter("an admin reads a user's scans", seedUsers, () => getDoc(doc(adminDoc(), "users/u1/scans/s1")));
+await canAfter("an admin archives a user", seedUsers, () => updateDoc(doc(adminDoc(), "users/u2"), { status: "archived", inBin: false, statusChangedAt: serverTimestamp(), statusChangedBy: "a1" }));
+await canAfter("an admin moves a user to the Recycle Bin", seedUsers, () => updateDoc(doc(adminDoc(), "users/u2"), bin()));
+await canAfter("an admin edits name, username and role", seedUsers, () => updateDoc(doc(adminDoc(), "users/u2"), { fullName: "New Name", username: "newname", role: "admin" }));
+await cannotAfter("an admin changes a user's e-mail", seedUsers, () => updateDoc(doc(adminDoc(), "users/u2"), { email: "x@example.com" }));
+await cannotAfter("an admin changes a user's skin profile", seedUsers, () => updateDoc(doc(adminDoc(), "users/u2"), { skinType: "Oily" }));
+await cannotAfter("an admin sets an unknown status", seedUsers, () => updateDoc(doc(adminDoc(), "users/u2"), { status: "vip" }));
+await cannotAfter("an admin sets an unknown role", seedUsers, () => updateDoc(doc(adminDoc(), "users/u2"), { role: "owner" }));
+await cannotAfter("an admin records another admin as the one who changed it", seedUsers, () => updateDoc(doc(adminDoc(), "users/u2"), { status: "archived", statusChangedBy: "a9" }));
+await cannotAfter("an admin changes their own account here", seedUsers, () => updateDoc(doc(adminDoc(), "users/a1"), { status: "archived" }));
+await cannotAfter("an admin changes a user with a name 200 characters long", seedUsers, () => updateDoc(doc(adminDoc(), "users/u2"), { fullName: "x".repeat(200) }));
+await cannotAfter("a plain user changes another user", seedUsers, () => updateDoc(doc(other(), "users/u2"), { status: "archived" }));
+await canAfter("an admin deletes a user that is in the Recycle Bin", () => seedUsers(bin({ statusChangedAt: Timestamp.now() })), () => deleteDoc(doc(adminDoc(), "users/u2")));
+await cannotAfter("an admin deletes a user that is not in the Recycle Bin", seedUsers, () => deleteDoc(doc(adminDoc(), "users/u2")));
+await canAfter("a user still updates their own profile (the app's merge)", seedUsers, () => setDoc(doc(user(), "users/u1"), { skinType: "Oily", skinTone: "Medium" }, { merge: true }));
+await cannotAfter("a user sets their own status", seedUsers, () => setDoc(doc(user(), "users/u1"), { status: "active" }, { merge: true }));
+await cannotAfter("a user sets their own role", seedUsers, () => setDoc(doc(user(), "users/u1"), { role: "admin" }, { merge: true }));
+await cannotAfter("a user creates a profile that already carries a status", () => env.clearFirestore(), () => setDoc(doc(env.authenticatedContext("u7").firestore(), "users/u7"), { firstName: "New", status: "active" }));
+await canAfter("a user creates a plain profile", () => env.clearFirestore(), () => setDoc(doc(env.authenticatedContext("u7").firestore(), "users/u7"), { firstName: "New", email: "n@example.com" }));
+const banUser = async () => { await seedUsers(); await env.withSecurityRulesDisabled(async (c) => setDoc(doc(c.firestore(), "users/u1"), { firstName: "Test", status: "banned" })); };
+await cannotAfter("a banned user changes their own profile", banUser, () => setDoc(doc(user(), "users/u1"), { skinType: "Oily" }, { merge: true }));
+await canAfter("a banned user can still read their own profile", banUser, () => getDoc(doc(user(), "users/u1")));
+await cannotAfter("a banned user unbans themself", banUser, () => setDoc(doc(user(), "users/u1"), { status: "active" }, { merge: true }));
+await canAfter("an admin unbans a user", banUser, () => updateDoc(doc(adminDoc(), "users/u1"), { status: "active", inBin: false, statusChangedAt: serverTimestamp(), statusChangedBy: "a1" }));
+await canAfter("an admin saves the shared layout of the users page", seed, () => setDoc(doc(adminDoc(), "siteLayouts/users"), { layout: {}, appearance: {}, updatedAt: serverTimestamp(), updatedBy: "a1" }));
+
+// ---- New22 (20 November 2026): replies to users, announcements, Maintenance Mode ----
+const replyNote = (extra) => Object.assign({ kind: "reply", title: "Reply to your bug report", body: "Fixed in the next version.", reportId: "r1", read: false, createdAt: serverTimestamp(), createdBy: "a1" }, extra || {});
+await can("an admin sends a reply to a user", () => setDoc(doc(adminDoc(), "users/u1/notifications/n1"), replyNote()));
+await cannot("a plain user writes a notification to another user", () => setDoc(doc(other(), "users/u1/notifications/n1"), replyNote({ createdBy: "u2" })));
+await cannot("a user writes a notification to themself", () => setDoc(doc(user(), "users/u1/notifications/n1"), replyNote({ createdBy: "u1" })));
+await cannot("a reply 600 characters long", () => setDoc(doc(adminDoc(), "users/u1/notifications/n1"), replyNote({ body: "x".repeat(600) })));
+await cannot("a reply in another admin's name", () => setDoc(doc(adminDoc(), "users/u1/notifications/n1"), replyNote({ createdBy: "a9" })));
+const seedNote = async () => { await seed(); await env.withSecurityRulesDisabled(async (c) => setDoc(doc(c.firestore(), "users/u1/notifications/n1"), { kind: "reply", title: "t", body: "b", read: false, createdAt: Timestamp.now(), createdBy: "a1" })); };
+await canAfter("the user reads their notifications", seedNote, () => getDocs(collection(user(), "users/u1/notifications")));
+await canAfter("the user marks one read", seedNote, () => updateDoc(doc(user(), "users/u1/notifications/n1"), { read: true }));
+await cannotAfter("the user changes the text of one", seedNote, () => updateDoc(doc(user(), "users/u1/notifications/n1"), { body: "changed" }));
+await canAfter("the user deletes one", seedNote, () => deleteDoc(doc(user(), "users/u1/notifications/n1")));
+await cannotAfter("another user reads them", seedNote, () => getDocs(collection(other(), "users/u1/notifications")));
+const ann = (extra) => Object.assign({ kind: "maintenance", title: "Scheduled App Update", body: "We are updating the ingredient list.", startsAt: Timestamp.fromMillis(Date.now() + 3600e3), endsAt: Timestamp.fromMillis(Date.now() + 7200e3), createdAt: serverTimestamp(), createdBy: "a1" }, extra || {});
+await can("an admin posts an announcement", () => setDoc(doc(adminDoc(), "announcements/x1"), ann()));
+await cannot("a plain user posts an announcement", () => setDoc(doc(user(), "announcements/x1"), ann({ createdBy: "u1" })));
+await cannot("an announcement of an unknown kind", () => setDoc(doc(adminDoc(), "announcements/x1"), ann({ kind: "ad" })));
+await canAfter("a signed-in user reads announcements", seed, () => getDocs(collection(user(), "announcements")));
+await cannotAfter("nobody signed in reads announcements", seed, () => getDocs(collection(anon(), "announcements")));
+const mm = (extra) => Object.assign({ isActive: false, scheduledStart: null, scheduledEnd: null, bannerTitle: "Scheduled App Update", customMessage: "Back soon.", notifyUsers: false, notifiedAt: null, updatedBy: "a1", updatedAt: serverTimestamp() }, extra || {});
+await can("an admin saves Maintenance Mode", () => setDoc(doc(adminDoc(), "systemConfig/maintenanceMode"), mm()));
+await can("an admin switches maintenance on with an end time", () => setDoc(doc(adminDoc(), "systemConfig/maintenanceMode"), mm({ isActive: true, scheduledEnd: Timestamp.fromMillis(Date.now() + 3600e3) })));
+await cannot("a plain user switches maintenance off", () => setDoc(doc(user(), "systemConfig/maintenanceMode"), mm({ updatedBy: "u1" })));
+await cannot("maintenance with an extra field", () => setDoc(doc(adminDoc(), "systemConfig/maintenanceMode"), mm({ evil: true })));
+await cannot("a banner title over 80 characters", () => setDoc(doc(adminDoc(), "systemConfig/maintenanceMode"), mm({ bannerTitle: "x".repeat(81) })));
+await cannot("a message over 300 characters", () => setDoc(doc(adminDoc(), "systemConfig/maintenanceMode"), mm({ customMessage: "x".repeat(301) })));
+await cannot("an admin writes another systemConfig document", () => setDoc(doc(adminDoc(), "systemConfig/other"), mm()));
+await canAfter("anyone, even signed out, reads the maintenance state", async () => { await seed(); await env.withSecurityRulesDisabled(async (c) => setDoc(doc(c.firestore(), "systemConfig/maintenanceMode"), { isActive: false })); }, () => getDoc(doc(anon(), "systemConfig/maintenanceMode")));
+await cannotAfter("nobody lists systemConfig", seed, () => getDocs(collection(anon(), "systemConfig")));
+
+await canAfter("a user saves their profile photo", seedUsers, () => setDoc(doc(user(), "users/u1"), { photoData: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ==" }, { merge: true }));
+await cannotAfter("a profile photo that is not a JPEG", seedUsers, () => setDoc(doc(user(), "users/u1"), { photoData: "data:image/svg+xml;base64,PHN2Zz4=" }, { merge: true }));
+await cannotAfter("a profile photo over 200 KB", seedUsers, () => setDoc(doc(user(), "users/u1"), { photoData: "data:image/jpeg;base64," + "A".repeat(200100) }, { merge: true }));
+await cannotAfter("a user sets another user's photo", seedUsers, () => setDoc(doc(other(), "users/u1"), { photoData: "data:image/jpeg;base64,AAAA" }, { merge: true }));
 
 await env.cleanup();
 console.log(`checks made: ${checks}`);

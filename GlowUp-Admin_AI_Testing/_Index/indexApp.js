@@ -5,6 +5,7 @@ import { signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordRe
 import { DASHBOARD_PAGE, REQUIRE_ADMIN_RECORD, isAdmin } from "../_Shared/adminCommon.js";
 import { mountThemeToggle, hydrate, dialogFrame } from "../_Shared/adminShell.js";
 import { createLockout, mmss, LOCK_MS } from "./loginLockout.js";
+import { mountSignup, signupBusy, noteForRequest } from "./adminSignup.js";
 
 console.log("GlowUp Admin Login Portal Initialized.");
 
@@ -137,7 +138,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     onAuthStateChanged(auth, async (user) => {
-        if (!user || signingIn) return;
+        if (!user || signingIn || signupBusy()) return;
         if (REQUIRE_ADMIN_RECORD && !(await isAdmin(user))) { await signOut(auth); return; }
         window.location.replace(DASHBOARD_PAGE);
     });
@@ -158,8 +159,10 @@ document.addEventListener("DOMContentLoaded", () => {
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             if (REQUIRE_ADMIN_RECORD && !(await isAdmin(userCredential.user))) {
+                lockout.clear(email);                                    // the password was right
+                const note = await noteForRequest(userCredential.user);  // a pending admin request says where it stands
                 await signOut(auth);
-                throw { code: "glowup/not-admin" };
+                throw { code: "glowup/not-admin", note };
             }
             lockout.clear(email);
             console.log("Admin logged in successfully:", userCredential.user.email);
@@ -177,8 +180,19 @@ document.addEventListener("DOMContentLoaded", () => {
                     return;
                 }
             }
-            say(explain(error));
+            if (error && error.note) say(error.note, 10); else say(explain(error));
             validateForm();
+        }
+    });
+
+    // "Sign Up": the request for admin access (adminSignup.js). Back to log-in brings the e-mail along.
+    mountSignup({
+        lockout,
+        onBackToLogin: (email) => {
+            if (!email) return;
+            usernameInput.value = email;
+            validateForm();
+            passwordInput.focus({ preventScroll: true });
         }
     });
 });

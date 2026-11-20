@@ -41,7 +41,8 @@ namespace GlowUp.EditorTools
             new Step("Loading", LoadingSceneBuilder.Build),
             new Step("AI Scan Result", ScanResultSceneBuilder.Build),
             new Step("AR Try-On", ArTryOnSceneBuilder.Build),
-            new Step("Settings", SettingsSceneBuilder.Build)
+            new Step("Settings", SettingsSceneBuilder.Build),
+            new Step("Notifications", NotificationsSceneBuilder.Build)
         };
 
         [MenuItem("GlowUp/Build Scene/All Scenes", false, 90)]

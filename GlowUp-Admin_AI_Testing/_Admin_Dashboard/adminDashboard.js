@@ -13,7 +13,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 
-import { getDocs, updateDoc, writeBatch, onListsRefreshed, getCountFromServer, onSnapshot } from "../_Shared/adminStore.js";
+import { getDocs, updateDoc, deleteDoc, writeBatch, onListsRefreshed, getCountFromServer, onSnapshot } from "../_Shared/adminStore.js";
+import { openReplyDrawer } from "../_Shared/replyDrawer.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, escapeHtml, asArray, toWholeNumber, timeAgo, formatWhen, startOfTodayUnix,
     notify, describeError, toneBadge
@@ -514,9 +515,12 @@ function renderSupportKind(kind) {
                 <p class="report-from small muted">${senderHtml(r)}${r.appVersion ? " · app " + escapeHtml(r.appVersion) : ""}</p>
                 ${scan}
             </div>
-            <div class="suggestion-actions btn-group">
-                <button class="icon-btn small row-btn approve" data-action="handled" data-id="${escapeHtml(r.id)}" aria-label="Mark handled">${icon("check")}</button>
-                <button class="icon-btn small row-btn danger" data-action="dismissed" data-id="${escapeHtml(r.id)}" aria-label="Dismiss">${icon("x")}</button>
+            <div class="suggestion-actions report-actions">
+                <button class="btn small-btn reply-btn" data-action="reply" data-id="${escapeHtml(r.id)}"${r.uid ? "" : " disabled"}>${icon("left")}Reply</button>
+                <span class="btn-group">
+                    <button class="icon-btn small row-btn approve" data-action="handled" data-id="${escapeHtml(r.id)}" aria-label="Mark handled">${icon("check")}</button>
+                    <button class="icon-btn small row-btn danger" data-action="delete" data-id="${escapeHtml(r.id)}" aria-label="Delete the report">${icon("x")}</button>
+                </span>
             </div>
         </li>`;
     }).join("");
@@ -603,6 +607,28 @@ async function onSupportClick(event) {
     const button = event.target.closest("button[data-action]");
     if (!button) return;
     const id = button.getAttribute("data-id"), status = button.getAttribute("data-action");
+    const report = supportReports.find((r) => r.id === id);
+    // New22: Reply opens the panel on the right; X deletes the report for good (asks first)
+    if (status === "reply") {
+        if (report) openReplyDrawer(report, { onSent: () => { supportReports = supportReports.filter((r) => r.id !== id); renderSupportReports(); } });
+        return;
+    }
+    if (status === "delete") {
+        const sure = await askConfirm({ title: "Delete this report?", message: "The report is deleted for good. This cannot be undone.", items: report ? [report.message.slice(0, 120)] : [], confirmLabel: "Delete", danger: true, badgeIcon: "trash" });
+        if (!sure) return;
+        button.disabled = true;
+        try {
+            await deleteDoc(doc(db, "supportReports", id));
+            supportReports = supportReports.filter((r) => r.id !== id);
+            renderSupportReports();
+            notify("Report deleted.", "ok");
+        } catch (error) {
+            console.error("Error deleting support report: ", error);
+            notify("The report was not deleted. " + describeError(error), "error");
+            button.disabled = false;
+        }
+        return;
+    }
     button.disabled = true;
     try {
         await updateDoc(doc(db, "supportReports", id), { status, handledAt: serverTimestamp() });

@@ -55,6 +55,7 @@ import { parseLabeledProducts } from "../_Shared/ingredientBlock.js";
 import { nearShade } from "../_Shared/listRules.js";
 import { mountIngredientPicker } from "../_Shared/adminIngredientPicker.js";
 import { openFacets } from "../_Shared/adminFacets.js";
+import { attachCounters } from "../_Shared/charLimit.js";
 import { bindActions, bindButtons, comboFor } from "../_Shared/shortcuts.js";
 import { EXPORT_MAX_ROWS, EXPORT_FILE_PREFIX, toCsv, downloadCsv, today } from "../_Shared/adminExport.js";
 import { setPageSettings } from "../_Shared/adminSettingsMenu.js";
@@ -64,6 +65,7 @@ import { applyRole, brandPageOf, groupByType, bulkAllowed } from "../_Shared/sou
 import { gs1Hint, VERIFIED_BY_GS1 } from "../_Shared/gs1Hint.js";
 
 const OTHER_TYPE = "__other__";
+let paintCounters = () => { };              // character counters under the form fields (charLimit.js)
 const NO_BRAND = "__none__";
 const MAX_SHADES = 100;
 const SHADE_STRIP_FROM = 11;
@@ -169,6 +171,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     try { const saved = JSON.parse(localStorage.getItem(VIEW_KEY) || "{}"); if (saved.mode === "all") view.mode = "all"; if (SORTS.some((s) => s.id === saved.sort)) view.sort = saved.sort; } catch (error) {                   }
     registerData();
     mountShell("inventory");
+    paintCounters = attachCounters(["brandNameInput", "brandMarketInput", "productNameInput", "productTypeOtherInput", "productDescInput"]);
     placeInHeader(".search-container", "headerActions");
     wireSignOut();
     wireWebsiteAndGs1Buttons();
@@ -2297,6 +2300,7 @@ function openBrandForm(brand) {
     el("brandModalTitle").textContent = brand ? "Edit Brand" : "Add New Brand";
     el("brandNameInput").value = brand ? brand.name : "";
     el("brandMarketInput").value = brand ? brand.market : "Global";
+    paintCounters();
     // the suggestions also offer every market already used by a listed brand (for example "Philippines" from the FDA list)
     const marketList = el("brandMarketOptions");
     const offered = new Set([...marketList.options].map((o) => o.value.toLowerCase()));
@@ -2461,6 +2465,7 @@ function openProductForm(product, brandId) {
     el("productTypeOtherInput").value = known ? "" : type;
 
     el("productDescInput").value = product ? product.description : "";
+    paintCounters();
     el("productIngredientsInput").value = product ? product.ingredients.join(", ") : "";
     el("productImageInput").value = product ? product.imageUrl : "";
     el("productFdaInput").value = product ? product.fdaNumber : "";

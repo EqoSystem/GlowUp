@@ -76,6 +76,82 @@ namespace GlowUp.AppSettings
             }
 
             EnsureReportDocId();
+            AddLimitAndEmail();
+        }
+
+        // ---- New22 (20 November 2026): a character limit with a counter, and the support address that opens Gmail ----
+        /// <summary>The longest report a person can type. Long enough for steps to reproduce, short enough to read at a glance.</summary>
+        public const int ReportLimit = 500;
+        public const string SupportAddress = "GlowUpAdminSupport@gmail.com";
+        private TextMeshProUGUI counterText;
+
+        /// <summary>Adds the "n / 500" counter under the message box and the e-mail line under the toggle, made at run time from the
+        /// form's own status text so they share its font and colours (no scene rebuild needed).</summary>
+        private void AddLimitAndEmail()
+        {
+            if (maximumCharacters <= 0 || maximumCharacters > ReportLimit) maximumCharacters = ReportLimit;
+            if (messageInput == null) return;
+            messageInput.characterLimit = maximumCharacters;
+            TextMeshProUGUI style = feedbackText != null ? feedbackText : sendLabel;
+            if (style == null) return;
+
+            counterText = MakeLine("CharacterCounter", style, messageInput.transform, TextAlignmentOptions.Right);
+            messageInput.onValueChanged.AddListener(_ => PaintCounter());
+            PaintCounter();
+
+            Transform after = includeLastScanToggle != null ? includeLastScanToggle.transform : messageInput.transform;
+            TextMeshProUGUI email = MakeLine("SupportEmailLink", style, after, TextAlignmentOptions.Left);
+            email.text = "Or email us: <u>" + SupportAddress + "</u>";
+            email.raycastTarget = true;
+            var layout = email.gameObject.GetComponent<LayoutElement>() ?? email.gameObject.AddComponent<LayoutElement>();
+            layout.minHeight = Mathf.Max(layout.minHeight, 144f);         // 144 units = 48 dp at the 1080-wide layout
+            var button = email.gameObject.AddComponent<Button>();
+            button.targetGraphic = email;
+            button.onClick.AddListener(() => OpenSupportEmail(SupportAddress, "GlowUp support"));
+        }
+
+        private static TextMeshProUGUI MakeLine(string name, TextMeshProUGUI style, Transform after, TextAlignmentOptions align)
+        {
+            TextMeshProUGUI line = Instantiate(style, after.parent);
+            line.name = name;
+            line.gameObject.SetActive(true);
+            line.transform.SetSiblingIndex(after.GetSiblingIndex() + 1);
+            line.alignment = align;
+            line.fontSize = Mathf.Max(22f, style.fontSize * 0.85f);
+            line.enableWordWrapping = true;
+            line.raycastTarget = false;
+            line.text = "";
+            return line;
+        }
+
+        private void PaintCounter()
+        {
+            if (counterText == null || messageInput == null) return;
+            int n = messageInput.text != null ? messageInput.text.Length : 0;
+            counterText.text = n + " / " + maximumCharacters;
+        }
+
+        /// <summary>Opens Gmail's compose screen to the support address; any other mail app (or the chooser) when Gmail is missing.</summary>
+        public static void OpenSupportEmail(string address, string subject)
+        {
+            string mailto = "mailto:" + address + "?subject=" + Uri.EscapeDataString(subject ?? "");
+#if UNITY_ANDROID && !UNITY_EDITOR
+            try
+            {
+                using (var uriClass = new AndroidJavaClass("android.net.Uri"))
+                using (AndroidJavaObject uri = uriClass.CallStatic<AndroidJavaObject>("parse", mailto))
+                using (var intent = new AndroidJavaObject("android.content.Intent", "android.intent.action.SENDTO", uri))
+                using (var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer"))
+                using (AndroidJavaObject activity = player.GetStatic<AndroidJavaObject>("currentActivity"))
+                {
+                    intent.Call<AndroidJavaObject>("setPackage", "com.google.android.gm");
+                    activity.Call("startActivity", intent);
+                    return;
+                }
+            }
+            catch (Exception) { /* Gmail is not installed: fall back to the phone's own choice of mail app */ }
+#endif
+            Application.OpenURL(mailto);
         }
 
         void OnEnable()

@@ -146,7 +146,7 @@ function watchIdle() {
     }, 30 * 1000);
 }
 
-async function confirmSignOut() {
+export async function confirmSignOut() {
     const sure = await askConfirm({ title: "Sign out?", confirmLabel: "Sign out", danger: true, inline: true, confirmIcon: "logout", cancelIcon: "x" });
     if (!sure) return;
     remember(false);

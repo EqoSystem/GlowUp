@@ -50,6 +50,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/_Project/Scenes/SettingsScene.unity
     guid: 626872c3853c19f4f940fd38625af071
+  - enabled: 1
+    path: Assets/_Project/Scenes/NotificationsScene.unity
+    guid: f96e2fcba35513c428bb6a51c0ccef5d
   m_configObjects:
     UnityEditor.XR.ARCore.ARCoreSettings: {fileID: 11400000, guid: eb1f0a0e34d66804d89c996cc1ea6e43,
       type: 2}

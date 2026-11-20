@@ -75,3 +75,10 @@
 .support-scan { flex-basis: 100%; font-size: var(--fs-sm); }
 .support-scan summary { cursor: pointer; color: var(--text-2); }
 .support-scan p { margin: calc(4 * var(--u)) 0 0; overflow-wrap: anywhere; }
+
+/* New22 (20 Nov 2026): Reply + mark handled + delete under each report; narrow panels put them on their own row */
+.report-item .report-actions { align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.report-item .reply-btn { gap: calc(6 * var(--u)); padding: calc(5 * var(--u)) calc(10 * var(--u)); font-size: var(--fs-sm); min-height: calc(32 * var(--u)); }
+.report-item .reply-btn svg.ic { transform: scaleX(-1) rotate(180deg); }
+@media (pointer: coarse) { .report-item .reply-btn { min-height: calc(44 * var(--u)); } }
+@container panel (max-width: 420px) { .report-item { grid-template-columns: minmax(0, 1fr); } .report-item .report-actions { justify-content: flex-start; } }

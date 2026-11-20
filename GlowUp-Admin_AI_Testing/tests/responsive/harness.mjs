@@ -12,7 +12,8 @@ export const SITE = process.env.SITE || path.resolve(HERE, "../..");
 export const BASE = "http://glowup.test/";
 export const PAGES = {
     login: "_Index/index.html", dash: "_Admin_Dashboard/adminDashboard.html", inv: "_Admin_Brand_Inventory/adminBrandInventory.html",
-    cur: "_Admin_Ingredient_Curator/adminIngredientCurator.html", bin: "_Admin_Recycle_Bin/adminRecycleBin.html", arc: "_Admin_Archive/adminArchive.html"
+    cur: "_Admin_Ingredient_Curator/adminIngredientCurator.html", bin: "_Admin_Recycle_Bin/adminRecycleBin.html", arc: "_Admin_Archive/adminArchive.html",
+    users: "_Admin_User_Management/adminUserManagement.html"
 };
 const TYPES = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".png": "image/png", ".jpg": "image/jpeg", ".webp": "image/webp", ".svg": "image/svg+xml", ".json": "application/json", ".mp3": "audio/mpeg", ".wav": "audio/wav", ".ico": "image/x-icon", ".woff2": "font/woff2" };
 const auditSrc = fs.readFileSync(path.join(HERE, "audit.js"), "utf8");

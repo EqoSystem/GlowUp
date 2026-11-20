@@ -107,10 +107,20 @@ function run(target) {
 export async function getDocs(target) { await wait(LAT()); return run(target); }
 export async function getDoc(ref) { await wait(LAT()); return snapDoc(ref.path, store.get(ref.path)); }
 export async function getCountFromServer(target) { await wait(LAT()); const r = run(target); return { data: () => ({ count: r.size }) }; }
+// Live like Firestore: every listener answers once, then again after each committed write (window.__NOTIFY() after
+// a test changes window.__STORE by hand). window.__SNAP_ERROR = a code makes new listeners fail with it.
+const liveListeners = new Set();
+const answer = (l) => { if (l.target.type === "doc") l.next(snapDoc(l.target.path, store.get(l.target.path))); else l.next(run(l.target)); };
+function notifyAll() { liveListeners.forEach((l) => { try { answer(l); } catch (e) { } }); }
+window.__NOTIFY = notifyAll;
+window.__LIVE = () => liveListeners.size;
 export function onSnapshot(target, next, fail) {
-    let live = true;
-    setTimeout(() => { if (!live) return; if (target.type === "doc") next(snapDoc(target.path, store.get(target.path))); else next(run(target)); }, LAT());
-    return () => { live = false; };
+    const l = { target, next };
+    setTimeout(() => {
+        if (window.__SNAP_ERROR) { if (fail) fail(Object.assign(new Error("pretend"), { code: window.__SNAP_ERROR })); return; }
+        liveListeners.add(l); answer(l);
+    }, LAT());
+    return () => { liveListeners.delete(l); };
 }
 function applyWrite(path, data, merge) {
     const old = merge ? Object.assign({}, store.get(path) || {}) : {};
@@ -130,7 +140,7 @@ export function writeBatch() {
             ops.push(() => applyWrite(ref.path, data, true)); return b;
         },
         delete(ref) { ops.push(() => store.delete(ref.path)); return b; },
-        async commit() { await wait(LAT()); if (window.__FAIL_WRITES) throw Object.assign(new Error("pretend failure"), { code: window.__FAIL_WRITES }); ops.forEach((f) => f()); }
+        async commit() { await wait(LAT()); if (window.__FAIL_WRITES) throw Object.assign(new Error("pretend failure"), { code: window.__FAIL_WRITES }); ops.forEach((f) => f()); window.__WRITES = (window.__WRITES || 0) + 1; setTimeout(notifyAll, 0); }
     };
     return b;
 }

@@ -69,6 +69,20 @@ namespace GlowUp.Dashboard
         [SerializeField] private TextMeshProUGUI accountEmailText;
         [SerializeField] private Button signOutButton;
 
+        [Header("Account pop-up: photo and full skin profile (New22, 20 November 2026)")]
+        [Tooltip("The round picture in the pop-up: a tap asks first, then opens the phone's photo picker")]
+        [SerializeField] private Button accountAvatarButton;
+        [Tooltip("Every skin answer, also those not in the Quick Summary (skin concerns)")]
+        [SerializeField] private TextMeshProUGUI skinProfileText;
+        [Tooltip("Opens the saved answers for editing (sign-up Steps 1 to 5, filled in; Save edits returns here)")]
+        [SerializeField] private Button editSkinProfileButton;
+        [SerializeField] private string photoTitle = "Choose a profile photo?";
+        [SerializeField] private string photoMessage = "GlowUp opens your phone's photo picker. Only the photo you choose is shared with the app. It is shown on your account and to the GlowUp team.";
+        [SerializeField] private string photoConfirm = "Choose photo";
+        [SerializeField] private string photoSaved = "Profile photo updated.";
+        [SerializeField] private string photoFailed = "The photo could not be used. Try another one.";
+        [SerializeField] private string photoUnavailable = "This phone has no photo picker GlowUp can open.";
+
         [Header("Log out: asked first (the same question as on the Settings page)")]
         [SerializeField] private GlowUp.AppSettings.ConfirmDialog signOutConfirm;
         [SerializeField] private string signOutTitle = "Log out?";
@@ -98,6 +112,46 @@ namespace GlowUp.Dashboard
             if (avatarButton != null) avatarButton.onClick.AddListener(() => { if (accountPanel != null) accountPanel.Show(); });
             if (signOutButton != null) signOutButton.onClick.AddListener(AskSignOut);
             if (settingsButton != null) settingsButton.onClick.AddListener(() => SceneNavigator.Go(settingsScene));
+            if (accountAvatarButton != null) accountAvatarButton.onClick.AddListener(AskPhoto);
+            if (editSkinProfileButton != null) editSkinProfileButton.onClick.AddListener(EditSkinProfile);
+            GlowUp.AppSettings.ProfilePhoto.Changed += ShowPhoto;
+            ShowPhoto();
+        }
+
+        void OnDestroy() { GlowUp.AppSettings.ProfilePhoto.Changed -= ShowPhoto; }
+
+        void ShowPhoto()
+        {
+            if (avatarButton != null) GlowUp.AppSettings.ProfilePhoto.Apply(avatarButton.targetGraphic);
+            if (accountAvatarButton != null) GlowUp.AppSettings.ProfilePhoto.Apply(accountAvatarButton.targetGraphic);
+        }
+
+        void AskPhoto()
+        {
+            if (signOutConfirm == null) { PickPhoto(); return; }
+            signOutConfirm.Ask(photoTitle, photoMessage, photoConfirm, PickPhoto);
+        }
+
+        void PickPhoto()
+        {
+            GlowUp.AppSettings.ProfilePhoto.Choose((ok, reason) =>
+            {
+                if (this == null || reason == "cancelled") return;
+                FormalToast toast = FormalToast.OnScreen(transform, greetingText);
+                if (toast == null) return;
+                if (ok) toast.Show(FormalToast.Kind.Success, photoSaved);
+                else toast.Show(FormalToast.Kind.Error, reason == "no-picker" ? photoUnavailable : photoFailed);
+            });
+        }
+
+        // the saved answers open in sign-up Steps 1 to 5 (email and password locked); "Save edits" writes them and comes back here,
+        // and the Quick Summary, this pop-up and the admins' User Management page all show the new answers (live)
+        void EditSkinProfile()
+        {
+            if (accountPanel != null) accountPanel.Hide();
+            if (profile == null) { GlowUp.Onboarding.OnboardingSession.BeginRetake(SceneNames.Dashboard); SceneNavigator.Go(SceneNames.Onboarding2); return; }
+            GlowUp.Onboarding.OnboardingSession.BeginRetakeWith(profile, SceneNames.Dashboard);
+            SceneNavigator.Go(SceneNames.Onboarding1);
         }
 
         async void Start()
@@ -166,6 +220,14 @@ namespace GlowUp.Dashboard
                 accountNameText.text = string.IsNullOrWhiteSpace(full) ? name : full;
             }
             if (accountEmailText != null) accountEmailText.text = p != null ? p.email : "";
+            if (skinProfileText != null)
+            {
+                string List(List<string> items, string none) => items != null && items.Count > 0 ? string.Join(", ", items) : none;
+                skinProfileText.text = "<b>Skin type:</b> " + (p != null && !string.IsNullOrWhiteSpace(p.skinType) ? p.skinType : notSet)
+                    + "\n<b>Skin tone:</b> " + (p != null && !string.IsNullOrWhiteSpace(p.skinTone) ? p.skinTone : notSet)
+                    + "\n<b>Skin concerns:</b> " + List(p?.skinConditions, "None")
+                    + "\n<b>Allergens:</b> " + List(p?.knownAllergens, noAllergens);
+            }
         }
 
         static void Set(TextMeshProUGUI label, string value) { if (label != null) label.text = value; }

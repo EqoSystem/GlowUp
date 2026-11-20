@@ -24,6 +24,7 @@ try {
                 const header = document.querySelector(".topbar");
                 const controls = header.querySelector(".topbar-controls");
                 const gear = header.querySelector(".quick-gear");
+                const account = header.querySelector("#accountBtn") || gear;      // the profile button is the rightmost header control (20 Nov 2026)
                 const first = controls.querySelector(":scope > :not(.topbar-tools)") || controls.querySelector(".topbar-tools > :not(.quick-gear)");
                 const board = document.querySelector(".board");
                 const card = board.querySelector(":scope > .panel:not([hidden])");
@@ -62,6 +63,7 @@ try {
                     firstControl: rect(first),
                     card: rect(card),
                     gear: rect(gear),
+                    account: rect(account),
                     contentRight: boardRect.right - parseFloat(styles.paddingRight),
                     h1Count: document.querySelectorAll("main.main-content > h1.sr-only").length,
                     menuIdCount: document.querySelectorAll("#menuBtn").length,
@@ -93,7 +95,7 @@ try {
             if (state !== "collapsed") {
                 ok(m.longestLabel.whiteSpace === "nowrap" && m.longestLabel.scrollWidth <= m.longestLabel.clientWidth, `${label}: longest nav label fits without wrapping or truncation`);
             }
-            ok(Math.abs(m.gear.right - m.contentRight) <= 1, `${label}: gear aligns to the content right edge`);
+            ok(Math.abs(m.account.right - m.contentRight) <= 1, `${label}: the rightmost header control (profile) aligns to the content right edge`);
             ok(Math.abs(m.gear.centerY - m.menu.centerY) <= 1, `${label}: gear shares the header centerline`);
         }
         ok(errors.length === 0, `${key}: no page errors ${errors.join("; ")}`);
