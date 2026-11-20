@@ -21,6 +21,8 @@ namespace GlowUp.Common
         RectTransform root;
         CanvasGroup rootGroup;
         TextMeshProUGUI titleLabel, messageLabel;
+        Image tickBadge, cardBackground, okFill;
+        TextMeshProUGUI okLabel;
         Button okButton, backdropButton;
         float shownAt = -100f, autoCloseAt = float.MaxValue;
         bool open;
@@ -101,6 +103,18 @@ namespace GlowUp.Common
             // borrow font from any existing TMP text in canvasRoot so typography matches the app
             TMP_FontAsset font = canvasRoot.GetComponentInChildren<TextMeshProUGUI>(true)?.font;
 
+            // 22 Nov 2026: a round tick above the title for "it went through" messages (ShowDone), like the website's "Reply sent!"
+            GameObject tickRow = new GameObject("TickRow", typeof(RectTransform), typeof(LayoutElement));
+            tickRow.transform.SetParent(cardRt, false);
+            tickRow.GetComponent<LayoutElement>().preferredHeight = 120f;
+            popup.tickBadge = RuntimeUiKit.Box(tickRow.transform, "Tick", Color.white, false);
+            popup.tickBadge.sprite = RuntimeIcons.Circle;
+            RectTransform tickRt = popup.tickBadge.rectTransform;
+            tickRt.anchorMin = tickRt.anchorMax = tickRt.pivot = new Vector2(0.5f, 0.5f); tickRt.sizeDelta = new Vector2(120f, 120f);
+            RuntimeUiKit.Icon(tickRt, "Icon", RuntimeIcons.Tick, Color.white, 64f);
+            tickRow.SetActive(false);
+            popup.cardBackground = cardBg;
+
             // title
             popup.titleLabel = MakeLabel(cardRt, "Title", "", 48, FontStyles.Bold, font);
             popup.titleLabel.alignment = TextAlignmentOptions.Center;
@@ -120,11 +134,13 @@ namespace GlowUp.Common
             popup.okButton = btnGo.GetComponent<Button>();
             popup.okButton.targetGraphic = btnBg;
             popup.okButton.onClick.AddListener(() => popup.TryClose());
+            popup.okFill = btnBg;
 
             TextMeshProUGUI btnLabel = MakeLabel(btnGo.GetComponent<RectTransform>(), "Label", "OK", 36, FontStyles.Bold, font);
             btnLabel.alignment = TextAlignmentOptions.Center;
             btnLabel.color = new Color32(36, 26, 28, 255);   // same as ConfirmDialog normalText
             Stretch(btnLabel.rectTransform);
+            popup.okLabel = btnLabel;
 
             layerGo.SetActive(false);
             return popup;
@@ -159,8 +175,17 @@ namespace GlowUp.Common
         /// Shows the centered popup. `autoCloseSeconds` <= 0 means no auto-close.
         /// `closed` is called when the popup hides (by OK, backdrop tap, or auto-close).
         /// </summary>
+        /// <summary>The same popup with a round tick on top: for something that went through (a report sent).</summary>
+        public void ShowDone(string title, string message, string okText = "Okay", Action closed = null)
+        {
+            Show(title, message, okText, 0f, closed);
+            if (tickBadge != null) tickBadge.transform.parent.gameObject.SetActive(true);
+        }
+
         public void Show(string title, string message, string okText = "OK", float autoCloseSeconds = 0f, Action closed = null)
         {
+            if (tickBadge != null) tickBadge.transform.parent.gameObject.SetActive(false);
+            Paint();
             if (titleLabel != null) titleLabel.text = title ?? "";
             if (messageLabel != null) messageLabel.text = message ?? "";
             if (okButton != null)
@@ -175,6 +200,19 @@ namespace GlowUp.Common
             gameObject.SetActive(true);
             root.SetAsLastSibling();
             if (rootGroup != null) { rootGroup.alpha = 0f; rootGroup.blocksRaycasts = true; rootGroup.interactable = true; }
+        }
+
+        // the theme's colours (light and dark), read each time it opens
+        void Paint()
+        {
+            var p = RuntimeTheme.Palette;
+            if (p == null) return;
+            if (cardBackground != null) cardBackground.color = p.surface;
+            if (titleLabel != null) titleLabel.color = p.heading;
+            if (messageLabel != null) messageLabel.color = p.mainText;
+            if (okFill != null) okFill.color = p.buttonFill;
+            if (okLabel != null) okLabel.color = GlowUp.Theme.ContrastInk.On(p.buttonFill);
+            if (tickBadge != null) { tickBadge.color = p.buttonFill; var mark = tickBadge.transform.Find("Icon")?.GetComponent<Image>(); if (mark != null) mark.color = GlowUp.Theme.ContrastInk.On(p.buttonFill); }
         }
 
         public void Hide()

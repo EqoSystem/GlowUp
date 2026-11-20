@@ -46,6 +46,8 @@ namespace GlowUp.AppSettings
         [SerializeField] private string msgSuccess = "Report sent. Thank you for helping us improve GlowUp.";
         [Tooltip("The green toast shown low on the screen after a report is sent")]
         [SerializeField] private string msgSentToast = "Report Sent!";
+        [SerializeField] private string msgSentTitle = "Report sent!";
+        [SerializeField] private string msgSentDone = "Thank you. Your report went straight to the GlowUp team. Their reply will appear in your Notifications.";
         [SerializeField] private string msgValidation = "Please choose a category and describe what happened.";
         [SerializeField] private string msgFailure = "We couldn't send your report. Please try again.";
         [SerializeField] private string msgTimeout = "No connection right now. Your report will be sent when you're back online.";
@@ -368,9 +370,10 @@ namespace GlowUp.AppSettings
                         currentReportDocId = null; // Generate a fresh ID for the next report
                         if (panel != null && panel.IsOpen) panel.Hide();
                     }
-                    ScreenNotice toast = Application.isFocused ? ScreenNotice.On(transform, sendLabel != null ? sendLabel : feedbackText) : null;
-                    if (toast != null) { ClearForm(); toast.ShowBottom(msgSentToast); }
-                    else ShowCenteredPopup("Success", msgSuccess, "OK", autoCloseSuccessSeconds, onClosed: ClearForm);
+                    // 22 Nov 2026 (owner): a centred "Report sent!" with a tick and Okay, the same as the website's "Reply sent!"
+                    ClearForm();
+                    if (Application.isFocused && Popup != null) Popup.ShowDone(msgSentTitle, msgSentDone, "Okay");
+                    else ShowCenteredPopup(msgSentTitle, msgSentDone, "Okay", 0f);
                 }
             }
             catch (Exception ex)

@@ -40,19 +40,6 @@
         <script src="../_Shared/pageFrame.js"></script>
 
         <div data-header-parts hidden>
-                    <div class="segmented header-tabs" id="binTabs" role="tablist" aria-label="What to show">
-                        <button type="button" class="seg" role="tab" data-kind="ingredients"><i data-icon="flask"></i>Ingredients <span class="tab-count" id="countIngredients"></span></button>
-                        <button type="button" class="seg" role="tab" data-kind="brands"><i data-icon="tag"></i>Brands <span class="tab-count" id="countBrands"></span></button>
-                        <button type="button" class="seg" role="tab" data-kind="products"><i data-icon="lipstick"></i>Products <span class="tab-count" id="countProducts"></span></button>
-                    </div>
-                    <div class="search-container">
-                        <i data-icon="search"></i>
-                        <input type="text" placeholder="Search the Recycle bin" class="search-input" id="binSearchInput" autocomplete="off" aria-label="Search the Recycle bin">
-                        <button type="button" class="search-clear" id="binSearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
-                    </div>
-                    <div data-header-end>
-                        <a class="btn" id="archiveLink" href="../_Admin_Archive/adminArchive.html" data-tip-title="Archive" data-tip="What left the Recycle bin. It is kept 30 days, then deleted for good."><i data-icon="archive"></i>Archive</a>
-                    </div>
         </div>
         <div class="board">
 
@@ -65,6 +52,20 @@
                     <span class="spacer"></span>
 
                     <div class="pager" id="binPagerTop" data-head-end></div>
+                </div>
+                <div class="list-toolbar">
+                    <div class="segmented list-tabs" id="binTabs" role="tablist" aria-label="What to show">
+                        <button type="button" class="seg" role="tab" data-kind="ingredients"><i data-icon="flask"></i>Ingredients <span class="tab-count" id="countIngredients"></span></button>
+                        <button type="button" class="seg" role="tab" data-kind="brands"><i data-icon="tag"></i>Brands <span class="tab-count" id="countBrands"></span></button>
+                        <button type="button" class="seg" role="tab" data-kind="products"><i data-icon="lipstick"></i>Products <span class="tab-count" id="countProducts"></span></button>
+                        <button type="button" class="seg" role="tab" data-kind="users"><i data-icon="user"></i>Users <span class="tab-count" id="countUsers"></span></button>
+                    </div>
+                    <div class="search-container">
+                        <i data-icon="search"></i>
+                        <input type="text" placeholder="Search the Recycle bin" class="search-input" id="binSearchInput" autocomplete="off" aria-label="Search the Recycle bin">
+                        <button type="button" class="search-clear" id="binSearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
+                    </div>
+                    <div class="list-toolbar-end"><a class="btn" id="archiveLink" href="../_Admin_Archive/adminArchive.html" data-tip-title="Archive" data-tip="What left the Recycle bin. It is kept 30 days, then deleted for good."><i data-icon="archive"></i>Archive</a></div>
                 </div>
 
                 <div class="w-bar sel-bar" id="binBar" hidden>

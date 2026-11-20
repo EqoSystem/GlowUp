@@ -13,15 +13,17 @@
 
 
 import { db } from "../_Database/firebase-console.js";
-import { collection, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getDocs, writeBatch, onListsRefreshed } from "../_Shared/adminStore.js";
+import { auth } from "../_Database/firebase-console.js";
+import { collection, doc, serverTimestamp, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { writeBatch, onSnapshot } from "../_Shared/adminStore.js";
+import { normalizeUser, statusPatch, restoreTarget, statusLabel } from "../_Shared/userRules.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, escapeHtml, sameKey, asArray, toDate, timeAgo, formatWhen, notify, describeError,
     statusBadge, statusGuide, normalizeStatus, STATUSES, wireSearch, dialogIsOpen
 } from "../_Shared/adminCommon.js";
 import { matchesSearch } from "../_Shared/glowupRules.js";
 import { moveToArchive, KEEP_DAYS } from "../_Shared/adminArchive.js";
-import { mountShell, placeHeaderParts, paginate, renderPager, icon, BIN_ICON, askConfirm, hydrate, setBinCount, addRefreshDataButton } from "../_Shared/adminShell.js";
+import { mountShell, placeHeaderParts, paginate, renderPager, icon, BIN_ICON, askConfirm, hydrate, setBinCount } from "../_Shared/adminShell.js";
 import { bindButtons } from "../_Shared/shortcuts.js";
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 
@@ -31,10 +33,11 @@ const BATCH_LIMIT = 400;
 const KINDS = {
     ingredients: { title: "Removed ingredients", one: "ingredient", more: "ingredients" },
     brands: { title: "Removed brands", one: "brand", more: "brands" },
-    products: { title: "Removed products", one: "product", more: "products" }
+    products: { title: "Removed products", one: "product", more: "products" },
+    users: { title: "Removed users", one: "user", more: "users" }
 };
 
-const all = { ingredients: [], brands: [], products: [] };
+const all = { ingredients: [], brands: [], products: [], users: [] };
 let kind = "ingredients";
 let loaded = false;
 const picked = new Set();
@@ -52,7 +55,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     mountShell("bin");
     bindButtons({ "bin.restore": "#restoreSelectedBtn", "bin.archive": "#archiveSelectedBtn", "bin.delete": "#deleteSelectedBtn" });
 
-    addRefreshDataButton(placeHeaderParts());
+    placeHeaderParts();                                          // (no Refresh button: the lists are live)
     wireSignOut();
     setupNavigationGuard();
     el("binStatusGuide").innerHTML = statusGuide();
@@ -79,30 +82,41 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("archiveSelectedBtn").addEventListener("click", () => archive(binned().filter((x) => picked.has(x.id))));
     el("clearSelectedBtn").addEventListener("click", () => { picked.clear(); render(); });
 
-    onListsRefreshed(() => { if (!dialogIsOpen()) load(); });
     load();
+    window.addEventListener("pagehide", stopListening);
+    window.addEventListener("pageshow", (event) => { if (event.persisted) load(); });
 });
 
 
 
 
-async function load() {
-    try {
-        const [ingredients, brands, products] = await Promise.all([
-            getDocs(collection(db, "ingredients")), getDocs(collection(db, "brands")), getDocs(collection(db, "products"))
-        ]);
-        const read = (snapshot) => snapshot.docs.map((d) => {
-            const data = d.data(), since = toDate(data.binnedAt);
-            return Object.assign({}, data, { id: d.id, binned: data.binned === true, binnedAt: since ? since.getTime() : 0, raw: data });
+// Live lists (22 Nov 2026): one listener per list, so a removal on another page or by another admin shows here at once.
+let stops = [];
+const answered = new Set();
+function stopListening() { stops.forEach((stop) => stop()); stops = []; answered.clear(); }
+function failed(error) {
+    console.error("Error loading the Recycle bin: ", error);
+    el("binTableBody").innerHTML = `<tr><td colspan="6" class="table-message error">Could not load the Recycle bin. ${escapeHtml(describeError(error))} <button type="button" class="btn" id="binRetry">Try again</button></td></tr>`;
+    el("binRetry").addEventListener("click", load);
+}
+function load() {
+    stopListening();
+    const read = (snapshot) => snapshot.docs.map((d) => {
+        const data = d.data(), since = toDate(data.binnedAt);
+        return Object.assign({}, data, { id: d.id, binned: data.binned === true, binnedAt: since ? since.getTime() : 0, raw: data });
+    });
+    const arrive = (name) => { answered.add(name); loaded = answered.size === 4; if (loaded && !dialogIsOpen()) render(); };
+    ["ingredients", "brands", "products"].forEach((name) => {
+        stops.push(onSnapshot(collection(db, name), (snapshot) => { all[name] = read(snapshot); arrive(name); }, failed));
+    });
+    // users removed on User Management (status "deleted", inBin true): the same rows, restored to the status they had
+    stops.push(onSnapshot(query(collection(db, "users"), where("inBin", "==", true)), (snapshot) => {
+        all.users = snapshot.docs.map((d) => {
+            const u = normalizeUser(d.id, d.data());
+            return Object.assign({}, u, { id: d.id, binned: u.status === "deleted", binnedAt: u.changedAt, binnedReason: "Deleted on User Management.", raw: d.data(), user: u });
         });
-        all.ingredients = read(ingredients); all.brands = read(brands); all.products = read(products);
-        loaded = true;
-        render();
-    } catch (error) {
-        console.error("Error loading the Recycle bin: ", error);
-        el("binTableBody").innerHTML = `<tr><td colspan="6" class="table-message error">Could not load the Recycle bin. ${escapeHtml(describeError(error))} <button type="button" class="btn" id="binRetry">Try again</button></td></tr>`;
-        el("binRetry").addEventListener("click", load);
-    }
+        arrive("users");
+    }, failed));
 }
 
 
@@ -117,7 +131,7 @@ const ridersOf = (brand) => all.products.filter((p) => p.binned && p.binnedWith 
 function shownEntries() {
     const typed = el("binSearchInput").value;
     return binned()
-        .filter((x) => matchesSearch(typed, [nameOf(x), x.techName, x.brandName, x.cosmeticType, x.binnedReason].concat(asArray(x.aliases))))
+        .filter((x) => matchesSearch(typed, [nameOf(x), x.techName, x.brandName, x.cosmeticType, x.binnedReason, x.email, x.username].concat(asArray(x.aliases))))
         .sort((a, b) => (b.binnedAt || 0) - (a.binnedAt || 0) || nameOf(a).localeCompare(nameOf(b)));
 }
 
@@ -144,6 +158,9 @@ function render() {
     el("countIngredients").textContent = binned("ingredients").length || "";
     el("countBrands").textContent = binned("brands").length || "";
     el("countProducts").textContent = binned("products").length || "";
+    el("countUsers").textContent = binned("users").length || "";
+    const userTab = kind === "users";
+    el("archiveSelectedBtn").hidden = userTab;                     // users are not archived: restore or delete
     setBinCount();
 
     const inBin = binned(), shown = shownEntries();
@@ -179,7 +196,8 @@ function rowOf(x) {
     if (kind === "ingredients" && x.techName) sub = x.techName;
     if (kind === "products") sub = [x.brandName || (brandOf(x) ? nameOf(brandOf(x), "brands") : ""), x.cosmeticType].filter((part) => part).join(" · ");
     if (kind === "brands") { const riders = ridersOf(x).length; sub = riders > 0 ? `${many(riders, "product was", "products were")} removed with it` : ""; }
-    const before = kind === "ingredients" ? `<span class="muted">–</span>` : statusBadge(STATUSES.includes(normalizeStatus(x.statusBeforeBin)) ? normalizeStatus(x.statusBeforeBin) : "Active");
+    if (kind === "users") sub = [x.username ? "@" + x.username : "", x.email].filter(Boolean).join(" · ");
+    const before = kind === "ingredients" ? `<span class="muted">–</span>` : kind === "users" ? `<span class="status-badge user-${escapeHtml(restoreTarget(x.user))}">${escapeHtml(statusLabel(restoreTarget(x.user)))}</span>` : statusBadge(STATUSES.includes(normalizeStatus(x.statusBeforeBin)) ? normalizeStatus(x.statusBeforeBin) : "Active");
     const why = whyOf(x);
     return `
         <tr class="${isPicked ? "is-picked" : ""}" data-id="${escapeHtml(x.id)}">
@@ -190,7 +208,7 @@ function rowOf(x) {
             <td>${before}</td>
             <td><div class="row-actions">
                 <button type="button" class="row-btn main" data-act="restore" data-tip="Brings it back with the status it had.">${icon("undo")}Restore</button>
-                <button type="button" class="row-btn" data-act="archive" data-tip="Moves it to the Archive: kept ${KEEP_DAYS} days, then deleted. It can be restored until then.">${icon("archive")}Archive</button>
+                ${kind === "users" ? "" : `<button type="button" class="row-btn" data-act="archive" data-tip="Moves it to the Archive: kept ${KEEP_DAYS} days, then deleted. It can be restored until then.">${icon("archive")}Archive</button>`}
                 <button type="button" class="row-btn danger" data-act="delete" data-tip="Takes it out of the database for good. It asks first, and saves a copy to your computer.">${BIN_ICON}Delete permanently</button>
             </div></td>
         </tr>`;
@@ -243,7 +261,7 @@ async function archive(entries) {
         notify("Nothing was moved to the Archive. " + describeError(error), "error");
     }
     picked.clear();
-    await load();
+    render();
 }
 
 
@@ -263,8 +281,23 @@ async function runBatches(ops) {
 
 
 
+async function restoreUsers(entries) {
+    const me = auth.currentUser ? auth.currentUser.uid : "";
+    try {
+        const batch = writeBatch(db);
+        entries.forEach((x) => batch.update(doc(db, "users", x.id), statusPatch(x.user, restoreTarget(x.user), serverTimestamp(), me)));
+        await batch.commit();
+        notify(`${entries.length === 1 ? `"${nameOf(entries[0])}"` : many(entries.length, "user", "users")} restored: back on User Management with the status they had.`, "ok");
+    } catch (error) {
+        console.error("Error restoring users: ", error);
+        notify("Not everything was restored. " + describeError(error), "error");
+    }
+    picked.clear();
+}
+
 async function restore(entries) {
     if (entries.length === 0) return;
+    if (kind === "users") return restoreUsers(entries);
     const ops = [], seen = new Set();
     let riders = 0, brandsToo = 0;
     const statusOf = (x) => (STATUSES.includes(normalizeStatus(x.statusBeforeBin)) ? normalizeStatus(x.statusBeforeBin) : "Active");
@@ -293,7 +326,7 @@ async function restore(entries) {
         notify("Not everything was restored. " + describeError(error), "error");
     }
     picked.clear();
-    await load();
+    render();
 }
 
 
@@ -320,8 +353,27 @@ function saveCopy(documents) {
 
 
 
+async function purgeUsers(entries) {
+    const sure = await askConfirm({
+        title: `Delete permanently: ${many(entries.length, "user", "users")}?`,
+        message: "Their GlowUp profile (skin profile, settings, photo) is taken out of the database. Their sign-in account is not removed by this. This cannot be undone. A copy is saved to your computer first.",
+        items: entries.map((x) => nameOf(x) + (x.email ? " (" + x.email + ")" : "")), confirmLabel: "Delete permanently", danger: true
+    });
+    if (!sure) return;
+    if (!saveCopy(entries.map((x) => ({ collection: "users", id: x.id, data: x.raw }))) && !(await askConfirm({ title: "The copy could not be saved", message: "Delete anyway, without a copy?", confirmLabel: "Delete without a copy", danger: true }))) return;
+    try {
+        await runBatches(entries.map((x) => ({ ref: doc(db, "users", x.id) })));
+        notify(`${many(entries.length, "user", "users")} deleted for good. A copy is in your Downloads folder.`, "ok");
+    } catch (error) {
+        console.error("Error deleting users: ", error);
+        notify("Not everything was deleted. " + describeError(error), "error");
+    }
+    picked.clear();
+}
+
 async function purge(entries) {
     if (entries.length === 0) return;
+    if (kind === "users") return purgeUsers(entries);
     const refs = new Map(), copies = [], names = [];
     const take = (x, listName) => {
         const key = listName + "/" + x.id;
@@ -362,5 +414,5 @@ async function purge(entries) {
         notify("Not everything was deleted. " + describeError(error), "error");
     }
     picked.clear();
-    await load();
+    render();
 }

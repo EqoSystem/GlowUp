@@ -27,7 +27,7 @@ import { collection, doc, serverTimestamp, deleteField } from "https://www.gstat
 import { refreshRecommendabilityFlags } from "../_Shared/recommendabilityAdmin.js";
 // reading and writing go through the site's own copy of its lists: a list is downloaded once and kept between pages,
 // and after a change only the documents that were written are read again (see adminStore.js)
-import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed } from "../_Shared/adminStore.js";
+import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed, onSnapshot } from "../_Shared/adminStore.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
     notify, describeError, setBusy, setFormError, renderChecks, readChecks, writeChecks, originLabel, sourceLinks, assistSourceLinks, sourceGuideHtml, wireSearch,
@@ -89,6 +89,9 @@ let productUseKnown = false;
 let editingIngredientId = null;
 let modal = null;
 let sourceUi = null;
+let curatorLiveStops = [];
+let curatorLiveReady = new Set();
+let curatorLiveRefresh = false;
 
 function paintSourceCount() {
     const chip = el("ingredientSourceCount");
@@ -309,11 +312,31 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const askedFor = new URLSearchParams(window.location.search);
     loadIngredients().then(() => {
+        startCuratorLive();
         if (askedFor.get("add") === "1") openIngredientForm(null);
         else if (askedFor.get("cleanup") === "1") openCleanUp();
         else if (askedFor.get("duplicates") === "1") openDuplicates();
     });
+    window.addEventListener("pagehide", stopCuratorLive);
+    window.addEventListener("pageshow", (event) => { if (event.persisted) startCuratorLive(); });
 });
+
+// The curator stat cards follow the ingredient and product collections in real time.
+function stopCuratorLive() {
+    curatorLiveStops.forEach((stop) => stop());
+    curatorLiveStops = [];
+    curatorLiveReady = new Set();
+}
+
+function startCuratorLive() {
+    stopCuratorLive();
+    ["ingredients", "products"].forEach((name) => curatorLiveStops.push(onSnapshot(collection(db, name), () => {
+        curatorLiveReady.add(name);
+        if (curatorLiveReady.size < 2 || curatorLiveRefresh || dialogIsOpen()) return;
+        curatorLiveRefresh = true;
+        loadIngredients().finally(() => { curatorLiveRefresh = false; });
+    }, (error) => console.error(`Error watching ${name} for curator cards: `, error)));
+}
 
 function fromFirstPage() { pageState.page = 1; renderIngredients(); }
 
@@ -1954,7 +1977,7 @@ function registerData() {
             { id: "origin", label: "Where it came from", of: (i) => originLabel(i.source) || "Origin not recorded" },
             { id: "review", label: "Checked or not", of: (i) => (needsReview(i) ? "Waiting for review" : "Checked"), keys: ["Waiting for review", "Checked"], tone: (k) => (k === "Checked" ? "ok" : "info"), pick: (k) => narrow(k === "Checked" ? "" : "review", "") },
             { id: "allergen", label: "Allergen family", of: (i) => i.allergenTags.map((t) => labelOf(allOptions("allergens"), t)), none: "No allergen family" },
-            { id: "avoid", label: "Skin condition to avoid it", of: (i) => i.avoidForConditions.map((t) => labelOf(allOptions("conditions"), t)), none: "None" },
+            { id: "avoid", label: "Chronic skin condition to avoid it", of: (i) => i.avoidForConditions.map((t) => labelOf(allOptions("conditions"), t)), none: "None" },
             { id: "skin", label: "Skin type to avoid it", of: (i) => i.avoidForSkinTypes.map((t) => labelOf(SKIN_TYPES, t)), none: "None" },
             { id: "used", label: "Used in a listed product", of: (i) => (usedInProducts(i) > 0 ? "In a listed product" : "Not in any product"), keys: ["In a listed product", "Not in any product"] },
             { id: "folder", label: "Folder", of: (i) => i.folder || null, none: "No folder", pick: (k) => org.show(k === "No folder" ? { kind: "all" } : { kind: "folder", name: k }) }

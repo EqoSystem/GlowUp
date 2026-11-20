@@ -6,6 +6,9 @@ import { DASHBOARD_PAGE, REQUIRE_ADMIN_RECORD, isAdmin } from "../_Shared/adminC
 import { mountThemeToggle, hydrate, dialogFrame } from "../_Shared/adminShell.js";
 import { createLockout, mmss, LOCK_MS } from "./loginLockout.js";
 import { mountSignup, signupBusy, noteForRequest } from "./adminSignup.js";
+import { mountAuthAction } from "./authAction.js";
+import { icon } from "../_Shared/adminShell.js";
+import { attachCounters } from "../_Shared/charLimit.js";
 
 console.log("GlowUp Admin Login Portal Initialized.");
 
@@ -17,6 +20,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const loginForm = document.getElementById("login-form");
     const usernameInput = document.getElementById("username");
     const passwordInput = document.getElementById("password");
+    attachCounters(["username", "password"]);
     const loginBtn = document.getElementById("loginBtn");
     const message = document.getElementById("loginMessage");
     let signingIn = false;
@@ -127,6 +131,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }));
 
 
+    // a link from a Firebase e-mail (reset password, confirm e-mail): its own panels on this page (authAction.js)
+    const actionActive = mountAuthAction({
+        onBackToLogin: (email) => { if (email) { usernameInput.value = email; validateForm(); passwordInput.focus({ preventScroll: true }); } else usernameInput.focus({ preventScroll: true }); },
+        openResetDialog: (email) => openResetDialog({ typed: email, onSent: (sentTo) => { usernameInput.value = sentTo; validateForm(); }, onClosed: () => usernameInput.focus() })
+    });
+
     if (new URLSearchParams(window.location.search).get("denied")) say(NOT_ADMIN);
     if (new URLSearchParams(window.location.search).get("idle")) {
 
@@ -138,7 +148,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
     onAuthStateChanged(auth, async (user) => {
-        if (!user || signingIn || signupBusy()) return;
+        if (!user || signingIn || signupBusy() || (actionActive && document.getElementById("actionView"))) return;
         if (REQUIRE_ADMIN_RECORD && !(await isAdmin(user))) { await signOut(auth); return; }
         window.location.replace(DASHBOARD_PAGE);
     });
@@ -253,6 +263,9 @@ function openResetDialog({ typed, onSent, onClosed }) {
     heading.id = "resetTitle";
     frame.box.setAttribute("aria-labelledby", "resetTitle");
 
+    const lock = document.createElement("span");
+    lock.className = "reset-badge"; lock.setAttribute("aria-hidden", "true"); lock.innerHTML = icon("lock");
+    heading.before(lock);
     const intro = document.createElement("p");
     intro.className = "modal-intro";
     intro.textContent = "Enter the email of your admin account. We will send it a link to choose a new password.";
@@ -269,6 +282,9 @@ function openResetDialog({ typed, onSent, onClosed }) {
     input.value = EMAIL_SHAPE.test(typed || "") ? typed : "";
     label.htmlFor = input.id;
     field.append(label, input);
+    const note = document.createElement("p");
+    note.className = "reset-note";
+    note.textContent = "The link works once and expires after one hour.";
     const problem = document.createElement("p");
     problem.className = "form-error";
     problem.setAttribute("role", "alert");
@@ -277,9 +293,9 @@ function openResetDialog({ typed, onSent, onClosed }) {
     const cancel = document.createElement("button");
     cancel.type = "button"; cancel.className = "cancel-btn"; cancel.textContent = "Cancel";
     const send = document.createElement("button");
-    send.type = "submit"; send.className = "save-btn"; send.textContent = "Send link";
+    send.type = "submit"; send.className = "save-btn"; send.innerHTML = icon("send"); send.append(" Send Reset Link");
     actions.append(cancel, send);
-    form.append(field, problem, actions);
+    form.append(field, note, problem, actions);
     frame.box.append(intro, form);
 
     const showProblem = (text) => { problem.textContent = text || ""; problem.style.display = text ? "block" : "none"; };
@@ -324,7 +340,7 @@ function openResetDialog({ typed, onSent, onClosed }) {
             showProblem(resetProblem(error));
         } finally {
             sending = false;
-            if (!sent && !closed) { send.disabled = false; send.textContent = "Send link"; input.readOnly = false; }
+            if (!sent && !closed) { send.disabled = false; send.innerHTML = icon("send"); send.append(" Send Reset Link"); input.readOnly = false; }
         }
     });
 

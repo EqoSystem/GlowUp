@@ -35,49 +35,29 @@
 
         <script src="../_Shared/pageFrame.js"></script>
 
-        <div data-header-parts hidden>
-            <div class="segmented header-tabs" id="userTabs" role="tablist" aria-label="Which users to show">
-                <button type="button" class="seg" role="tab" data-tab="all">All Users <span class="tab-count" id="tabAll"></span></button>
-                <button type="button" class="seg" role="tab" data-tab="active">Active <span class="tab-count" id="tabActive"></span></button>
-                <button type="button" class="seg" role="tab" data-tab="archived">Archived <span class="tab-count" id="tabArchived"></span></button>
-                <button type="button" class="seg" role="tab" data-tab="bin">Recycle Bin <span class="tab-count" id="tabBin"></span></button>
-            </div>
-            <div class="search-container">
-                <i data-icon="search"></i>
-                <input type="text" placeholder="Search by name, email or UID" class="search-input" id="userSearchInput" autocomplete="off" aria-label="Search users by name, email or UID">
-                <button type="button" class="search-clear" id="userSearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
-            </div>
-        </div>
-
         <div class="board">
-
-            <section class="panel bare" data-panel="heading" data-label="Heading" data-w="12" data-no-fold>
-                <div class="um-heading">
-                    <span class="um-heading-icon"><i data-icon="user"></i></span>
-                    <div class="um-heading-text">
-                        <h2 class="um-title">User Management</h2>
-                        <p class="um-subtitle">Manage all registered users of GlowUp.</p>
-                    </div>
-                </div>
-            </section>
 
             <section class="panel bare" data-panel="numbers" data-label="Numbers" data-w="12">
                 <div class="kpi-row um-kpis" id="userKpis">
                     <div class="kpi" id="kpiAll" role="button" tabindex="0" data-tab="all">
-                        <span class="kpi-icon"><i data-icon="user"></i></span>
                         <span class="kpi-text"><span class="kpi-value skeleton" id="kpiAllValue">00</span><span class="kpi-title">Total Users</span><span class="kpi-delta" id="kpiAllWeek"></span></span>
+                        <span class="kpi-icon" aria-hidden="true"><i data-icon="user"></i></span>
+                    </div>
+                    <div class="kpi" id="kpiOnline" role="button" tabindex="0" data-tab="online">
+                        <span class="kpi-text"><span class="kpi-value skeleton" id="kpiOnlineValue">00</span><span class="kpi-title">Online Now</span><span class="kpi-delta" id="kpiOnlineWeek"></span></span>
+                        <span class="kpi-icon" aria-hidden="true"><i data-icon="activity"></i></span>
                     </div>
                     <div class="kpi" id="kpiActive" role="button" tabindex="0" data-tab="active">
-                        <span class="kpi-icon"><i data-icon="check"></i></span>
                         <span class="kpi-text"><span class="kpi-value skeleton" id="kpiActiveValue">00</span><span class="kpi-title">Active Users</span><span class="kpi-delta" id="kpiActiveWeek"></span></span>
+                        <span class="kpi-icon" aria-hidden="true"><i data-icon="check"></i></span>
                     </div>
                     <div class="kpi" id="kpiArchived" role="button" tabindex="0" data-tab="archived">
-                        <span class="kpi-icon"><i data-icon="archive"></i></span>
                         <span class="kpi-text"><span class="kpi-value skeleton" id="kpiArchivedValue">00</span><span class="kpi-title">Archived Users</span><span class="kpi-delta" id="kpiArchivedWeek"></span></span>
+                        <span class="kpi-icon" aria-hidden="true"><i data-icon="archive"></i></span>
                     </div>
                     <div class="kpi" id="kpiBin" role="button" tabindex="0" data-tab="bin">
-                        <span class="kpi-icon"><i data-icon="trash"></i></span>
                         <span class="kpi-text"><span class="kpi-value skeleton" id="kpiBinValue">00</span><span class="kpi-title">In Recycle Bin</span><span class="kpi-delta" id="kpiBinWeek"></span></span>
+                        <span class="kpi-icon" aria-hidden="true"><i data-icon="trash"></i></span>
                     </div>
                 </div>
             </section>
@@ -88,6 +68,11 @@
                     <h3 class="panel-title" id="userTitle">All Users</h3>
                     <span class="panel-count" id="userCountLine"></span>
                     <span class="spacer"></span>
+                    <div class="search-container um-search">
+                        <i data-icon="search"></i>
+                        <input type="text" placeholder="Search by name, email or UID" class="search-input" id="userSearchInput" autocomplete="off" aria-label="Search users by name, email or UID">
+                        <button type="button" class="search-clear" id="userSearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
+                    </div>
                     <div class="um-tools">
                         <button type="button" class="btn" id="userFilterBtn" aria-haspopup="dialog" aria-expanded="false"><i data-icon="sliders"></i><span class="um-btn-text">Filter</span></button>
                         <button type="button" class="btn" id="userExportBtn"><i data-icon="download"></i><span class="um-btn-text">Export</span></button>
@@ -107,7 +92,7 @@
                 <div class="table-container">
                     <table class="admin-table user-table">
                         <thead>
-                            <tr><th class="pick-col"></th><th>User</th><th>Email</th><th>Role</th><th>Status</th><th>Joined At</th><th>Last Active</th><th class="um-actions-head">Actions</th></tr>
+                            <tr><th class="pick-col"></th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th>Joined At</th><th>Last Active</th><th class="um-actions-head">Actions</th></tr>
                         </thead>
                         <tbody id="userTableBody">
                             <tr><td colspan="8"><div class="sk-list"><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div><div class="sk-line-row"><i class="sk sk-dot"></i><span><i class="sk sk-text w60"></i><i class="sk sk-text w35 thin"></i></span><i class="sk sk-pill"></i></div></div></td></tr>

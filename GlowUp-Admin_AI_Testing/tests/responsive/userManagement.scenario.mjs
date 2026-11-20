@@ -19,7 +19,7 @@ const seedUsers = () => {
         u2: { fullName: "Ben Cruz", username: "ben", email: "ben@example.com", createdAt: ts(20 * day), status: "archived", statusChangedAt: ts(1 * day), role: "admin" },
         u3: { fullName: "Cara Lim", username: "cara", email: "cara@example.com", createdAt: ts(40 * day), status: "banned" },
         u4: { fullName: "Dee Park", email: "dee@example.com", createdAt: ts(30 * day), inBin: true, status: "deleted", statusBefore: "archived", statusChangedAt: ts(3 * day) },
-        u5: { fullName: "Eve Stone", email: "eve@example.com", createdAt: ts(3 * day) }
+        u5: { fullName: "Eve Stone", email: "eve@example.com", createdAt: ts(3 * day), lastActiveAt: ts(60 * 1000) }
     };
     for (let i = 6; i <= 17; i++) U["u" + i] = { fullName: "Person " + String(i).padStart(2, "0"), username: "p" + i, email: `p${i}@example.com`, createdAt: ts((50 + i) * day) };
     window.__SEED.users = U;
@@ -35,17 +35,25 @@ try {
 
         // sidebar
         const nav = await page.evaluate(() => [...document.querySelectorAll("#sidebarNav a")].map((a) => ({ label: a.getAttribute("aria-label"), active: a.classList.contains("active"), href: a.getAttribute("href") })));
-        ok(JSON.stringify(nav.map((n) => n.label)) === JSON.stringify(["Dashboard", "Brand & Product Inventory", "User Management", "Ingredient Curator"]), `sidebar order ${JSON.stringify(nav.map((n) => n.label))}`);
+        ok(JSON.stringify(nav.map((n) => n.label)) === JSON.stringify(["Dashboard", "User Management", "Brand & Product Inventory", "Ingredient Curator"]), `sidebar order ${JSON.stringify(nav.map((n) => n.label))}`);
         ok(nav.find((n) => n.label === "User Management").active, "User Management is the active link");
         ok(await page.evaluate(() => { const links = [...document.querySelectorAll("#sidebarNav a")]; const a = links[2], b = links[1]; const sa = getComputedStyle(a), sb = getComputedStyle(b); return sa.fontSize === sb.fontSize && a.getBoundingClientRect().height === b.getBoundingClientRect().height && a.querySelector("svg") && a.querySelector("svg").getBoundingClientRect().width === b.querySelector("svg").getBoundingClientRect().width; }), "the new sidebar item has the size of its neighbours");
-        ok((await text(page, ".um-title")) === "User Management" && /Manage all registered users of GlowUp\./.test(await text(page, ".um-subtitle")), "title and subtitle");
+        ok(!(await page.$(".um-title")) && !(await page.$("#userTabs")), "one page title (the header) and no header tabs: the cards are the filters");
+        ok(await page.evaluate(() => !!document.querySelector("[data-panel=list] .panel-head #userSearchInput")), "the search sits inside the Users container");
+        ok(/Username/.test(await text(page, ".user-table thead")), "the first column is called Username");
 
         // cards, tabs: one listener
         const val = (n) => text(page, `#kpi${n}Value`), week = (n) => text(page, `#kpi${n}Week`);
         ok(await val("All") === "18" && await val("Active") === "15" && await val("Archived") === "1" && await val("Bin") === "1", `cards ${await val("All")}/${await val("Active")}/${await val("Archived")}/${await val("Bin")}`);
         ok(await week("All") === "+2 this week", `total delta ${await week("All")}`);
         ok(await week("Archived") === "+1 this week" && await week("Bin") === "+1 this week", "archived / bin deltas use the status change time");
-        ok(await text(page, "#tabAll") === "18" && await text(page, "#tabBin") === "1", "tab counts");
+        ok(await val("Online") === "1", `Online now counts a user active in the last 5 minutes (${await val("Online")})`);
+        await page.click("#kpiOnline"); await page.waitForTimeout(150);
+        ok(JSON.stringify(await rowsOf(page)) === JSON.stringify(["u5"]) && /Online Now/.test(await text(page, "#userTitle")) && await page.getAttribute("#kpiOnline", "aria-pressed") === "true", "the Online card lists who is online");
+        await page.evaluate(() => { const d = window.__STORE.get("users/u5"); window.__STORE.set("users/u5", Object.assign({}, d, { lastActiveAt: { __ts: Date.now() - 10 * 60 * 1000 } })); window.__NOTIFY(); });
+        await page.waitForTimeout(150);
+        ok(await page.isVisible("#userEmpty") && await text(page, "#userEmptyMessage") === "No users are online.", "the Online tab has a safe empty state");
+        await page.click("#kpiAll"); await page.waitForTimeout(150);
         const liveBefore = await page.evaluate(() => window.__LIVE());
         ok(await page.evaluate(() => !document.querySelector(".kpi-value.skeleton")), "the skeleton leaves the numbers once data is in");
 
@@ -69,16 +77,16 @@ try {
         await page.click('#userPager [data-go="-1"]');
 
         // tabs
-        await page.click('#userTabs [data-tab="archived"]');
+        await page.click('#userKpis [data-tab="archived"]');
         ok(JSON.stringify(await rowsOf(page)) === '["u2"]' && /Archived Users/.test(await text(page, "#userTitle")), "Archived tab shows only archived users");
         ok(await page.evaluate(() => [...document.querySelectorAll('tr[data-uid="u2"] [data-act]')].map((b) => b.dataset.act).join() === "view,restore,bin"), "archived rows: View, Restore, Delete");
-        await page.click('#userTabs [data-tab="bin"]');
+        await page.click('#userKpis [data-tab="bin"]');
         ok(JSON.stringify(await rowsOf(page)) === '["u4"]' && await page.evaluate(() => [...document.querySelectorAll('tr[data-uid="u4"] [data-act]')].map((b) => b.dataset.act).join() === "view,restore,purge"), "bin rows: View, Restore, Delete permanently");
-        await page.click('#userTabs [data-tab="active"]');
+        await page.click('#userKpis [data-tab="active"]');
         ok(!(await rowsOf(page)).includes("u3") && !(await rowsOf(page)).includes("u2"), "Active tab leaves out banned, archived and binned users");
         await page.click("#kpiBin");
         ok(JSON.stringify(await rowsOf(page)) === '["u4"]', "a card opens its tab");
-        await page.click('#userTabs [data-tab="all"]');
+        await page.click('#userKpis [data-tab="all"]');
 
         // search is client side
         await page.fill("#userSearchInput", "ben@exa"); await settleUi(page, 300);
@@ -175,7 +183,7 @@ try {
         await page.waitForTimeout(250);
         const eveBin = await doc(page, "users/u5");
         ok(eveBin.status === "deleted" && eveBin.inBin === true && eveBin.statusBefore === "archived", "moved to the bin, remembering where it was");
-        await page.click('#userTabs [data-tab="bin"]');
+        await page.click('#userKpis [data-tab="bin"]');
         await page.click('tr[data-uid="u5"] [data-act="restore"]');
         await page.click(".modal-content .save-btn");
         await page.waitForTimeout(250);
@@ -194,7 +202,7 @@ try {
         ok(await text(page, "#userEmptyMessage") === "The Recycle Bin is empty." && await page.isVisible("#userEmpty"), "an empty bin gets its empty state");
 
         // unban
-        await page.click('#userTabs [data-tab="all"]');
+        await page.click('#userKpis [data-tab="all"]');
         await page.click('tr[data-uid="u3"] [data-act="unban"]');
         ok(/Unban User/.test(await text(page, ".modal-content h3")), "Unban asks first");
         await page.click(".modal-content .save-btn");
@@ -259,7 +267,7 @@ try {
         const faults = await check(page);
         ok(faults.length === 0, `${tag}: layout faults: ${faults.join(" | ")}`);
         const kp = await page.evaluate(() => { const r = [...document.querySelectorAll("#userKpis .kpi")].map((k) => k.getBoundingClientRect()); return { n: r.length, within: r.every((b) => b.left >= -0.5 && b.right <= document.documentElement.clientWidth + 0.5) }; });
-        ok(kp.n === 4 && kp.within, `${tag}: four cards, all inside the window`);
+        ok(kp.n === 5 && kp.within, `${tag}: five cards, all inside the window`);
         ok((await rowsOf(page)).length === 10, `${tag}: the table lists users`);
         const actionsIn = await page.evaluate(() => { const c = document.querySelector(".table-container"), b = document.querySelector('tr[data-uid="u1"] .um-actions').getBoundingClientRect(), cr = c.getBoundingClientRect(); return b.right <= cr.right + 1 || c.scrollWidth > c.clientWidth; });
         ok(actionsIn, `${tag}: the actions are reachable`);

@@ -135,7 +135,7 @@ namespace GlowUp.EditorTools
             GameObject matrix = Section(content, "CompatibilityCard", "How it matches you");
             CompatibilityIndicator skinType = A.Indicator(matrix.transform, "SkinTypeIndicator", "Skin type", true, BodySize, SmallSize, 64);
             CompatibilityIndicator allergens = A.Indicator(matrix.transform, "AllergensIndicator", "Allergens", true, BodySize, SmallSize, 64);
-            CompatibilityIndicator concerns = A.Indicator(matrix.transform, "ConcernsIndicator", "Skin concerns", true, BodySize, SmallSize, 64);
+            CompatibilityIndicator concerns = A.Indicator(matrix.transform, "ConcernsIndicator", "Chronic skin condition", true, BodySize, SmallSize, 64);
             CompatibilityIndicator age = A.Indicator(matrix.transform, "AgeIndicator", "Age", true, BodySize, SmallSize, 64);
 
             // 3. key ingredients (tap a chip for its details)

@@ -1,6 +1,6 @@
 
 const LAT = () => (window.__LAT && window.__LAT.auth) || 0;
-const USER = { uid: "admin1", email: "admin@example.test", getIdToken: async () => "test-token", getIdTokenResult: async () => ({ claims: { admin: true } }) };
+const USER = { uid: "admin1", email: "admin@example.test", metadata: { lastSignInTime: "Sat, 21 Nov 2026 06:10:00 GMT" }, getIdToken: async () => "test-token", getIdTokenResult: async () => ({ claims: { admin: true } }) };
 const auth = { currentUser: null };
 const listeners = new Set();
 export const getAuth = () => auth;
@@ -53,3 +53,24 @@ export async function sendEmailVerification(user, settings) {
 }
 export async function updateProfile(user, profile) { user.displayName = profile.displayName; }
 export async function reload(user) { if (window.__VERIFIED) user.emailVerified = true; }
+// Edit Profile (22 Nov 2026): the current password is checked against window.__PASSWORD (default "Passw0rd!")
+export const EmailAuthProvider = { credential: (email, password) => ({ email, password }) };
+export async function reauthenticateWithCredential(user, credential) {
+    if (credential.password !== (window.__PASSWORD || "Passw0rd!")) { const e = new Error("wrong"); e.code = "auth/invalid-credential"; throw e; }
+    return { user };
+}
+export async function updatePassword(user, password) { window.__PASSWORD = password; window.__PASSWORD_CHANGED = (window.__PASSWORD_CHANGED || 0) + 1; }
+// e-mail link actions (authAction.js): window.__OOB = { code: email } holds the codes that still work
+export async function verifyPasswordResetCode(a, code) {
+    const email = window.__OOB && window.__OOB[code];
+    if (!email) { const e = new Error("bad"); e.code = "auth/invalid-action-code"; throw e; }
+    return email;
+}
+export async function confirmPasswordReset(a, code, password) {
+    if (!window.__OOB || !window.__OOB[code]) { const e = new Error("bad"); e.code = "auth/expired-action-code"; throw e; }
+    window.__RESET_TO = password; delete window.__OOB[code];
+}
+export async function applyActionCode(a, code) {
+    if (!window.__OOB || !window.__OOB[code]) { const e = new Error("bad"); e.code = "auth/invalid-action-code"; throw e; }
+    delete window.__OOB[code];
+}

@@ -32,7 +32,7 @@ import { auth } from "../_Database/firebase-console.js";
 import { collection, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 
-import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed } from "../_Shared/adminStore.js";
+import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed, onSnapshot } from "../_Shared/adminStore.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
     statusBadge, toneBadge, statusGuide, normalizeStatus, notify, describeError, setBusy, setFormError, originLabel, sourceLinks, assistSourceLinks, sourceGuideHtml, COSMETIC_TYPES, STATUSES,
@@ -80,6 +80,9 @@ const VIEW_KEY = "glowup.inventory.view.v1";
 
 const AUTO_ADD_FDA_CATALOGUE = false;
 let catalogueChecked = false;
+let inventoryLiveStops = [];
+let inventoryLiveReady = new Set();
+let inventoryLiveRefresh = false;
 
 
 const AUTO_APPROVE_FDA = true;
@@ -360,10 +363,32 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     onListsRefreshed(() => { if (!dialogIsOpen()) loadInventory(); });
     const firstLoad = loadInventory();
+    firstLoad.then(startInventoryLive);
+    window.addEventListener("pagehide", stopInventoryLive);
+    window.addEventListener("pageshow", (event) => { if (event.persisted) startInventoryLive(); });
 
 
     if (new URLSearchParams(location.search).get("add") === "product") firstLoad.then(() => openProductForm(null));
 });
+
+// Keep every inventory stat card tied to live Firestore data. The table is refreshed from
+// the same snapshots' change notifications, so another admin's edit appears without a manual refresh.
+function stopInventoryLive() {
+    inventoryLiveStops.forEach((stop) => stop());
+    inventoryLiveStops = [];
+    inventoryLiveReady = new Set();
+}
+
+function startInventoryLive() {
+    stopInventoryLive();
+    const watch = (name) => inventoryLiveStops.push(onSnapshot(collection(db, name), () => {
+        inventoryLiveReady.add(name);
+        if (inventoryLiveReady.size < 4 || inventoryLiveRefresh || dialogIsOpen()) return;
+        inventoryLiveRefresh = true;
+        loadInventory().finally(() => { inventoryLiveRefresh = false; });
+    }, (error) => console.error(`Error watching ${name} for inventory cards: `, error)));
+    ["brands", "products", "ingredients", "productIngredientSuggestions"].forEach(watch);
+}
 
 const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) {                      } };
 function fromFirstPage() { pageState.page = 1; flatPage.page = 1; binPage.page = 1; brandPage.page = 1; renderInventory(); }

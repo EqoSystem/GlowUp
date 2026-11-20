@@ -38,20 +38,6 @@
         <script src="../_Shared/pageFrame.js"></script>
 
         <div data-header-parts hidden>
-                    <div class="segmented header-tabs" id="archiveTabs" role="tablist" aria-label="What to show">
-                        <button type="button" class="seg" role="tab" data-kind="ingredients"><i data-icon="flask"></i>Ingredients <span class="tab-count" id="countIngredients"></span></button>
-                        <button type="button" class="seg" role="tab" data-kind="brands"><i data-icon="tag"></i>Brands <span class="tab-count" id="countBrands"></span></button>
-                        <button type="button" class="seg" role="tab" data-kind="products"><i data-icon="lipstick"></i>Products <span class="tab-count" id="countProducts"></span></button>
-                    </div>
-                    <div class="search-container">
-                        <i data-icon="search"></i>
-                        <input type="text" placeholder="Search the Archive" class="search-input" id="archiveSearchInput" autocomplete="off" aria-label="Search the Archive">
-                        <button type="button" class="search-clear" id="archiveSearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
-                    </div>
-                    <div data-header-end>
-                        <a class="btn" href="../_Admin_Recycle_Bin/adminRecycleBin.html" data-tip="Back to the Recycle bin."><i data-icon="trash"></i>Recycle bin</a>
-                    <button type="button" class="guide-badge" data-tip-title="How the Archive works" data-tip="Entries moved here from the Recycle bin are kept 30 days, counted from the day they were archived, then a daily job on the server deletes them for good. Restore puts an entry back in the Recycle bin as it was. Delete now removes it at once, after a copy is saved to your computer.">i</button>
-                    </div>
         </div>
         <div class="board">
 
@@ -63,6 +49,20 @@
                     <span class="panel-count" id="archiveCountLine"></span>
                     <span class="spacer"></span>
                     <div class="pager" id="archivePagerTop"></div>
+                </div>
+                <div class="list-toolbar">
+                    <div class="segmented list-tabs" id="archiveTabs" role="tablist" aria-label="What to show">
+                        <button type="button" class="seg" role="tab" data-kind="ingredients"><i data-icon="flask"></i>Ingredients <span class="tab-count" id="countIngredients"></span></button>
+                        <button type="button" class="seg" role="tab" data-kind="brands"><i data-icon="tag"></i>Brands <span class="tab-count" id="countBrands"></span></button>
+                        <button type="button" class="seg" role="tab" data-kind="products"><i data-icon="lipstick"></i>Products <span class="tab-count" id="countProducts"></span></button>
+                        <button type="button" class="seg" role="tab" data-kind="supportReports"><i data-icon="inbox"></i>Reports <span class="tab-count" id="countReports"></span></button>
+                    </div>
+                    <div class="search-container">
+                        <i data-icon="search"></i>
+                        <input type="text" placeholder="Search the Archive" class="search-input" id="archiveSearchInput" autocomplete="off" aria-label="Search the Archive">
+                        <button type="button" class="search-clear" id="archiveSearchClear" aria-label="Clear the search" hidden><i data-icon="x"></i></button>
+                    </div>
+                    <div class="list-toolbar-end"><a class="btn" href="../_Admin_Recycle_Bin/adminRecycleBin.html" data-tip="Back to the Recycle bin."><i data-icon="trash"></i>Recycle bin</a> <button type="button" class="guide-badge" data-tip-title="How the Archive works" data-tip="Entries moved here from the Recycle bin are kept 30 days, counted from the day they were archived, then a daily job on the server deletes them for good. Restore puts an entry back in the Recycle bin as it was. Delete now removes it at once, after a copy is saved to your computer.">i</button></div>
                 </div>
 
                 <div class="w-bar sel-bar" id="archiveBar" hidden>

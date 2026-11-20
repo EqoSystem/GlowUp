@@ -18,7 +18,7 @@ import { BUILT_IN, MAX_ITEMS, MAX_LABEL, normalizeLists, cleanItem, slugId, chec
 
 export const KINDS = {
     allergens: { title: "Allergen families", one: "allergen family", words: true, intro: "A user who picked one of these in the app is warned about every ingredient marked with it. The words are what the app looks for in the user's own text." },
-    conditions: { title: "Skin conditions", one: "skin condition", words: true, intro: "Each condition can be marked Avoid or Good on an ingredient. The words are what the app looks for in a user's saved condition." },
+    conditions: { title: "Chronic skin conditions", one: "chronic skin condition", words: true, intro: "Each condition can be marked Avoid or Good on an ingredient. The words are what the app looks for in a user's saved condition." },
     highlights: { title: "Highlights", one: "highlight", words: false, intro: "A highlighted ingredient shows up among the chips of a scan result, even when it is safe. Key active and Umbrella term are built in." }
 };
 

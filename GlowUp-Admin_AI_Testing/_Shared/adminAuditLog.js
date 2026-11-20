@@ -1,7 +1,7 @@
 
 
 import { db } from "../_Database/firebase-console.js";
-import { collection, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { collection, query, orderBy, limit, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getDocs, AUDIT_COLLECTION } from "./adminStore.js";
 import { dialogFrame } from "./adminShell.js";
 
@@ -29,10 +29,12 @@ function lineOf(item) {
 }
 
 
-export async function openAuditLog() {
-    const frame = dialogFrame("Admin activity log", () => frame.close());
+/** The activity log. With { uid } it shows that admin's own records only (the profile menu's "My activity log"). */
+export async function openAuditLog(options) {
+    const mine = options && typeof options.uid === "string" && options.uid ? options.uid : "";
+    const frame = dialogFrame(mine ? "My activity log" : "Admin activity log", () => frame.close());
     frame.box.classList.add("wide");
-    const intro = make("p", "modal-intro", "Every change made on this website is recorded here with the admin who made it. Records cannot be edited or deleted. Changes made by the phone app (new scans, pending entries) are not admin changes and are not listed.");
+    const intro = make("p", "modal-intro", mine ? "Only the changes you made on this website, newest first. Records cannot be edited or deleted." : "Every change made on this website is recorded here with the admin who made it. Records cannot be edited or deleted. Changes made by the phone app (new scans, pending entries) are not admin changes and are not listed.");
     const list = make("div", "audit-list");
     list.append(make("p", "muted small", "Loading..."));
     const foot = make("div", "modal-actions");
@@ -42,11 +44,14 @@ export async function openAuditLog() {
     foot.append(close);
     frame.box.append(intro, list, foot);
     try {
-        const snapshot = await getDocs(query(collection(db, AUDIT_COLLECTION), orderBy("at", "desc"), limit(SHOW)));
+        const snapshot = await getDocs(mine ? query(collection(db, AUDIT_COLLECTION), where("uid", "==", mine), limit(300)) : query(collection(db, AUDIT_COLLECTION), orderBy("at", "desc"), limit(SHOW)));
         list.replaceChildren();
+        if (mine && snapshot.empty) { list.append(make("p", "muted small", "You have not changed anything on this website yet.")); return; }
         if (snapshot.empty) { list.append(make("p", "muted small", "No changes recorded yet. Recording started on 6 November 2026.")); return; }
-        snapshot.forEach((d) => {
-            const record = d.data();
+        const records = [];
+        snapshot.forEach((d) => records.push(d.data()));
+        if (mine) records.sort((a, b) => (Number(b.atUnix) || 0) - (Number(a.atUnix) || 0)).splice(SHOW);
+        records.forEach((record) => {
             const row = make("details", "audit-row");
             const summary = make("summary", "");
             summary.append(make("b", "", whenOf(record)), document.createTextNode(` · ${record.email || record.uid || "unknown admin"} · ${record.count || 0} ${record.count === 1 ? "change" : "changes"}${record.page ? " · " + record.page.replace(/\.html$/, "") : ""}`));

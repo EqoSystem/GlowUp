@@ -364,7 +364,7 @@ namespace GlowUp.EditorTools
                 healthToggle.isOn = false;
                 Transform label = healthT.Find("ReadLabel");
                 if (label != null) healthLabel = label.GetComponent<TextMeshProUGUI>();
-                if (healthLabel != null) { healthLabel.text = "I agree that GlowUp keeps my skin type, skin tone, skin conditions and allergies, to personalise my results"; healthLabel.fontSize = 28; }
+                if (healthLabel != null) { healthLabel.text = "I agree that GlowUp keeps my skin type, skin tone, chronic skin conditions and allergies, to personalise my results"; healthLabel.fontSize = 28; }
             }
 
             var go = SceneBuilderCore.EnsureRoot("TermsAcceptanceFlowController");

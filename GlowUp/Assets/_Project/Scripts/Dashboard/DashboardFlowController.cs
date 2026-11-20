@@ -73,7 +73,13 @@ namespace GlowUp.Dashboard
         [Tooltip("The round picture in the pop-up: a tap asks first, then opens the phone's photo picker")]
         [SerializeField] private Button accountAvatarButton;
         [Tooltip("Every skin answer, also those not in the Quick Summary (skin concerns)")]
-        [SerializeField] private TextMeshProUGUI skinProfileText;
+        [SerializeField] private TextMeshProUGUI skinProfileText;          // the one-text profile of New22 (scenes built before 22 Nov 2026)
+        [Header("Account pop-up facts (22 Nov 2026)")]
+        [SerializeField] private TextMeshProUGUI skinTypeFact;
+        [SerializeField] private TextMeshProUGUI skinToneFact;
+        [SerializeField] private TextMeshProUGUI conditionFact;
+        [SerializeField] private TextMeshProUGUI allergensFact;
+        [SerializeField] private Button closeAccountButton;
         [Tooltip("Opens the saved answers for editing (sign-up Steps 1 to 5, filled in; Save edits returns here)")]
         [SerializeField] private Button editSkinProfileButton;
         [SerializeField] private string photoTitle = "Choose a profile photo?";
@@ -96,6 +102,7 @@ namespace GlowUp.Dashboard
         [Header("Settings")]
         [Tooltip("The gear in the top right corner")]
         [SerializeField] private Button settingsButton;
+        [SerializeField] private GlowUp.Notifications.BellReveal bellReveal;    // 22 Nov 2026: the first tap on the gear slides the bell out
 
         [Header("Scenes")]
         [SerializeField] private string loginScene = SceneNames.Login;
@@ -111,9 +118,10 @@ namespace GlowUp.Dashboard
             if (recommendationTemplate != null) recommendationTemplate.gameObject.SetActive(false);
             if (avatarButton != null) avatarButton.onClick.AddListener(() => { if (accountPanel != null) accountPanel.Show(); });
             if (signOutButton != null) signOutButton.onClick.AddListener(AskSignOut);
-            if (settingsButton != null) settingsButton.onClick.AddListener(() => SceneNavigator.Go(settingsScene));
+            if (settingsButton != null) settingsButton.onClick.AddListener(() => { if (bellReveal != null && bellReveal.Reveal()) return; SceneNavigator.Go(settingsScene); });
             if (accountAvatarButton != null) accountAvatarButton.onClick.AddListener(AskPhoto);
             if (editSkinProfileButton != null) editSkinProfileButton.onClick.AddListener(EditSkinProfile);
+            if (closeAccountButton != null) closeAccountButton.onClick.AddListener(() => { if (accountPanel != null) accountPanel.Hide(); });
             GlowUp.AppSettings.ProfilePhoto.Changed += ShowPhoto;
             ShowPhoto();
         }
@@ -220,12 +228,17 @@ namespace GlowUp.Dashboard
                 accountNameText.text = string.IsNullOrWhiteSpace(full) ? name : full;
             }
             if (accountEmailText != null) accountEmailText.text = p != null ? p.email : "";
+            string Listed(List<string> items, string none) => items != null && items.Count > 0 ? string.Join(", ", items) : none;
+            Set(skinTypeFact, p != null && !string.IsNullOrWhiteSpace(p.skinType) ? p.skinType : notSet);
+            Set(skinToneFact, p != null && !string.IsNullOrWhiteSpace(p.skinTone) ? p.skinTone : notSet);
+            Set(conditionFact, Listed(p?.skinConditions, "None"));
+            Set(allergensFact, Listed(p?.knownAllergens, noAllergens));
             if (skinProfileText != null)
             {
                 string List(List<string> items, string none) => items != null && items.Count > 0 ? string.Join(", ", items) : none;
                 skinProfileText.text = "<b>Skin type:</b> " + (p != null && !string.IsNullOrWhiteSpace(p.skinType) ? p.skinType : notSet)
                     + "\n<b>Skin tone:</b> " + (p != null && !string.IsNullOrWhiteSpace(p.skinTone) ? p.skinTone : notSet)
-                    + "\n<b>Skin concerns:</b> " + List(p?.skinConditions, "None")
+                    + "\n<b>Chronic skin condition:</b> " + List(p?.skinConditions, "None")
                     + "\n<b>Allergens:</b> " + List(p?.knownAllergens, noAllergens);
             }
         }

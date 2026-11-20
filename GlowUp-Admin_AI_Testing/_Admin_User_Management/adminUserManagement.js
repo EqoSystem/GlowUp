@@ -14,12 +14,13 @@ import { normalizeUser, summarize, filterUsers, sortUsers, statusPatch, restoreT
 
 const el = (id) => document.getElementById(id);
 const BATCH = 200;                       // a batch also carries one audit record of up to 450 items
-const TAB_TITLES = { all: "All Users", active: "Active Users", archived: "Archived Users", bin: "Recycle Bin" };
+const TAB_TITLES = { all: "All Users", active: "Active Users", archived: "Archived Users", bin: "Recycle Bin", online: "Online Now" };
 const TAB_EMPTY = {
     all: ["No users yet.", "People who sign up in the app appear here by themselves."],
     active: ["No active users.", "Users you archive or send to the Recycle Bin are not listed here."],
     archived: ["Nothing archived.", "Archived users are kept here until you restore or delete them."],
-    bin: ["The Recycle Bin is empty.", "Users you delete come here. Restore them, or delete them permanently."]
+    bin: ["The Recycle Bin is empty.", "Users you delete come here. Restore them, or delete them permanently."],
+    online: ["No users are online.", "Users appear here while the app has checked in within the last 5 minutes."]
 };
 
 let users = null;                         // null = the first answer has not come yet
@@ -41,7 +42,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     paintTabs();
     await requireAdmin();
 
-    el("userTabs").addEventListener("click", (event) => { const b = event.target.closest("[data-tab]"); if (b) setTab(b.dataset.tab); });
     el("userKpis").addEventListener("click", (event) => { const k = event.target.closest(".kpi[data-tab]"); if (k) setTab(k.dataset.tab); });
     el("userKpis").addEventListener("keydown", (event) => { const k = event.target.closest(".kpi[data-tab]"); if (k && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); setTab(k.dataset.tab); } });
     wireSearch(el("userSearchInput"), el("userSearchClear"), () => { pager.page = 1; render(); });
@@ -66,6 +66,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // the live listener ends with the page; it starts again when the page comes back from the back/forward cache
     window.addEventListener("pagehide", unlisten);
     window.addEventListener("pageshow", (event) => { if (event.persisted && !stop) listen(); });
+    window.setInterval(() => { if (users && !document.hidden) render(); }, 30000);
 });
 
 // ---------- the one listener ----------
@@ -102,8 +103,7 @@ function setTab(next) {
     render();
 }
 function paintTabs() {
-    document.querySelectorAll("#userTabs .seg").forEach((b) => { const on = b.dataset.tab === tab; b.classList.toggle("on", on); b.setAttribute("aria-selected", on ? "true" : "false"); });
-    document.querySelectorAll("#userKpis .kpi").forEach((k) => k.classList.toggle("on", k.dataset.tab === tab));
+    document.querySelectorAll("#userKpis .kpi").forEach((k) => { const on = k.dataset.tab === tab; k.classList.toggle("on", on); k.setAttribute("aria-pressed", on ? "true" : "false"); });
     el("userTitle").textContent = TAB_TITLES[tab];
 }
 
@@ -131,12 +131,11 @@ function render() {
     if (users === null) return;                                  // the page's own skeleton rows stay until the first answer
 
     const sum = summarize(users);
-    [["All", "all"], ["Active", "active"], ["Archived", "archived"], ["Bin", "bin"]].forEach(([name, id]) => {
+    [["All", "all"], ["Online", "online"], ["Active", "active"], ["Archived", "archived"], ["Bin", "bin"]].forEach(([name, id]) => {
         const value = el("kpi" + name + "Value");
         value.classList.remove("skeleton");
         value.textContent = String(sum[id].count);
         el("kpi" + name + "Week").textContent = sum[id].week > 0 ? `+${sum[id].week} this week` : "";
-        el("tab" + name).textContent = String(sum[id].count);
     });
 
     const all = filtered();
@@ -150,7 +149,7 @@ function render() {
     body.innerHTML = rows.map((u) => `
         <tr data-uid="${escapeHtml(u.uid)}" tabindex="0" class="${picked.has(u.uid) ? "is-picked" : ""}">
             <td class="pick-col">${canChange(u) ? `<button type="button" class="pick" role="checkbox" data-pick="${escapeHtml(u.uid)}" aria-checked="${picked.has(u.uid)}" aria-label="Select ${escapeHtml(u.name)}"></button>` : ""}</td>
-            <td><div class="um-user">${avatar(u)}<div class="um-names"><span class="um-name">${escapeHtml(u.name)}</span><span class="um-sub">${u.username ? "@" + escapeHtml(u.username) : escapeHtml(u.uid.slice(0, 10))}</span></div></div></td>
+            <td><div class="um-user">${avatar(u)}<div class="um-names"><span class="um-name">${u.username ? "@" + escapeHtml(u.username) : escapeHtml(u.name)}</span><span class="um-sub">${u.username ? escapeHtml(u.name) : "No username yet"}</span></div></div></td>
             <td class="um-email">${escapeHtml(u.email) || '<span class="muted">No email</span>'}</td>
             <td>${roleBadge(u)}</td>
             <td>${statusBadgeOf(u)}</td>
@@ -336,7 +335,7 @@ function openDetails(uid) {
                     ${fact("Skin type", escapeHtml(s.skinType) || '<span class="muted">Not set</span>')}
                     ${fact("Skin tone", escapeHtml(s.skinTone) || '<span class="muted">Not set</span>')}
                     ${s.age ? fact("Age", String(s.age)) : ""}
-                    ${fact("Skin concerns", s.skinConditions.length ? `<span class="um-tags">${s.skinConditions.map(tag).join("")}</span>` : '<span class="muted">None</span>')}
+                    ${fact("Chronic skin conditions", s.skinConditions.length ? `<span class="um-tags">${s.skinConditions.map(tag).join("")}</span>` : '<span class="muted">None</span>')}
                     ${fact("Allergens", s.knownAllergens.length ? `<span class="um-tags">${s.knownAllergens.map(tag).join("")}</span>` : '<span class="muted">None</span>')}
                 </dl>` : '<p class="um-none">No skin profile found.</p>'}</section>`;
     };

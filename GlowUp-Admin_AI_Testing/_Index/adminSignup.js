@@ -15,6 +15,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVe
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { askConfirm } from "../_Shared/adminShell.js";
 import { PASSWORD_RULES, passwordChecks, cleanName, formProblem, signupProblem, requestNote } from "./signupRules.js";
+import { attachCounters } from "../_Shared/charLimit.js";
 
 const STEP_TIMEOUT_MS = 20000;
 const CHECK_EVERY_MS = 4000;
@@ -94,6 +95,7 @@ export function mountSignup({ lockout, onBackToLogin }) {
     const message = $("signupMessage");
     const ruleList = $("pwRules");
     const matchLine = $("pwMatch");
+    attachCounters(["signupName", "signupEmail", "signupPassword", "signupConfirm"]);
     let current = "login";
     let attempt = 0;
 

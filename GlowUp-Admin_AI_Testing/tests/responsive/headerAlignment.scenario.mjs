@@ -60,7 +60,7 @@ try {
                     menuRadius: menuStyle.borderRadius,
                     longestLabel: { clientWidth: longestLabel.clientWidth, scrollWidth: longestLabel.scrollWidth, whiteSpace: longStyle.whiteSpace },
                     signOut: rect(footer.querySelector(".sign-out")),
-                    firstControl: rect(first),
+                    firstControl: rect(first), firstControlIsPagePart: !!controls.querySelector(":scope > :not(.topbar-tools)"),
                     card: rect(card),
                     gear: rect(gear),
                     account: rect(account),
@@ -89,7 +89,7 @@ try {
             ok(m.navRows.every((height) => Math.abs(height - 38) <= 1), `${label}: nav rows share a 38px height`);
             ok(Math.abs(m.signOut.height - m.navIcon.height - 2) <= 1, `${label}: Sign Out row matches the nav row height`);
             if (m.firstControl) ok(Math.abs(m.firstControl.centerY - m.menu.centerY) <= 1 && Math.abs(m.firstControl.height - 36) <= 1, `${label}: header control has a 36px aligned box`);
-            if (key !== "dash") {
+            if (key !== "dash" && m.firstControlIsPagePart) {   // 22 Nov 2026: Bin, Archive and Users keep their tabs and search inside the list
                 ok(Math.abs(m.firstControl.left - Math.max(m.card.left, m.brand.right + 16)) <= 1, `${label}: first control follows content and clears the brand`);
             }
             if (state !== "collapsed") {

@@ -34,17 +34,26 @@ namespace GlowUp.EditorTools
             A.Outline(avatar.transform, ThemeRole.Gold, 104f);
 
             TextMeshProUGUI greeting = A.Label(card, "GreetingText", "Hi, there", 62, ThemeRole.Heading, FontRole.Title);
-            A.TopStrip(greeting.transform, 28, 104, 152, 236);          // room for the bell and the gear (New22)
+            A.TopStrip(greeting.transform, 28, 104, 152, 236);          // room for the bell (when out) and the gear
             A.Shrink(greeting, 40);
 
             // the Settings page (dark mode, graphics quality, account, alerts ...) opens from here
             Button settings = A.IconButton(card, "SettingsButton", IconFactory.Gear, 92, 58, ThemeRole.MainText);
             A.At(settings.transform, A.TR, new Vector2(-28, -34), new Vector2(92, 92));
 
-            // New22 (20 November 2026): the bell opens the Notifications screen; its unread badge is drawn by NotificationBell
+            // New22 (20 November 2026): the bell opens the Notifications screen; its unread badge is drawn by NotificationBell.
+            // 22 Nov 2026: it rests behind the gear and slides out on the first tap of the gear (BellReveal); a dot on the gear
+            // shows unread notifications while the bell is hidden.
             Button bell = A.IconButton(card, "NotificationsButton", IconFactory.Bell, 92, 58, ThemeRole.MainText);
-            A.At(bell.transform, A.TR, new Vector2(-128, -34), new Vector2(92, 92));
+            A.At(bell.transform, A.TR, new Vector2(-28, -34), new Vector2(92, 92));
             SceneBuilderCore.Ensure<GlowUp.Notifications.NotificationBell>(bell.gameObject);
+            bell.transform.SetSiblingIndex(settings.transform.GetSiblingIndex());
+            Image gearDot = A.Panel(settings.transform, "UnreadDot", ThemeRole.Warning, 1f, 12f);
+            A.At(gearDot.transform, A.TR, new Vector2(-14, -14), new Vector2(22, 22));
+            gearDot.raycastTarget = false;
+            gearDot.gameObject.SetActive(false);
+            var reveal = SceneBuilderCore.Ensure<GlowUp.Notifications.BellReveal>(settings.gameObject);
+            A.Set(reveal, "bell", (RectTransform)bell.transform); A.Set(reveal, "gear", (RectTransform)settings.transform); A.Set(reveal, "unreadDot", gearDot);
 
             // ---- quick summary ----
             TextMeshProUGUI summaryHeader = A.Label(card, "SummaryHeaderText", "Quick Summary", 40, ThemeRole.Heading, FontRole.Heading);
@@ -139,36 +148,56 @@ namespace GlowUp.EditorTools
             AppTiles.SwipeNavigation(s, bar);       // drag the dashboard right: Recent Scans comes in; left: AR Try-On (the scanner is opened with its button only)
 
             // ---- account pop-up (opens from the avatar) ----
+            // 22 Nov 2026 (owner's mockup), read top to bottom: title and one line, the photo (tap to change; a pencil badge says so),
+            // name and e-mail, "Skin Profile" with Edit Profile on its right, four facts in two rows (Skin Type, Skin Tone, Chronic
+            // Skin Condition, Allergens), one tip, then Log Out (the main action) and Close.
             A.AppPopup account = A.Overlay(s, "AccountPanel", "Your account");
-            // New22 (20 November 2026): taller, with the photo (tap it to change), the full skin profile and "Edit skin profile"
-            A.At(account.box, A.MC, new Vector2(0, 60), new Vector2(880, 1120));
+            A.At(account.box, A.MC, new Vector2(0, 40), new Vector2(880, 1260));
+            TextMeshProUGUI accountSub = A.Label(account.box, "SubtitleText", "Manage your profile and skin information", 27, ThemeRole.SecondaryText, FontRole.Body);
+            A.TopStrip(accountSub.transform, 104, 40, 48, 128); A.Shrink(accountSub, 20);
             Image accountAvatar = A.Panel(account.box, "AccountAvatar", ThemeRole.SurfaceAlt, 1f, 150f);
-            A.At(accountAvatar.transform, A.TC, new Vector2(0, -146), new Vector2(150, 150));
+            A.At(accountAvatar.transform, A.TC, new Vector2(0, -236), new Vector2(150, 150));
             A.Icon(accountAvatar.transform, "Icon", IconFactory.User, 84, ThemeRole.MainText);
             accountAvatar.raycastTarget = true;
             Button accountAvatarButton = SceneBuilderCore.Ensure<Button>(accountAvatar.gameObject);
             accountAvatarButton.targetGraphic = accountAvatar;
-            TextMeshProUGUI photoHint = A.Label(account.box, "PhotoHintText", "Tap your picture to change it", 26, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center);
-            A.TopStrip(photoHint.transform, 228, 40, 48, 48); A.Shrink(photoHint, 20); A.HintOnly(photoHint);
-            TextMeshProUGUI accountName = A.Label(account.box, "AccountNameText", "Your name", 44, ThemeRole.MainText, FontRole.Heading, TextAlignmentOptions.Center);
-            A.TopStrip(accountName.transform, 276, 68, 48, 48); A.Shrink(accountName, 30);
-            TextMeshProUGUI accountEmail = A.Label(account.box, "AccountEmailText", "name@email.com", 31, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center);
-            A.TopStrip(accountEmail.transform, 344, 50, 48, 48); A.Shrink(accountEmail, 24);
-            TextMeshProUGUI skinHeader = A.Label(account.box, "SkinProfileHeaderText", "Skin profile", 36, ThemeRole.Heading, FontRole.Heading, TextAlignmentOptions.MidlineLeft);
-            A.TopStrip(skinHeader.transform, 418, 50, 60, 60);
-            Image skinPanel = A.Panel(account.box, "SkinProfilePanel", ThemeRole.SurfaceAlt, Kit.PanelAlpha, 40f);
-            A.TopStrip(skinPanel.transform, 474, 236, 48, 48);
-            TextMeshProUGUI skinProfile = A.Label(skinPanel.transform, "SkinProfileText", "<b>Skin type:</b> Combination\n<b>Skin tone:</b> Medium\n<b>Skin concerns:</b> Acne\n<b>Allergens:</b> None",
-                                                  29, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            A.Fill(skinProfile.transform, 32, 22, 32, 22);
-            A.ShrinkWrapped(skinProfile, 22);
-            Button editSkin = A.PillButton(account.box, "EditSkinProfileButton", "Edit skin profile", 36, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Pencil);
-            A.TopStrip(editSkin.transform, 730, 120, 48, 48);
-            TextMeshProUGUI accountNote = A.Label(account.box, "AccountNoteText", "You can sign back in at any time with your email and password.",
-                                                  27, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center, true);
-            A.TopStrip(accountNote.transform, 868, 64, 60, 60);
-            Button signOut = A.PillButton(account.box, "SignOutButton", "Log Out", 40, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.SignOut);
-            A.BottomStrip(signOut.transform, 44, 120, 48, 48);
+            Image photoBadge = A.Panel(accountAvatar.transform, "EditBadge", ThemeRole.ButtonFill, 1f, 28f);
+            A.At(photoBadge.transform, new Vector2(1, 0), new Vector2(-10, 10), new Vector2(52, 52));
+            photoBadge.raycastTarget = false;
+            A.Icon(photoBadge.transform, "Icon", IconFactory.Pencil, 28, ThemeRole.ButtonText).raycastTarget = false;
+            TextMeshProUGUI accountName = A.Label(account.box, "AccountNameText", "Your name", 42, ThemeRole.MainText, FontRole.Heading, TextAlignmentOptions.Center);
+            A.TopStrip(accountName.transform, 324, 60, 48, 48); A.Shrink(accountName, 28);
+            TextMeshProUGUI accountEmail = A.Label(account.box, "AccountEmailText", "name@email.com", 29, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center);
+            A.TopStrip(accountEmail.transform, 386, 44, 48, 48); A.Shrink(accountEmail, 22);
+
+            TextMeshProUGUI skinHeader = A.Label(account.box, "SkinProfileHeaderText", "Skin Profile", 34, ThemeRole.Heading, FontRole.Heading, TextAlignmentOptions.MidlineLeft);
+            A.TopStrip(skinHeader.transform, 462, 64, 48, 300);
+            Button editSkin = A.PillButton(account.box, "EditSkinProfileButton", "Edit Profile", 28, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Pencil);
+            A.At(editSkin.transform, A.TR, new Vector2(-48, -462), new Vector2(240, 64));
+            // the four facts: label over value, two to a row; a long value wraps and shrinks inside its own tile
+            TextMeshProUGUI Fact(string name, string label, float top, bool right)
+            {
+                Image tile = A.Panel(account.box, name, ThemeRole.SurfaceAlt, Kit.PanelAlpha, 28f);
+                A.TopStrip(tile.transform, top, 132, right ? 452 : 48, right ? 48 : 452);
+                TextMeshProUGUI head = A.Label(tile.transform, "LabelText", label, 24, ThemeRole.SecondaryText, FontRole.Body);
+                A.TopStrip(head.transform, 14, 36, 24, 24); A.Shrink(head, 18);
+                TextMeshProUGUI value = A.Label(tile.transform, "ValueText", "-", 30, ThemeRole.MainText, FontRole.Heading, TextAlignmentOptions.TopLeft, true);
+                A.Fill(value.transform, 24, 12, 24, 52); A.ShrinkWrapped(value, 20);
+                return value;
+            }
+            TextMeshProUGUI factType = Fact("SkinTypeTile", "Skin Type", 542, false);
+            TextMeshProUGUI factTone = Fact("SkinToneTile", "Skin Tone", 542, true);
+            TextMeshProUGUI factCondition = Fact("ConditionTile", "Chronic Skin Condition", 690, false);
+            TextMeshProUGUI factAllergens = Fact("AllergensTile", "Allergens", 690, true);
+            Image tip = A.Panel(account.box, "TipPanel", ThemeRole.SurfaceAlt, Kit.PanelAlpha, 24f);
+            A.TopStrip(tip.transform, 840, 96, 48, 48);
+            TextMeshProUGUI tipText = A.Label(tip.transform, "TipText", "You can update your skin profile anytime for more accurate recommendations.",
+                                              25, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.MidlineLeft, true);
+            A.Fill(tipText.transform, 24, 8, 24, 8); A.ShrinkWrapped(tipText, 19);
+            Button signOut = A.PillButton(account.box, "SignOutButton", "Log Out", 36, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.SignOut);
+            A.BottomStrip(signOut.transform, 156, 104, 48, 48);
+            Button closeAccount = A.PillButton(account.box, "CloseAccountButton", "Close", 34, ThemeRole.SurfaceAlt, ThemeRole.MainText);
+            A.BottomStrip(closeAccount.transform, 36, 100, 48, 48);
 
             // ---- "Log out?" : asked before anything happens (the same question as on the Settings page) ----
             A.AppPopup signOutPopup = A.Overlay(s, "SignOutConfirmPanel", "Log out?");
@@ -209,10 +238,13 @@ namespace GlowUp.EditorTools
             A.Set(controller, "accountNameText", accountName); A.Set(controller, "accountEmailText", accountEmail);
             A.Set(controller, "signOutButton", signOut);
             A.Set(controller, "accountAvatarButton", accountAvatarButton);
-            A.Set(controller, "skinProfileText", skinProfile);
+            A.Set(controller, "skinTypeFact", factType); A.Set(controller, "skinToneFact", factTone);
+            A.Set(controller, "conditionFact", factCondition); A.Set(controller, "allergensFact", factAllergens);
+            A.Set(controller, "closeAccountButton", closeAccount);
             A.Set(controller, "editSkinProfileButton", editSkin);
             A.Set(controller, "signOutConfirm", signOutConfirm);
             A.Set(controller, "settingsButton", settings);
+            A.Set(controller, "bellReveal", reveal);
 
             // What is FETCHED on this screen: the five values of the summary (bars while the profile is fetched and nothing is
             // on the phone yet) and the rows under "Recommended for you" (their own placeholder rows, RecommendationsSkeleton).

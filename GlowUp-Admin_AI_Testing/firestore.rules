@@ -467,6 +467,7 @@ service cloud.firestore {
         && request.resource.data.get('device', '') is string && request.resource.data.get('device', '').size() <= 200
         && (!('lastScan' in request.resource.data) || (request.resource.data.lastScan is map && request.resource.data.lastScan.size() <= 6));
       allow read, update, delete: if isAdmin();
+      allow create: if isAdmin();                       // Restore from the Archive (22 Nov 2026)
     }
 
     // ---- AI photo snapshots: REMOVED on 11 November 2026 (the app matches photos with the catalogue only; no web search) --------
@@ -552,7 +553,8 @@ service cloud.firestore {
              'deleted_by', 'deleted_by_email', 'archivedWith'])
         && ((request.resource.data.type == 'ingredient' && request.resource.data.sourceCollection == 'ingredients')
             || (request.resource.data.type == 'brand' && request.resource.data.sourceCollection == 'brands')
-            || (request.resource.data.type == 'product' && request.resource.data.sourceCollection == 'products'))
+            || (request.resource.data.type == 'product' && request.resource.data.sourceCollection == 'products')
+            || (request.resource.data.type == 'report' && request.resource.data.sourceCollection == 'supportReports'))   // 22 Nov 2026: a deleted app report goes to the Archive
         && request.resource.data.sourceId is string
         && entryId == request.resource.data.sourceCollection + '__' + request.resource.data.sourceId
         && request.resource.data.name is string && request.resource.data.name.size() <= 200

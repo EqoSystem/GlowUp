@@ -25,7 +25,7 @@ body.login-page::before {
 .login-tools { display: flex; gap: calc(8 * var(--u)); margin-left: auto; }
 .login-main { display: grid; place-items: center; padding: calc(16 * var(--u)) var(--gutter) calc(24 * var(--u)); min-width: 0; }
 .login-card {
-    width: min(calc(380 * var(--u)), 100%); padding: clamp(calc(22 * var(--u)), 6vw, calc(32 * var(--u))) clamp(calc(18 * var(--u)), 5vw, calc(28 * var(--u))); border-radius: calc(var(--radius) + calc(4 * var(--u))); text-align: center;
+    width: min(calc(380 * var(--u)), 100%); max-height: calc(100dvh - calc(32 * var(--u))); overflow-y: auto; padding: clamp(calc(22 * var(--u)), 6vw, calc(32 * var(--u))) clamp(calc(18 * var(--u)), 5vw, calc(28 * var(--u))); border-radius: calc(var(--radius) + calc(4 * var(--u))); text-align: center;
     background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow); animation: pop-in .25s ease-out both;
     transition: border-color .25s, box-shadow .25s;
 }
@@ -122,6 +122,10 @@ html:has(.terms-dialog[open]) { overflow: hidden; }
 .signup-card .subtitle { margin-bottom: calc(18 * var(--u)); }
 
 .signup-form { display: flex; flex-direction: column; gap: calc(12 * var(--u)); text-align: left; }
+.signup-form .field { min-width: 0; }
+.signup-form .hint-row, .login-card .hint-row { margin-top: calc(4 * var(--u)); }
+.signup-form .hint-row .counter, .login-card .hint-row .counter { color: var(--muted); font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.signup-form .hint-row .counter.is-full, .login-card .hint-row .counter.is-full { color: var(--bad); font-weight: 600; }
 .signup-form input[aria-invalid="true"] { border-color: var(--bad); }
 .pw-rules { list-style: none; margin: calc(2 * var(--u)) 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(150 * var(--u)), 1fr)); gap: calc(2 * var(--u)) calc(12 * var(--u)); }
 .pw-rule { display: flex; align-items: center; gap: calc(6 * var(--u)); margin: 0; font-size: var(--fs-xs); line-height: 1.5; color: var(--muted); transition: color .2s; }
@@ -167,3 +171,36 @@ html:has(.terms-dialog[open]) { overflow: hidden; }
 
 /* the card slide must never widen the page, even for a frame */
 .login-main { overflow-x: clip; }
+
+@media (max-width: 480px) {
+    .login-main { align-items: start; padding-top: calc(12 * var(--u)); }
+    .login-card { max-height: calc(100dvh - calc(20 * var(--u))); }
+    .card-back { top: calc(8 * var(--u)); left: calc(8 * var(--u)); }
+}
+
+/* 22 Nov 2026: the Sign Up / Forgot password links show a soft tint and an underline on hover and keyboard focus;
+   the outline drawn outside the link overlapped the password box above it */
+.forgot-row .text-link { border-radius: var(--radius-sm); padding: 0 calc(6 * var(--u)); }
+.forgot-row .text-link:hover, .forgot-row .text-link:focus-visible { outline: none; text-decoration: underline; background: color-mix(in srgb, var(--accent) 10%, transparent); }
+
+
+/* ---- Reset dialog and the e-mail link panels (authAction.js), 22 Nov 2026 ---- */
+.reset-dialog .reset-badge, .action-badge { display: grid; place-items: center; width: calc(48 * var(--u)); height: calc(48 * var(--u)); border-radius: 50%; color: var(--accent-text); background: color-mix(in srgb, var(--accent) 14%, var(--surface)); }
+.reset-dialog .reset-badge { margin: 0 0 calc(10 * var(--u)); }
+.reset-dialog .reset-badge svg.ic, .action-badge svg.ic { width: calc(22 * var(--u)); height: calc(22 * var(--u)); }
+.reset-dialog .reset-note { margin: calc(8 * var(--u)) 0 0; padding: calc(8 * var(--u)) calc(10 * var(--u)); border-radius: var(--radius-sm); font-size: var(--fs-xs); color: var(--text-2); background: var(--surface-2); }
+.reset-dialog .cancel-btn { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.reset-dialog .save-btn svg.ic { width: calc(15 * var(--u)); height: calc(15 * var(--u)); vertical-align: -2px; }
+.action-card { display: flex; flex-direction: column; align-items: stretch; gap: calc(12 * var(--u)); text-align: center; }
+.action-card > .action-badge { align-self: center; width: calc(60 * var(--u)); height: calc(60 * var(--u)); }
+.action-card > .action-badge.ok { color: var(--accent-ink); background: var(--accent); }
+.action-card > .action-badge.warn { color: var(--warn); background: color-mix(in srgb, var(--warn) 14%, var(--surface)); }
+.action-card h1 { margin: 0; font-size: var(--fs-lg); }
+.action-card h1:focus { outline: none; }
+.action-text { margin: 0; font-size: var(--fs-sm); line-height: 1.55; color: var(--text-2); }
+.action-note { margin: 0; padding: calc(10 * var(--u)) calc(12 * var(--u)); border-radius: var(--radius-sm); font-size: var(--fs-sm); color: var(--text-2); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.action-email { margin: 0; font-size: var(--fs-sm); color: var(--text-2); overflow-wrap: anywhere; }
+.action-form { display: flex; flex-direction: column; gap: calc(12 * var(--u)); text-align: left; }
+.action-rules { margin: 0; padding: calc(10 * var(--u)) calc(12 * var(--u)); border-radius: var(--radius-sm); background: var(--surface-2); }
+.action-back { align-self: center; display: inline-flex; align-items: center; gap: calc(6 * var(--u)); }
+.action-back svg.ic { width: calc(15 * var(--u)); height: calc(15 * var(--u)); }

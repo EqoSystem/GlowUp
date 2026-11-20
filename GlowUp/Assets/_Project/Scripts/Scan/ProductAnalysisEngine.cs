@@ -194,10 +194,10 @@ namespace GlowUp.Scan
             else if (allergenHits.Count > 0) record.allergenMatch = Item("bad", $"Contains your allergen{(allergenLabels.Count == 1 ? "" : "s")} {Join(allergenLabels, 3)} ({Join(allergenHits, 3)}).");
             else record.allergenMatch = Item("good", "None of your saved allergens were found.");
 
-            if (conditions.Count == 0) record.concernMatch = Item("unknown", "No skin concerns saved in your profile.");
+            if (conditions.Count == 0) record.concernMatch = Item("unknown", "No chronic skin conditions saved in your profile.");
             else if (conditionConflicts.Count > 0) record.concernMatch = Item("caution", $"May aggravate {Join(conditionNames, 3)} ({Join(conditionConflicts.Distinct().ToList(), 3)}).");
             else if (conditionPositives.Count > 0) record.concernMatch = Item("good", $"Contains ingredients often used for {Join(conditionPositiveNames, 3)} ({Join(conditionPositives.Distinct().ToList(), 3)}).");
-            else record.concernMatch = Item("good", "No conflicts with your saved skin concerns.");
+            else record.concernMatch = Item("good", "No conflicts with your saved chronic skin conditions.");
 
             if (profile.age <= 0) record.ageMatch = Item("unknown", "No age saved in your profile.");
             else if (ageFlags.Count > 0) record.ageMatch = Item("caution", $"Contains ingredients usually not advised under {ageLimit} ({Join(ageFlags, 3)}).");

@@ -8,11 +8,15 @@ export const ROLES = ["user", "admin"];
 /** Fields only an admin may change (firestore.rules refuse a user who writes them). */
 export const ADMIN_FIELDS = ["status", "statusBefore", "role", "inBin", "statusChangedAt", "statusChangedBy"];
 export const WEEK_MS = 7 * 24 * 3600 * 1000;
+/** "Online now" (22 Nov 2026): the app marks lastActiveAt while it is open (about every 2 minutes), so 5 minutes of silence means gone. */
+export const ONLINE_MS = 5 * 60 * 1000;
+export const isOnline = (user, now = Date.now()) => user.status !== "deleted" && user.lastActive > 0 && now - user.lastActive <= ONLINE_MS;
 export const TABS = [
     { id: "all", label: "All Users" },
     { id: "active", label: "Active" },
     { id: "archived", label: "Archived" },
-    { id: "bin", label: "Recycle Bin" }
+    { id: "bin", label: "Recycle Bin" },
+    { id: "online", label: "Online Now" }
 ];
 
 const ms = (value) => {
@@ -54,15 +58,15 @@ export function normalizeUser(uid, data) {
 }
 
 /** The tab a user belongs to. A banned user shows in All Users (and through the Status filter) only. */
-export const inTab = (user, tab) => tab === "all" || (tab === "bin" ? user.status === "deleted" : user.status === tab);
+export const inTab = (user, tab, now = Date.now()) => tab === "all" || (tab === "online" ? isOnline(user, now) : tab === "bin" ? user.status === "deleted" : user.status === tab);
 
 /** Counts for the four cards and the four tabs, with the "+N this week" of each. */
 export function summarize(users, now = Date.now()) {
     const since = now - WEEK_MS;
     const out = {};
     TABS.forEach((tab) => {
-        const mine = users.filter((u) => inTab(u, tab.id));
-        out[tab.id] = { count: mine.length, week: mine.filter((u) => (tab.id === "all" ? u.createdAt : Math.max(u.createdAt, u.changedAt)) >= since).length };
+        const mine = users.filter((u) => inTab(u, tab.id, now));
+        out[tab.id] = { count: mine.length, week: tab.id === "online" ? 0 : mine.filter((u) => (tab.id === "all" ? u.createdAt : Math.max(u.createdAt, u.changedAt)) >= since).length };
     });
     return out;
 }

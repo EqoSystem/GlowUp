@@ -1,5 +1,5 @@
 // Header bell + admin profile (_Shared/headerAccount.js): alignment with the gear, the live badge, the grouped dropdown,
-// mark one / mark all as read, one dropdown at a time, outside click / Escape, the profile menu, Logout, and that the live
+// mark one / mark all as read, one dropdown at a time, outside click / Escape, the profile menu (Edit Profile, My activity log), and that the live
 // listener is released on sign-out and when the page is left.
 // Run: node tests/responsive/headerAccount.scenario.mjs   (SHOT_DIR=<folder> also saves pictures)
 import { launch, openPage, check } from "./harness.mjs";
@@ -58,8 +58,17 @@ try {
         // ---- the dropdown ----
         await page.click("#notificationsBtn");
         await settle(300);
-        const groups = await page.evaluate(() => [...document.querySelectorAll(".np-pop .np-group-title")].map((h) => h.querySelector("span").textContent + ":" + h.querySelector(".np-count").textContent));
-        ok(JSON.stringify(groups) === JSON.stringify(["Bug:2", "Suggestion:1", "Wrong Scan:1", "Others:1"]), `${tag}: groups in order with counts ${JSON.stringify(groups)}`);
+        const view = await page.evaluate(() => ({
+            groups: [...document.querySelectorAll(".np-pop .np-group-title")].map((h) => h.textContent),
+            kinds: [...new Set([...document.querySelectorAll(".np-pop .np-kind")].map((n) => n.textContent))].sort(),
+            unread: document.querySelectorAll(".np-pop .np-item:not(.is-read)").length, read: document.querySelectorAll(".np-pop .np-item.is-read").length,
+            icons: document.querySelectorAll(".np-pop .np-item svg").length, foot: document.querySelector(".np-pop .np-foot")?.textContent || "",
+            count: document.querySelector(".np-pop .np-unread")?.textContent || ""
+        }));
+        ok(view.groups.length >= 1 && view.groups.every((g) => g === "Today" || g === "Earlier") && view.groups.includes("Earlier"), `${tag}: grouped into Today and Earlier ${JSON.stringify(view.groups)}`);
+        ok(JSON.stringify(view.kinds) === JSON.stringify(["Bug report", "Other report", "Suggestion", "Wrong scan result"]), `${tag}: each row names its kind in words ${JSON.stringify(view.kinds)}`);
+        ok(view.unread === 5 && view.read === 1 && view.count === "5", `${tag}: pink dots on the 5 unread, the read one muted, the count in the header ${JSON.stringify(view)}`);
+        ok(view.icons === 0 && view.foot === "View all reports", `${tag}: no icon per row; a link to all reports at the bottom`);
         const first = await page.evaluate(() => { const i = [...document.querySelectorAll(".np-item")].find((n) => /scan button freezes/.test(n.textContent)); return { msg: i.querySelector(".np-msg").textContent, from: i.querySelector(".np-from").textContent, when: i.querySelector(".np-when").textContent }; });
         ok(first.msg.length <= 90 && first.msg.endsWith("…"), `${tag}: a long message is cut to a preview (${first.msg.length})`);
         ok(first.from === "Mark Azcueta", `${tag}: the sender is the name, or the account when there is no name (${first.from})`);
@@ -75,31 +84,38 @@ try {
         await page.evaluate(() => { window.__STORE.set("supportReports/n9", { uid: "u9abcdefgh", userName: "Dee", category: "Bug", message: "Brand new report", status: "new", createdAtUnix: Math.floor(Date.now() / 1000) }); window.__NOTIFY(); });
         await page.waitForTimeout(120);
         ok(await badge(page) === "6", `${tag}: the badge goes up by itself`);
-        ok(await page.locator(".np-pop .np-item").count() === 6 && /Brand new report/.test(await page.textContent(".np-pop")), `${tag}: the open panel shows it by itself`);
+        ok(await page.locator(".np-pop .np-item").count() === 7 && /Brand new report/.test(await page.textContent(".np-pop")), `${tag}: the open panel shows it by itself`);
 
-        // mark one as read
+        // a click marks it read and opens the reply window in the middle of the page
         await page.locator(".np-item", { hasText: "Please add a shade finder" }).click();
-        await page.waitForTimeout(200);
+        await page.waitForTimeout(300);
         const done = await doc(page, "supportReports/s1");
         ok(done && done.read === true && done.status === "new", `${tag}: the report is marked read:true (its status is left alone) ${JSON.stringify(done && done.read)}`);
         ok(await badge(page) === "5", `${tag}: the badge goes down by one`);
-        ok(await page.locator(".np-group-title", { hasText: "Suggestion" }).count() === 0, `${tag}: the empty group disappears`);
+        const rw = await page.evaluate(() => { const d = document.querySelector(".reply-drawer"); if (!d) return null; const r = d.getBoundingClientRect(); return { title: d.querySelector("h3").textContent, cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: innerWidth, h: innerHeight }; });
+        ok(rw && rw.title === "Reply to Ana" && Math.abs(rw.cx - rw.w / 2) < 2 && Math.abs(rw.cy - rw.h / 2) < 2, `${tag}: the reply window opens, centred ${JSON.stringify(rw)}`);
+        await page.keyboard.press("Escape"); await page.waitForTimeout(150);
+        ok(!(await page.$(".reply-drawer")), `${tag}: Escape closes an empty reply`);
 
-        // a failed write puts it back
+        // a failed write puts the dot back
+        await page.click("#notificationsBtn"); await settle(250);
         await page.evaluate(() => { window.__FAIL_WRITES = "unavailable"; });
         await page.locator(".np-item", { hasText: "Hello there" }).click();
         await page.waitForTimeout(250);
         ok(await badge(page) === "5" && (await doc(page, "supportReports/o1")).read !== true, `${tag}: a failed write puts the report back`);
         await page.evaluate(() => { window.__FAIL_WRITES = null; });
+        await page.keyboard.press("Escape"); await page.waitForTimeout(150);
 
         // mark all
+        await page.click("#notificationsBtn"); await settle(250);
         await page.click(".np-all");
         await page.waitForTimeout(250);
         ok(await badge(page) === "", `${tag}: Mark all as read clears the badge`);
         const left = await page.evaluate(() => [...window.__STORE.entries()].filter(([k, v]) => k.startsWith("supportReports/") && v.status === "new" && v.read !== true).map(([k]) => k));
         ok(left.length === 0, `${tag}: every new report now has read:true ${JSON.stringify(left)}`);
         ok((await doc(page, "supportReports/h1")).read === undefined, `${tag}: a handled report is not touched`);
-        ok(await page.locator(".np-pop .np-state").count() === 1 && await page.isDisabled(".np-all"), `${tag}: the panel says all caught up and the button is off`);
+        ok(await page.locator(".np-pop .np-item:not(.is-read)").count() === 0 && await page.isDisabled(".np-all"), `${tag}: every row is muted and the button is off`);
+        await page.keyboard.press("Escape"); await page.waitForTimeout(100);
 
         // ---- one dropdown at a time ----
         await page.click("#accountBtn");
@@ -129,20 +145,43 @@ try {
         await page.click("#accountBtn"); await settle(250);
         const who = await page.evaluate(() => ({ name: document.querySelector(".ap-name").textContent, email: document.querySelector(".ap-email").textContent, items: [...document.querySelectorAll(".ap-pop .menu-item")].map((b) => b.textContent) }));
         ok(who.email === "admin@example.test" && who.name === "Admin", `${tag}: name and e-mail are shown ${JSON.stringify(who)}`);
-        ok(JSON.stringify(who.items) === JSON.stringify(["Settings", "Logout"]), `${tag}: Settings and Logout ${JSON.stringify(who.items)}`);
+        ok(JSON.stringify(who.items) === JSON.stringify(["Edit Profile", "My activity log"]), `${tag}: Edit Profile and My activity log, no Settings or Logout ${JSON.stringify(who.items)}`);
+        ok(await page.evaluate(() => /Last login: Nov 21, 2026 · \d{1,2}:10 (AM|PM)/.test(document.querySelector(".ap-last")?.textContent || "")), `${tag}: the last sign-in time is shown`);
         await shot(page, `profile_${width}_${theme}`);
-        await page.click(".ap-pop .menu-item:first-of-type");
-        await settle(350);
-        ok(await page.getAttribute("#quickSettingsBtn", "aria-expanded") === "true" && !(await popOpen(page, ".hdr-pop")), `${tag}: Settings opens Quick settings`);
-        await page.click("#swClose"); await settle(350);
 
-        // ---- Logout: asks first, then signs out and leaves ----
+        // ---- My activity log: only this admin's records ----
+        await page.evaluate(() => {
+            const now = Math.floor(Date.now() / 1000);
+            window.__STORE.set("auditLog/m1", { uid: "admin1", email: "admin@example.test", atUnix: now - 60, page: "adminBrandInventory.html", count: 1, items: [{ collection: "products", docId: "p1", action: "update", name: "Mine" }] });
+            window.__STORE.set("auditLog/o1", { uid: "other", email: "other@example.test", atUnix: now - 30, page: "adminBrandInventory.html", count: 1, items: [{ collection: "products", docId: "p2", action: "update", name: "Theirs" }] });
+        });
+        await page.click(".ap-pop .menu-item:nth-of-type(2)"); await settle(400);
+        const log = await page.evaluate(() => { const box = [...document.querySelectorAll(".modal-content")].pop(); return { title: box.querySelector("h3").textContent, text: box.textContent }; });
+        ok(log.title === "My activity log" && /admin@example\.test/.test(log.text) && !/other@example\.test/.test(log.text), `${tag}: My activity log shows only my own records ${log.title}`);
+        await page.keyboard.press("Escape"); await settle(200);
+
+        // ---- Edit Profile: wrong current password, then a good change; Discard asks first ----
         await page.click("#accountBtn"); await settle(200);
-        await page.click(".ap-pop .menu-item.danger");
-        ok(await page.evaluate(() => /Sign out\?/.test(document.querySelector(".modal-content")?.textContent || "")), `${tag}: Logout asks "Sign out?" first`);
-        await page.keyboard.press("Escape");
-        await page.waitForTimeout(150);
-        ok(page.url().includes("adminDashboard"), `${tag}: Escape on the question stays signed in`);
+        await page.click(".ap-pop .menu-item:first-of-type"); await settle(300);
+        ok(await page.isVisible("#epName") && await page.inputValue("#epEmail") === "admin@example.test", `${tag}: Edit Profile opens with the name and the e-mail`);
+        ok(await page.evaluate(() => ["epName", "epEmail", "epCurrent", "epNext", "epConfirm"].every((id) => { const input = document.getElementById(id); return input && input.maxLength > 0 && input.closest(".field")?.querySelector(".counter"); })), `${tag}: Edit Profile text fields have limits and counters`);
+        await page.fill("#epName", "Grace Admin");
+        await page.fill("#epCurrent", "nope"); await page.fill("#epNext", "NewPassw0rd!"); await page.fill("#epConfirm", "NewPassw0rd!");
+        await page.click(".ep-dialog .save-btn"); await settle(300);
+        ok(/current password is not right/.test(await page.evaluate(() => document.querySelector(".ep-dialog .form-error").textContent)) && await page.getAttribute("#epCurrent", "aria-invalid") === "true", `${tag}: a wrong current password is named at its box`);
+        await page.fill("#epCurrent", "Passw0rd!");
+        await page.click(".ep-dialog .save-btn"); await settle(400);
+        const saved = await page.evaluate(() => ({ open: !!document.querySelector(".ep-dialog"), changed: window.__PASSWORD_CHANGED || 0 }));
+        ok(!saved.open && saved.changed === 1, `${tag}: the password is changed and the window closes ${JSON.stringify(saved)}`);
+        await page.click("#accountBtn"); await settle(200);
+        ok(await page.evaluate(() => document.querySelector(".ap-name").textContent) === "Grace Admin" && await page.evaluate(() => document.querySelector("#accountBtn .hdr-letter")?.textContent) === "G", `${tag}: the new name shows in the menu and the avatar`);
+        await page.click(".ap-pop .menu-item:first-of-type"); await settle(300);
+        await page.fill("#epName", "Someone Else");
+        await page.keyboard.press("Escape"); await settle(200);
+        ok(await page.evaluate(() => [...document.querySelectorAll(".modal-content h3")].some((h) => /Discard changes\?/.test(h.textContent))), `${tag}: leaving with changes asks Discard changes?`);
+        await page.locator(".modal-overlay").last().locator(".btn.danger").click(); await settle(200);
+        ok(!(await page.isVisible(".ep-dialog")), `${tag}: Discard closes Edit Profile`);
+        await page.evaluate(() => { window.__PASSWORD = "Passw0rd!"; window.__PASSWORD_CHANGED = 0; });
 
         // the listener is released: on leaving the page, and on sign-out
         const base = await page.evaluate(() => window.__LIVE());
@@ -159,18 +198,6 @@ try {
         ok(after === -1 || after < beforeOut, `${tag}: signing out releases the listener (${beforeOut} -> ${after})`);
         const real = errors.filter((e) => !/Execution context|navigat|ViewTransition|Mark as read failed/i.test(e));
         ok(real.length === 0, `${tag}: no page errors ${real.join("; ")}`);
-        await ctx.close();
-    }
-
-    // ---- the real Logout button ends on the login page ----
-    {
-        const { page, ctx, url, settle } = await openPage(browser, "dash", { width: 1280, height: 860, go: false });
-        await page.goto(url); await page.waitForTimeout(1400);
-        await page.click("#accountBtn"); await settle(200);
-        await page.click(".ap-pop .menu-item.danger");
-        await page.click(".modal-content .btn.danger");
-        await page.waitForURL(/_Index\/index\.html/, { timeout: 5000 }).catch(() => { });
-        ok(/_Index\/index\.html/.test(page.url()), "logout: confirming goes to the login page");
         await ctx.close();
     }
 

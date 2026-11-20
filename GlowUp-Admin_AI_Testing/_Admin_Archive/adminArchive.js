@@ -1,3 +1,6 @@
+import { collection } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { onSnapshot } from "../_Shared/adminStore.js";
+import { db } from "../_Database/firebase-console.js";
 
 
 
@@ -11,14 +14,15 @@ import { matchesSearch } from "../_Shared/glowupRules.js";
 import { mountShell, placeHeaderParts, paginate, renderPager, icon, BIN_ICON, askConfirm, hydrate } from "../_Shared/adminShell.js";
 import { bindButtons } from "../_Shared/shortcuts.js";
 import { registerDataset, datasetChanged } from "../_Shared/adminWidgets.js";
-import { listArchive, restoreFromArchive, deleteFromArchive, daysLeft, expired, KEEP_DAYS, WARN_DAYS } from "../_Shared/adminArchive.js";
+import { restoreFromArchive, deleteFromArchive, daysLeft, expired, KEEP_DAYS, WARN_DAYS } from "../_Shared/adminArchive.js";
 
 const el = (id) => document.getElementById(id);
 const many = (n, one, more) => `${n} ${n === 1 ? one : more}`;
 const KINDS = {
     ingredients: { title: "Archived ingredients", one: "ingredient", more: "ingredients" },
     brands: { title: "Archived brands", one: "brand", more: "brands" },
-    products: { title: "Archived products", one: "product", more: "products" }
+    products: { title: "Archived products", one: "product", more: "products" },
+    supportReports: { title: "Archived reports", one: "report", more: "reports" }
 };
 const toDate = (value) => (value && typeof value.toDate === "function" ? value.toDate() : null);
 
@@ -68,17 +72,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     load();
 });
 
-async function load() {
-    try {
-        entries = await listArchive();
+// Live (22 Nov 2026): the Archive listens, so what another admin moves here or restores shows at once.
+let stopArchive = null;
+function load() {
+    if (stopArchive) return;                                   // already listening: the list repaints by itself
+    stopArchive = onSnapshot(collection(db, "archive"), (snapshot) => {
+        entries = snapshot.docs.map((d) => Object.assign({ id: d.id }, d.data()));
         loaded = true;
         render();
-    } catch (error) {
+    }, (error) => {
+        stopArchive = null;
         console.error("Error loading the Archive: ", error);
         el("archiveTableBody").innerHTML = `<tr><td colspan="6" class="table-message error">Could not load the Archive. ${escapeHtml(describeError(error))} <button type="button" class="btn" id="archiveRetry">Try again</button></td></tr>`;
         el("archiveRetry").addEventListener("click", load);
-    }
+    });
 }
+window.addEventListener("pagehide", () => { if (stopArchive) { stopArchive(); stopArchive = null; } });
+window.addEventListener("pageshow", (event) => { if (event.persisted) load(); });
 
 const ofKind = (of = kind) => entries.filter((x) => x.sourceCollection === of);
 const nameOf = (x) => String(x.name || (x.data && x.data.name) || "Unnamed");
@@ -108,6 +118,7 @@ function render() {
     el("countIngredients").textContent = ofKind("ingredients").length || "";
     el("countBrands").textContent = ofKind("brands").length || "";
     el("countProducts").textContent = ofKind("products").length || "";
+    el("countReports").textContent = ofKind("supportReports").length || "";
 
     const here = ofKind(), shown = shownEntries();
     Array.from(picked).forEach((id) => { if (!here.some((x) => x.id === id)) picked.delete(id); });

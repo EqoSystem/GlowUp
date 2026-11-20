@@ -39,7 +39,7 @@ namespace GlowUp.EditorTools
             SetArray(group, "tiles", new Object[] { oily, normal, dry, mix });
 
             float y = HeaderBottom + 2 * cellH + gap + 18;
-            var head = TextOn(c.card, "SkinConditionHeaderText", "Skin Condition Selection (Optional)", HeaderSize, TextAlignmentOptions.MidlineLeft);
+            var head = TextOn(c.card, "SkinConditionHeaderText", "Chronic Skin Condition Selection (Optional)", HeaderSize, TextAlignmentOptions.MidlineLeft);
             SetText(head, "Skin Condition Selection (Optional)", HeaderSize, TextAlignmentOptions.MidlineLeft);
             Top(head.transform, c.card, y, 56); Role(head.transform, ThemeRole.Heading); y += 58;
             var desc = TextOn(c.card, "SkinConditionHintText", "", HelperSize, TextAlignmentOptions.MidlineLeft);

@@ -36,7 +36,7 @@ namespace GlowUp.AppSettings
         [SerializeField] private string noneSaved = "none";
         [SerializeField] private string confirmTitle = "Retake the skin quiz?";
         [SerializeField] private string confirmMessage = "You go through Steps 1 to 5 again with your current answers filled in. Change what you like; your email and password stay locked.\n\nOn the last step, Save edits keeps the changes and Cancel discards them.";
-        [SerializeField] private string confirmMessageWhenClearing = "Your saved skin type, skin tone, skin conditions and allergens are cleared now and the quiz starts empty.\n\nYour name, email, birthday and scan history are not changed.";
+        [SerializeField] private string confirmMessageWhenClearing = "Your saved skin type, skin tone, chronic skin conditions and allergens are cleared now and the quiz starts empty.\n\nYour name, email, birthday and scan history are not changed.";
         [SerializeField] private string confirmButtonText = "Retake Quiz";
 
         UserProfileData profile;
@@ -63,12 +63,14 @@ namespace GlowUp.AppSettings
             string tone = p != null && !string.IsNullOrWhiteSpace(p.skinTone) ? p.skinTone : notSet;
             int conditions = p != null && p.skinConditions != null ? p.skinConditions.Count : 0;
             int allergens = p != null ? p.RealAllergens().Count : 0;
-            currentProfileText.text = string.Format(profileFormat, type, tone, conditions == 0 ? noneSaved : conditions.ToString(), allergens == 0 ? noneSaved : allergens.ToString());
+            // 22 Nov 2026: "Chronic skin condition" is the name everywhere (scenes saved before keep the older word otherwise)
+            string format = profileFormat.Replace("\nSkin conditions:", "\nChronic skin conditions:");
+            currentProfileText.text = string.Format(format, type, tone, conditions == 0 ? noneSaved : conditions.ToString(), allergens == 0 ? noneSaved : allergens.ToString());
         }
 
         void Ask()
         {
-            string message = clearSavedProfileBeforeQuiz ? confirmMessageWhenClearing : confirmMessage;
+            string message = (clearSavedProfileBeforeQuiz ? confirmMessageWhenClearing : confirmMessage).Replace("skin tone, skin conditions", "skin tone, chronic skin conditions");
             if (confirm != null) confirm.Ask(confirmTitle, message, confirmButtonText, Retake);
             else Retake();
         }

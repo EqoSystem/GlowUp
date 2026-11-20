@@ -37,8 +37,8 @@
     };
     var NAV = [
         { id: "dashboard", label: "Dashboard", icon: "dashboard", href: "../_Admin_Dashboard/adminDashboard.html" },
-        { id: "inventory", label: "Brand & Product Inventory", icon: "box", href: "../_Admin_Brand_Inventory/adminBrandInventory.html" },
         { id: "users", label: "User Management", icon: "users", href: "../_Admin_User_Management/adminUserManagement.html" },
+        { id: "inventory", label: "Brand & Product Inventory", icon: "box", href: "../_Admin_Brand_Inventory/adminBrandInventory.html" },
         { id: "curator", label: "Ingredient Curator", icon: "flask", href: "../_Admin_Ingredient_Curator/adminIngredientCurator.html" }
 
 

@@ -51,7 +51,7 @@ try {
         await page.click(".reset-dialog .save-btn");
         await page.waitForTimeout(80);
         ok(/internet/i.test(await page.textContent(".reset-dialog .form-error")), `${tag}: a network fault says so`);
-        ok(await page.isEnabled(".reset-dialog .save-btn") && (await page.textContent(".reset-dialog .save-btn")) === "Send link", `${tag}: Send link can be pressed again`);
+        ok(await page.isEnabled(".reset-dialog .save-btn") && (await page.textContent(".reset-dialog .save-btn")).trim() === "Send Reset Link", `${tag}: Send link can be pressed again`);
 
         // an unknown e-mail gets the same neutral answer
         await page.evaluate(() => { window.__RESET_ERROR = "auth/user-not-found"; });

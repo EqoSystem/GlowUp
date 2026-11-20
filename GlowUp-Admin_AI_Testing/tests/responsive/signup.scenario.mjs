@@ -35,6 +35,8 @@ try {
         ok(await visible(page, "signupView") && !(await visible(page, "loginView")), `${tag}: Sign Up shows the Create Admin Account card only`);
         ok(await page.evaluate(() => location.hash === "#signup"), `${tag}: the address says #signup`);
         ok(await page.evaluate(() => document.activeElement.id === "signupName"), `${tag}: focus starts on Full Name`);
+        ok(await page.evaluate(() => ["signupName", "signupEmail", "signupPassword", "signupConfirm"].every((id) => { const input = document.getElementById(id); return input.maxLength > 0 && input.closest(".field")?.querySelector(".counter"); })), `${tag}: every sign-up text field has a maxlength and live counter`);
+        ok(await page.evaluate(() => document.querySelectorAll("#signupView .counter").length === 4), `${tag}: sign-up counters stay aligned under their fields`);
         const faults = await check(page);
         ok(faults.length === 0, `${tag}: sign-up card layout faults: ${faults.join(" | ")}`);
         const back = await page.locator("#signupBack").boundingBox(), title = await page.locator("#signupTitle").boundingBox();

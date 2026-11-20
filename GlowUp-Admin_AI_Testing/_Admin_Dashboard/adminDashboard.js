@@ -13,8 +13,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 
-import { getDocs, updateDoc, deleteDoc, writeBatch, onListsRefreshed, getCountFromServer, onSnapshot } from "../_Shared/adminStore.js";
+import { getDocs, updateDoc, writeBatch, onListsRefreshed, getCountFromServer, onSnapshot } from "../_Shared/adminStore.js";
 import { openReplyDrawer } from "../_Shared/replyDrawer.js";
+import { archiveReport } from "../_Shared/adminArchive.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, escapeHtml, asArray, toWholeNumber, timeAgo, formatWhen, startOfTodayUnix,
     notify, describeError, toneBadge
@@ -28,14 +29,15 @@ import { openAuditLog } from "../_Shared/adminAuditLog.js";
 
 const RECENT_ITEMS = 120;
 const PAGE_SIZE = 8;
+const REPORT_PAGE_SIZE = 10;
 const activityPage = { page: 1, size: PAGE_SIZE };
-const suggestionPage = { page: 1, size: PAGE_SIZE };
+const suggestionPage = { page: 1, size: REPORT_PAGE_SIZE };
 
 
 const SUPPORT_KINDS = [
-    { prefix: "support", dataset: "supportBug", label: "Bug reports", category: "Bug", title: "bug reports", none: "No new bug reports.", page: { page: 1, size: PAGE_SIZE } },
-    { prefix: "supportWrong", dataset: "supportWrong", label: "Wrong scan results", category: "Wrong scan result", title: "wrong scan results", none: "No new wrong scan results.", page: { page: 1, size: PAGE_SIZE } },
-    { prefix: "supportOther", dataset: "supportOther", label: "Other reports", category: "Other", title: "other reports", none: "No new reports.", page: { page: 1, size: PAGE_SIZE } }
+    { prefix: "support", dataset: "supportBug", label: "Bug reports", category: "Bug", title: "bug reports", none: "No new bug reports.", page: { page: 1, size: REPORT_PAGE_SIZE } },
+    { prefix: "supportWrong", dataset: "supportWrong", label: "Wrong scan results", category: "Wrong scan result", title: "wrong scan results", none: "No new wrong scan results.", page: { page: 1, size: REPORT_PAGE_SIZE } },
+    { prefix: "supportOther", dataset: "supportOther", label: "Other reports", category: "Other", title: "other reports", none: "No new reports.", page: { page: 1, size: REPORT_PAGE_SIZE } }
 ];
 const kindOf = (category) => (SUPPORT_KINDS.find((k) => k.category === category) || SUPPORT_KINDS[2]);
 let supportReports = [];
@@ -60,6 +62,7 @@ let openScanId = "";
 let scansToday = null, flaggedToday = 0;
 let waitingInventory = null, waitingIngredients = null;
 let suggestionsLoaded = false;
+let stopCatalogueCards = [];
 
 let todayAnswered = false, activityAnswered = false, brandsAnswered = false;
 const many = (n, one, more) => `${n} ${n === 1 ? one : more}`;
@@ -69,9 +72,47 @@ const statusOf = (a) => (a.status === "safe" || a.status === "harmful" ? a.statu
 const toneOf = (status) => ({ safe: "ok", caution: "warn", harmful: "bad" }[status] || "muted");
 const INVENTORY_PAGE = "../_Admin_Brand_Inventory/adminBrandInventory.html";
 
+// ---- the Reports panel (22 Nov 2026): one container, a button per kind of report in its header ----
+const REPORT_VIEWS = ["bug", "wrong", "other", "suggestions"];
+let reportView = "bug";
+function showReportView(view) {
+    if (!REPORT_VIEWS.includes(view)) return;
+    reportView = view;
+    REPORT_VIEWS.forEach((key) => {
+        const on = key === view;
+        const tab = el("rt_" + key), body = el("rv_" + key);
+        if (tab) { tab.classList.toggle("on", on); tab.setAttribute("aria-selected", on ? "true" : "false"); tab.tabIndex = on ? 0 : -1; }
+        if (body) body.hidden = !on;
+    });
+}
+function paintReportTabs() {
+    const counts = {
+        bug: supportReports.filter((r) => kindOf(r.category) === SUPPORT_KINDS[0]).length,
+        wrong: supportReports.filter((r) => kindOf(r.category) === SUPPORT_KINDS[1]).length,
+        other: supportReports.filter((r) => kindOf(r.category) === SUPPORT_KINDS[2]).length,
+        suggestions: suggestions.length
+    };
+    REPORT_VIEWS.forEach((key) => { const c = el("rtCount_" + key); if (c) c.textContent = counts[key] > 0 ? String(counts[key]) : ""; });
+    const total = counts.bug + counts.wrong + counts.other + counts.suggestions;
+    setPanelQuiet("reports", total === 0, total === 0 ? "Nothing waiting" : many(total, "item waits", "items wait"));
+}
+function wireReportTabs() {
+    const bar = el("reportTabs");
+    if (!bar) return;
+    bar.addEventListener("click", (event) => { const b = event.target.closest("[data-view]"); if (b) showReportView(b.dataset.view); });
+    bar.addEventListener("keydown", (event) => {                                   // arrow keys move between the tabs
+        if (event.key !== "ArrowRight" && event.key !== "ArrowLeft") return;
+        const i = REPORT_VIEWS.indexOf(reportView), next = REPORT_VIEWS[(i + (event.key === "ArrowRight" ? 1 : REPORT_VIEWS.length - 1)) % REPORT_VIEWS.length];
+        showReportView(next); el("rt_" + next).focus(); event.preventDefault();
+    });
+    const wanted = (location.hash.match(/^#reports-(bug|wrong|other|suggestions)$/) || [])[1];
+    showReportView(wanted || "bug");
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
     registerData();
     mountShell("dashboard");
+    wireReportTabs();
     bindButtons({ "dashboard.activityLog": "#auditLogTile", "dashboard.addProduct": 'a.tile[href*="add=product"]' });
     const auditTile = document.getElementById("auditLogTile");
     if (auditTile) auditTile.addEventListener("click", openAuditLog);
@@ -81,8 +122,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     setupNavigationGuard();
     await requireAdmin();
 
-    loadCatalogueCounts();
-    onListsRefreshed((name) => { if (name === "brands") loadCatalogueCounts(); });
+    watchCatalogueCards();
+    onListsRefreshed(() => { /* live card listeners below are the source of truth */ });
     watchScansToday();
     watchRecentActivity();
     loadSuggestions();
@@ -112,6 +153,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
     window.setInterval(() => { if (startOfTodayUnix() !== todayStart) watchScansToday(); }, 60000);
+    window.addEventListener("pagehide", stopCatalogueCardListeners);
+    window.addEventListener("pageshow", (event) => { if (event.persisted) watchCatalogueCards(); });
 });
 
 function setMetric(id, value, title) {
@@ -145,6 +188,33 @@ async function loadCatalogueCounts() {
     }
     countInto("products", "totalProductsCount");
     countInto("ingredients", "totalIngredientsCount");
+}
+
+// The dashboard cards must move when another admin or the app changes the catalogue.
+// The listener snapshots also keep the top-brand card in step with the three totals.
+function stopCatalogueCardListeners() {
+    stopCatalogueCards.forEach((stop) => stop());
+    stopCatalogueCards = [];
+}
+
+function watchCatalogueCards() {
+    stopCatalogueCardListeners();
+    const watch = (name, done) => stopCatalogueCards.push(onSnapshot(collection(db, name), done, (error) => {
+        console.error(`Error watching ${name} for dashboard cards: `, error);
+        const target = name === "brands" ? "totalBrandsCount" : name === "products" ? "totalProductsCount" : "totalIngredientsCount";
+        setMetric(target, "–", describeError(error));
+    }));
+    watch("brands", (snapshot) => {
+        allBrands = snapshot.docs.filter((d) => d.data().binned !== true).map((d) => ({ id: d.id, name: d.data().name || "Unnamed Brand", category: d.data().category || "", status: String(d.data().status || "Active"), scans: toWholeNumber(d.data().scans) }));
+        setMetric("totalBrandsCount", allBrands.length);
+        allBrands.sort((a, b) => b.scans - a.scans || a.name.localeCompare(b.name));
+        brandsAnswered = true;
+        renderTopBrands(allBrands);
+        datasetChanged("topBrands");
+        refreshAssist("brands");
+    });
+    watch("products", (snapshot) => setMetric("totalProductsCount", snapshot.docs.filter((d) => d.data().binned !== true).length));
+    watch("ingredients", (snapshot) => setMetric("totalIngredientsCount", snapshot.docs.filter((d) => d.data().binned !== true).length));
 }
 
 async function countInto(collectionName, elementId) {
@@ -373,7 +443,7 @@ function activityRow(a) {
 async function loadSuggestions() {
     const sources = [
         { name: "allergenSuggestions", kind: "Allergen" },
-        { name: "conditionSuggestions", kind: "Skin condition" }
+        { name: "conditionSuggestions", kind: "Chronic skin condition" }
     ];
     typedSuggestions = [];
     let failed = null;
@@ -403,9 +473,9 @@ async function loadSuggestions() {
 function renderSuggestions() {
     suggestionsLoaded = true;
     el("suggestionClearAll").hidden = suggestions.length === 0;
-    datasetChanged("suggestions");
+    datasetChanged("suggestions"); datasetChanged("reports");
     refreshAssist("suggestions");
-    setPanelQuiet("suggestions", suggestions.length === 0, suggestions.length === 0 ? "Nothing waiting" : `${many(suggestions.length, "suggestion waits", "suggestions wait")} for review`);
+    paintReportTabs();
     if (suggestions.length === 0) { showEmpty("suggestion", "No suggestions waiting for review.", false); return; }
     suggestions.sort((a, b) => b.createdAtUnix - a.createdAtUnix);
     el("suggestionEmpty").style.display = "none";
@@ -493,9 +563,9 @@ function renderSupportReports() {
 
 function renderSupportKind(kind) {
     const mine = supportReports.filter((r) => kindOf(r.category) === kind);
-    datasetChanged(kind.dataset);
+    datasetChanged(kind.dataset); datasetChanged("reports");
     el(kind.prefix + "ClearAll").hidden = mine.length === 0;
-    setPanelQuiet(kind.prefix, mine.length === 0, mine.length === 0 ? "No new reports" : many(mine.length, "new report", "new reports"));
+    paintReportTabs();
     if (mine.length === 0) { showEmpty(kind.prefix, kind.none, false); return; }
     mine.sort((a, b) => b.createdAtUnix - a.createdAtUnix);
     el(kind.prefix + "Empty").style.display = "none";
@@ -516,10 +586,10 @@ function renderSupportKind(kind) {
                 ${scan}
             </div>
             <div class="suggestion-actions report-actions">
-                <button class="btn small-btn reply-btn" data-action="reply" data-id="${escapeHtml(r.id)}"${r.uid ? "" : " disabled"}>${icon("left")}Reply</button>
+                <button class="btn small-btn reply-btn" data-action="reply" data-id="${escapeHtml(r.id)}"${r.uid ? "" : " disabled"}>${icon("mail")}Reply</button>
+                <button class="btn small-btn report-delete" data-action="delete" data-id="${escapeHtml(r.id)}">${icon("trash")}Delete</button>
                 <span class="btn-group">
                     <button class="icon-btn small row-btn approve" data-action="handled" data-id="${escapeHtml(r.id)}" aria-label="Mark handled">${icon("check")}</button>
-                    <button class="icon-btn small row-btn danger" data-action="delete" data-id="${escapeHtml(r.id)}" aria-label="Delete the report">${icon("x")}</button>
                 </span>
             </div>
         </li>`;
@@ -608,20 +678,20 @@ async function onSupportClick(event) {
     if (!button) return;
     const id = button.getAttribute("data-id"), status = button.getAttribute("data-action");
     const report = supportReports.find((r) => r.id === id);
-    // New22: Reply opens the panel on the right; X deletes the report for good (asks first)
+    // Reply opens the reply window; Delete moves the report to the Archive for 30 days (asks first; it can be restored there)
     if (status === "reply") {
         if (report) openReplyDrawer(report, { onSent: () => { supportReports = supportReports.filter((r) => r.id !== id); renderSupportReports(); } });
         return;
     }
     if (status === "delete") {
-        const sure = await askConfirm({ title: "Delete this report?", message: "The report is deleted for good. This cannot be undone.", items: report ? [report.message.slice(0, 120)] : [], confirmLabel: "Delete", danger: true, badgeIcon: "trash" });
+        const sure = await askConfirm({ title: "Delete this report?", message: "The report moves to the Archive. It stays there for 30 days and can be restored from the Archive page.", items: report ? [report.message.slice(0, 120)] : [], confirmLabel: "Delete", danger: true });
         if (!sure) return;
         button.disabled = true;
         try {
-            await deleteDoc(doc(db, "supportReports", id));
+            await archiveReport({ id });
             supportReports = supportReports.filter((r) => r.id !== id);
             renderSupportReports();
-            notify("Report deleted.", "ok");
+            notify("Report moved to the Archive.", "ok");
         } catch (error) {
             console.error("Error deleting support report: ", error);
             notify("The report was not deleted. " + describeError(error), "error");
@@ -696,7 +766,7 @@ function registerHelpers() {
         const allergens = suggestions.filter((s) => s.kind === "Allergen").length, conditions = suggestions.length - allergens;
         const parts = [];
         if (allergens > 0) parts.push(many(allergens, "allergen", "allergens"));
-        if (conditions > 0) parts.push(many(conditions, "skin condition", "skin conditions"));
+        if (conditions > 0) parts.push(many(conditions, "chronic skin condition", "chronic skin conditions"));
         const oldest = suggestions.reduce((least, s) => (s.createdAtUnix > 0 && s.createdAtUnix < least ? s.createdAtUnix : least), Infinity);
         return [{ tone: "info", text: `${parts.join(" and ")} suggested by app users.` + (Number.isFinite(oldest) ? ` Oldest: ${timeAgo(oldest)}.` : ""), label: "Curator", run: () => { window.location.href = "../_Admin_Ingredient_Curator/adminIngredientCurator.html"; }, tip: "Add what is useful to the Ingredient Curator, then mark the suggestion reviewed." }];
     });
@@ -754,7 +824,7 @@ function registerData() {
         label: "Suggestions", noun: "suggestions", nounOne: "suggestion",
         items: () => suggestions,
         map: (s) => ({ id: s.collection + "/" + s.id, title: s.text || "(empty)", subtitle: s.kind, meta: timeAgo(s.createdAtUnix), tone: s.kind === "Allergen" ? "warn" : "pink" }),
-        dimensions: [{ id: "kind", label: "Kind", of: (s) => s.kind, keys: ["Allergen", "Skin condition"] }],
+        dimensions: [{ id: "kind", label: "Kind", of: (s) => s.kind, keys: ["Allergen", "Chronic skin condition"] }],
         removedWord: "dismissed", foreverLabel: "Dismiss for good",
         removeNote: "They leave this list for everyone who uses the admin site.",
         remove: async (rows) => {
@@ -787,6 +857,29 @@ function registerData() {
         }
     }));
 
+
+    // 22 Nov 2026: the merged Reports panel, all four tabs in one list (Show as row, grid or graph by kind)
+    const reportKind = (r) => r.collection ? "Suggestion" : (kindOf(r.category) || { label: "Other reports" }).label;
+    registerDataset("reports", {
+        label: "Reports", noun: "reports", nounOne: "report",
+        items: () => supportReports.concat(suggestions),
+        map: (r) => r.collection
+            ? { id: r.collection + "/" + r.id, title: r.text || "(empty)", subtitle: "Suggestion: " + r.kind, meta: timeAgo(r.createdAtUnix), tone: "pink" }
+            : { id: r.id, title: r.message || "(empty)", subtitle: senderText(r), meta: timeAgo(r.createdAtUnix), tone: r.category === "Bug" ? "bad" : r.category === "Wrong scan result" ? "warn" : "pink" },
+        dimensions: [{ id: "kind", label: "Kind", of: reportKind, keys: ["Bug reports", "Wrong scan results", "Other reports", "Suggestion"] }],
+        removedWord: "dismissed", foreverLabel: "Dismiss for good", removeNote: "They leave this list for everyone who uses the admin site.",
+        remove: async (rows) => {
+            try {
+                const tips = rows.filter((r) => r.collection), reports = rows.filter((r) => !r.collection);
+                if (reports.length) await dismissAll(reports.map((r) => ({ id: r.id, collection: "supportReports" })), () => ({ status: "dismissed", handledAt: serverTimestamp() }));
+                for (const s of tips) await updateDoc(doc(db, s.collection, s.id), { status: "dismissed", reviewedAt: serverTimestamp() });
+                supportReports = supportReports.filter((r) => !rows.includes(r));
+                suggestions = suggestions.filter((s) => !rows.includes(s));
+                renderSupportReports(); renderSuggestions();
+                notify(`${rows.length} report${rows.length === 1 ? "" : "s"} dismissed.`, "ok");
+            } catch (error) { throw new Error(describeError(error)); }
+        }
+    });
 
     registerTileDataset("numbers", {
         label: "Numbers", noun: "numbers", nounOne: "number", valueNoun: "Number", selector: ".kpi-row .kpi", watch: ".kpi-row",

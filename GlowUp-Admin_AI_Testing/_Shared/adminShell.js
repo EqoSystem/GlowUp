@@ -89,7 +89,9 @@ const ICONS = {
     minus: '<path d="M5 12h14"/>',
     clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
     bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15L6 16z"/><path d="M10 21a2.2 2.2 0 0 0 4 0"/>',
-    bug: '<rect x="8" y="8" width="8" height="11" rx="4"/><path d="M12 12v7M9.5 8V6.5a2.5 2.5 0 0 1 5 0V8M4 11h4M16 11h4M4 17h4M16 17h4M5.5 6.5L8 9M18.5 6.5L16 9"/>'
+    bug: '<rect x="8" y="8" width="8" height="11" rx="4"/><path d="M12 12v7M9.5 8V6.5a2.5 2.5 0 0 1 5 0V8M4 11h4M16 11h4M4 17h4M16 17h4M5.5 6.5L8 9M18.5 6.5L16 9"/>',
+    mail: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 6.5l8.5 6.5 8.5-6.5"/>',
+    send: '<path d="M21 3L10.5 13.5"/><path d="M21 3l-6.5 18-4-7.5-7.5-4L21 3z"/>',
 };
 
 export const BIN_ICON = '<svg class="ic bin-ic" viewBox="0 0 24 24" aria-hidden="true"><g class="bin-lid"><path d="M4 7h16"/><path d="M9 7V4h6v3"/></g><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg>';

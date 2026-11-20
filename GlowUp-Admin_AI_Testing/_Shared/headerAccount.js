@@ -9,8 +9,9 @@
 // The listener starts when an account is signed in, and stops on sign-out and when the page is left (it starts again when the
 // page comes back from the browser's back/forward cache).
 //
-// PROFILE: a pink circle with the first letter of the admin's name or e-mail; its menu shows name and e-mail, opens Quick
-// settings, and signs out through the same "Sign out?" question as the sidebar button.
+// PROFILE: a pink circle with the first letter of the admin's name or e-mail; its menu shows name and e-mail, Edit Profile
+// (name, password: adminProfile.js), My activity log (this admin's own audit records) and the last sign-in time. Settings and
+// Sign out are not repeated here (22 Nov 2026): the gear and the sidebar's Sign Out already do that.
 //
 // One dropdown at a time: opening one closes the other (and any open menu); a click outside, Escape or a resize closes it.
 
@@ -18,7 +19,10 @@ import { auth, db } from "../_Database/firebase-console.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import * as fb from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { onSnapshot, writeBatch } from "./adminStore.js";
-import { timeAgo, confirmSignOut } from "./adminCommon.js";
+import { timeAgo } from "./adminCommon.js";
+import { openEditProfile, lastLoginText } from "./adminProfile.js";
+import { openAuditLog } from "./adminAuditLog.js";
+import { openReplyDrawer } from "./replyDrawer.js";
 import { icon, closeMenu, toast } from "./adminShell.js";
 
 export const KINDS = [
@@ -51,7 +55,7 @@ function startReports() {
         reports = snapshot.docs.map((d) => {
             const data = d.data();
             return { id: d.id, category: String(data.category || "Other"), message: String(data.message || ""), uid: String(data.uid || ""), userName: String(data.userName || "").trim(), read: data.read === true, when: data.createdAt || data.createdAtUnix || 0 };
-        }).filter((r) => !r.read).sort((a, b) => whenMs(b) - whenMs(a));
+        }).sort((a, b) => whenMs(b) - whenMs(a));
         problem = null;
         emit();
     }, (error) => {
@@ -70,8 +74,8 @@ export function stopWatching() {
 
 async function markRead(ids) {
     if (ids.length === 0) return;
-    const gone = (reports || []).filter((r) => ids.includes(r.id));
-    reports = (reports || []).filter((r) => !ids.includes(r.id));        // the badge drops at once
+    const changed = (reports || []).filter((r) => ids.includes(r.id) && !r.read);
+    changed.forEach((r) => { r.read = true; });                         // the badge drops at once
     emit();
     try {
         for (let i = 0; i < ids.length; i += CHUNK) {
@@ -81,8 +85,7 @@ async function markRead(ids) {
         }
     } catch (error) {
         console.error("Mark as read failed:", error && error.code ? error.code : error);
-        const have = new Set((reports || []).map((r) => r.id));
-        reports = (reports || []).concat(gone.filter((r) => !have.has(r.id))).sort((a, b) => whenMs(b) - whenMs(a));
+        changed.forEach((r) => { r.read = false; });
         emit();
         toast("Not marked as read. Check the connection and try again.", "error");
     }
@@ -130,21 +133,29 @@ function openPop(name, anchor, el, repaint) {
 const node = (tag, className, text) => { const el = document.createElement(tag); if (className) el.className = className; if (text !== undefined) el.textContent = text; return el; };
 
 // ---- bell ----
+const unread = () => (reports || []).filter((r) => !r.read);
 function paintBadge() {
     if (!bellBtn) return;
-    const n = reports ? reports.length : 0;
+    const n = unread().length;
     badgeEl.hidden = n === 0;
     badgeEl.textContent = n > 99 ? "99+" : String(n);
     bellBtn.setAttribute("aria-label", n > 0 ? `Notifications, ${n} new` : "Notifications");
 }
 
+const KIND_WORDS = { bug: "Bug report", suggestion: "Suggestion", wrong: "Wrong scan result", other: "Other report" };
+const dayStart = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); };
+
 function paintNotifications(panel) {
     const head = node("div", "np-head");
-    head.append(node("strong", "np-title", "Notifications"));
+    const name = node("div", "np-name");
+    name.append(node("strong", "np-title", "Notifications"));
+    const left = unread().length;
+    if (left > 0) name.append(node("span", "np-unread", String(left > 99 ? "99+" : left)));
+    head.append(name);
     const all = node("button", "btn ghost np-all", "Mark all as read");
     all.type = "button";
-    all.disabled = !reports || reports.length === 0;
-    all.addEventListener("click", () => markRead((reports || []).map((r) => r.id)));
+    all.disabled = left === 0;
+    all.addEventListener("click", () => markRead(unread().map((r) => r.id)));
     head.append(all);
     const body = node("div", "np-body");
     if (reports === null) {
@@ -161,33 +172,36 @@ function paintNotifications(panel) {
         body.append(fail);
     } else if (reports.length === 0) {
         const empty = node("div", "np-state");
-        empty.innerHTML = icon("bell");
         empty.append(node("p", "", "You are all caught up."), node("small", "", "New reports from the app appear here by themselves."));
         body.append(empty);
     } else {
-        KINDS.forEach((kind) => {
-            const mine = reports.filter((r) => kindOf(r.category) === kind);
+        const cut = dayStart();
+        [["Today", reports.filter((r) => whenMs(r) >= cut)], ["Earlier", reports.filter((r) => whenMs(r) < cut)]].forEach(([label, mine]) => {
             if (mine.length === 0) return;
             const group = node("section", "np-group");
-            const title = node("h4", "np-group-title");
-            title.innerHTML = icon(kind.icon);
-            title.append(node("span", "", kind.label), node("span", "np-count", String(mine.length)));
-            group.append(title);
+            group.append(node("h4", "np-group-title", label));
             mine.forEach((r) => {
-                const item = node("button", "np-item");
+                const item = node("button", "np-item" + (r.read ? " is-read" : ""));
                 item.type = "button";
-                item.append(node("span", "np-msg", preview(r.message)));
-                const meta = node("span", "np-meta");
-                meta.append(node("span", "np-from", senderOf(r)), node("span", "np-when", timeAgo(r.when)));
-                item.append(meta);
-                item.setAttribute("aria-label", `Mark as read: ${preview(r.message)}`);
-                item.addEventListener("click", () => markRead([r.id]));
+                item.dataset.kind = kindOf(r.category).key;
+                const dot = node("span", "np-dot"); dot.setAttribute("aria-hidden", "true");
+                const words = node("span", "np-words");
+                words.append(node("span", "np-kind", KIND_WORDS[kindOf(r.category).key]), node("span", "np-msg", preview(r.message)), node("span", "np-from", senderOf(r)));
+                item.append(dot, words, node("span", "np-when", timeAgo(r.when)));
+                item.setAttribute("aria-label", `${r.read ? "" : "Unread. "}${KIND_WORDS[kindOf(r.category).key]} from ${senderOf(r)}: ${preview(r.message)}. Open to reply.`);
+                item.addEventListener("click", () => {
+                    closePop(false);
+                    if (!r.read) markRead([r.id]);
+                    openReplyDrawer({ id: r.id, uid: r.uid, userName: r.userName, category: r.category, message: r.message });
+                });
                 group.append(item);
             });
             body.append(group);
         });
     }
-    panel.replaceChildren(head, body);
+    const foot = node("a", "np-foot", "View all reports");
+    foot.href = "../_Admin_Dashboard/adminDashboard.html#reports";
+    panel.replaceChildren(head, body, foot);
 }
 
 function toggleBell() {
@@ -226,10 +240,11 @@ function toggleProfile() {
         button.addEventListener("click", () => { closePop(false); run(); });
         return button;
     };
-    const gear = () => document.getElementById("quickSettingsBtn");
-    const items = [who, node("div", "menu-sep")];
-    if (gear()) items.push(row("Settings", "gear", () => { const g = gear(); if (g && g.getAttribute("aria-expanded") !== "true") g.click(); }));
-    items.push(row("Logout", "logout", confirmSignOut, true));
+    const items = [who, node("div", "menu-sep"),
+        row("Edit Profile", "edit", openEditProfile),
+        row("My activity log", "list", () => openAuditLog({ uid: user ? user.uid : "" }))];
+    const last = lastLoginText(user);
+    if (last) { items.push(node("div", "menu-sep")); const line = node("p", "ap-last", "Last login: " + last); items.push(line); }
     panel.append(...items);
     if (openPop("profile", avatarBtn, panel)) panel.querySelector(".menu-item")?.focus({ preventScroll: true });
 }
@@ -260,6 +275,7 @@ export function mountHeaderAccount(tools) {
     avatarBtn.addEventListener("click", toggleProfile);
     subscribers.add(paintBadge);
 
+    document.addEventListener("glowup:profile-changed", paintAvatar);
     onAuthStateChanged(auth, (account) => {
         user = account || null;
         paintAvatar();

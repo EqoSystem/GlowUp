@@ -15,11 +15,11 @@ export const ARCHIVE = "archive";
 export const KEEP_DAYS = 30;
 export const WARN_DAYS = 3;
 export const DAY_MS = 24 * 60 * 60 * 1000;
-export const TYPE_OF = { ingredients: "ingredient", brands: "brand", products: "product" };
+export const TYPE_OF = { ingredients: "ingredient", brands: "brand", products: "product", supportReports: "report" };
 const PAIRS_PER_BATCH = 200;
 
 export const archiveId = (collectionName, id) => `${collectionName}__${id}`;
-const nameOf = (data, collectionName) => String((data && (data.name || (collectionName === "products" ? data.productName : ""))) || `Unnamed ${TYPE_OF[collectionName]}`).slice(0, 200);
+const nameOf = (data, collectionName) => String((data && (data.name || (collectionName === "products" ? data.productName : "") || (collectionName === "supportReports" ? `${data.category || "Report"}: ${String(data.message || "").slice(0, 120)}` : ""))) || `Unnamed ${TYPE_OF[collectionName]}`).slice(0, 200);
 const millis = (value) => (value && typeof value.toMillis === "function" ? value.toMillis() : value && typeof value.seconds === "number" ? value.seconds * 1000 : 0);
 
 
@@ -65,6 +65,24 @@ export async function moveToArchive(entries) {
     return { moved: pairs.length, skipped };
 }
 
+
+/** An app report deleted on the dashboard (22 Nov 2026): kept in the Archive for KEEP_DAYS days, then purged like everything else.
+ *  The report and its archive entry change in one batch, so a report is never lost half-way. */
+export async function archiveReport(report) {
+    const user = auth.currentUser;
+    if (!user) throw new Error("Not signed in.");
+    const snap = await getDoc(doc(db, "supportReports", report.id));
+    noteReads("archive: report checked before moving", 1);
+    if (!snap.exists()) return { moved: 0 };
+    const batch = writeBatch(db);
+    batch.set(doc(db, ARCHIVE, archiveId("supportReports", report.id)), {
+        type: "report", sourceCollection: "supportReports", sourceId: report.id, name: nameOf(snap.data(), "supportReports"), data: snap.data(),
+        deleted_at: serverTimestamp(), expires_at: Timestamp.fromMillis(Date.now() + KEEP_DAYS * DAY_MS), deleted_by: user.uid, deleted_by_email: user.email || "", archivedWith: ""
+    });
+    batch.delete(doc(db, "supportReports", report.id));
+    await batch.commit();
+    return { moved: 1 };
+}
 
 export async function listArchive() {
     const snapshot = await getDocs(collection(db, ARCHIVE));

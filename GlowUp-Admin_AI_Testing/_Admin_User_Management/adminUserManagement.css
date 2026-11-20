@@ -1,19 +1,29 @@
 /* User Management page (20 November 2026). Colours, radii, sizes and motion come from adminCommon.css tokens; this file only places things. */
 
-.tab-count { margin-left: calc(2 * var(--u)); padding: 0 calc(7 * var(--u)); border-radius: calc(999 * var(--u)); font-size: var(--fs-xs); font-weight: 600; background: color-mix(in srgb, currentColor 16%, transparent); }
-.tab-count:empty { display: none; }
-/* New23 (contrast): on the selected pink tab a tinted bubble lowered the count to 3.6:1, so it is drawn as an outline there */
-.seg.on .tab-count { background: transparent; box-shadow: inset 0 0 0 1px currentColor; }
-#userTabs .seg { gap: calc(7 * var(--u)); }
+/* 22 Nov 2026: the header tabs and the second page title are gone (the page header names the page; the cards are the filters).
+   Each card: the number and its words on the left, a tinted icon badge on the right, the same height as its neighbours. */
+.um-kpis .kpi { grid-template-columns: minmax(0, 1fr) auto; grid-auto-rows: min-content; align-content: start; column-gap: calc(12 * var(--u)); padding: calc(14 * var(--u)) calc(16 * var(--u)); transition: border-color .2s, background-color .2s, transform .2s var(--ease); }
+.um-kpis .kpi-value, .um-kpis .kpi-title, .um-kpis .kpi-delta { grid-column: 1; }
+.um-kpis .kpi-icon { grid-column: 2; grid-row: 1 / span 3; align-self: center; width: calc(38 * var(--u)); height: calc(38 * var(--u)); border-radius: var(--radius-sm); color: var(--accent-text); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.um-kpis .kpi:hover { transform: translateY(calc(-2 * var(--u))); }
+.um-kpis .kpi.on .kpi-icon { color: var(--accent-ink); background: var(--accent); }
+#kpiOnline .kpi-value::before { content: ""; display: inline-block; width: calc(8 * var(--u)); height: calc(8 * var(--u)); margin: 0 calc(8 * var(--u)) calc(3 * var(--u)) 0; border-radius: 50%; background: var(--ok); vertical-align: middle; }
+#kpiOnline .kpi-value.skeleton::before { display: none; }
+@media (prefers-reduced-motion: reduce) { .um-kpis .kpi { transition: none; } .um-kpis .kpi:hover { transform: none; } }
 
-.um-heading { display: flex; align-items: center; gap: calc(12 * var(--u)); }
-.um-heading-icon { display: grid; place-items: center; width: calc(40 * var(--u)); height: calc(40 * var(--u)); flex: none; border-radius: var(--radius-sm); color: var(--gold); background: color-mix(in srgb, var(--accent) 12%, var(--surface)); border: 1px solid var(--border); }
-.um-heading-icon svg.ic { width: calc(20 * var(--u)); height: calc(20 * var(--u)); }
-.um-title { margin: 0; font-size: var(--fs-lg); font-weight: 700; line-height: 1.25; }
-.um-subtitle { margin: calc(2 * var(--u)) 0 0; font-size: var(--fs-sm); color: var(--muted); }
+/* the search sits inside the Users container, at the right of its title row; it takes the whole row on narrow screens */
+.um-search { flex: 1 1 calc(220 * var(--u)); max-width: calc(340 * var(--u)); min-width: 0; }
+/* narrow: the search and the two tools share the second row of the Users header (the "..." menu stays on the title row) */
+@container panel (max-width: 620px) { .um-search { order: 10; flex: 1 1 calc(160 * var(--u)); max-width: none; } .um-tools { order: 11; flex-wrap: nowrap; } }
+/* phones: two cards a row with no icon badge (the words need the room); an odd last card takes the whole row */
+@container panel (max-width: 459.98px) { .um-kpis .kpi { grid-template-columns: minmax(0, 1fr); padding: calc(12 * var(--u)); } .um-kpis .kpi-icon { display: none; } .um-kpis > .kpi:last-child:nth-child(odd) { grid-column: 1 / -1; } }
+/* the username column keeps a readable width; on a phone the table scrolls sideways inside its box instead of breaking names letter by letter */
+.user-table td:nth-child(2) { min-width: calc(150 * var(--u)); }
+.um-name, .um-sub { overflow-wrap: break-word; word-break: normal; }
 
 .um-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@container panel (min-width: 560px) { .um-kpis { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); } }
+@container panel (min-width: 760px) { .um-kpis { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); } }
+@container panel (min-width: 460px) and (max-width: 759.98px) { .um-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .um-kpis > :last-child:nth-child(odd) { grid-column: auto; }
 .kpi-delta { grid-column: 1 / -1; font-size: var(--fs-xs); line-height: 1.3; color: var(--ok); font-variant-numeric: tabular-nums; }
 .kpi-delta:empty { display: none; }

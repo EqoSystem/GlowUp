@@ -123,7 +123,13 @@ function node(tag, className, text) {
 /** Draws the Quick settings view: loading rows, an error with Retry, an empty state, or the requests. */
 export function paintRequestsView(host) {
     if (!host) return;
-    const intro = node("p", "req-intro", "People who pressed Sign Up on the login page. Approve only people you know: an admin can change all GlowUp data.");
+    const intro = node("div", "req-top");
+    intro.append(node("p", "req-intro", "People who pressed Sign Up on the login page. Approve only people you know: an admin can change all GlowUp data."));
+    // 22 Nov 2026: the three steps, read top to bottom, so a new admin knows what each button does
+    const steps = node("ol", "req-steps");
+    [["They sign up", "and confirm their e-mail from the link we send."], ["You approve", "and they can log in to this website at once."], ["Or you decline", "and the request is removed. They are not told."]]
+        .forEach(([b, rest]) => { const li = node("li"); li.append(node("strong", "", b), document.createTextNode(" " + rest)); steps.append(li); });
+    intro.append(steps);
     if (list === null) {
         const rows = Array.from({ length: 3 }, () => { const r = node("div", "req-row req-skeleton"); r.setAttribute("aria-hidden", "true"); r.append(node("span", "sk sk-dot"), node("span", "sk sk-line")); return r; });
         const box = node("div", "req-list"); box.setAttribute("aria-busy", "true"); box.append(...rows);
@@ -148,8 +154,12 @@ export function paintRequestsView(host) {
         host.replaceChildren(intro, empty);
         return;
     }
+    const ready = list.filter((r) => r.emailVerified).length;
+    const summary = node("p", "req-summary");
+    summary.setAttribute("aria-live", "polite");
+    summary.append(node("strong", "", list.length + (list.length === 1 ? " request" : " requests")), document.createTextNode(` waiting · ${ready} ready to approve`));
     const box = node("ul", "req-list");
-    list.forEach((request) => {
+    list.slice().sort((a, b) => Number(b.emailVerified) - Number(a.emailVerified)).forEach((request) => {
         const row = node("li", "req-row");
         const avatar = node("span", "req-avatar", String(request.name || request.email || "?").trim().charAt(0).toUpperCase());
         avatar.setAttribute("aria-hidden", "true");
@@ -175,5 +185,5 @@ export function paintRequestsView(host) {
         if (!request.emailVerified) row.append(node("p", "req-why", "Approve opens once they confirm their email (they open the link we sent, or log in once after it)."));
         box.append(row);
     });
-    host.replaceChildren(intro, box);
+    host.replaceChildren(intro, summary, box);
 }

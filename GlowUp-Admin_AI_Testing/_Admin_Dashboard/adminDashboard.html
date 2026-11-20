@@ -141,67 +141,54 @@
 
 
 
-            <section class="panel" data-panel="suggestions" data-label="Suggestions" data-w="8" data-source="suggestions">
-                <div class="panel-head">
-                    <h3 class="panel-title">Suggestions</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Suggestions from app users" data-tip="Allergens and skin conditions users typed in because they were not on the app's lists, and ideas sent from the app's Contact support (Suggestion)." data-tip-preview="Mark one reviewed after you dealt with it, or dismiss it.">i</button>
+            <!-- 22 Nov 2026: the four report panels became one. The buttons in its header change the list; every list keeps its own pager,
+                 Clear all and empty state (same ids as before). Reply opens the reply window; Delete moves a report to the Archive. -->
+            <section class="panel" data-panel="reports" id="reports" data-label="Reports" data-w="8" data-source="reports">
+                <div class="panel-head report-head-row">
+                    <h3 class="panel-title">Reports</h3>
+                    <button type="button" class="guide-badge" data-tip-title="Reports from app users" data-tip="What users sent from the app: bugs, wrong scan results, other messages, and suggestions (allergens, chronic skin conditions and ideas). Reply answers the user in the app; Delete moves a report to the Archive for 30 days.">i</button>
                     <span class="spacer"></span>
-                    <div class="pager" id="suggestionPager"></div>
-                    <button type="button" class="btn small ghost clear-all-btn" id="suggestionClearAll" hidden>Clear all</button>
                 </div>
-                <ul class="suggestion-list" id="suggestionList" style="display: none;"></ul>
-                <div class="empty-state loading" id="suggestionEmpty"><div class="sk-list"><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div></div>
-                    <p class="empty-message" id="suggestionEmptyMessage">Loading suggestions...</p>
-                    <span class="empty-hint" id="suggestionEmptyHint">Nothing to review right now.</span>
+                <div class="segmented report-tabs" id="reportTabs" role="tablist" aria-label="Which reports to show">
+                        <button type="button" class="seg on" role="tab" id="rt_bug" data-view="bug" aria-controls="rv_bug" aria-selected="true">Bug reports <span class="tab-count" id="rtCount_bug"></span></button>
+                        <button type="button" class="seg" role="tab" id="rt_wrong" data-view="wrong" aria-controls="rv_wrong" aria-selected="false">Wrong scan results <span class="tab-count" id="rtCount_wrong"></span></button>
+                        <button type="button" class="seg" role="tab" id="rt_other" data-view="other" aria-controls="rv_other" aria-selected="false">Other reports <span class="tab-count" id="rtCount_other"></span></button>
+                        <button type="button" class="seg" role="tab" id="rt_suggestions" data-view="suggestions" aria-controls="rv_suggestions" aria-selected="false">Suggestions <span class="tab-count" id="rtCount_suggestions"></span></button>
                 </div>
-            </section>
-
-
-
-            <section class="panel" data-panel="support" data-label="Bug reports" data-w="8" data-source="supportBug">
-                <div class="panel-head">
-                    <h3 class="panel-title">Bug reports</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Bug reports" data-tip="Bugs that users reported from the app's Contact support." data-tip-preview="Mark one handled when you dealt with it, or dismiss it.">i</button>
-                    <span class="spacer"></span>
-                    <div class="pager" id="supportPager"></div>
-                    <button type="button" class="btn small ghost clear-all-btn" id="supportClearAll" hidden>Clear all</button>
-                </div>
-                <ul class="suggestion-list support-list" id="supportList" style="display: none;"></ul>
+                <div class="report-view" id="rv_bug" role="tabpanel" aria-labelledby="rt_bug">
+                    <div class="report-view-bar"><div class="pager" id="supportPager"></div><span class="spacer"></span><button type="button" class="btn small ghost clear-all-btn" id="supportClearAll" hidden>Clear all</button></div>
+                    <ul class="suggestion-list support-list" id="supportList" style="display: none;"></ul>
                 <div class="empty-state loading" id="supportEmpty"><div class="sk-list"><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div></div>
                     <p class="empty-message" id="supportEmptyMessage">Loading reports...</p>
                     <span class="empty-hint" id="supportEmptyHint">Bug reports from the app's Contact support show here.</span>
                 </div>
-            </section>
-
-            <section class="panel" data-panel="supportWrong" data-label="Wrong scan results" data-w="8" data-source="supportWrong">
-                <div class="panel-head">
-                    <h3 class="panel-title">Wrong scan results</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Wrong scan results" data-tip="Scan results that users said were wrong, with their last scan when they attached it." data-tip-preview="Mark one handled when you dealt with it, or dismiss it.">i</button>
-                    <span class="spacer"></span>
-                    <div class="pager" id="supportWrongPager"></div>
-                    <button type="button" class="btn small ghost clear-all-btn" id="supportWrongClearAll" hidden>Clear all</button>
                 </div>
-                <ul class="suggestion-list support-list" id="supportWrongList" style="display: none;"></ul>
+                <div class="report-view" id="rv_wrong" role="tabpanel" aria-labelledby="rt_wrong" hidden>
+                    <div class="report-view-bar"><div class="pager" id="supportWrongPager"></div><span class="spacer"></span><button type="button" class="btn small ghost clear-all-btn" id="supportWrongClearAll" hidden>Clear all</button></div>
+                    <ul class="suggestion-list support-list" id="supportWrongList" style="display: none;"></ul>
                 <div class="empty-state loading" id="supportWrongEmpty"><div class="sk-list"><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div></div>
                     <p class="empty-message" id="supportWrongEmptyMessage">Loading reports...</p>
                     <span class="empty-hint" id="supportWrongEmptyHint">Wrong scan results reported from the app show here.</span>
                 </div>
-            </section>
-
-            <section class="panel" data-panel="supportOther" data-label="Other reports" data-w="8" data-source="supportOther">
-                <div class="panel-head">
-                    <h3 class="panel-title">Other reports</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Other reports" data-tip="Any other message users sent from the app's Contact support." data-tip-preview="Mark one handled when you dealt with it, or dismiss it.">i</button>
-                    <span class="spacer"></span>
-                    <div class="pager" id="supportOtherPager"></div>
-                    <button type="button" class="btn small ghost clear-all-btn" id="supportOtherClearAll" hidden>Clear all</button>
                 </div>
-                <ul class="suggestion-list support-list" id="supportOtherList" style="display: none;"></ul>
+                <div class="report-view" id="rv_other" role="tabpanel" aria-labelledby="rt_other" hidden>
+                    <div class="report-view-bar"><div class="pager" id="supportOtherPager"></div><span class="spacer"></span><button type="button" class="btn small ghost clear-all-btn" id="supportOtherClearAll" hidden>Clear all</button></div>
+                    <ul class="suggestion-list support-list" id="supportOtherList" style="display: none;"></ul>
                 <div class="empty-state loading" id="supportOtherEmpty"><div class="sk-list"><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div></div>
                     <p class="empty-message" id="supportOtherEmptyMessage">Loading reports...</p>
                     <span class="empty-hint" id="supportOtherEmptyHint">Other messages from the app's Contact support show here.</span>
                 </div>
+                </div>
+                <div class="report-view" id="rv_suggestions" role="tabpanel" aria-labelledby="rt_suggestions" hidden>
+                    <div class="report-view-bar"><div class="pager" id="suggestionPager"></div><span class="spacer"></span><button type="button" class="btn small ghost clear-all-btn" id="suggestionClearAll" hidden>Clear all</button></div>
+                    <ul class="suggestion-list" id="suggestionList" style="display: none;"></ul>
+                <div class="empty-state loading" id="suggestionEmpty"><div class="sk-list"><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div><div class="sk-line-row sugg"><span><i class="sk sk-text w45"></i></span><i class="sk sk-pill"></i><i class="sk sk-pill short"></i></div></div>
+                    <p class="empty-message" id="suggestionEmptyMessage">Loading suggestions...</p>
+                    <span class="empty-hint" id="suggestionEmptyHint">Nothing to review right now.</span>
+                </div>
+                </div>
             </section>
+
         </div>
     </main>
 

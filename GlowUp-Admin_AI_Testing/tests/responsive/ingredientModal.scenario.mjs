@@ -103,7 +103,7 @@ try {
         ok(await page.evaluate(() => Array.from(document.querySelectorAll(".ing-modal .label-row > label[for]")).every((l) => document.getElementById(l.htmlFor))), `${tag}: every label points at its box`);
 
         const sequence = await page.evaluate(() => Array.from(document.querySelectorAll("#secJudge .label-row > label, #secJudge .label-row > .label-text")).map((l) => l.textContent.replace(/\(optional\)/, "").trim()));
-        ok(sequence.join("|") === "Risk Level|Minimum Age|Caution Note|Commonly Used In|Highlights|Allergen Family|Skin Types|Skin Conditions", `${tag}: order in the last section (got ${sequence.join("|")})`);
+        ok(sequence.join("|") === "Risk Level|Minimum Age|Caution Note|Commonly Used In|Highlights|Allergen Family|Skin Types|Chronic Skin Conditions", `${tag}: order in the last section (got ${sequence.join("|")})`);
 
         const halves = await page.evaluate(() => Array.from(document.querySelectorAll(".ing-grid > .half")).map((n) => n.querySelector("label").textContent.trim().replace(/\s*\*$/, "")));
         ok(halves.join("|") === "INCI name|Ingredient classification|Risk Level|Minimum Age", `${tag}: only the short boxes share a row`);

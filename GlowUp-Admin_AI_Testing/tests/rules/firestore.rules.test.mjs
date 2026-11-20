@@ -242,6 +242,10 @@ await can("an admin with the claim archives a brand", () => setDoc(doc(adminClai
 await cannot("a plain user archives", () => setDoc(doc(user(), "archive/products__p1"), entry("u1")));
 await cannot("nobody signed in archives", () => setDoc(doc(anon(), "archive/products__p1"), entry("x")));
 await cannot("an id that does not match the entry", () => setDoc(doc(adminDoc(), "archive/products__other"), entry("a1")));
+await can("an admin archives an app report (22 Nov 2026)", () => setDoc(doc(adminDoc(), "archive/supportReports__r1"), entry("a1", { type: "report", sourceCollection: "supportReports", sourceId: "r1", data: { category: "Bug", message: "x" } })));
+await cannot("a report entry from another list", () => setDoc(doc(adminDoc(), "archive/products__r1"), entry("a1", { type: "report", sourceCollection: "products", sourceId: "r1" })));
+await can("an admin restores a report from the Archive (creates it again)", () => setDoc(doc(adminDoc(), "supportReports/r9"), { uid: "u1", category: "Bug", message: "Back again", status: "new", createdAtUnix: 1 }));
+await cannot("a user creates a report in someone else's name", () => setDoc(doc(user(), "supportReports/r8"), { uid: "u2", category: "Bug", message: "Spoof", status: "new" }));
 await cannot("a type that does not match the collection", () => setDoc(doc(adminDoc(), "archive/products__p1"), entry("a1", { type: "brand" })));
 await cannot("another collection than the three", () => setDoc(doc(adminDoc(), "archive/users__u1"), entry("a1", { type: "user", sourceCollection: "users", sourceId: "u1" })));
 await cannot("deleted_by is somebody else", () => setDoc(doc(adminDoc(), "archive/products__p1"), entry("someone-else")));
@@ -451,6 +455,8 @@ await cannot("an admin writes systemConfig (removed)", () => setDoc(doc(adminDoc
 await cannotAfter("nobody reads systemConfig (removed)", seed, () => getDoc(doc(anon(), "systemConfig/maintenanceMode")));
 
 await canAfter("a user saves their profile photo", seedUsers, () => setDoc(doc(user(), "users/u1"), { photoData: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ==" }, { merge: true }));
+await canAfter("a user marks themself active (Online now, 22 Nov 2026)", seedUsers, () => setDoc(doc(user(), "users/u1"), { lastActiveAt: serverTimestamp() }, { merge: true }));
+await cannotAfter("a user marks someone else active", seedUsers, () => setDoc(doc(other(), "users/u1"), { lastActiveAt: serverTimestamp() }, { merge: true }));
 await cannotAfter("a profile photo that is not a JPEG", seedUsers, () => setDoc(doc(user(), "users/u1"), { photoData: "data:image/svg+xml;base64,PHN2Zz4=" }, { merge: true }));
 await cannotAfter("a profile photo over 200 KB", seedUsers, () => setDoc(doc(user(), "users/u1"), { photoData: "data:image/jpeg;base64," + "A".repeat(200100) }, { merge: true }));
 await cannotAfter("a profile photo labelled JPEG whose content is not a JPEG (New23)", seedUsers, () => setDoc(doc(user(), "users/u1"), { photoData: "data:image/jpeg;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+" }, { merge: true }));
