@@ -8,7 +8,10 @@ const QUIET_FIELDS = new Set(["scans", "updatedAt", "lastScannedAt", "scanCount"
 const KINDS = { products: "product", ingredients: "ingredient" };
 const WORD = { product: ["product", "products"], ingredient: ["ingredient", "ingredients"] };
 
-const cut = (text, max) => { const t = String(text || "").replace(/\s+/g, " ").trim(); return t.length <= max ? t : t.slice(0, max - 1).trimEnd() + "…"; };
+// names can come from the app (a user's own scan creates a product), so markup and control characters are removed here;
+// the app also shows notices as plain text
+const plain = (text) => String(text || "").replace(/[\u0000-\u001f\u007f<>]/g, " ");
+const cut = (text, max) => { const t = plain(text).replace(/\s+/g, " ").trim(); return t.length <= max ? t : t.slice(0, max - 1).trimEnd() + "…"; };
 const meaningful = (item) => item.action === "delete" || !Array.isArray(item.fields) || item.fields.length === 0 || item.fields.some((f) => !QUIET_FIELDS.has(f));
 
 /**

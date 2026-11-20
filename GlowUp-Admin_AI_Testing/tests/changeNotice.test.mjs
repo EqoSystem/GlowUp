@@ -23,5 +23,7 @@ const many = Array.from({ length: 450 }, (_, i) => it("ingredients", "Name " + i
 n = noticeFor(many);
 ok(n.title === "450 ingredients updated" && n.body.length <= BODY_MAX, "a big import is still one short notice");
 ok(noticeFor([it("products", "P", { action: "set", fields: ["updatedAt"] })]) === null, "only a time stamp changed: nothing to say");
+n = noticeFor([it("products", "<size=300><link=\"x\">Free gift</link>\u0007")]);
+ok(n && !/[<>\u0007]/.test(n.title + n.body) && /Free gift/.test(n.body), `markup is removed from names ${n && n.body}`);
 console.log(failed === 0 ? `ALL PASSED  (checks made: ${checks})` : `${failed} FAILED  (checks made: ${checks})`);
 process.exit(failed === 0 ? 0 : 1);

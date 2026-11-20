@@ -102,9 +102,12 @@ namespace GlowUp.Notifications
             TextMeshProUGUI kind = RuntimeUiKit.Label(words, "Kind", (item.read ? "" : "New · ") + label + " · " + When(item.createdAt), 26, p.secondaryText, body, TextAlignmentOptions.Left);
             TextMeshProUGUI title = RuntimeUiKit.Label(words, "Title", item.title, 36, p.heading, heading, TextAlignmentOptions.Left);
             title.fontStyle = FontStyles.Bold;
+            // New23 (security review): a notice carries names typed by users (an app-added product), so its words are plain text, never markup
+            kind.richText = false; title.richText = false;
             if (!string.IsNullOrEmpty(item.body))
             {
                 TextMeshProUGUI text = RuntimeUiKit.Label(words, "Body", item.body, 32, p.mainText, body, TextAlignmentOptions.TopLeft);
+                text.richText = false;
                 if (!expanded) { text.maxVisibleLines = 2; text.overflowMode = TextOverflowModes.Ellipsis; }
             }
 
