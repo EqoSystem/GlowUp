@@ -201,6 +201,17 @@ try {
         await page.waitForTimeout(250);
         ok((await doc(page, "users/u3")).status === "active", "Unban sets the user active");
 
+        // New23: banning from the edit form asks first (red button); Cancel keeps the form and bans nobody
+        await page.click('tr[data-uid="u3"] [data-act="edit"]');
+        await page.selectOption("#umStatus", "banned");
+        await page.click(".um-dialog .save-btn");
+        ok(await page.evaluate(() => { const top = [...document.querySelectorAll(".modal-overlay")].pop(); return /Ban User/.test((top.querySelector("h3") || {}).textContent) && !!top.querySelector(".btn.danger"); }), "Ban from the edit form asks first, with a red button");
+        await page.click(".modal-overlay:last-of-type .cancel-btn"); await page.waitForTimeout(150);
+        ok((await doc(page, "users/u3")).status === "active" && await page.isVisible(".um-dialog"), "Cancel bans nobody and keeps the form");
+        await page.click(".um-dialog .save-btn");
+        await page.locator(".modal-overlay").last().locator(".btn.danger").click(); await page.waitForTimeout(250);
+        ok((await doc(page, "users/u3")).status === "banned", "confirming bans the user");
+
         // bulk
         await page.click('tr[data-uid="u6"] .pick'); await page.click('tr[data-uid="u7"] .pick');
         ok(await page.isVisible("#userBar") && /2 selected/.test(await text(page, "#userBarCount")) && await page.isVisible("#barArchive") && !(await page.isVisible("#barRestore")), "selecting rows shows the bar with the actions that fit");

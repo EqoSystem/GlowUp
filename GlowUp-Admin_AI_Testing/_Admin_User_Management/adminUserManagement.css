@@ -2,6 +2,8 @@
 
 .tab-count { margin-left: calc(2 * var(--u)); padding: 0 calc(7 * var(--u)); border-radius: calc(999 * var(--u)); font-size: var(--fs-xs); font-weight: 600; background: color-mix(in srgb, currentColor 16%, transparent); }
 .tab-count:empty { display: none; }
+/* New23 (contrast): on the selected pink tab a tinted bubble lowered the count to 3.6:1, so it is drawn as an outline there */
+.seg.on .tab-count { background: transparent; box-shadow: inset 0 0 0 1px currentColor; }
 #userTabs .seg { gap: calc(7 * var(--u)); }
 
 .um-heading { display: flex; align-items: center; gap: calc(12 * var(--u)); }

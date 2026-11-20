@@ -134,6 +134,12 @@ try {
         await page.goto(url); await wait(page, 1600); await settle(300);
         const faults = await check(page);
         ok(faults.length === 0, `${tag}: header faults ${faults.join(" | ")}`);
+        // New22: on a phone the pill is hidden while the system is online (the header has no room); it shows once maintenance is on
+        if (width <= 600) {
+            ok(!(await page.isVisible("#maintenancePill")), `${tag}: online, the pill is hidden on a phone`);
+            await page.evaluate(() => { window.__STORE.set("systemConfig/maintenanceMode", { isActive: true }); window.__NOTIFY(); });
+            await settle(400);
+        }
         const p = await page.locator("#maintenancePill").boundingBox();
         ok(p && p.x >= 0 && p.x + p.width <= width, `${tag}: the pill is on screen`);
         await page.click("#maintenancePill"); await settle(400);

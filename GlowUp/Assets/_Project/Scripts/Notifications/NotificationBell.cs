@@ -27,7 +27,7 @@ namespace GlowUp.Notifications
             var rt = badge.rectTransform;
             rt.anchorMin = rt.anchorMax = new Vector2(1f, 1f); rt.pivot = new Vector2(0.5f, 0.5f);
             rt.anchoredPosition = new Vector2(-14f, -14f); rt.sizeDelta = new Vector2(46f, 46f);
-            count = RuntimeUiKit.Label(badge.transform, "Count", "", 26, Color.white, RuntimeTheme.Font(GlowUp.Theme.FontRole.Label, GetComponentInChildren<TMP_Text>(true)));
+            count = RuntimeUiKit.Label(badge.transform, "Count", "", 26, GlowUp.Theme.ContrastInk.On(p.warning), RuntimeTheme.Font(GlowUp.Theme.FontRole.Label, GetComponentInChildren<TMP_Text>(true)));
             count.fontStyle = FontStyles.Bold; count.enableWordWrapping = false;
             RuntimeUiKit.Stretch(count.rectTransform);
             badge.gameObject.SetActive(false);

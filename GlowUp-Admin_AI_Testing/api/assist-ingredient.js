@@ -896,6 +896,7 @@ async function askAny(key, prompt, searchQuery, confirmedWebsite, purpose) {
         if (got) return { ...got, notes };
     }
     const error = new Error(notes.length > 0 ? "Every AI that is set up said no: " + brief(notes) + ". Try again later, or write the entry by hand." : "No AI is set up.");
+    error.forAdmin = true;                       // New23: a message written here for the admin, safe to show
     throw error;
 }
 
@@ -919,6 +920,7 @@ module.exports = async (req, res) => {
         const header = String(req.headers.authorization || "");
         const uid = await adminUid(header.startsWith("Bearer ") ? header.slice(7) : "");
         if (!uid) return send(res, 401, { error: "Only a signed-in admin can use Assist with AI. Sign in again." });
+        if (!assistAllowed(uid)) return send(res, 429, { error: "Too many Assist requests in a minute. Wait a moment and try again.", retryAfter: 30 });
 
         const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
         const mode = text(body.mode || "ingredient", 20);
@@ -1002,9 +1004,23 @@ module.exports = async (req, res) => {
         const credible = sources.filter((s) => s.credible).length;
         return send(res, 200, { found: true, draft: tidy(object, name), sources, lookups, credibleSources: credible, model, searched, notes });
     } catch (error) {
-        return send(res, 502, { error: text(error && error.message, 300) || "Assist with AI failed." });
+        // New23 (safe errors): messages written for the admin (forAdmin) are shown; any other failure stays in the server log
+        // (name only: a fetch error may carry a request address) and the admin gets a message that says what to do
+        if (error && error.forAdmin) return send(res, 502, { error: text(error.message, 300) });
+        console.error("assist-ingredient:", error && error.name);
+        return send(res, 502, { error: "Assist with AI could not finish. Check the connection and try again in a minute." });
     }
 };
 
 
-module.exports.helpers = { adminUid, unsupportedClaims, recordDefinition, definitionBasis, fieldSourcesOf, cosmileResults, parseCosmile, cosmileBlock, cosmileDraft, tidyDescriptionDraft, plainKey, sourceKind, describeSource, makerHost, suggestedWebsite, SOURCE_KINDS, SEARCH_KINDS, normalShade, ingredientImportQuestion, tidyIngredientImport, firstObject, tidy, tidyProduct, tidyBrand, tidyImport, isCredible, hostOf, question, descriptionQuestion, productQuestion, brandQuestion, importQuestion, lookupLinks, searchResultUrl, chatContent, share, PROJECT, KEY_REFERER, FIREBASE_WEB_KEY, text, httpsUrl, plainAddress, isRedirect, sourcesOf, withTimeout, order: () => ["Gemini"].concat(BACKUPS.map((b) => b.label)) };
+// New23 (security guideline 5, rate limits): at most ASSIST_PER_MINUTE Assist requests per admin per minute, held in memory
+// like the limits in app-ai.js and source-link.js (one server instance; enough to stop a runaway loop or a stolen session).
+const ASSIST_PER_MINUTE = 30, assistRecent = new Map();
+function assistAllowed(uid, now = Date.now()) {
+    const list = (assistRecent.get(uid) || []).filter((t) => now - t < 60000);
+    if (list.length >= ASSIST_PER_MINUTE) { assistRecent.set(uid, list); return false; }
+    list.push(now); assistRecent.set(uid, list);
+    return true;
+}
+
+module.exports.helpers = { assistAllowed,  adminUid, unsupportedClaims, recordDefinition, definitionBasis, fieldSourcesOf, cosmileResults, parseCosmile, cosmileBlock, cosmileDraft, tidyDescriptionDraft, plainKey, sourceKind, describeSource, makerHost, suggestedWebsite, SOURCE_KINDS, SEARCH_KINDS, normalShade, ingredientImportQuestion, tidyIngredientImport, firstObject, tidy, tidyProduct, tidyBrand, tidyImport, isCredible, hostOf, question, descriptionQuestion, productQuestion, brandQuestion, importQuestion, lookupLinks, searchResultUrl, chatContent, share, PROJECT, KEY_REFERER, FIREBASE_WEB_KEY, text, httpsUrl, plainAddress, isRedirect, sourcesOf, withTimeout, order: () => ["Gemini"].concat(BACKUPS.map((b) => b.label)) };

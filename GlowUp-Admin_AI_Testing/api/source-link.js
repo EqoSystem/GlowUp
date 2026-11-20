@@ -142,7 +142,7 @@ module.exports = async (req, res) => {
         return send(res, 400, { error: "Unknown request." });
     } catch (error) {
         console.error("source-link:", error);
-        return send(res, 500, { error: "Something went wrong. Try again." });
+        return send(res, 500, { error: "The source check could not finish. Try again in a minute." });   // New23: says what to do
     }
 };
 

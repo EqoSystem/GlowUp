@@ -29,8 +29,10 @@ for (const [name, t] of Object.entries(themes)) {
         check(r >= 4.5, `${name}: --${fg} ${t[fg]} on --${bg} ${t[bg]} is ${r.toFixed(2)}:1 (needs 4.5)`);
     }
     check(ratio(t["accent-ink"], t.accent) >= 4.5, `${name}: button text on the pink fill reaches 4.5:1`);
+    check(ratio(t["accent-ink"], t["accent-hover"]) >= 4.5, `${name}: button text on the hovered pink fill reaches 4.5:1 (New23)`);
     check(ratio(t.accent, t.surface) >= 3, `${name}: the pink focus ring / control edge reaches 3:1 on cards`);
     check(t["bad-ink"] && ratio(t["bad-ink"], t.bad) >= 4.5, `${name}: text on a red fill (--bad-ink) reaches 4.5:1`);
+    check(ratio(t["bad-ink"], t["bad-hover"]) >= 4.5, `${name}: text on a hovered red button reaches 4.5:1 (New23)`);
 }
 // Fixed white text on a pink or red fill fails in dark mode (3.3:1 and 2.8:1): such text must use the ink tokens.
 for (const file of ["../_Shared/adminCommon.css", "../_Shared/adminSettingsMenu.css"]) {

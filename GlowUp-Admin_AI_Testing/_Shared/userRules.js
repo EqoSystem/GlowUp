@@ -29,7 +29,7 @@ const list = (value) => (Array.isArray(value) ? value.map((v) => String(v).trim(
 /** The picture to show: the app's own photo (photoData: a small JPEG as data:image/jpeg;base64, New22) or an https link; "" when none. */
 export function photoOf(d) {
     const data = text(d && d.photoData);
-    if (/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(data) && data.length <= 200100) return data;
+    if (/^data:image\/jpeg;base64,\/9j\/[A-Za-z0-9+/=]+$/.test(data) && data.length <= 200100) return data;
     const url = text(d && d.photoURL);
     return /^https:\/\//.test(url) ? url : "";
 }

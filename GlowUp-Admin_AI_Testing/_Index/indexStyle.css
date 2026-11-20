@@ -134,6 +134,9 @@ html:has(.terms-dialog[open]) { overflow: hidden; }
 .agree-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0 calc(4 * var(--u)); font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5; }
 .agree-row input { accent-color: var(--accent); width: calc(18 * var(--u)); height: calc(18 * var(--u)); margin: 0 calc(4 * var(--u)) 0 0; cursor: pointer; flex: none; }
 .agree-row label { cursor: pointer; }
+/* New23: the tick box sits inside its label, so the whole "I agree to the" line is one touch target (44 px tall on touch screens) */
+.agree-row .agree-hit { display: inline-flex; align-items: center; }
+@media (pointer: coarse) { .agree-row .agree-hit { min-height: calc(44 * var(--u)); } .agree-row .text-link { min-width: calc(44 * var(--u)); } #signupToLogin { min-width: calc(44 * var(--u)); justify-content: center; } }
 .agree-row .text-link { font-size: inherit; }
 
 /* Check Your Email: an envelope with a tick; the tick turns into the answer (confirmed, approved, declined) */

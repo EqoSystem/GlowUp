@@ -369,7 +369,7 @@ service cloud.firestore {
     function userPhotoOk() {
       return request.resource.data.get('photoData', '') is string
         && request.resource.data.get('photoData', '').size() <= 200100
-        && (request.resource.data.get('photoData', '') == '' || request.resource.data.get('photoData', '').matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$'));
+        && (request.resource.data.get('photoData', '') == '' || request.resource.data.get('photoData', '').matches('^data:image/jpeg;base64,/9j/[A-Za-z0-9+/=]+$'));   // New23: /9j/ = the JPEG start bytes FF D8 FF, so the content is checked, not only the label
     }
     function adminUserChange() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName', 'username'].concat(userAdminFields()))

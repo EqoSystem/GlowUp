@@ -456,6 +456,7 @@ await cannotAfter("nobody lists systemConfig", seed, () => getDocs(collection(an
 await canAfter("a user saves their profile photo", seedUsers, () => setDoc(doc(user(), "users/u1"), { photoData: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ==" }, { merge: true }));
 await cannotAfter("a profile photo that is not a JPEG", seedUsers, () => setDoc(doc(user(), "users/u1"), { photoData: "data:image/svg+xml;base64,PHN2Zz4=" }, { merge: true }));
 await cannotAfter("a profile photo over 200 KB", seedUsers, () => setDoc(doc(user(), "users/u1"), { photoData: "data:image/jpeg;base64," + "A".repeat(200100) }, { merge: true }));
+await cannotAfter("a profile photo labelled JPEG whose content is not a JPEG (New23)", seedUsers, () => setDoc(doc(user(), "users/u1"), { photoData: "data:image/jpeg;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+" }, { merge: true }));
 await cannotAfter("a user sets another user's photo", seedUsers, () => setDoc(doc(other(), "users/u1"), { photoData: "data:image/jpeg;base64,AAAA" }, { merge: true }));
 
 await env.cleanup();

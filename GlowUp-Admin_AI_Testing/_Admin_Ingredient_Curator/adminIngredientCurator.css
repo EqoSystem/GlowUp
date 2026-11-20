@@ -84,7 +84,7 @@
 .migration-lines { margin: 0 0 calc(10 * var(--u)); padding-left: calc(20 * var(--u)); display: flex; flex-direction: column; gap: calc(6 * var(--u)); font-size: var(--fs-base); }
 
 
-.test-banner { flex: none; display: flex; align-items: center; gap: calc(12 * var(--u)); margin: calc(12 * var(--u)) var(--gutter) 0; padding: calc(8 * var(--u)) calc(12 * var(--u)); border-radius: var(--radius-sm); border: 1px solid var(--warn, #d9a441); background: color-mix(in srgb, var(--warn, #d9a441) 16%, var(--surface)); color: var(--text); font-size: var(--fs-sm); line-height: 1.4; }
+.test-banner { flex: none; display: flex; align-items: center; gap: calc(12 * var(--u)); margin: calc(12 * var(--u)) var(--gutter) 0; padding: calc(8 * var(--u)) calc(12 * var(--u)); border-radius: var(--radius-sm); border: 1px solid var(--warn); background: color-mix(in srgb, var(--warn) 16%, var(--surface)); color: var(--text); font-size: var(--fs-sm); line-height: 1.4; }
 .test-banner-text { flex: 1 1 auto; min-width: 0; margin: 0; overflow-wrap: anywhere; }
 .test-banner-close { flex: none; min-height: calc(32 * var(--u)); padding: 0 calc(12 * var(--u)); border-radius: var(--radius-sm); border: 1px solid var(--border, currentColor); background: transparent; color: inherit; font: inherit; cursor: pointer; }
 @media (max-width: 767px) { .test-banner { flex-wrap: wrap; } .test-banner-close { min-height: calc(44 * var(--u)); min-width: calc(44 * var(--u)); } }

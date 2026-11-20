@@ -393,6 +393,8 @@ function openEdit(u) {
         const bad = editProblem(values);
         if (bad) { show(bad.text, bad.field); return; }
         if (!dirty()) { release(); frame.close(); return; }
+        // New23 (destructive actions are confirmed): banning from the edit form asks first, like Unban, Archive and Recycle Bin
+        if (values.status === "banned" && u.status !== "banned" && !(await askConfirm({ title: "Ban User", message: "This user can no longer change their profile in the app. You can unban them at any time.", items: [u.name], confirmLabel: "Ban", danger: true }))) return;
         sending = true;
         save.disabled = true; cancel.disabled = true;
         save.innerHTML = '<span class="btn-spin" aria-hidden="true"></span>Saving...';

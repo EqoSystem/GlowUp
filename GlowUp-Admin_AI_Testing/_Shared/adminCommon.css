@@ -56,6 +56,7 @@
     --muted: #928f9a;                   /* New21: 4.5:1 on surface-3 too */
     --accent: #e0668a;
     --accent-ink: #1a0d12;
+    --accent-hover: #e47898;            /* New23 "Primary Hover" token: dark mode lightens the pink (6.7:1 with accent-ink) */
     --accent-text: #f08fab;
     --gold: #cfa862;
     --on-gold: #1b1408;                 /* text on a gold fill (badges), both themes */
@@ -64,11 +65,13 @@
     --warn: #f0b545;
     --bad: #f27272;
     --bad-ink: #1a0d0d;                 /* New21: text on a red fill, 6.7:1 */
+    --bad-hover: #f48383;               /* New23 "Primary Hover" for red buttons: lighter in dark mode (7.6:1 with bad-ink; the black mix gave 5.1:1) */
     --info: #86b7f7;
     --shadow: 0 calc(4 * var(--u)) calc(14 * var(--u)) rgba(0, 0, 0, .28);
     --overlay: rgba(0, 0, 0, .62);
 
     --zone: rgba(150, 44, 58, .78);
+    --zone-ink: #ffffff;                /* New23: the words on the drop-to-remove zone (dark in both themes) */
     --viz-1: #d55181; --viz-2: #008300; --viz-3: #3987e5; --viz-4: #c98500; --viz-5: #199e70; --viz-6: #d95926;
     --viz-other: #5d5a66;
 }
@@ -86,12 +89,14 @@
     --muted: #6c6163;
     --accent: #c9456d;
     --accent-ink: #ffffff;
+    --accent-hover: #b13d60;            /* New23: light mode darkens it; the old white mix left white text at 3.8:1 */
     --accent-text: #b03a5e;
     --gold: #7e5f25;
     --ok: #19714e;
     --warn: #865c07;
     --bad: #b33535;
     --bad-ink: #ffffff;
+    --bad-hover: #9a2e2e;               /* New23: darker in light mode, 7.5:1 with bad-ink */
     --info: #2a64ac;
     --shadow: 0 calc(3 * var(--u)) calc(10 * var(--u)) rgba(80, 40, 50, .08);
     --overlay: rgba(40, 25, 30, .42);
@@ -415,12 +420,12 @@ html.qs-open .board > .panel[data-qs-grow] { grid-column: span var(--qs-span) !i
 }
 .btn:hover, .secondary-btn:hover, .row-btn:hover, .cancel-btn:hover, .icon-btn:hover { background: var(--surface-3); }
 .primary-btn, .save-btn, .login-btn, .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.primary-btn:hover, .save-btn:hover, .login-btn:hover, .btn.primary:hover { background: color-mix(in srgb, var(--accent) 88%, #fff); }
+.primary-btn:hover, .save-btn:hover, .login-btn:hover, .btn.primary:hover { background: var(--accent-hover); }
 .btn.ghost { background: transparent; }
 .btn.danger, .row-btn.danger, .danger-btn { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
 .btn.danger:hover, .row-btn.danger:hover { background: color-mix(in srgb, var(--bad) 14%, transparent); }
 .btn.danger.solid { background: var(--bad); border-color: var(--bad); color: var(--bad-ink); }
-.btn.danger.solid:hover { background: color-mix(in srgb, var(--bad) 86%, #000); }
+.btn.danger.solid:hover { background: var(--bad-hover); }
 /* dark theme: white on the light red is 2.8:1, dark ink on it passes AA (16 November 2026) */
 :root:not([data-theme="light"]) .btn.danger.solid { color: var(--accent-ink); }
 .primary-btn:hover svg.ic, .btn.primary:hover svg.ic, .save-btn:hover svg.ic { transform: translateX(calc(2 * var(--u))) scale(1.1); }
@@ -718,7 +723,7 @@ th .guide-badge { margin-left: calc(6 * var(--u)); vertical-align: 1px; }
 [data-btn="pixel"] .fx.fx-run::after { animation: fx-sweep .52s var(--ease); }
 .fx.fx-run { animation: fx-glow .52s ease-out; }
 [data-btn="none"] .fx.fx-run { animation: none; }
-.primary-btn.fx, .save-btn.fx, .login-btn.fx, .btn.primary.fx { --fx: #ffffff; }
+.primary-btn.fx, .save-btn.fx, .login-btn.fx, .btn.primary.fx { --fx: var(--accent-ink); }   /* New23: token, was #ffffff */
 @keyframes fx-sweep {
     0% { opacity: .0; -webkit-mask-position: 0 0, 0 0, 100% 0%; mask-position: 0 0, 0 0, 100% 0%; }
     15% { opacity: .55; }
@@ -927,7 +932,7 @@ tr:hover .row-actions, tr:focus-within .row-actions, .ingredient-card:hover .row
 .remove-zone {
     position: absolute; left: calc(var(--pad) * -1 + calc(2 * var(--u))); top: calc(-6 * var(--u)); bottom: calc(30 * var(--u)); width: 44%; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .25s;
     border-radius: var(--radius-sm); background: linear-gradient(90deg, var(--zone) 0%, color-mix(in srgb, var(--zone) 50%, transparent) 55%, transparent 100%);
-    display: flex; flex-direction: column; justify-content: center; gap: calc(10 * var(--u)); padding-left: calc(26 * var(--u)); color: #fff;
+    display: flex; flex-direction: column; justify-content: center; gap: calc(10 * var(--u)); padding-left: calc(26 * var(--u)); color: var(--zone-ink);
 }
 .widget-body.shaking .remove-zone { opacity: .55; }
 .zone-disc { width: calc(54 * var(--u)); height: calc(54 * var(--u)); border-radius: 50%; display: grid; place-items: center; font-size: calc(24 * var(--u)); background: var(--surface); color: var(--bad); border: calc(2 * var(--u)) solid var(--bad); transition: scale .2s var(--ease); }
@@ -1122,7 +1127,7 @@ tr.detail-row > td { padding: 0 calc(12 * var(--u)) calc(12 * var(--u)); backgro
 .detail-actions .spacer { flex: 1; }
 .detail-box { user-select: text; -webkit-user-select: text; }
 .row-btn.main { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.row-btn.main:hover { background: color-mix(in srgb, var(--accent) 88%, #fff); }
+.row-btn.main:hover { background: var(--accent-hover); }
 .row-btn svg.ic { width: 1.05em; height: 1.05em; }
 
 
@@ -1569,7 +1574,7 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 .note-row[data-tone="info"] { border-left-color: var(--info); background: color-mix(in srgb, var(--info) 8%, var(--surface-2)); }
 .note-row[data-tone="info"] .note-level { background: var(--info); color: var(--bg); }
 .note-row[data-tone="ok"] { border-left-color: var(--ok); }
-.note-row[data-tone="ok"] .note-level { background: color-mix(in srgb, var(--ok) 22%, transparent); color: var(--ok); }
+.note-row[data-tone="ok"] .note-level { background: var(--ok); color: var(--bg); }   /* New23: solid like the other tones (the tint was 3.9:1) */
 .note-row[data-tone=""] .note-text { color: var(--muted); }
 @container panel (max-width: 700px) { .note-row { flex-wrap: wrap; } .note-text { flex-basis: 100%; order: 3; } }
 
@@ -1671,7 +1676,7 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 .sd-play { display: flex; align-items: center; justify-content: center; gap: calc(8 * var(--u)); width: 100%; margin: calc(4 * var(--u)) 0 calc(12 * var(--u)); }
 @media (prefers-reduced-motion: reduce) { .panel[data-edge="always"]::before { animation: none; } }
 
-.modal-overlay.style-overlay { justify-content: flex-end; align-items: stretch; padding: 0; background: color-mix(in srgb, #000 10%, transparent); }
+.modal-overlay.style-overlay { justify-content: flex-end; align-items: stretch; padding: 0; background: color-mix(in srgb, var(--overlay) 16%, transparent); }
 .style-overlay .style-dialog { width: min(calc(460 * var(--u)), 100%); height: 100%; max-height: none; border-radius: 0; border-width: 0 0 0 1px; animation: slide-in .22s var(--ease); }
 .style-dialog .modal-actions { position: sticky; bottom: calc(-24 * var(--u)); z-index: 2; margin: calc(16 * var(--u)) calc(-24 * var(--u)) calc(-24 * var(--u)); padding: calc(12 * var(--u)) calc(24 * var(--u)); background: var(--surface); border-top: 1px solid var(--border); flex-wrap: wrap; }
 .style-dialog .modal-actions .spacer { flex: 1; }
@@ -2141,7 +2146,7 @@ body:has(> :is(#addIngredientModal, #addBrandModal, #productModal)[style*="flex"
 .ing-modal .finder-row .row-btn { min-height: calc(32 * var(--u)); border-radius: calc(8 * var(--u)); font-size: calc(13 * var(--u)); white-space: nowrap; }
 .ing-modal .finder-what { color: var(--text-2); line-height: 1.45; min-width: 0; overflow-wrap: anywhere; }
 .ing-modal .finder-inci { font-weight: 600; overflow-wrap: anywhere; min-width: 0; }
-.ing-modal .finder-inci .chip { margin: 0 0 0 calc(4 * var(--u)); font-size: calc(11 * var(--u)); }
+.ing-modal .finder-inci .chip { margin: 0 0 0 calc(4 * var(--u)); font-size: var(--fs-xs); }   /* New23: no text under 12 px */
 .ing-modal .src-note { font-size: calc(12 * var(--u)); color: var(--im-hint); margin: 0; }
 .ing-modal .finder-cosing { display: flex; flex-direction: column; gap: calc(8 * var(--u)); min-width: 0; }
 .ing-modal .finder-official { align-self: flex-start; min-height: calc(32 * var(--u)); border-radius: calc(8 * var(--u)); font-size: calc(13 * var(--u)); }
@@ -2262,8 +2267,8 @@ html.sb-mobile-open body::after { content: ""; position: fixed; z-index: 899; in
 /* ---- Style and text panel (round New16) ---- */
 /* A pixel width is a ceiling inside the panel's columns, on wide screens only: the panel can get narrower than its room, never wider, so it cannot overlap a neighbour. */
 @media (min-width: 1024px) { .panel[data-fixed-w]:not(.member) { width: min(var(--wpx), 100%); justify-self: start; } }
-.field-error { display: block; margin-top: calc(4 * var(--u)); font-size: var(--fs-sm); line-height: 1.4; color: var(--bad, #b3402f); overflow-wrap: anywhere; }
-.style-dialog [aria-invalid="true"] { border-color: var(--bad, #b3402f); }
+.field-error { display: block; margin-top: calc(4 * var(--u)); font-size: var(--fs-sm); line-height: 1.4; color: var(--bad); overflow-wrap: anywhere; }
+.style-dialog [aria-invalid="true"] { border-color: var(--bad); }
 .style-dialog .label-rows { display: flex; flex-direction: column; gap: calc(12 * var(--u)); }
 .style-dialog .label-row { display: flex; flex-direction: column; gap: calc(6 * var(--u)); padding: calc(10 * var(--u)); border: 1px solid var(--border); border-radius: var(--radius-sm); min-width: 0; }
 /* Size keeps a narrow box; Style and Align get room for "Same as the page" and wrap under it when the window is narrow */
@@ -2317,6 +2322,9 @@ td .chip { flex-shrink: 1; overflow-wrap: anywhere; }
     .text-link { display: inline-flex; align-items: center; }
     .pick, .guide-badge, .brand-toggle { position: relative; }
     .pick::before, .guide-badge::before, .brand-toggle::before { content: ""; position: absolute; inset: calc(-13 * var(--u)); }
+    /* New23: the parts found by tests/responsive/guidelinesOpen.scenario.mjs (dropdown rows, dialog buttons, the switch) */
+    .menu-item, .save-btn, .cancel-btn { min-height: calc(44 * var(--u)); }
+    .switch::before { content: ""; position: absolute; inset: calc(-11 * var(--u)) 0; }
 }
 
 
@@ -2333,7 +2341,7 @@ td .chip { flex-shrink: 1; overflow-wrap: anywhere; }
 .hdr-badge[hidden] { display: none; }
 @keyframes hdr-badge-pop { 0% { transform: scale(.6); } 60% { transform: scale(1.18); } 100% { transform: none; } }
 .icon-btn.hdr-avatar { border-radius: 50%; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: var(--fs-sm); line-height: 1; }
-.icon-btn.hdr-avatar:hover { background: color-mix(in srgb, var(--accent) 88%, #fff); }
+.icon-btn.hdr-avatar:hover { background: var(--accent-hover); }
 .hdr-letter { pointer-events: none; }
 
 /* the two dropdowns reuse .menu (position, surface, border, shadow, motion) */
