@@ -21,7 +21,6 @@ const finish = (page) => page.evaluate(() => document.getAnimations().forEach((a
 const STATES = [
     { key: "dash", name: "bell dropdown", open: (p) => p.click("#notificationsBtn") },
     { key: "dash", name: "profile dropdown", open: (p) => p.click("#accountBtn") },
-    { key: "dash", name: "System status", open: (p) => p.evaluate(() => import("/_Shared/adminSettingsMenu.js").then((m) => m.openSettingsView("maintenance"))) },
     { key: "dash", name: "Reply drawer", open: (p) => p.evaluate(() => import("/_Shared/replyDrawer.js").then((m) => m.openReplyDrawer({ id: "b1", uid: "u1abcdefgh", userName: "Mark Azcueta With An Unusually Long Display Name", category: "Bug", message: "The scan button freezes after I take a photo of a lipstick and nothing happens until I restart the app completely.", createdAtUnix: Math.floor(Date.now() / 1000) - 7200 }))) },
     { key: "users", name: "user details", open: (p) => p.click('#userTableBody tr[data-uid="u1"] [data-act="view"]') },
     { key: "users", name: "user edit", open: (p) => p.click('#userTableBody tr[data-uid="u1"] [data-act="edit"]') },

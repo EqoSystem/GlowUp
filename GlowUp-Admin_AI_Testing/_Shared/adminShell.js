@@ -12,8 +12,7 @@
 import { catchFailures } from "./quietConsole.js";
 import { initLayouts, applyAppearance } from "./adminLayouts.js";
 import { refreshData, refreshWait } from "./adminStore.js";
-import { mountSettingsMenu, openSettingsView } from "./adminSettingsMenu.js";
-import { mountMaintenancePill } from "./maintenance.js";
+import { mountSettingsMenu } from "./adminSettingsMenu.js";
 import { mountHeaderAccount } from "./headerAccount.js";
 import { startShortcuts, keyChips } from "./shortcuts.js";
 import { ariaKeys } from "./shortcutKeys.js";
@@ -299,7 +298,6 @@ export function mountShell(page) {
     hydrate(document);
     mountSettingsMenu(tools);
     mountHeaderAccount(tools);
-    mountMaintenancePill(tools, () => openSettingsView("maintenance", "maintenance-card"));
     initLayouts(page);
     watchForNewControls();
     startShortcuts(page);

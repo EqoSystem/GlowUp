@@ -10,8 +10,8 @@ namespace GlowUp.EditorTools
 {
     /// <summary>
     /// Menu: GlowUp > Build Scene > 15 Notifications (New22, 20 November 2026).
-    /// The same card as every app page: back button, the title, one scrolling list. The rows (the admins' replies, maintenance
-    /// notices, app updates and product changes) are made at run time by NotificationsScreen from live data; the scene holds
+    /// The same card as every app page: back button, the title, one scrolling list. The rows (the admins' replies and the product and ingredient changes
+    /// notices) are made at run time by NotificationsScreen from live data; the scene holds
     /// only what stays: the list, the line shown when it is empty, and the controller.
     /// </summary>
     public static class NotificationsSceneBuilder

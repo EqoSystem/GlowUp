@@ -570,42 +570,21 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // ---- announcements to every app user (New22, 20 November 2026): maintenance notices, app updates, product changes ----
-    // Any signed-in user reads them (the app's Notifications screen); only admins write them, in a fixed shape.
+    // ---- change notices for the app (New22/New23): one short notice each time an admin saves a product or an ingredient ----
+    // adminStore.js adds it to the same batch as the save (changeNotice.js builds the text, so it always fits these limits).
+    // Any signed-in user reads them (the app's Notifications screen); only admins create them, in a fixed shape; nobody edits one.
     match /announcements/{noteId} {
       allow read: if signedIn();
       allow delete: if isAdmin();
       allow create: if isAdmin()
-        && request.resource.data.keys().hasOnly(['kind', 'title', 'body', 'startsAt', 'endsAt', 'createdAt', 'createdBy'])
-        && request.resource.data.kind in ['maintenance', 'update', 'product']
+        && request.resource.data.keys().hasOnly(['kind', 'title', 'body', 'createdAt', 'createdBy'])
+        && request.resource.data.kind in ['product', 'ingredient']
         && request.resource.data.title is string && request.resource.data.title.size() >= 1 && request.resource.data.title.size() <= 80
         && request.resource.data.body is string && request.resource.data.body.size() <= 300
-        && (request.resource.data.get('startsAt', null) == null || request.resource.data.get('startsAt', null) is timestamp)
-        && (request.resource.data.get('endsAt', null) == null || request.resource.data.get('endsAt', null) is timestamp)
         && request.resource.data.createdBy == request.auth.uid
         && request.resource.data.createdAt == request.time;
       allow update: if false;
     }
-
-    // ---- Maintenance Mode (New22, 20 November 2026): ONE document, systemConfig/maintenanceMode ----
-    // Everyone may read it, also before signing in (the app's log-in screen must know it). Only admins write it, in a fixed shape.
-    // Ending maintenance when scheduledEnd passes is done by any open admin tab (no Cloud Functions on the free tier).
-    match /systemConfig/{docId} {
-      allow get: if docId == 'maintenanceMode';
-      allow list, delete: if false;
-      allow create, update: if isAdmin() && docId == 'maintenanceMode'
-        && request.resource.data.keys().hasOnly(['isActive', 'scheduledStart', 'scheduledEnd', 'bannerTitle', 'customMessage', 'notifyUsers', 'notifiedAt', 'updatedBy', 'updatedAt'])
-        && request.resource.data.isActive is bool
-        && request.resource.data.notifyUsers is bool
-        && (request.resource.data.scheduledStart == null || request.resource.data.scheduledStart is timestamp)
-        && (request.resource.data.scheduledEnd == null || request.resource.data.scheduledEnd is timestamp)
-        && (request.resource.data.notifiedAt == null || request.resource.data.notifiedAt is timestamp)
-        && request.resource.data.bannerTitle is string && request.resource.data.bannerTitle.size() <= 80
-        && request.resource.data.customMessage is string && request.resource.data.customMessage.size() <= 300
-        && request.resource.data.updatedBy == request.auth.uid
-        && request.resource.data.updatedAt == request.time;
-    }
-
 
     // anything not listed above is closed
   }

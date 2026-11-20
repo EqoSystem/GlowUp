@@ -169,8 +169,8 @@ export function mountSignup({ lockout, onBackToLogin }) {
         current = view;
         Object.entries(views).forEach(([key, el]) => { el.hidden = key !== view; });
         const card = views[view];
-        card.classList.remove("card-in", "card-back");
-        if (!calm()) { void card.offsetWidth; card.classList.add(back ? "card-back" : "card-in"); }
+        card.classList.remove("card-slide-in", "card-slide-back");
+        if (!calm()) { void card.offsetWidth; card.classList.add(back ? "card-slide-back" : "card-slide-in"); }
         if (leaving === "check" && view !== "check") stopWatching(true);
         if (focus) {
             const target = view === "signup" ? fields.name : view === "check" ? $("checkTitle") : $("username");

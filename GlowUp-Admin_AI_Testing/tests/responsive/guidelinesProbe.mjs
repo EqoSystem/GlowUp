@@ -45,7 +45,7 @@ export const probe = () => {
         const r = el.getBoundingClientRect(); if (r.width < 2 || r.height < 2) continue;
         if (r.bottom < 0 || r.top > innerHeight * 3) continue;
         const s = getComputedStyle(el);
-        if (el.tagName === "A" && s.display === "inline" && el.closest("p, li, small, .hint, .muted")) continue; // links inside a sentence (WCAG 2.5.8 exception)
+        if ((el.tagName === "A" || el.matches("button.text-link")) && (s.display === "inline" || s.display === "inline-block") && el.closest("p, li, small, .hint, .muted")) continue; // links inside a sentence (WCAG 2.5.8 exception), also the inline text buttons of the sign-up sentence
         const hit = el.closest("label") || el;
         const hr = hit.getBoundingClientRect();
         // an invisible touch area drawn by ::before (position: absolute; inset: -N px) counts too

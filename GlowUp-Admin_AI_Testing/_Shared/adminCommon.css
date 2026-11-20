@@ -2411,55 +2411,12 @@ td .chip { flex-shrink: 1; overflow-wrap: anywhere; }
 .reply-form textarea { width: 100%; resize: vertical; min-height: calc(130 * var(--u)); }
 .reply-form .modal-actions { margin-top: 0; }
 @media (prefers-reduced-motion: reduce) { .reply-drawer, .reply-backdrop { transition: none; } }
-/* small spinner inside a busy button (shared: reply panel, maintenance card, user pages) */
+/* small spinner inside a busy button (shared: reply window, user pages) */
 .btn-spin { display: inline-block; width: calc(14 * var(--u)); height: calc(14 * var(--u)); margin-right: calc(8 * var(--u)); vertical-align: -2px; border-radius: 50%; border: calc(2 * var(--u)) solid color-mix(in srgb, currentColor 30%, transparent); border-top-color: currentColor; animation: spin .8s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .btn-spin { animation-duration: 2.5s; } }
-
-/* ---- Maintenance pill in the header (maintenance.js, New22): a dot and a word, left of the bell; same height as the gear ---- */
-.topbar-tools > .mm-pill { order: 7; }
-.mm-pill {
-    display: inline-flex; align-items: center; gap: calc(7 * var(--u)); height: calc(36 * var(--u)); padding: 0 calc(12 * var(--u)); flex: none;
-    border: 1px solid var(--border); border-radius: calc(10 * var(--u)); background: var(--surface-2); color: var(--text-2);
-    font: inherit; font-size: var(--fs-sm); font-weight: 600; white-space: nowrap; cursor: pointer; transition: background-color .2s, border-color .2s;
-}
-.mm-pill[hidden] { display: none; }
-.mm-pill:hover { background: var(--surface-3); }
-.mm-pill:focus-visible { outline: calc(2 * var(--u)) solid var(--accent); outline-offset: calc(2 * var(--u)); }
-.mm-dot { width: calc(9 * var(--u)); height: calc(9 * var(--u)); border-radius: 50%; flex: none; background: var(--ok); }
-.mm-pill[data-state="scheduled"] .mm-dot { background: var(--warn); }
-.mm-pill[data-state="active"] { border-color: color-mix(in srgb, var(--bad) 45%, var(--border)); color: var(--bad); }
-.mm-pill[data-state="active"] .mm-dot { background: var(--bad); }
-@media (pointer: coarse) { .mm-pill { min-height: calc(44 * var(--u)); } }
-/* phones: the word moves out of sight (the label stays for screen readers); the coloured dot and the button remain */
-@media (max-width: 600px) {
-    .mm-pill { padding: 0; width: calc(36 * var(--u)); justify-content: center; }
-    .mm-pill .mm-pill-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-}
-@media (max-width: 600px) and (pointer: coarse) { .mm-pill { width: calc(44 * var(--u)); } }
-
-/* ---- System status view in Quick settings ---- */
-.sw-view.mm-view { padding: calc(16 * var(--u)) calc(20 * var(--u)) calc(22 * var(--u)); display: flex; flex-direction: column; gap: calc(18 * var(--u)); }
-.mm-card { display: flex; flex-direction: column; gap: calc(12 * var(--u)); scroll-margin-top: calc(12 * var(--u)); }
-.mm-card + .mm-card { border-top: 1px solid var(--border); padding-top: calc(18 * var(--u)); }
-.mm-title { margin: 0; font-size: var(--fs-base); font-weight: 650; }
-.mm-intro { margin: 0; font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5; }
-.mm-status { margin: 0; padding: calc(8 * var(--u)) calc(10 * var(--u)); border-radius: var(--radius-sm); font-size: var(--fs-sm); font-weight: 600; border-left: calc(3 * var(--u)) solid var(--ok); background: color-mix(in srgb, var(--ok) 10%, var(--surface)); }
-.mm-status[data-state="scheduled"] { border-left-color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, var(--surface)); }
-.mm-status[data-state="active"], .mm-status[data-state="error"] { border-left-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--surface)); }
-.mm-row { display: flex; align-items: center; justify-content: space-between; gap: calc(12 * var(--u)); min-height: calc(44 * var(--u)); }
-.mm-row-label { font-weight: 600; font-size: var(--fs-sm); }
-.mm-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(calc(180 * var(--u)), 1fr)); gap: calc(12 * var(--u)); }
-.mm-card input:disabled { opacity: .55; cursor: not-allowed; }
-.mm-card textarea { resize: vertical; width: 100%; }
-.mm-callout { padding: calc(10 * var(--u)) calc(12 * var(--u)); border-radius: var(--radius-sm); font-size: var(--fs-sm); line-height: 1.5; color: var(--text-2); background: color-mix(in srgb, var(--info) 10%, var(--surface)); border: 1px solid color-mix(in srgb, var(--info) 32%, transparent); }
-.mm-save { width: 100%; }
-.mm-notice { align-self: flex-start; }
-.mm-notice-hint { margin-top: calc(-6 * var(--u)); }
 
 /* ---- Fold placement (adminLayouts.js foldFill, New22): wide boards only; arranging mode keeps the real sizes ---- */
 @container board (min-width: 1000px) {
     body:not(.layout-editing) .board > .panel[data-fold-fill]:not(.folded) { grid-column: span var(--fold-span) !important; }
     body:not(.layout-editing) .board.fit > .panel.folded { grid-column: span min(4, var(--w, 12)) / -1 !important; }
 }
-/* phones: the header has room for the pill only when it says something to act on (scheduled / active); "online" is in Quick settings > System status */
-@media (max-width: 600px) { .mm-pill[data-state="online"] { display: none; } }

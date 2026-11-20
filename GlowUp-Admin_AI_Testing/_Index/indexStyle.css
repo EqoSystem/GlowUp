@@ -99,10 +99,11 @@ html:has(.terms-dialog[open]) { overflow: hidden; }
 /* ---- Sign Up (20 November 2026): "Create Admin Account" and the live "Check Your Email" card ---- */
 /* The cards are views of one page; only one is shown. Moving forward slides in from the right, Back from the left. */
 .login-card[hidden] { display: none; }
-.login-card.card-in { animation: card-in .32s var(--ease) both; }
-.login-card.card-back { animation: card-back .32s var(--ease) both; }
-@keyframes card-in { from { opacity: 0; transform: translateX(calc(18 * var(--u))); } to { opacity: 1; transform: none; } }
-@keyframes card-back { from { opacity: 0; transform: translateX(calc(-18 * var(--u))); } to { opacity: 1; transform: none; } }
+/* the slide classes are NOT named card-back: that is the round back-arrow button below, and the clash made the log-in card collapse (22 Nov 2026) */
+.login-card.card-slide-in { animation: card-slide-in .32s var(--ease) both; }
+.login-card.card-slide-back { animation: card-slide-back .32s var(--ease) both; }
+@keyframes card-slide-in { from { opacity: 0; transform: translateX(calc(18 * var(--u))); } to { opacity: 1; transform: none; } }
+@keyframes card-slide-back { from { opacity: 0; transform: translateX(calc(-18 * var(--u))); } to { opacity: 1; transform: none; } }
 
 /* "Sign Up" left, "Forgot password?" right, on the row under the password box */
 .forgot-row { justify-content: space-between; gap: calc(8 * var(--u)); }
@@ -131,12 +132,14 @@ html:has(.terms-dialog[open]) { overflow: hidden; }
 .pw-match:not(.met) { color: var(--warn); }
 .pw-match:not(.met) svg.ic { opacity: 0; width: 0; }
 
-.agree-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0 calc(4 * var(--u)); font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5; }
-.agree-row input { accent-color: var(--accent); width: calc(18 * var(--u)); height: calc(18 * var(--u)); margin: 0 calc(4 * var(--u)) 0 0; cursor: pointer; flex: none; }
-.agree-row label { cursor: pointer; }
-/* New23: the tick box sits inside its label, so the whole "I agree to the" line is one touch target (44 px tall on touch screens) */
-.agree-row .agree-hit { display: inline-flex; align-items: center; }
-@media (pointer: coarse) { .agree-row .agree-hit { min-height: calc(44 * var(--u)); } .agree-row .text-link { min-width: calc(44 * var(--u)); } #signupToLogin { min-width: calc(44 * var(--u)); justify-content: center; } }
+.agree-row { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 0 calc(8 * var(--u)); font-size: var(--fs-sm); color: var(--text-2); line-height: 1.5; }
+/* New23/22 Nov: the tick box has its own column and the sentence wraps inside the other one, so a long line never slides under the box */
+.agree-box { display: grid; place-items: center; min-height: calc(24 * var(--u)); min-width: calc(24 * var(--u)); cursor: pointer; }
+.agree-box input { accent-color: var(--accent); width: calc(18 * var(--u)); height: calc(18 * var(--u)); margin: 0; cursor: pointer; }
+.agree-text { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.agree-text label { cursor: pointer; }
+.agree-text .text-link { display: inline; min-height: 0; padding: 0; font-size: inherit; text-align: left; }
+@media (pointer: coarse) { .agree-box { min-height: calc(44 * var(--u)); min-width: calc(44 * var(--u)); } .agree-row { column-gap: 0; } #signupToLogin { min-width: calc(44 * var(--u)); justify-content: center; } }
 .agree-row .text-link { font-size: inherit; }
 
 /* Check Your Email: an envelope with a tick; the tick turns into the answer (confirmed, approved, declined) */
@@ -160,7 +163,7 @@ html:has(.terms-dialog[open]) { overflow: hidden; }
 .check-actions { display: flex; flex-direction: column; align-items: stretch; gap: calc(8 * var(--u)); margin-top: calc(16 * var(--u)); }
 .check-actions [hidden] { display: none; }
 .check-back { align-self: center; display: inline-flex; align-items: center; min-height: calc(44 * var(--u)); padding: 0 calc(6 * var(--u)); font-size: var(--fs-sm); }
-@media (prefers-reduced-motion: reduce) { .login-card.card-in, .login-card.card-back, .check-card .mail-tick { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .login-card.card-slide-in, .login-card.card-slide-back, .check-card .mail-tick { animation: none; } }
 
 /* the card slide must never widen the page, even for a frame */
 .login-main { overflow-x: clip; }

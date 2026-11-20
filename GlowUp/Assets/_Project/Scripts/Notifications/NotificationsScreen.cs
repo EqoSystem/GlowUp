@@ -8,8 +8,8 @@ using UnityEngine.UI;
 namespace GlowUp.Notifications
 {
     /// <summary>
-    /// NotificationsScene (New22, 20 November 2026): the admins' replies to the user's reports, maintenance notices, app updates
-    /// and product changes, newest first, live (InboxService). A tap on a row opens it to its full text and marks it read; the X
+    /// NotificationsScene (New22, 20 November 2026): the admins' replies to the user's reports, and live notices when an admin changes a product or an ingredient,
+    /// newest first, live (InboxService). A tap on a row opens it to its full text and marks it read; the X
     /// deletes it (a reply from the account, an announcement from this phone) and a toast confirms. Opening the screen marks
     /// nothing read by itself, so the bell's count only drops for what was looked at. Back (button or the phone's key) returns.
     /// The rows are made at run time from the theme's colours and fonts; the scene itself comes from NotificationsSceneBuilder.
@@ -98,7 +98,7 @@ namespace GlowUp.Notifications
             column.spacing = 10; column.childControlWidth = true; column.childControlHeight = true; column.childForceExpandHeight = false; column.childForceExpandWidth = true;
             words.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1;
 
-            string label = item.kind == "reply" ? "Reply from GlowUp" : item.kind == "maintenance" ? "Maintenance" : item.kind == "product" ? "Product change" : "App update";
+            string label = item.kind == "reply" ? "Reply from GlowUp" : item.kind == "product" ? "Product change" : item.kind == "ingredient" ? "Ingredient change" : "GlowUp news";
             TextMeshProUGUI kind = RuntimeUiKit.Label(words, "Kind", (item.read ? "" : "New · ") + label + " · " + When(item.createdAt), 26, p.secondaryText, body, TextAlignmentOptions.Left);
             TextMeshProUGUI title = RuntimeUiKit.Label(words, "Title", item.title, 36, p.heading, heading, TextAlignmentOptions.Left);
             title.fontStyle = FontStyles.Bold;

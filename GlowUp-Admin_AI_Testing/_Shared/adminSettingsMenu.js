@@ -26,8 +26,6 @@ import { keptBinnedCount, onListsRefreshed } from "./adminStore.js";
 import { themeChoice, setThemeChoice, icon, hydrate } from "./adminShell.js";
 import { paintShortcutsView } from "./shortcutsPanel.js";
 import { watchRequests, onRequestsChanged, paintRequestsView, requestsState } from "./adminRequests.js";
-import { watchMaintenance, onMaintenanceChanged, paintMaintenanceView, maintenanceSnapshot } from "./maintenance.js";
-import { maintenanceState, STATE_TEXT } from "./maintenanceRules.js";
 
 export const BIN_PAGE = "../_Admin_Recycle_Bin/adminRecycleBin.html";
 const BIN_LISTS = ["ingredients", "brands", "products"];
@@ -58,14 +56,12 @@ function show(next) {
     if (host) host.hidden = view !== "layout";
     el("swKeysView").hidden = view !== "shortcuts";
     el("swReqView").hidden = view !== "requests";
-    el("swMaintView").hidden = view !== "maintenance";
     el("swBack").hidden = view === "menu";
-    el("swTitle").textContent = view === "layout" ? "Layout & Style" : view === "shortcuts" ? "Keyboard shortcuts" : view === "requests" ? "Admin requests" : view === "maintenance" ? "System status" : "Quick settings";
+    el("swTitle").textContent = view === "layout" ? "Layout & Style" : view === "shortcuts" ? "Keyboard shortcuts" : view === "requests" ? "Admin requests" : "Quick settings";
     win.setAttribute("aria-label", el("swTitle").textContent);
     if (view === "menu") renderMenu();
     else if (view === "shortcuts") paintShortcutsView(el("swKeysView"));
     else if (view === "requests") paintRequestsView(el("swReqView"));
-    else if (view === "maintenance") paintMaintenanceView(el("swMaintView"));
     else document.dispatchEvent(new CustomEvent("glowup:layout-view"));
 }
 
@@ -87,7 +83,6 @@ function build() {
             <div class="sw-view" id="swMenuView"></div>
             <div class="sw-view keys-view" id="swKeysView" hidden></div>
             <div class="sw-view req-view" id="swReqView" aria-live="polite" hidden></div>
-            <div class="sw-view mm-view" id="swMaintView" hidden></div>
         </div>`;
     document.body.appendChild(win);
 
@@ -203,21 +198,6 @@ function requestsItem() {
     return item({ label: "Admin requests", iconName: "user", badge: n > 0 ? (n > 99 ? "99+" : String(n)) : "", description, run: () => show("requests") });
 }
 
-// "System status": Maintenance Mode and announcements (maintenance.js); the description follows the live state
-function maintenanceItem() {
-    const { data, loaded, failure } = maintenanceSnapshot();
-    const description = !loaded ? "Loading..." : failure ? "Could not be read." : STATE_TEXT[maintenanceState(data)] + ". Maintenance Mode and announcements.";
-    return item({ label: "System status", iconName: "monitor", description, run: () => show("maintenance") });
-}
-
-/** Opens Quick settings on one of its views (the header's maintenance pill opens "maintenance") and scrolls to its card. */
-export function openSettingsView(name, anchorId) {
-    if (!isOpen()) openWindow();
-    show(name);
-    const target = anchorId && document.getElementById(anchorId);
-    if (target) requestAnimationFrame(() => target.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }));
-}
-
 function renderMenu() {
     const host = el("swMenuView");
     if (!host) return;
@@ -229,7 +209,6 @@ function renderMenu() {
     host.replaceChildren(
         ...(layoutHere ? [item({ label: "Layout and style", iconName: "sliders", description: "Arrange the panels, fonts and colours.", run: () => show("layout") })] : []),
         requestsItem(),
-        maintenanceItem(),
         item({ label: "Keyboard shortcuts", iconName: "keyboard", description: "Keys for this page's actions. Press ? on a page to see them.", run: () => show("shortcuts") }),
         item({ label: "Recycle bin", iconName: "trash", checked: here.includes("Recycle_Bin"), badge: n > 0 ? (n > 99 ? "99+" : String(n)) : "", description, run: go(BIN_PAGE) }),
         separator(),
@@ -295,12 +274,6 @@ export function mountSettingsMenu(tools) {
     document.addEventListener("glowup:theme", () => { if (isOpen() && view === "menu") renderMenu(); });
     document.addEventListener("glowup:bin-count", () => { if (isOpen() && view === "menu") renderMenu(); });
     watchRequests();
-    watchMaintenance();
-    onMaintenanceChanged(() => {
-        if (!isOpen()) return;
-        if (view === "menu") renderMenu();
-        else if (view === "maintenance") paintMaintenanceView(el("swMaintView"));
-    });
     onRequestsChanged(() => {
         if (!isOpen()) return;
         if (view === "menu") renderMenu();

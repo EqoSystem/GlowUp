@@ -12,7 +12,7 @@ namespace GlowUp.Notifications
     /// The app's Notifications (New22, 20 November 2026), live from Firestore:
     ///   - users/{uid}/notifications: the admins' replies to this user's reports (only admins can create one; the user reads,
     ///     marks read and deletes their own: firestore.rules);
-    ///   - announcements: maintenance notices, app updates and product changes posted by the admins for every user.
+    ///   - announcements: notices that the website adds when an admin saves a product or an ingredient (shown live to every user).
     /// One listener per collection for the whole app (a DontDestroyOnLoad object), started on the first request and stopped on
     /// sign-out or when the app closes. Deleting an announcement hides it on this phone only (it belongs to everyone); a reply is
     /// deleted from the account. "Read" for announcements is kept on this phone too.
@@ -25,7 +25,7 @@ namespace GlowUp.Notifications
         {
             public string id;
             public Source source;
-            public string kind;         // reply | maintenance | update | product
+            public string kind;         // reply | product | ingredient
             public string title, body;
             public DateTime createdAt;
             public bool read;

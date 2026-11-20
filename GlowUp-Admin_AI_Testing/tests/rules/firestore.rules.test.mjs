@@ -436,22 +436,19 @@ await canAfter("the user marks one read", seedNote, () => updateDoc(doc(user(), 
 await cannotAfter("the user changes the text of one", seedNote, () => updateDoc(doc(user(), "users/u1/notifications/n1"), { body: "changed" }));
 await canAfter("the user deletes one", seedNote, () => deleteDoc(doc(user(), "users/u1/notifications/n1")));
 await cannotAfter("another user reads them", seedNote, () => getDocs(collection(other(), "users/u1/notifications")));
-const ann = (extra) => Object.assign({ kind: "maintenance", title: "Scheduled App Update", body: "We are updating the ingredient list.", startsAt: Timestamp.fromMillis(Date.now() + 3600e3), endsAt: Timestamp.fromMillis(Date.now() + 7200e3), createdAt: serverTimestamp(), createdBy: "a1" }, extra || {});
-await can("an admin posts an announcement", () => setDoc(doc(adminDoc(), "announcements/x1"), ann()));
-await cannot("a plain user posts an announcement", () => setDoc(doc(user(), "announcements/x1"), ann({ createdBy: "u1" })));
-await cannot("an announcement of an unknown kind", () => setDoc(doc(adminDoc(), "announcements/x1"), ann({ kind: "ad" })));
-await canAfter("a signed-in user reads announcements", seed, () => getDocs(collection(user(), "announcements")));
-await cannotAfter("nobody signed in reads announcements", seed, () => getDocs(collection(anon(), "announcements")));
-const mm = (extra) => Object.assign({ isActive: false, scheduledStart: null, scheduledEnd: null, bannerTitle: "Scheduled App Update", customMessage: "Back soon.", notifyUsers: false, notifiedAt: null, updatedBy: "a1", updatedAt: serverTimestamp() }, extra || {});
-await can("an admin saves Maintenance Mode", () => setDoc(doc(adminDoc(), "systemConfig/maintenanceMode"), mm()));
-await can("an admin switches maintenance on with an end time", () => setDoc(doc(adminDoc(), "systemConfig/maintenanceMode"), mm({ isActive: true, scheduledEnd: Timestamp.fromMillis(Date.now() + 3600e3) })));
-await cannot("a plain user switches maintenance off", () => setDoc(doc(user(), "systemConfig/maintenanceMode"), mm({ updatedBy: "u1" })));
-await cannot("maintenance with an extra field", () => setDoc(doc(adminDoc(), "systemConfig/maintenanceMode"), mm({ evil: true })));
-await cannot("a banner title over 80 characters", () => setDoc(doc(adminDoc(), "systemConfig/maintenanceMode"), mm({ bannerTitle: "x".repeat(81) })));
-await cannot("a message over 300 characters", () => setDoc(doc(adminDoc(), "systemConfig/maintenanceMode"), mm({ customMessage: "x".repeat(301) })));
-await cannot("an admin writes another systemConfig document", () => setDoc(doc(adminDoc(), "systemConfig/other"), mm()));
-await canAfter("anyone, even signed out, reads the maintenance state", async () => { await seed(); await env.withSecurityRulesDisabled(async (c) => setDoc(doc(c.firestore(), "systemConfig/maintenanceMode"), { isActive: false })); }, () => getDoc(doc(anon(), "systemConfig/maintenanceMode")));
-await cannotAfter("nobody lists systemConfig", seed, () => getDocs(collection(anon(), "systemConfig")));
+// New23: announcements are the app's change notices (a saved product or ingredient); Maintenance Mode was removed, so systemConfig is closed
+const ann = (extra) => Object.assign({ kind: "ingredient", title: "Ingredient updated", body: "Niacinamide was updated.", createdAt: serverTimestamp(), createdBy: "a1" }, extra || {});
+await can("an admin posts a change notice for an ingredient", () => setDoc(doc(adminDoc(), "announcements/x1"), ann()));
+await can("an admin posts a change notice for a product", () => setDoc(doc(adminDoc(), "announcements/x1"), ann({ kind: "product", title: "Product updated" })));
+await cannot("a plain user posts a change notice", () => setDoc(doc(user(), "announcements/x1"), ann({ createdBy: "u1" })));
+await cannot("a notice of an unknown kind", () => setDoc(doc(adminDoc(), "announcements/x1"), ann({ kind: "maintenance" })));
+await cannot("a notice with an extra field", () => setDoc(doc(adminDoc(), "announcements/x1"), ann({ startsAt: Timestamp.fromMillis(Date.now()) })));
+await cannot("a notice title over 80 characters", () => setDoc(doc(adminDoc(), "announcements/x1"), ann({ title: "x".repeat(81) })));
+await cannot("a notice text over 300 characters", () => setDoc(doc(adminDoc(), "announcements/x1"), ann({ body: "x".repeat(301) })));
+await canAfter("a signed-in user reads notices", seed, () => getDocs(collection(user(), "announcements")));
+await cannotAfter("nobody signed in reads notices", seed, () => getDocs(collection(anon(), "announcements")));
+await cannot("an admin writes systemConfig (removed)", () => setDoc(doc(adminDoc(), "systemConfig/maintenanceMode"), { isActive: true }));
+await cannotAfter("nobody reads systemConfig (removed)", seed, () => getDoc(doc(anon(), "systemConfig/maintenanceMode")));
 
 await canAfter("a user saves their profile photo", seedUsers, () => setDoc(doc(user(), "users/u1"), { photoData: "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ==" }, { merge: true }));
 await cannotAfter("a profile photo that is not a JPEG", seedUsers, () => setDoc(doc(user(), "users/u1"), { photoData: "data:image/svg+xml;base64,PHN2Zz4=" }, { merge: true }));

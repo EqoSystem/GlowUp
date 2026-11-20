@@ -23,6 +23,7 @@
 
 import { auth, db } from "../_Database/firebase-console.js";
 import * as fb from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { noticeFor } from "./changeNotice.js";
 
 
 export const LISTS = ["brands", "products", "ingredients"];
@@ -367,6 +368,9 @@ export function writeBatch(database) {
         delete(ref) { touch(ref); batch.delete(ref); if (logged(ref)) items.push(auditItem("delete", ref, [])); return api; },
         commit: () => {
             if (items.length > 0) batch.set(fb.doc(fb.collection(db, AUDIT_COLLECTION)), auditRecord(items));
+            // New23: a saved product or ingredient also becomes ONE notice in the app's Notifications (live), in the same batch
+            const notice = auth.currentUser ? noticeFor(items) : null;
+            if (notice) batch.set(fb.doc(fb.collection(db, "announcements")), { ...notice, createdAt: fb.serverTimestamp(), createdBy: auth.currentUser.uid });
             return batch.commit();
         }
     };
