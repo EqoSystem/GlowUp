@@ -31,8 +31,8 @@ try {
         ok(/No new bug reports/.test(await page.textContent("#rv_bug")), `${width}px: marking it handled empties the Bug list`);
 
         ok(/the scan said harmful/.test(await page.textContent("#supportWrongList")), `${width}px: the wrong scan result is in its own panel`);
-        ok(/Mark Azcueta/.test(await page.textContent("#supportWrongList")) && /account user3abc/.test(await page.textContent("#supportWrongList")), `${width}px: the report shows the sender's name WITH the account id (the name is self-given)`);
-        ok(/user1abc/.test(await page.textContent("#supportList")), `${width}px: an older report without a name still shows its account`);
+        ok(/Mark Azcueta/.test(await page.textContent("#supportWrongList")) && !/account user3abc/.test(await page.textContent("#supportWrongList")), `${width}px: the report shows only the sender's name`);
+        ok(/GlowUp User/.test(await page.textContent("#supportList")) && !/user1abc/.test(await page.textContent("#supportList")), `${width}px: an older report without a name uses the neutral sender label`);
         ok(/how do I change my email/.test(await page.textContent("#supportOtherList")), `${width}px: the other report is in its own panel`);
         ok(!/how do I change/.test(await page.textContent("#supportList")), `${width}px: kinds are not mixed`);
         ok(await page.evaluate(() => !!document.querySelector("[data-panel=reports] .panel-fold-btn") && ["support", "supportWrong", "supportOther", "suggestion"].every((id) => document.getElementById(id + "ClearAll"))), `${width}px: the panel has its fold arrow and each tab its Clear all`);

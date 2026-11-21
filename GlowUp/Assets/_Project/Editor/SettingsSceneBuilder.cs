@@ -125,7 +125,8 @@ namespace GlowUp.EditorTools
             else Debug.LogWarning("[GlowUp] Settings: " + LegalPath + " was not found, so the legal pop-up has no text. Assign a document on LegalText > Legal Text Source.");
 
             // ---- contact support ----
-            A.AppPopup supportPopup = A.Overlay(s, "SupportPanel", "Contact support");
+            A.AppPopup supportPopup = A.Overlay(s, "SupportPanel", "Contact Support");
+            // Keep this as a centered, self-contained card so it remains readable on phones and tablets.
             A.At(supportPopup.box, A.MC, new Vector2(0, 40), new Vector2(940, 1230));
             TextMeshProUGUI supportIntro = A.Label(supportPopup.box, "IntroText", "Tell us what went wrong. Your report goes straight to the GlowUp team.",
                                                    30, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
@@ -134,13 +135,29 @@ namespace GlowUp.EditorTools
             ChoiceTabs categoryTabs = TabsGrid(supportPopup.box, "CategoryTabs", new[] { "Bug", "Wrong scan result", "Suggestion", "Other" }, 0, 2, 28);
             A.TopStrip(categoryTabs.transform.parent, 222, TwoRowTrack, 48, 48);
             TMP_InputField feedbackInput = SceneBuilderCore.MakeInput(supportPopup.box, "FeedbackInputField", "Describe what happened...", A.TC, Vector2.zero, new Vector2(840, 360));
-            A.TopStrip(feedbackInput.transform, 222 + TwoRowTrack + 18, 360, 48, 48);
+            float feedbackTop = 222 + TwoRowTrack + 18;
+            A.TopStrip(feedbackInput.transform, feedbackTop, 360, 48, 48);
             Kit.StyleInput(feedbackInput, "Describe what happened...", ThemeRole.InputBackground);
             SmartScanSceneBuilder.MakeMultiLine(feedbackInput, 32);
             var feedbackBehaviour = SceneBuilderCore.Ensure<InputFieldBehaviour>(feedbackInput.gameObject);
-            A.Set(feedbackBehaviour, "characterLimit", 1000);
+            A.Set(feedbackBehaviour, "characterLimit", SupportFeedbackForm.ReportLimit);
+
+            // The report counter belongs to the description field and stays inside the card's width.
+            GameObject counterRow = A.Node(supportPopup.box, "FeedbackCounterRow");
+            A.TopStrip(counterRow.transform, feedbackTop + 360 - 44, 36, 48, 48);
+            TextMeshProUGUI counterText = A.Label(counterRow.transform, "CharacterCounter", "0 / 500", 22, ThemeRole.SecondaryText,
+                                                   FontRole.Body, TextAlignmentOptions.Right);
+            A.Fill(counterText.transform, 0, 0, 0, 0);
+            var counter = SceneBuilderCore.Ensure<InlineHelperText>(counterRow);
+            A.Set(counter, "inputField", feedbackInput);
+            A.Set(counter, "helperLabel", null);
+            A.Set(counter, "badgeLabel", counterText);
+            A.Set(counter, "helperMessage", "");
+            A.Set(counter, "badgeMessage", "0 / 500");
+            A.Set(counter, "showCharacterCounter", true);
+
             GameObject includeRow = A.Node(supportPopup.box, "IncludeLastScanRow");
-            A.TopStrip(includeRow.transform, 222 + TwoRowTrack + 18 + 360 + 12, 84, 56, 56);
+            A.TopStrip(includeRow.transform, feedbackTop + 360 + 12, 84, 56, 56);
             A.HStack(includeRow, 20);
             TextMeshProUGUI includeLabel = A.Label(includeRow.transform, "Label", "Include my last scan (product and ingredients)", 30, ThemeRole.MainText, FontRole.Label,
                                                    TextAlignmentOptions.MidlineLeft, true);
@@ -360,7 +377,7 @@ namespace GlowUp.EditorTools
             // =====================================================================================
             Transform skin = TileSection(content, scroll, "SkinProfileSection", "Skin Profile", "Skin type, tone, allergens", IconFactory.Sparkle, SettingsIconAnimator.Style.Sparkle, 4);
             GameObject skinBlock = Block(skin, "SkinProfileBlock", 16);
-            TextMeshProUGUI skinCurrent = A.Label(skinBlock.transform, "CurrentProfileText", "Skin type: Mix\nSkin tone: Medium\nSkin conditions: 1   |   Allergens: 2",
+            TextMeshProUGUI skinCurrent = A.Label(skinBlock.transform, "CurrentProfileText", "Skin type: Mix\nSkin tone: Medium\nChronic skin conditions: 1   |   Allergens: 2",
                                                   32, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             TextMeshProUGUI skinHint = A.Label(skinBlock.transform, "HintText", "Skin changed, or picked the wrong type? Take the skin quiz again. Your answers are replaced when you finish it.",
                                                RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);

@@ -134,6 +134,10 @@ namespace GlowUp.EditorTools
         public static Sprite Star4 => Get("icon_star4", (x, y) => Star(x, y, 0.95f));
         public static Sprite User => Get("icon_user_line", (x, y) =>
             Ring(x, y - 0.4f, 0.3f, 0.08f) || (Ring(x, y + 0.88f, 0.76f, 0.08f) && y > -0.8f) || Stroke(x, y, 0.08f, new[] { -0.72f, -0.8f, 0.72f, -0.8f }));
+        /// <summary>A simple skin drop used beside Skin Type; it is intentionally line-only like the other profile icons.</summary>
+        public static Sprite SkinDrop => Get("icon_skin_drop", (x, y) =>
+            Stroke(x, y, 0.08f, new[] { 0f, 0.86f, 0.58f, 0.08f, 0.48f, -0.52f, 0f, -0.84f, -0.48f, -0.52f, -0.58f, 0.08f, 0f, 0.86f }) ||
+            Ring(x, y - 0.06f, 0.18f, 0.06f));
         public static Sprite SignOut => Get("icon_sign_out", (x, y) =>
             Stroke(x, y, 0.08f, new[] { -0.05f, 0.75f, -0.7f, 0.75f, -0.7f, -0.75f, -0.05f, -0.75f }) ||
             Stroke(x, y, 0.08f, new[] { -0.25f, 0f, 0.78f, 0f }) || Stroke(x, y, 0.08f, new[] { 0.45f, 0.33f, 0.78f, 0f, 0.45f, -0.33f }));

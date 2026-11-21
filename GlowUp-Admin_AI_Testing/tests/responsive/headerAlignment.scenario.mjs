@@ -24,7 +24,7 @@ try {
                 const header = document.querySelector(".topbar");
                 const controls = header.querySelector(".topbar-controls");
                 const gear = header.querySelector(".quick-gear");
-                const account = header.querySelector("#accountBtn") || gear;      // the profile button is the rightmost header control (20 Nov 2026)
+                const account = gear; // The header profile icon was removed globally; the gear is now the rightmost control.
                 const first = controls.querySelector(":scope > :not(.topbar-tools)") || controls.querySelector(".topbar-tools > :not(.quick-gear)");
                 const board = document.querySelector(".board");
                 const card = board.querySelector(":scope > .panel:not([hidden])");

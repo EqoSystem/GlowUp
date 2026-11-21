@@ -46,8 +46,6 @@ export function openReplyDrawer(report, { onSent } = {}) {
     label.htmlFor = box.id;
     const row = node("div", "hint-row");
     row.append(node("p", "field-hint", "Sent as “The GlowUp team” to the user's Notifications in the app."));
-    const counter = node("span", "counter", `0 / ${REPLY_MAX}`);
-    row.append(counter);
     field.append(label, box, row);
     const problem = node("p", "form-error"); problem.setAttribute("role", "alert");
     const actions = node("div", "modal-actions");
@@ -61,8 +59,6 @@ export function openReplyDrawer(report, { onSent } = {}) {
 
     let sending = false;
     const paint = () => {
-        counter.textContent = `${box.value.length} / ${REPLY_MAX}`;
-        counter.classList.toggle("is-full", box.value.length >= REPLY_MAX);
         send.disabled = sending || box.value.trim().length < 2;
         problem.style.display = "none";
     };

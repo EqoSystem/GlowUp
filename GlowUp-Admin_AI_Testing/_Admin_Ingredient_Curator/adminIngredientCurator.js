@@ -335,7 +335,7 @@ function startCuratorLive() {
         if (curatorLiveReady.size < 2 || curatorLiveRefresh || dialogIsOpen()) return;
         curatorLiveRefresh = true;
         loadIngredients().finally(() => { curatorLiveRefresh = false; });
-    }, (error) => console.error(`Error watching ${name} for curator cards: `, error)));
+    }, (error) => console.error(`Error watching ${name} for curator cards: `, error))));
 }
 
 function fromFirstPage() { pageState.page = 1; renderIngredients(); }
@@ -555,15 +555,9 @@ let limitedWidth = 0;
 function wireLimited() {
     paintNameCount = attachCounters(["ingredientNameInput"]);
     LIMITED_IDS.forEach((id) => {
-        const box = el(id), field = box.closest(".field");
-        if (!field || box.dataset.limitedWired) return;
+        const box = el(id);
+        if (!box || box.dataset.limitedWired) return;
         box.dataset.limitedWired = "1";
-        let row = field.querySelector(".hint-row");
-        if (!row) { row = document.createElement("div"); row.className = "hint-row"; box.insertAdjacentElement("afterend", row); }
-        let counter = row.querySelector(".counter");
-        if (!counter) { counter = document.createElement("span"); counter.className = "counter"; row.appendChild(counter); }
-        box._counter = counter;
-        counter.setAttribute("aria-live", "off");
         if (box.classList.contains("one-line")) {
             box.addEventListener("keydown", (e) => { if (e.key === "Enter") e.preventDefault(); });
             box.addEventListener("input", () => { if (/[\r\n]/.test(box.value)) box.value = box.value.replace(/\s*[\r\n]+\s*/g, " "); });
@@ -579,10 +573,7 @@ function paintLimited(only) {
     LIMITED_IDS.forEach((id) => {
         const box = el(id);
         if (only && only !== box) return;
-        if (!box._counter) return;
-        const max = box.maxLength > 0 ? box.maxLength : 0;
-        box._counter.textContent = max ? `${box.value.length} / ${max}` : `${box.value.length}`;
-        box._counter.classList.toggle("is-full", max > 0 && box.value.length >= max);
+        // maxlength remains active on the field; no counter is shown below it.
     });
     if (!only) fitLimited();
 }

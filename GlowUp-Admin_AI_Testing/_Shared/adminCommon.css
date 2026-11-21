@@ -2382,7 +2382,14 @@ td .chip { flex-shrink: 1; overflow-wrap: anywhere; }
 .ap-email { font-size: var(--fs-xs); color: var(--muted); overflow-wrap: anywhere; }
 .ap-last { margin: 0; padding: calc(6 * var(--u)) calc(10 * var(--u)) calc(4 * var(--u)); font-size: var(--fs-xs); color: var(--muted); }
 /* Edit Profile window (adminProfile.js) */
-.ep-dialog { width: min(calc(480 * var(--u)), calc(100vw - calc(24 * var(--u)))); max-height: min(calc(720 * var(--u)), calc(100dvh - calc(32 * var(--u)))); overflow: auto; }
+.ep-dialog { width: min(calc(560 * var(--u)), calc(100vw - calc(24 * var(--u)))); max-height: min(calc(780 * var(--u)), calc(100dvh - calc(32 * var(--u)))); overflow: auto; }
+.ep-profile-head { display: flex; align-items: center; gap: calc(18 * var(--u)); padding: calc(8 * var(--u)) 0 calc(18 * var(--u)); border-bottom: 1px solid var(--border); }
+.ep-avatar { width: calc(72 * var(--u)); height: calc(72 * var(--u)); flex: none; display: grid; place-items: center; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-size: calc(30 * var(--u)); font-weight: 750; }
+.ep-identity { min-width: 0; }
+.ep-name { margin: 0; color: var(--text); font-size: var(--fs-lg); }
+.ep-email { margin: calc(4 * var(--u)) 0 0; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ep-identity-fields { display: grid; grid-template-columns: 1fr 1fr; gap: calc(12 * var(--u)); margin-top: calc(16 * var(--u)); }
+@media (max-width: 560px) { .ep-identity-fields { grid-template-columns: 1fr; } }
 .ep-form { display: flex; flex-direction: column; gap: calc(12 * var(--u)); margin-top: calc(8 * var(--u)); }
 .ep-form .field { display: flex; flex-direction: column; gap: calc(6 * var(--u)); }
 .ep-form input[readonly] { opacity: .75; }

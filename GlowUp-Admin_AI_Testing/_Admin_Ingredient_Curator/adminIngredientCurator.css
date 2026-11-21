@@ -1,4 +1,9 @@
 
+.curator-page .topbar-tools > .hdr-avatar,
+.curator-page #accountBtn { display: none !important; }
+.curator-page .topbar-tools { justify-content: flex-end; }
+.curator-page .topbar-tools > #headerActions { margin-right: 0; }
+
 
 
 .ingredients-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(250 * var(--u)), 1fr)); gap: calc(12 * var(--u)); align-items: start; }

@@ -164,7 +164,7 @@ try {
         await page.click("#accountBtn"); await settle(200);
         await page.click(".ap-pop .menu-item:first-of-type"); await settle(300);
         ok(await page.isVisible("#epName") && await page.inputValue("#epEmail") === "admin@example.test", `${tag}: Edit Profile opens with the name and the e-mail`);
-        ok(await page.evaluate(() => ["epName", "epEmail", "epCurrent", "epNext", "epConfirm"].every((id) => { const input = document.getElementById(id); return input && input.maxLength > 0 && input.closest(".field")?.querySelector(".counter"); })), `${tag}: Edit Profile text fields have limits and counters`);
+        ok(await page.evaluate(() => ["epName", "epEmail", "epCurrent", "epNext", "epConfirm"].every((id) => { const input = document.getElementById(id); return input && input.maxLength > 0 && !input.closest(".field")?.querySelector(".counter"); })), `${tag}: Edit Profile text fields have limits without counters`);
         await page.fill("#epName", "Grace Admin");
         await page.fill("#epCurrent", "nope"); await page.fill("#epNext", "NewPassw0rd!"); await page.fill("#epConfirm", "NewPassw0rd!");
         await page.click(".ep-dialog .save-btn"); await settle(300);
@@ -205,7 +205,7 @@ try {
     for (const key of ["inv", "cur", "bin", "arc"]) {
         const { page, ctx, errors } = await openPage(browser, key, { width: 1280, height: 860 });
         const b = await page.locator("#notificationsBtn").boundingBox(), g = await page.locator("#quickSettingsBtn").boundingBox(), a = await page.locator("#accountBtn").boundingBox();
-        ok(b && g && a && b.x < g.x && g.x < a.x && Math.abs(b.y - g.y) < 0.6 && Math.abs(a.y - g.y) < 0.6, `${key}: bell, gear, profile aligned`);
+        ok(b && g && (key === "cur" ? !a : a) && b.x < g.x && (key === "cur" ? true : g.x < a.x) && Math.abs(b.y - g.y) < 0.6 && (key === "cur" || Math.abs(a.y - g.y) < 0.6), `${key}: header actions aligned`);
         const faults = await check(page);
         ok(faults.length === 0, `${key}: layout faults: ${faults.join(" | ")}`);
         ok(errors.length === 0, `${key}: no page errors ${errors.join("; ")}`);

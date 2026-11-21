@@ -63,16 +63,23 @@ export function openEditProfile() {
     };
     const frame = dialogFrame("Edit Profile", leave);
     frame.box.classList.add("ep-dialog");
-    const intro = make("p", "modal-intro", "Change the name other admins see, or your password. Your e-mail is your sign-in and cannot be changed here.");
     const form = document.createElement("form");
     form.className = "ep-form"; form.noValidate = true;
+    const profileHead = make("div", "ep-profile-head");
+    const avatar = make("div", "ep-avatar", (startName || user.email || "A").trim().charAt(0).toUpperCase());
+    avatar.setAttribute("aria-hidden", "true");
+    const identity = make("div", "ep-identity");
+    identity.append(make("h4", "ep-name", startName || "Your profile"), make("p", "ep-email", user.email || ""));
+    profileHead.append(avatar, identity);
+    const identityFields = make("div", "ep-identity-fields");
     const pwTitle = make("h4", "ep-section", "Change password");
     const cancel = make("button", "cancel-btn", "Cancel"); cancel.type = "button";
     const save = make("button", "save-btn", "Save changes"); save.type = "submit";
     const bar = make("div", "modal-actions"); bar.append(cancel, save);
-    form.append(field("Display name", name, "epName"), field("E-mail", email, "epEmail"), pwTitle,
+    identityFields.append(field("Display name", name, "epName"), field("E-mail", email, "epEmail"));
+    form.append(profileHead, identityFields, pwTitle,
         field("Current password", current, "epCurrent"), field("New password", next, "epNext", rules), field("Confirm new password", confirm, "epConfirm"), problem, bar);
-    frame.box.append(intro, form);
+    frame.box.append(form);
     attachCounters(["epName", "epEmail", "epCurrent", "epNext", "epConfirm"]);
     name.focus();
 
@@ -87,7 +94,7 @@ export function openEditProfile() {
         rules.hidden = next.value === "";
         save.disabled = sending || !dirty();
     };
-    form.addEventListener("input", () => { show(""); paint(); });
+    form.addEventListener("input", () => { identity.querySelector(".ep-name").textContent = cleanName(name.value) || "Your profile"; show(""); paint(); });
     cancel.addEventListener("click", leave);
     paint();
 

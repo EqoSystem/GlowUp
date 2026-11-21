@@ -85,10 +85,8 @@ namespace GlowUp.AppSettings
         /// <summary>The longest report a person can type. Long enough for steps to reproduce, short enough to read at a glance.</summary>
         public const int ReportLimit = 500;
         public const string SupportAddress = "GlowUpAdminSupport@gmail.com";
-        private TextMeshProUGUI counterText;
 
-        /// <summary>Adds the "n / 500" counter under the message box and the e-mail line under the toggle, made at run time from the
-        /// form's own status text so they share its font and colours (no scene rebuild needed).</summary>
+        /// <summary>Applies the native character limit and adds the e-mail line under the toggle.</summary>
         private void AddLimitAndEmail()
         {
             if (maximumCharacters <= 0 || maximumCharacters > ReportLimit) maximumCharacters = ReportLimit;
@@ -96,10 +94,6 @@ namespace GlowUp.AppSettings
             messageInput.characterLimit = maximumCharacters;
             TextMeshProUGUI style = feedbackText != null ? feedbackText : sendLabel;
             if (style == null) return;
-
-            counterText = MakeLine("CharacterCounter", style, messageInput.transform, TextAlignmentOptions.Right);
-            messageInput.onValueChanged.AddListener(_ => PaintCounter());
-            PaintCounter();
 
             Transform after = includeLastScanToggle != null ? includeLastScanToggle.transform : messageInput.transform;
             TextMeshProUGUI email = MakeLine("SupportEmailLink", style, after, TextAlignmentOptions.Left);
@@ -124,13 +118,6 @@ namespace GlowUp.AppSettings
             line.raycastTarget = false;
             line.text = "";
             return line;
-        }
-
-        private void PaintCounter()
-        {
-            if (counterText == null || messageInput == null) return;
-            int n = messageInput.text != null ? messageInput.text.Length : 0;
-            counterText.text = n + " / " + maximumCharacters;
         }
 
         /// <summary>Opens Gmail's compose screen to the support address; any other mail app (or the chooser) when Gmail is missing.</summary>

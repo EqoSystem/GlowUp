@@ -1,5 +1,5 @@
-// Header notification bell and admin profile (20 November 2026). Mounted by mountShell next to the Quick settings gear:
-// bell, gear, profile (left to right), on every admin page.
+// Header notification bell (20 November 2026). The profile/avatar control is intentionally not rendered in the header;
+// account actions are available from Quick settings so every page keeps the same clean right edge.
 //
 // BELL: a live count of new support reports the admin has not opened yet. It follows the same documents the dashboard's report
 // panels read (supportReports with status "new"), but live (onSnapshot through adminStore) so a report sent from the app shows
@@ -9,9 +9,7 @@
 // The listener starts when an account is signed in, and stops on sign-out and when the page is left (it starts again when the
 // page comes back from the browser's back/forward cache).
 //
-// PROFILE: a pink circle with the first letter of the admin's name or e-mail; its menu shows name and e-mail, Edit Profile
-// (name, password: adminProfile.js), My activity log (this admin's own audit records) and the last sign-in time. Settings and
-// Sign out are not repeated here (22 Nov 2026): the gear and the sidebar's Sign Out already do that.
+// PROFILE: Edit Profile and My activity log are available under the gear's Account section.
 //
 // One dropdown at a time: opening one closes the other (and any open menu); a click outside, Escape or a resize closes it.
 
@@ -250,7 +248,7 @@ function toggleProfile() {
 }
 
 // ---- mounting ----
-/** Adds the bell left of the gear and the profile right of it (once). `tools` is the header's .topbar-tools. */
+/** Adds the notification bell left of the gear (once). `tools` is the header's .topbar-tools. */
 export function mountHeaderAccount(tools) {
     if (!tools || tools.querySelector(".hdr-bell")) return;
     bellBtn = node("button", "icon-btn hdr-bell");
@@ -263,22 +261,14 @@ export function mountHeaderAccount(tools) {
     badgeEl.hidden = true;
     badgeEl.setAttribute("aria-hidden", "true");
     bellBtn.append(badgeEl);
-    avatarBtn = node("button", "icon-btn hdr-avatar");
-    avatarBtn.type = "button";
-    avatarBtn.id = "accountBtn";
-    avatarBtn.setAttribute("aria-haspopup", "dialog");
-    avatarBtn.setAttribute("aria-expanded", "false");
     const gearBtn = tools.querySelector(".quick-gear");
-    if (gearBtn) { gearBtn.before(bellBtn); gearBtn.after(avatarBtn); } else tools.append(bellBtn, avatarBtn);
-    paintBadge(); paintAvatar();
+    if (gearBtn) gearBtn.before(bellBtn); else tools.append(bellBtn);
+    paintBadge();
     bellBtn.addEventListener("click", toggleBell);
-    avatarBtn.addEventListener("click", toggleProfile);
     subscribers.add(paintBadge);
 
-    document.addEventListener("glowup:profile-changed", paintAvatar);
     onAuthStateChanged(auth, (account) => {
         user = account || null;
-        paintAvatar();
         if (user) startReports();
         else { stopWatching(); closePop(false); reports = null; problem = null; emit(); }
     });

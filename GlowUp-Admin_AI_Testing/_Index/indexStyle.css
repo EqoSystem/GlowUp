@@ -173,7 +173,8 @@ html:has(.terms-dialog[open]) { overflow: hidden; }
 .login-main { overflow-x: clip; }
 
 @media (max-width: 480px) {
-    .login-main { align-items: start; padding-top: calc(12 * var(--u)); }
+    .login-main { padding-top: calc(12 * var(--u)); }
+    .login-main:has(.signup-card:not([hidden])) { align-items: start; }
     .login-card { max-height: calc(100dvh - calc(20 * var(--u))); }
     .card-back { top: calc(8 * var(--u)); left: calc(8 * var(--u)); }
 }

@@ -50,6 +50,7 @@ let exactToday = null;
 
 const el = (id) => document.getElementById(id);
 let stopToday = null;
+let stopSupportReports = null;
 let todayStart = 0;
 let suggestions = [];
 let appSuggestions = [];
@@ -127,7 +128,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     watchScansToday();
     watchRecentActivity();
     loadSuggestions();
-    loadSupportReports();
+    watchSupportReports();
     loadReviewQueue();
     el("suggestionList").addEventListener("click", onSuggestionClick);
     el("suggestionClearAll").addEventListener("click", clearAllSuggestions);
@@ -526,9 +527,9 @@ async function onSuggestionClick(event) {
 
 
 
-async function loadSupportReports() {
-    try {
-        const snapshot = await getDocs(query(collection(db, "supportReports"), where("status", "==", "new")));
+function watchSupportReports() {
+    if (stopSupportReports) stopSupportReports();
+    stopSupportReports = onSnapshot(query(collection(db, "supportReports"), where("status", "==", "new")), (snapshot) => {
         supportReports = [];
         appSuggestions = [];
         snapshot.forEach((d) => {
@@ -548,13 +549,13 @@ async function loadSupportReports() {
         renderSupportReports();
         suggestions = typedSuggestions.concat(appSuggestions);
         if (suggestionsLoaded) renderSuggestions();
-    } catch (error) {
+    }, (error) => {
         console.error("Error loading supportReports: ", error);
         SUPPORT_KINDS.forEach((kind) => {
             showEmpty(kind.prefix, "Could not load the reports.", true);
             el(kind.prefix + "EmptyHint").textContent = describeError(error);
         });
-    }
+    });
 }
 
 function renderSupportReports() {
@@ -582,7 +583,7 @@ function renderSupportKind(kind) {
                     <span class="report-when small muted">${escapeHtml(formatWhen(r.createdAtUnix))} · ${escapeHtml(timeAgo(r.createdAtUnix))}</span>
                 </div>
                 <p class="support-message report-text">${escapeHtml(r.message)}</p>
-                <p class="report-from small muted">${senderHtml(r)}${r.appVersion ? " · app " + escapeHtml(r.appVersion) : ""}</p>
+                <p class="report-from small muted">${senderHtml(r)}</p>
                 ${scan}
             </div>
             <div class="suggestion-actions report-actions">
@@ -601,12 +602,10 @@ function renderSupportKind(kind) {
 
 
 function senderText(r) {
-    const account = "account " + String(r.uid || "").slice(0, 8);
-    return r.userName ? `${r.userName} (${account})` : account;
+    return r.userName || "GlowUp User";
 }
 function senderHtml(r) {
-    const account = "account " + escapeHtml(String(r.uid || "").slice(0, 8));
-    return r.userName ? `<b title="Name given by the sender">${escapeHtml(r.userName)}</b> <span class="muted">(${account})</span>` : account;
+    return `<b title="Name given by the sender">${escapeHtml(r.userName || "GlowUp User")}</b>`;
 }
 
 

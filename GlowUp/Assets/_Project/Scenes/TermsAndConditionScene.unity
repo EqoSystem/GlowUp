@@ -1389,12 +1389,12 @@ MonoBehaviour:
     us when registering for an account and while using the application. This includes:\n\n<indent=4%>-
     Personal Identifiers: your first name, middle name, last name, date of birth,
     age, and email address.</indent>\n<indent=4%>- Profile and Preference Data: your
-    skin type, skin tone, skin conditions, and known cosmetic allergens and sensitivities.
+    skin type, skin tone, chronic skin conditions, and known cosmetic allergens and sensitivities.
     This information is used exclusively to tailor the app's safety analyses and
     product recommendations to your personal profile.</indent>\n<indent=4%>- Scan
     Data: the ingredient text read from product labels, the results of each analysis,
     the products you save to your Recent Scans, and any names you give them.</indent>\n<indent=4%>-
-    Suggestions: skin conditions, allergens, or ingredients you add that are not
+    Suggestions: chronic skin conditions, allergens, or ingredients you add that are not
     yet in our lists, so that we can review them and improve the database.</indent>\n<indent=4%>-
     Technical Data: our cloud provider may process basic technical information, such
     as your IP address and device identifiers, in order to deliver and secure the
@@ -1415,7 +1415,7 @@ MonoBehaviour:
     email addresses cannot be used to sign up.</indent>\n<indent=4%>- Store and retrieve
     your profile preferences securely using Google Cloud Firestore.</indent>\n<indent=4%>-
     Personalize cosmetic ingredient safety assessments and filter recommendations
-    based on your registered skin type, skin conditions, age, and allergies.</indent>\n<indent=4%>-
+    based on your registered skin type, chronic skin conditions, age, and allergies.</indent>\n<indent=4%>-
     Keep your scan history available across sessions and, when you are online, across
     your devices.</indent>\n<indent=4%>- Count how often a brand is scanned, without
     attaching your name to that count, so that we can prioritise which products to
@@ -1475,7 +1475,7 @@ MonoBehaviour:
     else) may be sent to Open Beauty Facts, a public list of cosmetics, to compare
     its ingredient list with the one the app has.\n\nYour profile is never sent to
     the AI service. Your name, email address, password, age, skin type, skin tone,
-    skin conditions, and allergens stay out of every such request: the comparison
+    chronic skin conditions, and allergens stay out of every such request: the comparison
     between a product and your profile is made on your device.\n\nAutomated results
     can be incomplete or wrong. Please read section 4 of the Terms and Conditions
     below.\n\n<size=108%><b>6. Data Security and Third-Party Services</b></size>\nWe
@@ -1505,7 +1505,7 @@ MonoBehaviour:
     about the account on your phone. You can also ask our support team to delete
     it.\n\nA few things are kept apart from your profile and are not removed by Delete
     My Account: the anonymous scan counts (they carry no name, email or account id),
-    and the skin conditions, allergens, ingredients or product photos you sent us
+    and the chronic skin conditions, allergens, ingredients or product photos you sent us
     as suggestions, which carry your account id until our team has reviewed them.
     Ask our support team if you want those removed too.\n\n<size=108%><b>9. Children's
     Privacy</b></size>\nGlowUp is not intended for children under 13 years of age,
@@ -1519,7 +1519,7 @@ MonoBehaviour:
     of it, and to withdraw your consent at any time. You can update your profile
     in the app, delete your account in Settings, and contact us for anything else.
     If you think your data was handled wrongly, you may also complain to the National
-    Privacy Commission (privacy.gov.ph).\n\nYour skin type, skin tone, skin conditions
+    Privacy Commission (privacy.gov.ph).\n\nYour skin type, skin tone, chronic skin conditions
     and allergens are information about your health. The law treats such information
     as sensitive personal information, so we use it only with your clear consent.
     You give that consent with the second box on the page where you accept this policy,
@@ -8342,7 +8342,7 @@ MonoBehaviour:
   backButton: {fileID: 576611999}
   feedbackText: {fileID: 1866138315}
   bottomThreshold: 0.03
-  healthText: I agree that GlowUp keeps my skin type, skin tone, skin conditions
+  healthText: I agree that GlowUp keeps my skin type, skin tone, chronic skin conditions
     and allergies, to personalise my results (sensitive personal information)
   readLabel: I have read and agree to the Privacy Policy and Terms & Conditions
   dashboardScene: UserDashboardScene

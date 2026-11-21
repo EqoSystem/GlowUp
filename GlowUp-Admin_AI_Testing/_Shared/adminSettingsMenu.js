@@ -26,6 +26,9 @@ import { keptBinnedCount, onListsRefreshed } from "./adminStore.js";
 import { themeChoice, setThemeChoice, icon, hydrate } from "./adminShell.js";
 import { paintShortcutsView } from "./shortcutsPanel.js";
 import { watchRequests, onRequestsChanged, paintRequestsView, requestsState } from "./adminRequests.js";
+import { auth } from "../_Database/firebase-console.js";
+import { openEditProfile } from "./adminProfile.js";
+import { openAuditLog } from "./adminAuditLog.js";
 
 export const BIN_PAGE = "../_Admin_Recycle_Bin/adminRecycleBin.html";
 const BIN_LISTS = ["ingredients", "brands", "products"];
@@ -216,6 +219,10 @@ function renderMenu() {
         item({ label: "Light", iconName: "sun", checked: choice === "light", run: () => { setThemeChoice("light"); renderMenu(); } }),
         item({ label: "Dark", iconName: "moon", checked: choice === "dark", run: () => { setThemeChoice("dark"); renderMenu(); } }),
         item({ label: "System", iconName: "monitor", checked: choice === "system", description: "Follows this computer's setting.", run: () => { setThemeChoice("system"); renderMenu(); } }),
+        separator(),
+        heading("Account"),
+        item({ label: "Edit Profile", iconName: "edit", description: "Change your name or password.", run: () => { closeSettingsWindow(); openEditProfile(); } }),
+        item({ label: "My activity log", iconName: "list", description: "Review your admin changes.", run: () => { closeSettingsWindow(); openAuditLog({ uid: auth.currentUser ? auth.currentUser.uid : "" }); } }),
         ...pageEntries()
     );
 }

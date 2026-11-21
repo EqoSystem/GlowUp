@@ -31,7 +31,7 @@ namespace GlowUp.AppSettings
 
         [Header("Wording")]
         [Tooltip("{0} = skin type, {1} = skin tone, {2} = number of skin conditions, {3} = number of allergens")]
-        [SerializeField] private string profileFormat = "Skin type: {0}\nSkin tone: {1}\nSkin conditions: {2}   |   Allergens: {3}";
+        [SerializeField] private string profileFormat = "Skin type: {0}\nSkin tone: {1}\nChronic skin conditions: {2}   |   Allergens: {3}";
         [SerializeField] private string notSet = "not set";
         [SerializeField] private string noneSaved = "none";
         [SerializeField] private string confirmTitle = "Retake the skin quiz?";

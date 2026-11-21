@@ -175,20 +175,23 @@ namespace GlowUp.EditorTools
             Button editSkin = A.PillButton(account.box, "EditSkinProfileButton", "Edit Profile", 28, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Pencil);
             A.At(editSkin.transform, A.TR, new Vector2(-48, -462), new Vector2(240, 64));
             // the four facts: label over value, two to a row; a long value wraps and shrinks inside its own tile
-            TextMeshProUGUI Fact(string name, string label, float top, bool right)
+            TextMeshProUGUI Fact(string name, string label, float top, bool right, Sprite icon)
             {
                 Image tile = A.Panel(account.box, name, ThemeRole.SurfaceAlt, Kit.PanelAlpha, 28f);
                 A.TopStrip(tile.transform, top, 132, right ? 452 : 48, right ? 48 : 452);
+                Image iconDisc = A.Panel(tile.transform, "IconDisc", ThemeRole.ButtonFill, Kit.PanelAlpha, 24f);
+                A.At(iconDisc.transform, A.TL, new Vector2(18, -18), new Vector2(48, 48));
+                Image factIcon = A.Icon(iconDisc.transform, "Icon", icon, 28, ThemeRole.ButtonText);
                 TextMeshProUGUI head = A.Label(tile.transform, "LabelText", label, 24, ThemeRole.SecondaryText, FontRole.Body);
-                A.TopStrip(head.transform, 14, 36, 24, 24); A.Shrink(head, 18);
+                A.TopStrip(head.transform, 14, 36, 76, 24); A.Shrink(head, 18);
                 TextMeshProUGUI value = A.Label(tile.transform, "ValueText", "-", 30, ThemeRole.MainText, FontRole.Heading, TextAlignmentOptions.TopLeft, true);
-                A.Fill(value.transform, 24, 12, 24, 52); A.ShrinkWrapped(value, 20);
+                A.Fill(value.transform, 76, 12, 24, 52); A.ShrinkWrapped(value, 20);
                 return value;
             }
-            TextMeshProUGUI factType = Fact("SkinTypeTile", "Skin Type", 542, false);
-            TextMeshProUGUI factTone = Fact("SkinToneTile", "Skin Tone", 542, true);
-            TextMeshProUGUI factCondition = Fact("ConditionTile", "Chronic Skin Condition", 690, false);
-            TextMeshProUGUI factAllergens = Fact("AllergensTile", "Allergens", 690, true);
+            TextMeshProUGUI factType = Fact("SkinTypeTile", "Skin Type", 542, false, IconFactory.SkinDrop);
+            TextMeshProUGUI factTone = Fact("SkinToneTile", "Skin Tone", 542, true, IconFactory.Palette);
+            TextMeshProUGUI factCondition = Fact("ConditionTile", "Skin Concerns", 690, false, IconFactory.ShieldPlain);
+            TextMeshProUGUI factAllergens = Fact("AllergensTile", "Allergies", 690, true, IconFactory.Warning);
             Image tip = A.Panel(account.box, "TipPanel", ThemeRole.SurfaceAlt, Kit.PanelAlpha, 24f);
             A.TopStrip(tip.transform, 840, 96, 48, 48);
             TextMeshProUGUI tipText = A.Label(tip.transform, "TipText", "You can update your skin profile anytime for more accurate recommendations.",
