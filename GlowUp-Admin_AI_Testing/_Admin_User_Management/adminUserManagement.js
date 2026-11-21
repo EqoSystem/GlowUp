@@ -1,4 +1,4 @@
-// User Management (20 November 2026). ONE live listener on the users collection feeds everything on the page: the four cards, the
+// User Management. ONE live listener on the users collection feeds everything on the page: the four cards, the
 // tab counts, the table, and the details window. Tabs, search, filters and paging are client-side on that snapshot (no extra reads).
 // The details window is drawn from the same snapshot, so it follows live changes with no second listener.
 // Users are made by the app (sign-up); an admin cannot add one here. Writes go through adminStore, which records each in auditLog.
@@ -392,7 +392,7 @@ function openEdit(u) {
         const bad = editProblem(values);
         if (bad) { show(bad.text, bad.field); return; }
         if (!dirty()) { release(); frame.close(); return; }
-        // New23 (destructive actions are confirmed): banning from the edit form asks first, like Unban, Archive and Recycle Bin
+        // banning from the edit form asks first, like Unban, Archive and Recycle Bin
         if (values.status === "banned" && u.status !== "banned" && !(await askConfirm({ title: "Ban User", message: "This user can no longer change their profile in the app. You can unban them at any time.", items: [u.name], confirmLabel: "Ban", danger: true }))) return;
         sending = true;
         save.disabled = true; cancel.disabled = true;

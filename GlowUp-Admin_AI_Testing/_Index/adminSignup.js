@@ -1,4 +1,4 @@
-// Admin sign-up on the login page (20 November 2026): "Sign Up" -> "Create Admin Account" -> "Check Your Email".
+// Admin sign-up on the login page: "Sign Up" -> "Create Admin Account" -> "Check Your Email".
 //
 // Signing up NEVER makes anyone an admin. It makes (or reuses) a Firebase account, sends Firebase's e-mail confirmation
 // link and writes a pending request to adminRequests/{uid}. An existing admin approves it in Quick settings > Admin requests

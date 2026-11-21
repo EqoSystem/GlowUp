@@ -66,7 +66,7 @@ export async function moveToArchive(entries) {
 }
 
 
-/** An app report deleted on the dashboard (22 Nov 2026): kept in the Archive for KEEP_DAYS days, then purged like everything else.
+/** An app report deleted on the dashboard: kept in the Archive for KEEP_DAYS days, then purged like everything else.
  *  The report and its archive entry change in one batch, so a report is never lost half-way. */
 export async function archiveReport(report) {
     const user = auth.currentUser;

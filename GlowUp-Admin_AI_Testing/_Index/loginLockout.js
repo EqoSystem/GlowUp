@@ -1,4 +1,4 @@
-// Log-in lock-out (20 November 2026): after 3 wrong passwords for one e-mail, the log-in page refuses that e-mail for 5 minutes
+// Log-in lock-out: after 3 wrong passwords for one e-mail, the log-in page refuses that e-mail for 5 minutes
 // and recommends "Forgot password?". The count lives in this browser only (localStorage), keyed by a hash of the e-mail so the
 // address itself is not stored. Firebase Authentication still applies its own server-side limit ("too many requests") on top;
 // this lock is the friendly, visible part of it. A successful log-in clears the count.

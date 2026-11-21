@@ -896,7 +896,7 @@ async function askAny(key, prompt, searchQuery, confirmedWebsite, purpose) {
         if (got) return { ...got, notes };
     }
     const error = new Error(notes.length > 0 ? "Every AI that is set up said no: " + brief(notes) + ". Try again later, or write the entry by hand." : "No AI is set up.");
-    error.forAdmin = true;                       // New23: a message written here for the admin, safe to show
+    error.forAdmin = true;                       // a message written here for the admin, safe to show
     throw error;
 }
 
@@ -1004,7 +1004,7 @@ module.exports = async (req, res) => {
         const credible = sources.filter((s) => s.credible).length;
         return send(res, 200, { found: true, draft: tidy(object, name), sources, lookups, credibleSources: credible, model, searched, notes });
     } catch (error) {
-        // New23 (safe errors): messages written for the admin (forAdmin) are shown; any other failure stays in the server log
+        // messages written for the admin (forAdmin) are shown; any other failure stays in the server log
         // (name only: a fetch error may carry a request address) and the admin gets a message that says what to do
         if (error && error.forAdmin) return send(res, 502, { error: text(error.message, 300) });
         console.error("assist-ingredient:", error && error.name);
@@ -1013,7 +1013,7 @@ module.exports = async (req, res) => {
 };
 
 
-// New23 (security guideline 5, rate limits): at most ASSIST_PER_MINUTE Assist requests per admin per minute, held in memory
+// at most ASSIST_PER_MINUTE Assist requests per admin per minute, held in memory
 // like the limits in app-ai.js and source-link.js (one server instance; enough to stop a runaway loop or a stolen session).
 const ASSIST_PER_MINUTE = 30, assistRecent = new Map();
 function assistAllowed(uid, now = Date.now()) {

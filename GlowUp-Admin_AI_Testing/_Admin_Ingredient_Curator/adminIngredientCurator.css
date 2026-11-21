@@ -74,7 +74,7 @@
 
 [data-panel="list"] > .panel-inner > .panel-head > .head-end { position: relative; }
 [data-panel="list"] > .panel-inner > .panel-head > .head-end > .panel-menu-btn { position: absolute; right: 100%; margin-right: calc(4 * var(--u)); z-index: 2; }
-/* 19 Nov 2026: in a narrow list panel the header wraps onto rows; the "..." button was out of the flow (absolute, left of the pager) and
+/* in a narrow list panel the header wraps onto rows; the "..." button was out of the flow (absolute, left of the pager) and
    landed on top of the Recycle bin chip and its count ("24" was cut off). Narrow panels keep it in the row like every other button. */
 @container panel (max-width: 620px) { [data-panel="list"] > .panel-inner > .panel-head > .head-end > .panel-menu-btn { position: static; margin-right: 0; } }
 @media (max-width: 1400px) { [data-panel="list"] #sortNow { display: none; } }

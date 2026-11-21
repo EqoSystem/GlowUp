@@ -1,4 +1,4 @@
-// Layout & Style: how this browser's saved layouts and the admin's own copy in the database are put together (17 November 2026).
+// Layout & Style: how this browser's saved layouts and the admin's own copy in the database are put together.
 // Before, named layouts ("Echo") lived only in the browser where they were made; now every device the admin signs in on gets them.
 // Pure: no Firebase here, so tests/layoutSync.test.mjs checks it in Node.
 //

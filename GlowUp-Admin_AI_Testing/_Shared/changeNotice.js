@@ -1,4 +1,4 @@
-// Change notices for the app (New23, 22 November 2026). Pure functions, no page and no Firebase, so tests/changeNotice.test.mjs runs them in node.
+// Change notices for the app. Pure functions, no page and no Firebase, so tests/changeNotice.test.mjs runs them in node.
 // Every admin save that touches a product or an ingredient adds ONE short notice to the same batch (adminStore.js). The app's
 // Notifications screen lists it live. The text is cut to the limits in firestore.rules (title 80, text 300): a notice that did not
 // fit would be refused and would fail the whole save, so this module must never produce more.

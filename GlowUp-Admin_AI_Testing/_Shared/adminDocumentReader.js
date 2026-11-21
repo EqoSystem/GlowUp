@@ -113,7 +113,7 @@ async function readWord(file) {
 
 export async function readAdminDocument(file, onProgress = () => {}) {
     if (!file) throw new Error("Choose a PDF, Excel, Word, CSV or text file.");
-    // security guideline 10 (16 November 2026): a size limit, and the file's first bytes must match its kind
+    // security guideline 10: a size limit, and the file's first bytes must match its kind
     if (file.size > MAX_DOCUMENT_BYTES) throw new Error(`This file is ${Math.round(file.size / 1048576)} MB. Use a file of at most ${MAX_DOCUMENT_BYTES / 1048576} MB, or split it.`);
     const extension = (file.name.split(".").pop() || "").toLowerCase();
     const isPdf = extension === "pdf" || file.type === "application/pdf";

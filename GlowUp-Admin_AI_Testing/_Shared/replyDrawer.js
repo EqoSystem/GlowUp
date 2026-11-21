@@ -1,4 +1,4 @@
-// Reply to an app user's report (New22, 20 November 2026; a centred window since 22 Nov 2026). The window shows the report, a reply box
+// Reply to an app user's report (a centred window). The window shows the report, a reply box
 // (500 characters, counter) and Send. Send writes, in ONE batch, a notification to users/{uid}/notifications (the app shows
 // it in its Notifications screen, live) and marks the report handled with the reply kept on it. The batch goes through
 // adminStore, so the audit log records it. Close (X), Cancel, Escape and a click beside the panel leave it; with text typed

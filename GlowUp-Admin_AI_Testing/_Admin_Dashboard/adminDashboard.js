@@ -73,7 +73,7 @@ const statusOf = (a) => (a.status === "safe" || a.status === "harmful" ? a.statu
 const toneOf = (status) => ({ safe: "ok", caution: "warn", harmful: "bad" }[status] || "muted");
 const INVENTORY_PAGE = "../_Admin_Brand_Inventory/adminBrandInventory.html";
 
-// ---- the Reports panel (22 Nov 2026): one container, a button per kind of report in its header ----
+// ---- the Reports panel: one container, a button per kind of report in its header ----
 const REPORT_VIEWS = ["bug", "wrong", "other", "suggestions"];
 let reportView = "bug";
 function showReportView(view) {
@@ -857,7 +857,7 @@ function registerData() {
     }));
 
 
-    // 22 Nov 2026: the merged Reports panel, all four tabs in one list (Show as row, grid or graph by kind)
+    // the merged Reports panel, all four tabs in one list (Show as row, grid or graph by kind)
     const reportKind = (r) => r.collection ? "Suggestion" : (kindOf(r.category) || { label: "Other reports" }).label;
     registerDataset("reports", {
         label: "Reports", noun: "reports", nounOne: "report",

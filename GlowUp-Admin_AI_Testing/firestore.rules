@@ -28,7 +28,7 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
-    // signed in within the last 5 minutes (account deletion, 12 November 2026): the app re-authenticates and refreshes its token first
+    // signed in within the last 5 minutes (account deletion): the app re-authenticates and refreshes its token first
     function recentLogin() {
       return request.auth.token.auth_time > request.time.toMillis() / 1000 - 300;
     }
@@ -103,7 +103,7 @@ service cloud.firestore {
     // ---- who is an admin -------------------------------------------------------------------
     // Created and removed only by hand in the Firebase console. An account may look up its own
     // entry (the website does this when "REQUIRE_ADMIN_RECORD" is switched on).
-    // ADDED on 20 November 2026 (admin sign-up): an admin may also ADD an admin, but only by approving that person's own
+    // admin sign-up: an admin may also ADD an admin, but only by approving that person's own
     // request in "adminRequests" (pending, e-mail confirmed), in the same batch that marks the request approved. Nobody can
     // add themself, and changing or removing an admin is still done by hand in the console.
     match /admins/{uid} {
@@ -122,7 +122,7 @@ service cloud.firestore {
     }
 
     // ---- requests for admin access (the login page's "Sign Up"), ONE document per account: adminRequests/{uid} ----
-    // ADDED on 20 November 2026. Signing up never makes anyone an admin: the person's own account writes a pending request,
+    // Signing up never makes anyone an admin: the person's own account writes a pending request,
     // and an existing admin approves it (see admins above) or declines it (deletes the request).
     // - the owner creates it (pending, own e-mail, not already an admin) and may later only switch emailVerified to true,
     //   and only when the sign-in token says the e-mail is confirmed;
@@ -162,7 +162,7 @@ service cloud.firestore {
     function sizedList(field, most) {
       return request.resource.data.get(field, []) is list && request.resource.data.get(field, []).size() <= most;
     }
-    // the source link beside a box of the Ingredient form (10 November 2026): empty, or one https address of at most 600 characters
+    // the source link beside a box of the Ingredient form: empty, or one https address of at most 600 characters
     function sourceLinkOrEmpty(field) {
       return request.resource.data.get(field, '') == ''
         || (request.resource.data.get(field, '') is string
@@ -311,7 +311,7 @@ service cloud.firestore {
     }
 
     // ---- ingredient classifications: everyone reads (the app shows them), only an admin writes. An ingredient links by document id. ----
-    // "other" is the safe fallback: it can be renamed, never deleted. ADDED on 5 November 2026.
+    // "other" is the safe fallback: it can be renamed, never deleted.
     match /ingredientClassifications/{classificationId} {
       allow read: if true;
       allow create, update: if isAdmin()
@@ -323,7 +323,7 @@ service cloud.firestore {
     }
 
     // The TEST copy of the list: a preview or a local copy of the website uses this one, so looking at them never touches the real list.
-    // Nothing reads it but the website's test pages. ADDED on 5 November 2026.
+    // Nothing reads it but the website's test pages.
     match /ingredientClassificationsTest/{classificationId} {
       allow read: if isAdmin();
       allow create, update: if isAdmin()
@@ -356,7 +356,7 @@ service cloud.firestore {
     }
 
     // ---- each app user's own data -----------------------------------------------------------
-    // CHANGED on 20 November 2026 (User Management page; the project owner chose full access for admins): an admin may READ every
+    // User Management page: an admin may READ every
     // users/{uid} (profile and skin profile) and may change only the fields the admin site manages. The app's own writes are
     // merges of the profile fields, so they never touch these. A user cannot set or change them (no self-unban, no self-role), and
     // a banned user cannot write their profile. The scans below stay private to the user. Permanent delete removes the profile
@@ -369,7 +369,7 @@ service cloud.firestore {
     function userPhotoOk() {
       return request.resource.data.get('photoData', '') is string
         && request.resource.data.get('photoData', '').size() <= 200100
-        && (request.resource.data.get('photoData', '') == '' || request.resource.data.get('photoData', '').matches('^data:image/jpeg;base64,/9j/[A-Za-z0-9+/=]+$'));   // New23: /9j/ = the JPEG start bytes FF D8 FF, so the content is checked, not only the label
+        && (request.resource.data.get('photoData', '') == '' || request.resource.data.get('photoData', '').matches('^data:image/jpeg;base64,/9j/[A-Za-z0-9+/=]+$'));   // /9j/ = the JPEG start bytes FF D8 FF, so the content is checked, not only the label
     }
     function adminUserChange() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName', 'username'].concat(userAdminFields()))
@@ -381,7 +381,7 @@ service cloud.firestore {
     }
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
-      // photoData (New22): the app's profile picture, a small JPEG as text (the app sends about 20 KB); capped here
+      // photoData: the app's profile picture, a small JPEG as text (the app sends about 20 KB); capped here
       allow create: if isOwner(uid) && !request.resource.data.keys().hasAny(userAdminFields()) && userPhotoOk();
       allow update: if (isOwner(uid) && !userBanned(uid) && userPhotoOk()
                         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(userAdminFields()))
@@ -393,7 +393,7 @@ service cloud.firestore {
         allow read, write: if isOwner(uid);
       }
 
-      // ---- the user's notifications (New22, 20 November 2026): an admin's reply to a report. Only admins create one;
+      // ---- the user's notifications: an admin's reply to a report. Only admins create one;
       // the user reads it, marks it read, or deletes it, and nobody else sees it ----
       match /notifications/{noteId} {
         allow read, delete: if isOwner(uid);
@@ -450,7 +450,7 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
 
-    // ---- Contact support (10 November 2026): the app writes a report, the admin website's Dashboard lists it -------------
+    // ---- Contact support: the app writes a report, the admin website's Dashboard lists it -------------
     // A signed-in user may CREATE their own report only (their own uid, status "new", a message of 3 to 2000 characters, one of three
     // kinds). Nobody but an admin may read, change or delete a report. "lastScan" is there only when the user switched it on.
     match /supportReports/{reportId} {
@@ -467,10 +467,10 @@ service cloud.firestore {
         && request.resource.data.get('device', '') is string && request.resource.data.get('device', '').size() <= 200
         && (!('lastScan' in request.resource.data) || (request.resource.data.lastScan is map && request.resource.data.lastScan.size() <= 6));
       allow read, update, delete: if isAdmin();
-      allow create: if isAdmin();                       // Restore from the Archive (22 Nov 2026)
+      allow create: if isAdmin();                       // Restore from the Archive
     }
 
-    // ---- AI photo snapshots: REMOVED on 11 November 2026 (the app matches photos with the catalogue only; no web search) --------
+    // ---- AI photo snapshots: REMOVED (the app matches photos with the catalogue only; no web search) --------
     // Nobody creates these any more. The app still asks for its own entry by id (the live scan's look-up), and an admin may
     // still read and delete what is left from before.
     match /pending_products/{pendingId} {
@@ -502,7 +502,7 @@ service cloud.firestore {
     }
 
     // ---- shared default layouts of the admin website: ONE document per page, siteLayouts/{page} ----
-    // ADDED on 9 November 2026 (Layout & Style > "Make this the default for everyone"). Admins only. The website cleans what it
+    // Layout & Style > "Make this the default for everyone". Admins only. The website cleans what it
     // reads (componentStyle.js / adminLayouts.js), so the rule checks the shape and the size only.
     match /siteLayouts/{pageKey} {
       allow read, delete: if isAdmin();
@@ -516,7 +516,7 @@ service cloud.firestore {
     }
 
     // ---- keyboard shortcuts: one document per admin, only that admin reads or writes it ----
-    // ADDED on 9 November 2026 (Quick settings > Keyboard shortcuts, shortcutStore.js). Any other account, admin or not, is refused.
+    // Quick settings > Keyboard shortcuts (shortcutStore.js). Any other account, admin or not, is refused.
     // The website cleans what it reads (shortcutKeys.js mergeWithCatalog), so the rule checks the owner, the shape and the size.
     match /adminShortcuts/{uid} {
       allow read, delete: if isAdmin() && request.auth.uid == uid;
@@ -530,7 +530,7 @@ service cloud.firestore {
     }
 
     // ---- saved layouts (Layout & Style): one document per admin, only that admin reads or writes it ----
-    // ADDED on 17 November 2026 (personalLayouts.js) so a layout made on one device ("Echo") shows on every device the admin
+    // personalLayouts.js: so a layout made on one device ("Echo") shows on every device the admin
     // signs in on. `store` is the layouts as JSON text; the website cleans what it reads (adminLayouts.js cleanStore).
     match /adminLayouts/{uid} {
       allow read, delete: if isAdmin() && request.auth.uid == uid;
@@ -544,7 +544,7 @@ service cloud.firestore {
 
     // ---- the Archive: entries that left the Recycle bin, kept 30 days, then deleted by the server job ----
     // Admins only. An entry is created once (id "<collection>__<id>"), never changed; the job deletes it after expires_at.
-    // ADDED on 29 October 2026 (ARCHIVE_DESIGN.md), published on 5 November 2026.
+    // See ARCHIVE_DESIGN.md.
     match /archive/{entryId} {
       allow read, delete: if isAdmin();
       allow update: if false;
@@ -554,7 +554,7 @@ service cloud.firestore {
         && ((request.resource.data.type == 'ingredient' && request.resource.data.sourceCollection == 'ingredients')
             || (request.resource.data.type == 'brand' && request.resource.data.sourceCollection == 'brands')
             || (request.resource.data.type == 'product' && request.resource.data.sourceCollection == 'products')
-            || (request.resource.data.type == 'report' && request.resource.data.sourceCollection == 'supportReports'))   // 22 Nov 2026: a deleted app report goes to the Archive
+            || (request.resource.data.type == 'report' && request.resource.data.sourceCollection == 'supportReports'))   // a deleted app report goes to the Archive
         && request.resource.data.sourceId is string
         && entryId == request.resource.data.sourceCollection + '__' + request.resource.data.sourceId
         && request.resource.data.name is string && request.resource.data.name.size() <= 200
@@ -572,7 +572,7 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // ---- change notices for the app (New22/New23): one short notice each time an admin saves a product or an ingredient ----
+    // ---- change notices for the app: one short notice each time an admin saves a product or an ingredient ----
     // adminStore.js adds it to the same batch as the save (changeNotice.js builds the text, so it always fits these limits).
     // Any signed-in user reads them (the app's Notifications screen); only admins create them, in a fixed shape; nobody edits one.
     match /announcements/{noteId} {

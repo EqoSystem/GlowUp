@@ -1,6 +1,6 @@
-/* User Management page (20 November 2026). Colours, radii, sizes and motion come from adminCommon.css tokens; this file only places things. */
+/* User Management page. Colours, radii, sizes and motion come from adminCommon.css tokens; this file only places things. */
 
-/* 22 Nov 2026: the header tabs and the second page title are gone (the page header names the page; the cards are the filters).
+/* the header tabs and the second page title are gone (the page header names the page; the cards are the filters).
    Each card: the number and its words on the left, a tinted icon badge on the right, the same height as its neighbours. */
 .um-kpis .kpi { grid-template-columns: minmax(0, 1fr) auto; grid-auto-rows: min-content; align-content: start; column-gap: calc(12 * var(--u)); padding: calc(14 * var(--u)) calc(16 * var(--u)); transition: border-color .2s, background-color .2s, transform .2s var(--ease); }
 .um-kpis .kpi-value, .um-kpis .kpi-title, .um-kpis .kpi-delta { grid-column: 1; }

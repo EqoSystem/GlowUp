@@ -13,7 +13,7 @@
 :root {
     --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     --scale: 1;
-    /* ONE UNIT FOR EVERY LENGTH (18 Nov 2026). Every size in the site's CSS is written calc(N * var(--u)) (tools/scalePx.mjs made it;
+    /* ONE UNIT FOR EVERY LENGTH. Every size in the site's CSS is written calc(N * var(--u)) (tools/scalePx.mjs made it;
        write new sizes the same way). Desktop: 1px, nothing changes. Phone (<= 600 px): the unit grows with the screen width, the
        layout is designed at 340 units wide, so text, buttons, cards, panels, icons, paddings AND gaps scale together
        (a 393 px phone, e.g. Redmi Note 14: 1.16 px). Hairlines (1px borders) stay 1px. */
@@ -53,7 +53,7 @@
     --border: #2b2b35;
     --text: #f2f1f4;
     --text-2: #b9b6c0;
-    --muted: #928f9a;                   /* New21: 4.5:1 on surface-3 too */
+    --muted: #928f9a;                   /* 4.5:1 on surface-3 too */
     --accent: #e0668a;
     --accent-ink: #1a0d12;
     --accent-hover: #e47898;            /* New23 "Primary Hover" token: dark mode lightens the pink (6.7:1 with accent-ink) */
@@ -64,14 +64,14 @@
     --ok: #4ccf9a;
     --warn: #f0b545;
     --bad: #f27272;
-    --bad-ink: #1a0d0d;                 /* New21: text on a red fill, 6.7:1 */
+    --bad-ink: #1a0d0d;                 /* text on a red fill, 6.7:1 */
     --bad-hover: #f48383;               /* New23 "Primary Hover" for red buttons: lighter in dark mode (7.6:1 with bad-ink; the black mix gave 5.1:1) */
     --info: #86b7f7;
     --shadow: 0 calc(4 * var(--u)) calc(14 * var(--u)) rgba(0, 0, 0, .28);
     --overlay: rgba(0, 0, 0, .62);
 
     --zone: rgba(150, 44, 58, .78);
-    --zone-ink: #ffffff;                /* New23: the words on the drop-to-remove zone (dark in both themes) */
+    --zone-ink: #ffffff;                /* the words on the drop-to-remove zone (dark in both themes) */
     --viz-1: #d55181; --viz-2: #008300; --viz-3: #3987e5; --viz-4: #c98500; --viz-5: #199e70; --viz-6: #d95926;
     --viz-other: #5d5a66;
 }
@@ -84,19 +84,19 @@
     --border: #e3d8d9;
     --text: #2b2426;
     --text-2: #554a4d;
-    /* New21 (WCAG 2.2 AA): every text and status colour reaches 4.5:1 on every surface, the darkest (surface-3) included.
+    /* every text and status colour reaches 4.5:1 on every surface, the darkest (surface-3) included.
        tests/tokens.contrast.test.mjs reads this block and fails if a shade slips back. */
     --muted: #6c6163;
     --accent: #c9456d;
     --accent-ink: #ffffff;
-    --accent-hover: #b13d60;            /* New23: light mode darkens it; the old white mix left white text at 3.8:1 */
+    --accent-hover: #b13d60;            /* light mode darkens it; the old white mix left white text at 3.8:1 */
     --accent-text: #b03a5e;
     --gold: #7e5f25;
     --ok: #19714e;
     --warn: #865c07;
     --bad: #b33535;
     --bad-ink: #ffffff;
-    --bad-hover: #9a2e2e;               /* New23: darker in light mode, 7.5:1 with bad-ink */
+    --bad-hover: #9a2e2e;               /* darker in light mode, 7.5:1 with bad-ink */
     --info: #2a64ac;
     --shadow: 0 calc(3 * var(--u)) calc(10 * var(--u)) rgba(80, 40, 50, .08);
     --overlay: rgba(40, 25, 30, .42);
@@ -392,7 +392,7 @@ body.layout-editing .board > .panel .panel-fold-btn { pointer-events: auto; }
 
 .board { container: board / inline-size; }
 /* a compact board (small desktop, or Quick settings open) never gives a panel less than a third of its width:
-   a quarter-wide panel there squeezed titles, badges and buttons into each other (New17). Saved layouts are not changed. */
+   a quarter-wide panel there squeezed titles, badges and buttons into each other. Saved layouts are not changed. */
 @container board (max-width: 1099px) { .board > .panel:not([data-qs-grow]) { grid-column: span max(4, var(--w, 12)) !important; } }
 @container board (max-width: 999px) { html:not(.qs-open) .board > .panel { grid-column: span calc(6 + 6 * clamp(0, var(--w, 12) - 6, 1)) !important; } }
 
@@ -405,7 +405,7 @@ body.layout-editing .board > .panel .panel-fold-btn { pointer-events: auto; }
 html.qs-open .board > .panel[data-qs-grow] { grid-column: span var(--qs-span) !important; }
 @container board (max-width: 639px) {
     /* phone: every panel takes the whole width. :not(#_) lifts this above the compact-board rules above
-       (html:not(.qs-open) .board > .panel is more specific): before 17 Nov 2026 a desktop layout with half-width panels
+       (html:not(.qs-open) .board > .panel is more specific): a desktop layout with half-width panels
        stayed two columns of ~150 px on a phone, and titles, buttons and rows collided. */
     .board > .panel:not(#_) { grid-column: 1 / -1 !important; }
     .panel.group[data-group="side"] > .panel-inner > .group-body { grid-template-columns: minmax(0, 1fr); }
@@ -426,7 +426,7 @@ html.qs-open .board > .panel[data-qs-grow] { grid-column: span var(--qs-span) !i
 .btn.danger:hover, .row-btn.danger:hover { background: color-mix(in srgb, var(--bad) 14%, transparent); }
 .btn.danger.solid { background: var(--bad); border-color: var(--bad); color: var(--bad-ink); }
 .btn.danger.solid:hover { background: var(--bad-hover); }
-/* dark theme: white on the light red is 2.8:1, dark ink on it passes AA (16 November 2026) */
+/* dark theme: white on the light red is 2.8:1, dark ink on it passes AA */
 :root:not([data-theme="light"]) .btn.danger.solid { color: var(--accent-ink); }
 .primary-btn:hover svg.ic, .btn.primary:hover svg.ic, .save-btn:hover svg.ic { transform: translateX(calc(2 * var(--u))) scale(1.1); }
 .row-btn { padding: calc(6 * var(--u)) calc(10 * var(--u)); font-size: var(--fs-sm); border-radius: calc(8 * var(--u)); }
@@ -692,7 +692,7 @@ th .guide-badge { margin-left: calc(6 * var(--u)); vertical-align: 1px; }
 .panel-head .widget-pager .page-short { display: inline; }
 
 /* a head with a pager stays on one line while it fits; in a narrow panel the pager and buttons move under the title
-   instead of squeezing it to one letter per line (New17: "Most scanned brands") */
+   instead of squeezing it to one letter per line ("Most scanned brands") */
 .panel-head:has(> .head-end > .widget-pager:not(:empty)) { flex-wrap: wrap; }
 .panel-head:has(> .head-end > .widget-pager:not(:empty)) > .panel-title { flex: 1 1 10ch; min-width: min(10ch, 100%); overflow-wrap: break-word; }
 .panel-head:has(> .head-end > .widget-pager:not(:empty)) > .head-end { margin-left: auto; }
@@ -723,7 +723,7 @@ th .guide-badge { margin-left: calc(6 * var(--u)); vertical-align: 1px; }
 [data-btn="pixel"] .fx.fx-run::after { animation: fx-sweep .52s var(--ease); }
 .fx.fx-run { animation: fx-glow .52s ease-out; }
 [data-btn="none"] .fx.fx-run { animation: none; }
-.primary-btn.fx, .save-btn.fx, .login-btn.fx, .btn.primary.fx { --fx: var(--accent-ink); }   /* New23: token, was #ffffff */
+.primary-btn.fx, .save-btn.fx, .login-btn.fx, .btn.primary.fx { --fx: var(--accent-ink); }   /* token, was #ffffff */
 @keyframes fx-sweep {
     0% { opacity: .0; -webkit-mask-position: 0 0, 0 0, 100% 0%; mask-position: 0 0, 0 0, 100% 0%; }
     15% { opacity: .55; }
@@ -1574,7 +1574,7 @@ body.snapx-open .modal-overlay { z-index: 3000; }
 .note-row[data-tone="info"] { border-left-color: var(--info); background: color-mix(in srgb, var(--info) 8%, var(--surface-2)); }
 .note-row[data-tone="info"] .note-level { background: var(--info); color: var(--bg); }
 .note-row[data-tone="ok"] { border-left-color: var(--ok); }
-.note-row[data-tone="ok"] .note-level { background: var(--ok); color: var(--bg); }   /* New23: solid like the other tones (the tint was 3.9:1) */
+.note-row[data-tone="ok"] .note-level { background: var(--ok); color: var(--bg); }   /* solid like the other tones (the tint was 3.9:1) */
 .note-row[data-tone=""] .note-text { color: var(--muted); }
 @container panel (max-width: 700px) { .note-row { flex-wrap: wrap; } .note-text { flex-basis: 100%; order: 3; } }
 
@@ -2146,7 +2146,7 @@ body:has(> :is(#addIngredientModal, #addBrandModal, #productModal)[style*="flex"
 .ing-modal .finder-row .row-btn { min-height: calc(32 * var(--u)); border-radius: calc(8 * var(--u)); font-size: calc(13 * var(--u)); white-space: nowrap; }
 .ing-modal .finder-what { color: var(--text-2); line-height: 1.45; min-width: 0; overflow-wrap: anywhere; }
 .ing-modal .finder-inci { font-weight: 600; overflow-wrap: anywhere; min-width: 0; }
-.ing-modal .finder-inci .chip { margin: 0 0 0 calc(4 * var(--u)); font-size: var(--fs-xs); }   /* New23: no text under 12 px */
+.ing-modal .finder-inci .chip { margin: 0 0 0 calc(4 * var(--u)); font-size: var(--fs-xs); }   /* no text under 12 px */
 .ing-modal .src-note { font-size: calc(12 * var(--u)); color: var(--im-hint); margin: 0; }
 .ing-modal .finder-cosing { display: flex; flex-direction: column; gap: calc(8 * var(--u)); min-width: 0; }
 .ing-modal .finder-official { align-self: flex-start; min-height: calc(32 * var(--u)); border-radius: calc(8 * var(--u)); font-size: calc(13 * var(--u)); }
@@ -2170,7 +2170,7 @@ body:has(> :is(#addIngredientModal, #addBrandModal, #productModal)[style*="flex"
 .confirm-words > .modal-intro { margin: calc(4 * var(--u)) 0 0; color: var(--muted); }
 .modal-actions button.has-ic { display: inline-flex; align-items: center; justify-content: center; gap: calc(8 * var(--u)); min-height: calc(44 * var(--u)); }
 @media (max-width: 480px) {
-    /* phone: the title stands on its own line above the two buttons, centred over them (Sign out?, 17 Nov 2026) */
+    /* phone: the title stands on its own line above the two buttons, centred over them (Sign out?) */
     .modal-content.confirm-inline > h3 { flex: 1 1 100%; text-align: center; }
     .modal-content.confirm-inline > .modal-actions { flex: 1 1 100%; display: flex; gap: calc(10 * var(--u)); }
     .modal-content.confirm-inline > .modal-actions > button.has-ic { flex: 1 1 0; }
@@ -2216,7 +2216,7 @@ html.sb-collapsed.sb-hover .sidebar { width: var(--nav-w); box-shadow: var(--sha
 .main-content > .topbar {
     position: fixed; z-index: 950; top: 0; left: 0; right: 0; height: var(--header-h);
     display: flex; align-items: center; gap: 0; padding: 0;
-    background: var(--bg); border-bottom: 1px solid var(--border);      /* solid: on a phone the page text showed through the header (17 Nov 2026) */
+    background: var(--bg); border-bottom: 1px solid var(--border);      /* solid: on a phone the page text showed through the header */
 }
 .topbar-leading { width: var(--rail-w); height: 100%; flex: 0 0 var(--rail-w); display: grid; place-items: center; }
 .topbar .menu-btn { width: var(--icon-box); height: var(--icon-box); padding: 0; flex: none; display: grid; place-items: center; border-radius: var(--radius-sm); }
@@ -2240,7 +2240,7 @@ html.sb-mobile-open body::after { content: ""; position: fixed; z-index: 899; in
     .main-content { margin-left: 0; }
     .topbar-controls { gap: calc(8 * var(--u)); }
 }
-/* Phone (17 Nov 2026): menu, logo and name on the first row; the search with the page's buttons (Add, settings) on a second row
+/* Phone: menu, logo and name on the first row; the search with the page's buttons (Add, settings) on a second row
    across the whole width. One row squeezed the search under the name and the buttons scrolled out of sight sideways.
    pageFrame.js measures the taller header into --header-h, so the page starts under it. */
 @media (max-width: 600px) {
@@ -2264,7 +2264,7 @@ html.sb-mobile-open body::after { content: ""; position: fixed; z-index: 899; in
     html.sb-ready .main-content, .sidebar, html.sb-mobile-open .sidebar, .topbar-controls { transition: none !important; }
 }
 
-/* ---- Style and text panel (round New16) ---- */
+/* ---- Style and text panel ---- */
 /* A pixel width is a ceiling inside the panel's columns, on wide screens only: the panel can get narrower than its room, never wider, so it cannot overlap a neighbour. */
 @media (min-width: 1024px) { .panel[data-fixed-w]:not(.member) { width: min(var(--wpx), 100%); justify-self: start; } }
 .field-error { display: block; margin-top: calc(4 * var(--u)); font-size: var(--fs-sm); line-height: 1.4; color: var(--bad); overflow-wrap: anywhere; }
@@ -2278,7 +2278,7 @@ html.sb-mobile-open body::after { content: ""; position: fixed; z-index: 899; in
 .style-dialog .label-look .field { min-width: 0; }
 .style-dialog .label-look :is(input, select) { width: 100%; min-width: 0; min-height: calc(44 * var(--u)); }
 @media (max-width: 480px) { .style-dialog .label-look { grid-template-columns: minmax(0, 1fr); } }
-/* a section title with its "i" at the end of the text (the long explanation lives in the "i", New17) */
+/* a section title with its "i" at the end of the text (the long explanation lives in the "i") */
 .style-dialog .sd-section-head { display: flex; align-items: center; gap: calc(8 * var(--u)); min-width: 0; flex-wrap: wrap; }
 .style-dialog .sd-section-head .info-slot { display: inline-flex; margin: 0; }
 .style-dialog .sd-title-head h3 { margin: 0; min-width: 0; overflow-wrap: anywhere; }
@@ -2308,7 +2308,7 @@ html.sb-mobile-open body::after { content: ""; position: fixed; z-index: 899; in
 /* inside a table cell a chip may shrink and break a long word: a table would otherwise grow wider than a phone screen */
 td .chip { flex-shrink: 1; overflow-wrap: anywhere; }
 
-/* New21 (responsive guideline 9): on a touch screen every control is at least 44 x 44 CSS px. A mouse keeps the
+/* on a touch screen every control is at least 44 x 44 CSS px. A mouse keeps the
    compact sizes. Text controls grow; small glyphs (tick boxes, the "?" badge, the brand fold arrow) keep their look
    and get an invisible 44 px touch area around them instead, so rows and headers do not change shape.
    Checked by tests/responsive/guidelines.scenario.mjs. */
@@ -2322,13 +2322,13 @@ td .chip { flex-shrink: 1; overflow-wrap: anywhere; }
     .text-link { display: inline-flex; align-items: center; }
     .pick, .guide-badge, .brand-toggle { position: relative; }
     .pick::before, .guide-badge::before, .brand-toggle::before { content: ""; position: absolute; inset: calc(-13 * var(--u)); }
-    /* New23: the parts found by tests/responsive/guidelinesOpen.scenario.mjs (dropdown rows, dialog buttons, the switch) */
+    /* the parts found by tests/responsive/guidelinesOpen.scenario.mjs (dropdown rows, dialog buttons, the switch) */
     .menu-item, .save-btn, .cancel-btn { min-height: calc(44 * var(--u)); }
     .switch::before { content: ""; position: absolute; inset: calc(-11 * var(--u)) 0; }
 }
 
 
-/* ---- Header bell and admin profile (20 November 2026, headerAccount.js): same box as the Quick settings gear (.icon-btn).
+/* ---- Header bell and admin profile (headerAccount.js): same box as the Quick settings gear (.icon-btn).
    The DOM order is bell, gear, profile; `order` keeps that visual order even when a page puts its own buttons beside the gear. ---- */
 .topbar-tools > .hdr-bell { order: 8; position: relative; }
 .topbar-tools > .quick-gear { order: 9; }
@@ -2460,7 +2460,7 @@ td .chip { flex-shrink: 1; overflow-wrap: anywhere; }
 .btn-spin { display: inline-block; width: calc(14 * var(--u)); height: calc(14 * var(--u)); margin-right: calc(8 * var(--u)); vertical-align: -2px; border-radius: 50%; border: calc(2 * var(--u)) solid color-mix(in srgb, currentColor 30%, transparent); border-top-color: currentColor; animation: spin .8s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .btn-spin { animation-duration: 2.5s; } }
 
-/* ---- Two sides (adminLayouts.js placeSides, 22 Nov 2026): wide panels stay left, narrow ones stay right, with a divider ---- */
+/* ---- Two sides (adminLayouts.js placeSides): wide panels stay left, narrow ones stay right, with a divider ---- */
 body:not(.layout-editing) .board.two-sides > .panel[data-side="main"] { grid-column: 1 / span var(--w, 8) !important; }
 body:not(.layout-editing) .board.two-sides > .panel[data-side="side"] { grid-column: span var(--w, 4) / -1 !important; }
 .board.two-sides { isolation: isolate; }   /* the divider (z-index -1) runs behind the panels, so a full-width panel covers it; panels keep their own stacking */
@@ -2469,7 +2469,7 @@ body:not(.layout-editing) .board.two-sides > .panel[data-side="side"] { grid-col
     left: calc(var(--gutter) + (100% - 2 * var(--gutter) - 11 * var(--gap)) * var(--main-w, 8) / 12 + (var(--main-w, 8) - 0.5) * var(--gap));
 }
 
-/* ---- Recycle bin and Archive (22 Nov 2026): the kind tabs and the search sit inside the list, under its title ---- */
+/* ---- Recycle bin and Archive: the kind tabs and the search sit inside the list, under its title ---- */
 .list-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: calc(10 * var(--u)); margin: 0 0 calc(12 * var(--u)); }
 .list-toolbar .list-tabs { flex: 0 1 auto; max-width: 100%; }
 .list-toolbar .search-container { flex: 1 1 calc(220 * var(--u)); max-width: calc(380 * var(--u)); margin-left: auto; }

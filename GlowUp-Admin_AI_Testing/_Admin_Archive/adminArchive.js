@@ -72,7 +72,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     load();
 });
 
-// Live (22 Nov 2026): the Archive listens, so what another admin moves here or restores shows at once.
+// Live: the Archive listens, so what another admin moves here or restores shows at once.
 let stopArchive = null;
 function load() {
     if (stopArchive) return;                                   // already listening: the list repaints by itself

@@ -1,4 +1,4 @@
-// The app's AI requests (16 November 2026). The Unity app no longer holds an AI key: it sends its Gemini "generateContent"
+// The app's AI requests. The Unity app no longer holds an AI key: it sends its Gemini "generateContent"
 // request here with the user's Firebase sign-in token, and this function adds the key (a Vercel environment variable only)
 // and passes the request on. The answer comes back unchanged, so the app reads it as before.
 // Checks: POST only, a valid Firebase sign-in, an allowed model name, a body size limit, only the known request fields,

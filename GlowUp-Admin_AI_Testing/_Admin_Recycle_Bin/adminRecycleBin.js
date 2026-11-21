@@ -90,7 +90,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
 
-// Live lists (22 Nov 2026): one listener per list, so a removal on another page or by another admin shows here at once.
+// Live lists: one listener per list, so a removal on another page or by another admin shows here at once.
 let stops = [];
 const answered = new Set();
 function stopListening() { stops.forEach((stop) => stop()); stops = []; answered.clear(); }

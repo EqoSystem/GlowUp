@@ -1,4 +1,4 @@
-// Header notification bell (20 November 2026). The profile/avatar control is intentionally not rendered in the header;
+// Header notification bell. The profile/avatar control is intentionally not rendered in the header;
 // account actions are available from Quick settings so every page keeps the same clean right edge.
 //
 // BELL: a live count of new support reports the admin has not opened yet. It follows the same documents the dashboard's report

@@ -65,7 +65,7 @@
 .rank-item.can-open:hover { background: color-mix(in srgb, var(--accent) 7%, transparent); transform: translateX(calc(3 * var(--u))); }
 
 
-/* Suggestions, Bug reports, Wrong scan results, Other reports: one row layout (New20).
+/* Suggestions, Bug reports, Wrong scan results, Other reports: one row layout.
    Line 1: kind chip, then date (wraps under the chip when narrow). Line 2: the message. Line 3: who sent it.
    The two actions sit in their own column at the top right and are always visible (no hover needed). */
 .report-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: calc(4 * var(--u)) calc(12 * var(--u)); padding: calc(12 * var(--u)) calc(4 * var(--u)); }
@@ -83,14 +83,14 @@
 .support-scan summary { cursor: pointer; color: var(--text-2); }
 .support-scan p { margin: calc(4 * var(--u)) 0 0; overflow-wrap: anywhere; }
 
-/* New22 (20 Nov 2026): Reply + mark handled + delete under each report; narrow panels put them on their own row */
+/* Reply + mark handled + delete under each report; narrow panels put them on their own row */
 .report-item .report-actions { align-items: center; flex-wrap: wrap; justify-content: flex-end; }
 .report-item .reply-btn, .report-item .report-delete { gap: calc(6 * var(--u)); padding: calc(5 * var(--u)) calc(10 * var(--u)); font-size: var(--fs-sm); min-height: calc(32 * var(--u)); }
 /* (the old flipped arrow is now the envelope icon, drawn as it is) */
 @media (pointer: coarse) { .report-item .reply-btn, .report-item .report-delete { min-height: calc(44 * var(--u)); } }
 @container panel (max-width: 420px) { .report-item { grid-template-columns: minmax(0, 1fr); } .report-item .report-actions { justify-content: flex-start; } }
 
-/* ---- Reports panel (22 Nov 2026): one container, a button per kind of report under its title ---- */
+/* ---- Reports panel: one container, a button per kind of report under its title ---- */
 .report-tabs { display: flex; flex-wrap: wrap; gap: calc(6 * var(--u)); margin: 0 0 calc(12 * var(--u)); }
 .report-tabs .seg { gap: calc(6 * var(--u)); }
 .report-tabs .tab-count { min-width: calc(20 * var(--u)); padding: 0 calc(6 * var(--u)); border-radius: calc(999 * var(--u)); font-size: var(--fs-xs); font-weight: 650; line-height: calc(18 * var(--u)); text-align: center; background: var(--surface-3); color: var(--text-2); }

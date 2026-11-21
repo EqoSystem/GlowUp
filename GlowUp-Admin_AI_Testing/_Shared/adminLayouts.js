@@ -29,7 +29,7 @@ import { signedInUid, readPersonal, writePersonal } from "./personalLayouts.js";
 import { mergeLayouts } from "./layoutSync.js";
 
 const LAYOUT_KEY = "glowup.layouts.v1";
-// 17 Nov 2026: the layouts also live in the admin's own database copy (adminLayouts/{uid}), so every device gets them.
+// the layouts also live in the admin's own database copy (adminLayouts/{uid}), so every device gets them.
 const SAVED_AT_KEY = "glowup.layouts.savedAt";        // when this browser last changed its layouts
 const MET_KEY = "glowup.layouts.synced.";             // + uid: this browser has synced with that admin's copy before
 
@@ -337,7 +337,7 @@ export function initLayouts(page) {
         setShared(data);
         if (JSON.stringify(shared) !== before && !activeProfile()) applyLayout(); else paintDrawer();
     }).catch((error) => console.warn("The shared default layout could not be read: ", error)).finally(ready);
-    syncPersonal();                                          // layouts made on another device (17 Nov 2026)
+    syncPersonal();                                          // layouts made on another device
     byId("addPanelBtn").addEventListener("click", () => openPanelDialog(null));
     byId("doneArrangingBtn").addEventListener("click", () => setEditing(false));
     wireBoard();
@@ -496,7 +496,7 @@ function fitOn() {
 let fitWatcher = null, fitQueued = 0;
 
 
-// Two sides (22 Nov 2026). On a wide board a wide panel (7 to 12 columns) belongs to the left side and a narrow one (5 or
+// Two sides. On a wide board a wide panel (7 to 12 columns) belongs to the left side and a narrow one (5 or
 // fewer) to the right side, folded or not, so opening or closing a panel never moves it to the other side. A thin divider
 // is drawn between the sides (CSS: .board.two-sides). Arranging mode and narrower boards keep the normal flow.
 // (Replaces the New22 fold placement, which let a panel grow into a folded neighbour's columns and moved folded bars right.)
@@ -1059,7 +1059,7 @@ async function openStyleDialog(id) {
     const hasCards = !!panel.querySelector(".kpi-row, .stat-row");
     const isMember = panel.classList.contains("member");
     const opt = (list, value) => list.map((o) => `<option value="${esc(o.id)}"${o.id === (value || "") ? " selected" : ""}>${esc(o.label)}</option>`).join("");
-    // the column span is no longer chosen here (New17): the panel keeps the span it already has, so no saved layout moves
+    // the column span is no longer chosen here: the panel keeps the span it already has, so no saved layout moves
     const width = Math.min(12, Math.max(2, Number(before.w) || 12));
     // a long explanation sits behind a small "i" at the end of its title (tap, keyboard focus or hover), not under it
     const tip = (text, label) => `<span class="info-slot" data-info="${esc(text)}" data-info-label="${esc(label)}"></span>`;

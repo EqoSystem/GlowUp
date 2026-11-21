@@ -1,4 +1,4 @@
-// The admin's own profile (22 November 2026), opened from the profile menu in the header (headerAccount.js).
+// The admin's own profile, opened from the profile menu in the header (headerAccount.js).
 // Edit Profile: the display name (Firebase Auth profile) and the password (the current password is asked again first:
 // Firebase refuses a password change on an old sign-in, and it proves the person at the keyboard owns the account).
 // The password rules are the sign-up rules (signupRules.js), checked live while typing.

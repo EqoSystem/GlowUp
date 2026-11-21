@@ -1,4 +1,4 @@
-// User Management rules (20 November 2026): pure functions, no page and no Firebase, so tests/userRules.test.mjs can run them in node.
+// User Management rules: pure functions, no page and no Firebase, so tests/userRules.test.mjs can run them in node.
 // The app writes users/{uid} (firstName, fullName, username, email, skinType, skinTone, skinConditions, knownAllergens, createdAt ...).
 // The admin site adds the fields it manages itself: status, statusBefore, role, inBin, statusChangedAt, statusChangedBy.
 // A user with none of them is an active "user", so every account the app ever made shows up with no migration.
@@ -8,7 +8,7 @@ export const ROLES = ["user", "admin"];
 /** Fields only an admin may change (firestore.rules refuse a user who writes them). */
 export const ADMIN_FIELDS = ["status", "statusBefore", "role", "inBin", "statusChangedAt", "statusChangedBy"];
 export const WEEK_MS = 7 * 24 * 3600 * 1000;
-/** "Online now" (22 Nov 2026): the app marks lastActiveAt while it is open (about every 2 minutes), so 5 minutes of silence means gone. */
+/** "Online now": the app marks lastActiveAt while it is open (about every 2 minutes), so 5 minutes of silence means gone. */
 export const ONLINE_MS = 5 * 60 * 1000;
 export const isOnline = (user, now = Date.now()) => user.status !== "deleted" && user.lastActive > 0 && now - user.lastActive <= ONLINE_MS;
 export const TABS = [
@@ -30,7 +30,7 @@ const ms = (value) => {
 const text = (value) => (typeof value === "string" ? value.trim() : "");
 const list = (value) => (Array.isArray(value) ? value.map((v) => String(v).trim()).filter(Boolean) : []);
 
-/** The picture to show: the app's own photo (photoData: a small JPEG as data:image/jpeg;base64, New22) or an https link; "" when none. */
+/** The picture to show: the app's own photo (photoData: a small JPEG as data:image/jpeg;base64) or an https link; "" when none. */
 export function photoOf(d) {
     const data = text(d && d.photoData);
     if (/^data:image\/jpeg;base64,\/9j\/[A-Za-z0-9+/=]+$/.test(data) && data.length <= 200100) return data;

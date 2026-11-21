@@ -1,4 +1,4 @@
-// The links Firebase e-mails (22 November 2026), handled on the log-in page in its own panels instead of Firebase's plain page.
+// The links Firebase e-mails, handled on the log-in page in its own panels instead of Firebase's plain page.
 // For this, the Firebase console's "Action URL" (Authentication > Templates > any template > Customize action URL) must be
 // https://glowupapp.xyz/_Index/index.html . Until then Firebase keeps opening its own page; nothing here breaks.
 //

@@ -1,4 +1,4 @@
-// Admin requests (20 November 2026): the people who pressed "Sign Up" on the login page and wait for admin access.
+// Admin requests: the people who pressed "Sign Up" on the login page and wait for admin access.
 // Shown in Quick settings > Admin requests, LIVE: the list and the menu's count follow adminRequests in real time, and a new
 // request shows a notice on whatever admin page is open.
 //
@@ -125,7 +125,7 @@ export function paintRequestsView(host) {
     if (!host) return;
     const intro = node("div", "req-top");
     intro.append(node("p", "req-intro", "People who pressed Sign Up on the login page. Approve only people you know: an admin can change all GlowUp data."));
-    // 22 Nov 2026: the three steps, read top to bottom, so a new admin knows what each button does
+    // the three steps, read top to bottom, so a new admin knows what each button does
     const steps = node("ol", "req-steps");
     [["They sign up", "and confirm their e-mail from the link we send."], ["You approve", "and they can log in to this website at once."], ["Or you decline", "and the request is removed. They are not told."]]
         .forEach(([b, rest]) => { const li = node("li"); li.append(node("strong", "", b), document.createTextNode(" " + rest)); steps.append(li); });

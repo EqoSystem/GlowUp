@@ -815,7 +815,7 @@ export function askConfirm(options) {
         cancel.type = "button"; cancel.className = "cancel-btn"; cancel.textContent = options.cancelLabel || "Cancel";
         const ok = document.createElement("button");
         ok.type = "button"; ok.className = options.danger ? "btn danger solid" : "save-btn"; ok.textContent = options.confirmLabel || "Confirm";
-        // optional icons (Sign out, 16 November 2026): an icon before each label, and a badge before the title
+        // optional icons (Sign out): an icon before each label, and a badge before the title
         if (options.cancelIcon) { cancel.classList.add("has-ic"); cancel.insertAdjacentHTML("afterbegin", icon(options.cancelIcon)); }
         if (options.confirmIcon) { ok.classList.add("has-ic"); ok.insertAdjacentHTML("afterbegin", icon(options.confirmIcon)); }
         if (options.badgeIcon) {
