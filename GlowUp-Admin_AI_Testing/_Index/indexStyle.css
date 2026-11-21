@@ -117,8 +117,7 @@ html:has(.terms-dialog[open]) { overflow: hidden; }
 .card-back svg.ic { width: calc(22 * var(--u)); height: calc(22 * var(--u)); transition: transform .2s var(--ease); }
 .card-back:hover svg.ic { transform: translateX(calc(-2 * var(--u))); }
 
-.card-badge { display: inline-grid; place-items: center; width: calc(58 * var(--u)); height: calc(58 * var(--u)); margin: 0 auto calc(6 * var(--u)); color: var(--accent); }
-.card-badge svg { width: 100%; height: 100%; fill: color-mix(in srgb, var(--accent) 14%, transparent); stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.signup-card h1 { margin-top: calc(36 * var(--u)); }
 .signup-card .subtitle { margin-bottom: calc(18 * var(--u)); }
 
 .signup-form { display: flex; flex-direction: column; gap: calc(12 * var(--u)); text-align: left; }
