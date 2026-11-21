@@ -134,9 +134,12 @@ namespace GlowUp.EditorTools
             // phase 4 (11 November 2026): four kinds, Suggestion between Wrong scan result and Other, as two rows of two so every name fits
             ChoiceTabs categoryTabs = TabsGrid(supportPopup.box, "CategoryTabs", new[] { "Bug", "Wrong scan result", "Suggestion", "Other" }, 0, 2, 28);
             A.TopStrip(categoryTabs.transform.parent, 222, TwoRowTrack, 48, 48);
-            TMP_InputField feedbackInput = SceneBuilderCore.MakeInput(supportPopup.box, "FeedbackInputField", "Describe what happened...", A.TC, Vector2.zero, new Vector2(840, 360));
+            // Top to bottom, nothing overlaps: intro, kinds, description, its counter UNDER the box, the scan switch, the e-mail
+            // row, the status line, then Send Report pinned to the bottom of the card.
+            const float FeedbackHeight = 320;
+            TMP_InputField feedbackInput = SceneBuilderCore.MakeInput(supportPopup.box, "FeedbackInputField", "Describe what happened...", A.TC, Vector2.zero, new Vector2(840, FeedbackHeight));
             float feedbackTop = 222 + TwoRowTrack + 18;
-            A.TopStrip(feedbackInput.transform, feedbackTop, 360, 48, 48);
+            A.TopStrip(feedbackInput.transform, feedbackTop, FeedbackHeight, 48, 48);
             Kit.StyleInput(feedbackInput, "Describe what happened...", ThemeRole.InputBackground);
             SmartScanSceneBuilder.MakeMultiLine(feedbackInput, 32);
             var feedbackBehaviour = SceneBuilderCore.Ensure<InputFieldBehaviour>(feedbackInput.gameObject);
@@ -144,7 +147,7 @@ namespace GlowUp.EditorTools
 
             // The report counter belongs to the description field and stays inside the card's width.
             GameObject counterRow = A.Node(supportPopup.box, "FeedbackCounterRow");
-            A.TopStrip(counterRow.transform, feedbackTop + 360 - 44, 36, 48, 48);
+            A.TopStrip(counterRow.transform, feedbackTop + FeedbackHeight + 6, 36, 56, 56);
             TextMeshProUGUI counterText = A.Label(counterRow.transform, "CharacterCounter", "0 / 500", 22, ThemeRole.SecondaryText,
                                                    FontRole.Body, TextAlignmentOptions.Right);
             A.Fill(counterText.transform, 0, 0, 0, 0);
@@ -157,20 +160,43 @@ namespace GlowUp.EditorTools
             A.Set(counter, "showCharacterCounter", true);
 
             GameObject includeRow = A.Node(supportPopup.box, "IncludeLastScanRow");
-            A.TopStrip(includeRow.transform, feedbackTop + 360 + 12, 84, 56, 56);
+            float includeTop = feedbackTop + FeedbackHeight + 48;
+            A.TopStrip(includeRow.transform, includeTop, 96, 56, 56);
             A.HStack(includeRow, 20);
             TextMeshProUGUI includeLabel = A.Label(includeRow.transform, "Label", "Include my last scan (product and ingredients)", 30, ThemeRole.MainText, FontRole.Label,
                                                    TextAlignmentOptions.MidlineLeft, true);
             A.Size(includeLabel, -1, -1, 1);
+            A.ShrinkWrapped(includeLabel, 22);
             Toggle includeScan = Switch(includeRow.transform, "IncludeLastScanSwitch", true);
-            TextMeshProUGUI supportMessage = A.Label(supportPopup.box, "FeedbackText", "", 28, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            A.TopStrip(supportMessage.transform, 222 + TwoRowTrack + 18 + 360 + 12 + 84 + 8, 140, 48, 48);
+
+            // the support address on its own row (mail icon + two lines), so a long address wraps or shrinks instead of
+            // running into the switch; the whole row is one 48 dp tap target that opens the mail app
+            float emailTop = includeTop + 96 + 12;
+            Image emailRow = A.Panel(supportPopup.box, "SupportEmailRow", ThemeRole.SurfaceAlt, Kit.PanelAlpha, 28f);
+            A.TopStrip(emailRow.transform, emailTop, 104, 48, 48);
+            emailRow.raycastTarget = true;
+            Button emailButton = SceneBuilderCore.Ensure<Button>(emailRow.gameObject);
+            emailButton.targetGraphic = emailRow;
+            Image emailIcon = A.Icon(emailRow.transform, "Icon", IconFactory.Mail, 40, ThemeRole.AccentText);
+            A.At(emailIcon.transform, A.ML, new Vector2(28, 0), new Vector2(40, 40));
+            emailIcon.raycastTarget = false;
+            TextMeshProUGUI emailText = A.Label(emailRow.transform, "EmailText", "Or email us\n<u>" + SupportFeedbackForm.SupportAddress + "</u>", 26,
+                                                ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.MidlineLeft, true);
+            A.Fill(emailText.transform, 92, 8, 24, 8); A.ShrinkWrapped(emailText, 18);
+            emailText.raycastTarget = false;
+
+            TextMeshProUGUI supportMessage = A.Label(supportPopup.box, "FeedbackText", "", 24, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            A.TopStrip(supportMessage.transform, emailTop + 104 + 8, 48, 48, 48);
+            A.ShrinkWrapped(supportMessage, 18);
             Button supportSend = A.PillButton(supportPopup.box, "SendButton", "Send Report", 38, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Mail);
             A.BottomStrip(supportSend.transform, 44, 112, 48, 48);
 
             var support = Feature<SupportFeedbackForm>(features, "SupportFeedbackForm");
             A.Set(support, "panel", supportPopup.panel); A.Set(support, "categoryTabs", categoryTabs); A.Set(support, "messageInput", feedbackInput);
             A.Set(support, "includeLastScanToggle", includeScan); A.Set(support, "sendButton", supportSend); A.Set(support, "feedbackText", supportMessage);
+            A.Set(support, "supportEmailButton", emailButton);
+            SceneBuilderCore.ReplaceText(support, "msgTimeout", "Not sent yet: there is no connection. Your report is saved on this phone and goes out by itself when you are back online.",
+                "No connection right now. Your report will be sent when you're back online.");
             // a form saved before phase 4 keeps its own words: the kinds and the two messages are brought up to date
             var supportSo = new SerializedObject(support);
             SerializedProperty kinds = supportSo.FindProperty("categoryNames");

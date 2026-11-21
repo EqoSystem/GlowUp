@@ -30,6 +30,8 @@ namespace GlowUp.AppSettings
         [SerializeField] private Toggle includeLastScanToggle;
         [SerializeField] private Button sendButton;
         [SerializeField] private TextMeshProUGUI feedbackText;
+        [Tooltip("The row with the support address; tapping it opens the mail app. When empty, a line is made at run time.")]
+        [SerializeField] private Button supportEmailButton;
 
         [Header("Report Settings")]
         [SerializeField] private string[] categoryNames = { "Bug", "Wrong scan result", "Suggestion", "Other" };
@@ -50,7 +52,8 @@ namespace GlowUp.AppSettings
         [SerializeField] private string msgSentDone = "Thank you. Your report went straight to the GlowUp team. Their reply will appear in your Notifications.";
         [SerializeField] private string msgValidation = "Please choose a category and describe what happened.";
         [SerializeField] private string msgFailure = "We couldn't send your report. Please try again.";
-        [SerializeField] private string msgTimeout = "No connection right now. Your report will be sent when you're back online.";
+        [SerializeField] private string msgTimeout = "Not sent yet: there is no connection. Your report is saved on this phone and goes out by itself when you are back online.";
+        [SerializeField] private string msgSignIn = "Sign in to send a report, so the GlowUp team can reply to you.";
         [SerializeField] private string msgSending = "Sending...";
         [SerializeField] private string defaultSendButtonText = "Send Report";
 
@@ -92,10 +95,17 @@ namespace GlowUp.AppSettings
             if (maximumCharacters <= 0 || maximumCharacters > ReportLimit) maximumCharacters = ReportLimit;
             if (messageInput == null) return;
             messageInput.characterLimit = maximumCharacters;
+            if (supportEmailButton != null)
+            {
+                supportEmailButton.onClick.AddListener(() => OpenSupportEmail(SupportAddress, "GlowUp support"));
+                return;
+            }
             TextMeshProUGUI style = feedbackText != null ? feedbackText : sendLabel;
             if (style == null) return;
 
-            Transform after = includeLastScanToggle != null ? includeLastScanToggle.transform : messageInput.transform;
+            // the toggle sits inside its own row: the line goes after that row, never inside it
+            Transform after = includeLastScanToggle != null ? includeLastScanToggle.transform.parent : messageInput.transform;
+            if (after == null || after == messageInput.transform.parent) after = messageInput.transform;
             TextMeshProUGUI email = MakeLine("SupportEmailLink", style, after, TextAlignmentOptions.Left);
             email.text = "Or email us: <u>" + SupportAddress + "</u>";
             email.raycastTarget = true;
@@ -286,15 +296,21 @@ namespace GlowUp.AppSettings
                         userName = WhoSent(user);
                     }
                 }
-                catch (Exception authEx)
+                catch (Exception)
                 {
-                    { }
+                    uid = "anonymous";
+                }
+
+                // the database only takes reports from a signed-in account (rule: uid == the sign-in's id)
+                if (uid == "anonymous")
+                {
+                    ShowCenteredPopup("Sign in first", msgSignIn, "OK");
+                    return;
                 }
 
                 // Build report data dictionary
                 var reportData = new Dictionary<string, object>
                 {
-                    { "reportId", docId },
                     { "uid", uid },
                     { "userName", userName },
                     { "category", category },
@@ -334,12 +350,12 @@ namespace GlowUp.AppSettings
                 {
                     // TIMEOUT: Firestore queues offline writes and will sync when back online
                     { }
-                    ShowCenteredPopup(
-                        "Offline Mode",
-                        msgTimeout,
-                        "OK"
-                    );
-                    // Do not clear fields and do not reset doc ID so retry will target the same document
+                    // The write is queued by Firestore and goes out when the phone is online again. The form is cleared and
+                    // a new id is used for the next report, so a second tap cannot send the same report twice.
+                    if (messageInput != null) messageInput.text = "";
+                    currentReportDocId = null;
+                    if (panel != null && panel.IsOpen) panel.Hide();
+                    ShowCenteredPopup("Not sent yet", msgTimeout, "OK");
                 }
                 else
                 {

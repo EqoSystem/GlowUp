@@ -156,7 +156,7 @@ namespace GlowUp.EditorTools
             TextMeshProUGUI accountSub = A.Label(account.box, "SubtitleText", "Manage your profile and skin information", 27, ThemeRole.SecondaryText, FontRole.Body);
             A.TopStrip(accountSub.transform, 104, 40, 48, 128); A.Shrink(accountSub, 20);
             Image accountAvatar = A.Panel(account.box, "AccountAvatar", ThemeRole.SurfaceAlt, 1f, 150f);
-            A.At(accountAvatar.transform, A.TC, new Vector2(0, -236), new Vector2(150, 150));
+            A.At(accountAvatar.transform, A.TC, new Vector2(0, -156), new Vector2(150, 150));      // 156..306: clear of the subtitle and the name
             A.Icon(accountAvatar.transform, "Icon", IconFactory.User, 84, ThemeRole.MainText);
             accountAvatar.raycastTarget = true;
             Button accountAvatarButton = SceneBuilderCore.Ensure<Button>(accountAvatar.gameObject);
@@ -166,32 +166,30 @@ namespace GlowUp.EditorTools
             photoBadge.raycastTarget = false;
             A.Icon(photoBadge.transform, "Icon", IconFactory.Pencil, 28, ThemeRole.ButtonText).raycastTarget = false;
             TextMeshProUGUI accountName = A.Label(account.box, "AccountNameText", "Your name", 42, ThemeRole.MainText, FontRole.Heading, TextAlignmentOptions.Center);
-            A.TopStrip(accountName.transform, 324, 60, 48, 48); A.Shrink(accountName, 28);
+            A.TopStrip(accountName.transform, 318, 56, 48, 48); A.Shrink(accountName, 28);
             TextMeshProUGUI accountEmail = A.Label(account.box, "AccountEmailText", "name@email.com", 29, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center);
-            A.TopStrip(accountEmail.transform, 386, 44, 48, 48); A.Shrink(accountEmail, 22);
+            A.TopStrip(accountEmail.transform, 376, 44, 48, 48); A.Shrink(accountEmail, 22);
 
             TextMeshProUGUI skinHeader = A.Label(account.box, "SkinProfileHeaderText", "Skin Profile", 34, ThemeRole.Heading, FontRole.Heading, TextAlignmentOptions.MidlineLeft);
             A.TopStrip(skinHeader.transform, 462, 64, 48, 300);
             Button editSkin = A.PillButton(account.box, "EditSkinProfileButton", "Edit Profile", 28, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Pencil);
             A.At(editSkin.transform, A.TR, new Vector2(-48, -462), new Vector2(240, 64));
-            // the four facts: label over value, two to a row; a long value wraps and shrinks inside its own tile
-            TextMeshProUGUI Fact(string name, string label, float top, bool right, Sprite icon)
+            // the four facts: label over value, two to a row; a long value wraps and shrinks inside its own tile.
+            // No icons here: no icon clearly stands for "Skin Concerns" or "Allergies", so the text labels carry the meaning.
+            TextMeshProUGUI Fact(string name, string label, float top, bool right)
             {
                 Image tile = A.Panel(account.box, name, ThemeRole.SurfaceAlt, Kit.PanelAlpha, 28f);
                 A.TopStrip(tile.transform, top, 132, right ? 452 : 48, right ? 48 : 452);
-                Image iconDisc = A.Panel(tile.transform, "IconDisc", ThemeRole.ButtonFill, Kit.PanelAlpha, 24f);
-                A.At(iconDisc.transform, A.TL, new Vector2(18, -18), new Vector2(48, 48));
-                Image factIcon = A.Icon(iconDisc.transform, "Icon", icon, 28, ThemeRole.ButtonText);
-                TextMeshProUGUI head = A.Label(tile.transform, "LabelText", label, 24, ThemeRole.SecondaryText, FontRole.Body);
-                A.TopStrip(head.transform, 14, 36, 76, 24); A.Shrink(head, 18);
+                TextMeshProUGUI head = A.Label(tile.transform, "LabelText", label, 25, ThemeRole.SecondaryText, FontRole.Body);
+                A.TopStrip(head.transform, 16, 36, 28, 24); A.Shrink(head, 18);
                 TextMeshProUGUI value = A.Label(tile.transform, "ValueText", "-", 30, ThemeRole.MainText, FontRole.Heading, TextAlignmentOptions.TopLeft, true);
-                A.Fill(value.transform, 76, 12, 24, 52); A.ShrinkWrapped(value, 20);
+                A.Fill(value.transform, 28, 12, 24, 56); A.ShrinkWrapped(value, 20);
                 return value;
             }
-            TextMeshProUGUI factType = Fact("SkinTypeTile", "Skin Type", 542, false, IconFactory.SkinDrop);
-            TextMeshProUGUI factTone = Fact("SkinToneTile", "Skin Tone", 542, true, IconFactory.Palette);
-            TextMeshProUGUI factCondition = Fact("ConditionTile", "Skin Concerns", 690, false, IconFactory.ShieldPlain);
-            TextMeshProUGUI factAllergens = Fact("AllergensTile", "Allergies", 690, true, IconFactory.Warning);
+            TextMeshProUGUI factType = Fact("SkinTypeTile", "Skin Type", 542, false);
+            TextMeshProUGUI factTone = Fact("SkinToneTile", "Skin Tone", 542, true);
+            TextMeshProUGUI factCondition = Fact("ConditionTile", "Skin Concerns", 690, false);
+            TextMeshProUGUI factAllergens = Fact("AllergensTile", "Allergies", 690, true);
             Image tip = A.Panel(account.box, "TipPanel", ThemeRole.SurfaceAlt, Kit.PanelAlpha, 24f);
             A.TopStrip(tip.transform, 840, 96, 48, 48);
             TextMeshProUGUI tipText = A.Label(tip.transform, "TipText", "You can update your skin profile anytime for more accurate recommendations.",
