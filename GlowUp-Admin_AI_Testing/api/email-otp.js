@@ -201,15 +201,20 @@ module.exports = async (req, res) => {
             // opening the link only SHOWS a button (a mail scanner that opens links confirms nothing); the button posts the same token back
             const link = parseLink(req.query && req.query.t);
             if (!cfg || !link) return page(res, 400, "This link does not work", "Ask for a new code on the sign-up page.");
-            // say WHICH address is being confirmed (security review: a stranger may have started a sign-up with someone else's address)
-            let shown = "this account";
+            // say WHICH address is being confirmed (a stranger may have started a sign-up with someone else's address). The address is shown ONLY
+            // when the link's signature is right for it, so nobody can use this page to find out whose address belongs to an account id.
+            let shown = "";
             try {
                 const token = await serviceToken(cfg.account);
+                if ((await bump(token, `view_${link.uid}_${currentWindow(Date.now())}`)) > 20) return page(res, 429, "Too many tries", "Wait a few minutes, then ask for a new code.");
                 const found = await timed(`https://identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts:lookup`,
                     { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ localId: [link.uid] }) }, 5);
                 const who = found.ok ? (((await found.json()).users || [])[0]) : null;
-                if (who && who.email) { const [name, domain] = String(who.email).split("@"); shown = name.slice(0, 2) + "***@" + (domain || ""); }
-            } catch (e) { }
+                if (who && who.email && who.emailVerified !== true && linkIsRight(cfg.secret, link.uid, who.email, link.windowIndex, link.mac, Date.now())) {
+                    const [name, domain] = String(who.email).split("@"); shown = name.slice(0, 2) + "***@" + (domain || "");
+                }
+            } catch (e) { shown = ""; }
+            if (!shown) return page(res, 400, "This link does not work", "It may have expired or already been used. Ask for a new code on the sign-up page.");
             return page(res, 200, "Confirm your e-mail", "Confirm the GlowUp sign-up for " + shown + "? Press the button only if YOU just started a GlowUp sign-up with this address. If you did not, close this page.",
                 "<form method=post action='/api/email-otp'><input type=hidden name=t value='" + escapeHtml(req.query.t) + "'><button style='font-size:1.1rem;padding:.7rem 1.6rem;border-radius:2rem;border:0;background:#d96a87;color:#fff'>Confirm my e-mail</button></form>");
         }

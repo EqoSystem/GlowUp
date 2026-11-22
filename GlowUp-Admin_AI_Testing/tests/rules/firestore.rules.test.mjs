@@ -387,6 +387,44 @@ await cannotAfter("a plain user deletes someone else's request", seedRequest, ()
 await cannotAfter("an admin removes another admin from the website", seed, () => deleteDoc(doc(adminDoc(), "admins/a1")));
 await cannotAfter("a request when the account is already an admin", async () => { await seed(); await env.withSecurityRulesDisabled(async (c) => setDoc(doc(c.firestore(), "admins/n1"), { note: "x" })); }, () => setDoc(doc(asker(), "adminRequests/n1"), request()));
 
+// ---- Admin Management (22 Nov 2026): admins look after other admins ----
+const seedAdmins = async (extra) => {
+    await seed();
+    await env.withSecurityRulesDisabled(async (context) => {
+        const d = context.firestore();
+        await setDoc(doc(d, "admins/m1"), Object.assign({ email: "m1@example.com", name: "Second Admin", approvedBy: "a1", approvedAt: Timestamp.now() }, extra || {}));
+        await setDoc(doc(d, "admins/m2"), { email: "m2@example.com", name: "Owner", approvedBy: "a1", approvedAt: Timestamp.now(), protected: true });
+    });
+};
+const archivePatch = (who, to) => ({ status: to, inBin: to === "deleted", statusChangedAt: serverTimestamp(), statusChangedBy: who });
+await canAfter("an admin lists the admins", seedAdmins, () => getDocs(query(collection(adminDoc(), "admins"))));
+await cannotAfter("a plain user lists the admins", seedAdmins, () => getDocs(query(collection(user(), "admins"))));
+await canAfter("an admin archives another admin", seedAdmins, () => updateDoc(doc(adminDoc(), "admins/m1"), archivePatch("a1", "archived")));
+await canAfter("an admin sends another admin to the bin", seedAdmins, () => updateDoc(doc(adminDoc(), "admins/m1"), Object.assign(archivePatch("a1", "deleted"), { statusBefore: "active" })));
+await canAfter("an admin restores another admin", () => seedAdmins({ status: "archived" }), () => updateDoc(doc(adminDoc(), "admins/m1"), archivePatch("a1", "active")));
+await canAfter("an admin renames another admin", seedAdmins, () => updateDoc(doc(adminDoc(), "admins/m1"), { name: "Renamed Admin" }));
+await cannotAfter("an admin changes their OWN status", seedAdmins, () => updateDoc(doc(adminDoc(), "admins/a1"), archivePatch("a1", "archived")));
+await cannotAfter("an admin changes another admin's e-mail", seedAdmins, () => updateDoc(doc(adminDoc(), "admins/m1"), { email: "x@example.com" }));
+await cannotAfter("an admin sets a status that does not exist", seedAdmins, () => updateDoc(doc(adminDoc(), "admins/m1"), archivePatch("a1", "banned")));
+await cannotAfter("a status change that names another admin as the one who did it", seedAdmins, () => updateDoc(doc(adminDoc(), "admins/m1"), archivePatch("m1", "archived")));
+await cannotAfter("a status change with a made-up time", seedAdmins, () => updateDoc(doc(adminDoc(), "admins/m1"), { status: "archived", inBin: false, statusChangedAt: Timestamp.fromMillis(1000), statusChangedBy: "a1" }));
+await cannotAfter("an admin adds a protected flag to another admin", seedAdmins, () => updateDoc(doc(adminDoc(), "admins/m1"), { protected: false }));
+await cannotAfter("an admin changes a protected admin", seedAdmins, () => updateDoc(doc(adminDoc(), "admins/m2"), archivePatch("a1", "archived")));
+await cannotAfter("a plain user changes an admin", seedAdmins, () => updateDoc(doc(user(), "admins/m1"), archivePatch("u1", "archived")));
+await cannotAfter("an archived admin cannot change brands", () => seedAdmins().then(() => env.withSecurityRulesDisabled(async (c) => updateDoc(doc(c.firestore(), "admins/a1"), { status: "archived" }))), () => setDoc(doc(adminDoc(), "brands/b9"), newBrand));
+await cannotAfter("an archived admin cannot change another admin", () => seedAdmins().then(() => env.withSecurityRulesDisabled(async (c) => updateDoc(doc(c.firestore(), "admins/a1"), { status: "deleted" }))), () => updateDoc(doc(adminDoc(), "admins/m1"), archivePatch("a1", "archived")));
+await canAfter("an archived admin still reads their own admins entry", () => seedAdmins().then(() => env.withSecurityRulesDisabled(async (c) => updateDoc(doc(c.firestore(), "admins/a1"), { status: "archived" }))), () => getDoc(doc(adminDoc(), "admins/a1")));
+await canAfter("an admin deletes an admin that is in the bin", () => seedAdmins({ status: "deleted", inBin: true }), () => deleteDoc(doc(adminDoc(), "admins/m1")));
+await cannotAfter("an admin deletes an active admin", seedAdmins, () => deleteDoc(doc(adminDoc(), "admins/m1")));
+await cannotAfter("an admin deletes an archived admin", () => seedAdmins({ status: "archived" }), () => deleteDoc(doc(adminDoc(), "admins/m1")));
+await cannotAfter("an admin deletes themself", () => seedAdmins().then(() => env.withSecurityRulesDisabled(async (c) => updateDoc(doc(c.firestore(), "admins/a1"), { status: "deleted" }))), () => deleteDoc(doc(adminDoc(), "admins/a1")));
+await cannotAfter("an admin deletes a protected admin in the bin", async () => { await seedAdmins(); await env.withSecurityRulesDisabled(async (c) => updateDoc(doc(c.firestore(), "admins/m2"), { status: "deleted" })); }, () => deleteDoc(doc(adminDoc(), "admins/m2")));
+await canAfter("an admin marks their own last-seen time", seedAdmins, () => updateDoc(doc(adminDoc(), "admins/a1"), { lastActiveAt: serverTimestamp() }));
+await cannotAfter("an admin marks a made-up last-seen time", seedAdmins, () => updateDoc(doc(adminDoc(), "admins/a1"), { lastActiveAt: Timestamp.fromMillis(1000) }));
+await cannotAfter("an admin writes another field on their own entry", seedAdmins, () => updateDoc(doc(adminDoc(), "admins/a1"), { lastActiveAt: serverTimestamp(), name: "Me" }));
+await cannotAfter("an admin marks another admin's last-seen time", seedAdmins, () => updateDoc(doc(adminDoc(), "admins/m1"), { lastActiveAt: serverTimestamp() }));
+await cannotAfter("a plain user marks a last-seen time on an admin entry", seedAdmins, () => updateDoc(doc(user(), "admins/m1"), { lastActiveAt: serverTimestamp() }));
+
 // ---- User Management (20 November 2026): admins read every profile and change only the managed fields ----
 const seedUsers = async (extra) => {
     await seed();

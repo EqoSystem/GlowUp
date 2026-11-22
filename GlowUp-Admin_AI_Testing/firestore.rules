@@ -18,10 +18,12 @@ service cloud.firestore {
     // An admin is an account whose UID is the id of a document in "admins", OR an account that carries the custom claim admin = true
     // (set with the Firebase Admin SDK, never from a browser or the app: a claim cannot be changed by its owner). The website's login
     // gate still looks at "admins"; the claim is for scripts and tools that sign in as an admin. Neither path can be set from the app.
+    // An admin whose record says "archived" or "deleted" (Admin Management) has no admin access until restored; a record with no status is active.
     function isAdmin() {
       return signedIn()
         && (request.auth.token.get('admin', false) == true
-            || exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+            || (exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+                && get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.get('status', 'active') == 'active'));
     }
 
     function isOwner(uid) {
@@ -105,9 +107,9 @@ service cloud.firestore {
     // entry (the website does this when "REQUIRE_ADMIN_RECORD" is switched on).
     // admin sign-up: an admin may also ADD an admin, but only by approving that person's own
     // request in "adminRequests" (pending, e-mail confirmed), in the same batch that marks the request approved. Nobody can
-    // add themself, and changing or removing an admin is still done by hand in the console.
+    // add themself. Changing or removing an admin is done on Admin Management (rules below); an admin marked `protected` in the console cannot be changed there.
     match /admins/{uid} {
-      allow read: if isOwner(uid);
+      allow read: if isOwner(uid) || isAdmin();
       allow create: if isAdmin()
         && uid != request.auth.uid
         && exists(/databases/$(database)/documents/adminRequests/$(uid))
@@ -118,7 +120,25 @@ service cloud.firestore {
         && request.resource.data.name is string && request.resource.data.name.size() <= 80
         && request.resource.data.approvedBy == request.auth.uid
         && request.resource.data.approvedAt == request.time;
-      allow update, delete: if false;
+      // Admin Management: an admin changes ANOTHER admin (never themself, never one marked protected by hand in the console): the name and the
+      // status (active, archived, deleted = in the Recycle Bin), with who changed it and when. Nothing else, and never the e-mail.
+      allow update: if isAdmin()
+        && uid != request.auth.uid
+        && resource.data.get('protected', false) != true
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'status', 'statusBefore', 'inBin', 'statusChangedAt', 'statusChangedBy'])
+        && request.resource.data.get('name', '') is string && request.resource.data.get('name', '').size() <= 80
+        && request.resource.data.get('status', 'active') in ['active', 'archived', 'deleted']
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'inBin', 'statusBefore', 'statusChangedAt', 'statusChangedBy'])
+            || (request.resource.data.statusChangedBy == request.auth.uid && request.resource.data.statusChangedAt == request.time));
+      // an admin marks their OWN last-seen time (the "Online now" card): that field only
+      allow update: if isOwner(uid)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt'])
+        && request.resource.data.lastActiveAt == request.time;
+      // removing an admin for good: another admin, only from the Recycle Bin, never one marked protected
+      allow delete: if isAdmin()
+        && uid != request.auth.uid
+        && resource.data.get('protected', false) != true
+        && resource.data.get('status', 'active') == 'deleted';
     }
 
     // ---- requests for admin access (the login page's "Sign Up"), ONE document per account: adminRequests/{uid} ----

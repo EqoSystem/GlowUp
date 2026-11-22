@@ -107,6 +107,23 @@ check("bad sign-in: 401", (await call("POST", { action: "send", idToken: "t" }))
     check("a code made for the old e-mail does not work", (await good("verify", { code: sentCode })).body.ok === false);
     user = { localId: "uidX", email: "me@mail.com", emailVerified: true };
     check("an already confirmed account is told so", (await good("verify", { code: "000000" })).body.already === true);
+    // the link page and the confirm button, with the fake Google
+    const getPage = (q) => new Promise((resolve) => { const res = { headers: {}, setHeader(k, v) { this.headers[k] = v; }, end(t) { resolve({ status: this.statusCode, html: t }); } }; mod({ method: "GET", headers: {}, query: q }, res); });
+    const postForm = (t) => new Promise((resolve) => { const res = { headers: {}, setHeader(k, v) { this.headers[k] = v; }, end(h) { resolve({ status: this.statusCode, html: h }); } }; mod({ method: "POST", headers: {}, body: "t=" + encodeURIComponent(t) }, res); });
+    user = { localId: "uidL", email: "Lina@Mail.com", emailVerified: false };
+    const wNow = Math.floor(Date.now() / 600000), macOk = mod.linkMac(secret, "uidL", "lina@mail.com", wNow);
+    const okToken = "uidL." + wNow + "." + macOk;
+    const viewOk = await getPage({ t: okToken });
+    check("link page shows a button and the masked address", viewOk.status === 200 && viewOk.html.includes("Confirm my e-mail") && viewOk.html.includes("Li***@Mail.com") && !viewOk.html.includes("Lina@"));
+    counters.clear();
+    check("link page with a wrong signature shows no address", (await getPage({ t: "uidL." + wNow + "." + "A".repeat(43) })).html.includes("does not work") && !(await getPage({ t: "uidL." + wNow + "." + "A".repeat(43) })).html.includes("Li***"));
+    updated = 0;
+    check("opening the link (GET) confirms nothing", updated === 0);
+    check("the button (POST) with a wrong signature confirms nothing", (await postForm("uidL." + wNow + "." + "A".repeat(43))).status === 400 && updated === 0);
+    const done = await postForm(okToken);
+    check("the button (POST) with the right link confirms the e-mail", done.status === 200 && updated === 1 && done.html.includes("confirmed"));
+    user = { localId: "uidL", email: "lina@mail.com", emailVerified: true };
+    check("link page for an account that is already confirmed shows no address", (await getPage({ t: okToken })).status === 400);
     tlsMod.connect = realConnect;
 }
 // the one-click link
@@ -124,8 +141,6 @@ check("bad sign-in: 401", (await call("POST", { action: "send", idToken: "t" }))
     const get = (q) => new Promise((resolve) => { const res = { headers: {}, setHeader(k, v) { this.headers[k] = v; }, end(t) { resolve({ status: this.statusCode, type: this.headers["Content-Type"], html: t }); } }; mod({ method: "GET", headers: {}, query: q }, res); });
     const bad = await get({ t: "nope" });
     check("GET with a bad token: 400 page", bad.status === 400 && /html/.test(bad.type));
-    const good = await get({ t });
-    check("GET with a good token only shows a button (no confirmation)", good.status === 200 && good.html.includes("<form method=post") && good.html.includes("Confirm my e-mail"));
     check("the token is escaped in the page", !(await get({ t: "\"><script>" })).html.includes("<script>"));
 }
 console.log(fail === 0 ? `ALL PASSED  (checks made: ${pass})` : `${fail} FAILED  (checks made: ${pass + fail})`);
