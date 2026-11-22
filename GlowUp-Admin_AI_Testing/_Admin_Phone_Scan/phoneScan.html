@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GlowUp Phone Scanner</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="../_Shared/assets/glowup-icon-32.png">
+    <script>
+        (function () {
+            var t = null;
+            try { t = localStorage.getItem("glowup.theme"); } catch (e) { }
+            if (t !== "light" && t !== "dark") t = "light";
+            document.documentElement.dataset.theme = t;
+        })();
+    </script>
+    <link rel="stylesheet" href="../_Shared/adminCommon.css">
+    <link rel="stylesheet" href="../_Admin_Phone_Scan/phoneScan.css">
+</head>
+<body class="phone-scan-page">
+    <main class="ps-main">
+        <section class="ps-card" aria-labelledby="psTitle">
+            <header class="ps-head">
+                <img src="../_Shared/assets/glowup-icon-128.png" width="40" height="40" alt="" decoding="async">
+                <div>
+                    <h1 id="psTitle">Phone scanner</h1>
+                    <p class="ps-sub" id="psSub">Connecting to the computer...</p>
+                </div>
+            </header>
+            <div class="ps-actions" id="psActions" hidden>
+                <button type="button" class="ps-big" id="psBarcode">
+                    <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6v12M7 6v12M10.5 6v12M13 6v12M17 6v12M20 6v12"/></svg>
+                    <span><strong>Scan the barcode</strong><small>Fills the product from its barcode</small></span>
+                </button>
+                <button type="button" class="ps-big" id="psLabel">
+                    <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3.2l1.8-2.5h6l1.8 2.5H20v11H4z"/><circle cx="12" cy="13.2" r="3.6"/></svg>
+                    <span><strong>Photo of the ingredient list</strong><small>Reads the list printed on the pack</small></span>
+                </button>
+            </div>
+            <p class="ps-state" id="psState" role="status" aria-live="polite"></p>
+            <ul class="ps-sent" id="psSent" aria-label="Sent to the computer"></ul>
+        </section>
+    </main>
+    <script type="module" src="../_Admin_Phone_Scan/phoneScan.js"></script>
+</body>
+</html>

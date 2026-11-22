@@ -152,14 +152,14 @@ try {
         await settle(500);
         await openAdd(page, "Product");
 
-        ok(await page.evaluate(() => Array.from(document.querySelectorAll("#productModal .ing-section-title")).map((h) => h.textContent).join("|") === "Product|Sources|Ingredients and shades|Listing"), "the product window has four sections");
+        ok(await page.evaluate(() => Array.from(document.querySelectorAll("#productModal .ing-section-title")).map((h) => h.textContent).join("|") === "Quick fill|Product|Sources|Ingredients and shades|Listing"), "the product window has Quick fill and four sections");
         await page.click('#productModal .ing-nav-btn[data-jump="productSecListing"]');
         await page.waitForTimeout(700);
         ok(await page.locator('#productModal .ing-nav-btn[data-jump="productSecListing"][aria-current="true"]').count() === 1, "clicking a section in the bar marks it");
         ok(await page.evaluate(() => { const a = document.getElementById("productSecListingTitle").getBoundingClientRect().top, b = document.querySelector("#productModal .ing-body").getBoundingClientRect().top; return a >= b - 1 && a < b + 120 || document.querySelector("#productModal .ing-body").scrollTop + document.querySelector("#productModal .ing-body").clientHeight >= document.querySelector("#productModal .ing-body").scrollHeight - 2; }), "and the section is at the top of the body (or the body is at its end)");
         await page.evaluate(() => { document.querySelector("#productModal .ing-body").scrollTop = 0; });
         await page.waitForTimeout(200);
-        ok(await page.locator('#productModal .ing-nav-btn[data-jump="productSecBasics"][aria-current="true"]').count() === 1, "scrolling back moves the mark back");
+        ok(await page.locator('#productModal .ing-nav-btn[data-jump="productQuickFill"][aria-current="true"]').count() === 1, "scrolling back moves the mark back");
 
         await page.click('#productModal .ing-nav-btn[data-jump="productSecContents"]');
         await page.waitForTimeout(600);

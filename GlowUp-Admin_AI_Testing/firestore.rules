@@ -156,6 +156,32 @@ service cloud.firestore {
       allow delete: if isAdmin() || isOwner(uid);
     }
 
+    // ---- "Use my phone" on the admin forms: ONE short-lived document per link, phoneLinks/{code} ----
+    // The admin's computer creates it (own uid, empty value, ends within 20 minutes); the same admin, signed in on a phone,
+    // may only add a value (kind + text + count + 1) while the link has not ended. Nobody else can read or write it.
+    match /phoneLinks/{code} {
+      allow get, delete: if isAdmin() && resource.data.uid == request.auth.uid;
+      allow create: if isAdmin()
+        && code.matches('[a-z0-9]{10,20}')
+        && request.resource.data.keys().hasOnly(['uid', 'what', 'kind', 'value', 'count', 'createdAt', 'expiresAtUnix'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.what in ['barcode', 'ingredients', 'any']
+        && request.resource.data.kind == '' && request.resource.data.value == '' && request.resource.data.count == 0
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.expiresAtUnix is int
+        && request.resource.data.expiresAtUnix > request.time.toMillis() / 1000
+        && request.resource.data.expiresAtUnix <= request.time.toMillis() / 1000 + 1200;
+      allow update: if isAdmin()
+        && resource.data.uid == request.auth.uid
+        && resource.data.expiresAtUnix > request.time.toMillis() / 1000
+        && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['phoneSeen']) && request.resource.data.phoneSeen == true)
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['kind', 'value', 'count', 'sentAt'])
+            && request.resource.data.kind in ['barcode', 'ingredients']
+            && request.resource.data.value is string && request.resource.data.value.size() >= 1 && request.resource.data.value.size() <= 4000
+            && request.resource.data.count == resource.data.count + 1
+            && request.resource.data.sentAt == request.time));
+    }
+
     // What an admin may write to the catalogue (brands, products, ingredients). The website's own forms keep to this already;
     // the rule is a second lock: a name that is not text, a list that is absurdly long, or a "link" that is not an https
     // address is refused, whatever tool wrote it. Kept loose on purpose so old entries can still be saved.
@@ -371,6 +397,19 @@ service cloud.firestore {
         && request.resource.data.get('photoData', '').size() <= 200100
         && (request.resource.data.get('photoData', '') == '' || request.resource.data.get('photoData', '').matches('^data:image/jpeg;base64,/9j/[A-Za-z0-9+/=]+$'));   // /9j/ = the JPEG start bytes FF D8 FF, so the content is checked, not only the label
     }
+    // Age check (panel revision): the app asks for the birthday on sign-up and refuses anyone under 13. The database refuses it too:
+    // an age the user sets must be a whole number from 13 to 120 (0 = not filled in yet, e.g. right after a Google sign-in),
+    // and a birthday must be written yyyy-MM-dd. Older documents without these fields stay valid.
+    function userAgeOk() {
+      return request.resource.data.get('age', 0) is int
+        && (request.resource.data.get('age', 0) == 0
+            || (request.resource.data.get('age', 0) >= 13 && request.resource.data.get('age', 0) <= 120))
+        && request.resource.data.get('birthday', '') is string
+        && (request.resource.data.get('birthday', '') == '' || request.resource.data.get('birthday', '').matches('(19|20)[0-9]{2}-[01][0-9]-[0-3][0-9]'));
+    }
+    function userAgeUnchangedOrOk() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['age', 'birthday']) || userAgeOk();
+    }
     function adminUserChange() {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fullName', 'username'].concat(userAdminFields()))
         && request.resource.data.get('role', 'user') in ['user', 'admin']
@@ -382,8 +421,8 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
       // photoData: the app's profile picture, a small JPEG as text (the app sends about 20 KB); capped here
-      allow create: if isOwner(uid) && !request.resource.data.keys().hasAny(userAdminFields()) && userPhotoOk();
-      allow update: if (isOwner(uid) && !userBanned(uid) && userPhotoOk()
+      allow create: if isOwner(uid) && !request.resource.data.keys().hasAny(userAdminFields()) && userPhotoOk() && userAgeOk();
+      allow update: if (isOwner(uid) && !userBanned(uid) && userPhotoOk() && userAgeUnchangedOrOk()
                         && !request.resource.data.diff(resource.data).affectedKeys().hasAny(userAdminFields()))
                     || (isAdmin() && uid != request.auth.uid && adminUserChange());
       allow delete: if (isOwner(uid) && recentLogin())       // only during account deletion, right after a fresh sign-in

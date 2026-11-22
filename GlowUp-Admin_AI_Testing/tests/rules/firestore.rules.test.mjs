@@ -462,6 +462,35 @@ await cannotAfter("a profile photo over 200 KB", seedUsers, () => setDoc(doc(use
 await cannotAfter("a profile photo labelled JPEG whose content is not a JPEG (New23)", seedUsers, () => setDoc(doc(user(), "users/u1"), { photoData: "data:image/jpeg;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+" }, { merge: true }));
 await cannotAfter("a user sets another user's photo", seedUsers, () => setDoc(doc(other(), "users/u1"), { photoData: "data:image/jpeg;base64,AAAA" }, { merge: true }));
 
+// age check (panel revision 22 Nov 2026)
+await can("a user saves age 13 and a birthday", () => setDoc(doc(user(), "users/u1"), { age: 13, birthday: "2013-01-05" }, { merge: true }));
+await can("a user saves age 0 (not filled in yet)", () => setDoc(doc(user(), "users/u1"), { age: 0, birthday: "" }, { merge: true }));
+await cannot("a user saves age 12", () => setDoc(doc(user(), "users/u1"), { age: 12 }, { merge: true }));
+await cannot("a user saves age 150", () => setDoc(doc(user(), "users/u1"), { age: 150 }, { merge: true }));
+await cannot("a user saves an age that is not a number", () => setDoc(doc(user(), "users/u1"), { age: "20" }, { merge: true }));
+await cannot("a user saves a birthday in another format", () => setDoc(doc(user(), "users/u1"), { birthday: "05/01/2000" }, { merge: true }));
+await cannot("a new profile with age 10", () => setDoc(doc(other(), "users/u2"), { firstName: "Kid", age: 10 }));
+await can("a new profile with age 25", () => setDoc(doc(other(), "users/u2"), { firstName: "Adult", age: 25, birthday: "2001-03-04" }));
+
+// "Use my phone" links (phoneLinks)
+const link = (extra) => Object.assign({ uid: "a1", what: "barcode", kind: "", value: "", count: 0, createdAt: serverTimestamp(), expiresAtUnix: Math.floor(Date.now() / 1000) + 900 }, extra || {});
+const seedLink = (extra) => async () => { await seed(); await env.withSecurityRulesDisabled(async (c) => { await setDoc(doc(c.firestore(), "phoneLinks/abcdefghjk23"), Object.assign({ uid: "a1", what: "barcode", kind: "", value: "", count: 0, expiresAtUnix: Math.floor(Date.now() / 1000) + 900 }, extra || {})); }); };
+await can("an admin opens a phone link", () => setDoc(doc(adminDoc(), "phoneLinks/abcdefghjk23"), link()));
+await cannot("a user opens a phone link", () => setDoc(doc(user(), "phoneLinks/abcdefghjk23"), link({ uid: "u1" })));
+await cannot("an admin opens a link in another admin's name", () => setDoc(doc(adminDoc(), "phoneLinks/abcdefghjk23"), link({ uid: "a9" })));
+await cannot("a link that lasts an hour", () => setDoc(doc(adminDoc(), "phoneLinks/abcdefghjk23"), link({ expiresAtUnix: Math.floor(Date.now() / 1000) + 3600 })));
+await cannot("a link made with a value already in it", () => setDoc(doc(adminDoc(), "phoneLinks/abcdefghjk23"), link({ value: "123" })));
+await cannot("a link with a short guessable code", () => setDoc(doc(adminDoc(), "phoneLinks/abc"), link()));
+await canAfter("the admin's phone sends a barcode", seedLink(), () => updateDoc(doc(adminDoc(), "phoneLinks/abcdefghjk23"), { kind: "barcode", value: "3600531652300", count: 1, sentAt: serverTimestamp() }));
+await canAfter("the admin's phone says it is connected", seedLink(), () => updateDoc(doc(adminDoc(), "phoneLinks/abcdefghjk23"), { phoneSeen: true }));
+await cannotAfter("the phone sends after the link ended", seedLink({ expiresAtUnix: Math.floor(Date.now() / 1000) - 5 }), () => updateDoc(doc(adminDoc(), "phoneLinks/abcdefghjk23"), { kind: "barcode", value: "1", count: 1, sentAt: serverTimestamp() }));
+await cannotAfter("the phone skips the count", seedLink(), () => updateDoc(doc(adminDoc(), "phoneLinks/abcdefghjk23"), { kind: "barcode", value: "1", count: 5, sentAt: serverTimestamp() }));
+await cannotAfter("the phone changes the owner", seedLink(), () => updateDoc(doc(adminDoc(), "phoneLinks/abcdefghjk23"), { uid: "a9" }));
+await cannotAfter("a user reads an admin's link", seedLink(), () => getDoc(doc(user(), "phoneLinks/abcdefghjk23")));
+await cannotAfter("a user writes into an admin's link", seedLink(), () => updateDoc(doc(user(), "phoneLinks/abcdefghjk23"), { kind: "barcode", value: "1", count: 1, sentAt: serverTimestamp() }));
+await canAfter("the admin reads and deletes their link", seedLink(), async () => { await getDoc(doc(adminDoc(), "phoneLinks/abcdefghjk23")); await deleteDoc(doc(adminDoc(), "phoneLinks/abcdefghjk23")); });
+await cannotAfter("nobody lists the links", seedLink(), () => getDocs(collection(adminDoc(), "phoneLinks")));
+
 await env.cleanup();
 console.log(`checks made: ${checks}`);
 if (failures.length > 0) {

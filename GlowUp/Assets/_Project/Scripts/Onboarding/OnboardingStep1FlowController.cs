@@ -84,6 +84,8 @@ namespace GlowUp.Onboarding
         [SerializeField] private int passwordMin = 8;
         [SerializeField] private int passwordMax = 64;
         [SerializeField] private int minimumAge = 13;
+        [Tooltip("An older age is a typing mistake; the database refuses it too (firestore.rules userAgeOk)")]
+        [SerializeField] private int maximumAge = 120;
         [Tooltip("First and last name are needed: together with the middle name they identify the user's record in the database")]
         [SerializeField] private bool requireFirstAndLastName = true;
 
@@ -93,6 +95,7 @@ namespace GlowUp.Onboarding
         [Header("Messages")]
         [SerializeField] private string msgFillAll = "Please complete every required field.";
         [SerializeField] private string msgUnderAge = "You must be at least {0} years old to use Glow Up.";
+        [SerializeField] private string msgTooOld = "Check the year of your birthday: that is more than {0} years ago.";
 
         [Header("Messages: confirming the email ({0} = the email)")]
         [SerializeField] private string msgNeedInternet = "Connect to the internet to confirm your email.";
@@ -350,7 +353,8 @@ namespace GlowUp.Onboarding
 
             bool emailOk = emailFromAccount || (emailCheck != null && emailCheck.Look(T(email)));
             bool namesOk = !requireFirstAndLastName || (T(firstName).Length > 0 && T(lastName).Length > 0);
-            bool dobOk = birthday != null && birthday.Value.HasValue && InputRules.CalculateAge(birthday.Value.Value) >= minimumAge;
+            int ageNow = birthday != null && birthday.Value.HasValue ? InputRules.CalculateAge(birthday.Value.Value) : -1;
+            bool dobOk = ageNow >= minimumAge && ageNow <= maximumAge;
 
             bool ready = pwOk && match && emailOk && namesOk && dobOk && !busy;
             if (continueAnimator != null) continueAnimator.SetReady(ready);
@@ -358,7 +362,7 @@ namespace GlowUp.Onboarding
 
             // a field's reason stands UNDER that field (New13 item 5A); passing messages are toasts (Say); the old free line stays empty
             FieldHint dobHint = birthday != null ? FieldHint.After(birthday.transform, feedbackText) : null;
-            if (dobHint != null) { if (birthday.Value.HasValue && !dobOk) dobHint.Show(FieldHint.Kind.Error, string.Format(msgUnderAge, minimumAge)); else dobHint.Hide(); }
+            if (dobHint != null) { if (birthday.Value.HasValue && !dobOk) dobHint.Show(FieldHint.Kind.Error, ageNow > maximumAge ? string.Format(msgTooOld, maximumAge) : string.Format(msgUnderAge, minimumAge)); else dobHint.Hide(); }
             FieldHint mailHint = email != null && emailCheck != null && !emailCheck.ShowsOwnMessages ? FieldHint.After(email.transform, feedbackText) : null;
             if (mailHint != null) { if (!emailOk && T(email).Length > 0 && Judged(email)) mailHint.Show(FieldHint.Kind.Error, emailCheck.Message); else mailHint.Hide(); }
             // the retyped password: named under its box once judged (the tick "Passwords match" shows the live state)

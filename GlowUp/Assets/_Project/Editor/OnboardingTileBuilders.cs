@@ -39,8 +39,12 @@ namespace GlowUp.EditorTools
             SetArray(group, "tiles", new Object[] { oily, normal, dry, mix });
 
             float y = HeaderBottom + 2 * cellH + gap + 18;
-            var head = TextOn(c.card, "SkinConditionHeaderText", "Chronic Skin Condition Selection (Optional)", HeaderSize, TextAlignmentOptions.MidlineLeft);
-            SetText(head, "Chronic Skin Condition Selection (Optional)", HeaderSize, TextAlignmentOptions.MidlineLeft);
+            // panel revision (22 Nov 2026): help is on the page, the user never has to look it up elsewhere
+            var finder = HelpLink(c.card, "SkinTypeFinderButton", "Find my skin type", y, true);
+            var sources = HelpLink(c.card, "SkinListSourcesButton", "Where lists come from", y, false);
+            y += 132 + 28;
+            var head = TextOn(c.card, "SkinConditionHeaderText", "Chronic Skin Conditions (Optional)", HeaderSize, TextAlignmentOptions.MidlineLeft);
+            SetText(head, "Chronic Skin Conditions (Optional)", HeaderSize, TextAlignmentOptions.MidlineLeft);
             Top(head.transform, c.card, y, 56); Role(head.transform, ThemeRole.Heading); y += 58;
             var desc = TextOn(c.card, "SkinConditionHintText", "", HelperSize, TextAlignmentOptions.MidlineLeft);
             SetText(desc, "Tick any that apply, or add your own below.", HelperSize, TextAlignmentOptions.MidlineLeft);
@@ -55,9 +59,28 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(ctl, "skinTypeGroup", group); SceneBuilderCore.SetField(ctl, "conditions", panel);
             SceneBuilderCore.SetField(ctl, "continueButton", c.cont); SceneBuilderCore.SetField(ctl, "continueAnimator", c.anim);
             SceneBuilderCore.SetField(ctl, "backButton", c.back); SceneBuilderCore.SetField(ctl, "feedbackText", c.feedback);
+            SceneBuilderCore.SetField(ctl, "finderButton", finder); SceneBuilderCore.SetField(ctl, "listSourcesButton", sources);
 
             FinishScene(); SceneBuilderCore.Save(scene);
             Debug.Log("[GlowUp] OnboardingStep2Scene built. Tile = OuterPanel (frame) > InnerPanel (FaceTexture + skin type name); the subtitle sits in the frame; InfoBadge is a hint for new users.");
+        }
+
+        /// <summary>A quiet outlined button on one half of the row at `y` (132 units tall = 44 dp), for help that opens a sheet.</summary>
+        static Button HelpLink(Transform card, string name, string label, float y, bool left)
+        {
+            Button b = SceneBuilderCore.MakeButton(card, name, label, HelperSize, new Vector2(0.5f, 1f), Vector2.zero, new Vector2(100, 132), Color.white);
+            var rt = (RectTransform)b.transform;
+            if (rt.parent != card) rt.SetParent(card, false);
+            rt.anchorMin = new Vector2(left ? 0f : 0.5f, 1f); rt.anchorMax = new Vector2(left ? 0.5f : 1f, 1f); rt.pivot = new Vector2(0.5f, 1f);
+            rt.offsetMin = new Vector2(left ? PadX : 8f, -y - 132f); rt.offsetMax = new Vector2(left ? -8f : -PadX, -y);
+            var img = b.GetComponent<Image>(); StyleRounded(img); SetRadius(img, 66f);
+            SceneBuilderCore.Themed(b.gameObject, ThemeRole.InputBackground);
+            EnsureOutline(b.transform, "Outline", ThemeRole.Accent, 66f);
+            var text = b.GetComponentInChildren<TextMeshProUGUI>();
+            text.text = label; text.fontSize = HelperSize; text.fontStyle = FontStyles.Bold; text.enableWordWrapping = true; text.alignment = TextAlignmentOptions.Center;
+            text.rectTransform.offsetMin = new Vector2(20, 6); text.rectTransform.offsetMax = new Vector2(-20, -6);
+            Role(text.transform, ThemeRole.AccentText);
+            return b;
         }
 
         // =====================================================================================

@@ -184,6 +184,8 @@ namespace GlowUp.Result
         [Tooltip("\"Scan a different product\": a new scan; this result stays in Recent Scans")]
         [SerializeField] private Button differentProductButton;
         [SerializeField] private Button tryOnButton;
+        [Tooltip("Ask about this product: questions answered on the phone from this result (ProductQuestions)")]
+        [SerializeField] private Button askButton;
         [SerializeField] private string scanScene = SceneNames.AiSmartAnalysis;
         [SerializeField] private string tryOnScene = SceneNames.ArTryOn;
         [SerializeField] private string defaultBackScene = SceneNames.Dashboard;
@@ -211,6 +213,7 @@ namespace GlowUp.Result
             if (dermatologistQuietButton != null) dermatologistQuietButton.onClick.AddListener(() => Application.OpenURL(dermatologistUrl));
             if (saferAlternativesButton != null) saferAlternativesButton.onClick.AddListener(ShowAlternatives);
             if (fdaVerificationButton != null) fdaVerificationButton.onClick.AddListener(OpenFdaVerification);
+            if (askButton != null) askButton.onClick.AddListener(OpenQuestions);
             if (alternativesButton != null) alternativesButton.onClick.AddListener(ShowAlternatives);
             if (renameButton != null) renameButton.onClick.AddListener(BeginRename);
             if (renameSaveButton != null) renameSaveButton.onClick.AddListener(SaveRename);
@@ -271,6 +274,7 @@ namespace GlowUp.Result
             if (tryOnButton != null) tryOnButton.interactable = has && ProductScope.CanTryOn(record);      // AR Try-On is for make-up only
             if (allIngredientsButton != null) allIngredientsButton.interactable = has;
             if (fdaVerificationButton != null) fdaVerificationButton.interactable = has;
+            if (askButton != null) askButton.interactable = has;
             if (renameButton != null) renameButton.gameObject.SetActive(false);     // New22: users may not edit product names or details
             if (saferAlternativesButton != null) saferAlternativesButton.gameObject.SetActive(has && IsFlagged(record));
             if (!has)
@@ -315,6 +319,27 @@ namespace GlowUp.Result
         static bool IsFlagged(ScanRecord r) => r != null && (r.status == "caution" || r.status == "harmful");
 
         static void Set(TextMeshProUGUI label, string value) { if (label != null) label.text = value ?? ""; }
+
+        /// <summary>The list of questions; a question opens its answer, with a way back to the list (one sheet, two pages).</summary>
+        void OpenQuestions()
+        {
+            if (record == null) return;
+            ChoiceSheet sheet = ChoiceSheet.Get(askButton != null ? askButton.transform : nameText != null ? nameText.transform : null);
+            if (sheet == null) return;
+            List<ProductQuestions.Item> items = ProductQuestions.For(record);
+            void ShowList()
+            {
+                var choices = new List<ChoiceSheet.Choice>();
+                foreach (ProductQuestions.Item item in items)
+                {
+                    ProductQuestions.Item it = item;
+                    choices.Add(new ChoiceSheet.Choice(it.question, () => sheet.Show(it.question, it.answer,
+                        new List<ChoiceSheet.Choice> { new ChoiceSheet.Choice("Back to the questions", ShowList, true) }, ProductQuestions.Note)));
+                }
+                sheet.Show("Ask about " + record.Title, "", choices, ProductQuestions.Note);
+            }
+            ShowList();
+        }
 
         void OpenFdaVerification()
         {

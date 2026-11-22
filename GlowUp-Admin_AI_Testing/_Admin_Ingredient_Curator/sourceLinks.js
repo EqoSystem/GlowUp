@@ -212,6 +212,13 @@ export function mountSourceLinks({ getName, getCas, getToken, onChange }) {
 
         refresh() { for (const r of rows.values()) paint(r); },
 
+        // Quick fill: a found page becomes a box's source link, only when the box has none yet.
+        setIfEmpty(key, url) {
+            const r = rows.get(key);
+            if (!r || r.input.value.trim() || !/^https:\/\//i.test(String(url || ""))) return;
+            r.input.value = url; r.checked = null; paint(r); onChange();
+        },
+
         firstError() {
             for (const r of rows.values()) { const v = checkSourceUrl(r.input.value); if (!v.ok) return { input: r.input, message: `${r.field.label} source link: ${v.error}` }; }
             return null;

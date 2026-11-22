@@ -63,10 +63,15 @@ import { mountSourceEditor, openApplyWindow } from "./productSources.js";
 import { wireWindow } from "../_Shared/adminWindow.js";
 import { applyRole, brandPageOf, groupByType, bulkAllowed } from "../_Shared/sourceEdit.js";
 import { gs1Hint, VERIFIED_BY_GS1 } from "../_Shared/gs1Hint.js";
+import { mountProductQuickFill } from "./productQuickFill.js";
+import { loadCatalogue } from "../_Shared/quickFill.js";
 
 const OTHER_TYPE = "__other__";
 let paintCounters = () => { };              // character counters under the form fields (charLimit.js)
 const NO_BRAND = "__none__";
+const NEW_BRAND = "__newbrand__";          // Quick fill found a brand that is not listed: it is added when the product is saved
+let pendingBrandName = "";
+let quickFill = { reset() {} };
 const MAX_SHADES = 100;
 const SHADE_STRIP_FROM = 11;
 const MAX_TAGS = 10;
@@ -349,6 +354,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         textarea: el("productIngredientsInput"), search: el("productIngredientSearch"), results: el("productIngredientResults"), pills: el("productIngredientPills"),
         library: () => curatedList,
         create: createIngredientFromPicker
+    });
+    quickFill = mountProductQuickFill({
+        brands: () => everyBrand, products: () => everyProduct,
+        fill: fillProductFromQuick, fillIngredients: (names) => fillProductFromQuick({ ingredients: names }, { partial: true }),
+        openExisting: (product) => { productModal.close(); openProductForm(product); }
     });
     el("productShadeEditor").addEventListener("click", onShadeClick);
     el("productShadeEditor").addEventListener("input", onShadeInput);
@@ -2092,7 +2102,20 @@ async function importFdaCatalogue(byItself) {
 
 
 
+// Brand names from the FDA Philippines list that are not in the inventory yet: typing offers them, spelled as notified.
+async function fillBrandSuggestions() {
+    const list = el("brandNameSuggestions");
+    if (!list || list.dataset.ready) return;
+    list.dataset.ready = "1";
+    const data = await loadCatalogue();
+    const listed = new Set(everyBrand.flatMap((b) => [b.name, ...(b.aliases || [])]).map(compactName));
+    const names = Array.from(new Set((data.products || []).map((p) => String(p.brand || "").trim()).filter(Boolean)))
+        .filter((n) => !listed.has(compactName(n))).sort((a, b) => a.localeCompare(b));
+    list.replaceChildren(...names.map((n) => { const o = document.createElement("option"); o.value = n; return o; }));
+}
+
 function openBrandForm(brand) {
+    fillBrandSuggestions().catch(() => {});
     const form = el("addBrandForm");
     form.reset();
     setFormError(form, "");
@@ -2278,6 +2301,9 @@ function openProductForm(product, brandId) {
     shadeAdding = false; shadeMessage = "";
     sourceEditor.reset();
     sourceEditor.paint();
+    pendingBrandName = "";
+    quickFill.reset();
+    el("productQuickFill").hidden = !!product;
 
     showOtherTypeBox();
     showBrandHint();
@@ -2288,6 +2314,45 @@ function openProductForm(product, brandId) {
     productWindow.reset();
 
     if (brands.length === 0) setFormError(form, "There are no brands yet. Close this, add a brand first, then add the brand's products.");
+}
+
+
+// Puts what Quick fill found into the form. partial: only the parts given are changed (a barcode, a photographed list).
+function fillProductFromQuick(found, { partial } = {}) {
+    const has = (key) => found[key] !== undefined && found[key] !== null && !(Array.isArray(found[key]) && found[key].length === 0) && found[key] !== "";
+    if (has("name")) el("productNameInput").value = found.name.slice(0, 100);
+    if (has("brand") || !partial) {
+        const key = compactName(found.brand || "");
+        const listed = key ? brands.find((b) => [b.name, ...(b.aliases || [])].some((n) => compactName(n) === key)) : null;
+        const select = el("productBrandInput");
+        const stale = select.querySelector(`option[value="${NEW_BRAND}"]`);
+        if (stale) stale.remove();
+        pendingBrandName = "";
+        if (listed) select.value = listed.id;
+        else if (key) {
+            pendingBrandName = found.brand.replace(/\s+/g, " ").trim().slice(0, 60);
+            const option = document.createElement("option");
+            option.value = NEW_BRAND;
+            option.textContent = `New brand: ${pendingBrandName} (added when you save)`;
+            select.appendChild(option);
+            select.value = NEW_BRAND;
+        }
+        showBrandHint();
+        sourceEditor.paint();
+    }
+    if (has("cosmeticType")) {
+        const known = COSMETIC_TYPES.find((t) => sameKey(t) === sameKey(found.cosmeticType));
+        el("productTypeInput").value = known || OTHER_TYPE;
+        el("productTypeOtherInput").value = known ? "" : found.cosmeticType;
+        showOtherTypeBox();
+    }
+    if (has("ingredients")) { el("productIngredientsInput").value = found.ingredients.join(", "); el("productIngredientsInput").dispatchEvent(new Event("input", { bubbles: true })); showIngredientSummary(); }
+    if (has("barcode")) { el("productBarcodeInput").value = found.barcode; showBarcodeCheck(); }
+    if (has("fdaNumber")) el("productFdaInput").value = found.fdaNumber;
+    if (has("imageUrl") && !el("productImageInput").value) el("productImageInput").value = found.imageUrl;
+    if (has("sources")) { assistedProductSources = Array.from(new Set(assistedProductSources.concat(found.sources))).slice(0, 10); sourceEditor.paint(); }
+    showScopeHint();
+    paintCounters();
 }
 
 
@@ -2310,7 +2375,10 @@ function showOtherTypeBox() {
 function showBrandHint() {
     const brand = brands.find((b) => b.id === el("productBrandInput").value);
     const hint = el("productBrandHint");
-    if (brand && brand.status !== "Active") {
+    if (el("productBrandInput").value === NEW_BRAND && pendingBrandName) {
+        hint.textContent = `"${pendingBrandName}" is not listed yet. Saving the product adds the brand too (Active, market Global); edit the brand later for its logo and website.`;
+        hint.className = "field-hint";
+    } else if (brand && brand.status !== "Active") {
         hint.textContent = `This brand is ${brand.status}. The app hides its products until the brand is Active.`;
         hint.className = "field-hint warn";
     } else {
@@ -2547,7 +2615,8 @@ async function saveProduct(event) {
 
     const clean = (id) => el(id).value.replace(/\s+/g, " ").trim();
     const name = clean("productNameInput");
-    const brand = brands.find((b) => b.id === el("productBrandInput").value);
+    const newBrand = el("productBrandInput").value === NEW_BRAND && pendingBrandName ? pendingBrandName : "";
+    let brand = brands.find((b) => b.id === el("productBrandInput").value) || (newBrand ? { id: "", name: newBrand } : null);
     const cosmeticType = el("productTypeInput").value === OTHER_TYPE ? clean("productTypeOtherInput") : el("productTypeInput").value;
     const description = el("productDescInput").value.trim();
     const ingredients = toList(el("productIngredientsInput").value);
@@ -2596,6 +2665,17 @@ async function saveProduct(event) {
 
     setBusy(saveButton, true, "Saving...");
     try {
+        if (newBrand && !brand.id) {
+            const twin = everyBrand.find((b) => [b.name, ...(b.aliases || [])].some((known) => compactName(known) === compactName(newBrand)));
+            if (twin && twin.binned) throw new Error(`"${twin.name}" is in the Recycle bin. Restore the brand from there first.`);
+            const madeBrand = twin ? { id: twin.id } : await addDoc(collection(db, "brands"), {
+                name: newBrand, category: BRAND_CATEGORY, market: "Global", status: "Active", logoUrl: "", imageUrl: "",
+                ...websiteFields("", null), scans: 0, createdAt: serverTimestamp()
+            });
+            brand = { id: madeBrand.id, name: newBrand };
+            data.brandId = brand.id;
+            pendingBrandName = "";
+        }
         if (editingProductId) {
             await updateDoc(doc(db, "products", editingProductId), data);
             notify("Product saved.", "ok");

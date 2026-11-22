@@ -53,6 +53,8 @@ import { loadClassifications, classifications, classificationName, openClassific
 import { makeCombo } from "../_Shared/adminSelect.js";
 import { wireWindow } from "../_Shared/adminWindow.js";
 import { mountSourceLinks, countSaved } from "./sourceLinks.js";
+import { lookupIngredient } from "../_Shared/quickFill.js";
+import { suggestClassification, friendlyStarter, pubchemPage as pubchemCompoundPage } from "../_Shared/smartAdd.js";
 import { SOURCE_LINK_FIELDS } from "../_Shared/fieldSources.js";
 import { FIELD_GUIDE, SOURCES, linksFor, allSourcesFor, addReference, labelBareUrls, pubchemLookupUrl, firstCompoundId, pubchemPageUrl, insertPaste } from "../_Shared/fieldSources.js";
 import { aliasesWithInci, firstAlias, needsClassification, MAX_PURPOSE, CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING } from "../_Shared/classificationRules.js";
@@ -291,6 +293,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         onChange: paintSourceCount
     });
     el("ingredientNameInput").addEventListener("input", () => sourceUi.refresh());
+    el("ingredientQuickBtn").addEventListener("click", quickFillIngredient);
     wirePasteTidy();
     wireLimited();
     el("ingredientAliasesInput").addEventListener("input", showNameClash);
@@ -523,6 +526,39 @@ function manageClassifications() {
         ingredients: () => everyIngredient,
         onChanged: async () => { fillClassInput(el("ingredientClassInput").value); fillClassFilter(); renderIngredients(); datasetChanged("ingredients"); }
     });
+}
+
+// Quick fill: empty boxes only. PubChem gives other names and the technical description (with its page as the source
+// link of those boxes); the classification is chosen from words in the name. The risk level is never set here.
+async function quickFillIngredient() {
+    const status = (text, tone) => { const s = el("ingredientQuickStatus"); s.textContent = text || ""; s.className = "field-hint qf-status" + (tone ? " " + tone : ""); };
+    const name = el("ingredientNameInput").value.replace(/\s+/g, " ").trim();
+    if (name.length < 3) { status("Type the INCI name first (at least 3 letters).", "warn"); el("ingredientNameInput").focus(); return; }
+    const button = el("ingredientQuickBtn");
+    setBusy(button, true, "Looking up...");
+    status(`Looking up "${name}" on PubChem...`);
+    const filled = [];
+    try {
+        const found = await lookupIngredient(name);
+        const empty = (id) => !el(id).value.trim();
+        const put = (id, value, label) => { if (value && empty(id)) { el(id).value = value; el(id).dispatchEvent(new Event("input", { bubbles: true })); filled.push(label); return true; } return false; };
+        if (found && found.cid) {
+            if (put("ingredientAliasesInput", found.aliases.join(", ").slice(0, 300), "other names")) sourceUi.setIfEmpty("aliases", pubchemCompoundPage(found.cid));
+            if (put("ingredientChemInput", found.chemical.slice(0, 600), "what the chemical is")) sourceUi.setIfEmpty("chemicalDescription", pubchemCompoundPage(found.cid));
+        }
+        const select = el("ingredientClassInput");
+        let className = classificationName(select.value) || "";
+        if (!select.value) {
+            const guess = suggestClassification(name, found ? found.chemical : "", classifications());
+            if (guess) { select.value = guess.id; select.dataset.last = guess.id; if (classCombo) classCombo.refresh(); className = guess.name; filled.push(`classification (${guess.name})`); }
+        }
+        if (className && empty("ingredientPurposeInput")) put("ingredientPurposeInput", className.split("/")[0].trim().slice(0, MAX_PURPOSE), "purpose");
+        put("ingredientDescInput", friendlyStarter(name, className.split("/")[0].trim()), "a first plain-words sentence");
+        showNameClash(); paintLimited(); paintSourceCount();
+        if (filled.length === 0) status(found ? "Nothing new to fill: the boxes already have text, or PubChem has nothing more." : `PubChem does not know "${name}". Check the spelling, or fill the boxes by hand.`, "warn");
+        else status(`Filled: ${filled.join(", ")}. Read each box and correct it before saving. Risk level is still yours to set from a source.`, "ok");
+    } catch (error) { status("The look-up did not finish. Check the internet connection and try again.", "warn"); }
+    finally { setBusy(button, false); }
 }
 
 function wirePurposeAndClassification() {
@@ -1445,6 +1481,7 @@ function openIngredientForm(item) {
     }
 
     el("ingredientNameInput").value = item ? item.name : "";
+    el("ingredientQuickStatus").textContent = "";
     paintFieldSources();
     showNameClash();
     fillClassInput(item ? item.classificationId : "");

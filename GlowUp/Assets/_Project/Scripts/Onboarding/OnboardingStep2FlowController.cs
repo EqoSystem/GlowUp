@@ -18,6 +18,11 @@ namespace GlowUp.Onboarding
         [SerializeField] private string nextScene = SceneNames.Onboarding3;
         [SerializeField] private string previousScene = SceneNames.Onboarding1;
         [SerializeField] private string msgChooseSkinType = "Please choose your skin type to continue.";
+        [Header("Help on the page (panel revision, 22 Nov 2026)")]
+        [Tooltip("Not sure? Find your type: three questions that choose the skin type (SkinTypeFinder)")]
+        [SerializeField] private Button finderButton;
+        [Tooltip("Where these lists come from (SkinListSources)")]
+        [SerializeField] private Button listSourcesButton;
 
         void Awake()
         {
@@ -26,6 +31,47 @@ namespace GlowUp.Onboarding
             if (conditions != null) conditions.CustomAdded += t => { if (!OnboardingSession.CustomConditions.Contains(t)) OnboardingSession.CustomConditions.Add(t); };
             if (continueButton != null) continueButton.onClick.AddListener(OnContinue);
             if (backButton != null) backButton.onClick.AddListener(GoBack);
+            if (finderButton != null) finderButton.onClick.AddListener(OpenFinder);
+            if (listSourcesButton != null) listSourcesButton.onClick.AddListener(OpenListSources);
+        }
+
+        /// <summary>Three questions, one per page of the sheet; the result selects the matching tile (the user can still pick another).</summary>
+        void OpenFinder()
+        {
+            ChoiceSheet sheet = ChoiceSheet.Get(finderButton.transform);
+            if (sheet == null) return;
+            var answers = new System.Collections.Generic.List<int>();
+            void Ask(int q)
+            {
+                if (q >= SkinTypeFinder.Questions.Length)
+                {
+                    string type = SkinTypeFinder.Result(answers);
+                    sheet.Show("Your skin type", SkinTypeFinder.Explain(type), new System.Collections.Generic.List<ChoiceSheet.Choice>
+                    {
+                        new ChoiceSheet.Choice("Use " + (type == SkinTypeFinder.Mix ? "Mix" : type), () => { if (skinTypeGroup != null) skinTypeGroup.Select(type, true); sheet.Hide(); Refresh(); }, true),
+                        new ChoiceSheet.Choice("Answer again", () => { answers.Clear(); Ask(0); })
+                    }, SkinTypeFinder.SourceNote);
+                    return;
+                }
+                SkinTypeFinder.Question question = SkinTypeFinder.Questions[q];
+                var choices = new System.Collections.Generic.List<ChoiceSheet.Choice>();
+                for (int a = 0; a < question.answers.Length; a++)
+                {
+                    int pick = a;
+                    choices.Add(new ChoiceSheet.Choice(question.answers[a], () => { while (answers.Count > q) answers.RemoveAt(answers.Count - 1); answers.Add(pick); Ask(q + 1); }));
+                }
+                if (q > 0) choices.Add(new ChoiceSheet.Choice("Back to the previous question", () => { answers.RemoveAt(answers.Count - 1); Ask(q - 1); }));
+                sheet.Show($"Question {q + 1} of {SkinTypeFinder.Questions.Length}", question.text, choices, "General guidance, not a diagnosis.");
+            }
+            Ask(0);
+        }
+
+        void OpenListSources()
+        {
+            ChoiceSheet sheet = ChoiceSheet.Get(listSourcesButton.transform);
+            if (sheet == null) return;
+            sheet.Show(SkinListSources.Title, SkinListSources.Body,
+                new System.Collections.Generic.List<ChoiceSheet.Choice> { new ChoiceSheet.Choice("Got it", sheet.Hide, true) }, SkinListSources.Note);
         }
 
         /// <summary>

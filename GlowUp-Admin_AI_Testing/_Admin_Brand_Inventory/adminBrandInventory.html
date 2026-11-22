@@ -186,7 +186,8 @@
                         <div class="ing-grid">
                             <div class="field half">
                                 <div class="label-row"><label for="brandNameInput">Brand Name <span class="required" aria-hidden="true">*</span></label></div>
-                                <input type="text" id="brandNameInput" maxlength="60" placeholder="e.g., Maybelline" autocomplete="off" aria-required="true" aria-describedby="brandNameHint">
+                                <input type="text" id="brandNameInput" maxlength="60" placeholder="e.g., Maybelline" autocomplete="off" aria-required="true" aria-describedby="brandNameHint" list="brandNameSuggestions">
+                                <datalist id="brandNameSuggestions"></datalist>
                                 <div class="hint-row"><p class="field-hint" id="brandNameHint">Write it exactly as printed on the packaging: the app looks for this name on scanned labels.</p></div>
                             </div>
                             <div class="field half">
@@ -256,7 +257,8 @@
                 <button type="button" class="icon-btn ing-close" data-close aria-label="Close"><i data-icon="x"></i></button>
             </header>
             <nav class="ing-nav" aria-label="Sections of this form">
-                <button type="button" class="ing-nav-btn" data-jump="productSecBasics" aria-current="true">Product</button>
+                <button type="button" class="ing-nav-btn" data-jump="productQuickFill" aria-current="true">Quick fill</button>
+                <button type="button" class="ing-nav-btn" data-jump="productSecBasics">Product</button>
                 <button type="button" class="ing-nav-btn" data-jump="productSecSources">Sources</button>
                 <button type="button" class="ing-nav-btn" data-jump="productSecContents">Ingredients and shades</button>
                 <button type="button" class="ing-nav-btn" data-jump="productSecListing">Listing</button>
@@ -264,6 +266,22 @@
             <form id="productForm" class="modal-form ing-form" novalidate>
                 <div class="ing-body">
                     <p class="review-note" id="productReviewNote" style="display: none;"></p>
+
+                    <section class="ing-section qf-section" id="productQuickFill" aria-labelledby="productQuickFillTitle">
+                        <h4 class="ing-section-title" id="productQuickFillTitle">Quick fill</h4>
+                        <p class="field-hint">Type the product name or the barcode, or scan it. The form fills itself from the FDA Philippines list and Open Beauty Facts. Check it, then save.</p>
+                        <div class="qf-bar">
+                            <input type="text" id="productQuickInput" maxlength="120" placeholder="Product name or barcode, e.g. Superstay Matte Ink or 3600531652300" autocomplete="off" aria-label="Product name or barcode to look up">
+                            <button type="button" class="btn primary" id="productQuickFind">Find</button>
+                        </div>
+                        <div class="qf-tools">
+                            <button type="button" class="btn" id="productQuickScan"><i data-icon="barcode"></i>Scan barcode</button>
+                            <button type="button" class="btn" id="productQuickLabel"><i data-icon="camera"></i>Photo of ingredient list</button>
+                            <button type="button" class="btn" id="productQuickPhone"><i data-icon="phone"></i>Use my phone</button>
+                        </div>
+                        <p class="field-hint qf-status" id="productQuickStatus" role="status" aria-live="polite"></p>
+                        <div class="qf-results" id="productQuickResults"></div>
+                    </section>
 
                     <section class="ing-section" id="productSecBasics" aria-labelledby="productSecBasicsTitle">
                         <h4 class="ing-section-title" id="productSecBasicsTitle">Product</h4>

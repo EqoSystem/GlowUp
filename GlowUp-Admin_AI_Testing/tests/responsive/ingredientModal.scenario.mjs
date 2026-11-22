@@ -96,8 +96,8 @@ try {
         ok(await page.locator("#addIngredientModal .modal-actions").evaluate((n) => { const r = n.getBoundingClientRect(); return Math.abs(r.right - n.closest(".ing-modal").getBoundingClientRect().right) < 40; }), `${tag}: Cancel and Save are at the bottom right`);
         const order = await page.evaluate(() => Array.from(document.querySelectorAll(".ing-modal .modal-actions button")).map((b) => b.textContent.trim()));
         ok(order[0] === "Cancel" && order[1] === "Save Ingredient", `${tag}: Cancel is left of Save`);
-        ok(await page.locator(".ing-nav-btn").count() === 3, `${tag}: three sections in the bar`);
-        ok(await page.evaluate(() => Array.from(document.querySelectorAll(".ing-section-title")).map((h) => h.textContent).join("|") === "What app users read|Other names and sources|How the app judges it"), `${tag}: the three section names are kept`);
+        ok(await page.locator(".ing-nav-btn").count() === 4, `${tag}: Quick fill and three sections in the bar`);
+        ok(await page.evaluate(() => Array.from(document.querySelectorAll(".ing-section-title")).map((h) => h.textContent).join("|") === "Quick fill|What app users read|Other names and sources|How the app judges it"), `${tag}: Quick fill and the three section names are kept`);
 
         ok(await page.evaluate(() => Array.from(document.querySelectorAll(".ing-modal .field")).every((f) => f.firstElementChild && f.firstElementChild.classList.contains("label-row"))), `${tag}: every field starts with a label row`);
         ok(await page.evaluate(() => Array.from(document.querySelectorAll(".ing-modal .label-row > label[for]")).every((l) => document.getElementById(l.htmlFor))), `${tag}: every label points at its box`);
@@ -162,7 +162,7 @@ try {
         ok(await page.evaluate(() => { const a = document.getElementById("secJudgeTitle").getBoundingClientRect().top, b = document.getElementById("ingBody").getBoundingClientRect().top; return a >= b - 1 && a < b + 120; }), "and the section's title is at the top of the body, not hidden");
         await page.evaluate(() => { document.getElementById("ingBody").scrollTop = 0; });
         await page.waitForTimeout(200);
-        ok(await page.locator('.ing-nav-btn[data-jump="secUsers"][aria-current="true"]').count() === 1, "scrolling back up moves the mark back");
+        ok(await page.locator('.ing-nav-btn[data-jump="ingredientQuickFill"][aria-current="true"]').count() === 1, "scrolling back up moves the mark back");
 
 
         const purpose = '[data-field-sources="purpose"]';

@@ -238,6 +238,14 @@ namespace GlowUp.EditorTools
             TextMeshProUGUI shadeCaption = A.Label(shade.transform, "ShadeCaptionText", "Picked for your skin tone.", SmallSize, ThemeRole.SecondaryText, FontRole.Body,
                                                    TextAlignmentOptions.TopLeft, true);
 
+            // 5b. questions about the product, answered on the phone from this result (ProductQuestions; panel revision 22 Nov 2026)
+            GameObject askCard = Section(content, "AskCard", "Questions about this product?");
+            A.Label(askCard.transform, "AskText", "Is it safe for me, which ingredients to watch, is it FDA-registered: tap to see the answers for your profile.",
+                BodySize, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            Button askButton = A.PillButton(askCard.transform, "AskButton", "Ask about this product", ButtonSize, ThemeRole.InputBackground, ThemeRole.MainText, IconFactory.Sparkle);
+            A.Size(askButton, -1, Tap);
+            A.Outline(askButton.transform, ThemeRole.Accent, Tap);
+
             // 6. see a specialist. Two looks of one button: pink when something is flagged, an outline otherwise (so AR Try-On
             //    stays the one pink next step). The controller shows one of them; the pink one is inactive here.
             GameObject specialist = Section(content, "DermatologistCard", "Not sure about this result?");
@@ -304,6 +312,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "brandText", brand); A.Set(controller, "nameText", name); A.Set(controller, "typeText", type); A.Set(controller, "dateText", date);
             A.Set(controller, "typeIcon", typeIcon); A.Set(controller, "status", status); A.Set(controller, "summaryText", summary);
             A.Set(controller, "typeIcons", A.TypeIcons());
+            A.Set(controller, "askButton", askButton);
             A.Set(controller, "skinType", skinType); A.Set(controller, "allergens", allergens); A.Set(controller, "concerns", concerns); A.Set(controller, "age", age);
             A.Set(controller, "chipContent", chipGrid.transform); A.Set(controller, "chipTemplate", chipView);
             A.Set(controller, "ingredientBreakdownText", chipHint);

@@ -14,6 +14,18 @@ console.log("GlowUp Admin Login Portal Initialized.");
 
 const NOT_ADMIN = "This account is not an admin account.";
 
+// The phone scanner page (_Admin_Phone_Scan) sends a signed-out admin here and asks to come back after the log-in.
+// Only that page of this site is accepted, so the log-in page never sends anyone elsewhere.
+function pageAfterLogin() {
+    let wanted = "";
+    try { wanted = sessionStorage.getItem("glowup.afterLogin") || ""; sessionStorage.removeItem("glowup.afterLogin"); } catch (error) { return DASHBOARD_PAGE; }
+    try {
+        const url = new URL(wanted, window.location.href);
+        if (url.origin === window.location.origin && /\/_Admin_Phone_Scan\/phoneScan\.html$/.test(url.pathname)) return url.pathname + url.search;
+    } catch (error) {                                   }
+    return DASHBOARD_PAGE;
+}
+
 document.addEventListener("DOMContentLoaded", () => {
     hydrate(document);
     mountThemeToggle(document.getElementById("loginTools"));
@@ -150,7 +162,7 @@ document.addEventListener("DOMContentLoaded", () => {
     onAuthStateChanged(auth, async (user) => {
         if (!user || signingIn || signupBusy() || (actionActive && document.getElementById("actionView"))) return;
         if (REQUIRE_ADMIN_RECORD && !(await isAdmin(user))) { await signOut(auth); return; }
-        window.location.replace(DASHBOARD_PAGE);
+        window.location.replace(pageAfterLogin());
     });
 
     loginForm.addEventListener("submit", async (e) => {
@@ -176,7 +188,7 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             lockout.clear(email);
             console.log("Admin logged in successfully:", userCredential.user.email);
-            window.location.href = DASHBOARD_PAGE;
+            window.location.href = pageAfterLogin();
         } catch (error) {
             console.error("Login failed:", error && error.code ? error.code : error);
             signingIn = false;
