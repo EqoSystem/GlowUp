@@ -66,6 +66,16 @@ namespace GlowUp.Onboarding
         [SerializeField] private Button openGmailButton;
         [SerializeField] private Button sendAgainButton;
         [SerializeField] private TextMeshProUGUI sendAgainLabel;
+        [Header("The 6-digit code (22 Nov 2026 panel): shown in the pop-up only when GlowUp's server can send it; the link stays the other way")]
+        [SerializeField] private GameObject codeGroup;
+        [SerializeField] private TMP_InputField codeInput;
+        [SerializeField] private Button codeButton;
+        [SerializeField] private string msgCodeChecking = "Checking the code...";
+        [SerializeField] private string msgCodeWrong = "That code is not right. Check the 6 digits, or send a new one.";
+        [SerializeField] private string msgCodeLocked = "Too many wrong codes. Wait about 15 minutes, or use the link in the email.";
+        [SerializeField] private string msgCodeWait = "A code was sent a moment ago. Check the email, or wait a little.";
+        [SerializeField] private string msgCodeFailed = "The code could not be checked. Use the link in the email instead.";
+        [SerializeField] private string msgCodeShort = "Type the 6 digits.";
         [Tooltip("In the pop-up: \"Use another email\"")]
         [SerializeField] private Button changeEmailButton;
         [Tooltip("The small link under the email field that shows once the account exists: \"Use another email\"")]
@@ -144,6 +154,9 @@ namespace GlowUp.Onboarding
             if (confirmedButton != null) confirmedButton.onClick.AddListener(() => { _ = LookWhetherConfirmed(true); });
             if (openGmailButton != null) openGmailButton.onClick.AddListener(OpenGmail);
             if (sendAgainButton != null) sendAgainButton.onClick.AddListener(() => { _ = SendAgain(); });
+            if (codeInput != null) { codeInput.contentType = TMP_InputField.ContentType.IntegerNumber; codeInput.characterLimit = 6; }
+            if (codeButton != null) codeButton.onClick.AddListener(() => { _ = VerifyCode(); });
+            if (codeGroup != null) codeGroup.SetActive(false);
             if (changeEmailButton != null) changeEmailButton.onClick.AddListener(AskUseAnotherEmail);
             if (useAnotherEmailButton != null) { useAnotherEmailButton.onClick.AddListener(AskUseAnotherEmail); useAnotherEmailButton.gameObject.SetActive(false); }
             HideRemovedUsernameRows();
@@ -476,6 +489,38 @@ namespace GlowUp.Onboarding
             nextLook = Time.unscaledTime + Mathf.Max(1f, lookEverySeconds);
             ShowSendAgain();
             if (confirmPanel != null) confirmPanel.Show();
+            _ = OfferCode();
+        }
+
+        /// <summary>Asks the server to mail the 6-digit code; the code box shows only when it did (the server may not be set up for it, or the phone is offline).</summary>
+        async Task OfferCode()
+        {
+            if (codeGroup == null) return;
+            codeGroup.SetActive(false);
+            var outcome = await GlowUp.Security.EmailOtpClient.Send();
+            if (this == null) return;
+            if (outcome == GlowUp.Security.EmailOtpClient.Outcome.Ok || outcome == GlowUp.Security.EmailOtpClient.Outcome.Wait)
+            {
+                codeGroup.SetActive(true);
+                if (codeInput != null) codeInput.text = "";
+                if (outcome == GlowUp.Security.EmailOtpClient.Outcome.Wait && confirmStatusText != null) confirmStatusText.text = msgCodeWait;
+            }
+        }
+
+        async Task VerifyCode()
+        {
+            string code = codeInput != null ? codeInput.text.Trim() : "";
+            if (code.Length != 6) { if (confirmStatusText != null) confirmStatusText.text = msgCodeShort; return; }
+            if (codeButton != null) codeButton.interactable = false;
+            if (confirmStatusText != null) confirmStatusText.text = msgCodeChecking;
+            var outcome = await GlowUp.Security.EmailOtpClient.Verify(code);
+            if (this == null) return;
+            if (codeButton != null) codeButton.interactable = true;
+            if (outcome == GlowUp.Security.EmailOtpClient.Outcome.Ok) { await LookWhetherConfirmed(true); return; }    // the server marked the email confirmed: the usual look finds it
+            if (confirmStatusText != null)
+                confirmStatusText.text = outcome == GlowUp.Security.EmailOtpClient.Outcome.Wrong ? msgCodeWrong
+                    : outcome == GlowUp.Security.EmailOtpClient.Outcome.Locked ? msgCodeLocked
+                    : outcome == GlowUp.Security.EmailOtpClient.Outcome.Wait ? msgCodeWait : msgCodeFailed;
         }
 
         /// <summary>Asks whether the email was confirmed. `said` = the user tapped "I have confirmed" (then "not yet" is said too).</summary>
@@ -502,7 +547,7 @@ namespace GlowUp.Onboarding
                 if (confirmStatusText != null) confirmStatusText.text = msgSending;
                 SignUpAccount.Result sent = await SignUpAccount.SendConfirmation();
                 if (this == null) return;
-                if (sent.Ok) sentAt = Time.unscaledTime;
+                if (sent.Ok) { sentAt = Time.unscaledTime; _ = OfferCode(); }
                 if (confirmStatusText != null) confirmStatusText.text = sent.Ok ? msgSentAgain : WordsFor(sent);
             }
             finally { if (this != null) { busy = false; ShowSendAgain(); } }

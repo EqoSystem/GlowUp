@@ -1,9 +1,12 @@
 // 6-digit e-mail code for the admin sign-up (and the app's sign-up), sent from a Gmail address.
 //   POST { action: "send",   idToken }        -> the signed-in, not yet confirmed account gets a 6-digit code by e-mail
 //   POST { action: "verify", idToken, code }  -> a right code marks the account's e-mail as confirmed (Firebase Auth emailVerified = true)
-// No code is stored: it is an HMAC of the account id and a 10-minute window (a code is good for the window it was made in and the one after).
-// Wrong guesses are counted per account in Firestore (otpAttempts/{uid}, written only by this function with the service account; the rules give
-// clients no access), 5 per 15 minutes; when the count cannot be read or written the answer is "no" (fail closed).
+// No code is stored: it is an HMAC of the account id, the account's e-mail address and a 10-minute window (a code is good for the window it was
+// made in and the one after; a code made for one e-mail address is useless once the account has another).
+// Every count is an ATOMIC Firestore increment (documents:commit with a field transform) written only by this function with the service account
+// (the rules give clients no access): wrong guesses are counted BEFORE the code is looked at, 5 per account per 10-minute window; e-mails sent
+// are counted per account (1 per 45 s, 5 per hour), per recipient address (5 per hour) and in total (150 per hour). When a count cannot be
+// written the answer is "no" (fail closed). Free plan: a few small writes per request, far inside the daily free quota.
 // Environment variables (Vercel only, never in the repository): GLOWUP_OTP_SECRET (long random text), GMAIL_USER, GMAIL_APP_PASSWORD
 // (a Google "app password" of that Gmail account), FIREBASE_SERVICE_ACCOUNT (the service-account JSON, one line).
 // Until all of them exist the function answers 503 "not set up" and the pages keep using Firebase's confirmation link.
@@ -14,11 +17,9 @@ const PROJECT = "glowup-admin-portal";
 const FIREBASE_WEB_KEY = "AIzaSyAkb23xQ69a2Q4tpucGty9yDEoH0ab1JDM";
 const KEY_REFERER = "https://glowup-admin-snowy.vercel.app/";
 const WINDOW_MS = 10 * 60 * 1000;
-const MAX_WRONG = 5, LOCK_MS = 15 * 60 * 1000;
-const SEND_EVERY_MS = 45 * 1000, SEND_PER_HOUR = 5;
+const MAX_WRONG = 5;
+const SEND_EVERY_MS = 45 * 1000, SEND_PER_HOUR = 5, SEND_PER_ADDRESS_HOUR = 5, SEND_TOTAL_HOUR = 150;
 const MAX_BODY = 8 * 1024;
-
-const sentAt = new Map();              // uid -> [timestamps] (best effort per instance; the e-mail service has its own limits)
 
 function send(res, status, body) {
     res.statusCode = status;
@@ -34,18 +35,18 @@ async function timed(url, options, seconds) {
 }
 
 // ---- the code ----
-function codeFor(secret, uid, windowIndex) {
-    const h = crypto.createHmac("sha256", secret).update(uid + "|" + windowIndex).digest();
+function codeFor(secret, uid, email, windowIndex) {
+    const h = crypto.createHmac("sha256", secret).update(uid + "|" + String(email || "").toLowerCase() + "|" + windowIndex).digest();
     return String(h.readUInt32BE(0) % 1000000).padStart(6, "0");
 }
 function currentWindow(now) { return Math.floor((now === undefined ? Date.now() : now) / WINDOW_MS); }
-function codeIsRight(secret, uid, typed, now) {
+function codeIsRight(secret, uid, email, typed, now) {
     const t = String(typed || "").trim();
     if (!/^\d{6}$/.test(t)) return false;
     const w = currentWindow(now);
     let ok = false;
     for (const idx of [w, w - 1]) {
-        const a = Buffer.from(codeFor(secret, uid, idx)), b = Buffer.from(t);
+        const a = Buffer.from(codeFor(secret, uid, email, idx)), b = Buffer.from(t);
         if (a.length === b.length && crypto.timingSafeEqual(a, b)) ok = true;
     }
     return ok;
@@ -107,29 +108,19 @@ async function signedInUser(idToken) {
     return u && u.localId && u.email && !u.disabled ? { uid: u.localId, email: u.email, verified: u.emailVerified === true } : null;
 }
 
-// wrong guesses: { count, since } in otpAttempts/{uid}
-async function attemptsAllow(token, uid, now) {
-    const url = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents/otpAttempts/${encodeURIComponent(uid)}`;
-    const r = await timed(url, { headers: { Authorization: "Bearer " + token } }, 5);
-    if (r.status === 404) return true;
-    if (!r.ok) return false;                                                   // fail closed
-    const f = (await r.json()).fields || {};
-    const count = Number((f.count || {}).integerValue || 0), since = Number((f.since || {}).integerValue || 0);
-    return !(count >= MAX_WRONG && now - since < LOCK_MS);
-}
-async function attemptsAdd(token, uid, now, reset) {
-    const base = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents/otpAttempts/${encodeURIComponent(uid)}`;
-    let count = 1, since = now;
-    if (!reset) {
-        const r = await timed(base, { headers: { Authorization: "Bearer " + token } }, 5);
-        if (r.ok) {
-            const f = (await r.json()).fields || {};
-            const c = Number((f.count || {}).integerValue || 0), s = Number((f.since || {}).integerValue || 0);
-            if (now - s < LOCK_MS) { count = c + 1; since = s; }
-        }
-    } else count = 0;
-    await timed(base, { method: "PATCH", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
-        body: JSON.stringify({ fields: { count: { integerValue: String(count) }, since: { integerValue: String(since) } } }) }, 5);
+// An atomic counter: otpCounters/{id} gets +1 in ONE commit (the field transform creates the document when it is not there) and the new value comes
+// back in the same answer, so two requests at the same moment can never both see "4". Returns the new count, or 0 when the write failed (callers say no).
+async function bump(token, id) {
+    const name = `projects/${PROJECT}/databases/(default)/documents/otpCounters/${encodeURIComponent(id)}`;
+    try {
+        const r = await timed(`https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents:commit`,
+            { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+              body: JSON.stringify({ writes: [{ transform: { document: name, fieldTransforms: [{ fieldPath: "count", increment: { integerValue: "1" } }] } }] }) }, 5);
+        if (!r.ok) return 0;
+        const j = await r.json();
+        const v = (((j.writeResults || [])[0] || {}).transformResults || [])[0];
+        return v && v.integerValue ? Number(v.integerValue) : 0;
+    } catch (e) { return 0; }
 }
 
 async function markVerified(token, uid) {
@@ -166,22 +157,28 @@ module.exports = async (req, res) => {
         if (user.verified) return send(res, 200, { ok: true, already: true });
         const now = Date.now();
 
+        const hour = Math.floor(now / 3600000), win = currentWindow(now);
         if (body.action === "send") {
-            const list = (sentAt.get(user.uid) || []).filter((t) => now - t < 3600000);
-            if (list.length && now - list[list.length - 1] < SEND_EVERY_MS) return send(res, 429, { error: "wait", seconds: Math.ceil((SEND_EVERY_MS - (now - list[list.length - 1])) / 1000) });
-            if (list.length >= SEND_PER_HOUR) return send(res, 429, { error: "too-many" });
-            list.push(now); sentAt.set(user.uid, list); if (sentAt.size > 5000) sentAt.delete(sentAt.keys().next().value);
-            const code = codeFor(cfg.secret, user.uid, currentWindow(now));
+            const token = await serviceToken(cfg.account);
+            const addressKey = crypto.createHash("sha256").update(user.email.toLowerCase()).digest("hex").slice(0, 32);
+            const fast = await bump(token, `fast_${user.uid}_${Math.floor(now / SEND_EVERY_MS)}`);
+            if (fast === 0) return send(res, 502, { error: "server" });
+            if (fast > 1) return send(res, 429, { error: "wait", seconds: Math.ceil(SEND_EVERY_MS / 1000) });
+            const mine = await bump(token, `hour_${user.uid}_${hour}`), theirs = await bump(token, `addr_${addressKey}_${hour}`), all = await bump(token, `all_${hour}`);
+            if (mine === 0 || theirs === 0 || all === 0) return send(res, 502, { error: "server" });
+            if (mine > SEND_PER_HOUR || theirs > SEND_PER_ADDRESS_HOUR || all > SEND_TOTAL_HOUR) return send(res, 429, { error: "too-many" });
+            const code = codeFor(cfg.secret, user.uid, user.email, win);
             await smtpSend({ user: cfg.user, pass: cfg.pass, to: user.email, subject: "Your GlowUp code: " + code,
                 text: "Your GlowUp confirmation code is " + code + ".\r\nIt works for about 10 minutes. If you did not ask for it, ignore this e-mail: nobody can use it without your password.\r\n" });
             return send(res, 200, { ok: true });
         }
         if (body.action === "verify") {
             const token = await serviceToken(cfg.account);
-            if (!(await attemptsAllow(token, user.uid, now))) return send(res, 429, { error: "locked" });
-            if (!codeIsRight(cfg.secret, user.uid, body.code, now)) { await attemptsAdd(token, user.uid, now, false); return send(res, 200, { ok: false }); }
+            const tries = await bump(token, `try_${user.uid}_${win}`);          // counted first: a guess is spent whether or not it is right
+            if (tries === 0) return send(res, 502, { error: "server" });
+            if (tries > MAX_WRONG) return send(res, 429, { error: "locked" });
+            if (!codeIsRight(cfg.secret, user.uid, user.email, body.code, now)) return send(res, 200, { ok: false });
             if (!(await markVerified(token, user.uid))) return send(res, 502, { error: "could-not-confirm" });
-            await attemptsAdd(token, user.uid, now, true).catch(() => { });
             return send(res, 200, { ok: true });
         }
         return send(res, 400, { error: "action" });
@@ -190,6 +187,7 @@ module.exports = async (req, res) => {
     }
 };
 module.exports.codeFor = codeFor;
+module.exports.bump = bump;
 module.exports.codeIsRight = codeIsRight;
 module.exports.smtpSend = smtpSend;
 module.exports.config = { api: { bodyParser: { sizeLimit: "8kb" } } };

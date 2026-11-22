@@ -41,6 +41,15 @@ namespace GlowUp.Security
             return true;
         }
 
+        /// <summary>The Firebase sign-in token, or null when nobody is signed in with Firebase.</summary>
+        public static async Task<string> TokenOrNull()
+        {
+            FirebaseUser user = null;
+            try { user = FirebaseAuth.DefaultInstance?.CurrentUser; } catch (Exception) { }
+            if (user == null) return null;
+            try { return await user.TokenAsync(false); } catch (Exception) { return null; }
+        }
+
         public const string NotSignedIn = "Sign in again to use the AI analysis.";
     }
 }
