@@ -39,6 +39,30 @@ function codeFor(secret, uid, email, windowIndex) {
     const h = crypto.createHmac("sha256", secret).update(uid + "|" + String(email || "").toLowerCase() + "|" + windowIndex).digest();
     return String(h.readUInt32BE(0) % 1000000).padStart(6, "0");
 }
+// The one-click link in the same e-mail: HMAC of the account id, the e-mail and the window, so only the mailbox owner has it.
+function linkMac(secret, uid, email, windowIndex) {
+    return crypto.createHmac("sha256", secret).update("link|" + uid + "|" + String(email || "").toLowerCase() + "|" + windowIndex).digest("base64url");
+}
+function linkIsRight(secret, uid, email, windowIndex, mac, now) {
+    const w = currentWindow(now);
+    if (windowIndex !== w && windowIndex !== w - 1) return false;
+    const a = Buffer.from(linkMac(secret, uid, email, windowIndex)), b = Buffer.from(String(mac || ""));
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+function parseLink(t) {
+    const m = /^([A-Za-z0-9_-]{3,128})[.](\d{1,10})[.]([A-Za-z0-9_-]{40,50})$/.exec(String(t || ""));
+    return m ? { uid: m[1], windowIndex: Number(m[2]), mac: m[3] } : null;
+}
+const escapeHtml = (v) => String(v).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function page(res, status, title, text, form) {
+    res.statusCode = status;
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "no-store");
+    res.end("<!doctype html><html lang=en><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'><title>" + escapeHtml(title) + "</title>" +
+        "<body style='font-family:system-ui,sans-serif;max-width:26rem;margin:12vh auto;padding:0 1.2rem;text-align:center;color:#2a2a2a'>" +
+        "<h1 style='font-size:1.4rem'>" + escapeHtml(title) + "</h1><p>" + escapeHtml(text) + "</p>" + (form || "") + "</body></html>");
+}
+
 function currentWindow(now) { return Math.floor((now === undefined ? Date.now() : now) / WINDOW_MS); }
 function codeIsRight(secret, uid, email, typed, now) {
     const t = String(typed || "").trim();
@@ -172,11 +196,34 @@ async function readBody(req) {
 
 module.exports = async (req, res) => {
     try {
-        if (req.method !== "POST") return send(res, 405, { error: "Use POST." });
         const cfg = config();
+        if (req.method === "GET") {
+            // opening the link only SHOWS a button (a mail scanner that opens links confirms nothing); the button posts the same token back
+            const link = parseLink(req.query && req.query.t);
+            if (!cfg || !link) return page(res, 400, "This link does not work", "Ask for a new code on the sign-up page.");
+            return page(res, 200, "Confirm your e-mail", "Press the button to confirm your GlowUp e-mail address.",
+                "<form method=post action='/api/email-otp'><input type=hidden name=t value='" + escapeHtml(req.query.t) + "'><button style='font-size:1.1rem;padding:.7rem 1.6rem;border-radius:2rem;border:0;background:#d96a87;color:#fff'>Confirm my e-mail</button></form>");
+        }
+        if (req.method !== "POST") return send(res, 405, { error: "Use POST." });
         if (!cfg) return send(res, 503, { error: "not-set-up", problems: configProblems() });
         const text = await readBody(req);
         if (text === null || text.length > MAX_BODY) return send(res, 413, { error: "too-large" });
+        if (/^t=/.test(text)) {                                              // the button of the link page
+            const link = parseLink(new URLSearchParams(text).get("t"));
+            if (!link) return page(res, 400, "This link does not work", "Ask for a new code on the sign-up page.");
+            const token = await serviceToken(cfg.account);
+            const found = await timed(`https://identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts:lookup`,
+                { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ localId: [link.uid] }) }, 6);
+            const account = found.ok ? (((await found.json()).users || [])[0]) : null;
+            if (!account || !account.email || account.disabled) return page(res, 400, "This link does not work", "Ask for a new code on the sign-up page.");
+            if (account.emailVerified === true) return page(res, 200, "Already confirmed", "Your e-mail is confirmed. You can close this tab.");
+            const tries = await bump(token, `link_${link.uid}_${currentWindow(Date.now())}`);
+            if (tries === 0) return page(res, 502, "Try again", "The server could not answer. Open the link again in a moment.");
+            if (tries > 10) return page(res, 429, "Too many tries", "Wait a few minutes, then ask for a new code.");
+            if (!linkIsRight(cfg.secret, link.uid, account.email, link.windowIndex, link.mac, Date.now())) return page(res, 400, "This link has expired", "Ask for a new code on the sign-up page.");
+            if (!(await markVerified(token, link.uid))) return page(res, 502, "Try again", "The e-mail could not be confirmed. Open the link again in a moment.");
+            return page(res, 200, "E-mail confirmed", "Thank you. You can close this tab: the sign-up page you left open goes on by itself.");
+        }
         let body; try { body = JSON.parse(text || "{}"); } catch (e) { return send(res, 400, { error: "unreadable" }); }
         const user = await signedInUser(String(body.idToken || ""));
         if (!user) return send(res, 401, { error: "sign-in" });
@@ -194,8 +241,9 @@ module.exports = async (req, res) => {
             if (mine === 0 || theirs === 0 || all === 0) return send(res, 502, { error: "server" });
             if (mine > SEND_PER_HOUR || theirs > SEND_PER_ADDRESS_HOUR || all > SEND_TOTAL_HOUR) return send(res, 429, { error: "too-many" });
             const code = codeFor(cfg.secret, user.uid, user.email, win);
+            const link = "https://glowupapp.xyz/api/email-otp?t=" + user.uid + "." + win + "." + linkMac(cfg.secret, user.uid, user.email, win);
             await smtpSend({ user: cfg.user, pass: cfg.pass, to: user.email, subject: "Your GlowUp code: " + code,
-                text: "Your GlowUp confirmation code is " + code + ".\r\nIt works for about 10 minutes. If you did not ask for it, ignore this e-mail: nobody can use it without your password.\r\n" });
+                text: "Your GlowUp confirmation code is " + code + ". Type it on the sign-up page, or open this link in any tab or on your phone to confirm without typing: " + link + " .\r\nIt works for about 10 minutes. If you did not ask for it, ignore this e-mail: nobody can use it without your password.\r\n" });
             return send(res, 200, { ok: true });
         }
         if (body.action === "verify") {
@@ -213,6 +261,9 @@ module.exports = async (req, res) => {
     }
 };
 module.exports.codeFor = codeFor;
+module.exports.linkMac = linkMac;
+module.exports.linkIsRight = linkIsRight;
+module.exports.parseLink = parseLink;
 module.exports.bump = bump;
 module.exports.codeIsRight = codeIsRight;
 module.exports.smtpSend = smtpSend;

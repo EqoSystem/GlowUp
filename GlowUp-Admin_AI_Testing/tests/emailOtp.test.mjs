@@ -58,7 +58,7 @@ const call = (method, body) => new Promise((resolve) => {
 });
 delete process.env.GLOWUP_OTP_SECRET;
 check("not set up: 503", (await call("POST", { action: "send" })).status === 503);
-check("GET refused", (await call("GET")).status === 405);
+check("PUT refused", (await call("PUT")).status === 405);
 process.env.GLOWUP_OTP_SECRET = secret; process.env.GMAIL_USER = "me@gmail.com"; process.env.GMAIL_APP_PASSWORD = "pw";
 process.env.FIREBASE_SERVICE_ACCOUNT = JSON.stringify({ client_email: "x@y.iam", private_key: "k" });
 globalThis.fetch = async () => ({ ok: false, status: 400, json: async () => ({}) });
@@ -108,6 +108,25 @@ check("bad sign-in: 401", (await call("POST", { action: "send", idToken: "t" }))
     user = { localId: "uidX", email: "me@mail.com", emailVerified: true };
     check("an already confirmed account is told so", (await good("verify", { code: "000000" })).body.already === true);
     tlsMod.connect = realConnect;
+}
+// the one-click link
+{
+    const w = Math.floor(now / 600000), mac = mod.linkMac(secret, "uid1", "a@b.com", w);
+    const t = "uid1." + w + "." + mac;
+    const parsed = mod.parseLink(t);
+    check("link token parses", parsed && parsed.uid === "uid1" && parsed.windowIndex === w && parsed.mac === mac);
+    check("junk link token is refused", mod.parseLink("x") === null && mod.parseLink("uid1.1.short") === null && mod.parseLink("../..") === null);
+    check("link works for its e-mail", mod.linkIsRight(secret, "uid1", "A@b.com", w, mac, now));
+    check("link is tied to the e-mail", !mod.linkIsRight(secret, "uid1", "other@b.com", w, mac, now));
+    check("link is tied to the account", !mod.linkIsRight(secret, "uid2", "a@b.com", w, mac, now));
+    check("link works in the next window, dead after", mod.linkIsRight(secret, "uid1", "a@b.com", w, mac, now + 600000) && !mod.linkIsRight(secret, "uid1", "a@b.com", w, mac, now + 1300000));
+    check("a code is not a link", !mod.linkIsRight(secret, "uid1", "a@b.com", w, mod.codeFor(secret, "uid1", "a@b.com", w), now));
+    const get = (q) => new Promise((resolve) => { const res = { headers: {}, setHeader(k, v) { this.headers[k] = v; }, end(t) { resolve({ status: this.statusCode, type: this.headers["Content-Type"], html: t }); } }; mod({ method: "GET", headers: {}, query: q }, res); });
+    const bad = await get({ t: "nope" });
+    check("GET with a bad token: 400 page", bad.status === 400 && /html/.test(bad.type));
+    const good = await get({ t });
+    check("GET with a good token only shows a button (no confirmation)", good.status === 200 && good.html.includes("<form method=post") && good.html.includes("Confirm my e-mail"));
+    check("the token is escaped in the page", !(await get({ t: "\"><script>" })).html.includes("<script>"));
 }
 console.log(fail === 0 ? `ALL PASSED  (checks made: ${pass})` : `${fail} FAILED  (checks made: ${pass + fail})`);
 process.exit(fail ? 1 : 0);
