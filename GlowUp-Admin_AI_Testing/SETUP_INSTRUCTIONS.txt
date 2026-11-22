@@ -1,0 +1,130 @@
+GLOWUP - SETUP ON ANOTHER COMPUTER
+==================================
+
+GlowUp has two parts:
+
+  1. ADMIN WEBSITE   folder "GlowUp-Admin"   runs in Docker (Parts A to C)
+  2. SCANNER APP     folder "GlowUp"         Unity project, builds an Android APK (Part D)
+                                             Docker cannot run the app.
+
+Both parts use one Firestore database. Part C makes your own, so you do
+not touch the original owner's data.
+
+
+WHAT YOU RECEIVE
+----------------
+  GlowUp-Admin.zip          website, Dockerfile, docker-compose.yml
+  GlowUp-App.zip            Unity app
+  SecureProfileStore.cs     private file for the app (sent to you separately)
+  SETUP_INSTRUCTIONS.txt    this file
+
+
+PART A - INSTALL
+----------------
+  1. Install Docker Desktop from docker.com.
+  2. Start Docker Desktop. Wait until it says it is running.
+  3. Make a free Google account if you have none (needed for Firebase).
+
+
+PART B - START THE WEBSITE
+--------------------------
+  1. Unzip GlowUp-Admin.zip.
+  2. Open the folder "GlowUp-Admin". It contains the file "Dockerfile".
+  3. Click the address bar of the folder, type  cmd  and press Enter.
+  4. In the black window type:
+
+         docker compose up --build
+
+     The first time takes one or two minutes.
+
+  5. Open a browser and go to:
+
+         http://localhost:8080
+
+  6. To stop: press Ctrl+C in the black window.
+     To start again later:  docker compose up
+
+  If docker compose does not work, use these two lines instead:
+
+         docker build -t glowup-admin .
+         docker run -p 8080:80 glowup-admin
+
+  Note: only the web pages run in Docker. The folder "api" holds Vercel
+  functions (source check, archive purge, app AI). They do not run in
+  Docker, so those features do not work locally.
+
+
+PART C - YOUR OWN DATABASE (Firebase, free plan only)
+-----------------------------------------------------
+Until you finish this part, the website uses the original owner's
+database. Do this before you create accounts.
+
+  1. Go to console.firebase.google.com and click "Add project".
+  2. Build > Authentication > Get started.
+     Turn on "Email/Password".
+  3. Build > Firestore Database > Create database.
+     Choose production mode.
+  4. Project settings (gear icon) > Your apps > add a Web app.
+     Copy the values of "firebaseConfig".
+  5. Open this file in Notepad:
+
+         _Database\firebase-console.js
+
+     Replace the block "const firebaseConfig = { ... }" with your values.
+     Save.
+  6. Publish the security rules:
+     Firestore Database > Rules tab. Delete what is there. Paste the whole
+     content of the file "firestore.rules". Click Publish.
+  7. Restart the website in the black window:
+
+         docker compose up --build
+
+  8. Open http://localhost:8080 and create an account.
+  9. Make yourself admin:
+       - Firebase console > Authentication > copy your "User UID".
+       - Firestore Database > Start collection > name:  admins
+       - Document ID: paste your User UID. Add any field, for example
+         email = your e-mail. Save.
+       - Reload the website and sign in.
+
+  Do NOT use Firebase Storage. It needs a paid plan and is not needed.
+
+  Your database starts empty. Add brands, products and ingredients with
+  the import feature in the admin pages. The file format is described in
+  IMPORT_FORMAT.md. The data layout is in FIRESTORE_SCHEMA.md.
+
+
+PART D - THE UNITY APP
+----------------------
+  1. Install Unity Hub. Through it, install Unity 2022.3.62f3 with the
+     modules "Android Build Support", "OpenJDK" and "Android SDK & NDK".
+  2. Unzip GlowUp-App.zip.
+  3. In Unity Hub click Add and choose the folder "GlowUp".
+     The first opening takes a long time (Unity rebuilds its Library).
+  4. Copy the file SecureProfileStore.cs (sent to you separately) into:
+
+         GlowUp\Assets\_Project\Scripts\Security\
+
+     Without it the project does not compile.
+  5. In your Firebase project add an Android app. Use the package name
+     from Unity: Edit > Project Settings > Player > Android > Package Name.
+     Download "google-services.json" and replace:
+
+         GlowUp\Assets\google-services.json
+         GlowUp\Assets\StreamingAssets\google-services-desktop.json
+
+     (the second file is the desktop copy of the same settings).
+  6. For Google sign-in: turn it on in Firebase Authentication and add the
+     SHA-1 of your debug key to the Android app.
+  7. Unity: File > Build Settings > Android > Build.
+     Install the APK on a phone.
+
+  If a screen looks wrong, rebuild its scene from the builder menu entries
+  in the Unity menu bar (the code is in Assets\_Project\Editor).
+
+
+PLEASE DO NOT
+-------------
+  - Do not share your Firebase admin passwords, ".env" files or
+    SecureProfileStore.cs.
+  - Do not put any API key into the Docker image.
