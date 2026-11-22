@@ -17,7 +17,12 @@ async function adminUid(idToken) {
     if (!user || !user.localId) return "";
     const entry = await withTimeout(`https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents/admins/${encodeURIComponent(user.localId)}`,
         { headers: { Authorization: "Bearer " + idToken } }, 10);
-    return entry.ok ? user.localId : "";
+    if (!entry.ok) return "";
+    // an archived or binned admin keeps the record but loses access (same as isAdmin() in firestore.rules)
+    const f = ((await entry.json().catch(() => ({}))) || {}).fields || {};
+    const status = (f.status && f.status.stringValue) || "active";
+    if (status !== "active" || (f.inBin && f.inBin.booleanValue === true)) return "";
+    return user.localId;
 }
 
 module.exports = { adminUid };
