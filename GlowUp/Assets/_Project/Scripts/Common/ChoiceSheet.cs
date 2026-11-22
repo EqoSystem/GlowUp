@@ -25,13 +25,16 @@ namespace GlowUp.Common
             public Choice(string label, Action run, bool primary = false) { this.label = label; this.run = run; this.primary = primary; }
         }
 
-        RectTransform layer, card, list;
-        Image dim, cardBack, grip;
-        TextMeshProUGUI title, body, foot;
-        Button close;
-        CanvasGroup group;
-        ScrollRect scroll;
-        bool open;
+        // Every part is a serialized field: the sheet is made once in the scene by the scene builders (object "ChoiceSheetLayer" under the
+        // canvas, switched off), so it can be seen and restyled in the Unity Editor. Run time only fills it in; a scene that has none still gets
+        // one built on first use (the old way), so nothing breaks in a scene that was not rebuilt yet.
+        [SerializeField] RectTransform layer, card, list;
+        [SerializeField] Image dim, cardBack, grip;
+        [SerializeField] TextMeshProUGUI title, body, foot;
+        [SerializeField] Button close, backdrop;
+        [SerializeField] CanvasGroup group;
+        [SerializeField] ScrollRect scroll;
+        bool open, hooked;
         float shownAt;
         Action closed;
         readonly List<GameObject> rows = new List<GameObject>();
@@ -48,6 +51,25 @@ namespace GlowUp.Common
             if (known != null && known.TryGetComponent(out ChoiceSheet found)) return found;
             return Build(top);
         }
+
+        /// <summary>The sheet under this canvas root: the one that is already there, or a new one (used by the scene builders and by Get).</summary>
+        public static ChoiceSheet BuildInto(Transform canvasRoot)
+        {
+            Transform known = canvasRoot.Find("ChoiceSheetLayer");
+            if (known != null && known.TryGetComponent(out ChoiceSheet found)) return found;
+            return Build(canvasRoot);
+        }
+
+        void EnsureHooked()
+        {
+            if (hooked) return;
+            hooked = true;
+            if (backdrop != null) backdrop.onClick.AddListener(() => { if (Time.unscaledTime - shownAt > 0.35f) Hide(); });
+            if (close != null) close.onClick.AddListener(Hide);
+        }
+
+        /// <summary>Called by the swipe-down handler: the card follows the finger.</summary>
+        public void SetCardOffset(float down) { if (card != null) card.anchoredPosition = new Vector2(0f, -down); }
 
         static ChoiceSheet Build(Transform canvasRoot)
         {
@@ -67,7 +89,7 @@ namespace GlowUp.Common
             sheet.dim.color = new Color(0f, 0f, 0f, 0.5f);
             var backdrop = layer.gameObject.AddComponent<Button>();
             backdrop.transition = Selectable.Transition.None;
-            backdrop.onClick.AddListener(() => { if (Time.unscaledTime - sheet.shownAt > 0.35f) sheet.Hide(); });
+            sheet.backdrop = backdrop;
 
             // the card: bottom of the screen, at most 82 % of its height; the text and the choices scroll inside it
             sheet.cardBack = RuntimeUiKit.Box(layer, "Card", p.surface);
@@ -75,7 +97,7 @@ namespace GlowUp.Common
             sheet.card = sheet.cardBack.rectTransform;
             sheet.card.anchorMin = new Vector2(0f, 0f); sheet.card.anchorMax = new Vector2(1f, 0f); sheet.card.pivot = new Vector2(0.5f, 0f);
             sheet.card.offsetMin = new Vector2(0f, -40f); sheet.card.offsetMax = new Vector2(0f, 0f);
-            sheet.card.gameObject.AddComponent<SwipeDown>().sheet = sheet;
+            sheet.card.gameObject.AddComponent<ChoiceSheetSwipeDown>().sheet = sheet;
 
             sheet.grip = RuntimeUiKit.Box(sheet.card, "Grip", p.border);
             RectTransform gripRt = sheet.grip.rectTransform;
@@ -97,7 +119,6 @@ namespace GlowUp.Common
             closeRt.sizeDelta = new Vector2(132f, 132f); closeRt.anchoredPosition = new Vector2(-36f, -40f);
             sheet.close = closeBack.gameObject.AddComponent<Button>();
             sheet.close.targetGraphic = closeBack;
-            sheet.close.onClick.AddListener(sheet.Hide);
             TextMeshProUGUI cross = RuntimeUiKit.Label(closeRt, "X", "×", 76, p.mainText, RuntimeTheme.Font(FontRole.Button, fontFrom));
             RuntimeUiKit.Stretch(cross.rectTransform, 0, 0, 0, 8);
 
@@ -133,6 +154,7 @@ namespace GlowUp.Common
         /// <summary>Shows a page: `text` may use TMP rich text; `note` is the small line under the choices ("" = none).</summary>
         public void Show(string heading, string text, IList<Choice> choices, string note = "", Action whenClosed = null)
         {
+            EnsureHooked();
             ThemeProfile.Palette p = RuntimeTheme.Palette;
             TMP_Text fontFrom = title;
             cardBack.color = p.surface; title.color = p.heading; body.color = p.mainText; foot.color = p.secondaryText; grip.color = p.border;
@@ -187,25 +209,6 @@ namespace GlowUp.Common
         void Update()
         {
             if (open && Input.GetKeyDown(KeyCode.Escape)) Hide();          // Android Back closes the sheet, never more
-        }
-
-        /// <summary>Drag the sheet down by more than 200 units (or flick it) and it closes; less and it springs back.</summary>
-        class SwipeDown : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
-        {
-            public ChoiceSheet sheet;
-            float startY, startTime;
-            public void OnBeginDrag(PointerEventData e) { startY = e.position.y; startTime = Time.unscaledTime; }
-            public void OnDrag(PointerEventData e)
-            {
-                float down = Mathf.Max(0f, startY - e.position.y);
-                sheet.card.anchoredPosition = new Vector2(0f, -down);
-            }
-            public void OnEndDrag(PointerEventData e)
-            {
-                float down = startY - e.position.y, speed = down / Mathf.Max(0.01f, Time.unscaledTime - startTime);
-                if (down > 200f || (down > 60f && speed > 1500f)) sheet.Hide();
-                sheet.card.anchoredPosition = Vector2.zero;
-            }
         }
     }
 }

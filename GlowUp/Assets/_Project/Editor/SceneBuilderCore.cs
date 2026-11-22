@@ -45,6 +45,12 @@ namespace GlowUp.EditorTools
 
         public static void Save(Scene s)
         {
+            // 22 Nov 2026: the bottom sheet of these screens is an object of the scene (ChoiceSheetLayer, switched off), visible and editable in the Editor
+            if (s.name == "OnboardingStep2Scene" || s.name == "OnboardingStep3Scene" || s.name == "AiSmartAnalysisResultScene")
+            {
+                Canvas sheetCanvas = Object.FindObjectOfType<Canvas>();
+                if (sheetCanvas != null) GlowUp.Common.ChoiceSheet.BuildInto(sheetCanvas.rootCanvas.transform);
+            }
             TouchTargets.Apply(s);   // 48 dp touch areas, look unchanged (16 November 2026)
             EditorSceneManager.MarkSceneDirty(s);
             EditorSceneManager.SaveScene(s);
