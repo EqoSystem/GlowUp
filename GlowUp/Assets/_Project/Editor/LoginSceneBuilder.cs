@@ -197,6 +197,28 @@ namespace GlowUp.EditorTools
             Button resetSend = A.PillButton(reset.box, "SendResetButton", "Send link", 36, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Mail);
             A.BottomStrip(resetSend.transform, 44, 108, 462, 48);
 
+            // ----- 22 Nov 2026 (panel): "This email is not registered" as a centred pop-up with Sign Up and Cancel (a scene object: edit it in the Hierarchy) -----
+            Transform oldNotRegistered = Kit.Loose(ct, "NotRegisteredPanel");
+            if (oldNotRegistered != null) Object.DestroyImmediate(oldNotRegistered.gameObject);
+            A.AppPopup notRegistered = A.Overlay(new A.AppScreen { canvas = ct }, "NotRegisteredPanel", "Not registered yet");
+            A.At(notRegistered.box, A.MC, new Vector2(0, 60), new Vector2(900, 520));
+            TextMeshProUGUI notRegisteredMessage = A.Label(notRegistered.box, "MessageText", "This email has no GlowUp account. Create one now, or cancel and check the email.",
+                                                           32, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            A.Fill(notRegisteredMessage.transform, 48, 190, 48, 130);
+            A.ShrinkWrapped(notRegisteredMessage, 26);
+            Button notRegisteredCancel = A.PillButton(notRegistered.box, "CancelButton", "Cancel", 36, ThemeRole.SurfaceAlt, ThemeRole.MainText);
+            A.BottomStrip(notRegisteredCancel.transform, 44, 108, 48, 462);
+            Button notRegisteredSignUp = A.PillButton(notRegistered.box, "SignUpButton", "Sign Up", 36, ThemeRole.ButtonFill, ThemeRole.ButtonText);
+            A.BottomStrip(notRegisteredSignUp.transform, 44, 108, 462, 48);
+            // ConfirmDialog paints this button itself
+            Object.DestroyImmediate(notRegisteredSignUp.GetComponent<ThemedGraphic>());
+            Object.DestroyImmediate(A.LabelOf(notRegisteredSignUp).GetComponent<ThemedGraphic>());
+            var notRegisteredDialog = SceneBuilderCore.Ensure<GlowUp.AppSettings.ConfirmDialog>(SceneBuilderCore.EnsureRoot("NotRegisteredDialog"));
+            SceneBuilderCore.SetField(notRegisteredDialog, "panel", notRegistered.panel); SceneBuilderCore.SetField(notRegisteredDialog, "titleText", notRegistered.title);
+            SceneBuilderCore.SetField(notRegisteredDialog, "messageText", notRegisteredMessage);
+            SceneBuilderCore.SetField(notRegisteredDialog, "confirmButton", notRegisteredSignUp); SceneBuilderCore.SetField(notRegisteredDialog, "confirmLabel", A.LabelOf(notRegisteredSignUp));
+            SceneBuilderCore.SetField(notRegisteredDialog, "cancelButton", notRegisteredCancel); SceneBuilderCore.SetField(notRegisteredDialog, "cancelLabel", A.LabelOf(notRegisteredCancel));
+
             // ----- controller -----
             var flow = SceneBuilderCore.Ensure<LoginFlowController>(SceneBuilderCore.EnsureRoot("LoginFlowController"));
             SceneBuilderCore.SetField(flow, "emailInput", emailInput);
@@ -212,6 +234,7 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(flow, "resetMessageText", resetMessage);
             SceneBuilderCore.SetField(flow, "resetSendButton", resetSend);
             SceneBuilderCore.SetField(flow, "resetCancelButton", resetCancel);
+            SceneBuilderCore.SetField(flow, "notRegisteredDialog", notRegisteredDialog);
 
             ThemeKit.FinishScene();       // canvas scaler, paper background, input text, round shapes, fonts, colours
             SceneBuilderCore.Save(scene);

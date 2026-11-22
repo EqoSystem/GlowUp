@@ -196,6 +196,13 @@ namespace GlowUp.Recent
                     tile.DrawerOpening += CloseOtherRows;
                     tile.LockedTap += OnRowTappedWhileShaking;
                     tile.SetSelectedForRemoval(selected.Contains(record.id));
+                    // 22 Nov 2026 (panel): drag a row LEFT = remove it (the Restore bar brings it back), RIGHT = try the product on in AR
+                    if (tile.TryGetComponent(out TileSwipeActions swipe))
+                    {
+                        swipe.SetActions(true, ProductScope.CanTryOn(record));
+                        swipe.SwipedLeft += _ => { if (!shaking && !popping && tile.Data is ScanRecord gone) { popping = true; tile.PlayPop(() => { RemoveOne(gone.id); popping = false; if (this != null) Refresh(); }); } };
+                        swipe.SwipedRight += _ => { if (!shaking && tile.Data is ScanRecord tryOn) { ScanSession.TryOn = tryOn; SceneNavigator.Go(tryOnScene); } };
+                    }
                     if (tile.TryGetComponent(out HoldToRemoveTile hold))
                     {
                         if (removeZone != null) hold.SetRemoveArea((RectTransform)removeZone.transform);

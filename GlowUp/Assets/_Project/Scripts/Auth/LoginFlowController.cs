@@ -64,6 +64,12 @@ namespace GlowUp.Auth
         [SerializeField] private string msgEnterPassword = "Please enter your password.";
         [SerializeField] private string msgBadCredentials = "Email or password is incorrect.";
         [SerializeField] private string msgNotRegistered = "This email is not registered. Check it, or tap Sign Up.";
+        [Tooltip("22 Nov 2026 (panel): the centred pop-up for an email with no account. Built in the scene (NotRegisteredPanel); empty = only the message line above shows.")]
+        [SerializeField] private GlowUp.AppSettings.ConfirmDialog notRegisteredDialog;
+        [SerializeField] private string notRegisteredTitle = "Not registered yet";
+        [SerializeField] private string notRegisteredBody = "{0} has no GlowUp account. Create one now, or cancel and check the email.";
+        [SerializeField] private string notRegisteredSignUpLabel = "Sign Up";
+        [SerializeField] private string notRegisteredCancelLabel = "Cancel";
         [SerializeField] private string msgWrongPassword = "Password is incorrect.";
         [Tooltip("After 3 wrong passwords for one email ({0} = minutes:seconds left)")]
         [SerializeField] private string msgLocked = "Too many wrong passwords. Log-In is locked for this email for {0}. Tap Forgot Password to choose a new password.";
@@ -251,7 +257,12 @@ namespace GlowUp.Auth
                             // is off; with it on, both come back as InvalidCredential and the general message stays.
                             AuthError why = AuthErrorOf(e);
                             string said = why == AuthError.UserNotFound ? msgNotRegistered : why == AuthError.WrongPassword ? msgWrongPassword : msgBadCredentials;
-                            if (why == AuthError.UserNotFound) Fail(said);          // no account: not a password guess, nothing is counted
+                            if (why == AuthError.UserNotFound)                       // no account: not a password guess, nothing is counted
+                            {
+                                Fail(said);
+                                if (notRegisteredDialog != null)
+                                    notRegisteredDialog.Ask(notRegisteredTitle, string.Format(notRegisteredBody, email), notRegisteredSignUpLabel, SignUp, false, notRegisteredCancelLabel);
+                            }
                             else WrongPassword(email, said);
                             return;
                         }

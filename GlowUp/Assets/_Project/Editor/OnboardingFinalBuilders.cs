@@ -63,6 +63,31 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(ctl, "continueButton", c.cont); SceneBuilderCore.SetField(ctl, "continueAnimator", c.anim);
             SceneBuilderCore.SetField(ctl, "backButton", c.back); SceneBuilderCore.SetField(ctl, "feedbackText", c.feedback);
 
+            // ----- 22 Nov 2026 (panel): the allergen notice with "Find me a Dermatologist" and "I agree" (scene objects: edit them in the Hierarchy) -----
+            Transform oldNotice = Loose(ct, "AllergenNoticePanel");
+            if (oldNotice != null) Object.DestroyImmediate(oldNotice.gameObject);
+            AppKit.AppPopup notice = AppKit.Overlay(new AppKit.AppScreen { canvas = ct }, "AllergenNoticePanel", "Before you continue");
+            AppKit.At(notice.box, AppKit.MC, new Vector2(0, 40), new Vector2(900, 880));
+            TextMeshProUGUI noticeText = AppKit.Label(notice.box, "MessageText", "The allergens you picked are used only to flag products on this phone.",
+                                                      32, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            AppKit.Fill(noticeText.transform, 48, 300, 48, 130);
+            AppKit.ShrinkWrapped(noticeText, 26);
+            Button findDerm = AppKit.PillButton(notice.box, "FindDermatologistButton", "Find me a Dermatologist", 34, ThemeRole.SurfaceAlt, ThemeRole.MainText);
+            AppKit.BottomStrip(findDerm.transform, 172, 108, 48, 48);
+            Button noticeBack = AppKit.PillButton(notice.box, "BackButton", "Back", 36, ThemeRole.SurfaceAlt, ThemeRole.MainText);
+            AppKit.BottomStrip(noticeBack.transform, 44, 108, 48, 462);
+            Button noticeAgree = AppKit.PillButton(notice.box, "AgreeButton", "I agree", 36, ThemeRole.ButtonFill, ThemeRole.ButtonText);
+            AppKit.BottomStrip(noticeAgree.transform, 44, 108, 462, 48);
+            Object.DestroyImmediate(noticeAgree.GetComponent<ThemedGraphic>());                 // ConfirmDialog paints this button itself
+            Object.DestroyImmediate(AppKit.LabelOf(noticeAgree).GetComponent<ThemedGraphic>());
+            var noticeDialog = SceneBuilderCore.Ensure<GlowUp.AppSettings.ConfirmDialog>(SceneBuilderCore.EnsureRoot("AllergenNoticeDialog"));
+            SceneBuilderCore.SetField(noticeDialog, "panel", notice.panel); SceneBuilderCore.SetField(noticeDialog, "titleText", notice.title);
+            SceneBuilderCore.SetField(noticeDialog, "messageText", noticeText);
+            SceneBuilderCore.SetField(noticeDialog, "confirmButton", noticeAgree); SceneBuilderCore.SetField(noticeDialog, "confirmLabel", AppKit.LabelOf(noticeAgree));
+            SceneBuilderCore.SetField(noticeDialog, "cancelButton", noticeBack); SceneBuilderCore.SetField(noticeDialog, "cancelLabel", AppKit.LabelOf(noticeBack));
+            SceneBuilderCore.SetField(ctl, "noticeDialog", noticeDialog);
+            SceneBuilderCore.SetField(ctl, "findDermatologistButton", findDerm);
+
             // the earlier, vaguer wording of the "nothing selected" message is replaced once; your own wording is kept
             var so = new SerializedObject(ctl);
             var message = so.FindProperty("msgChooseOne");

@@ -102,6 +102,15 @@ namespace GlowUp.EditorTools
             A.Set(view, "typeIcon", typeIcon); A.Set(view, "statusDot", statusDot); A.Set(view, "tileButton", rowButton);
             A.Set(view, "popTarget", (RectTransform)visual.transform); A.Set(view, "popGroup", visual.GetComponent<CanvasGroup>());
 
+            // ---- 22 Nov 2026 (panel): drag the row sideways to act on it. The two hints sit BEHIND the row (first in the row) and show while it is dragged:
+            //      drag LEFT = the left hint (Save on the dashboard, Remove in Recent Scans), drag RIGHT = Try On. Reword or recolour them here. ----
+            CanvasGroup leftHint = SwipeHint(root.transform, "LeftHint", kind == TileKind.RecentScan ? "Remove" : "Save", kind == TileKind.RecentScan ? ThemeRole.Warning : ThemeRole.ButtonFill,
+                                             kind == TileKind.RecentScan ? ThemeRole.Background : ThemeRole.ButtonText, TextAlignmentOptions.MidlineRight);
+            CanvasGroup rightHint = SwipeHint(root.transform, "RightHint", "Try On in AR", ThemeRole.Accent, ThemeRole.Background, TextAlignmentOptions.MidlineLeft);
+            visual.transform.SetAsLastSibling();
+            var swipe = SceneBuilderCore.Ensure<TileSwipeActions>(root);
+            A.Set(swipe, "visual", (RectTransform)visual.transform); A.Set(swipe, "leftHint", leftHint); A.Set(swipe, "rightHint", rightHint);
+
             // ---- the strip that is uncovered when the row opens: it hangs under the closed row and is cut off at its own edge ----
             var actions = A.Node(visual.transform, "Actions", typeof(RectMask2D), typeof(CanvasGroup));
             var actionsRect = (RectTransform)actions.transform;
@@ -418,6 +427,21 @@ namespace GlowUp.EditorTools
         }
 
         /// <summary>A small round-ended button that sits on a product tile.</summary>
+        /// <summary>A coloured strip behind a row with one word at its end; the row's TileSwipeActions fades it in while the row is dragged.</summary>
+        static CanvasGroup SwipeHint(Transform row, string name, string word, ThemeRole fill, ThemeRole text, TextAlignmentOptions align)
+        {
+            Image strip = A.Panel(row, name, fill, 1f, TileRadius);
+            A.Fill(strip.transform);
+            strip.raycastTarget = false;
+            TextMeshProUGUI label = A.Label(strip.transform, "Text", word, 32, text, FontRole.Label, align);
+            A.Fill(label.transform, 36, 0, 36, 0);
+            label.raycastTarget = false;
+            var group = SceneBuilderCore.Ensure<CanvasGroup>(strip.gameObject);
+            group.alpha = 0f; group.blocksRaycasts = false; group.interactable = false;
+            strip.gameObject.SetActive(false);
+            return group;
+        }
+
         static Button TileButton(Transform tile, string name, string label, Sprite icon, bool primary)
         {
             Button button = A.PillButton(tile, name, label, 25, primary ? ThemeRole.ButtonFill : ThemeRole.SurfaceAlt, primary ? ThemeRole.ButtonText : ThemeRole.MainText, icon);

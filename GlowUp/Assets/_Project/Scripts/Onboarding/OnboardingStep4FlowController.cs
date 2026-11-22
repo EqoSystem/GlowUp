@@ -24,6 +24,15 @@ namespace GlowUp.Onboarding
         [SerializeField] private TextMeshProUGUI feedbackText;
         [SerializeField] private string nextScene = SceneNames.Onboarding5;
         [SerializeField] private string previousScene = SceneNames.Onboarding3;
+        [Header("Allergen notice (22 Nov 2026 panel): shown when allergens are selected; 'I agree' goes on, the other button opens a map search")]
+        [Tooltip("Built in the scene (AllergenNoticePanel). Empty = Continue goes straight on.")]
+        [SerializeField] private GlowUp.AppSettings.ConfirmDialog noticeDialog;
+        [SerializeField] private Button findDermatologistButton;
+        [SerializeField] private string dermatologistUrl = "https://www.google.com/maps/search/dermatologist+near+me";
+        [SerializeField] private string noticeTitle = "Before you continue";
+        [TextArea(3, 6)] [SerializeField] private string noticeBody = "The allergens you picked are used only to flag products on this phone. GlowUp cannot diagnose an allergy: a dermatologist can test which ingredients you react to, and it is wise to see one if a product ever burns, itches or swells. This is information, not medical advice.";
+        [SerializeField] private string noticeAgreeLabel = "I agree";
+        [SerializeField] private string noticeBackLabel = "Back";
         [Tooltip("Shown while nothing is selected")]
         [SerializeField] private string msgChooseOne = "Select at least one, or tick \"No known allergens\", to continue.";
 
@@ -36,6 +45,7 @@ namespace GlowUp.Onboarding
                 allergens.CustomAdded += t => { if (!OnboardingSession.CustomAllergens.Contains(t)) OnboardingSession.CustomAllergens.Add(t); };
             }
             if (continueButton != null) continueButton.onClick.AddListener(OnContinue);
+            if (findDermatologistButton != null) findDermatologistButton.onClick.AddListener(() => { try { Application.OpenURL(dermatologistUrl); } catch (System.Exception) { } });
             if (backButton != null) backButton.onClick.AddListener(() => SceneNavigator.Go(previousScene));
         }
 
@@ -82,6 +92,13 @@ namespace GlowUp.Onboarding
         void OnContinue()
         {
             if (!Ready) { OnboardingNotices.Error(feedbackText, msgChooseOne); return; }
+            // allergens ticked: the notice and "I agree" come first (nothing to agree to when "No known allergens" is ticked)
+            if (noticeDialog != null && !allergens.NoneSelected) { noticeDialog.Ask(noticeTitle, noticeBody, noticeAgreeLabel, Proceed, false, noticeBackLabel); return; }
+            Proceed();
+        }
+
+        void Proceed()
+        {
             OnboardingSession.Allergens = allergens.NoneSelected
                 ? new List<string> { UserProfileData.NoKnownAllergens }
                 : allergens.Selected;

@@ -214,6 +214,7 @@ namespace GlowUp.Common
             for (Transform t = hits[0].gameObject.transform; t != null; t = t.parent)
             {
                 if (t.GetComponent<Slider>() != null || t.GetComponent<Scrollbar>() != null || t.GetComponent<TMP_InputField>() != null) return true;
+                if (t.GetComponent<IOwnsSidewaysDrag>() != null) return true;        // a row swiped to act on it (TileSwipeActions)
                 ScrollRect scroll = t.GetComponent<ScrollRect>();
                 if (scroll != null && scroll.horizontal) return true;
                 OverlayPanel panel = t.GetComponent<OverlayPanel>();

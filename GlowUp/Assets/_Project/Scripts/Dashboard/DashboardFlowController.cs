@@ -285,6 +285,13 @@ namespace GlowUp.Dashboard
                 tile.AiClicked += t => { if (aiPanel != null) aiPanel.Show(t.Data as ScanRecord); };   // rows built before 18 Nov 2026
                 tile.Clicked += OnResult;                                                              // the "Result" button
                 tile.DrawerOpening += CloseOtherDrawers;
+                // 22 Nov 2026 (panel): drag a row LEFT = save it (it lands in Recent Scans), RIGHT = try the product on in AR
+                if (tile.TryGetComponent(out TileSwipeActions swipe))
+                {
+                    swipe.SetActions(true, GlowUp.Scan.ProductScope.CanTryOn(record));
+                    swipe.SwipedLeft += _ => OnSave(tile);
+                    swipe.SwipedRight += _ => OnTryOn(tile);
+                }
                 tiles.Add(tile);
                 cards.Add(tile.gameObject);
             }
