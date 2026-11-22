@@ -42,8 +42,14 @@ namespace GlowUp.Scan
             return Ask(config, apiKey, question, searchTheWeb, timeoutSeconds, jpegPicture != null && jpegPicture.Length > 0 ? new List<byte[]> { jpegPicture } : null);
         }
 
+        /// <param name="lookup">Product words (a name or barcode digits) the server may look up in its MCP tools first. Product words only, never the skin profile.</param>
+        public static Task<Answer> Ask(GeminiApiConfig config, string apiKey, string question, bool searchTheWeb, float timeoutSeconds, string lookup)
+        {
+            return Ask(config, apiKey, question, searchTheWeb, timeoutSeconds, (IList<byte[]>)null, lookup);
+        }
+
         /// <param name="jpegPictures">JPG pictures the question is about (the sides of one product), sent together in ONE request. Null or empty = none.</param>
-        public static async Task<Answer> Ask(GeminiApiConfig config, string apiKey, string question, bool searchTheWeb, float timeoutSeconds, IList<byte[]> jpegPictures)
+        public static async Task<Answer> Ask(GeminiApiConfig config, string apiKey, string question, bool searchTheWeb, float timeoutSeconds, IList<byte[]> jpegPictures, string lookup = null)
         {
             var last = new Answer { error = "No AI model is configured." };
             if (config == null) return last;
@@ -68,7 +74,7 @@ namespace GlowUp.Scan
                     {
                         bool retryAttempt = false;
                         // through GlowUp's server: the AI key is never inside the app (16 November 2026)
-                        using (var request = new UnityWebRequest(GlowUp.Security.AiProxy.Url(model), "POST"))
+                        using (var request = new UnityWebRequest(GlowUp.Security.AiProxy.Url(model, lookup), "POST"))
                         {
                             request.uploadHandler = new UploadHandlerRaw(Encoding.UTF8.GetBytes(Body(question, withSearch, jpegPictures)));
                             request.downloadHandler = new DownloadHandlerBuffer();

@@ -354,7 +354,7 @@ namespace GlowUp.Scan
             AppendListStepAndShape(q, "\"question\":\"\",\"notMakeup\":false,");
             q.Append("confidence is 0 to 1. NEVER invent a product, a page or an ingredient list. If you cannot find the product, reply {\"same\":false,\"question\":\"...\"}.");
 
-            AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), true, TimeoutSeconds + 10f);
+            AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), true, TimeoutSeconds + 10f, typedBrand.Length > 0 ? typedBrand + " " + typedProduct : typedProduct);
             if (answer == null || !answer.ok) { { } return result; }
             return WebMatchFrom(answer.text, answer.sources, answer.usedWebSearch, answer.model, typedBrand);
         }
@@ -458,7 +458,8 @@ namespace GlowUp.Scan
             q.Append("\"sources\":[\"page title | https://address\"],\"note\":\"\"}\n");
             q.Append("NEVER invent an ingredient list. If you cannot find the product's own published list, reply with found false and an empty ingredients array.");
 
-            AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), SearchTheWeb, TimeoutSeconds + 10f);
+            AiResearchClient.Answer answer = await AiResearchClient.Ask(ActiveConfig, Key, q.ToString(), SearchTheWeb, TimeoutSeconds + 10f,
+                OpenBeautyFacts.Digits(barcode).Length >= 8 ? OpenBeautyFacts.Digits(barcode) : ((brand ?? "") + " " + (name ?? "")).Trim());
             if (answer == null || !answer.ok) { { } return result; }
             Dictionary<string, object> json = AiResearchClient.JsonObjectIn(answer.text);
             if (json == null) return result;

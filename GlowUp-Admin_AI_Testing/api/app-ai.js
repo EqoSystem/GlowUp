@@ -12,6 +12,8 @@ const MAX_OUTPUT_TOKENS = 8192;
 const PER_MINUTE = 20, PER_DAY = 400;               // per user, per server instance (best effort on the free plan)
 const IP_PER_MINUTE = 60;
 const SECONDS = 55;
+const LOOKUP_SECONDS = 5;                            // the MCP lookups get this long at most; late or failed = the request goes on without them
+const mcp = require("./mcp");
 
 const seen = new Map();                              // uid -> { minute, minuteCount, day, dayCount }
 const byIp = new Map();                              // ip -> { minute, count }
@@ -76,6 +78,25 @@ function cleanRequest(incoming) {
     return body;
 }
 
+// Reference data from GlowUp's own MCP tools (api/mcp.js): the app names a product (or its barcode) in ?lookup= and the answer of
+// Open Beauty Facts and the FDA Philippines list is added to the question as a plain text part. Fallback by design: when a tool is slow,
+// down or finds nothing, the request goes on exactly as the app sent it. Only the product words the app put in ?lookup= are used:
+// the skin profile never reaches a tool.
+async function referenceText(lookup) {
+    const term = String(lookup || "").replace(/[\x00-\x1f]/g, " ").trim().slice(0, 120);
+    if (term.length < 2) return "";
+    const give = async (name, args) => {
+        try { const r = await Promise.race([mcp.TOOLS[name].run(args), new Promise((resolve) => setTimeout(() => resolve(null), LOOKUP_SECONDS * 1000))]); return r && r.content ? r.content[0].text : ""; }
+        catch (e) { return ""; }
+    };
+    const [off, fda] = await Promise.all([give("product_lookup", { query: term }), /^\d{8,14}$/.test(term) ? "" : give("fda_check", { name: term })]);
+    const useful = (t) => t && !/not available|no match|Give a|does not prove/.test(t);
+    const parts = [];
+    if (useful(off)) parts.push("Open Beauty Facts:\n" + off);
+    if (useful(fda)) parts.push("FDA Philippines list:\n" + fda);
+    return parts.length ? "REFERENCE DATA from GlowUp's own database look-ups (may be incomplete or about a similar product; check it against what you find, never copy it blindly):\n" + parts.join("\n\n") : "";
+}
+
 function withinLimit(uid) {
     const now = Date.now(), minute = Math.floor(now / 60000), day = Math.floor(now / 86400000);
     const s = seen.get(uid) || { minute, minuteCount: 0, day, dayCount: 0 };
@@ -121,6 +142,9 @@ module.exports = async (req, res) => {
         try { incoming = JSON.parse(text || "{}"); } catch (e) { return send(res, 400, { error: { message: "The request could not be read." } }); }
         const body = cleanRequest(incoming);
         if (!body) return send(res, 400, { error: { message: "The request has an unexpected form." } });
+
+        const extra = await referenceText(req.query && req.query.lookup);
+        if (extra) body.contents[body.contents.length - 1].parts.push({ text: extra });
 
         const answer = await withTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
             { method: "POST", headers: { "Content-Type": "application/json", "x-goog-api-key": key }, body: JSON.stringify(body) }, SECONDS);

@@ -19,6 +19,13 @@ namespace GlowUp.Security
         public static string Url(string model) => Endpoint + "?model=" + UnityWebRequest.EscapeURL(model ?? "");
 
         /// <summary>
+        /// Same, with the product words (a name or the barcode digits) the server may look up in GlowUp's MCP tools (Open Beauty Facts,
+        /// the FDA Philippines list) before the AI answers. Product words only: never anything from the skin profile. Empty = no look-up.
+        /// </summary>
+        public static string Url(string model, string lookup) =>
+            Url(model) + (string.IsNullOrWhiteSpace(lookup) ? "" : "&lookup=" + UnityWebRequest.EscapeURL(lookup.Trim().Length > 120 ? lookup.Trim().Substring(0, 120) : lookup.Trim()));
+
+        /// <summary>
         /// Adds the sign-in token to the request. False when nobody is signed in with Firebase (for example after an offline
         /// sign-in that has not reached Firebase yet): the AI is then not asked.
         /// </summary>
