@@ -13,10 +13,11 @@ not touch the original owner's data.
 
 WHAT YOU RECEIVE
 ----------------
-  GlowUp-Admin.zip          website, Dockerfile, docker-compose.yml
-  GlowUp-App.zip            Unity app
+  GlowUp-Package.zip        one zip. After unzipping you have:
+      SETUP_INSTRUCTIONS.txt    this file
+      GlowUp-Admin\             website, Dockerfile, docker-compose.yml
+      GlowUp\                   Unity app
   SecureProfileStore.cs     private file for the app (sent to you separately)
-  SETUP_INSTRUCTIONS.txt    this file
 
 
 PART A - INSTALL
@@ -28,8 +29,8 @@ PART A - INSTALL
 
 PART B - START THE WEBSITE
 --------------------------
-  1. Unzip GlowUp-Admin.zip.
-  2. Open the folder "GlowUp-Admin". It contains the file "Dockerfile".
+  1. Unzip GlowUp-Package.zip.
+  2. Open the folder "GlowUp-Admin" inside it. It contains the file "Dockerfile".
   3. Click the address bar of the folder, type  cmd  and press Enter.
   4. In the black window type:
 
@@ -98,7 +99,7 @@ PART D - THE UNITY APP
 ----------------------
   1. Install Unity Hub. Through it, install Unity 2022.3.62f3 with the
      modules "Android Build Support", "OpenJDK" and "Android SDK & NDK".
-  2. Unzip GlowUp-App.zip.
+  2. Use the folder "GlowUp" from the unzipped package.
   3. In Unity Hub click Add and choose the folder "GlowUp".
      The first opening takes a long time (Unity rebuilds its Library).
   4. Copy the file SecureProfileStore.cs (sent to you separately) into:
