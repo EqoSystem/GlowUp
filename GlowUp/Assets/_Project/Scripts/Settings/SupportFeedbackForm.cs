@@ -192,9 +192,20 @@ namespace GlowUp.AppSettings
             }
         }
 
+        /// <summary>One line on the form (under the e-mail row): what happened to the report. Visible whatever the pop-up does.</summary>
+        private void Inline(string text)
+        {
+            if (feedbackText == null) return;
+            feedbackText.gameObject.SetActive(true);
+            feedbackText.enableWordWrapping = true;
+            feedbackText.overflowMode = TextOverflowModes.Overflow;
+            feedbackText.text = text ?? "";
+        }
+
         private void ShowCenteredPopup(string title, string message, string okText = "OK", float autoCloseSeconds = 0f, Action onClosed = null)
         {
             if (!Application.isPlaying) return;
+            Inline(title + ": " + message);          // 22 Nov 2026 (phone check): the result is ALSO written on the form itself, so it shows even if the pop-up cannot
 
             // If app is not in foreground or popup cannot be shown immediately, store as pending
             if (!Application.isFocused)
@@ -206,10 +217,12 @@ namespace GlowUp.AppSettings
                 return;
             }
 
-            var p = Popup;
+            CenteredFeedbackPopup p = null;
+            try { p = Popup; } catch (Exception) { p = null; }
             if (p != null)
             {
-                p.Show(title, message, okText, autoCloseSeconds, onClosed);
+                try { p.Show(title, message, okText, autoCloseSeconds, onClosed); }
+                catch (Exception) { /* the line on the form above still says it */ }
             }
             else
             {
@@ -279,6 +292,7 @@ namespace GlowUp.AppSettings
             sending = true;
             if (sendButton != null) sendButton.interactable = false;
             if (sendLabel != null) sendLabel.text = msgSending;
+            Inline(msgSending);
 
             EnsureReportDocId();
             string docId = currentReportDocId;
@@ -377,7 +391,8 @@ namespace GlowUp.AppSettings
                     }
                     // 22 Nov 2026 (owner): a centred "Report sent!" with a tick and Okay, the same as the website's "Reply sent!"
                     ClearForm();
-                    if (Application.isFocused && Popup != null) Popup.ShowDone(msgSentTitle, msgSentDone, "Okay");
+                    Inline(msgSentTitle + " " + msgSentDone);
+                    if (Application.isFocused && Popup != null) { try { Popup.ShowDone(msgSentTitle, msgSentDone, "Okay"); } catch (Exception) { } }
                     else ShowCenteredPopup(msgSentTitle, msgSentDone, "Okay", 0f);
                 }
             }

@@ -201,7 +201,16 @@ module.exports = async (req, res) => {
             // opening the link only SHOWS a button (a mail scanner that opens links confirms nothing); the button posts the same token back
             const link = parseLink(req.query && req.query.t);
             if (!cfg || !link) return page(res, 400, "This link does not work", "Ask for a new code on the sign-up page.");
-            return page(res, 200, "Confirm your e-mail", "Press the button to confirm your GlowUp e-mail address.",
+            // say WHICH address is being confirmed (security review: a stranger may have started a sign-up with someone else's address)
+            let shown = "this account";
+            try {
+                const token = await serviceToken(cfg.account);
+                const found = await timed(`https://identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts:lookup`,
+                    { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ localId: [link.uid] }) }, 5);
+                const who = found.ok ? (((await found.json()).users || [])[0]) : null;
+                if (who && who.email) { const [name, domain] = String(who.email).split("@"); shown = name.slice(0, 2) + "***@" + (domain || ""); }
+            } catch (e) { }
+            return page(res, 200, "Confirm your e-mail", "Confirm the GlowUp sign-up for " + shown + "? Press the button only if YOU just started a GlowUp sign-up with this address. If you did not, close this page.",
                 "<form method=post action='/api/email-otp'><input type=hidden name=t value='" + escapeHtml(req.query.t) + "'><button style='font-size:1.1rem;padding:.7rem 1.6rem;border-radius:2rem;border:0;background:#d96a87;color:#fff'>Confirm my e-mail</button></form>");
         }
         if (req.method !== "POST") return send(res, 405, { error: "Use POST." });
@@ -243,7 +252,7 @@ module.exports = async (req, res) => {
             const code = codeFor(cfg.secret, user.uid, user.email, win);
             const link = "https://glowupapp.xyz/api/email-otp?t=" + user.uid + "." + win + "." + linkMac(cfg.secret, user.uid, user.email, win);
             await smtpSend({ user: cfg.user, pass: cfg.pass, to: user.email, subject: "Your GlowUp code: " + code,
-                text: "Your GlowUp confirmation code is " + code + ". Type it on the sign-up page, or open this link in any tab or on your phone to confirm without typing: " + link + " .\r\nIt works for about 10 minutes. If you did not ask for it, ignore this e-mail: nobody can use it without your password.\r\n" });
+                text: "Your GlowUp confirmation code is " + code + ". Type it on the sign-up page, or open this link in any tab or on your phone to confirm without typing: " + link + " .\r\nIt works for about 10 minutes. If you did not ask for it, ignore this e-mail and do not press the link: confirm only if YOU just started a GlowUp sign-up with this address.\r\n" });
             return send(res, 200, { ok: true });
         }
         if (body.action === "verify") {

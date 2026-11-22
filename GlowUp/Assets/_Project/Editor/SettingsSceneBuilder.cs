@@ -190,6 +190,9 @@ namespace GlowUp.EditorTools
             A.ShrinkWrapped(supportMessage, 18);
             Button supportSend = A.PillButton(supportPopup.box, "SendButton", "Send Report", 38, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Mail);
             A.BottomStrip(supportSend.transform, 44, 112, 48, 48);
+            // 22 Nov 2026 (phone check): the keyboard covered Send Report, so nothing could be sent. The pop-up now slides up until the counter, the
+            // e-mail row, the message line and Send Report are above the keyboard, not just the text field.
+            KeyboardKit.KeepVisible(feedbackInput, counterText, includeRow.transform, emailRow, supportMessage, supportSend);
 
             var support = Feature<SupportFeedbackForm>(features, "SupportFeedbackForm");
             A.Set(support, "panel", supportPopup.panel); A.Set(support, "categoryTabs", categoryTabs); A.Set(support, "messageInput", feedbackInput);
