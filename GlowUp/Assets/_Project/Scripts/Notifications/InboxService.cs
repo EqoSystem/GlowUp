@@ -144,6 +144,22 @@ namespace GlowUp.Notifications
             catch (Exception) { /* offline: the database library sends it later */ }
         }
 
+        /// <summary>22 Nov 2026 (panel): every notification shown becomes read (one write for the announcements, one per reply).</summary>
+        public void MarkAllRead()
+        {
+            foreach (Item item in Items()) if (!item.read) MarkRead(item);
+            Changed?.Invoke();
+        }
+
+        /// <summary>22 Nov 2026 (panel): removes every notification shown (replies from the account, announcements from this phone's list). Returns how many failed.</summary>
+        public async System.Threading.Tasks.Task<int> DeleteAll()
+        {
+            int failed = 0;
+            foreach (Item item in Items()) if (!await Delete(item)) failed++;
+            Changed?.Invoke();
+            return failed;
+        }
+
         /// <summary>Removes a notification: a reply from the account, an announcement from this phone's list. Returns false when it failed.</summary>
         public async System.Threading.Tasks.Task<bool> Delete(Item item)
         {

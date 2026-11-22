@@ -353,6 +353,7 @@ export function mountSignup({ lockout, onBackToLogin }) {
         resendBtn.disabled = true; resendBtn.textContent = "Sending...";
         try {
             await withTimeout(sendConfirmation(holding));
+            offerCode();
             checkNote.textContent = "A new link is on its way. Check the inbox and the spam folder.";
             if (!pollTimer) startPolling();
             if (views.check.dataset.state === "stale") paintCheck("sent");
@@ -363,11 +364,43 @@ export function mountSignup({ lockout, onBackToLogin }) {
         }
     });
 
+    // ---- the 6-digit code (api/email-otp): offered next to the link when the server is set up for it; otherwise nothing changes ----
+    const codeBlock = $("codeBlock"), codeInput = $("codeInput"), codeBtn = $("codeBtn"), codeMessage = $("codeMessage");
+    async function otp(action, extra = {}) {
+        if (!holding) return { status: 0 };
+        try {
+            const idToken = await holding.getIdToken();
+            const r = await withTimeout(fetch("/api/email-otp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, idToken, ...extra }) }), 15000);
+            let body = {}; try { body = await r.json(); } catch (error) { }
+            return { status: r.status, body };
+        } catch (error) { return { status: 0 }; }
+    }
+    async function offerCode() {
+        codeBlock.hidden = true; codeMessage.textContent = "";
+        const r = await otp("send");
+        if (r.status === 200 && r.body && r.body.ok) { codeBlock.hidden = false; codeInput.value = ""; }
+        else if (r.status === 429) { codeBlock.hidden = false; codeMessage.textContent = "A code was sent a moment ago. Check the e-mail, or wait a little before asking again."; }
+        // 503 (not set up), an error or offline: the link above is the way
+    }
+    codeInput.addEventListener("input", () => { codeInput.value = codeInput.value.replace(/\D/g, "").slice(0, 6); if (codeInput.value.length === 6) codeBtn.click(); });
+    codeBtn.addEventListener("click", async () => {
+        if (codeBtn.disabled) return;
+        const code = codeInput.value.trim();
+        if (!/^\d{6}$/.test(code)) { codeMessage.textContent = "Type the 6 digits."; return; }
+        codeBtn.disabled = true; codeMessage.textContent = "Checking...";
+        const r = await otp("verify", { code });
+        codeBtn.disabled = false;
+        if (r.status === 200 && r.body && r.body.ok) { codeMessage.textContent = ""; codeBlock.hidden = true; await checkConfirmed(); }
+        else if (r.status === 200) codeMessage.textContent = "That code is not right. Check the digits, or ask for a new one.";
+        else if (r.status === 429) codeMessage.textContent = "Too many wrong codes. Wait about 15 minutes, or use the link.";
+        else codeMessage.textContent = "The code could not be checked. Use the link in the e-mail instead.";
+    });
+
     function openCheck(user, verified) {
         $("checkEmail").textContent = user.email || "";
         paintCheck(verified ? "confirmed" : "sent");
         show("check");
-        if (!verified) { startPolling(); resendCooldown(); }
+        if (!verified) { startPolling(); resendCooldown(); offerCode(); }
         // the request in real time: approval or decline shows at once
         let seen = false;
         stopRequest = onSnapshot(doc(db, "adminRequests", user.uid), (snap) => {

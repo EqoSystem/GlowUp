@@ -189,6 +189,10 @@ namespace GlowUp.EditorTools
             ChoiceTabs tabs = TabRow(list, "AreaTabs", ShadeAdvisor.Areas, 30);
             // the texture of the colour
             ChoiceTabs finishTabs = TabRow(list, "FinishTabs", new[] { "Matte", "Satin", "Glossy", "Shimmer", "Metallic" }, 26);
+            // 22 Nov 2026 (panel): one small line says where the starting texture came from
+            TextMeshProUGUI finishSource = A.Label(list, "FinishSourceText", "", 24, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center);
+            A.Size(finishSource, -1, 40);
+            A.Shrink(finishSource, 18);
 
             // ---- shades ----
             ShadeButton[] productShades = ShadeGroup(list, "ProductShades", "This product's shades", out GameObject productGroup, out _);
@@ -314,7 +318,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "cameraFeed", camera); A.Set(controller, "makeup", makeup); A.Set(controller, "statusText", status);
             A.Set(controller, "cameraCard", waitView);
             A.Set(controller, "productText", productText); A.Set(controller, "changeProductButton", change);
-            A.Set(controller, "areaTabs", tabs); A.Set(controller, "finishTabs", finishTabs); A.Set(controller, "split", splitView);
+            A.Set(controller, "areaTabs", tabs); A.Set(controller, "finishTabs", finishTabs); A.Set(controller, "finishSourceText", finishSource); A.Set(controller, "split", splitView);
             A.Set(controller, "productShadesGroup", productGroup);
             Kit.SetArray(controller, "productShadeButtons", productShades); Kit.SetArray(controller, "recommendedShadeButtons", recommendedShades);
             A.Set(controller, "recommendedLabel", recommendedLabel);

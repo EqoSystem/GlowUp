@@ -95,7 +95,7 @@ namespace GlowUp.EditorTools
             const float gap = 20;
             var grid = TileGrid(c.card, "SkinToneTiles", gap);
             RemoveBrokenScripts(grid.gameObject);
-            TopBottom(grid, c.card, HeaderBottom, FooterTop);                      // the six tiles share whatever height the phone has
+            TopBottom(grid, c.card, HeaderBottom, FooterTop + 150);                // the six tiles share the height that is left (the help row sits under them)
             grid.GetComponent<GridLayoutGroup>().cellSize = new Vector2((InnerWidth - gap) / 2f, 388);
             var fit = SceneBuilderCore.Ensure<GridFitCells>(grid.gameObject);
             SceneBuilderCore.SetField(fit, "columns", 2); SceneBuilderCore.SetField(fit, "rows", 3);
@@ -111,11 +111,68 @@ namespace GlowUp.EditorTools
             var group = SceneBuilderCore.Ensure<TileSelectionGroup>(grid.gameObject);
             SetArray(group, "tiles", new Object[] { fair, light, medium, tan, deep, dark });
 
+            // ---- 22 Nov 2026 (panel): the help row under the tiles: a selfie suggests the tone, a sheet says where the tones come from ----
+            Button selfieOpen = HelpLink(c.card, "SelfieToneButton", "Find my tone with a selfie", 0, true);
+            Button toneSources = HelpLink(c.card, "SkinToneSourcesButton", "Where tones come from", 0, false);
+            foreach (Button help in new[] { selfieOpen, toneSources })
+            {
+                var hr = (RectTransform)help.transform;
+                bool left = help == selfieOpen;
+                hr.anchorMin = new Vector2(left ? 0f : 0.5f, 0f); hr.anchorMax = new Vector2(left ? 0.5f : 1f, 0f); hr.pivot = new Vector2(0.5f, 0f);
+                hr.offsetMin = new Vector2(left ? PadX : 8f, FooterTop + 8f); hr.offsetMax = new Vector2(left ? -8f : -PadX, FooterTop + 8f + 132f);
+            }
+
+            Transform oldSelfie = Loose(c.canvas, "SelfiePanel");
+            if (oldSelfie != null) Object.DestroyImmediate(oldSelfie.gameObject);
+            AppKit.AppPopup selfie = AppKit.Overlay(new AppKit.AppScreen { canvas = c.canvas }, "SelfiePanel", "Find my tone");
+            AppKit.At(selfie.box, AppKit.MC, new Vector2(0, 40), new Vector2(920, 1240));
+            GameObject frame = AppKit.Node(selfie.box, "PreviewFrame", typeof(RectMask2D), typeof(Image));
+            AppKit.At(frame.transform, AppKit.TC, new Vector2(0, -130), new Vector2(640, 640));
+            frame.GetComponent<Image>().color = new Color(0, 0, 0, 0.08f);
+            GameObject previewObject = AppKit.Node(frame.transform, "Preview", typeof(RawImage));
+            AppKit.Fill(previewObject.transform);
+            TextMeshProUGUI selfieStatus = AppKit.Label(selfie.box, "StatusText", "", 30, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            AppKit.Fill(selfieStatus.transform, 48, 330, 48, 800);
+            AppKit.ShrinkWrapped(selfieStatus, 24);
+            Button deleteSelfie = AppKit.PillButton(selfie.box, "DeleteSelfieButton", "Delete my selfie", 32, ThemeRole.SurfaceAlt, ThemeRole.Warning);
+            AppKit.BottomStrip(deleteSelfie.transform, 172, 100, 48, 48);
+            Button selfieClose = AppKit.PillButton(selfie.box, "CloseButton", "Close", 36, ThemeRole.SurfaceAlt, ThemeRole.MainText);
+            AppKit.BottomStrip(selfieClose.transform, 44, 108, 48, 462);
+            Button selfieTake = AppKit.PillButton(selfie.box, "TakePhotoButton", "Take photo", 36, ThemeRole.ButtonFill, ThemeRole.ButtonText);
+            AppKit.BottomStrip(selfieTake.transform, 44, 108, 462, 48);
+
+            Transform oldConsent = Loose(c.canvas, "SelfieConsentPanel");
+            if (oldConsent != null) Object.DestroyImmediate(oldConsent.gameObject);
+            AppKit.AppPopup consent = AppKit.Overlay(new AppKit.AppScreen { canvas = c.canvas }, "SelfieConsentPanel", "Use a selfie?");
+            AppKit.At(consent.box, AppKit.MC, new Vector2(0, 60), new Vector2(900, 760));
+            TextMeshProUGUI consentText = AppKit.Label(consent.box, "MessageText", "Agree first.", 32, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            AppKit.Fill(consentText.transform, 48, 190, 48, 130);
+            AppKit.ShrinkWrapped(consentText, 26);
+            Button consentCancel = AppKit.PillButton(consent.box, "CancelButton", "Cancel", 36, ThemeRole.SurfaceAlt, ThemeRole.MainText);
+            AppKit.BottomStrip(consentCancel.transform, 44, 108, 48, 462);
+            Button consentAgree = AppKit.PillButton(consent.box, "AgreeButton", "I agree", 36, ThemeRole.ButtonFill, ThemeRole.ButtonText);
+            AppKit.BottomStrip(consentAgree.transform, 44, 108, 462, 48);
+            Object.DestroyImmediate(consentAgree.GetComponent<ThemedGraphic>());                 // ConfirmDialog paints this button itself
+            Object.DestroyImmediate(AppKit.LabelOf(consentAgree).GetComponent<ThemedGraphic>());
+            var consentDialog = SceneBuilderCore.Ensure<GlowUp.AppSettings.ConfirmDialog>(SceneBuilderCore.EnsureRoot("SelfieConsentDialog"));
+            SceneBuilderCore.SetField(consentDialog, "panel", consent.panel); SceneBuilderCore.SetField(consentDialog, "titleText", consent.title);
+            SceneBuilderCore.SetField(consentDialog, "messageText", consentText);
+            SceneBuilderCore.SetField(consentDialog, "confirmButton", consentAgree); SceneBuilderCore.SetField(consentDialog, "confirmLabel", AppKit.LabelOf(consentAgree));
+            SceneBuilderCore.SetField(consentDialog, "cancelButton", consentCancel); SceneBuilderCore.SetField(consentDialog, "cancelLabel", AppKit.LabelOf(consentCancel));
+
+            var selfieTone = SceneBuilderCore.Ensure<SkinToneSelfie>(SceneBuilderCore.EnsureRoot("SkinToneSelfie"));
+            SceneBuilderCore.SetField(selfieTone, "openButton", selfieOpen); SceneBuilderCore.SetField(selfieTone, "toneGroup", group);
+            SceneBuilderCore.SetField(selfieTone, "panel", selfie.panel); SceneBuilderCore.SetField(selfieTone, "preview", previewObject.GetComponent<RawImage>());
+            SceneBuilderCore.SetField(selfieTone, "statusText", selfieStatus); SceneBuilderCore.SetField(selfieTone, "takeButton", selfieTake);
+            SceneBuilderCore.SetField(selfieTone, "closeButton", selfieClose); SceneBuilderCore.SetField(selfieTone, "deleteButton", deleteSelfie);
+            SceneBuilderCore.SetField(selfieTone, "consentDialog", consentDialog);
+
             var go = SceneBuilderCore.EnsureRoot("OnboardingStep3FlowController");
             var ctl = SceneBuilderCore.Ensure<OnboardingStep3FlowController>(go);
             SceneBuilderCore.SetField(ctl, "skinToneGroup", group);
             SceneBuilderCore.SetField(ctl, "continueButton", c.cont); SceneBuilderCore.SetField(ctl, "continueAnimator", c.anim);
             SceneBuilderCore.SetField(ctl, "backButton", c.back); SceneBuilderCore.SetField(ctl, "feedbackText", c.feedback);
+            SceneBuilderCore.SetField(ctl, "toneSourcesButton", toneSources);
 
             FinishScene(); SceneBuilderCore.Save(scene);
             Debug.Log("[GlowUp] OnboardingStep3Scene built. Tile = OuterPanel (frame) > InnerPanel (tone colour) > tone name; SubtitleText = description in the frame.");

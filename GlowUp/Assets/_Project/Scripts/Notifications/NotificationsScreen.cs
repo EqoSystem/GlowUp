@@ -20,6 +20,15 @@ namespace GlowUp.Notifications
         [SerializeField] private RectTransform content;
         [SerializeField] private TextMeshProUGUI emptyText;
         [SerializeField] private TextMeshProUGUI fontSource;
+        [Header("22 Nov 2026 (panel): the two buttons above the list (NotificationsScene > ListActions)")]
+        [SerializeField] private Button markAllButton;
+        [SerializeField] private Button deleteAllButton;
+        [SerializeField] private GlowUp.AppSettings.ConfirmDialog deleteAllConfirm;
+        [SerializeField] private GameObject listActions;
+        [SerializeField] private string deleteAllTitle = "Delete all?";
+        [SerializeField] private string deleteAllBody = "Every notification in this list is removed. This cannot be undone.";
+        [SerializeField] private string deleteAllLabel = "Delete all";
+        [SerializeField] private string msgDeleteAllFailed = "Some notifications could not be deleted. Check your connection and try again.";
         [SerializeField] private string msgEmpty = "No notifications yet. Replies to your reports and news about GlowUp appear here.";
         [SerializeField] private string msgLoading = "Loading your notifications...";
         [SerializeField] private string msgDeleted = "Notification deleted.";
@@ -31,6 +40,21 @@ namespace GlowUp.Notifications
         void Awake()
         {
             if (backButton != null) backButton.onClick.AddListener(Leave);
+            if (markAllButton != null) markAllButton.onClick.AddListener(() => { InboxService.Instance?.MarkAllRead(); });
+            if (deleteAllButton != null) deleteAllButton.onClick.AddListener(AskDeleteAll);
+        }
+
+        void AskDeleteAll()
+        {
+            if (InboxService.Instance == null) return;
+            if (deleteAllConfirm == null) { _ = DoDeleteAll(); return; }
+            deleteAllConfirm.Ask(deleteAllTitle, deleteAllBody, deleteAllLabel, () => { _ = DoDeleteAll(); }, true);
+        }
+
+        async System.Threading.Tasks.Task DoDeleteAll()
+        {
+            int failed = await InboxService.Instance.DeleteAll();
+            if (failed > 0 && FormalToast.Current != null) FormalToast.Current.Show(FormalToast.Kind.Warning, msgDeleteAllFailed);
         }
 
         void OnEnable()
@@ -64,6 +88,8 @@ namespace GlowUp.Notifications
                 emptyText.gameObject.SetActive(items.Count == 0);
                 emptyText.text = inbox != null && inbox.Loaded ? msgEmpty : msgLoading;
             }
+            if (listActions != null) listActions.SetActive(items.Count > 0);
+            if (markAllButton != null) markAllButton.interactable = items.Exists(i => !i.read);
             foreach (InboxService.Item item in items) rows.Add(MakeRow(item));
             LayoutRebuilder.MarkLayoutForRebuild(content);
         }

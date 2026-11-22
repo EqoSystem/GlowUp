@@ -250,6 +250,7 @@ namespace GlowUp.AppSettings
                 }
                 await profile.DeleteAsync().OrTimeout(StepWaitSeconds, "Deleting your profile");
                 dataRemoved = true;
+                GlowUp.Onboarding.SelfieStore.Delete();          // the skin tone selfie lives only on this phone: it goes with the account
                 { }
                 // (no Firebase Storage is used by the app: there are no files to remove)
 

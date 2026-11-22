@@ -49,6 +49,8 @@ namespace GlowUp.AR
         [SerializeField] private ChoiceTabs finishTabs;
         [Tooltip("The finish of each tab. The names must match the list 'Finishes' on FallbackMakeupOverlay.")]
         [SerializeField] private string[] finishNames = { "matte", "satin", "glossy", "shimmer", "metallic" };
+        [Tooltip("22 Nov 2026 (panel): says where the starting texture came from (the product's scan, your own choice, a guess from the kind of product). Built in the scene (FinishSourceText).")]
+        [SerializeField] private TextMeshProUGUI finishSourceText;
         [Tooltip("The finish used when the scan did not tell the product's finish")]
         [SerializeField] private string defaultFinish = "satin";
 
@@ -108,7 +110,16 @@ namespace GlowUp.AR
             if (changeProductButton != null) changeProductButton.onClick.AddListener(OpenPicker);
             if (pickerScanButton != null) pickerScanButton.onClick.AddListener(() => { StopCamera(); SceneNavigator.Go(scanScene); });
             if (areaTabs != null) areaTabs.Changed += _ => OnAreaChanged();
-            if (finishTabs != null) finishTabs.Changed += index => ApplyFinish(index);
+            if (finishTabs != null) finishTabs.Changed += index =>
+            {
+                ApplyFinish(index);
+                // a tap is the user's own choice: it is remembered for products whose scan did not tell the finish
+                if (finishNames != null && index >= 0 && index < finishNames.Length)
+                {
+                    ArTexturePreference.Preferred = finishNames[index];
+                    if (finishSourceText != null) finishSourceText.text = ArTexturePreference.SourceLine(ArTexturePreference.Source.Preference);
+                }
+            };
             if (split != null) split.Changed += on => { if (liveTracking != null) liveTracking.SetCompare(on); };
             foreach (ShadeButton b in AllShadeButtons()) if (b != null) b.Clicked += Select;
             if (intensitySlider != null)
@@ -265,12 +276,8 @@ namespace GlowUp.AR
             if (area == ShadeAdvisor.Brows && modeKnown && liveTracking != null && !liveTracking.FollowsFace) Say(msgBrowsNeedLive);
 
             // the finish: what the scan saw on the product, otherwise a sensible guess from the kind of product
-            string finish = record != null ? (record.finish ?? "") : "";
-            if (Array.IndexOf(finishNames, finish) < 0)
-            {
-                string type = record != null ? (record.cosmeticType ?? "").ToLowerInvariant() : "";
-                finish = type.Contains("gloss") ? "glossy" : type.Contains("foundation") || type.Contains("concealer") ? "matte" : defaultFinish;
-            }
+            string finish = ArTexturePreference.Choose(record != null ? record.finish : null, record != null ? record.cosmeticType : null, finishNames, defaultFinish, out ArTexturePreference.Source finishSource);
+            if (finishSourceText != null) finishSourceText.text = ArTexturePreference.SourceLine(finishSource);
             int finishIndex = Mathf.Max(0, Array.IndexOf(finishNames, finish));
             if (finishTabs != null) finishTabs.Select(finishIndex, false);
             ApplyFinish(finishIndex);

@@ -55,6 +55,9 @@
       "maxDuration": 20,
       "includeFiles": "_Shared/sourceLinkRules.mjs"
     },
+    "api/email-otp.js": {
+      "maxDuration": 15
+    },
     "api/mcp.js": {
       "maxDuration": 10,
       "includeFiles": "_Shared/data/fdaCatalogue.json"

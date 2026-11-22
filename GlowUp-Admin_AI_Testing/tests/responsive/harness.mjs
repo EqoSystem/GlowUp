@@ -41,6 +41,7 @@ export async function openPage(browser, key, { theme = "light", width = 1440, he
             return route.fulfill({ status: 200, contentType: "text/javascript", body: fs.readFileSync(file, "utf8"), headers: { "access-control-allow-origin": "*" } });
         }
         if (url.host === "glowup.test") {
+            if (url.pathname === "/api/email-otp") return route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"not-set-up"}' });   // the 6-digit code is not set up here: the page keeps the link
             if (url.pathname.startsWith("/api/")) return route.fulfill({ status: 404, body: "{}" });
             const file = path.join(SITE, decodeURIComponent(url.pathname));
             if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) return route.fulfill({ status: 404, body: "not found" });
@@ -51,7 +52,7 @@ export async function openPage(browser, key, { theme = "light", width = 1440, he
     const page = await ctx.newPage();
     const errors = [];
     page.on("pageerror", (e) => errors.push(String(e.message || e).slice(0, 200)));
-    page.on("console", (m) => { if (m.type() === "error") errors.push("console: " + m.text().slice(0, 200)); });
+    page.on("console", (m) => { if (m.type() === "error" && !String(m.location().url || "").endsWith("/api/email-otp")) errors.push("console: " + m.text().slice(0, 200)); });
 
     const settle = async (ms = 300) => {
         await page.waitForTimeout(ms);

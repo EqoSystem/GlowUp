@@ -156,6 +156,12 @@ html:has(.terms-dialog[open]) { overflow: hidden; }
 .check-card[data-state="declined"] .mail-tick { background: var(--bad); }
 .check-card[data-state="declined"] .mail-tick svg { stroke: var(--bad-ink); }
 @keyframes tick-pop { 0% { transform: scale(.6); } 60% { transform: scale(1.18); } 100% { transform: none; } }
+.code-block { margin-top: calc(18 * var(--u)); text-align: left; }
+.code-block[hidden] { display: none; }
+.code-block label { display: block; font-size: var(--fs-sm); color: var(--text-2); margin-bottom: calc(6 * var(--u)); }
+.code-row { display: flex; gap: calc(10 * var(--u)); flex-wrap: wrap; }
+.code-row input { flex: 1 1 calc(120 * var(--u)); min-width: 0; letter-spacing: .35em; text-align: center; font-size: calc(20 * var(--u)); }
+.code-block .login-message { min-height: calc(20 * var(--u)); margin-top: calc(6 * var(--u)); }
 .check-lead { margin: calc(10 * var(--u)) 0 0; font-size: var(--fs-sm); color: var(--text-2); }
 .check-lead[hidden] { display: none; }
 .check-email { margin: calc(2 * var(--u)) 0 0; overflow-wrap: anywhere; }
