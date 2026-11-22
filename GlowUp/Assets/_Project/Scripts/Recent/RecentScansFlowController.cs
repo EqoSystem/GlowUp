@@ -201,7 +201,14 @@ namespace GlowUp.Recent
                     {
                         swipe.SetActions(true, ProductScope.CanTryOn(record));
                         swipe.SwipedLeft += _ => { if (!shaking && !popping && tile.Data is ScanRecord gone) { popping = true; tile.PlayPop(() => { RemoveOne(gone.id); popping = false; if (this != null) Refresh(); }); } };
-                        swipe.SwipedRight += _ => { if (!shaking && tile.Data is ScanRecord tryOn) { ScanSession.TryOn = tryOn; SceneNavigator.Go(tryOnScene); } };
+                        swipe.SwipedRight += _ => { if (!shaking && tile.Data is ScanRecord tryOn) { ScanSession.TryOnSet = null; ScanSession.TryOn = tryOn; SceneNavigator.Go(tryOnScene); } };
+                        swipe.SwipedRightFar += _ =>          // a longer swipe: every scan of the list that can be tried on
+                        {
+                            if (shaking || !(tile.Data is ScanRecord first)) return;
+                            var all = new List<ScanRecord>();
+                            foreach (ProductTileView t in tiles) if (t != null && t.Data is ScanRecord r && ProductScope.CanTryOn(r)) all.Add(r);
+                            ScanSession.TryOnSet = all; ScanSession.TryOn = first; SceneNavigator.Go(tryOnScene);
+                        };
                     }
                     if (tile.TryGetComponent(out HoldToRemoveTile hold))
                     {

@@ -178,6 +178,7 @@ namespace GlowUp.AR
             if (liveTracking != null) { liveTracking.ModeDecided -= OnModeDecided; liveTracking.FollowsFaceChanged -= RefreshAreaTabs; }
             // 17 Nov 2026 (owner): the product is forgotten on leaving AR Try-On, so the next visit needs a product chosen again
             ScanSession.TryOn = null;
+            ScanSession.TryOnSet = null;
         }
         void StopCamera()
         {
@@ -431,11 +432,13 @@ namespace GlowUp.AR
             pickerRows.Clear();
 
             string words = SearchWords();
-            List<ScanRecord> saved = ScanHistoryRepository.Active().FindAll(ProductScope.CanTryOn);      // skin care, hair and body products cannot be tried on
+            // "try on all": only the products of the list the user swiped from; otherwise the saved scans (skin care, hair and body products cannot be tried on)
+            bool fromSet = ScanSession.TryOnSet != null && ScanSession.TryOnSet.Count > 0;
+            List<ScanRecord> saved = fromSet ? ScanSession.TryOnSet.FindAll(ProductScope.CanTryOn) : ScanHistoryRepository.Active().FindAll(ProductScope.CanTryOn);
             if (words.Length > 0) saved = saved.FindAll(r => Holds(r.Title, words) || Holds(r.brandName, words) || Holds(r.cosmeticType, words));
 
             // not scanned yet: the product can be searched for in the inventory by hand
-            if (words.Length >= Mathf.Max(1, searchFromLetters) && inventory != null)
+            if (!fromSet && words.Length >= Mathf.Max(1, searchFromLetters) && inventory != null)
             {
                 int found = 0;
                 foreach (ProductData product in inventory)

@@ -110,6 +110,7 @@ namespace GlowUp.EditorTools
             visual.transform.SetAsLastSibling();
             var swipe = SceneBuilderCore.Ensure<TileSwipeActions>(root);
             A.Set(swipe, "visual", (RectTransform)visual.transform); A.Set(swipe, "leftHint", leftHint); A.Set(swipe, "rightHint", rightHint);
+            A.Set(swipe, "rightHintLabel", rightHint.GetComponentInChildren<TextMeshProUGUI>(true));
 
             // ---- the strip that is uncovered when the row opens: it hangs under the closed row and is cut off at its own edge ----
             var actions = A.Node(visual.transform, "Actions", typeof(RectMask2D), typeof(CanvasGroup));

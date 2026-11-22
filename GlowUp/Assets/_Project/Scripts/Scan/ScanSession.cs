@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using GlowUp.Data;
 
 namespace GlowUp.Scan
@@ -67,6 +68,8 @@ namespace GlowUp.Scan
 
         /// <summary>The product chosen for AR Try-On. Null = let the user pick one from their saved scans.</summary>
         public static ScanRecord TryOn;
+        /// <summary>"Try on all" (a long swipe to the right on a row): the products of that list that can be tried on. AR Try-On then offers only these in its product picker. Null/empty = the usual picker.</summary>
+        public static List<ScanRecord> TryOnSet;
 
         /// <summary>The flashlight on the scan screen: what the user chose with its button in the last visit (0 = nothing, 1 = on, -1 = off).</summary>
         public static int LightChoice;

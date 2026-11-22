@@ -23,7 +23,13 @@ namespace GlowUp.Views
         [Tooltip("Behind the row, uncovered when it is dragged to the RIGHT (the right action's words and colour)")]
         [SerializeField] private CanvasGroup rightHint;
         [Range(0.1f, 0.8f)] [SerializeField] private float commitFraction = 0.32f;
-        [Range(0.2f, 0.9f)] [SerializeField] private float maxFraction = 0.5f;
+        [Range(0.2f, 0.9f)] [SerializeField] private float maxFraction = 0.62f;
+        [Tooltip("Dragged to the RIGHT this far (a longer swipe) = the right action for ALL rows of the list (Try on all)")]
+        [Range(0.3f, 0.9f)] [SerializeField] private float allFraction = 0.52f;
+        [Tooltip("The words on the right hint: normal and for the long swipe")]
+        [SerializeField] private TMPro.TextMeshProUGUI rightHintLabel;
+        [SerializeField] private string rightWord = "Try On in AR";
+        [SerializeField] private string rightAllWord = "Try on all";
         [SerializeField] private float returnSeconds = 0.18f;
         [Tooltip("A drag counts as sideways when it is at least this many times longer across than up or down")]
         [SerializeField] private float sidewaysRatio = 1.2f;
@@ -31,7 +37,7 @@ namespace GlowUp.Views
         [SerializeField] private bool rightActionOn = true;
 
         /// <summary>Dragged left / right far enough. The row has already glided back; the owner does what the action means.</summary>
-        public event Action<TileSwipeActions> SwipedLeft, SwipedRight;
+        public event Action<TileSwipeActions> SwipedLeft, SwipedRight, SwipedRightFar;
 
         ScrollRect scroll;
         HoldToRemoveTile hold;
@@ -84,6 +90,7 @@ namespace GlowUp.Views
             offset = Mathf.Clamp(offset, low, high);
             visual.anchoredPosition = new Vector2(home.x + offset, home.y);
             ShowHints(width > 1f ? offset / (width * commitFraction) : 0f);
+            if (rightHintLabel != null) rightHintLabel.text = SwipedRightFar != null && offset >= width * allFraction ? rightAllWord : rightWord;
         }
 
         public void OnEndDrag(PointerEventData e)
@@ -97,7 +104,7 @@ namespace GlowUp.Views
             bool left = offset <= -commit && leftActionOn, right = offset >= commit && rightActionOn;
             returning = true; returnT = 0f; returnFrom = offset;
             if (left) SwipedLeft?.Invoke(this);
-            else if (right) SwipedRight?.Invoke(this);
+            else if (right) { if (SwipedRightFar != null && offset >= width * allFraction) SwipedRightFar.Invoke(this); else SwipedRight?.Invoke(this); }
         }
 
         void Update()

@@ -291,6 +291,7 @@ namespace GlowUp.Dashboard
                     swipe.SetActions(true, GlowUp.Scan.ProductScope.CanTryOn(record));
                     swipe.SwipedLeft += _ => OnSave(tile);
                     swipe.SwipedRight += _ => OnTryOn(tile);
+                    swipe.SwipedRightFar += _ => OnTryOnAll(tile);          // a longer swipe: every product of the list that can be tried on
                 }
                 tiles.Add(tile);
                 cards.Add(tile.gameObject);
@@ -312,6 +313,14 @@ namespace GlowUp.Dashboard
         void CloseOtherDrawers(ProductTileView opened)
         {
             foreach (ProductTileView tile in tiles) if (tile != null && tile != opened) tile.SetDrawer(false);
+        }
+
+        void OnTryOnAll(ProductTileView tile)
+        {
+            var all = new List<ScanRecord>();
+            foreach (ProductTileView t in tiles) if (t != null && t.Data is ScanRecord r && GlowUp.Scan.ProductScope.CanTryOn(r)) all.Add(r);
+            ScanSession.TryOnSet = all;
+            OnTryOn(tile);
         }
 
         void OnTryOn(ProductTileView tile)
