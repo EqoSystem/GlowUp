@@ -132,9 +132,12 @@ service cloud.firestore {
       allow list: if isAdmin();
       allow create: if isOwner(uid)
         && !exists(/databases/$(database)/documents/admins/$(uid))
-        && request.resource.data.keys().hasOnly(['name', 'email', 'status', 'emailVerified', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['name', 'firstName', 'middleName', 'lastName', 'email', 'status', 'emailVerified', 'createdAt'])
         && request.resource.data.name is string
-        && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 80
+        && request.resource.data.name.size() >= 2 && request.resource.data.name.size() <= 140
+        && request.resource.data.get('firstName', '') is string && request.resource.data.get('firstName', '').size() <= 40
+        && request.resource.data.get('middleName', '') is string && request.resource.data.get('middleName', '').size() <= 40
+        && request.resource.data.get('lastName', '') is string && request.resource.data.get('lastName', '').size() <= 40
         && request.resource.data.email == request.auth.token.get('email', '')
         && request.resource.data.email.size() > 3
         && request.resource.data.status == 'pending'
@@ -154,6 +157,30 @@ service cloud.firestore {
           && request.resource.data.decidedAt == request.time
           && existsAfter(/databases/$(database)/documents/admins/$(uid)));
       allow delete: if isAdmin() || isOwner(uid);
+    }
+
+    // ---- the admin log-in lock, shared by every browser: loginLocks/{sha-256 of the e-mail} ----
+    // Nobody has to be signed in (the lock is needed before log-in). A page can only count one wrong password at a time, the 3rd sets
+    // a five-minute lock that nobody can shorten, and a lock that has not ended cannot be restarted. A signed-in person removes the
+    // count after a right password. Known limit: someone who types 3 wrong passwords for an admin's e-mail locks that e-mail for 5 minutes.
+    function lockKey(key) { return key.matches('[a-f0-9]{64}'); }
+    function lockShape() {
+      return request.resource.data.keys().hasOnly(['fails', 'untilUnix', 'updatedAt'])
+        && request.resource.data.fails is int && request.resource.data.untilUnix is int
+        && request.resource.data.updatedAt == request.time;
+    }
+    match /loginLocks/{key} {
+      allow get: if lockKey(key);
+      allow create: if lockKey(key) && lockShape() && request.resource.data.fails == 1 && request.resource.data.untilUnix == 0;
+      allow update: if lockKey(key) && lockShape() && (
+        (resource.data.untilUnix == 0 && resource.data.fails < 3 && request.resource.data.fails == resource.data.fails + 1
+          && (request.resource.data.fails < 3
+              ? request.resource.data.untilUnix == 0
+              : (request.resource.data.untilUnix >= request.time.toMillis() / 1000 + 295 && request.resource.data.untilUnix <= request.time.toMillis() / 1000 + 305)))
+        || (request.resource.data.fails == 1 && request.resource.data.untilUnix == 0
+            && ((resource.data.untilUnix > 0 && resource.data.untilUnix <= request.time.toMillis() / 1000)
+                || resource.data.updatedAt < request.time - duration.value(1, 'd'))));
+      allow delete: if signedIn();
     }
 
     // ---- "Use my phone" on the admin forms: ONE short-lived document per link, phoneLinks/{code} ----
@@ -430,6 +457,15 @@ service cloud.firestore {
 
       match /scans/{scanId} {
         allow read, write: if isOwner(uid);
+      }
+
+      // which announcements the user has read or removed, kept in the account so every phone and every install shows the same list
+      match /inboxState/{stateId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid) && stateId == 'state' && !userBanned(uid)
+          && request.resource.data.keys().hasOnly(['hidden', 'read'])
+          && request.resource.data.get('hidden', []) is list && request.resource.data.get('hidden', []).size() <= 300
+          && request.resource.data.get('read', []) is list && request.resource.data.get('read', []).size() <= 300;
       }
 
       // ---- the user's notifications: an admin's reply to a report. Only admins create one;

@@ -636,7 +636,7 @@ namespace GlowUp.Scan
                 string caption = photoMode ? liveModeCaption : photoModeCaption;
                 if (modeCaption.text != caption) modeCaption.text = caption;
             }
-            if (stage == Stage.Scanning && !photoMode && !photoHintSaid) { photoHintSaid = true; Say(msgPhotoHint); }
+            if (stage == Stage.Scanning && !photoMode && !photoHintSaid) { photoHintSaid = true; Say(GlowUp.Auth.AdminAccount.IsAdmin ? msgAdminLiveHint : msgPhotoHint); }
         }
 
         LongPressHint modeHint;
@@ -823,6 +823,18 @@ namespace GlowUp.Scan
         // ---------------------------------------------------------------------------------------
         [Header("Photo mode")]
         [SerializeField] private string msgPhotoModeHint = "Frame the front of the pack, then tap capture.";
+
+        [Header("Admin quick registration (an admin signed in: the guide for which side of the product to photograph)")]
+        [Tooltip("One line per angle, in order. After each capture the guide moves to the next angle; after the last it says the product is complete.")]
+        [TextArea(2, 3)] [SerializeField] private string[] adminAngleHints =
+        {
+            "Angle 1 of 3: the FRONT. Hold the phone straight on, 15 to 25 cm away, so the brand and the product name fill the frame. Avoid glare, then tap capture.",
+            "Angle 2 of 3: the BACK or SIDE with the INGREDIENT LIST. Keep the text flat and sharp, tilt the pack away from the light if it shines, then tap capture.",
+            "Angle 3 of 3: the BARCODE. Line the bars up straight inside the frame, then tap capture. (The live scan reads a barcode too.)"
+        };
+        [SerializeField] private string msgAdminAnglesDone = "All three angles taken. The product is registered in the catalogue as soon as the read is done. Capture again to add another angle.";
+        [SerializeField] private string msgAdminLiveHint = "Admin: the product is added to the catalogue after the scan. Hold the list flat in the frame; use the camera button for the front, back and barcode angles.";
+        int adminAngle;
         [SerializeField] private string liveScanLabel = "Live scan";
         [SerializeField] private string photoMatchesMessageCatalogue = "Tap your product. If it is not here, choose None of these, then type it in.";
 
@@ -837,7 +849,15 @@ namespace GlowUp.Scan
             BuildShutter();
             if (holdButton != null) holdButton.gameObject.SetActive(false);
             if (shutter != null) shutter.gameObject.SetActive(true);
-            Say(msgPhotoModeHint);
+            adminAngle = 0;
+            Say(GlowUp.Auth.AdminAccount.IsAdmin ? AdminAngleHint() : msgPhotoModeHint);
+        }
+
+        /// <summary>The guide line for the next angle an admin should photograph (see adminAngleHints).</summary>
+        string AdminAngleHint()
+        {
+            if (adminAngleHints == null || adminAngleHints.Length == 0) return msgPhotoModeHint;
+            return adminAngle < adminAngleHints.Length ? adminAngleHints[adminAngle] : msgAdminAnglesDone;
         }
 
         void ExitPhotoMode()
@@ -871,7 +891,13 @@ namespace GlowUp.Scan
             if (camera != null) RuntimeUiKit.Icon(rt, "Camera", camera, p.buttonText, side * 0.36f);
             shutter = round.gameObject.AddComponent<Button>();
             shutter.targetGraphic = round;
-            shutter.onClick.AddListener(() => { if (snapshot != null) snapshot.CaptureNow(); });
+            shutter.onClick.AddListener(() =>
+            {
+                if (snapshot == null) return;
+                snapshot.CaptureNow();
+                // an admin is guided from angle to angle: the line changes as soon as one photo is taken
+                if (GlowUp.Auth.AdminAccount.IsAdmin) { adminAngle++; Say(AdminAngleHint()); }
+            });
             _ = ring; _ = core;
             // back to live scanning is the mode switch at the right of the bar (New13 item 1): no "Live scan" pill over the text any more
             shutter.gameObject.SetActive(false);

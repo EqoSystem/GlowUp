@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import {
     queryKind, ingredientsFromText, fromOpenBeautyFacts, fromFdaCatalogue, searchCatalogue, mergeCandidates, brandFor, existingProduct,
-    aliasesFromPubchem, descriptionFromPubchem, suggestClassification, friendlyStarter, scoreCandidate
+    aliasesFromPubchem, descriptionFromPubchem, suggestClassification, friendlyStarter, scoreCandidate, officialLinks
 } from "../_Shared/smartAdd.js";
 
 let checks = 0, failed = 0;
@@ -67,6 +67,13 @@ check(suggestClassification("Unknownium", "", classes) === null, "nothing known,
 check(friendlyStarter("Glycerin", "Humectant") === "Glycerin is a humectant used in make-up.", "a plain starter sentence");
 check(friendlyStarter("X", "Other") === "", "no sentence for Other");
 
+const withSite = [{ id: "b1", name: "Maybelline", aliases: [], website: "https://www.maybelline.com.ph/some/page" }, { id: "b3", name: "Evil", aliases: [], website: "javascript:alert(1)" }, { id: "b4", name: "Plain", aliases: [], website: "http://insecure.example" }];
+const links = officialLinks({ brand: "Maybelline", name: "Superstay Matte Ink" }, withSite);
+check(links[0].url === "https://www.maybelline.com.ph/" && links[0].label === "Brand's official site", "the registered brand's confirmed website is offered (its address only)");
+check(links[1].url === "https://www.maybelline.com.ph/search?q=Superstay%20Matte%20Ink", "a search on the official site is offered");
+check(links[links.length - 1].url === "https://verification.fda.gov.ph/", "the FDA Philippines portal is always offered");
+check(officialLinks({ brand: "Evil", name: "X" }, withSite).length === 1 && officialLinks({ brand: "Plain", name: "X" }, withSite).length === 1, "a website that is not https is never linked");
+check(officialLinks({ brand: "Unknown", name: "X" }, withSite).length === 1, "an unregistered brand gets only the FDA portal");
 console.log(`checks made: ${checks}`);
 console.log(failed === 0 ? "ALL PASSED" : `${failed} FAILED`);
 process.exit(failed === 0 ? 0 : 1);

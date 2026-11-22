@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using GlowUp.Auth;
+using GlowUp.Common;
 using GlowUp.Data;
 using UnityEngine;
 
@@ -72,6 +74,7 @@ namespace GlowUp.Scan
 
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             if (string.IsNullOrEmpty(record.id)) record.id = Guid.NewGuid().ToString("N");     // the inventory entry is named after the scan
+            if (AdminAccount.IsAdmin && named && PublishAsAdmin(record, labelIngredients, type, uid, now)) return;
 
             // ---- the brand ----
             string brandId = record.brandId ?? "", brandName = (record.brandName ?? "").Trim();
@@ -129,6 +132,110 @@ namespace GlowUp.Scan
                 sources = new List<string>(product.sources), source = "scan", reviewed = false, barcode = barcode
             });
             record.productId = productId;
+        }
+
+        /// <summary>
+        /// Quick registration (an admin signed in to the app): the scanned product goes to the catalogue now, with everything the user's
+        /// skin profile is matched against. It is Active and reviewed when it is complete (brand and name known, a printed make-up kind,
+        /// at least 4 ingredients read from the pack or taken from the catalogue); anything less is saved Pending for the website's
+        /// review queue. Returns false when it cannot (the normal Pending path then runs).
+        /// </summary>
+        static bool PublishAsAdmin(ScanRecord record, List<string> labelIngredients, string type, string uid, long now)
+        {
+            if (string.IsNullOrEmpty(uid)) return false;
+            string name = record.productName.Trim(), brandName = (record.brandName ?? "").Trim();
+            var ingredients = new List<string>();
+            foreach (string ingredient in labelIngredients)
+                if (!string.IsNullOrWhiteSpace(ingredient) && ingredients.Count < 80) ingredients.Add(Limit(ingredient.Trim(), 120));
+
+            bool fromPack = record.listFrom == "pack" || record.listFrom == "inventory";
+            bool complete = brandName.Length >= 2 && ingredients.Count >= 4 && fromPack;
+            string status = complete ? "Active" : "Pending";
+
+            // ---- the brand: existing, or new (Active and reviewed when the product is complete) ----
+            string brandId = record.brandId ?? "";
+            if (brandName.Length >= 2)
+            {
+                BrandData known = BrandRepository.FindByName(brandName);
+                if (known != null) { brandId = known.id; brandName = known.name; }
+                else
+                {
+                    brandId = ProductIndex.ScanBrandId(brandName);
+                    SyncQueue.EnqueueSet("brands/" + brandId, new AdminScannedBrandRecord
+                    {
+                        name = Limit(brandName, 60), status = status, reviewed = complete, reviewedBy = complete ? uid : "",
+                        reviewedAtUnix = complete ? now : 0, addedBy = uid, addedAtUnix = now
+                    });
+                    BrandRepository.AddLocal(new BrandData { id = brandId, name = Limit(brandName, 60), category = "Makeup", market = "Global", status = status });
+                }
+                record.brandId = brandId;
+            }
+
+            var shades = new List<string>();
+            if (!string.IsNullOrWhiteSpace(record.shadeHex) && ShadeAdvisor.IsColourCosmetic(type)) shades.Add(record.shadeHex.Trim());
+
+            // ids into the ingredient library: the app finds each ingredient's rating, allergen family and skin-type notes through them
+            var ids = new List<string>();
+            foreach (string ingredient in ingredients)
+            {
+                IngredientData data = IngredientRepository.Find(ingredient);
+                if (data != null && !string.IsNullOrEmpty(data.id) && !ids.Contains(data.id) && ids.Count < 300) ids.Add(data.id);
+            }
+            string barcode = MlKitBarcodeReader.Key(record.barcode).Length > 0 ? Limit(record.barcode.Trim(), 20) : "";
+            var tags = new List<string> { Slug(type) };
+            if (brandName.Length > 0) tags.Add(Slug(brandName));
+            if (shades.Count > 0) tags.Add("has-shades");
+            if (record.fdaChecked && !string.IsNullOrEmpty(record.fdaNumber)) tags.Add("fda-listed");
+            tags.RemoveAll(t => string.IsNullOrEmpty(t));
+
+            string productId = ProductIndex.ScanId(brandName, name);
+            if (productId.Length == 0) productId = "scan_" + record.id;
+            var product = new AdminScannedProductRecord
+            {
+                name = Limit(name, 100), brandId = brandId, brandName = Limit(brandName, 60), cosmeticType = Limit(type, 40), barcode = barcode,
+                description = Limit("Registered from Smart Scan by an admin." + FdaNote(record), 400),
+                ingredients = ingredients, ingredientIds = ids, ingredientCount = ingredients.Count, shades = shades, sources = SourcesFor(record), tags = tags,
+                status = status, reviewed = complete, reviewedBy = complete ? uid : "", reviewedAtUnix = complete ? now : 0, addedBy = uid, addedAtUnix = now
+            };
+            SyncQueue.EnqueueSet("products/" + productId, product);       // sent at once while online; kept and sent later when offline
+            ProductRepository.AddLocal(new ProductData
+            {
+                id = productId, name = product.name, brandId = brandId, brandName = product.brandName, cosmeticType = product.cosmeticType,
+                description = product.description, status = status, ingredients = new List<string>(ingredients), shades = new List<string>(shades),
+                sources = new List<string>(product.sources), source = "admin", reviewed = complete, barcode = barcode
+            });
+            record.productId = productId;
+            FormalToast.ShowAfterNextScene(FormalToast.Kind.Info, $"Sending {product.name} to the catalogue...");
+            WatchDelivery("products/" + productId, product.name, complete);
+            return true;
+        }
+
+        /// <summary>
+        /// Real time: the toast says "registered" only when the database has really taken the write (the queue no longer holds it),
+        /// and says so plainly when it is still waiting (no connection) or was refused. The website's inventory is a live listener, so the
+        /// product appears there by itself the moment the write lands.
+        /// </summary>
+        static async void WatchDelivery(string path, string name, bool complete)
+        {
+            const float waitSeconds = 25f;
+            float until = Time.realtimeSinceStartup + waitSeconds;
+            while (SyncQueue.HasPending(path) && Time.realtimeSinceStartup < until) await System.Threading.Tasks.Task.Delay(400);
+            FormalToast toast = FormalToast.Current;
+            if (toast == null) return;
+            if (!SyncQueue.HasPending(path))
+                toast.Show(complete ? FormalToast.Kind.Success : FormalToast.Kind.Info,
+                    complete ? $"Registered in the catalogue: {name}. It is live for users." : $"Saved as Pending: {name}. It needs a review on the website (brand, or a list read from the pack).");
+            else
+                toast.Show(FormalToast.Kind.Warning, $"{name} is saved on this phone and goes to the catalogue as soon as the connection allows.");
+        }
+
+        static string Slug(string text)
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (char c in (text ?? "").ToLowerInvariant()) sb.Append(char.IsLetterOrDigit(c) && c < 128 ? c : '-');
+            string s = sb.ToString().Trim('-');
+            while (s.Contains("--")) s = s.Replace("--", "-");
+            return s.Length > 30 ? s.Substring(0, 30).Trim('-') : s;
         }
 
         static void QueueIngredientSuggestion(ScanRecord record, ProductData listed, List<string> labelIngredients)

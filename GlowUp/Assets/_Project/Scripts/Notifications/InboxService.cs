@@ -39,7 +39,7 @@ namespace GlowUp.Notifications
         public static event Action Changed;
 
         readonly List<Item> personal = new List<Item>(), announcements = new List<Item>();
-        ListenerRegistration personalListener, announcementListener;
+        ListenerRegistration personalListener, announcementListener, stateListener;
         string uid;
         HashSet<string> hidden = new HashSet<string>(), readHere = new HashSet<string>();
         bool dirty;
@@ -76,6 +76,18 @@ namespace GlowUp.Notifications
             personalListener = db.Collection("users").Document(uid).Collection("notifications")
                 .OrderByDescending("createdAt").Limit(Limit)
                 .Listen(snap => { personal.Clear(); foreach (var d in snap.Documents) personal.Add(Read(d, Source.Personal)); Loaded = true; Failed = false; dirty = true; });
+            // 22 Nov 2026: which announcements this account has read or removed is kept in the account (users/{uid}/inboxState/state),
+            // not only on this phone, so a new install or a second phone shows the same notifications and the same unread count
+            stateListener = db.Collection("users").Document(uid).Collection("inboxState").Document("state")
+                .Listen(snap =>
+                {
+                    if (snap == null || !snap.Exists) return;
+                    var f = snap.ToDictionary();
+                    foreach (string id in IdsOf(f, "hidden")) hidden.Add(id);
+                    foreach (string id in IdsOf(f, "read")) readHere.Add(id);
+                    SaveSet(HiddenKey + uid, hidden); SaveSet(ReadKey + uid, readHere);
+                    dirty = true;
+                });
             announcementListener = db.Collection("announcements").OrderByDescending("createdAt").Limit(Limit)
                 .Listen(snap => { announcements.Clear(); foreach (var d in snap.Documents) announcements.Add(Read(d, Source.Announcement)); Loaded = true; Failed = false; dirty = true; });
         }
@@ -84,6 +96,7 @@ namespace GlowUp.Notifications
         {
             personalListener?.Stop(); personalListener = null;
             announcementListener?.Stop(); announcementListener = null;
+            stateListener?.Stop(); stateListener = null;
             personal.Clear(); announcements.Clear();
         }
 
@@ -126,7 +139,7 @@ namespace GlowUp.Notifications
         {
             if (item == null || item.read) return;
             item.read = true; dirty = true;
-            if (item.source == Source.Announcement) { readHere.Add(item.id); SaveSet(ReadKey + uid, readHere); return; }
+            if (item.source == Source.Announcement) { readHere.Add(item.id); SaveSet(ReadKey + uid, readHere); PushState("read", item.id); return; }
             try { await FirebaseFirestore.DefaultInstance.Collection("users").Document(uid).Collection("notifications").Document(item.id).UpdateAsync("read", true); }
             catch (Exception) { /* offline: the database library sends it later */ }
         }
@@ -135,10 +148,28 @@ namespace GlowUp.Notifications
         public async System.Threading.Tasks.Task<bool> Delete(Item item)
         {
             if (item == null) return false;
-            if (item.source == Source.Announcement) { hidden.Add(item.id); SaveSet(HiddenKey + uid, hidden); dirty = true; return true; }
+            if (item.source == Source.Announcement) { hidden.Add(item.id); SaveSet(HiddenKey + uid, hidden); dirty = true; PushState("hidden", item.id); return true; }
             personal.RemoveAll(p => p.id == item.id); dirty = true;
             try { await FirebaseFirestore.DefaultInstance.Collection("users").Document(uid).Collection("notifications").Document(item.id).DeleteAsync(); return true; }
             catch (Exception) { return false; }
+        }
+
+        /// <summary>Adds one id to this account's read / hidden list (a merge: two phones adding at once keep both). Offline, the library sends it later.</summary>
+        async void PushState(string field, string id)
+        {
+            if (string.IsNullOrEmpty(uid)) return;
+            try
+            {
+                await FirebaseFirestore.DefaultInstance.Collection("users").Document(uid).Collection("inboxState").Document("state")
+                    .SetAsync(new Dictionary<string, object> { { field, FieldValue.ArrayUnion(id) } }, SetOptions.MergeAll);
+            }
+            catch (Exception) { /* the phone keeps its own copy; the next change tries again */ }
+        }
+
+        static IEnumerable<string> IdsOf(IDictionary<string, object> f, string key)
+        {
+            if (f.TryGetValue(key, out object v) && v is IEnumerable<object> list)
+                foreach (object o in list) if (o is string s && s.Length > 0 && s.Length <= 80) yield return s;
         }
 
         static HashSet<string> LoadSet(string key)

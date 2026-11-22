@@ -26,12 +26,22 @@ export const passwordOk = (password) => Object.values(passwordChecks(password)).
 /** The name as it is saved: spaces squeezed, trimmed, at most NAME_MAX characters. */
 export const cleanName = (name) => String(name || "").replace(/\s+/g, " ").trim().slice(0, NAME_MAX);
 
+export const PART_MAX = 40;
+/** One part of a name (first, middle, last): spaces squeezed, trimmed, at most PART_MAX characters. */
+export const cleanPart = (part) => String(part || "").replace(/\s+/g, " ").trim().slice(0, PART_MAX);
+/** The full name that is saved: first, middle (when given) and last, in that order. */
+export const fullName = ({ first, middle, last }) => cleanName([cleanPart(first), cleanPart(middle), cleanPart(last)].filter(Boolean).join(" "));
+
 /** The first problem of the form, or "" when it can be sent. Field order, so the message names the field the eye meets first. */
-export function formProblem({ name, email, password, confirm, agreed }) {
-    const n = cleanName(name);
+export function formProblem({ first, middle, last, email, password, confirm, agreed }) {
+    const f = cleanPart(first), m = cleanPart(middle), l = cleanPart(last);
     const e = String(email || "").trim();
-    if (n.length < NAME_MIN) return { field: "name", text: "Enter your full name." };
-    if (!/\p{L}/u.test(n)) return { field: "name", text: "A name needs letters." };
+    if (f.length < 1) return { field: "first", text: "Enter your first name." };
+    if (!/\p{L}/u.test(f)) return { field: "first", text: "A first name needs letters." };
+    if (m.length > 0 && !/\p{L}/u.test(m)) return { field: "middle", text: "A middle name needs letters. Leave it empty if you have none." };
+    if (l.length < 1) return { field: "last", text: "Enter your last name." };
+    if (!/\p{L}/u.test(l)) return { field: "last", text: "A last name needs letters." };
+    if (fullName({ first: f, middle: m, last: l }).length < NAME_MIN) return { field: "first", text: "Enter your full name." };
     if (e === "") return { field: "email", text: "Enter your email address." };
     if (!EMAIL_SHAPE.test(e)) return { field: "email", text: "That does not look like an email address." };
     if (!password) return { field: "password", text: "Create a password." };

@@ -52,7 +52,8 @@ namespace GlowUp.AppSettings
         [SerializeField] private string msgSentDone = "Thank you. Your report went straight to the GlowUp team. Their reply will appear in your Notifications.";
         [SerializeField] private string msgValidation = "Please choose a category and describe what happened.";
         [SerializeField] private string msgFailure = "We couldn't send your report. Please try again.";
-        [SerializeField] private string msgTimeout = "Not sent yet: there is no connection. Your report is saved on this phone and goes out by itself when you are back online.";
+        [SerializeField] private string msgTimeout = "Your report is still being sent. It is saved on this phone and goes out by itself as soon as the connection allows. You can leave this screen: a message tells you when it has arrived.";
+        [SerializeField] private string msgLateDelivered = "Your report has now reached the GlowUp team. Their reply will appear in your Notifications.";
         [SerializeField] private string msgSignIn = "Sign in to send a report, so the GlowUp team can reply to you.";
         [SerializeField] private string msgSending = "Sending...";
         [SerializeField] private string defaultSendButtonText = "Send Report";
@@ -355,7 +356,8 @@ namespace GlowUp.AppSettings
                     if (messageInput != null) messageInput.text = "";
                     currentReportDocId = null;
                     if (panel != null && panel.IsOpen) panel.Hide();
-                    ShowCenteredPopup("Not sent yet", msgTimeout, "OK");
+                    ShowCenteredPopup("Still processing", msgTimeout, "OK");
+                    WatchLateDelivery(writeTask);
                 }
                 else
                 {
@@ -401,6 +403,18 @@ namespace GlowUp.AppSettings
                 if (sendButton != null) sendButton.interactable = true;
                 if (sendLabel != null) sendLabel.text = defaultSendButtonText;
             }
+        }
+
+        /// <summary>A report that was still going out when the wait ended: when the database finally takes it, a toast says so.</summary>
+        async void WatchLateDelivery(Task write)
+        {
+            try
+            {
+                await write;
+                var live = FormalToast.OnScreen(transform, sendLabel);
+                if (live != null) live.Show(FormalToast.Kind.Success, msgLateDelivered);
+            }
+            catch (Exception) { /* refused or cancelled: the queue keeps it, nothing more to say here */ }
         }
 
         /// <summary>

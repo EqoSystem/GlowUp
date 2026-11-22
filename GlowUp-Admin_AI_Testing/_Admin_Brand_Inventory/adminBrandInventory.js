@@ -322,6 +322,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("productBrandInput").addEventListener("change", () => sourceEditor.paint());
     el("productBarcodeInput").addEventListener("input", showBarcodeCheck);
     el("productNameInput").addEventListener("input", showScopeHint);
+    el("productNameInput").addEventListener("input", showNameClash);
+    el("productBrandInput").addEventListener("change", showNameClash);
+    el("productBarcodeInput").addEventListener("input", showNameClash);
+    el("productForm").addEventListener("input", saveDraft);
+    el("productForm").addEventListener("change", saveDraft);
     el("productTypeOtherInput").addEventListener("input", showScopeHint);
     el("addBrandForm").addEventListener("submit", saveBrand);
     el("productForm").addEventListener("submit", saveProduct);
@@ -1820,6 +1825,61 @@ async function purgeFromBin(keys) {
 
 
 
+// While typing: say at once when the product (same brand and name, or the same barcode) is in the inventory already, so the admin
+// opens it instead of adding a second one. The save also refuses it; this only tells sooner.
+function showNameClash() {
+    const note = el("productNameClash");
+    if (!note) return;
+    const name = el("productNameInput").value.trim(), brandId = el("productBrandInput").value;
+    const code = barcodeKey(el("productBarcodeInput").value.trim());
+    const same = everyProduct.find((p) => p.id !== editingProductId && !p.binned
+        && ((code && barcodeKey(p.barcode) === code) || (name.length >= 3 && brandId && p.brandId === brandId && [p.name, ...p.aliases].some((known) => compactName(known) === compactName(name)))));
+    if (!same) { note.hidden = true; note.textContent = ""; return; }
+    note.textContent = `Already listed: "${same.name}" of ${brandNameOf(same)}${same.status !== "Active" ? " (" + same.status + ")" : ""}. Close this and open it from the list instead of adding it twice.`;
+    note.hidden = false;
+}
+
+// A new product is kept as a draft in this browser while it is typed (never sent anywhere), so a closed tab or a crash does not lose
+// the work. It is offered back the next time Add Product opens, and removed when the product is saved or the admin throws it away.
+const DRAFT_KEY = "glowup.inventory.productDraft.v1";
+const DRAFT_IDS = ["productNameInput", "productTypeInput", "productTypeOtherInput", "productDescInput", "productIngredientsInput", "productImageInput", "productFdaInput", "productBarcodeInput", "productMinAgeInput"];
+let draftBrandName = "";
+function saveDraft() {
+    if (editingProductId || el("productModal").style.display === "none") return;
+    try {
+        const draft = { at: Date.now(), brandId: el("productBrandInput").value, brandName: pendingBrandName };
+        DRAFT_IDS.forEach((id) => { draft[id] = el(id).value; });
+        draft.shades = formShades.slice(0, 100); draft.codes = formShadeCodes.slice(0, 100);
+        if (!draft.productNameInput.trim() && !draft.productIngredientsInput.trim() && !draft.productBarcodeInput.trim()) { localStorage.removeItem(DRAFT_KEY); return; }
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch (error) {                                                        }
+}
+function readDraft() {
+    try { const d = JSON.parse(localStorage.getItem(DRAFT_KEY) || "null"); return d && Date.now() - d.at < 7 * 86400000 ? d : null; } catch (error) { return null; }
+}
+function clearDraft() { try { localStorage.removeItem(DRAFT_KEY); } catch (error) {                                       } }
+function showDraftNote(product) {
+    const note = el("productDraftNote");
+    const draft = product ? null : readDraft();
+    if (!draft) { note.hidden = true; note.replaceChildren(); return; }
+    note.replaceChildren();
+    note.append(`A draft from ${new Date(draft.at).toLocaleString()} is saved in this browser: "${draft.productNameInput || "no name yet"}". `);
+    const use = document.createElement("button"); use.type = "button"; use.className = "text-link"; use.textContent = "Restore it";
+    const drop = document.createElement("button"); drop.type = "button"; drop.className = "text-link"; drop.textContent = "Throw it away";
+    use.addEventListener("click", () => { restoreDraft(draft); note.hidden = true; });
+    drop.addEventListener("click", () => { clearDraft(); note.hidden = true; });
+    note.append(use, " · ", drop);
+    note.hidden = false;
+}
+function restoreDraft(draft) {
+    DRAFT_IDS.forEach((id) => { if (typeof draft[id] === "string") el(id).value = draft[id]; });
+    if (draft.brandId && brands.some((b) => b.id === draft.brandId)) el("productBrandInput").value = draft.brandId;
+    else if (draft.brandName) fillProductFromQuick({ brand: draft.brandName }, { partial: true });
+    formShades = Array.isArray(draft.shades) ? draft.shades.filter((s) => typeof s === "string") : [];
+    formShadeCodes = formShades.map((_, at) => (Array.isArray(draft.codes) && typeof draft.codes[at] === "string" ? draft.codes[at] : ""));
+    renderShadeEditor(); showOtherTypeBox(); showBrandHint(); showIngredientSummary(); showBarcodeCheck(); showNameClash(); paintCounters();
+}
+
 function showScopeHint() {
     const hint = el("productScopeHint");
     const type = el("productTypeInput").value === OTHER_TYPE ? el("productTypeOtherInput").value : el("productTypeInput").value;
@@ -2303,7 +2363,9 @@ function openProductForm(product, brandId) {
     sourceEditor.paint();
     pendingBrandName = "";
     quickFill.reset();
-    el("productQuickFill").hidden = !!product;
+    el("productQuickFill").hidden = !!product && !product.needsReview;            // also for a product waiting for review: complete it from the sources
+    showNameClash();
+    showDraftNote(product);
 
     showOtherTypeBox();
     showBrandHint();
@@ -2684,6 +2746,7 @@ async function saveProduct(event) {
             const made = await addDoc(collection(db, "products"), { ...data, scans: 0, folder, createdAt: serverTimestamp() });
             notify(folder ? `Product added to "${folder}".` : "Product added.", "ok");
         }
+        if (!editingProductId) clearDraft();
         productModal.close();
         await loadInventory();
     } catch (error) {

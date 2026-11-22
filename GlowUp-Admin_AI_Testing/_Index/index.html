@@ -80,8 +80,16 @@
 
         <form id="signupForm" class="signup-form" novalidate>
             <div class="field">
-                <label for="signupName">Full Name</label>
-                <input type="text" id="signupName" placeholder="Enter your full name" autocomplete="name" maxlength="80" autocapitalize="words">
+                <label for="signupFirst">First Name</label>
+                <input type="text" id="signupFirst" placeholder="Enter your first name" autocomplete="given-name" maxlength="40" autocapitalize="words">
+            </div>
+            <div class="field">
+                <label for="signupMiddle">Middle Name <span class="optional">(optional)</span></label>
+                <input type="text" id="signupMiddle" placeholder="Enter your middle name, or leave it empty" autocomplete="additional-name" maxlength="40" autocapitalize="words">
+            </div>
+            <div class="field">
+                <label for="signupLast">Last Name</label>
+                <input type="text" id="signupLast" placeholder="Enter your last name" autocomplete="family-name" maxlength="40" autocapitalize="words">
             </div>
             <div class="field">
                 <label for="signupEmail">Email Address</label>

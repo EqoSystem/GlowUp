@@ -82,6 +82,10 @@ namespace GlowUp.Tests
             StringAssert.Contains("1 name has", Answer("Why do some"));
             StringAssert.StartsWith("Yes", Answer("Should I see"));
             Assert.IsFalse(items.Any(i => i.question.StartsWith("Is it right for my age")), "an empty match is left out");
+            StringAssert.Contains("Niacinamide", Answer("What does it do"));
+            StringAssert.Contains("No conflicts with your saved", Answer("How does this product affect"));
+            StringAssert.Contains("Allergy:", Answer("How could this product trigger"));
+            StringAssert.Contains("you said you react to fragrance", Answer("How could this product trigger"));
         }
 
         [Test]

@@ -1,9 +1,9 @@
 // Admin sign-up form rules (_Index/signupRules.js). Run: node tests/signupRules.test.mjs
-import { passwordChecks, passwordOk, cleanName, formProblem, signupProblem, requestNote } from "../_Index/signupRules.js";
+import { passwordChecks, passwordOk, cleanName, cleanPart, fullName, formProblem, signupProblem, requestNote } from "../_Index/signupRules.js";
 
 let checks = 0, failed = 0;
 const ok = (cond, what) => { checks++; if (!cond) { failed++; console.log("FAILED: " + what); } };
-const good = { name: "Maria Santos", email: "maria@example.com", password: "Glow#2026x", confirm: "Glow#2026x", agreed: true };
+const good = { first: "Maria", middle: "", last: "Santos", email: "maria@example.com", password: "Glow#2026x", confirm: "Glow#2026x", agreed: true };
 const problemOf = (change) => { const p = formProblem(Object.assign({}, good, change)); return p ? p.field : null; };
 
 ok(passwordOk("Glow#2026x"), "a password with all five parts passes");
@@ -19,15 +19,15 @@ ok(cleanName("  Maria   Santos ") === "Maria Santos", "the name is squeezed and 
 ok(cleanName("x".repeat(120)).length === 80, "the name is cut at 80");
 
 ok(formProblem(good) === null, "a complete form has no problem");
-ok(problemOf({ name: " " }) === "name", "an empty name is caught");
-ok(problemOf({ name: "12" }) === "name", "a name without letters is caught");
-ok(problemOf({ name: "Ñora" }) === null, "a name with accented letters is fine");
+ok(problemOf({ first: " " }) === "first", "an empty first name is caught");
+ok(problemOf({ first: "12" }) === "first", "a first name without letters is caught");
+ok(problemOf({ first: "Ñora" }) === null, "a name with accented letters is fine");
 ok(problemOf({ email: "" }) === "email", "an empty email is caught");
 ok(problemOf({ email: "maria@example" }) === "email", "an email without a dot in the domain is caught");
 ok(problemOf({ password: "weak", confirm: "weak" }) === "password", "a weak password is caught");
 ok(problemOf({ confirm: "Glow#2026y" }) === "confirm", "different passwords are caught");
 ok(problemOf({ agreed: false }) === "agree", "the box must be ticked");
-ok(problemOf({ name: "", email: "" }) === "name", "the first field's problem comes first");
+ok(problemOf({ first: "", last: "", email: "" }) === "first", "the first field's problem comes first");
 
 ok(/already has a GlowUp account/.test(signupProblem({ code: "glowup/existing-account" })), "existing account explained");
 ok(/already an admin/.test(signupProblem({ code: "glowup/already-admin" })), "already an admin explained");

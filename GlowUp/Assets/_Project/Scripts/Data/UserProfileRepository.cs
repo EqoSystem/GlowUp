@@ -58,6 +58,7 @@ namespace GlowUp.Data
         {
             try { FirebaseAuth.DefaultInstance.SignOut(); } catch (Exception e) { { } }
             Current = null; OfflineEmail = null;
+            GlowUp.Auth.AdminAccount.Forget();
         }
 
         /// <summary>The profile saved on this phone for whoever is signed in. Instant: the cloud is not asked.</summary>

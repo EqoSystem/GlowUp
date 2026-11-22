@@ -14,7 +14,7 @@ import { auth, db } from "../_Database/firebase-console.js";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, updateProfile, signOut, reload } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { askConfirm } from "../_Shared/adminShell.js";
-import { PASSWORD_RULES, passwordChecks, cleanName, formProblem, signupProblem, requestNote } from "./signupRules.js";
+import { PASSWORD_RULES, passwordChecks, cleanName, cleanPart, fullName, formProblem, signupProblem, requestNote } from "./signupRules.js";
 import { attachCounters } from "../_Shared/charLimit.js";
 
 const STEP_TIMEOUT_MS = 20000;
@@ -55,7 +55,7 @@ async function sendConfirmation(user) {
  * Makes the account (or signs in to the one that already has this e-mail), then writes the pending request and sends
  * the confirmation link. Returns { user, verified }. Throws Firebase errors or { code: "glowup/..." }.
  */
-async function sendRequest({ name, email, password }, lockout) {
+async function sendRequest({ name, first, middle, last, email, password }, lockout) {
     let user = null, made = false;
     try {
         user = (await withTimeout(createUserWithEmailAndPassword(auth, email, password))).user;
@@ -80,7 +80,7 @@ async function sendRequest({ name, email, password }, lockout) {
     const earlier = await withTimeout(getDoc(ref));
     if (earlier.exists() && earlier.data().status !== "pending") await withTimeout(deleteDoc(ref));      // an old, closed request: ask afresh
     if (!earlier.exists() || earlier.data().status !== "pending") {
-        await withTimeout(setDoc(ref, { name, email: user.email, status: "pending", emailVerified: !!user.emailVerified, createdAt: serverTimestamp() }));
+        await withTimeout(setDoc(ref, { name, firstName: first, middleName: middle, lastName: last, email: user.email, status: "pending", emailVerified: !!user.emailVerified, createdAt: serverTimestamp() }));
     }
     if (!user.emailVerified) await withTimeout(sendConfirmation(user));
     return { user, verified: !!user.emailVerified };
@@ -90,12 +90,12 @@ export function mountSignup({ lockout, onBackToLogin }) {
     const views = Object.fromEntries(Object.entries(VIEWS).map(([key, id]) => [key, $(id)]));
     if (!views.signup || !views.check || !views.login) return;
     const form = $("signupForm");
-    const fields = { name: $("signupName"), email: $("signupEmail"), password: $("signupPassword"), confirm: $("signupConfirm"), agree: $("signupAgree") };
+    const fields = { first: $("signupFirst"), middle: $("signupMiddle"), last: $("signupLast"), email: $("signupEmail"), password: $("signupPassword"), confirm: $("signupConfirm"), agree: $("signupAgree") };
     const sendBtn = $("signupBtn");
     const message = $("signupMessage");
     const ruleList = $("pwRules");
     const matchLine = $("pwMatch");
-    attachCounters(["signupName", "signupEmail", "signupPassword", "signupConfirm"]);
+    attachCounters(["signupFirst", "signupMiddle", "signupLast", "signupEmail", "signupPassword", "signupConfirm"]);
     let current = "login";
     let attempt = 0;
 
@@ -146,12 +146,12 @@ export function mountSignup({ lockout, onBackToLogin }) {
         message.style.display = text ? "block" : "none";
         if (text) messageTimer = window.setTimeout(() => { if (message.textContent === text) say(""); }, seconds * 1000);
     };
-    const filled = () => fields.name.value.trim() !== "" && fields.email.value.trim() !== "" && fields.password.value !== "" && fields.confirm.value !== "" && fields.agree.checked;
+    const filled = () => fields.first.value.trim() !== "" && fields.last.value.trim() !== "" && fields.email.value.trim() !== "" && fields.password.value !== "" && fields.confirm.value !== "" && fields.agree.checked;
     const paintButton = () => {
         sendBtn.disabled = busy || !filled();
         sendBtn.textContent = busy ? "Sending request..." : "Request Admin Access";
     };
-    const dirty = () => current === "signup" && (fields.name.value.trim() !== "" || fields.email.value.trim() !== "" || fields.password.value !== "" || fields.confirm.value !== "");
+    const dirty = () => current === "signup" && (fields.first.value.trim() !== "" || fields.middle.value.trim() !== "" || fields.last.value.trim() !== "" || fields.email.value.trim() !== "" || fields.password.value !== "" || fields.confirm.value !== "");
     form.addEventListener("input", () => { paintRules(); paintButton(); if (message.style.display === "block" && !busy) say(""); });
     form.addEventListener("change", paintButton);
     paintRules(); paintButton();
@@ -175,7 +175,7 @@ export function mountSignup({ lockout, onBackToLogin }) {
         if (!calm()) { void card.offsetWidth; card.classList.add(back ? "card-slide-back" : "card-slide-in"); }
         if (leaving === "check" && view !== "check") stopWatching(true);
         if (focus) {
-            const target = view === "signup" ? fields.name : view === "check" ? $("checkTitle") : $("username");
+            const target = view === "signup" ? fields.first : view === "check" ? $("checkTitle") : $("username");
             window.requestAnimationFrame(() => target && target.focus({ preventScroll: true }));
         }
         document.title = view === "signup" ? "Create Admin Account - GlowUp" : view === "check" ? "Check Your Email - GlowUp" : "GlowUp Admin Portal";
@@ -235,7 +235,7 @@ export function mountSignup({ lockout, onBackToLogin }) {
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
         if (busy) return;
-        const values = { name: fields.name.value, email: fields.email.value.trim(), password: fields.password.value, confirm: fields.confirm.value, agreed: fields.agree.checked };
+        const values = { first: fields.first.value, middle: fields.middle.value, last: fields.last.value, email: fields.email.value.trim(), password: fields.password.value, confirm: fields.confirm.value, agreed: fields.agree.checked };
         const problem = formProblem(values);
         Object.values(fields).forEach((f) => f.removeAttribute("aria-invalid"));
         if (problem) {
@@ -251,7 +251,7 @@ export function mountSignup({ lockout, onBackToLogin }) {
         say("");
         paintButton();
         try {
-            const result = await sendRequest({ name: cleanName(values.name), email: values.email, password: values.password }, lockout);
+            const result = await sendRequest({ name: fullName(values), first: cleanPart(values.first), middle: cleanPart(values.middle), last: cleanPart(values.last), email: values.email, password: values.password }, lockout);
             if (mine !== attempt) { await signOut(auth).catch(() => { }); return; }   // the person left the form meanwhile
             holding = result.user;
             clearForm();

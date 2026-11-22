@@ -13,7 +13,9 @@ const storeDoc = (page, path) => page.evaluate((path) => { const d = window.__ST
 const PASS = "Glow#2026x";
 
 async function fill(page, { name = "Maria Santos", email = "maria@example.com", password = PASS, confirm = PASS, agree = true } = {}) {
-    await page.fill("#signupName", name);
+    const parts = name.split(" ");
+    await page.fill("#signupFirst", parts[0]);
+    await page.fill("#signupLast", parts.slice(1).join(" ") || "Cruz");
     await page.fill("#signupEmail", email);
     await page.fill("#signupPassword", password);
     await page.fill("#signupConfirm", confirm);
@@ -34,8 +36,8 @@ try {
         await settle(400);
         ok(await visible(page, "signupView") && !(await visible(page, "loginView")), `${tag}: Sign Up shows the Create Admin Account card only`);
         ok(await page.evaluate(() => location.hash === "#signup"), `${tag}: the address says #signup`);
-        ok(await page.evaluate(() => document.activeElement.id === "signupName"), `${tag}: focus starts on Full Name`);
-        ok(await page.evaluate(() => ["signupName", "signupEmail", "signupPassword", "signupConfirm"].every((id) => { const input = document.getElementById(id); return input.maxLength > 0 && !input.closest(".field")?.querySelector(".counter"); })), `${tag}: every sign-up text field has a maxlength without a counter`);
+        ok(await page.evaluate(() => document.activeElement.id === "signupFirst"), `${tag}: focus starts on First Name`);
+        ok(await page.evaluate(() => ["signupFirst", "signupMiddle", "signupLast", "signupEmail", "signupPassword", "signupConfirm"].every((id) => { const input = document.getElementById(id); return input.maxLength > 0 && !input.closest(".field")?.querySelector(".counter"); })), `${tag}: every sign-up text field has a maxlength without a counter`);
         ok(await page.evaluate(() => document.querySelectorAll("#signupView .counter").length === 0), `${tag}: sign-up fields have no visible counters`);
         const faults = await check(page);
         ok(faults.length === 0, `${tag}: sign-up card layout faults: ${faults.join(" | ")}`);
@@ -75,13 +77,13 @@ try {
 
         // a filled form asks "Discard changes?"; Escape means keep editing
         await page.click("#signupLink");
-        await page.fill("#signupName", "Maria");
+        await page.fill("#signupFirst", "Maria");
         await page.click("#signupBack");
         ok(await page.evaluate(() => /Discard changes\?/.test(document.querySelector(".modal-content h3")?.textContent || "")), "flow: a filled form asks Discard changes?");
         ok(await page.evaluate(() => [...document.querySelectorAll(".modal-content button")].map((b) => b.textContent).join("|") === "Keep editing|Discard"), "flow: the choices are Keep editing / Discard");
         await page.keyboard.press("Escape");
         await settle(150);
-        ok(await visible(page, "signupView") && await page.inputValue("#signupName") === "Maria", "flow: Escape keeps editing, the name is still there");
+        ok(await visible(page, "signupView") && await page.inputValue("#signupFirst") === "Maria", "flow: Escape keeps editing, the name is still there");
         await page.goBack();
         await page.waitForTimeout(200);
         ok(await page.evaluate(() => !!document.querySelector(".modal-content")), "flow: the browser's Back also asks first");
@@ -89,7 +91,7 @@ try {
         await settle(300);
         ok(await visible(page, "loginView"), "flow: Discard goes back to log-in");
         await page.click("#signupLink");
-        ok(await page.inputValue("#signupName") === "", "flow: a discarded form starts empty");
+        ok(await page.inputValue("#signupFirst") === "", "flow: a discarded form starts empty");
 
         // problems are named before anything is sent
         await fill(page, { password: "weakpass", confirm: "weakpass" });
@@ -134,7 +136,7 @@ try {
         ok(await page.evaluate(() => document.activeElement.id === "password"), "flow: focus goes to the password");
         await page.goBack();
         await page.waitForTimeout(150);
-        ok(!(await visible(page, "checkView")) && !(await visible(page, "signupView")) || await page.inputValue("#signupName") === "", "flow: Back never reopens the sent form with its data");
+        ok(!(await visible(page, "checkView")) && !(await visible(page, "signupView")) || await page.inputValue("#signupFirst") === "", "flow: Back never reopens the sent form with its data");
         ok(errors.length === 0, `flow: no page errors ${errors.join("; ")}`);
         await ctx.close();
     }

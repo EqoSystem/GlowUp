@@ -5,6 +5,7 @@ import { signInWithEmailAndPassword, onAuthStateChanged, signOut, sendPasswordRe
 import { DASHBOARD_PAGE, REQUIRE_ADMIN_RECORD, isAdmin } from "../_Shared/adminCommon.js";
 import { mountThemeToggle, hydrate, dialogFrame } from "../_Shared/adminShell.js";
 import { createLockout, mmss, LOCK_MS } from "./loginLockout.js";
+import { remoteRemaining, remoteFail, remoteClear } from "./remoteLock.js";
 import { mountSignup, signupBusy, noteForRequest } from "./adminSignup.js";
 import { mountAuthAction } from "./authAction.js";
 import { icon } from "../_Shared/adminShell.js";
@@ -183,15 +184,20 @@ document.addEventListener("DOMContentLoaded", () => {
         signingIn = true;
         say("");
         setButton(false, "Signing in...");
+        // the lock kept in the database also holds in a private window or on another browser (remoteLock.js)
+        const sharedLock = await remoteRemaining(email);
+        if (sharedLock > 0) { signingIn = false; lockout.lockFor(email, sharedLock); showLock(email); return; }
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             if (REQUIRE_ADMIN_RECORD && !(await isAdmin(userCredential.user))) {
                 lockout.clear(email);                                    // the password was right
+                remoteClear(email);
                 const note = await noteForRequest(userCredential.user);  // a pending admin request says where it stands
                 await signOut(auth);
                 throw { code: "glowup/not-admin", note };
             }
             lockout.clear(email);
+            await remoteClear(email);
             console.log("Admin logged in successfully:", userCredential.user.email);
             window.location.href = pageAfterLogin();
         } catch (error) {
@@ -199,7 +205,9 @@ document.addEventListener("DOMContentLoaded", () => {
             signingIn = false;
             if (credentialError(error)) {
                 const result = lockout.fail(email);
-                if (result.lockedMs > 0) { showLock(email); return; }
+                const shared = await remoteFail(email);                  // the same wrong password counted for every browser
+                if (shared && shared.lockedMs > 0 && result.lockedMs <= 0) lockout.lockFor(email, shared.lockedMs);
+                if (result.lockedMs > 0 || (shared && shared.lockedMs > 0)) { showLock(email); return; }
                 if (result.left === 1) {
                     if (forgotLinkEl) forgotLinkEl.classList.add("recommend");
                     say(`${explain(error)} 1 try left before log-in is locked for ${LOCK_MINUTES} minutes. Forgot your password? Use Forgot password?.`, 8);

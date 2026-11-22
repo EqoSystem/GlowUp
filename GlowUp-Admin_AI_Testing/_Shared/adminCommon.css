@@ -2492,6 +2492,7 @@ body:not(.layout-editing) .board.two-sides > .panel[data-side="side"] { grid-col
 .qf-hit-text strong { overflow-wrap: anywhere; }
 .qf-hit-text small { color: var(--text-2); font-size: var(--fs-xs); }
 .qf-hit .qf-from { color: var(--muted); }
+.qf-hit .qf-links a { color: var(--accent-text); text-decoration: underline; }
 .qf-hit .qf-warn { color: var(--bad); }
 .qf-hit.qf-out { opacity: .75; }
 .qf-hit .btn { flex: none; min-height: calc(44 * var(--u)); }

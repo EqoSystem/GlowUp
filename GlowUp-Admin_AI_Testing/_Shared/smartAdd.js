@@ -126,6 +126,23 @@ export function brandFor(name, brands) {
     return (brands || []).find((b) => !b.binned && [b.name, ...(b.aliases || [])].some((n) => compactName(n) === key)) || null;
 }
 
+// Where to read more about a candidate on the maker's own pages: the brand's CONFIRMED website from the inventory (an admin checked that
+// the brand owns it) and, for any brand, the FDA Philippines portal. Only https addresses are returned. The search address is a
+// guess at the site's own search page (most shops use ?q=): it may land on a page that says "not found", so it is labelled as a search.
+export function officialLinks(candidate, brands) {
+    const brand = brandFor(candidate && candidate.brand, brands);
+    const links = [];
+    let site = "";
+    try { const url = new URL(brand && brand.website ? brand.website : ""); if (url.protocol === "https:") site = url.origin; } catch (error) { site = ""; }
+    if (site) {
+        links.push({ label: "Brand's official site", url: site + "/" });
+        const typed = encodeURIComponent(String((candidate && candidate.name) || "").trim());
+        if (typed) links.push({ label: "Search the official site", url: `${site}/search?q=${typed}` });
+    }
+    links.push({ label: "FDA Philippines portal", url: FDA_PORTAL + "/" });
+    return links;
+}
+
 // A product of the inventory that is the same as the candidate (barcode, or brand + name), or null.
 export function existingProduct(candidate, products, brands) {
     if (!candidate) return null;

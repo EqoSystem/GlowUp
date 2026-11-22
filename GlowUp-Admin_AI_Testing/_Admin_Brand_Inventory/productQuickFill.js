@@ -4,7 +4,7 @@ import { escapeHtml } from "../_Shared/adminCommon.js";
 import { icon } from "../_Shared/adminShell.js";
 import { lookupProduct, scanBarcode, readLabelPhoto } from "../_Shared/quickFill.js";
 import { openPhoneLink } from "../_Shared/phoneLink.js";
-import { brandFor, existingProduct, queryKind } from "../_Shared/smartAdd.js";
+import { brandFor, existingProduct, queryKind, officialLinks } from "../_Shared/smartAdd.js";
 
 const el = (id) => document.getElementById(id);
 
@@ -31,7 +31,8 @@ export function mountProductQuickFill({ brands, products, fill, fillIngredients,
                 <div class="qf-hit-text"><strong>${escapeHtml(c.brand ? c.brand + " " : "")}${escapeHtml(c.name)}</strong>
                     <small>${escapeHtml(facts)}</small>
                     <small class="qf-from">From ${escapeHtml(c.origins.join(" + "))}${c.note ? " · " + escapeHtml(c.note) : ""}</small>
-                    ${notMakeup ? '<small class="qf-warn">Not make-up: GlowUp cannot list it.</small>' : ""}</div>
+                    ${notMakeup ? '<small class="qf-warn">Not make-up: GlowUp cannot list it.</small>' : ""}
+                    <small class="qf-links">Read more: ${officialLinks(c, brands()).map((l) => `<a href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.label)}</a>`).join(" · ")}</small></div>
                 ${same ? `<button type="button" class="btn" data-open="${at}">Open existing</button>`
                     : `<button type="button" class="btn primary" data-fill="${at}"${notMakeup ? " disabled" : ""}>${icon("check")}Fill form</button>`}
             </div>`;

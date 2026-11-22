@@ -48,6 +48,12 @@ export function createLockout(storage, now = () => Date.now()) {
             write(all);
             return { fails: e.fails, left: Math.max(0, MAX_TRIES - e.fails), lockedMs: e.until ? e.until - now() : 0 };
         },
+        /** The database says this e-mail is locked for `ms` more (set from another browser): the lock shows here too. */
+        lockFor(email, ms) {
+            const all = tidy(read());
+            all[keyOf(email)] = { fails: MAX_TRIES, at: now(), until: now() + Math.max(0, ms) };
+            write(all);
+        },
         /** A successful log-in. */
         clear(email) {
             const all = read();

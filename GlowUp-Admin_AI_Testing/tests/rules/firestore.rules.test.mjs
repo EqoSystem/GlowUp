@@ -472,6 +472,38 @@ await cannot("a user saves a birthday in another format", () => setDoc(doc(user(
 await cannot("a new profile with age 10", () => setDoc(doc(other(), "users/u2"), { firstName: "Kid", age: 10 }));
 await can("a new profile with age 25", () => setDoc(doc(other(), "users/u2"), { firstName: "Adult", age: 25, birthday: "2001-03-04" }));
 
+// inbox state in the account (users/{uid}/inboxState/state)
+await can("a user saves which announcements they read", () => setDoc(doc(user(), "users/u1/inboxState/state"), { read: ["a1", "a2"] }, { merge: true }));
+await can("a user saves which announcements they removed", () => setDoc(doc(user(), "users/u1/inboxState/state"), { hidden: ["a1"], read: ["a2"] }));
+await cannot("a user saves inbox state under another name", () => setDoc(doc(user(), "users/u1/inboxState/other"), { read: ["a1"] }));
+await cannot("a user saves inbox state with an extra field", () => setDoc(doc(user(), "users/u1/inboxState/state"), { read: [], note: "x" }));
+await cannot("a user saves 301 ids", () => setDoc(doc(user(), "users/u1/inboxState/state"), { read: Array.from({ length: 301 }, (_, i) => "i" + i) }));
+await cannot("another user writes someone's inbox state", () => setDoc(doc(other(), "users/u1/inboxState/state"), { read: ["a1"] }));
+await cannot("another user reads someone's inbox state", () => getDoc(doc(other(), "users/u1/inboxState/state")));
+await can("a user reads their own inbox state", () => getDoc(doc(user(), "users/u1/inboxState/state")));
+
+// the shared log-in lock (loginLocks): works with nobody signed in
+const LK = "a".repeat(64);
+const lockAt = (extra) => async () => { await seed(); await env.withSecurityRulesDisabled(async (c) => { await setDoc(doc(c.firestore(), "loginLocks/" + LK), Object.assign({ fails: 1, untilUnix: 0, updatedAt: Timestamp.now() }, extra || {})); }); };
+const lk = (fails, untilUnix) => ({ fails, untilUnix, updatedAt: serverTimestamp() });
+const inFive = () => Math.floor(Date.now() / 1000) + 300;
+await can("the first wrong password is counted (nobody signed in)", () => setDoc(doc(anon(), "loginLocks/" + LK), lk(1, 0)));
+await cannot("a first count that already locks", () => setDoc(doc(anon(), "loginLocks/" + LK), lk(3, inFive())));
+await cannot("a lock under a short key", () => setDoc(doc(anon(), "loginLocks/abc"), lk(1, 0)));
+await cannot("a lock with an extra field", () => setDoc(doc(anon(), "loginLocks/" + LK), Object.assign(lk(1, 0), { note: "x" })));
+await canAfter("the second wrong password is counted", lockAt({ fails: 1 }), () => setDoc(doc(anon(), "loginLocks/" + LK), lk(2, 0)));
+await canAfter("the third wrong password sets a five-minute lock", lockAt({ fails: 2 }), () => setDoc(doc(anon(), "loginLocks/" + LK), lk(3, inFive())));
+await cannotAfter("the third wrong password with a one-minute lock", lockAt({ fails: 2 }), () => setDoc(doc(anon(), "loginLocks/" + LK), lk(3, Math.floor(Date.now() / 1000) + 60)));
+await cannotAfter("the third wrong password with a one-day lock", lockAt({ fails: 2 }), () => setDoc(doc(anon(), "loginLocks/" + LK), lk(3, Math.floor(Date.now() / 1000) + 86400)));
+await cannotAfter("a count that skips a step", lockAt({ fails: 1 }), () => setDoc(doc(anon(), "loginLocks/" + LK), lk(3, inFive())));
+await cannotAfter("a count that goes down", lockAt({ fails: 2 }), () => setDoc(doc(anon(), "loginLocks/" + LK), lk(1, 0)));
+await cannotAfter("restarting a lock that has not ended", lockAt({ fails: 3, untilUnix: inFive() }), () => setDoc(doc(anon(), "loginLocks/" + LK), lk(1, 0)));
+await canAfter("restarting a lock that has ended", lockAt({ fails: 3, untilUnix: Math.floor(Date.now() / 1000) - 10 }), () => setDoc(doc(anon(), "loginLocks/" + LK), lk(1, 0)));
+await canAfter("anyone reads a lock by its key", lockAt({ fails: 3, untilUnix: inFive() }), () => getDoc(doc(anon(), "loginLocks/" + LK)));
+await cannotAfter("nobody lists the locks", lockAt(), () => getDocs(collection(anon(), "loginLocks")));
+await cannotAfter("nobody signed in removes a lock", lockAt(), () => deleteDoc(doc(anon(), "loginLocks/" + LK)));
+await canAfter("a signed-in person removes their lock after a right password", lockAt(), () => deleteDoc(doc(user(), "loginLocks/" + LK)));
+
 // "Use my phone" links (phoneLinks)
 const link = (extra) => Object.assign({ uid: "a1", what: "barcode", kind: "", value: "", count: 0, createdAt: serverTimestamp(), expiresAtUnix: Math.floor(Date.now() / 1000) + 900 }, extra || {});
 const seedLink = (extra) => async () => { await seed(); await env.withSecurityRulesDisabled(async (c) => { await setDoc(doc(c.firestore(), "phoneLinks/abcdefghjk23"), Object.assign({ uid: "a1", what: "barcode", kind: "", value: "", count: 0, expiresAtUnix: Math.floor(Date.now() / 1000) + 900 }, extra || {})); }); };

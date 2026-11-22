@@ -154,7 +154,11 @@ namespace GlowUp.Scan
             // Save the product to the device catalogue now; signed-in users also queue a pending website entry or review suggestion.
             // a product staged from a photo is already in pending_products: it is not added to the inventory a second time
             if (!record.pendingApproval)
-                try { ScannedProductPublisher.PublishIfNew(record, names, kindIsKnown); }
+                try
+                {
+                    await GlowUp.Auth.AdminAccount.Ensure();           // an admin's scan is registered in the catalogue at once
+                    ScannedProductPublisher.PublishIfNew(record, names, kindIsKnown);
+                }
             catch (Exception e) { { } }
             // every scan is saved to Recent Scans automatically; a scan that was done again takes the earlier one's place
             bool replaced = earlier != null && ScanHistoryRepository.Replace(earlier.id, record);

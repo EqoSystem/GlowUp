@@ -289,6 +289,40 @@ namespace GlowUp.Data
         };
     }
 
+    /// <summary>
+    /// A product registered by an ADMIN from Smart Scan (quick registration). The database rules take it only from an account listed in
+    /// 'admins'. It carries what the website's own form writes, so the user's skin profile can be cross-referenced with it at once:
+    /// the ingredient list in printed order, ids into the ingredient library, the count, tags and the barcode.
+    /// </summary>
+    [Serializable]
+    public class AdminScannedProductRecord
+    {
+        public string name, brandId, brandName, cosmeticType, description, barcode;
+        public List<string> ingredients = new List<string>();
+        public List<string> ingredientIds = new List<string>();
+        public int ingredientCount;
+        public List<string> shades = new List<string>();
+        public List<string> sources = new List<string>();
+        public List<string> tags = new List<string>();
+        public int minAge;
+        public string status = "Pending";
+        public long scans;
+        public string source = "admin";
+        public bool reviewed;
+        public string reviewedBy;
+        public long reviewedAtUnix, addedAtUnix;
+        public string addedBy, folder = "";
+    }
+
+    /// <summary>A brand registered by an admin from Smart Scan: Active and reviewed at once.</summary>
+    [Serializable]
+    public class AdminScannedBrandRecord
+    {
+        public string name, category = "Makeup", market = "Global", status = "Active", source = "admin", reviewedBy, addedBy, folder = "";
+        public long scans, reviewedAtUnix, addedAtUnix;
+        public bool reviewed = true;
+    }
+
     /// <summary>A product added automatically from an app scan ('products/scan_...'). Always Pending.</summary>
     [Serializable]
     public class ScannedProductRecord
