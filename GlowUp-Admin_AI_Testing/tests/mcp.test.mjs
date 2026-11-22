@@ -45,5 +45,5 @@ check("pubchem down: plain text", (await run("ingredient_lookup", { name: "Niaci
 check("oversized body refused", (await call("x".repeat(20000))).status === 413);
 let limited = 0; for (let i = 0; i < 40; i++) if ((await call(rpc("ping"))).status === 429) limited++;
 check("per-user limit applies", limited > 0);
-console.log(`mcp: ${pass} passed, ${fail} failed`);
+console.log(fail === 0 ? `ALL PASSED  (checks made: ${pass})` : `${fail} FAILED  (checks made: ${pass + fail})`);
 process.exit(fail ? 1 : 0);
