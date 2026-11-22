@@ -42,6 +42,14 @@ namespace GlowUp.Dashboard
         [SerializeField] private RectTransform recommendationsContent;
         [Tooltip("The pattern tile. It is hidden when the app runs and copied once per recommended product.")]
         [SerializeField] private ProductTileView recommendationTemplate;
+        [Header("Hold and drag to Try On (22 Nov 2026): press and hold a row, tap more rows to add them, drag one to the right half")]
+        [Tooltip("The right half of the list (TryOnZone): shown while the rows shake")]
+        [SerializeField] private CanvasGroup tryOnZone;
+        [Tooltip("Ends the hold mode (right of the heading)")]
+        [SerializeField] private Button holdDoneButton;
+        [Range(0f, 1f)] [SerializeField] private float tryOnZoneWaiting = 0.55f;
+        [SerializeField] private float tryOnZoneFade = 6f;
+        [SerializeField] private string msgNothingToTryOn = "These products cannot be tried on in AR (only make-up for the face can).";
         [Tooltip("The grey placeholder tiles shown while the recommendations load (skeleton loading)")]
         [SerializeField] private GameObject recommendationsSkeleton;
         [Tooltip("The pop-up the tiles' AI button opens")]
@@ -115,6 +123,7 @@ namespace GlowUp.Dashboard
 
         void Awake()
         {
+            Start_HoldParts();
             if (recommendationTemplate != null) recommendationTemplate.gameObject.SetActive(false);
             if (avatarButton != null) avatarButton.onClick.AddListener(() => { if (accountPanel != null) accountPanel.Show(); });
             if (signOutButton != null) signOutButton.onClick.AddListener(AskSignOut);
@@ -285,6 +294,17 @@ namespace GlowUp.Dashboard
                 tile.AiClicked += t => { if (aiPanel != null) aiPanel.Show(t.Data as ScanRecord); };   // rows built before 18 Nov 2026
                 tile.Clicked += OnResult;                                                              // the "Result" button
                 tile.DrawerOpening += CloseOtherDrawers;
+                // 22 Nov 2026 (owner): press and hold, then drag this row (or every row tapped meanwhile) to the right half: AR Try-On
+                if (tile.TryGetComponent(out HoldToRemoveTile hold))
+                {
+                    hold.SetRemoveEnabled(false);                       // nothing is removed from the recommendations
+                    if (tryOnZone != null) hold.SetTryOnArea((RectTransform)tryOnZone.transform);
+                    hold.HoldStarted += h => { SetHoldMode(true); if (h.TryGetComponent(out ProductTileView held)) { held.SetSelectedForRemoval(true); } };
+                    hold.OverTryOn += (h, on) => { overTryOn = on; if (on && h.TryGetComponent(out ProductTileView carried)) carried.ShowGroupCount(CarriedCount(carried)); };
+                    hold.DragEnded += (h, _) => { if (h.TryGetComponent(out ProductTileView carried)) carried.ShowGroupCount(0); };
+                    hold.DroppedOnTryOn += h => { if (h.TryGetComponent(out ProductTileView carried)) TryOnHeld(carried); };
+                }
+                tile.LockedTap += t => { if (holdMode) t.SetSelectedForRemoval(!t.Selected); };
                 // 22 Nov 2026 (panel): drag a row LEFT = save it (it lands in Recent Scans), RIGHT = try the product on in AR
                 if (tile.TryGetComponent(out TileSwipeActions swipe))
                 {
@@ -313,6 +333,12 @@ namespace GlowUp.Dashboard
         void CloseOtherDrawers(ProductTileView opened)
         {
             foreach (ProductTileView tile in tiles) if (tile != null && tile != opened) tile.SetDrawer(false);
+        }
+
+        void Start_HoldParts()
+        {
+            if (holdDoneButton != null) { holdDoneButton.onClick.AddListener(() => SetHoldMode(false)); holdDoneButton.gameObject.SetActive(false); }
+            if (tryOnZone != null) { tryOnZone.alpha = 0f; tryOnZone.blocksRaycasts = false; tryOnZone.interactable = false; }
         }
 
         void OnTryOnAll(ProductTileView tile)
@@ -357,8 +383,54 @@ namespace GlowUp.Dashboard
             signOutConfirm.Ask(signOutTitle, message, signOutConfirmLabel, SignOut, true);
         }
 
+        // ---------- hold mode: the rows shake, a tap selects, a drag to the right half tries them on ----------
+        bool holdMode, overTryOn;
+
+        void SetHoldMode(bool on)
+        {
+            holdMode = on;
+            foreach (ProductTileView t in tiles)
+            {
+                if (t == null) continue;
+                if (t.TryGetComponent(out HoldToRemoveTile h)) h.SetShaking(on);
+                t.SetExpandLocked(on);
+                if (!on) { t.SetSelectedForRemoval(false); t.ShowGroupCount(0); }
+            }
+            if (holdDoneButton != null) holdDoneButton.gameObject.SetActive(on);
+            if (!on) overTryOn = false;
+            SwipeSceneNavigator.Suppressed = on;                  // a sideways drag moves a row now, not the page
+        }
+
+        /// <summary>How many rows travel with `carried`: all the selected ones when it is one of them, otherwise just itself.</summary>
+        int CarriedCount(ProductTileView carried)
+        {
+            int n = 0;
+            foreach (ProductTileView t in tiles) if (t != null && t.Selected) n++;
+            return carried.Selected ? Mathf.Max(1, n) : 1;
+        }
+
+        void TryOnHeld(ProductTileView carried)
+        {
+            var list = new List<ScanRecord>();
+            if (carried.Selected) { foreach (ProductTileView t in tiles) if (t != null && t.Selected && t.Data is ScanRecord r && GlowUp.Scan.ProductScope.CanTryOn(r)) list.Add(r); }
+            else if (carried.Data is ScanRecord one && GlowUp.Scan.ProductScope.CanTryOn(one)) list.Add(one);
+            if (list.Count == 0) { if (FormalToast.Current != null) FormalToast.Current.Show(FormalToast.Kind.Warning, msgNothingToTryOn); return; }
+            // the row that was carried goes first when it can be tried on
+            if (carried.Data is ScanRecord first && list.Remove(first)) list.Insert(0, first);
+            SetHoldMode(false);
+            ScanSession.TryOnSet = list.Count > 1 ? list : null;
+            ScanSession.TryOn = list[0];
+            SceneNavigator.Go(tryOnScene);
+        }
+
         void Update()
         {
+            if (tryOnZone != null)
+            {
+                float target = holdMode ? (overTryOn ? 1f : tryOnZoneWaiting) : 0f;
+                tryOnZone.alpha = Mathf.MoveTowards(tryOnZone.alpha, target, tryOnZoneFade * Time.unscaledDeltaTime);
+            }
+            if (holdMode && Input.GetKeyDown(KeyCode.Escape)) { SetHoldMode(false); return; }   // Back leaves the hold mode first
             if (!phoneBackKeyClosesPopups || !Input.GetKeyDown(KeyCode.Escape)) return;
             if (signOutConfirm != null && signOutConfirm.IsOpen) signOutConfirm.Close();
             else if (accountPanel != null && accountPanel.IsOpen) accountPanel.Hide();

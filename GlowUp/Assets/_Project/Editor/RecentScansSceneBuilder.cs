@@ -84,6 +84,8 @@ namespace GlowUp.EditorTools
             TextMeshProUGUI zoneText = A.RawLabel(zone.transform, "RemoveZoneText", "Drag here\nto remove", 34, Color.white, FontRole.Label, TextAlignmentOptions.TopLeft, true);
             A.At(zoneText.transform, A.ML, new Vector2(44, -90), new Vector2(300, 110));
             var zoneGroup = zone.GetComponent<CanvasGroup>(); zoneGroup.alpha = 0f; zoneGroup.blocksRaycasts = false; zoneGroup.interactable = false;
+            // 22 Nov 2026 (owner): the right half is the Try On zone: drop one row, or the selected rows, there to try them on in AR
+            CanvasGroup tryOnZone = AppTiles.TryOnZone(listArea.transform);
 
             // ---- empty state ----
             GameObject empty = A.Node(listArea.transform, "EmptyState");
@@ -122,7 +124,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "countText", count); A.Set(controller, "emptyState", empty);
             A.Set(controller, "typeIcons", A.TypeIcons());
             A.Set(controller, "sortButton", sort); A.Set(controller, "sortLabel", A.LabelOf(sort));
-            A.Set(controller, "doneButton", done); A.Set(controller, "removeZone", zoneGroup);
+            A.Set(controller, "doneButton", done); A.Set(controller, "removeZone", zoneGroup); A.Set(controller, "tryOnZone", tryOnZone);
             A.Set(controller, "clearAllButton", clearAll);
             A.Set(controller, "restoreBar", restoreBar.gameObject); A.Set(controller, "restoreText", restoreText);
             A.Set(controller, "restoreButton", restore); A.Set(controller, "deleteForeverButton", deleteForever);

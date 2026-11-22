@@ -119,7 +119,10 @@ namespace GlowUp.Recent
         readonly List<ProductTileView> tiles = new List<ProductTileView>();
         ScanRecord renaming;
         SortOrder order;
-        bool shaking, popping, fingerInZone, selecting, groupShown;
+        bool shaking, popping, fingerInZone, selecting, groupShown, fingerInTryOn;
+        [Header("Drag to Try On (22 Nov 2026): the right half, shown while the rows shake")]
+        [SerializeField] private CanvasGroup tryOnZone;
+        [SerializeField] private string msgNothingToTryOn = "These scans cannot be tried on in AR (only make-up for the face can).";
         readonly HashSet<string> selected = new HashSet<string>();      // the ids of the selected scans
         float zoneTarget;
         Image zoneImage;
@@ -139,6 +142,7 @@ namespace GlowUp.Recent
             if (selectAllButton != null) selectAllButton.onClick.AddListener(SelectAll);
             if (cancelSelectionButton != null) cancelSelectionButton.onClick.AddListener(() => SetSelecting(false));
             if (selectionBar != null) selectionBar.SetActive(false);
+            if (tryOnZone != null) { tryOnZone.alpha = 0f; tryOnZone.blocksRaycasts = false; tryOnZone.interactable = false; }
             if (removeZone != null)
             {
                 removeZone.alpha = 0f; removeZone.blocksRaycasts = false; removeZone.interactable = false;
@@ -163,6 +167,8 @@ namespace GlowUp.Recent
 
         void Update()
         {
+            if (tryOnZone != null)
+                tryOnZone.alpha = Mathf.MoveTowards(tryOnZone.alpha, shaking ? (fingerInTryOn ? 1f : zoneAlphaWaiting) : 0f, zoneFadeSpeed * Time.unscaledDeltaTime);
             if (removeZone == null) return;
             removeZone.alpha = Mathf.MoveTowards(removeZone.alpha, zoneTarget, zoneFadeSpeed * Time.unscaledDeltaTime);
             // dark while it waits, red while the finger is inside it with a tile, dark again when the finger leaves
@@ -213,6 +219,9 @@ namespace GlowUp.Recent
                     if (tile.TryGetComponent(out HoldToRemoveTile hold))
                     {
                         if (removeZone != null) hold.SetRemoveArea((RectTransform)removeZone.transform);
+                        if (tryOnZone != null) hold.SetTryOnArea((RectTransform)tryOnZone.transform);
+                        hold.OverTryOn += (h, on) => fingerInTryOn = on;
+                        hold.DroppedOnTryOn += h => { if (h.TryGetComponent(out ProductTileView carried)) TryOnHeld(carried); };
                         hold.HoldStarted += _ => SetShaking(true);
                         hold.Dragging += (h, inZone) =>
                         {
@@ -393,6 +402,22 @@ namespace GlowUp.Recent
                 foreach (string id in ids) selected.Remove(id);
                 if (this != null) Refresh();
             });
+        }
+
+        /// <summary>A row (or the selected group it carries) was let go on the Try On zone: AR Try-On with those scans, the carried one first.</summary>
+        void TryOnHeld(ProductTileView carried)
+        {
+            fingerInTryOn = false;
+            if (!(carried.Data is ScanRecord first)) return;
+            var list = new List<ScanRecord>();
+            if (DragsGroup(carried)) { foreach (ProductTileView t in tiles) if (t != null && t.Data is ScanRecord r && selected.Contains(r.id) && ProductScope.CanTryOn(r)) list.Add(r); }
+            else if (ProductScope.CanTryOn(first)) list.Add(first);
+            if (list.Count == 0) { if (FormalToast.Current != null) FormalToast.Current.Show(FormalToast.Kind.Warning, msgNothingToTryOn); return; }
+            if (list.Remove(first)) list.Insert(0, first);
+            SetShaking(false);
+            ScanSession.TryOnSet = list.Count > 1 ? list : null;
+            ScanSession.TryOn = list[0];
+            SceneNavigator.Go(tryOnScene);
         }
 
         static int RemoveOne(string id)

@@ -115,6 +115,12 @@ namespace GlowUp.EditorTools
             ProductTileView template = AppTiles.ExpandingRow(content, "RecommendationTemplate", AppTiles.TileKind.Dashboard);
             // placeholder rows for the time the list is fetched: a row's panel with bars for the icon, the name and the brand
             // (inactive here: the app switches them on)
+            // 22 Nov 2026 (owner): press and hold a row, then drag it (or the rows you tapped) to the right half to try them on in AR.
+            // TryOnZone shows while the rows shake; Done (right of the heading) ends it.
+            CanvasGroup tryOnZone = AppTiles.TryOnZone(listArea.transform);
+            Button holdDone = A.PillButton(card, "HoldDoneButton", "Done", 28, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Check);
+            A.At(holdDone.transform, A.TR, new Vector2(-48, -listTop + 2), new Vector2(200, 60));
+            holdDone.gameObject.SetActive(false);
             GameObject skeleton = AppTiles.SkeletonRows(listArea.transform, "RecommendationsSkeleton", 5);
             skeleton.SetActive(false);
 
@@ -229,6 +235,7 @@ namespace GlowUp.EditorTools
             A.Set(controller, "skinTypeValue", skinType); A.Set(controller, "skinToneValue", skinTone);
             A.Set(controller, "allergensValue", allergens);
             A.Set(controller, "recommendationsContent", content); A.Set(controller, "recommendationTemplate", template);
+            A.Set(controller, "tryOnZone", tryOnZone); A.Set(controller, "holdDoneButton", holdDone);
             A.Set(controller, "recommendationsEmptyText", empty); A.Set(controller, "typeIcons", A.TypeIcons());
             A.Set(controller, "recommendationsNoteText", recommendedNote); A.Set(controller, "recommendationsBadge", recommendedBadge);
             // reworded for "make-up only" (wording changed in the Inspector is kept)

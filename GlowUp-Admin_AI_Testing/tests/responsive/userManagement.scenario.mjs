@@ -35,7 +35,7 @@ try {
 
         // sidebar
         const nav = await page.evaluate(() => [...document.querySelectorAll("#sidebarNav a")].map((a) => ({ label: a.getAttribute("aria-label"), active: a.classList.contains("active"), href: a.getAttribute("href") })));
-        ok(JSON.stringify(nav.map((n) => n.label)) === JSON.stringify(["Dashboard", "User Management", "Brand & Product Inventory", "Ingredient Curator"]), `sidebar order ${JSON.stringify(nav.map((n) => n.label))}`);
+        ok(JSON.stringify(nav.map((n) => n.label)) === JSON.stringify(["Dashboard", "User Management", "Admin Management", "Brand & Product Inventory", "Ingredient Curator"]), `sidebar order ${JSON.stringify(nav.map((n) => n.label))}`);
         ok(nav.find((n) => n.label === "User Management").active, "User Management is the active link");
         ok(await page.evaluate(() => { const links = [...document.querySelectorAll("#sidebarNav a")]; const a = links[2], b = links[1]; const sa = getComputedStyle(a), sb = getComputedStyle(b); return sa.fontSize === sb.fontSize && a.getBoundingClientRect().height === b.getBoundingClientRect().height && a.querySelector("svg") && a.querySelector("svg").getBoundingClientRect().width === b.querySelector("svg").getBoundingClientRect().width; }), "the new sidebar item has the size of its neighbours");
         ok(!(await page.$(".um-title")) && !(await page.$("#userTabs")), "one page title (the header) and no header tabs: the cards are the filters");

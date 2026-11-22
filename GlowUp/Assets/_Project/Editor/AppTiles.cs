@@ -169,6 +169,24 @@ namespace GlowUp.EditorTools
                 buttons.GetComponent<HorizontalLayoutGroup>().childForceExpandWidth = true;
                 A.Set(view, "saveButton", save); A.Set(view, "saveLabel", A.LabelOf(save));
                 A.Set(view, "tryOnButton", tryOn); A.Set(view, "resultButton", result); A.Set(view, "aiButton", (Button)null);
+
+                // 22 Nov 2026 (owner): press and hold a recommendation too, then drag it (or the selected ones) to the right side to try on in AR.
+                // The same parts as a Recent Scans row: a check mark for a selected row, the number on the row carried for a group.
+                Image mark = A.Panel(visual.transform, "SelectedMark", ThemeRole.ButtonFill, 1f, 26f);
+                A.At(mark.transform, A.TL, new Vector2(20, -20), new Vector2(88, 88));
+                A.Icon(mark.transform, "Icon", IconFactory.Check, 50, ThemeRole.ButtonText);
+                mark.gameObject.SetActive(false);
+                Image badge = A.Panel(visual.transform, "GroupBadge", ThemeRole.ButtonFill, 1f, 30f);
+                A.At(badge.transform, A.TR, new Vector2(10, 14), new Vector2(76, 60));
+                TextMeshProUGUI badgeText = A.Label(badge.transform, "CountText", "3", 32, ThemeRole.ButtonText, FontRole.Label, TextAlignmentOptions.Center);
+                A.Fill(badgeText.transform);
+                badge.gameObject.SetActive(false);
+                A.Set(view, "selectedMark", mark.gameObject); A.Set(view, "groupBadge", badge.gameObject); A.Set(view, "groupBadgeText", badgeText);
+                var layer = SceneBuilderCore.Ensure<Canvas>(visual);
+                SceneBuilderCore.Ensure<GraphicRaycaster>(visual);
+                var hold = SceneBuilderCore.Ensure<HoldToRemoveTile>(root);
+                A.Set(hold, "visual", (RectTransform)visual.transform); A.Set(hold, "visualCanvas", layer);
+                A.Set(hold, "shakeDegrees", 0.55f);
             }
 
             A.Set(view, "actions", actionsRect); A.Set(view, "actionsGroup", actions.GetComponent<CanvasGroup>());
@@ -428,6 +446,33 @@ namespace GlowUp.EditorTools
         }
 
         /// <summary>A small round-ended button that sits on a product tile.</summary>
+        /// <summary>
+        /// 22 Nov 2026 (owner): the right half of a list, shown while the rows shake: drop a row (or the selected rows) here to try them on in AR.
+        /// The mirror of Recent Scans' RemoveZone (left half). Invisible until needed (CanvasGroup alpha 0): set Alpha to 1 to see and style it.
+        /// </summary>
+        public static CanvasGroup TryOnZone(Transform listArea)
+        {
+            Transform old = listArea.Find("TryOnZone");
+            if (old != null) Object.DestroyImmediate(old.gameObject);
+            GameObject zone = A.Node(listArea, "TryOnZone", typeof(CanvasGroup));
+            var rect = (RectTransform)zone.transform;
+            rect.anchorMin = new Vector2(0.5f, 0); rect.anchorMax = new Vector2(1, 1); rect.pivot = new Vector2(1, 0.5f);
+            rect.offsetMin = Vector2.zero; rect.offsetMax = new Vector2(A.Pad, 0);          // from the middle of the screen to the panel's right edge
+            GameObject shadeObject = A.Node(zone.transform, "Shade", typeof(Image));
+            A.Fill(shadeObject.transform);
+            var shade = shadeObject.GetComponent<Image>(); shade.sprite = IconFactory.ShadowFromLeft; shade.type = Image.Type.Simple; shade.raycastTarget = false;
+            shade.color = new Color(0.55f, 0.20f, 0.33f, 1f);
+            shadeObject.transform.localScale = new Vector3(-1f, 1f, 1f);                    // the shadow comes from the RIGHT edge
+            Image disc = A.Panel(zone.transform, "TryOnDisc", ThemeRole.Background, 1f, 150f);
+            A.At(disc.transform, A.MR, new Vector2(-64, 60), new Vector2(150, 150));
+            A.Outline(disc.transform, ThemeRole.Accent, 150f);
+            A.Icon(disc.transform, "Icon", IconFactory.Sparkle, 78, ThemeRole.AccentText);
+            TextMeshProUGUI text = A.RawLabel(zone.transform, "TryOnZoneText", "Drag here to try on in AR", 34, Color.white, FontRole.Label, TextAlignmentOptions.TopRight, true);
+            A.At(text.transform, A.MR, new Vector2(-44, -90), new Vector2(340, 110));
+            var group = zone.GetComponent<CanvasGroup>(); group.alpha = 0f; group.blocksRaycasts = false; group.interactable = false;
+            return group;
+        }
+
         /// <summary>A coloured strip behind a row with one word at its end; the row's TileSwipeActions fades it in while the row is dragged.</summary>
         static CanvasGroup SwipeHint(Transform row, string name, string word, ThemeRole fill, ThemeRole text, TextAlignmentOptions align)
         {

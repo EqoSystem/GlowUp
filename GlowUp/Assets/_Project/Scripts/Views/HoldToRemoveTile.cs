@@ -65,12 +65,17 @@ namespace GlowUp.Views
         public event Action<HoldToRemoveTile, float> Dragging;
         /// <summary>The drag ended; true = the tile was let go with the finger inside the remove area.</summary>
         public event Action<HoldToRemoveTile, bool> DragEnded;
+        /// <summary>22 Nov 2026: while dragged, true = the finger is inside the Try On area (the right side of the screen).</summary>
+        public event Action<HoldToRemoveTile, bool> OverTryOn;
+        /// <summary>22 Nov 2026: let go with the finger inside the Try On area: the controller opens AR Try-On (this tile, or its whole group).</summary>
+        public event Action<HoldToRemoveTile> DroppedOnTryOn;
 
         public bool Shaking { get; private set; }
 
         ScrollRect scroll;
         Canvas rootCanvas;
-        RectTransform removeArea;
+        RectTransform removeArea, tryOnArea;
+        bool removeEnabled = true, insideTryOn;
         bool pressed, holdFired, dragging, forwarding, returning, inside;
         float pressedFor, returnT, phase, shrink = 1f;
         Vector2 pressAt, fingerNow, grab, returnFrom;
@@ -109,6 +114,10 @@ namespace GlowUp.Views
 
         /// <summary>The area in which letting go removes the tile (the controller's shadow). "Inside" is decided by the finger.</summary>
         public void SetRemoveArea(RectTransform area) { removeArea = area; }
+        /// <summary>The area in which letting go opens AR Try-On (the controller's right-side zone). Null = no try-on drop.</summary>
+        public void SetTryOnArea(RectTransform area) { tryOnArea = area; }
+        /// <summary>Off = a drag never removes (the dashboard's recommendations: there is nothing to remove there).</summary>
+        public void SetRemoveEnabled(bool on) { removeEnabled = on; }
 
         void Awake()
         {
@@ -193,7 +202,9 @@ namespace GlowUp.Views
         void Follow(Vector2 finger)
         {
             fingerNow = finger;
-            inside = InRemoveArea(finger);
+            bool overTryOn = tryOnArea != null && tryOnArea.gameObject.activeInHierarchy && RectTransformUtility.RectangleContainsScreenPoint(tryOnArea, finger, Eye);
+            inside = !overTryOn && removeEnabled && InRemoveArea(finger);
+            if (overTryOn != insideTryOn) { insideTryOn = overTryOn; OverTryOn?.Invoke(this, overTryOn); }
             Place();
             Dragging?.Invoke(this, inside ? 1f : 0f);
         }
@@ -221,9 +232,12 @@ namespace GlowUp.Views
             dragging = false; pressed = false;
             SwipeSceneNavigator.Suppressed = false;
             bool remove = inside;
-            // not removed: it glides back from exactly where it was let go
+            bool tryOn = insideTryOn && !remove;
+            if (insideTryOn) { insideTryOn = false; OverTryOn?.Invoke(this, false); }
+            // not removed: it glides back from exactly where it was let go (also when it opens AR Try-On: the list is as it was on return)
             if (!remove && visual != null) { returning = true; returnT = 0f; returnFrom = visual.anchoredPosition; returnScale = visual.localScale; }
             DragEnded?.Invoke(this, remove);
+            if (tryOn) DroppedOnTryOn?.Invoke(this);
         }
 
         void Update()
@@ -253,7 +267,7 @@ namespace GlowUp.Views
             if (dragging)
             {
                 // smaller while the finger is in the remove area, back to full size outside it; the finger keeps its place on the tile
-                float wanted = inside ? scaleAtRemove : 1f;
+                float wanted = inside || insideTryOn ? scaleAtRemove : 1f;
                 if (!Mathf.Approximately(shrink, wanted)) { shrink = Mathf.MoveTowards(shrink, wanted, Mathf.Max(0.1f, scaleSpeed) * Time.unscaledDeltaTime); Place(); }
                 return;                 // the tilt it had when it was picked up is kept, so nothing jumps
             }

@@ -1,7 +1,7 @@
 
 import { auth, db } from "../_Database/firebase-console.js";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { doc, getDoc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { MAKEUP_TYPES, normalizeName, judgeProduct, notMakeupWords, describeSourceLine, SOURCE_LINK_GUIDE } from "./glowupRules.js";
 import { clearStore } from "./adminStore.js";
 import { askConfirm } from "./adminShell.js";
@@ -66,7 +66,8 @@ export const STATUSES = ["Active", "Pending", "Inactive"];
 export async function isAdmin(user) {
     try {
         const snap = await getDoc(doc(db, "admins", user.uid));
-        return snap.exists();
+        // an admin that Admin Management archived or sent to the bin has no access until restored (a record with no status is active)
+        return snap.exists() && String(snap.data().status || "active") === "active";
     } catch (error) {
         console.warn("Could not check the admins list:", error);
         return false;
@@ -82,6 +83,17 @@ export async function isAdmin(user) {
 function leaveToLogin(address) {
     window.__glowupLeaving = true;
     window.location.replace(address);
+}
+
+// "Online now" on Admin Management: this admin's own record gets lastActiveAt now and then while a page is open and visible
+// (firestore.rules let an admin write that one field of their own record, and only the server's time).
+let heartbeatTimer = 0;
+function startHeartbeat(user) {
+    const beat = () => { if (!document.hidden) updateDoc(doc(db, "admins", user.uid), { lastActiveAt: serverTimestamp() }).catch(() => { }); };
+    beat();
+    window.clearInterval(heartbeatTimer);
+    heartbeatTimer = window.setInterval(beat, 2 * 60 * 1000);
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) beat(); });
 }
 
 export function requireAdmin() {
@@ -100,6 +112,7 @@ export function requireAdmin() {
                 return;
             }
             remember(true);
+            startHeartbeat(user);
             document.documentElement.classList.remove("auth-pending", "auth-stuck", "frame-first");
             document.querySelectorAll(".brand-loader, .auth-stuck-box").forEach((box) => box.remove());
             showSignedInAs(user);

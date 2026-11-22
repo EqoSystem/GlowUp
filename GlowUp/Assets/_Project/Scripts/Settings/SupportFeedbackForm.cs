@@ -192,6 +192,17 @@ namespace GlowUp.AppSettings
             }
         }
 
+        /// <summary>A toast low on the screen: it stays when the form closes, and does not depend on the centred pop-up (22 Nov 2026, phone check: the form closed and nothing was said).</summary>
+        private void Toast(FormalToast.Kind kind, string text)
+        {
+            try
+            {
+                FormalToast toast = FormalToast.Current != null ? FormalToast.Current : FormalToast.OnScreen(transform, sendLabel != null ? (TMP_Text)sendLabel : feedbackText);
+                if (toast != null) toast.Show(kind, text);
+            }
+            catch (Exception) { /* the pop-up and the line on the form still say it */ }
+        }
+
         /// <summary>One line on the form (under the e-mail row): what happened to the report. Visible whatever the pop-up does.</summary>
         private void Inline(string text)
         {
@@ -205,6 +216,7 @@ namespace GlowUp.AppSettings
         private void ShowCenteredPopup(string title, string message, string okText = "OK", float autoCloseSeconds = 0f, Action onClosed = null)
         {
             if (!Application.isPlaying) return;
+            Toast(title.IndexOf("Error", StringComparison.OrdinalIgnoreCase) >= 0 || title.IndexOf("Incomplete", StringComparison.OrdinalIgnoreCase) >= 0 || title.IndexOf("Sign in", StringComparison.OrdinalIgnoreCase) >= 0 ? FormalToast.Kind.Warning : FormalToast.Kind.Info, message);
             Inline(title + ": " + message);          // 22 Nov 2026 (phone check): the result is ALSO written on the form itself, so it shows even if the pop-up cannot
 
             // If app is not in foreground or popup cannot be shown immediately, store as pending
@@ -391,6 +403,7 @@ namespace GlowUp.AppSettings
                     }
                     // 22 Nov 2026 (owner): a centred "Report sent!" with a tick and Okay, the same as the website's "Reply sent!"
                     ClearForm();
+                    Toast(FormalToast.Kind.Success, msgSentTitle + " " + msgSentDone);
                     Inline(msgSentTitle + " " + msgSentDone);
                     if (Application.isFocused && Popup != null) { try { Popup.ShowDone(msgSentTitle, msgSentDone, "Okay"); } catch (Exception) { } }
                     else ShowCenteredPopup(msgSentTitle, msgSentDone, "Okay", 0f);

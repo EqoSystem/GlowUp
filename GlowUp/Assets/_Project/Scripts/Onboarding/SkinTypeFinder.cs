@@ -98,17 +98,17 @@ namespace GlowUp.Onboarding
         public const string ToneTitle = "Where the skin tones come from";
 
         public const string ToneBody =
-            "<b>Fitzpatrick scale</b> (Fitzpatrick, 1975; Archives of Dermatology 1988): the long-standing six-type scale of how skin reacts to the sun, "
+            "<b>Fitzpatrick scale</b> (as discussed in the Journal of Drugs in Dermatology, 2025): the long-standing six-type scale of how skin reacts to the sun, "
             + "from \"always burns\" to \"rarely burns\". It is the scale dermatologists use most, so the one-line description on each tile follows it.\n\n"
-            + "<b>Monk Skin Tone Scale</b> (Dr Ellis Monk with Google, 2022): ten shades made to cover a wider range of skin, especially darker skin. "
-            + "A 2025 comparison with measured skin colour found it matched the measurement more closely than the Fitzpatrick scale "
+            + "<b>Monk Skin Tone Scale</b>: ten shades made to cover a wider range of skin, especially darker skin. "
+            + "A 2026 comparison with measured skin colour in 517 people found it matched the measurement more closely than the Fitzpatrick scale "
             + "(Diamantidis et al., Medical University of Vienna). A shade on a screen is still an approximation.\n\n"
             + "<b>GlowUp's six tones</b> (Fair, Light, Medium, Tan, Deep, Dark) group these scales into six easy-to-pick tiles. "
             + "The selfie option reads the colour of the skin in the middle of one photo and picks the nearest tile; lighting changes what a camera sees, so you can always choose another.";
 
         public const string TypeSources =
-            "<b>Baumann Skin Type Indicator</b> (Baumann, Dermatologic Clinics 2008): argues that normal / dry / oily / combination says little about the skin, "
-            + "and adds sensitive vs resistant, pigmented vs not, wrinkled vs tight. GlowUp keeps the four everyday types for simplicity and handles sensitivity "
+            "<b>Baumann Skin Type Questionnaire</b> (validated again by Brzozowska et al., Postępy Dermatologii i Alergologii, 2025): holds that normal / dry / oily / combination says little about the skin "
+            + "and that people often label their own type wrongly, so it asks questions instead, including sensitive vs resistant. GlowUp keeps the four everyday types for simplicity and handles sensitivity "
             + "through the ingredients you react to (the allergens step).";
     }
 }

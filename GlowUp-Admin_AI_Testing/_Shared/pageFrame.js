@@ -20,7 +20,7 @@
     var main = script && script.parentElement && script.parentElement.tagName === "MAIN" ? script.parentElement : document.querySelector("main.main-content");
     var root = document.documentElement;
     var path = location.pathname;
-    var page = path.indexOf("Inventory") >= 0 ? "inventory" : path.indexOf("Curator") >= 0 ? "curator" : path.indexOf("Recycle") >= 0 ? "bin" : path.indexOf("_Admin_Archive") >= 0 ? "archive" : path.indexOf("_Admin_User_Management") >= 0 ? "users" : "dashboard";
+    var page = path.indexOf("Inventory") >= 0 ? "inventory" : path.indexOf("Curator") >= 0 ? "curator" : path.indexOf("Recycle") >= 0 ? "bin" : path.indexOf("_Admin_Archive") >= 0 ? "archive" : path.indexOf("_Admin_User_Management") >= 0 ? "users" : path.indexOf("_Admin_Admin_Management") >= 0 ? "admins" : "dashboard";
 
 
     var ICON = {
@@ -31,6 +31,7 @@
         bin: '<path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/>',
         camera: '<path d="M4 8h3.2l1.8-2.5h6l1.8 2.5H20v11H4z"/><circle cx="12" cy="13.2" r="3.6"/>',
         chevron: '<path d="M15 6l-6 6 6 6"/>',
+        shield: '<path d="M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6l8-3z"/><path d="M9 12l2.2 2.2L15 10.5"/>',
         users: '<circle cx="9" cy="8" r="3.6"/><path d="M2.5 20c1.2-3.6 3.8-5.5 6.5-5.5s5.3 1.9 6.5 5.5"/><path d="M16 4.6a3.6 3.6 0 0 1 0 6.8M18.5 14.8c1.7.8 2.9 2.6 3.5 5.2"/>',
         menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
         logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/>'
@@ -38,6 +39,7 @@
     var NAV = [
         { id: "dashboard", label: "Dashboard", icon: "dashboard", href: "../_Admin_Dashboard/adminDashboard.html" },
         { id: "users", label: "User Management", icon: "users", href: "../_Admin_User_Management/adminUserManagement.html" },
+        { id: "admins", label: "Admin Management", icon: "shield", href: "../_Admin_Admin_Management/adminAdminManagement.html" },
         { id: "inventory", label: "Brand & Product Inventory", icon: "box", href: "../_Admin_Brand_Inventory/adminBrandInventory.html" },
         { id: "curator", label: "Ingredient Curator", icon: "flask", href: "../_Admin_Ingredient_Curator/adminIngredientCurator.html" }
 
