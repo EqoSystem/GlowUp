@@ -184,9 +184,10 @@ document.addEventListener("DOMContentLoaded", () => {
         signingIn = true;
         say("");
         setButton(false, "Signing in...");
-        // the lock kept in the database also holds in a private window or on another browser (remoteLock.js)
+        // The lock kept in the database (remoteLock.js) is ADVICE, not a gate (security review, 22 Nov 2026): anyone can write it for any e-mail, so
+        // refusing the attempt would let a stranger lock an admin out. The attempt always goes to Firebase; a RIGHT password always gets in and clears
+        // the lock. A wrong one, while the shared lock holds, shows the lock message and is not counted again.
         const sharedLock = await remoteRemaining(email);
-        if (sharedLock > 0) { signingIn = false; lockout.lockFor(email, sharedLock); showLock(email); return; }
         try {
             const userCredential = await signInWithEmailAndPassword(auth, email, password);
             if (REQUIRE_ADMIN_RECORD && !(await isAdmin(userCredential.user))) {
@@ -203,6 +204,7 @@ document.addEventListener("DOMContentLoaded", () => {
         } catch (error) {
             console.error("Login failed:", error && error.code ? error.code : error);
             signingIn = false;
+            if (credentialError(error) && sharedLock > 0) { lockout.lockFor(email, sharedLock); showLock(email); return; }
             if (credentialError(error)) {
                 const result = lockout.fail(email);
                 const shared = await remoteFail(email);                  // the same wrong password counted for every browser
