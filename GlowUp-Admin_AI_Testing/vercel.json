@@ -48,9 +48,6 @@
     }
   ],
   "functions": {
-    "api/assist-ingredient.js": {
-      "maxDuration": 60
-    },
     "api/archive-purge.js": {
       "maxDuration": 60
     },

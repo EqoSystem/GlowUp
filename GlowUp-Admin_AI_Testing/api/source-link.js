@@ -11,7 +11,7 @@
 
 
 const dns = require("dns").promises;
-const { adminUid } = require("./assist-ingredient.js").helpers;
+const { adminUid } = require("./_adminAuth.js");
 
 const CHECK_SECONDS = 5;
 const MAX_BYTES = 1500000;

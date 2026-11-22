@@ -117,17 +117,6 @@
                 <div class="suggestion-list" id="ingredientSuggestionsList"></div>
             </section>
 
-            <section class="panel ingredient-suggestions" id="inventoryAiDraftPanel" hidden data-panel="ai-drafts" data-label="AI drafts to review" data-w="8">
-                <div class="panel-head">
-                    <h3 class="panel-title">AI drafts to review</h3>
-                    <span class="panel-count" id="inventoryAiDraftCount"></span>
-                    <span class="spacer"></span>
-                    <button type="button" class="primary-btn" id="inventoryApproveAllBtn" disabled><i data-icon="check"></i>Approve reviewed drafts</button>
-                </div>
-                <p class="field-hint">Check each draft against official sources or the product packaging. Only checked drafts are saved; ingredient lists are never replaced if the product already has one.</p>
-                <div class="suggestion-list" id="inventoryAiDraftList"></div>
-            </section>
-
 
             <section class="panel" data-panel="table" data-label="Inventory table" data-w="8" data-source="products">
 
@@ -327,7 +316,6 @@
                             <div class="field full">
                                 <div class="label-row">
                                     <label for="productIngredientsInput">Ingredients <span class="required" aria-hidden="true">*</span></label>
-                                    <span class="label-actions"><button type="button" class="row-btn" id="assistProductIngredientsBtn"><i data-icon="sparkle"></i>Assist with AI</button></span>
                                 </div>
                                 <div class="ing-search">
                                     <input type="text" id="productIngredientSearch" role="combobox" aria-expanded="false" aria-controls="productIngredientResults" aria-autocomplete="list" autocomplete="off" aria-label="Search the ingredient library">
@@ -336,7 +324,6 @@
                                 <div id="productIngredientPills" class="ing-pills" aria-live="polite"></div>
                                 <textarea id="productIngredientsInput" rows="3" placeholder="Or paste the whole list from the packaging, e.g. Dimethicone, Isododecane, Mica, Parfum" aria-describedby="productIngredientsHint" aria-required="true" style="margin-top: 8px;"></textarea>
                                 <div class="hint-row"><p class="field-hint" id="productIngredientsHint">Search above to pick from the library, or paste the list here, separated by commas (or one on each line).</p></div>
-                                <p class="review-note ai-product-note" id="productAiNote" role="status" aria-live="polite" hidden></p>
                             </div>
                             <div class="field full" role="group" aria-labelledby="productShadesLabel">
                                 <div class="label-row"><span class="label-text" id="productShadesLabel">Shades</span></div>

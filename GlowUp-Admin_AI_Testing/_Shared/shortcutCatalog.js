@@ -49,7 +49,6 @@ export const CATALOG = [
     { id: "curator.addIngredient", scope: "curator", label: "Add ingredient", description: "Opens the Add ingredient form.", keys: "Ctrl+Alt+KeyN" },
     { id: "curator.import", scope: "curator", label: "Import a file", description: "Opens the file chooser to import ingredients.", keys: "Ctrl+Alt+KeyI" },
     { id: "curator.classifications", scope: "curator", label: "Classifications", description: "Opens the list of ingredient classifications.", keys: "Ctrl+Alt+KeyC" },
-    { id: "curator.approveDrafts", scope: "curator", label: "Approve reviewed drafts", description: "Asks first, then approves the drafts you ticked as reviewed.", keys: "Ctrl+Alt+KeyA" },
     { id: "curator.sort", scope: "curator", label: "Sort", description: "Opens the sort choices of the ingredient list.", keys: "", paletteOnly: true },
 
     { id: "bin.restore", scope: "bin", label: "Restore selected", description: "Restores the ticked entries to their lists.", keys: "Ctrl+Alt+KeyR" },

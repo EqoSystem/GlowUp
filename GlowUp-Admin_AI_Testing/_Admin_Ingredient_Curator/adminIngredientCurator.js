@@ -30,7 +30,7 @@ import { refreshRecommendabilityFlags } from "../_Shared/recommendabilityAdmin.j
 import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed, onSnapshot } from "../_Shared/adminStore.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
-    notify, describeError, setBusy, setFormError, renderChecks, readChecks, writeChecks, originLabel, sourceLinks, assistSourceLinks, sourceGuideHtml, wireSearch,
+    notify, describeError, setBusy, setFormError, renderChecks, readChecks, writeChecks, originLabel, sourceLinks, sourceGuideHtml, wireSearch,
     SKIN_TYPES, dialogIsOpen, statusBadge, toneBadge
 } from "../_Shared/adminCommon.js";
 import { matchesSearch, normalizeName, evidenceProblem } from "../_Shared/glowupRules.js";
@@ -40,7 +40,7 @@ import { openPlanDialog, openDuplicatesDialog, showScan } from "../_Shared/admin
 import { attachCounters } from "../_Shared/charLimit.js";
 import { mountShell, placeInHeader, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
 import { bindButtons } from "../_Shared/shortcuts.js";
-import { readAdminDocument, splitForAi } from "../_Shared/adminDocumentReader.js";
+import { readAdminDocument } from "../_Shared/adminDocumentReader.js";
 import { startImport } from "../_Shared/importReview.js";
 import { parseImportText, inventoryNotHere } from "../_Shared/importFormat.js";
 import { loadLists, optionsOf, allOptions, openListManager, listsNow } from "../_Shared/adminLists.js";
@@ -106,7 +106,6 @@ let fdaBrands = [];
 let fieldFound = {};
 let definitionBasis = null;
 let assisted = null;
-let ingredientAiDrafts = [];
 let org = null;
 let openId = "";
 let quick = "";
@@ -170,7 +169,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     mountShell("curator");
 
     bindButtons({ "curator.addIngredient": "#addIngredientBtn", "curator.import": "#chooseIngredientFileBtn", "curator.classifications": "#manageClassBtn",
-        "curator.approveDrafts": "#ingredientApproveAllBtn", "curator.sort": "#sortMenuBtn" });
+        "curator.sort": "#sortMenuBtn" });
     placeInHeader(".search-container", "headerActions");
     wireSignOut();
     setupNavigationGuard();
@@ -227,15 +226,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         move: moveToFolder, bin: moveToBin, restore: restoreFromBin, purge: purgeFromBin,
         renameFolder: (from, to) => refolder(from, to), deleteFolder: (name) => refolder(name, ""),
         selectionActions: () => [
-            { label: "Assist with AI", className: "bar-main", tip: "Draft sourced descriptions for selected ingredients.", icon: icon("sparkle"), run: assistSelectedIngredients },
             { label: "Approve All", className: "bar-quiet", tip: "Approve only selected AI entries that are still waiting for review.", run: approveSelectedIngredients }
         ],
         onView: () => { fromFirstPage(); }
     });
     setAssistPage("curator");
     registerHelpers();
-    el("ingredientAiDraftList").addEventListener("change", updateIngredientDraftApproval);
-    el("ingredientApproveAllBtn").addEventListener("click", approveIngredientDrafts);
 
     wireSearch(el("ingredientSearchInput"), el("ingredientSearchClear"), fromFirstPage);
 
@@ -769,8 +765,7 @@ function renderFromProducts(term, typed) {
                     <dt>Listed by</dt><dd>${x.products.slice(0, 12).map((name) => `<span class="chip">${escapeHtml(name)}</span>`).join("")}${x.products.length > 12 ? `<span class="muted small">and ${x.products.length - 12} more</span>` : ""}</dd>
                     <dt>In the app</dt><dd>No entry here yet: the app uses its own built-in knowledge for it, or looks it up when it is scanned.</dd>
                 </dl>
-                <div class="detail-actions"><button type="button" class="row-btn main" data-act="write" data-name="${escapeHtml(x.name)}" data-tip="Opens the form with the name filled in. You write what it is and how the app should judge it.">${icon("plus")}Write its entry</button>`
-                    + `<button type="button" class="row-btn" data-act="assist" data-name="${escapeHtml(x.name)}" data-tip-title="Assist with AI" data-tip="The AI is given the COSMILE Europe record (when it has one) and is asked to use regulators, medical bodies and ingredient databases. It drafts the description, purpose, uses and other names; risk, allergen and skin boxes stay yours. Every page it used is listed with its kind. Nothing is saved until you have read it and pressed Save.">${icon("sparkle")}Assist with AI</button></div>
+                <div class="detail-actions"><button type="button" class="row-btn main" data-act="write" data-name="${escapeHtml(x.name)}" data-tip="Opens the form with the name filled in. You write what it is and how the app should judge it.">${icon("plus")}Write its entry</button></div>
             </div>`;
         return `
             <article class="ingredient-card from-product${open ? " open" : ""}" data-id="new:${escapeHtml(x.key)}" tabindex="0" aria-expanded="${open}">
@@ -912,23 +907,6 @@ function writeFit(container, avoid, good) {
 
 
 
-const ASSIST_PER_DAY = 40;
-const ASSIST_KEY = "glowup.curator.assist";
-
-
-function assistsToday(add) {
-    const today = new Date().toISOString().slice(0, 10);
-    let kept = {};
-    try { kept = JSON.parse(localStorage.getItem(ASSIST_KEY) || "{}"); } catch (error) { kept = {}; }
-    const count = (kept.day === today ? Number(kept.count) || 0 : 0) + (add ? 1 : 0);
-    if (add) localStorage.setItem(ASSIST_KEY, JSON.stringify({ day: today, count }));
-    return count;
-}
-
-
-function assistSources(pages) {
-    return assistSourceLinks(pages, "<b>The AI named no web page.</b> Treat every box as unchecked.");
-}
 
 
 
@@ -1097,73 +1075,6 @@ function showPasteNote(box, text) {
 }
 
 
-async function assistWithAi(name) {
-    const note = el("ingredientReviewNote"), form = el("addIngredientForm"), saveButton = el("saveIngredientBtn");
-    const say = (html) => { note.innerHTML = html; note.style.display = ""; };
-    if (!name) return;
-    if (assistsToday(false) >= ASSIST_PER_DAY) { say(`Assist with AI was used ${ASSIST_PER_DAY} times today in this browser. Write this entry by hand, or go on tomorrow.`); return; }
-    say(`${icon("sparkle")} <b>Asking the AI about "${escapeHtml(name)}"...</b> It is asked to use regulators, medical bodies and ingredient databases; this can take up to a minute.`);
-    setBusy(saveButton, true, "Waiting for the AI...");
-    try {
-        const user = auth.currentUser;
-        if (!user) throw new Error("You are signed out. Sign in again.");
-        const stop = new AbortController();
-        const timer = setTimeout(() => stop.abort(), 75000);
-        let answer;
-        try {
-            answer = await fetch("/api/assist-ingredient", {
-                method: "POST", signal: stop.signal,
-                headers: { "Content-Type": "application/json", Authorization: "Bearer " + (await user.getIdToken()) },
-                body: JSON.stringify({ mode: "description", name, aliases: toList(el("ingredientAliasesInput").value).slice(0, 3) })
-            });
-        } finally { clearTimeout(timer); }
-        assistsToday(true);
-        const body = await answer.json().catch(() => ({}));
-        if (!answer.ok) throw new Error(body.error || "The AI could not be reached (error " + answer.status + ").");
-        if (!dialogIsOpen() || el("ingredientNameInput").value.trim() !== name.trim()) return;
-        if (!body.found) { say(`<b>No description draft.</b> ${escapeHtml(body.message || "The AI found no source for this name.")}<br>${assistSources(body.sources)}`); return; }
-
-        const d = body.draft;
-        el("ingredientDescInput").value = d.description;
-
-        const filled = ["Definition"];
-        const fillEmpty = (id, value, label) => { const box = el(id); if (value && !box.value.trim()) { box.value = value; filled.push(label); box.dispatchEvent(new Event("input", { bubbles: true })); } };
-        fillEmpty("ingredientPurposeInput", String(d.purpose || "").slice(0, MAX_PURPOSE), "Purpose");
-        fillEmpty("ingredientUsesInput", d.commonUses, "Commonly used in");
-        fillEmpty("ingredientChemInput", String(d.chemicalDescription || "").slice(0, 600), "What the chemical is");
-        const names = toList(el("ingredientAliasesInput").value);
-        const newNames = (d.aliases || []).filter((a) => sameKey(a) !== sameKey(name) && !names.some((n) => sameKey(n) === sameKey(a)));
-        if (newNames.length) { el("ingredientAliasesInput").value = names.concat(newNames).join(", "); filled.push("Also known as"); el("ingredientAliasesInput").dispatchEvent(new Event("input", { bubbles: true })); }
-        const links = el("ingredientSourcesInput");
-        const newLinks = (d.links || []).filter((l) => !links.value.includes(l.url)).map((l) => `${l.title} | ${l.url}`);
-        if (newLinks.length) { links.value = links.value.trim().split(/\r?\n/).concat(newLinks).filter(Boolean).join("\n"); filled.push("Reference links"); }
-        assisted = { sources: body.sources || [], model: body.model || "" };
-        fieldFound = body.fieldSources || {};
-        definitionBasis = body.basis && typeof body.basis === "object" ? body.basis : null;
-        paintFieldSources();
-        const cosmile = body.cosmile && body.cosmile.found
-            ? `<br><b>COSMILE Europe record used:</b> <a class="source-link" href="${escapeHtml(body.cosmile.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(body.cosmile.inci)}</a>`
-            : `<br><span class="field-hint">COSMILE Europe has no record with exactly this name, so it was not used.</span>`;
-        const backupNote = body.notes && body.notes.length > 0 ? `<br><span class="field-hint">Before it answered: ${escapeHtml(body.notes.join("; "))}.</span>` : "";
-        say(`<b>This is a draft. Nothing is saved yet.</b> Filled: ${escapeHtml(filled.join(", "))}. Risk level, allergens and skin boxes are left to you. Read it against the sources, correct what is wrong, then press Save.`
-            + cosmile
-            + (body.searched === false ? `<br><b>This draft was written WITHOUT a web search (by ${escapeHtml(body.model || "a backup AI")}), from the AI's memory. It names no sources, so every box is unchecked: check it with the links below.</b>` : "")
-            + `<br><b>Sources:</b><br>${assistSources(body.sources)}`
-            + `<br><b>Check it yourself:</b> ` + (body.lookups || []).map((l) => `<a class="source-link" href="${escapeHtml(l.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(l.title)}</a>`).join(" · ")
-            + backupNote);
-    } catch (error) {
-        const why = error && error.name === "AbortError" ? "The AI took too long." : (error && error.message) || "Something went wrong.";
-        say(`<b>Assist with AI did not work.</b> ${escapeHtml(why)} You can still write the entry by hand.`);
-        setFormError(form, "");
-    } finally {
-        setBusy(saveButton, false);
-    }
-}
-
-
-
-
-
 const IMPORT_MAX_ROWS = 60;
 
 
@@ -1208,28 +1119,7 @@ async function extractIngredients(documentText, say, signal) {
     if (keyed.kind === "inventory") return { refused: "This file lists only brands or products. " + inventoryNotHere(keyed.draft.products.length + keyed.draft.brands.length) };
     if (keyed.kind === "mixed") return { refused: `This file mixes ${many(keyed.counts.ingredients, "ingredient record", "ingredient records")} with brands or products, so nothing was imported. ` + inventoryNotHere(keyed.counts.inventory) };
     if (keyed.kind === "ingredients") { say("Reading the file's own fields. No AI is used."); return { draft: keyed.draft, notes: keyed.notes.slice(0, 6), model: "" }; }
-    if (assistsToday(false) >= ASSIST_PER_DAY) throw new Error(`The AI was used ${ASSIST_PER_DAY} times today in this browser. Try again tomorrow.`);
-
-    const parts = splitForAi(documentText);
-    const found = [], failedParts = [];
-    let model = "", inventoryRecords = 0;
-    for (let i = 0; i < parts.length; i++) {
-        if (signal && signal.aborted) break;
-        say(parts.length > 1 ? `Asking the AI about part ${i + 1} of ${parts.length}. Only the extracted text is sent, not the file.` : "Asking the AI to pick out the ingredients. Only the extracted text is sent, not the file.");
-        try {
-            const answer = await askCuratorApi({ mode: "ingredientImport", documentText: parts[i] }, signal);
-            found.push(...((answer.draft && answer.draft.ingredients) || []));
-            inventoryRecords += Number(answer.inventoryRecords) || 0;
-            model = model || answer.model || "";
-        } catch (error) {
-            if (i === 0 || (signal && signal.aborted)) throw error;
-            failedParts.push(`part ${i + 1} (${error && error.name === "AbortError" ? "the AI took too long" : (error && error.message) || "it failed"})`);
-        }
-    }
-    assistsToday(true);
-    const notes = (failedParts.length ? [`Not read: ${failedParts.join("; ")}. Import the file again later for those parts; what is saved now is then skipped as a duplicate.`] : [])
-        .concat(inventoryRecords > 0 ? [inventoryNotHere(inventoryRecords)] : []);
-    return { draft: { ingredients: found }, notes, model: model || "the AI" };
+    return { refused: "This file is not in the GlowUp import format, so nothing was imported. Use the import template." };
 }
 
 
@@ -1321,126 +1211,6 @@ function listIds(kind, names, unmatched) {
         if (item) { if (!ids.includes(item.id)) ids.push(item.id); } else unmatched.add(String(raw).trim());
     });
     return ids;
-}
-
-async function askCuratorAi(name) {
-    return askCuratorApi({ mode: "description", name });
-}
-
-async function askCuratorApi(payload, signal = null) {
-    const user = auth.currentUser;
-    if (!user) throw new Error("You are signed out. Sign in again.");
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 75000);
-    const onCancel = () => controller.abort();
-    if (signal) signal.addEventListener("abort", onCancel);
-    let response;
-    try {
-        response = await fetch("/api/assist-ingredient", {
-            method: "POST",
-            signal: controller.signal,
-            headers: { "Content-Type": "application/json", Authorization: "Bearer " + (await user.getIdToken()) },
-            body: JSON.stringify(payload)
-        });
-    } finally {
-        clearTimeout(timeout);
-        if (signal) signal.removeEventListener("abort", onCancel);
-    }
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || `The AI could not be reached (error ${response.status}).`);
-    return result;
-}
-
-function paintIngredientDrafts() {
-    const panel = el("ingredientAiDraftPanel"), list = el("ingredientAiDraftList");
-    panel.hidden = ingredientAiDrafts.length === 0;
-    el("ingredientAiDraftCount").textContent = many(ingredientAiDrafts.length, "draft", "drafts");
-    list.innerHTML = ingredientAiDrafts.map((draft, index) => {
-        const sources = assistSourceLinks(draft.sources, "");
-        return `<article class="suggestion-card" data-draft-index="${index}">
-            <strong>${escapeHtml(titleOf(draft.item))}</strong>
-            <label class="field">Description draft <textarea data-draft-description rows="3" maxlength="600">${escapeHtml(draft.description)}</textarea></label>
-            <p class="field-hint">AI: ${escapeHtml(draft.model || "unknown model")}${draft.searched === false ? " (no web search; verify carefully)" : ""}</p>
-            <p class="field-hint">Sources: ${sources || "No source links were returned; verify this description yourself."}</p>
-            <label class="field-hint"><input type="checkbox" data-draft-reviewed> I checked this description against its sources.</label>
-        </article>`;
-    }).join("");
-    updateIngredientDraftApproval();
-}
-
-function updateIngredientDraftApproval() {
-    const button = el("ingredientApproveAllBtn");
-    if (button) button.disabled = !el("ingredientAiDraftList").querySelector("[data-draft-reviewed]:checked");
-}
-
-async function assistSelectedIngredients(keys) {
-    const selected = keys.map((id) => everyIngredient.find((item) => item.id === id && !item.binned)).filter((item) => item && (item.name || item.techName));
-    if (!selected.length) {
-        notify("Select at least one listed ingredient first.", "info");
-        return;
-    }
-    let completed = 0;
-    for (const item of selected) {
-        if (ingredientAiDrafts.some((draft) => draft.item.id === item.id)) continue;
-        try {
-            const answer = await askCuratorAi(item.techName || item.name);
-            if (!answer.found || !answer.draft || !answer.draft.description) throw new Error(answer.message || "No sourced description was found.");
-            ingredientAiDrafts.push({ item, description: answer.draft.description, sources: answer.sources || [], model: answer.model, searched: answer.searched });
-            completed++;
-        } catch (error) {
-            const reason = error && error.name === "AbortError" ? "The AI took too long." : describeError(error);
-            notify(`AI could not assist "${titleOf(item)}". ${reason}`, "error");
-        }
-    }
-    paintIngredientDrafts();
-    if (completed) notify(`${many(completed, "draft is", "drafts are")} ready. Check the sources and select the drafts you reviewed.`, "ok");
-}
-
-async function approveIngredientDrafts() {
-    const checked = Array.from(el("ingredientAiDraftList").querySelectorAll("[data-draft-reviewed]:checked"))
-        .map((checkbox) => Number(checkbox.closest("[data-draft-index]").dataset.draftIndex))
-        .filter((index) => Number.isInteger(index) && ingredientAiDrafts[index]);
-    if (!checked.length) return;
-    const drafts = checked.map((index) => ({
-        index,
-        entry: ingredientAiDrafts[index],
-        description: el("ingredientAiDraftList").querySelector(`[data-draft-index="${index}"] [data-draft-description]`).value.trim()
-    })).filter((draft) => draft.description);
-    if (!drafts.length) {
-        notify("Enter a description in at least one checked draft before approving.", "error");
-        return;
-    }
-    if (!(await askConfirm({
-        title: `Approve ${many(drafts.length, "reviewed description", "reviewed descriptions")}?`,
-        message: "Only checked descriptions are saved. Ingredient names and all risk or safety fields remain unchanged.",
-        items: drafts.map((draft) => titleOf(draft.entry.item)),
-        confirmLabel: "Approve All"
-    }))) return;
-    const ops = drafts.map(({ entry, description }) => {
-        const sources = entry.sources.map((source) => `${source.title || source.site || "web page"} | ${source.url}`).filter((source) => !source.endsWith(" | "));
-        return {
-            ref: doc(db, "ingredients", entry.item.id),
-            data: {
-                description,
-                source: entry.item.source || "aiassist",
-                sources: Array.from(new Set(entry.item.sources.concat(sources))),
-                webSearched: sources.length > 0,
-                aiAssistModel: entry.model || "",
-                reviewed: true,
-                reviewedBy: reviewer(),
-                reviewedAt: serverTimestamp(),
-                updatedAt: serverTimestamp()
-            }
-        };
-    });
-    try {
-        await saveOrReload(ops);
-        ingredientAiDrafts = ingredientAiDrafts.filter((entry) => !drafts.some((draft) => draft.entry === entry));
-        paintIngredientDrafts();
-        notify(`${many(drafts.length, "reviewed description was", "reviewed descriptions were")} saved.`, "ok");
-    } catch (error) {
-        notify("The reviewed descriptions were not saved. " + describeError(error), "error");
-    }
 }
 
 async function approveSelectedIngredients(keys) {
@@ -1833,11 +1603,10 @@ function onListClick(event) {
         return;
     }
     const act = button.dataset.act, id = button.dataset.id || "";
-    if (act === "write" || act === "assist") {
+    if (act === "write") {
         openIngredientForm(null);
         el("ingredientNameInput").value = button.dataset.name || "";
         el("ingredientDescInput").focus();
-        if (act === "assist") assistWithAi(button.dataset.name || "");
         return;
     }
     const item = everyIngredient.find((i) => i.id === id);

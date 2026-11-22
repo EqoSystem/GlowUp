@@ -35,7 +35,7 @@ import { collection, doc, serverTimestamp } from "https://www.gstatic.com/fireba
 import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed, onSnapshot } from "../_Shared/adminStore.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
-    statusBadge, toneBadge, statusGuide, normalizeStatus, notify, describeError, setBusy, setFormError, originLabel, sourceLinks, assistSourceLinks, sourceGuideHtml, COSMETIC_TYPES, STATUSES,
+    statusBadge, toneBadge, statusGuide, normalizeStatus, notify, describeError, setBusy, setFormError, originLabel, sourceLinks, sourceGuideHtml, COSMETIC_TYPES, STATUSES,
     productScope, notMakeup, scopeWords, categoryOutOfScope, BRAND_CATEGORY, wireSearch, dialogIsOpen
 } from "../_Shared/adminCommon.js";
 import { matchesSearch, compactName, barcodeKey } from "../_Shared/glowupRules.js";
@@ -48,7 +48,7 @@ import { mountShell, placeInHeader, paginate, renderPager, icon, BIN_ICON, openM
 import { registerDataset, registerTileDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
-import { readAdminDocument, splitForAi } from "../_Shared/adminDocumentReader.js";
+import { readAdminDocument } from "../_Shared/adminDocumentReader.js";
 import { startImport } from "../_Shared/importReview.js";
 import { parseImportText, pairShades, shadeCodeOf, ingredientsNotHere } from "../_Shared/importFormat.js";
 import { parseLabeledProducts } from "../_Shared/ingredientBlock.js";
@@ -107,7 +107,6 @@ let everyBrand = [];
 let everyProduct = [];
 let ingredientSuggestions = [];
 let ingredientSuggestionsError = "";
-let inventoryAiDrafts = [];
 let brands = [];
 let products = [];
 let binBrands = [];
@@ -202,7 +201,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         move: moveToFolder, bin: moveToBin, restore: restoreFromBin, purge: purgeFromBin,
         renameFolder: (from, to) => refolder(from, to), deleteFolder: (name) => refolder(name, ""),
         selectionActions: () => [
-            { label: "Assist with AI", className: "bar-main", tip: "Draft sourced ingredient lists and brand aliases for selected entries.", icon: icon("sparkle"), run: assistSelectedInventory },
             { label: "Approve All", className: "bar-quiet", tip: "Approve only eligible selected entries after you confirm you have reviewed them.", run: approveSelectedInventory },
             { label: "Apply website or source", className: "bar-quiet", tip: "Give every selected product a web address, also those on other pages. You see how many change and confirm first.", icon: icon("layers"), run: applyToSelected }
         ],
@@ -212,8 +210,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     setAssistPage("inventory");
     registerHelpers();
-    el("inventoryAiDraftList").addEventListener("change", updateInventoryDraftApproval);
-    el("inventoryApproveAllBtn").addEventListener("click", approveInventoryDrafts);
 
     const askedFor = new URLSearchParams(window.location.search).get("q");
     if (askedFor) el("inventorySearchInput").value = askedFor;
@@ -241,7 +237,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     ]));
 
     bindButtons({ "inventory.new": "#addMenuBtn", "inventory.import": "#chooseInventoryFileBtn", "inventory.filters": "#filterMenuBtn",
-        "inventory.approveDrafts": "#inventoryApproveAllBtn", "inventory.sort": "#sortMenuBtn" });
+        "inventory.sort": "#sortMenuBtn" });
     bindActions({
         "inventory.addBrand": { run: () => openBrandForm(null) },
         "inventory.addProduct": { run: () => openProductForm(null, brandFilterValue()), isAvailable: () => (brands.length === 0 ? "Add product: add a brand first. A product needs a listed brand." : true) }
@@ -342,7 +338,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
         if (file) importInventoryFile(file);
     });
-    el("assistProductIngredientsBtn").addEventListener("click", assistProductIngredients);
     el("inventoryTableBody").addEventListener("click", onTableClick);
     el("ingredientSuggestionsList").addEventListener("click", onIngredientSuggestionClick);
     el("inventoryTableBody").addEventListener("dblclick", onTableDoubleClick);
@@ -763,162 +758,7 @@ function fillBrandSelects() {
     el("productBrandInput").innerHTML = `<option value="">Choose a brand</option>` + brands.map(option).join("");
 }
 
-const INVENTORY_AI_DAILY_LIMIT = 40;
 const IMPORT_GROUP = 40;
-const INVENTORY_AI_LIMIT_KEY = "glowup.inventory.ai.daily";
-function inventoryAiCalls(add) {
-    const today = new Date().toISOString().slice(0, 10);
-    let state = {};
-    try { state = JSON.parse(localStorage.getItem(INVENTORY_AI_LIMIT_KEY) || "{}"); } catch (error) { state = {}; }
-    const count = (state.day === today ? Number(state.count) || 0 : 0) + (add ? 1 : 0);
-    if (add) localStorage.setItem(INVENTORY_AI_LIMIT_KEY, JSON.stringify({ day: today, count }));
-    return count;
-}
-
-
-async function askInventoryAi(payload, countIt = true, signal = null) {
-    if (countIt && inventoryAiCalls(false) >= INVENTORY_AI_DAILY_LIMIT) throw new Error(`Assist with AI was used ${INVENTORY_AI_DAILY_LIMIT} times today in this browser. Try again tomorrow.`);
-    const user = auth.currentUser;
-    if (!user) throw new Error("You are signed out. Sign in again.");
-    const stop = new AbortController();
-    const timer = setTimeout(() => stop.abort(), 75000);
-    const onCancel = () => stop.abort();
-    if (signal) signal.addEventListener("abort", onCancel);
-    let answer;
-    try {
-        answer = await fetch("/api/assist-ingredient", {
-            method: "POST", signal: stop.signal,
-            headers: { "Content-Type": "application/json", Authorization: "Bearer " + (await user.getIdToken()) },
-            body: JSON.stringify(payload)
-        });
-    } finally { clearTimeout(timer); if (signal) signal.removeEventListener("abort", onCancel); }
-    const body = await answer.json().catch(() => ({}));
-    if (!answer.ok) throw new Error(body.error || `The AI could not be reached (error ${answer.status}).`);
-    if (countIt) inventoryAiCalls(true);
-    return body;
-}
-
-function assistProductSourceLinks(sources) {
-    return assistSourceLinks(sources, "<b>The AI named no web page. Check every ingredient against the package.</b>");
-}
-
-function paintInventoryDrafts() {
-    const panel = el("inventoryAiDraftPanel");
-    const list = el("inventoryAiDraftList");
-    panel.hidden = inventoryAiDrafts.length === 0;
-    el("inventoryAiDraftCount").textContent = many(inventoryAiDrafts.length, "draft", "drafts");
-    list.innerHTML = inventoryAiDrafts.map((draft, index) => {
-        const fields = draft.kind === "brand"
-            ? `<label class="field">Market <input data-draft-field="market" value="${escapeHtml(draft.draft.market || draft.item.market || "")}" maxlength="40"></label>
-               <label class="field">Aliases (comma separated) <input data-draft-field="aliases" value="${escapeHtml((draft.draft.aliases || []).join(", "))}" maxlength="400"></label>`
-              + (draft.draft.websiteSuggested ? `<p class="field-hint">Suggested official website: <code class="small">${escapeHtml(draft.draft.websiteSuggested)}</code>${draft.draft.websiteSeenInSources ? " (a page the AI used is on it)" : " (no page the AI used is on it)"}. Approving keeps it as a SUGGESTION only: confirm it on the Brand form before its pages count as the maker's.</p>` : "")
-            : `<label class="field">Ingredient list <textarea data-draft-field="ingredients" rows="4">${escapeHtml((draft.draft.ingredients || []).join(", "))}</textarea></label>`;
-        const sources = draft.kind === "brand" ? assistProductSourceLinks(draft.sources) : assistProductSourceLinks(draft.sources);
-        return `<article class="suggestion-card" data-draft-index="${index}">
-            <div class="suggestion-title"><strong>${escapeHtml(draft.item.name || "Unnamed")} — ${draft.kind === "brand" ? "brand details" : "product ingredients"}</strong></div>
-            ${fields}<p class="field-hint">AI: ${escapeHtml(draft.model || "unknown model")}${draft.searched === false ? " (no web search; verify carefully)" : ""}</p>
-            <p class="field-hint">Sources: ${sources}</p>
-            <label class="field-hint"><input type="checkbox" data-draft-reviewed> I checked this draft against its sources or the product packaging.</label>
-        </article>`;
-    }).join("");
-    updateInventoryDraftApproval();
-}
-
-function updateInventoryDraftApproval() {
-    if (!el("inventoryApproveAllBtn")) return;
-    el("inventoryApproveAllBtn").disabled = !el("inventoryAiDraftList").querySelector("[data-draft-reviewed]:checked");
-}
-
-async function assistSelectedInventory(keys) {
-    const selectedItems = keys.map((key) => ({ key, item: itemOf(key), kind: key.startsWith("b:") ? "brand" : "product" }))
-        .filter(({ item }) => item && !item.binned);
-    const eligible = selectedItems.filter(({ item, kind }) => {
-        if (kind === "brand") return !brandOut(item) && !!item.name;
-        const brand = brands.find((candidate) => candidate.id === item.brandId);
-        return !isOut(item) && !isUnclear(item) && item.ingredients.length === 0 && !!brand && !!item.name;
-    });
-    if (!eligible.length) {
-        notify("Select at least one listed brand or a make-up product that has no ingredient list.", "info");
-        return;
-    }
-
-    let completed = 0;
-    for (const entry of eligible) {
-        const draftKey = `${entry.kind}:${entry.item.id}`;
-        if (inventoryAiDrafts.some((draft) => draft.key === draftKey)) continue;
-        try {
-            const payload = entry.kind === "brand"
-                ? { mode: "brand", name: entry.item.name, brandWebsite: entry.item.website || "" }
-                : { mode: "product", brandName: entry.item.brandName, productName: entry.item.name, brandWebsite: websiteOfEntry(entry.item) };
-            const body = await askInventoryAi(payload);
-            if (!body.found) throw new Error(body.message || "No sourced draft was found.");
-            inventoryAiDrafts.push({ key: draftKey, kind: entry.kind, item: entry.item, draft: body.draft, sources: body.sources || body.draft.sources || [], model: body.model, searched: body.searched });
-            completed++;
-        } catch (error) {
-            console.error(`Could not draft AI assistance for ${entry.item.name}:`, error);
-            notify(`AI could not assist "${entry.item.name}". ${describeError(error)}`, "error");
-        }
-    }
-    paintInventoryDrafts();
-    if (completed) notify(`${many(completed, "draft is", "drafts are")} ready. Check the sources and mark the drafts you reviewed before approving.`, "ok");
-}
-
-async function approveInventoryDrafts() {
-    const checked = Array.from(el("inventoryAiDraftList").querySelectorAll("[data-draft-reviewed]:checked"))
-        .map((checkbox) => Number(checkbox.closest("[data-draft-index]").dataset.draftIndex))
-        .filter((index) => Number.isInteger(index) && inventoryAiDrafts[index]);
-    const drafts = checked.map((index) => ({ index, entry: inventoryAiDrafts[index], card: el("inventoryAiDraftList").querySelector(`[data-draft-index="${index}"]`) }));
-    if (!drafts.length) return;
-    if (!(await sure(`Approve ${many(drafts.length, "reviewed draft", "reviewed drafts")}?`, "Approve All", false))) return;
-    const ops = [];
-    const approvedDrafts = [];
-    const approvedBrandIds = new Set();
-    drafts.forEach(({ entry, card }) => {
-        const item = entry.item;
-        if (entry.kind === "brand") {
-            const brand = everyBrand.find((candidate) => candidate.id === item.id && !candidate.binned);
-            if (!brand || brandOut(brand)) return;
-            const aliases = (card.querySelector('[data-draft-field="aliases"]').value || "").split(",").map((value) => value.trim()).filter(Boolean);
-            const mergedAliases = Array.from(new Map(brand.aliases.concat(aliases).filter((alias) => sameKey(alias) !== sameKey(brand.name)).map((alias) => [sameKey(alias), alias])).values());
-            const market = card.querySelector('[data-draft-field="market"]').value.trim();
-            const data = { aliases: mergedAliases, aiAssistModel: entry.model || "", aiAssistSources: entry.sources.map((source) => source.url).filter(Boolean), updatedAt: serverTimestamp() };
-            if (!brand.market && market) data.market = market;
-            if (!brand.website && entry.draft && entry.draft.websiteSuggested) data.websiteSuggested = entry.draft.websiteSuggested;
-            if (brand.needsReview) Object.assign(data, approval());
-            ops.push({ ref: doc(db, "brands", brand.id), data });
-            approvedBrandIds.add(brand.id);
-        } else {
-            const product = everyProduct.find((candidate) => candidate.id === item.id && !candidate.binned);
-            const brand = product && brands.find((candidate) => candidate.id === product.brandId);
-            const ingredients = card.querySelector('[data-draft-field="ingredients"]').value.split(/[,;\n]/).map((value) => value.trim()).filter(Boolean);
-            if (!product || product.ingredients.length || isOut(product) || isUnclear(product) || !brand || !ingredients.length) return;
-            const data = { ingredients: Array.from(new Set(ingredients)), aiAssistModel: entry.model || "", sources: Array.from(new Set(product.sources.concat(entry.sources.map((source) => `${source.title || source.site || "AI source"} | ${source.url}`).filter((value) => !value.endsWith(" | "))))), updatedAt: serverTimestamp() };
-            if (product.needsReview) Object.assign(data, approval());
-            ops.push({ ref: doc(db, "products", product.id), data });
-            if (brand.needsReview && !approvedBrandIds.has(brand.id)) {
-                ops.push({ ref: doc(db, "brands", brand.id), data: approval() });
-                approvedBrandIds.add(brand.id);
-            }
-        }
-        approvedDrafts.push(entry);
-    });
-    if (!ops.length) {
-        notify("No drafts were saved. Confirm the selected records still meet the review requirements.", "error");
-        return;
-    }
-    try {
-        const uniqueOps = Array.from(ops.reduce((byPath, op) => {
-            byPath.set(op.ref.path, Object.assign(byPath.get(op.ref.path) || { ref: op.ref, data: {} }, { data: Object.assign({}, byPath.get(op.ref.path)?.data || {}, op.data) }));
-            return byPath;
-        }, new Map()).values());
-        await saveOrReload(uniqueOps);
-        inventoryAiDrafts = inventoryAiDrafts.filter((entry) => !approvedDrafts.includes(entry));
-        paintInventoryDrafts();
-        notify(`${many(approvedDrafts.length, "reviewed draft was", "reviewed drafts were")} saved.`, "ok");
-    } catch (error) {
-        notify("The reviewed drafts were not saved. " + describeError(error), "error");
-    }
-}
 
 async function approveSelectedInventory(keys) {
     const selectedItems = keys.map((key) => ({ key, item: itemOf(key) })).filter(({ item }) => item && !item.binned && item.needsReview);
@@ -950,49 +790,6 @@ async function approveSelectedInventory(keys) {
         notify("The selected entries were not approved. " + describeError(error), "error");
     }
 }
-
-async function assistProductIngredients() {
-    const button = el("assistProductIngredientsBtn"), note = el("productAiNote");
-    const brand = brands.find((item) => item.id === el("productBrandInput").value);
-    const productName = el("productNameInput").value.trim();
-    note.hidden = false;
-    if (!brand || !productName) {
-        note.textContent = "Choose a brand and enter the exact product name first.";
-        return;
-    }
-    setBusy(button, true, "Searching...");
-    note.textContent = "Searching for the exact product and ingredient list. This may take up to a minute.";
-    try {
-        const body = await askInventoryAi({ mode: "product", brandName: brand.name, productName, brandWebsite: brand.website || "" });
-        if (!dialogIsOpen() || el("productNameInput").value.trim() !== productName || el("productBrandInput").value !== brand.id) return;
-        if (!body.found || !body.draft || !Array.isArray(body.draft.ingredients) || body.draft.ingredients.length === 0) {
-            note.innerHTML = `<b>No ingredient-list draft was found.</b> ${escapeHtml(body.message || "Check the package or try another spelling.")}<br>${assistProductSourceLinks(body.sources)}`;
-            return;
-        }
-        el("productIngredientsInput").value = body.draft.ingredients.join(", ");
-        if (ingredientPicker) ingredientPicker.refresh();
-        const sources = (body.sources || []).filter((page) => page && /^https:\/\//i.test(page.url || ""))
-            .map((page) => `${page.title || page.site || page.url} | ${page.url}`);
-        if (body.draft.fdaVerifiedLink && /^https:\/\/([a-z0-9-]+\.)*fda\.gov\.ph\//i.test(body.draft.fdaVerifiedLink))
-            sources.unshift(`FDA Philippines verification | ${body.draft.fdaVerifiedLink}`);
-        assistedProductSources = Array.from(new Set(assistedProductSources.concat(sources))).slice(0, 10);
-        sourceEditor.paint();
-        showIngredientSummary();
-        note.innerHTML = `<b>AI draft only; nothing is saved yet.</b> Compare the list against the package before saving.`
-            + (body.searched === false ? ` <b>${escapeHtml(body.model || "A backup AI")} answered without web search; it gave no source pages.</b>` : "")
-            + `<br><b>Sources:</b><br>${assistProductSourceLinks(body.sources)}`
-            + (body.notes && body.notes.length ? `<br><span class="field-hint">Provider notes: ${escapeHtml(body.notes.join("; "))}.</span>` : "");
-    } catch (error) {
-        const reason = error && error.name === "AbortError" ? "The AI took too long." : (error && error.message) || "Something went wrong.";
-        note.textContent = `Assist with AI did not work. ${reason}`;
-    } finally {
-        setBusy(button, false);
-    }
-}
-
-
-
-
 
 function importInventoryFile(file) {
     showImportFlags(el("inventoryImportFlags"), []);
@@ -1049,26 +846,7 @@ async function extractInventory(documentText, say, signal) {
     const labeled = parseLabeledProducts(documentText);
     if (labeled.kind === "inventory") { say("Reading the labelled Brand / Product / Ingredients lines. No AI is used."); return { draft: labeled.draft, notes: labeled.notes.slice(0, 6), model: "" }; }
 
-    const parts = splitForAi(documentText);
-    const found = { products: [], brands: [] }, failedParts = [];
-    let model = "", ingredientRecords = 0;
-    for (let i = 0; i < parts.length; i++) {
-        if (signal && signal.aborted) break;
-        say(parts.length > 1 ? `Asking the AI about part ${i + 1} of ${parts.length}. The file itself is not uploaded.` : "Asking the AI to pick out brands and products. The file itself is not uploaded.");
-        try {
-            const answer = await askInventoryAi({ mode: "import", documentText: parts[i] }, i === 0, signal);
-            found.products.push(...((answer.draft && answer.draft.products) || []));
-            found.brands.push(...((answer.draft && answer.draft.brands) || []));
-            ingredientRecords += Number(answer.ingredientRecords) || 0;
-            model = model || answer.model || "";
-        } catch (error) {
-            if (i === 0 || (signal && signal.aborted)) throw error;
-            failedParts.push(`part ${i + 1} (${error && error.name === "AbortError" ? "the AI took too long" : (error && error.message) || "it failed"})`);
-        }
-    }
-    const notes = (failedParts.length ? [`Not read: ${failedParts.join("; ")}. Import the file again later for those parts; what is saved now is then skipped as a duplicate.`] : [])
-        .concat(ingredientRecords > 0 ? [ingredientsNotHere(ingredientRecords)] : []);
-    return { draft: found, notes, model: model || "the AI" };
+    return { refused: "This file is not in the GlowUp import format, so nothing was imported. Use the import template or labelled Brand / Product / Ingredients lines." };
 }
 
 
@@ -1777,9 +1555,7 @@ function productRow(p, brand, flat) {
 
     return `
         <tr class="product-row${isOut(p) ? " out-row" : ""}${open ? " open" : ""}" data-product="${escapeHtml(p.id)}" data-key="p:${escapeHtml(p.id)}" data-drag tabindex="0" aria-expanded="${open}">
-            <td class="name-cell"><div class="name-line">${pickBox(p.name || "product")}${toneDot(attentionOf(p, brand, !flat))}<span class="product-name">${escapeHtml(p.name || "Unnamed Product")}</span>${containsNote(p)}${p.ingredients.length === 0 ? (isOut(p)
-                ? `<span class="chip warn ingredient-missing">${icon("alert")}<span>No ingredient list</span></span>`
-                : `<button type="button" class="chip warn ingredient-missing" data-act="assist-product" data-id="${escapeHtml(p.id)}" aria-label="No ingredient list. Find ingredients for ${escapeHtml(p.name || "product")} with AI." data-tip="Search the web for a draft ingredient list, then check it against the product package.">${icon("alert")}<span>No ingredient list</span><span class="ingredient-missing-cta">Find with AI</span></button>`) : ""}</div></td>
+            <td class="name-cell"><div class="name-line">${pickBox(p.name || "product")}${toneDot(attentionOf(p, brand, !flat))}<span class="product-name">${escapeHtml(p.name || "Unnamed Product")}</span>${containsNote(p)}${p.ingredients.length === 0 ? (`<span class="chip warn ingredient-missing">${icon("alert")}<span>No ingredient list</span></span>`) : ""}</div></td>
             ${flat ? `<td class="brand-ref">${escapeHtml(brand ? brand.name : (p.brandName || "–"))}</td>` : ""}
             <td class="type-cell">${escapeHtml(p.cosmeticType || "–")}</td>
             <td class="shade-cell">${shadeCell}</td>
@@ -1837,7 +1613,6 @@ function detailRow(p, brand, columns) {
 
     const button = (cls, act, iconHtml, label, tip) => `<button type="button" class="row-btn ${cls}" data-act="${act}" data-id="${escapeHtml(p.id)}" data-tip="${escapeHtml(tip)}">${iconHtml}${label}</button>`;
     const buttons = [button("main", "edit-product", icon("edit"), "Edit", "Change the name, brand, type, ingredients, shades or status.")];
-    if (p.ingredients.length === 0 && !isOut(p)) buttons.push(button("", "assist-product", icon("sparkle"), "Assist with AI", "Search for a draft ingredient list, then check it against the product package."));
     const together = approvalFor(p, brand);
     if (together) buttons.push(button("approve", "approve-with-brand", icon("check"), together.label, together.tip));
     else if (p.needsReview && scope === "makeup") buttons.push(button("approve", "approve-product", icon("check"), "Approve", "You have checked it: set it to Active."));
@@ -2474,8 +2249,6 @@ function openProductForm(product, brandId) {
     const form = el("productForm");
     form.reset();
     setFormError(form, "");
-    el("productAiNote").hidden = true;
-    el("productAiNote").textContent = "";
     editingProductId = product ? product.id : null;
     assistedProductSources = product ? product.sources.slice() : [];
     el("productModalTitle").textContent = product ? "Edit Product" : "Add Product";
@@ -2977,7 +2750,6 @@ function onTableClick(event) {
     else if (act === "approve-product" && product) approveProduct(product, button);
     else if (act === "approve-with-brand" && product) approveWithBrand(product, button);
     else if (act === "edit-product" && product) openProductForm(product, null);
-    else if (act === "assist-product" && product) { openProductForm(product, null); assistProductIngredients(); }
     else if (act === "folder-product" && product) org.chooseFolder(button, ["p:" + product.id]);
     else if (act === "bin-product" && product) org.toBin(["p:" + product.id]);
 }

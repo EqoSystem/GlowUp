@@ -79,8 +79,6 @@
 .suggestion-actions { display: flex; justify-content: flex-end; gap: calc(8 * var(--u)); margin-top: calc(12 * var(--u)); }
 .field-heading { display: flex; align-items: center; justify-content: space-between; gap: calc(10 * var(--u)); margin-bottom: calc(6 * var(--u)); }
 .field-heading label { margin: 0; }
-.ai-product-note { margin: calc(8 * var(--u)) 0 0; }
-.ai-product-note[hidden] { display: none; }
 
 
 
