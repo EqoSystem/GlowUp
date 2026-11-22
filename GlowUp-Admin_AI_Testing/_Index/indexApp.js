@@ -21,7 +21,12 @@ function pageAfterLogin() {
     try { wanted = sessionStorage.getItem("glowup.afterLogin") || ""; sessionStorage.removeItem("glowup.afterLogin"); } catch (error) { return DASHBOARD_PAGE; }
     try {
         const url = new URL(wanted, window.location.href);
-        if (url.origin === window.location.origin && /\/_Admin_Phone_Scan\/phoneScan\.html$/.test(url.pathname)) return url.pathname + url.search;
+        // the address is rebuilt from a fixed path and the checked link code only: a parsed path is never followed
+        // (a same-origin path such as "//other.site/_Admin_Phone_Scan/phoneScan.html" would leave the site)
+        const code = url.searchParams.get("c") || "", what = url.searchParams.get("w") || "any";
+        if (url.origin === window.location.origin && /\/_Admin_Phone_Scan\/phoneScan\.html$/.test(url.pathname)
+            && /^[a-z0-9]{10,20}$/.test(code) && ["barcode", "ingredients", "any"].includes(what))
+            return "../_Admin_Phone_Scan/phoneScan.html?c=" + encodeURIComponent(code) + "&w=" + encodeURIComponent(what);
     } catch (error) {                                   }
     return DASHBOARD_PAGE;
 }
