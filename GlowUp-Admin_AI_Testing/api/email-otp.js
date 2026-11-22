@@ -129,12 +129,38 @@ async function markVerified(token, uid) {
     return r.ok;
 }
 
+// which setting is missing or unusable (names only, never values), so a wrong Vercel variable is easy to find
+function configProblems() {
+    const out = [];
+    const secret = process.env.GLOWUP_OTP_SECRET;
+    if (!secret) out.push("GLOWUP_OTP_SECRET missing"); else if (secret.length < 24) out.push("GLOWUP_OTP_SECRET shorter than 24 characters");
+    if (!process.env.GMAIL_USER) out.push("GMAIL_USER missing");
+    if (!process.env.GMAIL_APP_PASSWORD) out.push("GMAIL_APP_PASSWORD missing");
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+    if (!raw) out.push("FIREBASE_SERVICE_ACCOUNT missing");
+    else {
+        const account = parseAccount(raw);
+        if (!account) out.push("FIREBASE_SERVICE_ACCOUNT is not readable JSON");
+        else if (!account.client_email || !account.private_key) out.push("FIREBASE_SERVICE_ACCOUNT has no client_email or private_key");
+    }
+    return out;
+}
+
+const LF = String.fromCharCode(10), BSN = String.fromCharCode(92) + String.fromCharCode(110);
+// the JSON as pasted: whole file, possibly with quotes around it or with real line breaks inside the key text
+function parseAccount(raw) {
+    let t = String(raw).trim();
+    for (let i = 0; i < 2; i++) {
+        try { const v = JSON.parse(t); if (typeof v === "string") { t = v.trim(); continue; } return v; } catch (e) { }
+        try { return JSON.parse(t.split(LF).join(BSN)); } catch (e) { }
+        break;
+    }
+    return null;
+}
+
 function config() {
-    const secret = process.env.GLOWUP_OTP_SECRET, user = process.env.GMAIL_USER, pass = process.env.GMAIL_APP_PASSWORD;
-    let account = null;
-    try { account = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT || ""); } catch (e) { account = null; }
-    if (!secret || secret.length < 24 || !user || !pass || !account || !account.client_email || !account.private_key) return null;
-    return { secret, user, pass, account };
+    if (configProblems().length) return null;
+    return { secret: process.env.GLOWUP_OTP_SECRET, user: process.env.GMAIL_USER, pass: process.env.GMAIL_APP_PASSWORD, account: parseAccount(process.env.FIREBASE_SERVICE_ACCOUNT) };
 }
 
 async function readBody(req) {
@@ -148,7 +174,7 @@ module.exports = async (req, res) => {
     try {
         if (req.method !== "POST") return send(res, 405, { error: "Use POST." });
         const cfg = config();
-        if (!cfg) return send(res, 503, { error: "not-set-up" });
+        if (!cfg) return send(res, 503, { error: "not-set-up", problems: configProblems() });
         const text = await readBody(req);
         if (text === null || text.length > MAX_BODY) return send(res, 413, { error: "too-large" });
         let body; try { body = JSON.parse(text || "{}"); } catch (e) { return send(res, 400, { error: "unreadable" }); }
