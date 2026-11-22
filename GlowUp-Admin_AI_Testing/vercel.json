@@ -55,6 +55,10 @@
       "maxDuration": 20,
       "includeFiles": "_Shared/sourceLinkRules.mjs"
     },
+    "api/mcp.js": {
+      "maxDuration": 10,
+      "includeFiles": "_Shared/data/fdaCatalogue.json"
+    },
     "api/app-ai.js": {
       "maxDuration": 60
     }
