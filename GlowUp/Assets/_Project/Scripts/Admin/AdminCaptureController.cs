@@ -162,7 +162,7 @@ namespace GlowUp.Admin
             if (titleText != null) titleText.text = barcode ? "Scan Barcode" : gallery ? "Upload from Gallery" : "Capture Product";
             if (roleBar != null) roleBar.SetActive(!barcode);
             role = barcode ? "Barcode" : gallery ? "Front" : role;
-            if (galleryPreview != null) galleryPreview.gameObject.SetActive(gallery);
+            if (galleryPreview != null) { galleryPreview.texture = null; galleryPreview.gameObject.SetActive(false); }          // shown only once a photo is chosen (an empty picture drew a thin line)
             if (shutterButton != null) shutterButton.gameObject.SetActive(!gallery);
             if (torchButton != null) torchButton.gameObject.SetActive(!gallery);
             if (cameraFeed != null)
@@ -260,7 +260,7 @@ namespace GlowUp.Admin
                 if (tex == null) { Hint("No photo was chosen."); return; }
                 string r = StartMode == CaptureDraft.Mode.Barcode ? "Barcode" : role;
                 CaptureDraft.Photos.Add(new KeyValuePair<string, Texture2D>(r, tex));
-                if (galleryPreview != null) galleryPreview.texture = tex;
+                if (galleryPreview != null) { galleryPreview.texture = tex; galleryPreview.gameObject.SetActive(true); }
                 if (StartMode == CaptureDraft.Mode.Barcode) { _ = ReadAndReview(); return; }
                 Hint($"{r} photo added ({CaptureDraft.Photos.Count}). Change its label below if needed, add more, or tap Read & review.");
                 PaintThumbs();
