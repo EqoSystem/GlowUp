@@ -29,6 +29,7 @@ namespace GlowUp.Admin
 
         public string captureId = "", uid = "", mode = "Barcode";
         public long startedUnix;
+        public bool batchItem;                       // a product of the batch queue: never written to the single draft file
         public List<Field> fields = new List<Field>();
         public string rawText = "", rawFrom = "";
         public string duplicateOf = "", duplicateName = "";
@@ -75,6 +76,9 @@ namespace GlowUp.Admin
             current.Save();
             return current;
         }
+
+        /// <summary>A separate draft for the batch queue (the single draft of this phone is not touched).</summary>
+        public static CaptureDraft Blank(Mode mode) { CaptureDraft d = NewFor(StaffAccess.Uid ?? "", mode); d.batchItem = true; return d; }
 
         static CaptureDraft NewFor(string uid, Mode mode)
         {
@@ -123,7 +127,7 @@ namespace GlowUp.Admin
 
         public void Save()
         {
-            if (string.IsNullOrEmpty(uid)) return;
+            if (string.IsNullOrEmpty(uid) || batchItem) return;
             try { File.WriteAllText(PathOf(uid), JsonUtility.ToJson(this)); } catch (Exception) { }
         }
 

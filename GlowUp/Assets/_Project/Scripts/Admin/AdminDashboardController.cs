@@ -35,6 +35,8 @@ namespace GlowUp.Admin
         [SerializeField] private Button manualButton;
         [SerializeField] private Button resumeButton;
         [SerializeField] private TextMeshProUGUI resumeText;
+        [SerializeField] private Button batchButton;
+        [SerializeField] private TextMeshProUGUI batchText;
         [SerializeField] private Button tipsButton;
         [SerializeField] private OverlayPanel tipsPanel;
 
@@ -71,6 +73,8 @@ namespace GlowUp.Admin
             Hook(galleryButton, () => OpenCapture(CaptureDraft.Mode.Gallery));
             Hook(manualButton, () => OpenCapture(CaptureDraft.Mode.Manual));
             Hook(resumeButton, () => { CaptureDraft d = CaptureDraft.Current; AdminCaptureController.StartMode = d.ModeValue; AdminCaptureController.Resume = true; SceneNavigator.Go(captureScene); });
+            Hook(batchButton, () => { AdminCaptureController.OpenBatch = true; SceneNavigator.Go(captureScene); });
+            BatchQueue.Changed += Paint;
             Hook(viewAllButton, OpenSubmissions);
             Hook(statusBar, OpenSubmissions);
             Hook(previewButton, () => OpenCapture(CaptureDraft.Mode.Barcode));
@@ -97,7 +101,7 @@ namespace GlowUp.Admin
             try { await BrandRepository.LoadActive(true); await ProductRepository.LoadActive(true); } catch (System.Exception) { }
         }
 
-        void OnDestroy() { SubmissionStore.Changed -= Paint; ScannerPrefs.Changed -= Paint; ConnectivityMonitor.ConnectivityChanged -= OnConnection; }
+        void OnDestroy() { BatchQueue.Changed -= Paint; SubmissionStore.Changed -= Paint; ScannerPrefs.Changed -= Paint; ConnectivityMonitor.ConnectivityChanged -= OnConnection; }
 
         void OnConnection(bool online) { Paint(); }
 
@@ -126,7 +130,11 @@ namespace GlowUp.Admin
             CaptureDraft d = CaptureDraft.Current;
             bool unsent = d.HasContent && string.IsNullOrEmpty(d.submittedId);
             if (resumeButton != null) resumeButton.gameObject.SetActive(unsent);
-            if (resumeText != null) resumeText.text = unsent ? $"Unsent capture: {(d.Get("name").Has ? d.Get("name").value : "no name yet")}. Tap to continue." : "";
+            if (resumeText != null) resumeText.text = unsent ? $"Unsent: {(d.Get("name").Has ? d.Get("name").value : "no name yet")}" : "";
+
+            int waiting = BatchQueue.Count, readyNow = BatchQueue.ReadyCount;
+            if (batchButton != null) batchButton.gameObject.SetActive(waiting > 0);
+            if (batchText != null) batchText.text = waiting > 0 ? $"Batch: {waiting} waiting ({readyNow} ready)" : "";
 
             // live status bar: what the listener and the connection report, never assumed
             bool online = ConnectivityMonitor.Online;

@@ -16,6 +16,7 @@ namespace GlowUp.Admin
         [SerializeField] private Toggle autoFocusToggle;
         [SerializeField] private Toggle scanLineToggle;
         [SerializeField] private Toggle guideFrameToggle;
+        [SerializeField] private Toggle batchToggle;
         [SerializeField] private Button qualityButton;
         [SerializeField] private TextMeshProUGUI qualityValue;
         [SerializeField] private string settingsScene = "AdminSettingsScene";
@@ -25,6 +26,7 @@ namespace GlowUp.Admin
             Bind(flashToggle, ScannerPrefs.Flash, v => ScannerPrefs.Flash = v);
             Bind(autoFocusToggle, ScannerPrefs.AutoFocus, v => ScannerPrefs.AutoFocus = v);
             Bind(scanLineToggle, ScannerPrefs.ScanLine, v => ScannerPrefs.ScanLine = v);
+            Bind(batchToggle, ScannerPrefs.BatchMode, v => ScannerPrefs.BatchMode = v);
             Bind(guideFrameToggle, ScannerPrefs.GuideFrame, v => ScannerPrefs.GuideFrame = v);
             if (backButton != null) backButton.onClick.AddListener(Back);
             if (qualityButton != null) qualityButton.onClick.AddListener(() => { ScannerPrefs.HighQuality = !ScannerPrefs.HighQuality; PaintQuality(); });

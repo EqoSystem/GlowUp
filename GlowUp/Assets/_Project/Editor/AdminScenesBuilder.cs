@@ -188,10 +188,15 @@ namespace GlowUp.EditorTools
             Image tipsChevron = A.Icon(tipsObject.transform, "Chevron", IconFactory.ChevronRight, 40, ThemeRole.SecondaryText);
             A.At(tipsChevron.transform, A.MR, new Vector2(-28, 0), new Vector2(40, 40));
 
-            Button resume = A.PillButton(card, "ResumeButton", "Unsent capture: tap to continue", 28, ThemeRole.Background, ThemeRole.AccentText, IconFactory.History);
-            A.TopStrip(resume.transform, 1220, 74, 56, 56);
-            A.Shrink(A.LabelOf(resume), 22);
+            // two small buttons share one row: the unsent single capture (left) and the batch waiting to be sent (right)
+            Button resume = A.PillButton(card, "ResumeButton", "Unsent capture", 26, ThemeRole.Background, ThemeRole.AccentText, IconFactory.History);
+            A.At(resume.transform, A.TL, new Vector2(56, -1220), new Vector2(436, 74));
+            A.Shrink(A.LabelOf(resume), 18);
             resume.gameObject.SetActive(false);
+            Button batchBtn = A.PillButton(card, "BatchButton", "Batch waiting", 26, ThemeRole.Background, ThemeRole.AccentText, IconFactory.ListIcon);
+            A.At(batchBtn.transform, A.TL, new Vector2(508, -1220), new Vector2(436, 74));
+            A.Shrink(A.LabelOf(batchBtn), 18);
+            batchBtn.gameObject.SetActive(false);
 
             // ---- recent submissions (live) ----
             TextMeshProUGUI recentTitle = A.Label(card, "RecentTitle", "Recent Submissions", 36, ThemeRole.Heading, FontRole.Heading);
@@ -241,7 +246,7 @@ namespace GlowUp.EditorTools
             A.Set(c, "previewButton", viewportObject.GetComponent<Button>()); A.Set(c, "flashChip", flashChip); A.Set(c, "flashChipLabel", A.LabelOf(flashChip));
             A.Set(c, "autoFocusChipLabel", focusLabel); A.Set(c, "guideFrame", (RectTransform)frame.transform);
             A.Set(c, "scanButton", scan); A.Set(c, "captureButton", capture); A.Set(c, "galleryButton", gallery); A.Set(c, "manualButton", manual);
-            A.Set(c, "resumeButton", resume); A.Set(c, "resumeText", A.LabelOf(resume));
+            A.Set(c, "resumeButton", resume); A.Set(c, "resumeText", A.LabelOf(resume)); A.Set(c, "batchButton", batchBtn); A.Set(c, "batchText", A.LabelOf(batchBtn));
             A.Set(c, "tipsButton", tipsObject.GetComponent<Button>()); A.Set(c, "tipsPanel", tips);
             A.Set(c, "statusBar", bar.GetComponent<Button>()); A.Set(c, "onlineText", online); A.Set(c, "onlineDot", dot);
             A.Set(c, "totalScansText", total); A.Set(c, "syncText", syncWord);
@@ -356,7 +361,8 @@ namespace GlowUp.EditorTools
             Toggle flash = PrefRow(card, "FlashRow", IconFactory.Bolt, "Flash", "Turn on flash for darker areas", y, true); y += 134;
             Toggle focus = PrefRow(card, "AutoFocusRow", IconFactory.Scan, "Auto Focus", "Automatically focus on the barcode", y, true); y += 134;
             PrefInfoRow(card, "ScanModeRow", IconFactory.ListIcon, "Scan Mode", "Barcode & QR Code", y); y += 134;
-            Toggle line = PrefRow(card, "ScanLineRow", IconFactory.Minus, "Scan Line", "Show the scanning guide line", y, true); y += 134 + 36;
+            Toggle line = PrefRow(card, "ScanLineRow", IconFactory.Minus, "Scan Line", "Show the scanning guide line", y, true); y += 134;
+            Toggle batch = PrefRow(card, "BatchModeRow", IconFactory.ListIcon, "Batch Mode", "Keep scanning, or add many gallery photos", y, true); y += 134 + 36;
 
             TextMeshProUGUI photoTitle = A.Label(card, "PhotoOptionsTitle", "Photo Options", 32, ThemeRole.SecondaryText, FontRole.Heading, TextAlignmentOptions.MidlineLeft);
             A.TopStrip(photoTitle.transform, y, 52, 70, 56); y += 62;
@@ -371,7 +377,7 @@ namespace GlowUp.EditorTools
 
             var c = A.Controller<AdminScannerPrefsController>("AdminScannerPrefsController");
             A.Set(c, "backButton", s.back); A.Set(c, "flashToggle", flash); A.Set(c, "autoFocusToggle", focus);
-            A.Set(c, "scanLineToggle", line); A.Set(c, "guideFrameToggle", guide);
+            A.Set(c, "scanLineToggle", line); A.Set(c, "guideFrameToggle", guide); A.Set(c, "batchToggle", batch);
             A.Set(c, "qualityButton", quality); A.Set(c, "qualityValue", qualityValue);
             A.Finish(s);
         }
@@ -549,6 +555,25 @@ namespace GlowUp.EditorTools
             Button typeInstead = A.LinkButton(cap.transform, "TypeInsteadButton", "Type details instead", 30, ThemeRole.AccentText);
             A.BottomStrip(typeInstead.transform, 34, 76, 200, 200);
 
+            // ---------------- batch list (Batch Mode) ----------------
+            GameObject batch = A.Node(card, "BatchPanel");
+            A.Fill(batch.transform);
+            GameObject batchArea = A.Node(batch.transform, "BatchArea");
+            A.Between(batchArea.transform, A.HeaderBottom, 290, 30, 30);
+            A.Scroll(batchArea.transform, "BatchScrollView", out RectTransform batchContent, 12, 10, 18, 6, 40);
+            GameObject batchRow = Row(batchContent, "BatchRowTemplate", 118);
+            TextMeshProUGUI batchEmpty = A.Label(batch.transform, "BatchEmptyText", "Nothing in the batch yet.", 30, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center, true);
+            A.TopStrip(batchEmpty.transform, A.HeaderBottom + 80, 160, 80, 80);
+            Button batchAdd = A.PillButton(batch.transform, "BatchAddButton", "Add photos", 30, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Plus);
+            A.At(batchAdd.transform, A.BL, new Vector2(30, 170), new Vector2(440, 100));
+            A.Shrink(A.LabelOf(batchAdd), 20);
+            Button batchClear = A.PillButton(batch.transform, "BatchClearButton", "Clear batch", 30, ThemeRole.SurfaceAlt, ThemeRole.AccentText, IconFactory.Trash);
+            A.At(batchClear.transform, A.BR, new Vector2(-30, 170), new Vector2(440, 100));
+            A.Shrink(A.LabelOf(batchClear), 20);
+            Button batchSend = A.PillButton(batch.transform, "BatchSubmitButton", "Send ready", 38, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Check);
+            A.BottomStrip(batchSend.transform, 34, 116, 30, 30);
+            batch.SetActive(false);
+
             // ---------------- review form ----------------
             GameObject form = A.Node(card, "FormPanel");
             A.Between(form.transform, A.HeaderBottom, 30, 30, 30);
@@ -621,6 +646,8 @@ namespace GlowUp.EditorTools
             A.Set(c, "roleBar", roles); Kit.SetArray(c, "roleButtons", roleButtons);
             A.Set(c, "thumbsContent", (RectTransform)thumbs.transform); A.Set(c, "thumbTemplate", thumb);
             A.Set(c, "continueButton", cont); A.Set(c, "continueLabel", A.LabelOf(cont)); A.Set(c, "typeInsteadButton", typeInstead);
+            A.Set(c, "batchPanel", batch); A.Set(c, "batchContent", batchContent); A.Set(c, "batchRowTemplate", batchRow); A.Set(c, "batchEmptyText", batchEmpty);
+            A.Set(c, "batchSubmitButton", batchSend); A.Set(c, "batchSubmitLabel", A.LabelOf(batchSend)); A.Set(c, "batchAddButton", batchAdd); A.Set(c, "batchClearButton", batchClear);
             A.Set(c, "formPanel", form); Kit.SetArray(c, "fieldInputs", inputs); Kit.SetArray(c, "fieldStates", states); Kit.SetArray(c, "checkButtons", checks);
             A.Set(c, "resultThumb", resultThumb); A.Set(c, "resultName", resultName); A.Set(c, "resultSub", resultSub);
             A.Set(c, "resultPillText", resultPillText); A.Set(c, "resultPill", resultPill); A.Set(c, "tryAgainButton", tryAgain);

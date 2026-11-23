@@ -65,6 +65,12 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/_Project/Scenes/AdminSubmissionsScene.unity
     guid: a858537a35e2a2e42bdc15d6fdd363b0
+  - enabled: 1
+    path: Assets/_Project/Scenes/AdminSettingsScene.unity
+    guid: fb15dc6caa95138429093b2f082b2eab
+  - enabled: 1
+    path: Assets/_Project/Scenes/AdminScannerPrefsScene.unity
+    guid: 08456398997d36645b1092ffbfc8fbbb
   m_configObjects:
     UnityEditor.XR.ARCore.ARCoreSettings: {fileID: 11400000, guid: eb1f0a0e34d66804d89c996cc1ea6e43,
       type: 2}

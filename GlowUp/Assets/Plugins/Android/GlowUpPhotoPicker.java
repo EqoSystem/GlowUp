@@ -14,6 +14,8 @@ import android.util.Base64;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Profile picture (New22, 20 November 2026): opens the phone's own photo picker and answers with ONE small square JPEG.
@@ -61,6 +63,122 @@ public final class GlowUpPhotoPicker {
         pending = null;
         if (cb == null) return;
         if (base64 != null) cb.onPicked(base64); else cb.onFailed(reason == null ? "unreadable" : reason);
+    }
+
+    // ---- Staff batch (23 November 2026): several photos at once, each handed over WHOLE (no square crop: a label or a barcode must keep its edges).
+    public interface ManyCallback {
+        void onPhoto(String base64Jpeg);       // once per chosen photo, on a background thread
+        void onDone(int count);                // after the last one (0 = nothing chosen)
+        void onFailed(String reason);          // "no-picker", "cancelled"
+    }
+
+    private static ManyCallback pendingMany;
+    private static int pendingManySide = 1280, pendingManyMax = 12;
+
+    public static void pickMany(final Activity activity, final int maxSide, final int maxCount, final ManyCallback callback) {
+        if (activity == null || callback == null) return;
+        pendingMany = callback;
+        pendingManySide = Math.max(256, Math.min(2048, maxSide));
+        pendingManyMax = Math.max(1, Math.min(50, maxCount));
+        activity.runOnUiThread(new Runnable() {
+            @Override public void run() {
+                try {
+                    android.app.FragmentManager fm = activity.getFragmentManager();
+                    Fragment old = fm.findFragmentByTag(TAG + "_many");
+                    if (old != null) fm.beginTransaction().remove(old).commitAllowingStateLoss();
+                    fm.beginTransaction().add(new ManyFragment(), TAG + "_many").commitAllowingStateLoss();
+                } catch (Exception e) { failMany("no-picker"); }
+            }
+        });
+    }
+
+    private static void failMany(String reason) {
+        ManyCallback cb = pendingMany;
+        pendingMany = null;
+        if (cb != null) cb.onFailed(reason);
+    }
+
+    public static final class ManyFragment extends Fragment {
+        private static final int REQUEST_MANY = 47112;
+        public ManyFragment() { }
+
+        @Override public void onCreate(Bundle state) {
+            super.onCreate(state);
+            if (state != null) return;
+            Intent intent;
+            if (Build.VERSION.SDK_INT >= 33) {
+                intent = new Intent(MediaStore.ACTION_PICK_IMAGES);
+                if (pendingManyMax > 1) intent.putExtra(MediaStore.EXTRA_PICK_IMAGES_MAX, Math.min(pendingManyMax, MediaStore.getPickImagesMaxLimit()));
+            } else {
+                intent = new Intent(Intent.ACTION_GET_CONTENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                if (pendingManyMax > 1) intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+            }
+            intent.setType("image/*");
+            try { startActivityForResult(intent, REQUEST_MANY); }
+            catch (Exception e) { close(); failMany("no-picker"); }
+        }
+
+        @Override public void onActivityResult(int requestCode, int resultCode, Intent data) {
+            if (requestCode != REQUEST_MANY) return;
+            final Activity activity = getActivity();
+            close();
+            final ManyCallback cb = pendingMany;
+            pendingMany = null;
+            if (cb == null) return;
+            if (resultCode != Activity.RESULT_OK || data == null || activity == null) { cb.onFailed("cancelled"); return; }
+            final List<Uri> uris = new ArrayList<Uri>();
+            if (data.getClipData() != null) {
+                for (int i = 0; i < data.getClipData().getItemCount() && uris.size() < pendingManyMax; i++) uris.add(data.getClipData().getItemAt(i).getUri());
+            } else if (data.getData() != null) uris.add(data.getData());
+            final int side = pendingManySide;
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    int done = 0;
+                    for (Uri uri : uris) {
+                        try { cb.onPhoto(encodeWhole(activity, uri, side)); done++; } catch (Throwable t) { /* an unreadable photo is skipped */ }
+                    }
+                    cb.onDone(done);
+                }
+            }).start();
+        }
+
+        private void close() {
+            try { getFragmentManager().beginTransaction().remove(this).commitAllowingStateLoss(); } catch (Exception ignored) { }
+        }
+    }
+
+    /** The whole photo (upright, longest side at most `side`), as Base64 JPEG. */
+    static String encodeWhole(Activity activity, Uri uri, int side) throws Exception {
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        try (InputStream in = activity.getContentResolver().openInputStream(uri)) { BitmapFactory.decodeStream(in, null, bounds); }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw new IllegalArgumentException("not an image");
+        int sample = 1;
+        while (Math.max(bounds.outWidth, bounds.outHeight) / (sample * 2) >= side) sample *= 2;
+        BitmapFactory.Options opts = new BitmapFactory.Options();
+        opts.inSampleSize = sample;
+        Bitmap bmp;
+        try (InputStream in = activity.getContentResolver().openInputStream(uri)) { bmp = BitmapFactory.decodeStream(in, null, opts); }
+        if (bmp == null) throw new IllegalArgumentException("not an image");
+        int degrees = 0;
+        if (Build.VERSION.SDK_INT >= 24) {
+            try (InputStream in = activity.getContentResolver().openInputStream(uri)) {
+                android.media.ExifInterface exif = new android.media.ExifInterface(in);
+                int o = exif.getAttributeInt(android.media.ExifInterface.TAG_ORIENTATION, android.media.ExifInterface.ORIENTATION_NORMAL);
+                degrees = o == android.media.ExifInterface.ORIENTATION_ROTATE_90 ? 90 : o == android.media.ExifInterface.ORIENTATION_ROTATE_180 ? 180 : o == android.media.ExifInterface.ORIENTATION_ROTATE_270 ? 270 : 0;
+            } catch (Exception ignored) { }
+        }
+        float scale = Math.min(1f, (float) side / Math.max(bmp.getWidth(), bmp.getHeight()));
+        Matrix m = new Matrix();
+        m.postScale(scale, scale);
+        if (degrees != 0) m.postRotate(degrees);
+        Bitmap whole = Bitmap.createBitmap(bmp, 0, 0, bmp.getWidth(), bmp.getHeight(), m, true);
+        if (whole != bmp) bmp.recycle();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        whole.compress(Bitmap.CompressFormat.JPEG, 85, out);
+        whole.recycle();
+        return Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
     }
 
     /** A view-less fragment that starts the picker and receives its answer. */

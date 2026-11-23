@@ -15,6 +15,8 @@ namespace GlowUp.Admin
         public static bool AutoFocus { get => Get("autofocus", true); set => Set("autofocus", value); }
         public static bool ScanLine { get => Get("scanline", true); set => Set("scanline", value); }
         public static bool GuideFrame { get => Get("guideframe", true); set => Set("guideframe", value); }
+        /// <summary>Batch Mode: scanning goes on after each barcode (each product joins the batch), and the gallery takes several photos at once.</summary>
+        public static bool BatchMode { get => Get("batch", false); set => Set("batch", value); }
         public static bool HighQuality { get => Get("highquality", true); set => Set("highquality", value); }
 
         /// <summary>The longest side and JPEG quality of the small copies that go to the reviewer.</summary>

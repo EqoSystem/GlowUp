@@ -70,7 +70,8 @@ import {
     barcodeDigits, originEntry, originsAfterFill, uncheckedFields, markChecked, cleanOrigins, similarProducts, similarBrands,
     reviewReason, skippedLine, repeatedNames, FILL_FIELDS, STATE_WORDS, METHODS, DETECTED, NEEDS_REVIEW, VERIFIED, TYPED, REVIEW_CHANGES, waiting
 } from "../_Shared/capture.js";
-import { loadCatalogue } from "../_Shared/quickFill.js";
+import { loadCatalogue, lookupProduct } from "../_Shared/quickFill.js";
+import { parseBarcodes, lookupBatch, batchSummary } from "../_Shared/batchBarcodes.js";
 
 const OTHER_TYPE = "__other__";
 let paintCounters = () => { };              // character counters under the form fields (charLimit.js)
@@ -351,6 +352,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("addBrandForm").addEventListener("submit", saveBrand);
     el("productForm").addEventListener("submit", saveProduct);
     el("chooseInventoryFileBtn").addEventListener("click", () => el("inventoryFileInput").click());
+    const batchButton = el("inventoryBatchBtn"), batchText = el("inventoryBatchText");
+    if (batchButton && batchText) batchButton.addEventListener("click", () => {
+        const parsed = parseBarcodes(batchText.value);
+        if (parsed.kind !== "barcodes") { notify("Paste barcodes (8 to 14 digits), one per line or separated by commas.", "info"); batchText.focus(); return; }
+        importInventoryFile(new File([batchText.value], "Pasted barcodes.txt", { type: "text/plain" }));
+    });
     el("inventoryDropBox").addEventListener("click", () => el("inventoryFileInput").click());
     el("inventoryFileInput").addEventListener("change", (event) => {
         const file = event.target.files && event.target.files[0];
@@ -899,6 +906,19 @@ const INVENTORY_REVIEW = {
 
 async function extractInventory(documentText, say, signal) {
 
+    // a list of barcodes (pasted, or a file of them): each one is looked up like Quick fill, then checked like any import
+    const barcodes = parseBarcodes(documentText);
+    if (barcodes.kind === "barcodes") {
+        say(`Looking up ${barcodes.codes.length} barcode${barcodes.codes.length === 1 ? "" : "s"} (Open Beauty Facts, then UPCitemdb). No AI is used.`);
+        const getToken = () => (auth.currentUser ? auth.currentUser.getIdToken() : "");
+        const result = await lookupBatch(barcodes.codes, (code) => lookupProduct(code, { getToken }), { signal, onProgress: (n, total, code) => say(`Looking up ${n} of ${total}: ${code}`) });
+        const notes = [batchSummary(barcodes, result)];
+        result.notFound.slice(0, 12).forEach((n) => notes.push(`${n.code}: ${n.why}`));
+        if (result.notFound.length > 12) notes.push(`and ${result.notFound.length - 12} more not found`);
+        if (!result.records.length) return { refused: "None of these barcodes gave a product with a name and a brand, so nothing was imported. " + notes.slice(0, 4).join(" ") };
+        return { draft: { products: result.records, brands: [] }, notes: notes.slice(0, 14), model: "" };
+    }
+
     const keyed = parseImportText(documentText);
     if (keyed.kind === "ingredients") return { refused: "This file lists only ingredients. " + ingredientsNotHere(keyed.draft.ingredients.length) };
     if (keyed.kind === "mixed") return { refused: `This file mixes ${many(keyed.counts.inventory, "brand or product record", "brand or product records")} with ingredient records, so nothing was imported. ` + ingredientsNotHere(keyed.counts.ingredients) };
@@ -1056,11 +1076,12 @@ async function saveImportedProducts(records, brandRecords, fileName, memory, fir
             if (owner) notSaved.push({ row, name, brandName, why: `saved WITHOUT its barcode ${barcode}: that barcode is already on "${owner.name}"` });
             else { data.barcode = barcode; plannedCodes.set(barcodeKey(barcode), { name }); }
         } else if (String(record.barcode || "").trim()) notSaved.push({ row, name, brandName, why: `saved without its barcode: "${clean(record.barcode, 20)}" is not 6 to 14 digits` });
-        // every imported value is Detected (from the file) until an admin checks it
+        const origin = record.lookupFrom ? `Barcode look-up: ${clean(record.lookupFrom, 40)}` : fromFile;
+        // every imported value is Detected (from the file or the look-up) until an admin checks it
         data.fieldOrigins = {};
         ["name", "brand", "cosmeticType", "imageUrl", "barcode", "fdaNumber", "ingredients"].forEach((key) => {
             const value = key === "brand" ? brand.name : data[key];
-            if (Array.isArray(value) ? value.length : value) data.fieldOrigins[key] = originEntry(DETECTED, fromFile, "import");
+            if (Array.isArray(value) ? value.length : value) data.fieldOrigins[key] = originEntry(DETECTED, origin, record.lookupFrom ? "barcode" : "import");
         });
         const imageUrl = cleanLink(record.imageUrl);
         if (imageUrl) data.imageUrl = imageUrl;

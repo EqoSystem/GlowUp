@@ -22,6 +22,7 @@ namespace GlowUp.Admin
     {
         public static CaptureDraft.Mode StartMode = CaptureDraft.Mode.Barcode;
         public static bool Resume;
+        public static bool OpenBatch;            // the dashboard asked for the batch list
 
         [Header("Header")]
         [SerializeField] private Button backButton;
@@ -51,6 +52,16 @@ namespace GlowUp.Admin
         [SerializeField] private Image checkFocus;
         [SerializeField] private Image checkLighting;
         [SerializeField] private Image checkClear;
+
+        [Header("Batch (Batch Mode in Scanner Preferences)")]
+        [SerializeField] private GameObject batchPanel;
+        [SerializeField] private RectTransform batchContent;
+        [SerializeField] private GameObject batchRowTemplate;
+        [SerializeField] private TextMeshProUGUI batchEmptyText;
+        [SerializeField] private Button batchSubmitButton;
+        [SerializeField] private TextMeshProUGUI batchSubmitLabel;
+        [SerializeField] private Button batchAddButton;
+        [SerializeField] private Button batchClearButton;
 
         [Header("Review form (one row per value)")]
         [SerializeField] private GameObject formPanel;
@@ -86,12 +97,20 @@ namespace GlowUp.Admin
         static readonly Color Good = new Color(0.20f, 0.62f, 0.42f), Idle = new Color(0.70f, 0.66f, 0.67f);
         float nextRead, cameraAskedAt;
         readonly List<GameObject> thumbs = new List<GameObject>();
+        readonly List<GameObject> batchRows = new List<GameObject>();
+        BatchQueue.Item editing;                 // the batch item open in the review form
+        bool batchFromDashboard;
 
         void Start()
         {
-            draft = Resume ? CaptureDraft.Current : CaptureDraft.Start(StartMode, false);
-            if (!Resume) CaptureDraft.ReleasePhotos();
-            draft.mode = StartMode.ToString(); draft.Save();
+            bool openBatch = OpenBatch; OpenBatch = false;
+            if (openBatch) draft = CaptureDraft.Current;                          // the batch list: the single unsent draft is left alone
+            else
+            {
+                draft = Resume ? CaptureDraft.Current : CaptureDraft.Start(StartMode, false);
+                if (!Resume) CaptureDraft.ReleasePhotos();
+                draft.mode = StartMode.ToString(); draft.Save();
+            }
             Resume = false;
 
             Hook(backButton, Back);
@@ -100,7 +119,11 @@ namespace GlowUp.Admin
             Hook(torchButton, ToggleTorch);
             Hook(tipsButton, () => { if (tipsPanel != null) tipsPanel.Show(); });
             Hook(tryAgainButton, TryAgain);
-            Hook(continueButton, () => _ = ReadAndReview());
+            Hook(continueButton, () => { if (BatchBarcode) ShowBatch(); else _ = ReadAndReview(); });
+            Hook(batchSubmitButton, () => _ = SubmitBatch());
+            Hook(batchAddButton, () => { if (StartMode == CaptureDraft.Mode.Gallery || batchFromDashboard) PickBatch(); else ShowCapture(StartMode); });
+            Hook(batchClearButton, AskClearBatch);
+            BatchQueue.Changed += PaintBatch;
             Hook(typeInsteadButton, () => ShowForm("Type the details you have. The rest stays Missing for the website to fill."));
             Hook(addPhotosButton, () => ShowCapture(CaptureDraft.Mode.Photo));
             Hook(submitButton, () => _ = Submit());
@@ -111,13 +134,15 @@ namespace GlowUp.Admin
             for (int i = 0; fieldInputs != null && i < fieldInputs.Length && i < CaptureDraft.Keys.Length; i++)
             {
                 string key = CaptureDraft.Keys[i];
-                if (fieldInputs[i] != null) fieldInputs[i].onEndEdit.AddListener(v => { if (painting) return; draft.Type(key, v); draft.Save(); PaintForm(); });
+                if (fieldInputs[i] != null) fieldInputs[i].onEndEdit.AddListener(v => { if (painting) return; draft.Type(key, v); draft.Save(); if (editing != null) BatchQueue.Touch(); PaintForm(); });
             }
             for (int i = 0; checkButtons != null && i < checkButtons.Length && i < CaptureDraft.Keys.Length; i++)
-            { string key = CaptureDraft.Keys[i]; Hook(checkButtons[i], () => { draft.Confirm(key); draft.Save(); PaintForm(); }); }
+            { string key = CaptureDraft.Keys[i]; Hook(checkButtons[i], () => { draft.Confirm(key); draft.Save(); if (editing != null) BatchQueue.Touch(); PaintForm(); }); }
             if (thumbTemplate != null) thumbTemplate.SetActive(false);
             if (afterSubmit != null) afterSubmit.SetActive(false);
 
+            if (batchPanel != null) batchPanel.SetActive(false);
+            if (openBatch) { batchFromDashboard = true; StartMode = CaptureDraft.Mode.Gallery; ShowBatch(); return; }
             if (!string.IsNullOrEmpty(draft.submittedId)) { ShowForm(""); ShowSubmitted(true, ""); return; }
             if (StartMode == CaptureDraft.Mode.Manual) ShowForm("Fill in what you know. Category and ingredients can stay empty if the pack does not show them.");
             else ShowCapture(StartMode);
@@ -131,6 +156,7 @@ namespace GlowUp.Admin
         {
             StartMode = mode; draft.mode = mode.ToString(); draft.Save();
             if (formPanel != null) formPanel.SetActive(false);
+            if (batchPanel != null) batchPanel.SetActive(false);
             if (capturePanel != null) capturePanel.SetActive(true);
             bool gallery = mode == CaptureDraft.Mode.Gallery, barcode = mode == CaptureDraft.Mode.Barcode;
             if (titleText != null) titleText.text = barcode ? "Scan Barcode" : gallery ? "Upload from Gallery" : "Capture Product";
@@ -145,7 +171,7 @@ namespace GlowUp.Admin
                 else { cameraFeed.StartCamera(); cameraAskedAt = Time.realtimeSinceStartup; }
             }
             scanning = barcode;
-            Pill(barcode ? "Align the barcode within the frame" : gallery ? "Choose photos from your gallery" : "Keep the product in frame");
+            Pill(barcode ? (ScannerPrefs.BatchMode ? "Batch: scan one product after another" : "Align the barcode within the frame") : gallery ? "Choose photos from your gallery" : "Keep the product in frame");
             if (barcode && !CaptureReader.CanReadBarcodes) Warn("This phone cannot read barcodes here: take a photo, or type the digits.");
             if (scanFrame != null) scanFrame.gameObject.SetActive(ScannerPrefs.GuideFrame && !gallery);
             if (scanLine != null) scanLine.Allowed = barcode;
@@ -191,6 +217,7 @@ namespace GlowUp.Admin
             try { code = await CaptureReader.Barcode(frame); }
             finally { Destroy(frame); busy = false; }
             if (this == null || !scanning || string.IsNullOrEmpty(OpenBeautyFacts.Digits(code))) return;
+            if (ScannerPrefs.BatchMode) { await AddScannedToBatch(code); return; }          // Batch Mode: scanning goes on
             scanning = false;
             Handheld.Vibrate();
             cameraFeed.StopCamera();
@@ -225,6 +252,7 @@ namespace GlowUp.Admin
 
         void PickFromGallery()
         {
+            if (ScannerPrefs.BatchMode && StartMode == CaptureDraft.Mode.Gallery) { PickBatch(); return; }
             if (CaptureDraft.Photos.Count >= CaptureDraft.MaxPhotos) { Hint($"At most {CaptureDraft.MaxPhotos} photos. Remove one first."); return; }
             GalleryPicker.Pick(tex =>
             {
@@ -343,6 +371,14 @@ namespace GlowUp.Admin
             string type = draft.Get("cosmeticType").value, name = draft.Get("name").value;
             if (!ProductScope.IsMakeup(type, name) && !ProductScope.IsMakeup("", type))
             { Notice("GlowUp lists make-up and face products only. Check the category (for example Lipstick, Foundation, Mascara)."); FocusField("cosmeticType"); return; }
+            if (editing != null)
+            {   // a batch item: it is kept in the batch, and sent with "Send ready"
+                editing.state = ""; BatchQueue.Touch();
+                CaptureDraft.Photos.Clear(); editing = null;
+                Info("Saved to the batch.");
+                ShowBatch();
+                return;
+            }
             if (!ConnectivityMonitor.Online) Notice("You are offline: the submission is kept as \"Not yet synced\" and is sent when you are back online.");
             if (!string.IsNullOrEmpty(draft.duplicateOf) && confirmDialog != null)
             {
@@ -391,6 +427,151 @@ namespace GlowUp.Admin
             else StaffToast.Warn(this, "Saved as Not yet synced. It is sent by itself when the connection allows." + (string.IsNullOrEmpty(extra) ? "" : " " + extra));
         }
 
+        // ======================= batch =======================
+        bool BatchBarcode => ScannerPrefs.BatchMode && StartMode == CaptureDraft.Mode.Barcode;
+        static string BatchLabel() => BatchQueue.Count > 0 ? $"Review batch ({BatchQueue.Count})" : "Review batch";
+
+        async Task AddScannedToBatch(string code)
+        {
+            if (BatchQueue.Contains(code)) { Info("Already in this batch."); nextRead = Time.realtimeSinceStartup + 2f; return; }
+            if (BatchQueue.Full) { scanning = false; Warn($"The batch is full ({BatchQueue.MaxItems}). Review it and send what is ready."); return; }
+            busy = true;
+            Handheld.Vibrate();
+            try
+            {
+                CaptureDraft d = CaptureDraft.Blank(CaptureDraft.Mode.Barcode);
+                await CaptureReader.FromBarcode(d, code, true);
+                BatchQueue.Add(d, null);
+                string name = d.Get("name").Has ? d.Get("name").value : "barcode " + d.Get("barcode").value;
+                if (this != null) Info($"Added {name}. {BatchQueue.Count} in the batch.");
+            }
+            finally { busy = false; }
+            nextRead = Time.realtimeSinceStartup + 1.2f;
+            if (this != null && continueLabel != null) continueLabel.text = BatchLabel();
+        }
+
+        /// <summary>Several gallery photos at once: each becomes one product in the batch.</summary>
+        void PickBatch()
+        {
+            int room = BatchQueue.MaxItems - BatchQueue.Items.Count;
+            if (room <= 0) { Warn($"The batch is full ({BatchQueue.MaxItems}). Send what is ready first."); return; }
+            var incoming = new List<Texture2D>();
+            GalleryPicker.PickMany(Mathf.Min(12, room), tex => { if (tex != null) incoming.Add(tex); }, count => _ = ReadIncoming(incoming, count), problem => Warn(problem));
+        }
+
+        async Task ReadIncoming(List<Texture2D> incoming, int count)
+        {
+            if (incoming.Count == 0) { if (count == 0 && this != null) Info("No photos were chosen."); return; }
+            busy = true;
+            int n = 0;
+            try
+            {
+                foreach (Texture2D tex in incoming)
+                {
+                    n++;
+                    if (this != null) Pill($"Reading photo {n} of {incoming.Count}...");
+                    await BatchQueue.AddPhoto(tex);
+                }
+            }
+            catch (Exception) { if (this != null) Warn("A photo could not be read. The others were added."); }
+            finally { busy = false; }
+            if (this == null) return;
+            Pill("Choose photos from your gallery");
+            Info($"{n} photo{(n == 1 ? "" : "s")} added to the batch.");
+            ShowBatch();
+        }
+
+        void ShowBatch()
+        {
+            scanning = false;
+            if (cameraFeed != null) cameraFeed.StopCamera();
+            if (torchOn) { Flashlight.TrySet(false, out _); torchOn = false; }
+            if (capturePanel != null) capturePanel.SetActive(false);
+            if (formPanel != null) formPanel.SetActive(false);
+            if (batchPanel != null) batchPanel.SetActive(true);
+            if (!BatchQueue.IsSending) BatchQueue.DropSent();
+            PaintBatch();
+        }
+
+        void PaintBatch()
+        {
+            if (this == null || batchPanel == null || !batchPanel.activeSelf) return;
+            foreach (GameObject r in batchRows) if (r != null) Destroy(r);
+            batchRows.Clear();
+            if (batchRowTemplate != null) batchRowTemplate.SetActive(false);
+            BatchQueue.EnsureLoaded();
+            if (titleText != null) titleText.text = BatchQueue.Count > 0 ? $"Batch ({BatchQueue.Count})" : "Batch";
+            foreach (BatchQueue.Item item in BatchQueue.Items)
+            {
+                if (batchRowTemplate == null || batchContent == null) break;
+                GameObject row = Instantiate(batchRowTemplate, batchContent);
+                row.SetActive(true); row.name = "Batch_" + item.draft.captureId;
+                CaptureDraft d = item.draft;
+                string status = item.state == "sending" ? "Sending..." : item.Sent ? (string.IsNullOrEmpty(item.message) ? "Sent" : item.message) : item.state == "failed" ? "Not sent" : item.Ready ? "Ready" : "Needs details";
+                Color tint = item.state == "sending" ? Found : item.Sent ? Good : item.state == "failed" ? Missing : item.Ready ? Good : Missing;
+                foreach (TextMeshProUGUI t in row.GetComponentsInChildren<TextMeshProUGUI>(true))
+                {
+                    if (t.name == "NameText") t.text = d.Get("name").Has ? d.Get("name").value : "Name needed";
+                    else if (t.name == "BrandText") t.text = d.Get("brand").Has ? d.Get("brand").value : "Brand needed";
+                    else if (t.name == "TimeText") t.text = d.Get("barcode").Has ? d.Get("barcode").value : "No barcode";
+                    else if (t.name == "StatusText") { t.text = status; t.color = tint; }
+                }
+                foreach (Image img in row.GetComponentsInChildren<Image>(true)) if (img.name == "StatusPill") img.color = new Color(tint.r, tint.g, tint.b, 0.16f);
+                BatchQueue.Item captured = item;
+                Button b = row.GetComponent<Button>();
+                if (b != null) b.onClick.AddListener(() => OpenBatchItem(captured));
+                batchRows.Add(row);
+            }
+            if (batchEmptyText != null)
+            {
+                batchEmptyText.gameObject.SetActive(batchRows.Count == 0);
+                batchEmptyText.text = ScannerPrefs.BatchMode ? "Nothing in the batch yet. Scan products one after another, or add several gallery photos." : "Nothing in the batch. Turn on Batch Mode in Scanner Preferences.";
+            }
+            int ready = BatchQueue.ReadyCount;
+            if (batchSubmitLabel != null) batchSubmitLabel.text = BatchQueue.IsSending ? "Sending..." : ready > 0 ? $"Send ready ({ready})" : "Nothing ready to send";
+            if (batchSubmitButton != null) batchSubmitButton.interactable = ready > 0 && !BatchQueue.IsSending;
+            if (batchClearButton != null) batchClearButton.interactable = BatchQueue.Items.Count > 0 && !BatchQueue.IsSending;
+            if (batchAddButton != null) batchAddButton.gameObject.SetActive(batchFromDashboard ? ScannerPrefs.BatchMode : true);
+        }
+
+        void OpenBatchItem(BatchQueue.Item item)
+        {
+            if (item.Sent) { Info("That one was sent. It is on the website."); return; }
+            if (item.state == "sending") { Info("It is being sent."); return; }
+            editing = item; draft = item.draft;
+            CaptureDraft.Photos.Clear();
+            if (item.photo != null) CaptureDraft.Photos.Add(new KeyValuePair<string, Texture2D>("Front", item.photo));
+            if (batchPanel != null) batchPanel.SetActive(false);
+            ShowForm(item.Ready ? "" : "Add what is missing: a name, a brand and a make-up category.");
+            if (titleText != null) titleText.text = "Batch item";
+            if (submitLabel != null) submitLabel.text = "Save to batch";
+            TextMeshProUGUI again = tryAgainButton != null ? tryAgainButton.GetComponentInChildren<TextMeshProUGUI>(true) : null;
+            if (again != null) again.text = "Remove from batch";
+        }
+
+        async Task SubmitBatch()
+        {
+            if (BatchQueue.IsSending) return;
+            int need = BatchQueue.NeedDetails;
+            if (BatchQueue.ReadyCount == 0) { Warn(need > 0 ? $"{need} still need a name, a brand and a category. Tap one to add them." : "Nothing is ready to send."); return; }
+            if (!ConnectivityMonitor.Online) Info("You are offline: they are kept and sent when you are back online.");
+            PaintBatch();
+            int sent = await BatchQueue.SubmitReady();
+            if (this == null) return;
+            int failed = 0;
+            foreach (BatchQueue.Item i in BatchQueue.Items) if (i.state == "failed") failed++;
+            if (sent > 0) StaffToast.Ok(this, $"Sent {sent}. Waiting for review on the website." + (need > 0 ? $" {need} still need details." : ""));
+            if (failed > 0) Warn($"{failed} could not be sent. Tap Send ready to try again.");
+            PaintBatch();
+        }
+
+        void AskClearBatch()
+        {
+            void Clear() { BatchQueue.Clear(); Info("The batch was cleared."); PaintBatch(); }
+            if (confirmDialog != null) confirmDialog.Ask("Clear the batch?", "The products in this batch that were not sent are removed from this phone.", "Clear", Clear, true, "Keep");
+            else Clear();
+        }
+
         // ======================= small parts =======================
         void PaintRoles()
         {
@@ -428,7 +609,7 @@ namespace GlowUp.Admin
                 }
                 thumbs.Add(t);
             }
-            if (continueLabel != null) continueLabel.text = CaptureDraft.Photos.Count > 0 ? $"Read & review ({CaptureDraft.Photos.Count})" : "Read & review";
+            if (continueLabel != null) continueLabel.text = BatchBarcode ? BatchLabel() : CaptureDraft.Photos.Count > 0 ? $"Read & review ({CaptureDraft.Photos.Count})" : "Read & review";
         }
 
         // 23 Nov 2026: this screen says things with the app's toast only (FormalToast places it and keeps it clear of buttons); the pill
@@ -441,6 +622,7 @@ namespace GlowUp.Admin
 
         void TryAgain()
         {
+            if (editing != null) { CaptureDraft.Photos.Clear(); BatchQueue.Remove(editing); editing = null; Info("Removed from the batch."); ShowBatch(); return; }
             CaptureDraft.Clear(); CaptureDraft.ReleasePhotos();
             CaptureDraft.Mode again = StartMode == CaptureDraft.Mode.Manual ? CaptureDraft.Mode.Photo : StartMode;
             draft = CaptureDraft.Start(again, false);
@@ -468,6 +650,12 @@ namespace GlowUp.Admin
 
         void Back()
         {
+            if (editing != null) { CaptureDraft.Photos.Clear(); editing = null; ShowBatch(); return; }                // from a batch item back to the list
+            if (batchPanel != null && batchPanel.activeSelf)
+            {
+                if (batchFromDashboard) Finish(dashboardScene); else ShowCapture(StartMode == CaptureDraft.Mode.Manual ? CaptureDraft.Mode.Photo : StartMode);
+                return;
+            }
             // the draft is already saved on the phone; leaving never loses it
             if (formPanel != null && formPanel.activeSelf && StartMode != CaptureDraft.Mode.Manual && string.IsNullOrEmpty(draft.submittedId)) { ShowCapture(StartMode); return; }
             Finish(dashboardScene);
@@ -481,6 +669,6 @@ namespace GlowUp.Admin
             SceneNavigator.Go(scene);
         }
 
-        void OnDestroy() { if (torchOn) Flashlight.TrySet(false, out _); }
+        void OnDestroy() { BatchQueue.Changed -= PaintBatch; if (torchOn) Flashlight.TrySet(false, out _); }
     }
 }
