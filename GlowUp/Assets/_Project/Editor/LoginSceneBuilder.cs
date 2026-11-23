@@ -158,6 +158,9 @@ namespace GlowUp.EditorTools
             for (int i = 0; i < social.Length; i++)
                 TopAt(social[i].transform, card, (i - (social.Length - 1) / 2f) * (SocialSize + SocialGap), y, SocialSize, SocialSize);
 
+            // 23 Nov 2026 (staff plan): the small "Admin?" row under Google, above the legal line; closed by default
+            AdminScenesBuilder.AddLoginAccordion(card, y + SocialSize + 30);
+
             // legal text + links: anchored to the panel bottom
             BottomAt(termsText, card, 0, 56, Inner, 70, 28);
 

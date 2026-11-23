@@ -85,7 +85,27 @@ export async function getCountFromServer(target) {
 }
 
 export function onSnapshot(target, next, fail) {
-    return fb.onSnapshot(target, (snapshot) => { noteReads("live listener", snapshot.docChanges().length); next(snapshot); }, fail);
+    // Real time across devices: a live listener on one of the cached lists writes what changed into the cache first, so the
+    // page's next read shows a change made elsewhere (the mobile staff capture, another admin) at once, not after the next sync.
+    const listName = target && target.type === "collection" && LISTS.includes(target.id) ? target.id : "";
+    return fb.onSnapshot(target, (snapshot) => {
+        noteReads("live listener", snapshot.docChanges().length);
+        if (listName) absorb(listName, snapshot);
+        next(snapshot);
+    }, fail);
+}
+
+function absorb(name, snapshot) {
+    const kept = load(name);
+    if (!kept) return;                                           // nothing cached yet: the first read downloads the whole list
+    let changed = 0;
+    snapshot.docChanges().forEach((change) => {
+        if (change.type === "removed") { if (kept.docs.delete(change.doc.id)) changed++; return; }
+        kept.docs.set(change.doc.id, copy(change.doc.data()));
+        changed++;
+    });
+    if (changed > 0 && !(snapshot.metadata && snapshot.metadata.hasPendingWrites)) save(name, kept);
+    else if (changed > 0) memory[name] = kept;
 }
 
 

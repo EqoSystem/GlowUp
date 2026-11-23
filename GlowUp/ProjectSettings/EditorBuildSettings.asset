@@ -53,6 +53,18 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/_Project/Scenes/NotificationsScene.unity
     guid: f96e2fcba35513c428bb6a51c0ccef5d
+  - enabled: 1
+    path: Assets/_Project/Scenes/AdminLoginScene.unity
+    guid: b977c86e9b0548448b81ed02be0476b9
+  - enabled: 1
+    path: Assets/_Project/Scenes/AdminDashboardScene.unity
+    guid: a9accbe321d84574ebeff26ca81518f1
+  - enabled: 1
+    path: Assets/_Project/Scenes/AdminCaptureScene.unity
+    guid: 69c3482334dbc604d8a97bdc65c7f789
+  - enabled: 1
+    path: Assets/_Project/Scenes/AdminSubmissionsScene.unity
+    guid: a858537a35e2a2e42bdc15d6fdd363b0
   m_configObjects:
     UnityEditor.XR.ARCore.ARCoreSettings: {fileID: 11400000, guid: eb1f0a0e34d66804d89c996cc1ea6e43,
       type: 2}

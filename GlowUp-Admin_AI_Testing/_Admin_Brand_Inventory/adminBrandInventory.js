@@ -29,7 +29,7 @@
 
 import { db } from "../_Database/firebase-console.js";
 import { auth } from "../_Database/firebase-console.js";
-import { collection, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { collection, doc, serverTimestamp, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 
 import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed, onSnapshot } from "../_Shared/adminStore.js";
@@ -635,6 +635,10 @@ async function loadInventory() {
                 ingredientsRaw: String(data.ingredientsRaw || "").slice(0, 4000),
                 ingredientsRawFrom: String(data.ingredientsRawFrom || "").slice(0, 120),
                 reviewState: String(data.reviewState || ""),
+                captureMethod: String(data.captureMethod || ""),
+                evidenceCount: toWholeNumber(data.evidenceCount),
+                possibleDuplicateOf: String(data.possibleDuplicateOf || ""),
+                addedBy: String(data.addedBy || ""),
                 reviewNote: String(data.reviewNote || "").slice(0, 500),
                 aliases: asArray(data.aliases),
                 folder: cleanFolder(data.folder),
@@ -1687,6 +1691,12 @@ function detailRow(p, brand, columns) {
     const unchecked = uncheckedFields(p.fieldOrigins);
     if (unchecked.length) facts.push(["Not checked", `<span class="chip warn">${escapeHtml(unchecked.map((f) => `${f.label} (${STATE_WORDS[f.state].toLowerCase()}${f.from ? ", " + f.from : ""})`).join("; "))}</span>`]);
     if (p.reviewNote && p.reviewState) facts.push([p.reviewState === REVIEW_CHANGES ? "Sent back" : "Review note", escapeHtml(p.reviewNote)]);
+    if (p.source === "staff-capture") {
+        const how = { Barcode: "barcode scan", Photo: "product photos", Gallery: "gallery photos", Manual: "manual entry" }[p.captureMethod] || "the mobile app";
+        const dup = p.possibleDuplicateOf ? everyProduct.find((x) => x.id === p.possibleDuplicateOf) : null;
+        facts.push(["Staff capture", escapeHtml(`Captured by ${how}`) + (p.evidenceCount ? ` · <button type="button" class="text-link" data-act="capture-photos" data-id="${escapeHtml(p.id)}">Show ${many(p.evidenceCount, "photo", "photos")}</button>` : " · no photos attached")
+            + (dup ? `<br><span class="chip warn">Possible duplicate of "${escapeHtml(dup.name)}": compare before approving</span>` : "")]);
+    }
 
     const button = (cls, act, iconHtml, label, tip) => `<button type="button" class="row-btn ${cls}" data-act="${act}" data-id="${escapeHtml(p.id)}" data-tip="${escapeHtml(tip)}">${iconHtml}${label}</button>`;
     const buttons = [button("main", "edit-product", icon("edit"), "Edit", "Change the name, brand, type, ingredients, shades or status.")];
@@ -3069,6 +3079,37 @@ async function approveWithBrand(product, button) {
 
 
 
+// The photos a staff member took in the mobile app (captureEvidence/{productId}, admins only). Small JPEGs, read on demand.
+async function showCapturePhotos(product) {
+    const frame = dialogFrame(`Capture photos: ${product.name || "product"}`, () => frame.close());
+    frame.box.classList.add("wide");
+    const holder = document.createElement("div");
+    holder.className = "capture-photos";
+    holder.textContent = "Loading the photos...";
+    const close = document.createElement("button");
+    close.type = "button"; close.className = "cancel-btn"; close.textContent = "Close";
+    close.addEventListener("click", () => frame.close());
+    const actions = document.createElement("div"); actions.className = "modal-actions"; actions.append(close);
+    frame.box.append(holder, actions);
+    try {
+        const snap = await getDoc(doc(db, "captureEvidence", product.id));
+        const photos = snap.exists() && Array.isArray(snap.data().photos) ? snap.data().photos : [];
+        holder.replaceChildren();
+        if (photos.length === 0) { holder.textContent = "No photos were attached to this capture."; return; }
+        photos.slice(0, 3).forEach((p) => {
+            const b64 = String(p && p.jpeg || "");
+            if (!/^[A-Za-z0-9+/=]+$/.test(b64)) return;                        // only plain base64 JPEG data is shown
+            const fig = document.createElement("figure");
+            const img = document.createElement("img");
+            img.src = "data:image/jpeg;base64," + b64; img.alt = `${String(p.role || "Photo")} photo of ${product.name || "the product"}`; img.loading = "lazy";
+            const cap = document.createElement("figcaption"); cap.textContent = String(p.role || "Photo");
+            fig.append(img, cap); holder.append(fig);
+        });
+    } catch (error) {
+        holder.textContent = "The photos could not be read. " + describeError(error);
+    }
+}
+
 // "Send back": the product stays Pending and waits; the note says what to correct. Whoever edits and saves it resubmits it.
 // "Reject": a reason is required; the product goes to the Recycle bin with that reason (restorable, and in the activity log).
 function askReason({ title, intro, label, confirmLabel, danger }) {
@@ -3159,6 +3200,7 @@ function onTableClick(event) {
     else if (act === "approve-product" && product) approveProduct(product, button);
     else if (act === "approve-with-brand" && product) approveWithBrand(product, button);
     else if (act === "send-back-product" && product) sendBackProduct(product, button);
+    else if (act === "capture-photos" && product) showCapturePhotos(product);
     else if (act === "reject-product" && product) rejectProduct(product, button);
     else if (act === "edit-product" && product) openProductForm(product, null);
     else if (act === "folder-product" && product) org.chooseFolder(button, ["p:" + product.id]);

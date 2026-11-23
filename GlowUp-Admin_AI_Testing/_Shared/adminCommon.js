@@ -425,6 +425,7 @@ export function originLabel(source) {
         case "ai": return "Found by the app's AI lookup";
         case "aiassist": return "Drafted with Assist with AI, checked by an admin";
         case "scan": return "Added by an app scan";
+        case "staff-capture": return "Submitted from the mobile app (staff capture)";
         case "openbeautyfacts": return "Imported from Open Beauty Facts";
         case "document-import": return "Imported from a document";
         case "starter": return "Starter data";

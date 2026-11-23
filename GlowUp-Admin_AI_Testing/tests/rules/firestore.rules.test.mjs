@@ -561,6 +561,24 @@ await cannotAfter("a user writes into an admin's link", seedLink(), () => update
 await canAfter("the admin reads and deletes their link", seedLink(), async () => { await getDoc(doc(adminDoc(), "phoneLinks/abcdefghjk23")); await deleteDoc(doc(adminDoc(), "phoneLinks/abcdefghjk23")); });
 await cannotAfter("nobody lists the links", seedLink(), () => getDocs(collection(adminDoc(), "phoneLinks")));
 
+// Staff capture from the mobile app (23 Nov 2026): the submission is a Pending product; its photos go to captureEvidence
+const capture = (extra = {}) => Object.assign({ name: "Glow Tint", brandId: "", brandName: "Testbrand", cosmeticType: "Lip Tint", ingredients: ["Aqua", "Mica"],
+    shades: [], sources: [], tags: ["staff-capture"], status: "Pending", reviewed: false, source: "staff-capture", addedBy: "a1", addedAtUnix: 1, scans: 0,
+    fieldOrigins: { name: { state: "detected", from: "Open Beauty Facts", method: "barcode", atUnix: 1 } }, barcode: "0012345678905", captureId: "cap_a1aaaa_1" }, extra);
+const evidence = (extra = {}) => Object.assign({ by: "a1", atUnix: 1, productId: "cap_a1aaaa_1", photos: [{ role: "Front", jpeg: "QUJD" }] }, extra);
+await can("an admin's phone submits a staff capture (Pending)", () => setDoc(doc(adminDoc(), "products/cap_a1aaaa_1"), capture()));
+await cannot("a normal user cannot submit a staff capture", () => setDoc(doc(user(), "products/cap_a1aaaa_1"), capture({ addedBy: "u1" })));
+await can("an admin attaches capture photos", () => setDoc(doc(adminDoc(), "captureEvidence/cap_a1aaaa_1"), evidence()));
+await cannot("a normal user cannot attach capture photos", () => setDoc(doc(user(), "captureEvidence/cap_a1aaaa_1"), evidence({ by: "u1" })));
+await cannot("photos in another admin's name", () => setDoc(doc(adminDoc(), "captureEvidence/cap_a1aaaa_1"), evidence({ by: "a9" })));
+await cannot("more than 3 photos", () => setDoc(doc(adminDoc(), "captureEvidence/cap_a1aaaa_1"), evidence({ photos: [1, 2, 3, 4] })));
+await cannot("photos under an id that is not a capture", () => setDoc(doc(adminDoc(), "captureEvidence/p1"), evidence({ productId: "p1" })));
+await cannot("extra fields with the photos", () => setDoc(doc(adminDoc(), "captureEvidence/cap_a1aaaa_1"), evidence({ public: true })));
+const seedEvidence = async () => { await seed(); await env.withSecurityRulesDisabled((c) => setDoc(doc(c.firestore(), "captureEvidence/cap_a1aaaa_1"), evidence())); };
+await canAfter("an admin reviewer reads the photos", seedEvidence, () => getDoc(doc(adminDoc(), "captureEvidence/cap_a1aaaa_1")));
+await cannotAfter("a normal user cannot read the photos", seedEvidence, () => getDoc(doc(user(), "captureEvidence/cap_a1aaaa_1")));
+await cannotAfter("nobody signed in reads the photos", seedEvidence, () => getDoc(doc(anon(), "captureEvidence/cap_a1aaaa_1")));
+
 await env.cleanup();
 console.log(`checks made: ${checks}`);
 if (failures.length > 0) {
