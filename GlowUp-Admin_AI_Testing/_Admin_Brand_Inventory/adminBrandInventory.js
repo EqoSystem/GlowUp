@@ -44,7 +44,7 @@ import {
 } from "../_Shared/glowupCatalog.js";
 import { refreshRecommendabilityFlags } from "../_Shared/recommendabilityAdmin.js";
 import { openPlanDialog, openDuplicatesDialog } from "../_Shared/adminCleanup.js";
-import { mountShell, placeInHeader, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount } from "../_Shared/adminShell.js";
+import { mountShell, placeInHeader, paginate, renderPager, icon, BIN_ICON, openMenu, askConfirm, setBinCount, dialogFrame } from "../_Shared/adminShell.js";
 import { registerDataset, registerTileDataset, datasetChanged } from "../_Shared/adminWidgets.js";
 import { createOrganizer, cleanFolder, friendly } from "../_Shared/adminOrganizer.js";
 import { setAssistPage, registerAssist, refreshAssist } from "../_Shared/adminAssist.js";
@@ -64,6 +64,10 @@ import { wireWindow } from "../_Shared/adminWindow.js";
 import { applyRole, brandPageOf, groupByType, bulkAllowed } from "../_Shared/sourceEdit.js";
 import { gs1Hint, VERIFIED_BY_GS1 } from "../_Shared/gs1Hint.js";
 import { mountProductQuickFill } from "./productQuickFill.js";
+import {
+    barcodeDigits, originEntry, originsAfterFill, uncheckedFields, markChecked, cleanOrigins, similarProducts, similarBrands,
+    reviewReason, skippedLine, repeatedNames, FILL_FIELDS, STATE_WORDS, METHODS, DETECTED, NEEDS_REVIEW, VERIFIED, TYPED, REVIEW_CHANGES, waiting
+} from "../_Shared/capture.js";
 import { loadCatalogue } from "../_Shared/quickFill.js";
 
 const OTHER_TYPE = "__other__";
@@ -72,6 +76,14 @@ const NO_BRAND = "__none__";
 const NEW_BRAND = "__newbrand__";          // Quick fill found a brand that is not listed: it is added when the product is saved
 let pendingBrandName = "";
 let quickFill = { reset() {} };
+// where each value of the open product form came from, and whether a person has checked it (capture.js); saved as fieldOrigins
+let fieldOrigins = {};
+// the ingredient statement exactly as the source or the photo gave it (kept as evidence; the list itself is what the app uses)
+let ingredientsRaw = { text: "", from: "" };
+const ORIGIN_INPUTS = {
+    name: ["productNameInput"], brand: ["productBrandInput"], cosmeticType: ["productTypeInput", "productTypeOtherInput"],
+    imageUrl: ["productImageInput"], barcode: ["productBarcodeInput"], fdaNumber: ["productFdaInput"], ingredients: ["productIngredientsInput"]
+};
 const MAX_SHADES = 100;
 const SHADE_STRIP_FROM = 11;
 const MAX_TAGS = 10;
@@ -327,6 +339,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("productBarcodeInput").addEventListener("input", showNameClash);
     el("productForm").addEventListener("input", saveDraft);
     el("productForm").addEventListener("change", saveDraft);
+    el("productForm").addEventListener("input", onOriginEdit);
+    el("productForm").addEventListener("change", onOriginEdit);
+    el("productForm").addEventListener("click", onOriginClick);
     el("productTypeOtherInput").addEventListener("input", showScopeHint);
     el("addBrandForm").addEventListener("submit", saveBrand);
     el("productForm").addEventListener("submit", saveProduct);
@@ -362,7 +377,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     quickFill = mountProductQuickFill({
         brands: () => everyBrand, products: () => everyProduct,
-        fill: fillProductFromQuick, fillIngredients: (names) => fillProductFromQuick({ ingredients: names }, { partial: true }),
+        readForm: readProductForm,
+        fill: fillProductFromQuick,
+        noteOrigins: (rows, method, score) => { fieldOrigins = originsAfterFill(fieldOrigins, rows, method, score); paintOrigins(); saveDraft(); },
+        noteRaw: (text, from) => { ingredientsRaw = { text: String(text || "").slice(0, 4000), from: String(from || "").slice(0, 120) }; paintRawIngredients(); saveDraft(); },
         openExisting: (product) => { productModal.close(); openProductForm(product); }
     });
     el("productShadeEditor").addEventListener("click", onShadeClick);
@@ -594,6 +612,11 @@ async function loadInventory() {
                 fdaNumber: String(data.fdaNumber || "").replace(/\s+/g, " ").trim().slice(0, 40),
                 imageUrl: String(data.imageUrl || ""),
                 ingredientNotes: Array.isArray(data.ingredientNotes) ? data.ingredientNotes : [],
+                fieldOrigins: cleanOrigins(data.fieldOrigins),
+                ingredientsRaw: String(data.ingredientsRaw || "").slice(0, 4000),
+                ingredientsRawFrom: String(data.ingredientsRawFrom || "").slice(0, 120),
+                reviewState: String(data.reviewState || ""),
+                reviewNote: String(data.reviewNote || "").slice(0, 500),
                 aliases: asArray(data.aliases),
                 folder: cleanFolder(data.folder),
                 addedAt: madeAt(data)
@@ -873,11 +896,12 @@ async function saveInventoryDraft(draft, fileName, say) {
     const groups = Math.max(Math.ceil(records.length / IMPORT_GROUP), Math.ceil(brandRecords.length / IMPORT_GROUP), 1);
     for (let g = 0; g < groups; g++) {
         if (groups > 1) say(`Saving group ${g + 1} of ${groups}...`);
-        const part = await saveImportedProducts(records.slice(g * IMPORT_GROUP, (g + 1) * IMPORT_GROUP), brandRecords.slice(g * IMPORT_GROUP, (g + 1) * IMPORT_GROUP), fileName, memory);
+        const part = await saveImportedProducts(records.slice(g * IMPORT_GROUP, (g + 1) * IMPORT_GROUP), brandRecords.slice(g * IMPORT_GROUP, (g + 1) * IMPORT_GROUP), fileName, memory, g * IMPORT_GROUP);
         ["savedProducts", "savedBrands", "suggestedLists", "skippedDuplicates", "skippedInvalid", "withFdaLink"].forEach((k) => { result[k] += part[k]; });
         result.flagged.push(...part.flagged);
+        (result.notSaved = result.notSaved || []).push(...part.notSaved);
     }
-    showImportFlags(el("inventoryImportFlags"), result.flagged);
+    showImportFlags(el("inventoryImportFlags"), result.flagged, result.notSaved || []);
     const flaggedOut = result.flagged.filter((f) => !f.saved).length;
     const skipped = result.skippedDuplicates + result.skippedInvalid;
     if (result.savedProducts === 0 && result.savedBrands === 0 && result.suggestedLists === 0) {
@@ -900,14 +924,15 @@ async function saveInventoryDraft(draft, fileName, say) {
 
 
 
-function showImportFlags(box, flagged) {
+function showImportFlags(box, flagged, notSaved = []) {
     if (!box) return;
-    box.hidden = flagged.length === 0;
-    if (flagged.length === 0) { box.innerHTML = ""; return; }
+    box.hidden = flagged.length === 0 && notSaved.length === 0;
+    if (box.hidden) { box.innerHTML = ""; return; }
     const out = flagged.filter((f) => !f.saved), unclear = flagged.filter((f) => f.saved);
     const line = (f) => `<li><b>${escapeHtml(f.name)}</b>${f.brandName ? " (" + escapeHtml(f.brandName) + ")" : ""}${f.cosmeticType ? ", " + escapeHtml(f.cosmeticType) : ""}: ${escapeHtml(f.why)}</li>`;
     box.innerHTML = (out.length ? `<span class="chip warn">Flagged: skin care or not make-up</span> Not saved. GlowUp lists make-up only.<ul>${out.map(line).join("")}</ul>` : "")
-        + (unclear.length ? `<span class="chip review">Flagged: kind not clear</span> Saved as Pending; open each one and choose its make-up kind, or move it to the Recycle bin.<ul>${unclear.map(line).join("")}</ul>` : "");
+        + (unclear.length ? `<span class="chip review">Flagged: kind not clear</span> Saved as Pending; open each one and choose its make-up kind, or move it to the Recycle bin.<ul>${unclear.map(line).join("")}</ul>` : "")
+        + (notSaved.length ? `<span class="chip">Rows not saved or changed</span> Every row of the file is accounted for: fix the file and import it again (rows already saved are skipped, nothing is saved twice).<ul>${notSaved.slice(0, 60).map((n) => `<li>${escapeHtml(skippedLine(n))}</li>`).join("")}${notSaved.length > 60 ? `<li>and ${notSaved.length - 60} more</li>` : ""}</ul>` : "");
 }
 
 
@@ -915,13 +940,15 @@ function showImportFlags(box, flagged) {
 
 
 
-async function saveImportedProducts(records, brandRecords, fileName, memory) {
+async function saveImportedProducts(records, brandRecords, fileName, memory, firstRow = 0) {
     const batch = writeBatch(db);
     const kept = memory || { newBrands: new Map(), plannedProducts: new Set() };
     const newBrands = new Map();
     const plannedProducts = kept.plannedProducts;
-    const flagged = [];
+    const flagged = [], notSaved = [];
     const uid = auth.currentUser ? auth.currentUser.uid : "";
+    const plannedCodes = kept.plannedCodes || (kept.plannedCodes = new Map());
+    const fromFile = `File: ${String(fileName || "").trim().slice(0, 60)}`;
     let savedProducts = 0, skippedDuplicates = 0, skippedInvalid = 0, withFdaLink = 0, suggestedLists = 0, writes = 0;
     const clean = (value, most) => String(value || "").replace(/\s+/g, " ").trim().slice(0, most);
     const names = (list, most, count) => Array.from(new Map((Array.isArray(list) ? list : []).map((v) => clean(v, most)).filter(Boolean).map((v) => [sameKey(v), v])).values()).slice(0, count);
@@ -947,11 +974,12 @@ async function saveImportedProducts(records, brandRecords, fileName, memory) {
         return brand;
     };
 
-    records.slice(0, IMPORT_GROUP).forEach((record) => {
+    records.slice(0, IMPORT_GROUP).forEach((record, at) => {
         const brandName = clean(record.brandName, 60);
         const name = clean(record.productName, 100);
         const cosmeticType = clean(record.cosmeticType, 60);
-        if (brandName.length < 2 || !name) { skippedInvalid++; return; }
+        const row = firstRow + at + 1;
+        if (brandName.length < 2 || !name) { skippedInvalid++; notSaved.push({ row, name, brandName, why: !name ? "no product name" : "no brand name (at least 2 letters)" }); return; }
         const scope = productScope(cosmeticType, name);
 
         if (scope === "out" || scope === "skincare") {
@@ -960,7 +988,7 @@ async function saveImportedProducts(records, brandRecords, fileName, memory) {
         }
 
         let brand = knownBrand(brandName);
-        if (brand && brand.binned) { skippedDuplicates++; return; }
+        if (brand && brand.binned) { skippedDuplicates++; notSaved.push({ row, name, brandName, why: `its brand "${brand.name}" is in the Recycle bin` }); return; }
         if (!brand) brand = kept.newBrands.get(sameKey(brandName)) || addBrand(brandName, { market: record.brandMarket, aliases: record.brandAliases, logoUrl: record.brandLogoUrl, imageUrl: record.brandImageUrl, websiteSuggested: record.brandWebsiteSuggested });
 
         const ingredients = (Array.isArray(record.ingredients) ? record.ingredients : []).map((item) => String(item).trim().slice(0, 100)).filter(Boolean).slice(0, 80);
@@ -983,7 +1011,8 @@ async function saveImportedProducts(records, brandRecords, fileName, memory) {
                 });
                 writes++;
                 suggestedLists++;
-            } else skippedDuplicates++;
+                notSaved.push({ row, name, brandName, why: "already listed without ingredients: its list went to Web ingredient lists to review" });
+            } else { skippedDuplicates++; notSaved.push({ row, name, brandName, why: existing ? `already listed as "${existing.name}"` : "twice in this file" }); }
             return;
         }
         plannedProducts.add(key);
@@ -998,8 +1027,18 @@ async function saveImportedProducts(records, brandRecords, fileName, memory) {
             status: "Pending", scans: 0, folder: "",
             source: "document-import", reviewed: false, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         };
-        const barcode = barcodeKey(record.barcode || "");
-        if (barcode) data.barcode = barcode;
+        const barcode = barcodeDigits(record.barcode || "");
+        if (barcode) {
+            const owner = everyProduct.find((p) => !p.binned && barcodeKey(p.barcode) === barcodeKey(barcode)) || plannedCodes.get(barcodeKey(barcode));
+            if (owner) notSaved.push({ row, name, brandName, why: `saved WITHOUT its barcode ${barcode}: that barcode is already on "${owner.name}"` });
+            else { data.barcode = barcode; plannedCodes.set(barcodeKey(barcode), { name }); }
+        } else if (String(record.barcode || "").trim()) notSaved.push({ row, name, brandName, why: `saved without its barcode: "${clean(record.barcode, 20)}" is not 6 to 14 digits` });
+        // every imported value is Detected (from the file) until an admin checks it
+        data.fieldOrigins = {};
+        ["name", "brand", "cosmeticType", "imageUrl", "barcode", "fdaNumber", "ingredients"].forEach((key) => {
+            const value = key === "brand" ? brand.name : data[key];
+            if (Array.isArray(value) ? value.length : value) data.fieldOrigins[key] = originEntry(DETECTED, fromFile, "import");
+        });
         const imageUrl = cleanLink(record.imageUrl);
         if (imageUrl) data.imageUrl = imageUrl;
         batch.set(doc(collection(db, "products")), data);
@@ -1015,7 +1054,7 @@ async function saveImportedProducts(records, brandRecords, fileName, memory) {
         addBrand(name, record);
     });
 
-    const result = { savedProducts, savedBrands: newBrands.size, suggestedLists, skippedDuplicates, skippedInvalid, withFdaLink, flagged };
+    const result = { savedProducts, savedBrands: newBrands.size, suggestedLists, skippedDuplicates, skippedInvalid, withFdaLink, flagged, notSaved };
     if (writes === 0) return Object.assign(result, { savedBrands: 0 });
     await batch.commit();
     return result;
@@ -1566,11 +1605,12 @@ function productRow(p, brand, flat) {
     const together = approvalFor(p, brand);
     if (together) buttons.push(actionButton("row-btn approve", "approve-with-brand", p.id, icon("check"), together.label, together.tip, "It asks first. Both are saved together or not at all."));
     else if (p.needsReview && !isOut(p) && !isUnclear(p)) buttons.push(actionButton("row-btn approve", "approve-product", p.id, icon("check"), "Approve", "You have checked this product: set it to Active.", "It asks first. The app then uses it."));
+    if (p.needsReview) buttons.push(actionButton("row-btn", "send-back-product", p.id, icon("edit"), "Send back", "Ask for corrections with a note. It stays Pending.", "It asks for the note first."));
     buttons.push(actionButton("row-btn danger", "bin-product", p.id, BIN_ICON, "Recycle bin", "Remove this product.", "It goes to the Recycle bin and can be restored."));
 
     return `
         <tr class="product-row${isOut(p) ? " out-row" : ""}${open ? " open" : ""}" data-product="${escapeHtml(p.id)}" data-key="p:${escapeHtml(p.id)}" data-drag tabindex="0" aria-expanded="${open}">
-            <td class="name-cell"><div class="name-line">${pickBox(p.name || "product")}${toneDot(attentionOf(p, brand, !flat))}<span class="product-name">${escapeHtml(p.name || "Unnamed Product")}</span>${containsNote(p)}${p.ingredients.length === 0 ? (`<span class="chip warn ingredient-missing">${icon("alert")}<span>No ingredient list</span></span>`) : ""}</div></td>
+            <td class="name-cell"><div class="name-line">${pickBox(p.name || "product")}${toneDot(attentionOf(p, brand, !flat))}<span class="product-name">${escapeHtml(p.name || "Unnamed Product")}</span>${containsNote(p)}${p.needsReview && p.reviewState === REVIEW_CHANGES ? `<span class="chip warn">Sent back</span>` : p.needsReview && p.reviewState === "resubmitted" ? `<span class="chip review">Resubmitted</span>` : ""}${p.ingredients.length === 0 ? (`<span class="chip warn ingredient-missing">${icon("alert")}<span>No ingredient list</span></span>`) : ""}</div></td>
             ${flat ? `<td class="brand-ref">${escapeHtml(brand ? brand.name : (p.brandName || "–"))}</td>` : ""}
             <td class="type-cell">${escapeHtml(p.cosmeticType || "–")}</td>
             <td class="shade-cell">${shadeCell}</td>
@@ -1625,14 +1665,20 @@ function detailRow(p, brand, columns) {
     if (p.folder) facts.push(["Folder", escapeHtml(p.folder)]);
     const origin = originText(p);
     if (origin) facts.push(["Added", origin]);
+    const unchecked = uncheckedFields(p.fieldOrigins);
+    if (unchecked.length) facts.push(["Not checked", `<span class="chip warn">${escapeHtml(unchecked.map((f) => `${f.label} (${STATE_WORDS[f.state].toLowerCase()}${f.from ? ", " + f.from : ""})`).join("; "))}</span>`]);
+    if (p.reviewNote && p.reviewState) facts.push([p.reviewState === REVIEW_CHANGES ? "Sent back" : "Review note", escapeHtml(p.reviewNote)]);
 
     const button = (cls, act, iconHtml, label, tip) => `<button type="button" class="row-btn ${cls}" data-act="${act}" data-id="${escapeHtml(p.id)}" data-tip="${escapeHtml(tip)}">${iconHtml}${label}</button>`;
     const buttons = [button("main", "edit-product", icon("edit"), "Edit", "Change the name, brand, type, ingredients, shades or status.")];
     const together = approvalFor(p, brand);
     if (together) buttons.push(button("approve", "approve-with-brand", icon("check"), together.label, together.tip));
     else if (p.needsReview && scope === "makeup") buttons.push(button("approve", "approve-product", icon("check"), "Approve", "You have checked it: set it to Active."));
+    if (p.needsReview) buttons.push(button("", "send-back-product", icon("edit"), "Send back", "Ask for corrections with a note. It stays Pending."));
     buttons.push(button("", "folder-product", icon("folder"), "Folder", "Put it in a folder, or take it out."));
-    buttons.push(`<span class="spacer"></span>`, button("danger", "bin-product", BIN_ICON, "Recycle bin", "Remove it. It can be restored from the Recycle bin."));
+    buttons.push(`<span class="spacer"></span>`);
+    if (p.needsReview) buttons.push(button("danger", "reject-product", BIN_ICON, "Reject", "Reject it with a reason. It goes to the Recycle bin."));
+    else buttons.push(button("danger", "bin-product", BIN_ICON, "Recycle bin", "Remove it. It can be restored from the Recycle bin."));
 
     return `
         <tr class="detail-row" data-for="${escapeHtml(p.id)}"><td colspan="${columns}">
@@ -1834,9 +1880,109 @@ function showNameClash() {
     const code = barcodeKey(el("productBarcodeInput").value.trim());
     const same = everyProduct.find((p) => p.id !== editingProductId && !p.binned
         && ((code && barcodeKey(p.barcode) === code) || (name.length >= 3 && brandId && p.brandId === brandId && [p.name, ...p.aliases].some((known) => compactName(known) === compactName(name)))));
+    showSimilarProducts(same);
     if (!same) { note.hidden = true; note.textContent = ""; return; }
     note.textContent = `Already listed: "${same.name}" of ${brandNameOf(same)}${same.status !== "Active" ? " (" + same.status + ")" : ""}. Close this and open it from the list instead of adding it twice.`;
     note.hidden = false;
+}
+
+// Products that may be a variant (another shade, size or version) of the one in the form: shown so the admin can compare,
+// never merged or blocked. The exact same barcode or brand + name is the clash note above (and is refused on save).
+function showSimilarProducts(exact) {
+    const box = el("productSimilar");
+    if (!box) return;
+    const found = similarProducts({ id: editingProductId || "", name: el("productNameInput").value, brandId: el("productBrandInput").value, barcode: "" }, everyProduct)
+        .filter((x) => !exact || x.product.id !== exact.id);
+    if (found.length === 0) { box.hidden = true; box.replaceChildren(); return; }
+    box.innerHTML = `<b>Similar products already listed.</b> If this is another shade, size or version, keep the names different and save; if it is the same product, open the one listed instead.<ul>`
+        + found.map(({ product: p, why }) => `<li><b>${escapeHtml(p.name)}</b> · ${escapeHtml(brandNameOf(p))} · ${escapeHtml(p.cosmeticType || "kind not set")}`
+            + `${p.barcode ? " · barcode " + escapeHtml(p.barcode) : ""} · ${many(p.shades.length, "shade", "shades")} · ${escapeHtml(p.status)} <span class="muted">(${escapeHtml(why)})</span></li>`).join("")
+        + "</ul>";
+    box.hidden = false;
+}
+
+// ---- where each value came from (provenance) and whether a person checked it ----
+function readProductForm() {
+    const brand = brands.find((b) => b.id === el("productBrandInput").value);
+    const type = el("productTypeInput").value === OTHER_TYPE ? el("productTypeOtherInput").value.trim() : el("productTypeInput").value;
+    return {
+        name: el("productNameInput").value.trim(),
+        brand: brand ? brand.name : (el("productBrandInput").value === NEW_BRAND ? pendingBrandName : ""),
+        cosmeticType: type, imageUrl: el("productImageInput").value.trim(), barcode: el("productBarcodeInput").value.trim(),
+        fdaNumber: el("productFdaInput").value.trim(), ingredients: toList(el("productIngredientsInput").value)
+    };
+}
+const originKeyOf = (id) => Object.keys(ORIGIN_INPUTS).find((key) => ORIGIN_INPUTS[key].includes(id)) || "";
+// The admin changed a detected value by hand: it is now theirs ("Typed"), so it no longer waits for a check.
+function onOriginEdit(event) {
+    const key = originKeyOf(event.target && event.target.id);
+    if (!key || !fieldOrigins[key] || fieldOrigins[key].state === TYPED) return;
+    fieldOrigins = { ...fieldOrigins, [key]: originEntry(TYPED, "Admin", "manual") };
+    paintOrigins();
+}
+function onOriginClick(event) {
+    const button = event.target.closest("[data-origin-check]");
+    if (!button) return;
+    fieldOrigins = markChecked(fieldOrigins, [button.dataset.originCheck]);
+    paintOrigins();
+    saveDraft();
+}
+// A small label beside each field: "Detected · Open Beauty Facts [Mark checked]", "Needs review", "Checked".
+function paintOrigins() {
+    Object.keys(ORIGIN_INPUTS).forEach((key) => {
+        const input = el(ORIGIN_INPUTS[key][0]);
+        const row = input && input.closest(".field") ? input.closest(".field").querySelector(".label-row") : null;
+        if (!row) return;
+        let chip = row.querySelector(".origin-chip");
+        const o = fieldOrigins[key];
+        if (!o || (o.state === TYPED)) { if (chip) chip.remove(); return; }
+        if (!chip) { chip = document.createElement("span"); row.appendChild(chip); }
+        chip.className = `origin-chip origin-${o.state}`;
+        chip.innerHTML = `${escapeHtml(STATE_WORDS[o.state])}${o.from ? " · " + escapeHtml(o.from) : ""}`
+            + (waiting(o.state) ? ` <button type="button" class="text-link" data-origin-check="${key}" aria-label="Mark the ${escapeHtml(key)} as checked against the pack">Mark checked</button>` : "");
+        chip.title = "";
+    });
+    const left = uncheckedFields(fieldOrigins);
+    const note = el("productOriginNote");
+    if (note) {
+        note.hidden = left.length === 0;
+        note.textContent = left.length ? `${many(left.length, "value came", "values came")} from a look-up, a photo or the phone and ${left.length === 1 ? "is" : "are"} not checked yet: ${left.map((f) => f.label.toLowerCase()).join(", ")}. Compare ${left.length === 1 ? "it" : "them"} with the pack, then press Mark checked.` : "";
+    }
+}
+function paintRawIngredients() {
+    const box = el("productIngredientsRaw");
+    if (!box) return;
+    box.hidden = !ingredientsRaw.text;
+    el("productIngredientsRawFrom").textContent = ingredientsRaw.from ? `As given by ${ingredientsRaw.from}` : "As given by the source";
+    el("productIngredientsRawText").textContent = ingredientsRaw.text;
+}
+// The fields that have a value but no origin yet were typed by the admin: record that too, so every value has a known origin.
+function originsForSave() {
+    const now = readProductForm(), out = { ...fieldOrigins };
+    FILL_FIELDS.forEach((f) => {
+        const has = Array.isArray(now[f.key]) ? now[f.key].length > 0 : !!now[f.key];
+        if (!has) delete out[f.key];
+        else if (!out[f.key]) out[f.key] = originEntry(TYPED, "Admin", "manual");
+    });
+    return out;
+}
+// Asked when an Active save still has values nobody checked: "checked" (mark them and save Active), "pending" or null (cancel).
+function askUncheckedSave(left) {
+    return new Promise((resolve) => {
+        const finish = (answer) => { frame.close(); resolve(answer); };
+        const frame = dialogFrame("Values not checked yet", () => finish(null));
+        const intro = document.createElement("p");
+        intro.className = "modal-intro";
+        intro.textContent = "These values came from a look-up, a photo or the phone. The app shows Active products to its users, so compare them with the pack first.";
+        const list = document.createElement("ul");
+        list.className = "confirm-list";
+        left.forEach((f) => { const li = document.createElement("li"); li.textContent = `${f.label}: ${STATE_WORDS[f.state]}${f.from ? " (" + f.from + ")" : ""}`; list.appendChild(li); });
+        const actions = document.createElement("div");
+        actions.className = "modal-actions";
+        const make = (cls, text, answer) => { const b = document.createElement("button"); b.type = "button"; b.className = cls; b.textContent = text; b.addEventListener("click", () => finish(answer)); return b; };
+        actions.append(make("cancel-btn", "Go back", null), make("btn", "Save as Pending for review", "pending"), make("save-btn", "I checked them: save Active", "checked"));
+        frame.box.append(intro, list, actions);
+    });
 }
 
 // A new product is kept as a draft in this browser while it is typed (never sent anywhere), so a closed tab or a crash does not lose
@@ -1850,6 +1996,7 @@ function saveDraft() {
         const draft = { at: Date.now(), brandId: el("productBrandInput").value, brandName: pendingBrandName };
         DRAFT_IDS.forEach((id) => { draft[id] = el(id).value; });
         draft.shades = formShades.slice(0, 100); draft.codes = formShadeCodes.slice(0, 100);
+        draft.origins = fieldOrigins; draft.raw = ingredientsRaw;
         if (!draft.productNameInput.trim() && !draft.productIngredientsInput.trim() && !draft.productBarcodeInput.trim()) { localStorage.removeItem(DRAFT_KEY); return; }
         localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     } catch (error) {                                                        }
@@ -1877,6 +2024,9 @@ function restoreDraft(draft) {
     else if (draft.brandName) fillProductFromQuick({ brand: draft.brandName }, { partial: true });
     formShades = Array.isArray(draft.shades) ? draft.shades.filter((s) => typeof s === "string") : [];
     formShadeCodes = formShades.map((_, at) => (Array.isArray(draft.codes) && typeof draft.codes[at] === "string" ? draft.codes[at] : ""));
+    fieldOrigins = cleanOrigins(draft.origins);
+    ingredientsRaw = draft.raw && typeof draft.raw.text === "string" ? { text: draft.raw.text.slice(0, 4000), from: String(draft.raw.from || "").slice(0, 120) } : { text: "", from: "" };
+    paintOrigins(); paintRawIngredients();
     renderShadeEditor(); showOtherTypeBox(); showBrandHint(); showIngredientSummary(); showBarcodeCheck(); showNameClash(); paintCounters();
 }
 
@@ -2223,6 +2373,8 @@ async function saveBrand(event) {
     const duplicate = everyBrand.find((b) => b.id !== editingBrandId && [b.name, ...b.aliases].some((known) => compactName(known) === compactName(name)));
     if (duplicate) { setFormError(form, duplicate.binned ? `"${duplicate.name}" is in the Recycle bin. Restore it from there instead.` : `"${duplicate.name}" is already in the inventory.`); el("brandNameInput").focus(); return; }
     setFormError(form, "");
+    const close = editingBrandId ? [] : similarBrands(name, everyBrand);
+    if (close.length && !(await askConfirm({ title: "A brand with a close name is listed", message: `Is "${name}" a different brand from these? Brands are never merged by themselves: if it is the same brand, cancel and add its products to the listed one.`, items: close.map((x) => `${x.brand.name} (${x.brand.status})`), confirmLabel: "It is a different brand", cancelLabel: "Cancel" }))) return;
 
     setBusy(saveButton, true, "Saving...");
     try {
@@ -2363,6 +2515,10 @@ function openProductForm(product, brandId) {
     sourceEditor.paint();
     pendingBrandName = "";
     quickFill.reset();
+    fieldOrigins = product ? { ...product.fieldOrigins } : {};
+    ingredientsRaw = product && product.ingredientsRaw ? { text: product.ingredientsRaw, from: product.ingredientsRawFrom } : { text: "", from: "" };
+    paintOrigins();
+    paintRawIngredients();
     el("productQuickFill").hidden = !!product && !product.needsReview;            // also for a product waiting for review: complete it from the sources
     showNameClash();
     showDraftNote(product);
@@ -2414,15 +2570,17 @@ function fillProductFromQuick(found, { partial } = {}) {
     if (has("imageUrl") && !el("productImageInput").value) el("productImageInput").value = found.imageUrl;
     if (has("sources")) { assistedProductSources = Array.from(new Set(assistedProductSources.concat(found.sources))).slice(0, 10); sourceEditor.paint(); }
     showScopeHint();
+    showNameClash();                 // the name or barcode may now match a listed product (or a variant of one)
     paintCounters();
 }
 
 
 function showReviewNote(note, entry, kind) {
     if (!entry || !entry.needsReview) { note.textContent = ""; note.style.display = "none"; return; }
-    const origin = originLabel(entry.source) || "Added automatically";
+    const origin = originLabel(entry.source) || (entry.source ? "Added automatically" : "Saved as Pending by an admin");
+    const sentBack = entry.reviewState === REVIEW_CHANGES && entry.reviewNote ? `<b>Sent back for changes:</b> ${escapeHtml(entry.reviewNote)}<br>` : "";
     const links = sourceLinks(entry.sources || [], websiteOfEntry(entry));
-    note.innerHTML = `<b>${escapeHtml(origin)}.</b> Nobody has checked this ${kind} yet. `
+    note.innerHTML = sentBack + `<b>${escapeHtml(origin)}.</b> Nobody has approved this ${kind} yet. `
         + (kind === "product" ? "Compare the name, brand, type and ingredient list with the packaging, " : "Check the name and category, ")
         + "set Status to <b>Active</b> if the app should use it, then save: <b>saving marks it as reviewed</b>."
         + (links ? "<br>Source: " + links + sourceGuideHtml() : "");
@@ -2438,8 +2596,11 @@ function showBrandHint() {
     const brand = brands.find((b) => b.id === el("productBrandInput").value);
     const hint = el("productBrandHint");
     if (el("productBrandInput").value === NEW_BRAND && pendingBrandName) {
-        hint.textContent = `"${pendingBrandName}" is not listed yet. Saving the product adds the brand too (Active, market Global); edit the brand later for its logo and website.`;
-        hint.className = "field-hint";
+        const close = similarBrands(pendingBrandName, everyBrand);
+        hint.textContent = close.length
+            ? `"${pendingBrandName}" is not listed, but ${close.map((x) => `"${x.brand.name}"`).join(" or ")} is close. If it is the same brand, choose it in the list instead; otherwise saving adds "${pendingBrandName}" as a new brand.`
+            : `"${pendingBrandName}" is not listed yet. Saving the product adds the brand too (market Global); edit the brand later for its logo and website.`;
+        hint.className = close.length ? "field-hint warn" : "field-hint";
     } else if (brand && brand.status !== "Active") {
         hint.textContent = `This brand is ${brand.status}. The app hides its products until the brand is Active.`;
         hint.className = "field-hint warn";
@@ -2465,6 +2626,8 @@ function showIngredientSummary() {
         text += ` ${missing.length} not in the Ingredient Curator yet: ${shown}. The app may still know them from its built-in list; add them to the Curator to control the wording.`;
     }
     if (names.length < 4) text += " The app needs at least 4 ingredients to recognise a scan as this product.";
+    const repeats = repeatedNames(el("productIngredientsInput").value);
+    if (repeats.length) text += ` Listed twice: ${repeats.slice(0, 5).join(", ")}${repeats.length > 5 ? " and more" : ""}. Each is kept once; check the pack in case one is a different ingredient.`;
     hint.textContent = text;
     hint.className = missing.length > 0 ? "field-hint warn" : "field-hint";
 }
@@ -2684,27 +2847,39 @@ async function saveProduct(event) {
     const ingredients = toList(el("productIngredientsInput").value);
     const minAgeText = el("productMinAgeInput").value.trim();
     const minAge = toWholeNumber(minAgeText);
-    const status = el("productStatusInput").value;
+    const statusChosen = el("productStatusInput").value;
     const { shades, codes: shadeCodes } = pairShades(formShades, formShadeCodes, MAX_SHADES);
     const imageUrl = cleanLink(el("productImageInput").value), fdaNumber = cleanFdaNumber(el("productFdaInput").value);
-    const barcodeText = el("productBarcodeInput").value.trim(), barcode = barcodeText ? barcodeKey(barcodeText) : "";
+    // the barcode is kept as text with its leading zeros; two barcodes are compared without them (barcodeKey)
+    const barcodeText = el("productBarcodeInput").value.trim(), barcode = barcodeText ? barcodeDigits(barcodeText) : "";
 
     if (imageUrl === null) { setFormError(form, "The photo link must be a web address that starts with https://"); el("productImageInput").focus(); return; }
     if (fdaNumber === null) { setFormError(form, "The FDA registration number may have letters, digits and . , # ( ) _ - / only (at most 40 characters)."); el("productFdaInput").focus(); return; }
     if (barcodeText && !barcode) { setFormError(form, "A barcode is 6 to 14 digits (the number under the bars). Leave it empty if you do not have it."); el("productBarcodeInput").focus(); return; }
-    const sameCode = barcode ? everyProduct.find((p) => p.id !== editingProductId && !p.binned && barcodeKey(p.barcode) === barcode) : null;
+    const sameCode = barcode ? everyProduct.find((p) => p.id !== editingProductId && !p.binned && barcodeKey(p.barcode) === barcodeKey(barcode)) : null;
     if (sameCode) { setFormError(form, `The barcode ${barcode} is already on "${sameCode.name}" of ${brandNameOf(sameCode)}. A barcode belongs to one product.`); el("productBarcodeInput").focus(); return; }
     if (!name) { setFormError(form, "Type the product name."); el("productNameInput").focus(); return; }
     if (!brand) { setFormError(form, "Choose the brand."); el("productBrandInput").focus(); return; }
     if (!cosmeticType) { setFormError(form, "Choose the cosmetic type."); el("productTypeInput").focus(); return; }
     const scope = productScope(cosmeticType, name);
     if (scope === "skincare" || scope === "out") { setFormError(form, `GlowUp lists make-up only. This reads like ${scopeWords(cosmeticType, name)}, so it cannot be saved. If that is wrong, check the name and the kind.`); el("productTypeInput").focus(); return; }
-    if (scope === "unclear" && status === "Active") { setFormError(form, `The app cannot tell that this is make-up: ${scopeWords(cosmeticType, name)}. Set Status to Pending to keep it for later, or correct the name or the kind.`); el("productStatusInput").focus(); return; }
+    if (scope === "unclear" && statusChosen === "Active") { setFormError(form, `The app cannot tell that this is make-up: ${scopeWords(cosmeticType, name)}. Set Status to Pending to keep it for later, or correct the name or the kind.`); el("productStatusInput").focus(); return; }
     if (ingredients.length === 0) { setFormError(form, "Paste the ingredient list. The app cannot check or recommend a product without it."); el("productIngredientsInput").focus(); return; }
     if (minAgeText !== "" && (!/^\d+$/.test(minAgeText) || minAge > 99)) { setFormError(form, "Minimum age must be a whole number from 0 to 99."); el("productMinAgeInput").focus(); return; }
     const duplicate = everyProduct.find((p) => p.id !== editingProductId && p.brandId === brand.id && [p.name, ...p.aliases].some((known) => compactName(known) === compactName(name)));
     if (duplicate) { setFormError(form, duplicate.binned ? `"${duplicate.name}" of ${brand.name} is in the Recycle bin. Restore it from there instead.` : `${brand.name} already has a product named "${duplicate.name}".`); el("productNameInput").focus(); return; }
     setFormError(form, "");
+
+    // values from a look-up, a photo or the phone that nobody checked: an Active save asks first (Pending keeps them waiting)
+    let status = statusChosen;
+    const left = uncheckedFields(fieldOrigins);
+    if (status === "Active" && left.length > 0) {
+        const answer = await askUncheckedSave(left);
+        if (!answer) return;
+        if (answer === "checked") fieldOrigins = markChecked(fieldOrigins, left.map((f) => f.key));
+        else status = "Pending";
+        paintOrigins();
+    }
 
 
     const sources = assistedProductSources.slice();
@@ -2712,6 +2887,8 @@ async function saveProduct(event) {
     const data = {
         name, brandId: brand.id, brandName: brand.name, cosmeticType, description,
         ingredients, shades, minAge, status, imageUrl, fdaNumber, barcode,
+        fieldOrigins: originsForSave(),
+        ingredientsRaw: ingredientsRaw.text, ingredientsRawFrom: ingredientsRaw.text ? ingredientsRaw.from : "",
 
         shadeCodes: shadeCodes.some(Boolean) ? shadeCodes : [],
 
@@ -2723,7 +2900,15 @@ async function saveProduct(event) {
     };
     if (sources.length > 0 || editingProductId) data.sources = Array.from(new Set(sources)).slice(0, 10);
     const before = products.find((p) => p.id === editingProductId);
-    if (before && before.needsReview) { data.reviewed = true; data.reviewedAt = serverTimestamp(); }
+    // Active = approved by the admin who saves it. Pending = a submission waiting in "Waiting for review" (also a new one),
+    // so another admin can approve it, send it back or reject it. A product sent back and saved again is "resubmitted".
+    if (status === "Active" && (!before || before.needsReview)) {
+        data.reviewed = true; data.reviewedAt = serverTimestamp(); data.reviewedBy = auth.currentUser ? auth.currentUser.uid : "";
+        if (before && before.reviewState) data.reviewState = "";
+    } else if (status === "Pending" && (!before || before.needsReview || before.status !== "Pending")) {
+        data.reviewed = false;
+        if (before && before.reviewState === REVIEW_CHANGES) data.reviewState = "resubmitted";
+    }
 
     setBusy(saveButton, true, "Saving...");
     try {
@@ -2731,7 +2916,8 @@ async function saveProduct(event) {
             const twin = everyBrand.find((b) => [b.name, ...(b.aliases || [])].some((known) => compactName(known) === compactName(newBrand)));
             if (twin && twin.binned) throw new Error(`"${twin.name}" is in the Recycle bin. Restore the brand from there first.`);
             const madeBrand = twin ? { id: twin.id } : await addDoc(collection(db, "brands"), {
-                name: newBrand, category: BRAND_CATEGORY, market: "Global", status: "Active", logoUrl: "", imageUrl: "",
+                // a brand made from inside the product form follows the product: Active only when the product is approved now
+                name: newBrand, category: BRAND_CATEGORY, market: "Global", status: status === "Active" ? "Active" : "Pending", reviewed: status === "Active", logoUrl: "", imageUrl: "",
                 ...websiteFields("", null), scans: 0, createdAt: serverTimestamp()
             });
             brand = { id: madeBrand.id, name: newBrand };
@@ -2740,11 +2926,11 @@ async function saveProduct(event) {
         }
         if (editingProductId) {
             await updateDoc(doc(db, "products", editingProductId), data);
-            notify("Product saved.", "ok");
+            notify(status === "Pending" ? "Product saved as Pending: it waits for review." : "Product saved.", "ok");
         } else {
             const folder = org.view.kind === "folder" ? org.view.name : "";
             const made = await addDoc(collection(db, "products"), { ...data, scans: 0, folder, createdAt: serverTimestamp() });
-            notify(folder ? `Product added to "${folder}".` : "Product added.", "ok");
+            notify((status === "Pending" ? "Product saved as Pending: it is in Waiting for review and the app does not show it yet." : "Product added.") + (folder ? ` Folder "${folder}".` : ""), status === "Pending" ? "info" : "ok");
         }
         if (!editingProductId) clearDraft();
         productModal.close();
@@ -2793,13 +2979,16 @@ async function approveProduct(product, button) {
 
 
     let question = `Approve "${product.name}"?\n\nIt becomes Active: the app can recognise it in scans and recommend it to the users it suits. Check its name, type and ingredient list first.`;
+    const unchecked = uncheckedFields(product.fieldOrigins);
+    if (unchecked.length) question += `\n\nNot checked yet (from a look-up, a photo or a file): ${unchecked.map((f) => f.label.toLowerCase()).join(", ")}. Approving marks them as checked by you.`;
     if (brand.status !== "Active") question += `\n\nIts brand "${brand.name}" is ${brand.status} and is NOT approved by this. The app hides the product until the brand is approved too.`;
     if (!(await sure(question, "Approve", false))) return;
 
     button.disabled = true;
     try {
-        await updateDoc(doc(db, "products", product.id), approval());
-        Object.assign(product, { status: "Active", rawStatus: "Active", reviewed: true, needsReview: false });
+        const checked = markChecked(product.fieldOrigins, Object.keys(product.fieldOrigins));
+        await updateDoc(doc(db, "products", product.id), { ...approval(), fieldOrigins: checked, reviewState: "" });
+        Object.assign(product, { status: "Active", rawStatus: "Active", reviewed: true, needsReview: false, fieldOrigins: checked, reviewState: "" });
         afterChange();
         if (brand.status !== "Active") notify(`Product approved. ${BRAND_HINT} ("${brand.name}" is ${brand.status}.)`, "info");
         else notify("Product approved.", "ok");
@@ -2857,6 +3046,60 @@ async function approveWithBrand(product, button) {
 
 
 
+// "Send back": the product stays Pending and waits; the note says what to correct. Whoever edits and saves it resubmits it.
+// "Reject": a reason is required; the product goes to the Recycle bin with that reason (restorable, and in the activity log).
+function askReason({ title, intro, label, confirmLabel, danger }) {
+    return new Promise((resolve) => {
+        const finish = (answer) => { frame.close(); resolve(answer); };
+        const frame = dialogFrame(title, () => finish(null));
+        frame.box.insertAdjacentHTML("beforeend", `<p class="modal-intro"></p>
+            <label class="small" for="reviewReasonInput"></label>
+            <textarea id="reviewReasonInput" rows="3" maxlength="500"></textarea>
+            <p class="field-hint" role="alert"></p>
+            <div class="modal-actions"><button type="button" class="cancel-btn" data-act="cancel">Cancel</button><button type="button" class="${danger ? "btn danger solid" : "save-btn"}" data-act="ok"></button></div>`);
+        frame.box.querySelector(".modal-intro").textContent = intro;
+        frame.box.querySelector("label").textContent = label;
+        frame.box.querySelector('[data-act="ok"]').textContent = confirmLabel;
+        const input = frame.box.querySelector("textarea"), error = frame.box.querySelector('[role="alert"]');
+        frame.box.querySelector('[data-act="cancel"]').addEventListener("click", () => finish(null));
+        frame.box.querySelector('[data-act="ok"]').addEventListener("click", () => {
+            const reason = reviewReason(input.value);
+            if (!reason) { error.textContent = "Write the reason (5 to 500 characters)."; input.focus(); return; }
+            finish(reason);
+        });
+        setTimeout(() => input.focus(), 0);
+    });
+}
+async function sendBackProduct(product, button) {
+    const reason = await askReason({ title: `Send back "${product.name}"`, intro: "It stays Pending and the app does not show it. The note is shown to whoever opens it next, so they can correct it and save it again.", label: "What should be corrected?", confirmLabel: "Send back" });
+    if (!reason) return;
+    button.disabled = true;
+    try {
+        await updateDoc(doc(db, "products", product.id), { status: "Pending", reviewed: false, reviewState: REVIEW_CHANGES, reviewNote: reason, reviewNoteBy: auth.currentUser ? auth.currentUser.uid : "", reviewNoteAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        notify("Sent back with your note. It stays in Waiting for review.", "ok");
+        await loadInventory();
+    } catch (error) {
+        notify("It was not sent back. " + describeError(error), "error");
+        button.disabled = false;
+    }
+}
+async function rejectProduct(product, button) {
+    const reason = await askReason({ title: `Reject "${product.name}"`, intro: "It goes to the Recycle bin with your reason, so the decision stays on record. It can be restored from there.", label: "Why is it rejected?", confirmLabel: "Reject", danger: true });
+    if (!reason) return;
+    button.disabled = true;
+    try {
+        await updateDoc(doc(db, "products", product.id), {
+            binned: true, binnedAt: serverTimestamp(), statusBeforeBin: product.status, status: "Inactive", binnedWith: "", binnedReason: "Rejected: " + reason,
+            reviewed: false, reviewState: "rejected", reviewNote: reason, reviewNoteBy: auth.currentUser ? auth.currentUser.uid : "", reviewNoteAt: serverTimestamp(), updatedAt: serverTimestamp()
+        });
+        notify("Rejected. It is in the Recycle bin with your reason.", "ok");
+        await loadInventory();
+    } catch (error) {
+        notify("It was not rejected. " + describeError(error), "error");
+        button.disabled = false;
+    }
+}
+
 function toggleBrand(id) {
     if (closed.has(id)) closed.delete(id); else closed.add(id);
     renderInventory();
@@ -2892,6 +3135,8 @@ function onTableClick(event) {
     else if (act === "bin-brand" && brand) org.toBin(["b:" + brand.id]);
     else if (act === "approve-product" && product) approveProduct(product, button);
     else if (act === "approve-with-brand" && product) approveWithBrand(product, button);
+    else if (act === "send-back-product" && product) sendBackProduct(product, button);
+    else if (act === "reject-product" && product) rejectProduct(product, button);
     else if (act === "edit-product" && product) openProductForm(product, null);
     else if (act === "folder-product" && product) org.chooseFolder(button, ["p:" + product.id]);
     else if (act === "bin-product" && product) org.toBin(["p:" + product.id]);

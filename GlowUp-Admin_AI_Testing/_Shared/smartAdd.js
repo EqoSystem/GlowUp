@@ -17,13 +17,14 @@ export const FDA_PORTAL = "https://verification.fda.gov.ph";
 
 const clean = (value) => String(value == null ? "" : value).replace(/\s+/g, " ").trim();
 
-// What the admin typed: a barcode (6 to 14 digits, spaces allowed) or words.
+// What the admin typed: a barcode (6 to 14 digits, spaces allowed) or words. A barcode keeps its leading zeros in "value"
+// (Open Beauty Facts stores 0-led codes with the zeros); "key" is the zero-less form used to compare two barcodes.
 export function queryKind(text) {
     const typed = clean(text);
-    if (!typed) return { kind: "empty", value: "" };
+    if (!typed) return { kind: "empty", value: "", key: "" };
     const digits = typed.replace(/[\s-]/g, "");
-    if (/^\d{6,14}$/.test(digits)) return { kind: "barcode", value: barcodeKey(digits) || digits };
-    return { kind: "name", value: typed };
+    if (/^\d{6,14}$/.test(digits) && barcodeKey(digits)) return { kind: "barcode", value: digits, key: barcodeKey(digits) };
+    return { kind: "name", value: typed, key: "" };
 }
 
 // A list as printed ("Aqua, Glycerin, ...") or a whole label photo read by OCR: the ingredient names in order.
@@ -55,7 +56,8 @@ export function fromOpenBeautyFacts(p) {
     return {
         origin: "openbeautyfacts", originLabel: "Open Beauty Facts",
         name, brand, cosmeticType: typeFor(name, categories), ingredients,
-        barcode: barcodeKey(code) || "", fdaNumber: "", imageUrl: image,
+        ingredientsText: clean(p.ingredients_text_en || p.ingredients_text).slice(0, 4000),
+        barcode: barcodeKey(code) ? code.replace(/\D/g, "") : "", fdaNumber: "", imageUrl: image,
         sources: code ? [offPageUrl(code)] : [], note: ingredients.length ? "" : "No ingredient list on Open Beauty Facts."
     };
 }
@@ -68,6 +70,7 @@ export function fromFdaCatalogue(entry) {
         origin: "fda", originLabel: "FDA Philippines list",
         name, brand, cosmeticType: typeFor(name, [entry.type || ""]) || (makeupType(entry.type || "", name) || ""),
         ingredients: (entry.ingredients || []).map(clean).filter(Boolean),
+        ingredientsText: (entry.ingredients || []).map(clean).filter(Boolean).join(", ").slice(0, 4000),
         barcode: "", fdaNumber: clean(entry.fdaNumber), imageUrl: "",
         sources: [FDA_PORTAL + "/"], note: entry.validUntil ? `Notified until ${clean(entry.validUntil)}.` : ""
     };
@@ -93,11 +96,20 @@ export function searchCatalogue(typed, catalogue, most = 5) {
 }
 
 // Fills the gaps of the best candidate from the others that are the same product (same barcode, or same brand and a close name),
-// so a barcode hit without a list still gets the FDA list and number. The sources of every part used are kept.
+// so a barcode hit without a list still gets the FDA list and number. The sources of every part used are kept, and so is
+// which source gave each field (fieldFrom) and where two sources disagree (conflicts): the admin sees both, nothing is chosen silently.
+const MERGED_FIELDS = ["name", "brand", "cosmeticType", "barcode", "fdaNumber", "imageUrl", "ingredients"];
+function sameField(key, a, b) {
+    if (key === "barcode") return barcodeKey(a) === barcodeKey(b);
+    if (key === "ingredients") return a.length === b.length && a.every((n, at) => compactName(n) === compactName(b[at]));
+    if (key === "imageUrl") return a === b;
+    return compactName(a) === compactName(b);
+}
+const hasField = (v) => (Array.isArray(v) ? v.length > 0 : !!v);
 export function mergeCandidates(list) {
     const items = (list || []).filter(Boolean);
     if (items.length === 0) return [];
-    const same = (a, b) => (a.barcode && b.barcode && a.barcode === b.barcode)
+    const same = (a, b) => (barcodeKey(a.barcode) && barcodeKey(a.barcode) === barcodeKey(b.barcode))
         || (compactName(a.brand) && compactName(a.brand) === compactName(b.brand) && similarity(normalizeName(a.name), normalizeName(b.name)) >= 0.85);
     const groups = [];
     for (const item of items) {
@@ -105,10 +117,19 @@ export function mergeCandidates(list) {
         if (group) group.push(item); else groups.push([item]);
     }
     return groups.map((group) => {
-        const out = { ...group[0], sources: [], origins: [] };
+        const out = { ...group[0], sources: [], origins: [], fieldFrom: {}, conflicts: [] };
         for (const part of group) {
-            for (const key of ["brand", "cosmeticType", "barcode", "fdaNumber", "imageUrl"]) if (!out[key] && part[key]) out[key] = part[key];
-            if ((!out.ingredients || out.ingredients.length === 0) && part.ingredients && part.ingredients.length) out.ingredients = part.ingredients.slice();
+            for (const key of MERGED_FIELDS) {
+                const theirs = part[key];
+                if (!hasField(theirs)) continue;
+                if (!hasField(out[key])) { out[key] = Array.isArray(theirs) ? theirs.slice() : theirs; out.fieldFrom[key] = part.originLabel; continue; }
+                if (!out.fieldFrom[key]) out.fieldFrom[key] = part.originLabel;
+                if (part !== group[0] && !sameField(key, out[key], theirs)) {
+                    let c = out.conflicts.find((x) => x.key === key);
+                    if (!c) { c = { key, values: [{ from: out.fieldFrom[key], value: Array.isArray(out[key]) ? out[key].join(", ") : String(out[key]) }] }; out.conflicts.push(c); }
+                    c.values.push({ from: part.originLabel, value: Array.isArray(theirs) ? theirs.join(", ") : String(theirs) });
+                }
+            }
             out.sources.push(...(part.sources || []));
             out.origins.push(part.originLabel);
         }

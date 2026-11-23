@@ -63,8 +63,13 @@ The admin website and the mobile app use the same Firebase project (`glowup-admi
 | `status` | text | `Active`, `Pending` or `Inactive`. |
 | `recommendable` | yes/no | Admin-calculated shared completeness flag for Alternatives and Recommended for you. The app still rechecks the product, brand and ingredient records at display time. |
 | `scans` | number | The app adds 1 each time a scan is recognised as this product. |
-| `source`, `reviewed` | text, yes/no | File imports use `document-import` and `false`; they are saved as Pending until checked. |
+| `source`, `reviewed` | text, yes/no | File imports use `document-import` and `false`; they are saved as Pending until checked. `reviewed: false` = waiting in "Waiting for review" (since 23 Nov 2026 also a product an admin saves as Pending). Saving or approving it as Active sets `reviewed`, `reviewedBy`, `reviewedAt`. |
 | `aiAssistModel` | text | Model used for an admin-reviewed ingredient-list suggestion. Existing ingredient lists are not overwritten. |
+| `barcode` | text | Digits only, kept as text WITH leading zeros (since 23 Nov 2026; older entries may lack the zeros). Two barcodes are compared without the zeros (`barcodeKey` on the site, `ProductIndex.BarcodeKey` in the app). |
+| `fdaNumber` | text | The FDA Philippines notification number exactly as the source shows it. Never filled from a barcode or a guess. |
+| `fieldOrigins` | map | Since 23 Nov 2026. Where each form value came from: key = `name`, `brand`, `cosmeticType`, `imageUrl`, `barcode`, `fdaNumber` or `ingredients`; value = `{ state, from, method, atUnix }`. `state`: `detected` (from a look-up, OCR, the phone or a file; nobody checked it), `review` (detected but sources disagree, or a weak match / hard-to-read photo), `verified` (an admin checked it against the pack or source), `typed` (an admin typed it). A missing key = no value. Written by the website only (`_Shared/capture.js`); the app does not read it. |
+| `ingredientsRaw`, `ingredientsRawFrom` | text | Optional. The ingredient statement exactly as the source or the photo gave it (at most 4000 characters) and where it came from. Evidence only: the app uses `ingredients`. |
+| `reviewState`, `reviewNote`, `reviewNoteBy`, `reviewNoteAt` | text, text, uid, time | Review decisions on a Pending product: `changes` (sent back with a note; stays Pending), `resubmitted` (saved again after that), `rejected` (moved to the Recycle bin; `binnedReason` starts "Rejected:"), `""` after approval. |
 
 ### Recommendation eligibility
 

@@ -269,7 +269,7 @@
 
                     <section class="ing-section qf-section" id="productQuickFill" aria-labelledby="productQuickFillTitle">
                         <h4 class="ing-section-title" id="productQuickFillTitle">Quick fill</h4>
-                        <p class="field-hint">Type the product name or the barcode, or scan it. The form fills itself from the FDA Philippines list and Open Beauty Facts. Check it, then save.</p>
+                        <p class="field-hint">Type the product name or the barcode, scan it, or read photos of the pack. The form fills itself from the FDA Philippines list and Open Beauty Facts. Filled values are marked Detected until you check them against the pack.</p>
                         <div class="qf-bar">
                             <input type="text" id="productQuickInput" maxlength="120" placeholder="Product name or barcode, e.g. Superstay Matte Ink or 3600531652300" autocomplete="off" aria-label="Product name or barcode to look up">
                             <button type="button" class="btn primary" id="productQuickFind">Find</button>
@@ -277,10 +277,12 @@
                         <div class="qf-tools">
                             <button type="button" class="btn" id="productQuickScan"><i data-icon="barcode"></i>Scan barcode</button>
                             <button type="button" class="btn" id="productQuickLabel"><i data-icon="camera"></i>Photo of ingredient list</button>
+                            <button type="button" class="btn" id="productQuickPhotos"><i data-icon="image"></i>Photos from gallery</button>
                             <button type="button" class="btn" id="productQuickPhone"><i data-icon="phone"></i>Use my phone</button>
                         </div>
                         <p class="field-hint qf-status" id="productQuickStatus" role="status" aria-live="polite"></p>
                         <div class="qf-results" id="productQuickResults"></div>
+                        <p class="field-hint warn" id="productOriginNote" role="status" aria-live="polite" hidden></p>
                     </section>
 
                     <section class="ing-section" id="productSecBasics" aria-labelledby="productSecBasicsTitle">
@@ -290,6 +292,7 @@
                                 <div class="label-row"><label for="productNameInput">Product Name <span class="required" aria-hidden="true">*</span></label></div>
                                 <input type="text" id="productNameInput" maxlength="100" placeholder="e.g., Superstay Matte Ink Liquid Lipstick" autocomplete="off" aria-required="true" aria-describedby="productNameClash">
                                 <p class="field-hint warn" id="productNameClash" role="status" aria-live="polite" hidden></p>
+                                <div class="field-hint similar-note" id="productSimilar" role="status" aria-live="polite" hidden></div>
                                 <p class="field-hint" id="productDraftNote" role="status" aria-live="polite" hidden></p>
                             </div>
                             <div class="field half">
@@ -344,6 +347,7 @@
                                 <div id="productIngredientPills" class="ing-pills" aria-live="polite"></div>
                                 <textarea id="productIngredientsInput" rows="3" placeholder="Or paste the whole list from the packaging, e.g. Dimethicone, Isododecane, Mica, Parfum" aria-describedby="productIngredientsHint" aria-required="true" style="margin-top: 8px;"></textarea>
                                 <div class="hint-row"><p class="field-hint" id="productIngredientsHint">Search above to pick from the library, or paste the list here, separated by commas (or one on each line).</p></div>
+                                <details class="raw-ingredients" id="productIngredientsRaw" hidden><summary id="productIngredientsRawFrom">As given by the source</summary><p class="raw-text" id="productIngredientsRawText"></p><p class="field-hint">Kept exactly as read, so the list above can be compared with it. Text read from a photo can have misread letters.</p></details>
                             </div>
                             <div class="field full" role="group" aria-labelledby="productShadesLabel">
                                 <div class="label-row"><span class="label-text" id="productShadesLabel">Shades</span></div>
@@ -369,6 +373,7 @@
                                 <input type="number" id="productMinAgeInput" min="0" max="99" step="1" placeholder="0 = no age limit" aria-describedby="productMinAgeHint">
                             </div>
                             <p class="field-hint full" id="productMinAgeHint">The app does not recommend the product to younger users, and warns them if they scan it.</p>
+                            <p class="field-hint full" id="productStatusHint"><b>Active</b>: approved, the app shows it. <b>Pending</b>: saved for review; it waits in Waiting for review and the app does not show it. <b>Inactive</b>: switched off, kept in the inventory.</p>
                         </div>
                     </section>
                 </div>

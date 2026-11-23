@@ -51,7 +51,17 @@ try {
         ok(filled.type === "Lipstick" || filled.type === "Lip Tint" || filled.type !== "", `${label}: the kind is chosen (${filled.type})`);
         ok(/Isododecane, Dimethicone, Mica, CI 77491, Tocopherol/.test(filled.list), `${label}: the ingredient list is filled`);
         ok(filled.barcode === "4800000000017", `${label}: the barcode is filled`);
-        ok(/Filled from Open Beauty Facts/.test(filled.status), `${label}: the status says where it came from (${filled.status.slice(0, 80)})`);
+        ok(/Filled .* from Open Beauty Facts/.test(filled.status), `${label}: the status says where it came from (${filled.status.slice(0, 80)})`);
+        const chips = await page.evaluate(() => Array.from(document.querySelectorAll("#productForm .origin-chip")).map((c) => c.textContent));
+        ok(chips.length >= 4 && chips.every((t) => /Detected · Open Beauty Facts/.test(t)), `${label}: each filled field is marked Detected with its source (${chips.length})`);
+        ok(await page.isVisible("#productOriginNote"), `${label}: the form lists the values not checked yet`);
+        ok(await page.isVisible("#productIngredientsRaw"), `${label}: the ingredient text as the source gave it is kept`);
+        await page.locator('[data-origin-check="name"]').click();
+        ok(/Checked/.test(await page.locator("#productForm .origin-chip").first().textContent()), `${label}: Mark checked turns the name to Checked`);
+        await page.fill("#productDescInput", "typed");
+        await page.fill("#productNameInput", "Velvet Matte Lip Cream 2");
+        ok(!/Detected/.test((await page.evaluate(() => { const r = document.getElementById("productNameInput").closest(".field").querySelector(".origin-chip"); return r ? r.textContent : ""; }))), `${label}: a value changed by hand is no longer Detected`);
+        await page.fill("#productNameInput", "Velvet Matte Lip Cream");
 
         // an unknown barcode goes into the Barcode box and says so
         await page.fill("#productQuickInput", "4800000000994");
@@ -65,8 +75,23 @@ try {
         await page.waitForSelector(".qf-hit", { timeout: 8000 }).catch(() => {});
         const hits = await page.locator(".qf-hit").count();
         ok(hits >= 1, `${label}: the FDA list finds the product by name (${hits})`);
+        ok((await page.evaluate(() => document.getElementById("productNameInput").value)) === "Velvet Matte Lip Cream", `${label}: a filled form is NOT overwritten by a new search`);
+        await page.locator(".qf-hit [data-fill]").first().click();
+        await page.waitForSelector(".qf-compare", { timeout: 4000 }).catch(() => {});
+        const compare = await page.evaluate(() => {
+            const box = document.querySelector(".qf-compare");
+            if (!box) return null;
+            const rows = Array.from(box.querySelectorAll("tbody tr")).map((tr) => ({ field: tr.querySelector("th").textContent, ticked: tr.querySelector("input").checked, conflict: tr.classList.contains("conflict") }));
+            return { rows, sideways: document.documentElement.scrollWidth > window.innerWidth + 1 };
+        });
+        ok(!!compare, `${label}: a filled form gets the comparison window`);
+        ok(compare && compare.rows.some((r) => /Product name/.test(r.field) && r.conflict && !r.ticked), `${label}: a different name already in the form is not ticked`);
+        ok(compare && compare.rows.some((r) => /FDA/.test(r.field) && r.ticked), `${label}: the empty FDA number is ticked`);
+        ok(compare && !compare.sideways, `${label}: the comparison window fits the screen`);
+        await page.locator('.qf-compare [data-act="ok"]').click();
         const fda = await page.evaluate(() => document.getElementById("productFdaInput").value);
         ok(/^NN-/.test(fda), `${label}: the FDA number is filled (${fda})`);
+        ok((await page.evaluate(() => document.getElementById("productNameInput").value)) === "Velvet Matte Lip Cream", `${label}: the unticked name stayed`);
 
         // empty search
         await page.fill("#productQuickInput", "");

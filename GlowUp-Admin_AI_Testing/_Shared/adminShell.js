@@ -39,6 +39,7 @@ const ICONS = {
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
     flag: '<path d="M5 21V4"/><path d="M5 4h11l-2 4 2 4H5"/>',
     x: '<path d="M6 6l12 12M18 6L6 18"/>',
+    image: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/>',
     camera: '<path d="M4 8h3.2l1.8-2.5h6l1.8 2.5H20v11H4z"/><circle cx="12" cy="13.2" r="3.6"/>',
     barcode: '<path d="M4 6v12M7 6v12M10.5 6v12M13 6v12M17 6v12M20 6v12"/>',
     phone: '<rect x="7" y="2.5" width="10" height="19" rx="2.2"/><path d="M11 18.5h2"/>',

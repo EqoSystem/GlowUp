@@ -4,7 +4,7 @@
 import { dialogFrame, icon } from "./adminShell.js";
 import {
     queryKind, offProductUrl, offSearchUrl, fromOpenBeautyFacts, searchCatalogue, mergeCandidates,
-    pubchemSynonymsUrl, pubchemDescriptionUrl, aliasesFromPubchem, descriptionFromPubchem, ingredientsFromText
+    pubchemSynonymsUrl, pubchemDescriptionUrl, aliasesFromPubchem, descriptionFromPubchem, ingredientsFromText, scoreCandidate
 } from "./smartAdd.js";
 
 const ZXING = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js";
@@ -142,9 +142,27 @@ export function scanBarcode(options = {}) {
     });
 }
 
-// A photo of the ingredient list read with text recognition (OCR), returned as the ingredient names in printed order.
+// A photo of the ingredient list read with text recognition (OCR), returned as the ingredient names in printed order
+// and the raw text exactly as read (kept, so the admin can compare the list with what the photo said).
 export async function readLabelPhoto(onProgress = () => {}) {
     const file = await pickPhoto(true);
+    if (!file) return null;
+    return readTextFromFile(file, onProgress);
+}
+
+// Photos chosen from the gallery or the computer's files (several at once, no camera).
+export function pickPhotos() {
+    return new Promise((resolve) => {
+        const input = document.createElement("input");
+        input.type = "file"; input.accept = "image/*"; input.multiple = true;
+        input.addEventListener("change", () => resolve(input.files ? Array.from(input.files).slice(0, 8) : []), { once: true });
+        input.addEventListener("cancel", () => resolve([]), { once: true });
+        input.click();
+    });
+}
+
+// Text recognition on one image file: { text, ingredients, confidence } (confidence 0 to 100, from the reader).
+export async function readTextFromFile(file, onProgress = () => {}) {
     if (!file) return null;
     if (!/^image\//.test(file.type)) throw new Error("Choose a photo (JPEG or PNG).");
     if (file.size > MAX_PHOTO_BYTES) throw new Error("The photo is larger than 12 MB. Take it again at a lower size.");
@@ -156,7 +174,7 @@ export async function readLabelPhoto(onProgress = () => {}) {
     try {
         const { data } = await worker.recognize(file);
         const text = (data && data.text) || "";
-        return { text, ingredients: ingredientsFromText(text) };
+        return { text, ingredients: ingredientsFromText(text), confidence: Math.round(Number(data && data.confidence) || 0) };
     } finally { await worker.terminate(); }
 }
 
@@ -174,9 +192,12 @@ export async function lookupProduct(text) {
     const list = await loadCatalogue();
     const found = [];
     if (query.kind === "barcode") {
-        const json = await getJson(offProductUrl(query.value));
+        let json = await getJson(offProductUrl(query.value));
+        // a 12-digit UPC-A code is often stored as the 13-digit EAN form (a leading 0): ask once more in that form
+        if (!(json && json.status === 1) && query.value.length === 12) json = await getJson(offProductUrl("0" + query.value));
         const hit = json && json.status === 1 ? fromOpenBeautyFacts(json.product) : null;
         if (hit) {
+            hit.score = 1;                                                  // the barcode itself matched
             found.push(hit);
             // only a near-certain FDA match joins a barcode hit (it then lends its list and number)
             found.push(...searchCatalogue(`${hit.brand} ${hit.name}`, list, 3).filter((c) => c.score >= 0.85));
@@ -184,7 +205,8 @@ export async function lookupProduct(text) {
     } else {
         found.push(...searchCatalogue(query.value, list, 5));
         const json = await getJson(offSearchUrl(query.value));
-        const products = (json && Array.isArray(json.products) ? json.products : []).map(fromOpenBeautyFacts).filter(Boolean);
+        const products = (json && Array.isArray(json.products) ? json.products : []).map(fromOpenBeautyFacts).filter(Boolean)
+            .map((c) => ({ ...c, score: Math.round(scoreCandidate(query.value, c) * 100) / 100 }));
         found.push(...products.slice(0, 5));
     }
     return { query, candidates: mergeCandidates(found).slice(0, 6) };
