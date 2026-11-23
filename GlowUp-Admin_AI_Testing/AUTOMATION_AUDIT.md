@@ -65,3 +65,11 @@ None new. Open Beauty Facts and PubChem need no key; the CSP already allows them
 - **Not measured:** precision/recall, false-duplicate rate, time saved. These need a labelled set of real GlowUp packs. The 0.95 / 0.75 limits are starting values, not proven accuracy.
 - Not done (lower priority in the brief): brand logo/photo preview, product photo preview, a stepper layout, drafts for edits and for the brand form, caching of look-up answers.
 - Real camera, real phone and live Open Beauty Facts were not tried in this pass.
+
+## 8. More sources (added the same day)
+
+- **Open Beauty Facts category list** shipped as `_Shared/data/obfCategories.json` (built by `tools/obfCategories.mjs`, hand overrides for eye-contour creams, bronzing powders, eye pencils, DD creams): 19 make-up categories give the cosmetic type; 163 not-make-up categories (lip balm, nail polish, skin care...) are named on the result.
+- **UPCitemdb** second barcode look-up when Open Beauty Facts has nothing, through `api/upc-lookup.js` (admin sign-in required; UPCitemdb refuses browser calls). Free trial: 100 a day and 6 a minute for the server's address, shared by all admins; wrong check digits never sent; answers kept for a day; never an ingredient list. Checked live on 23 Nov 2026 with UPC 041554239416 (Maybelline Great Lash): brand, name and type Mascara came back.
+- **Makeup API** "Find shades online" in the shade editor: colours by brand and kind, the closest product first, ticked shades added with their names (`shadeNames`) and a code only when printed at the start of the name. Marked Needs review. Checked live: 7 Maybelline lipsticks, the right product at 90 %. US and international brands only; the data is old and the service is a free hobby server.
+- A look-up brand now matches one listed brand whose name starts with it ("Maybelline" -> "Maybelline New York", 5+ letters); two possible brands = the admin chooses.
+- Tests: `tests/productSources.test.mjs` (47 checks), `tests/responsive/productSources.scenario.mjs` (38, desktop and phone).

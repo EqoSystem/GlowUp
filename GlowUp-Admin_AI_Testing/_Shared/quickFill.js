@@ -4,7 +4,8 @@
 import { dialogFrame, icon } from "./adminShell.js";
 import {
     queryKind, offProductUrl, offSearchUrl, fromOpenBeautyFacts, searchCatalogue, mergeCandidates,
-    pubchemSynonymsUrl, pubchemDescriptionUrl, aliasesFromPubchem, descriptionFromPubchem, ingredientsFromText, scoreCandidate
+    pubchemSynonymsUrl, pubchemDescriptionUrl, aliasesFromPubchem, descriptionFromPubchem, ingredientsFromText, scoreCandidate,
+    fromUpcItemDb, gtinValid
 } from "./smartAdd.js";
 
 const ZXING = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js";
@@ -178,6 +179,32 @@ export async function readTextFromFile(file, onProgress = () => {}) {
     } finally { await worker.terminate(); }
 }
 
+// Open Beauty Facts category id -> make-up type (tools/obfCategories.mjs builds it from Open Beauty Facts' own category list)
+let categoryTable = null;
+export async function loadCategoryTable() {
+    if (categoryTable) return categoryTable;
+    categoryTable = (await getJson(new URL("../_Shared/data/obfCategories.json", import.meta.url).href)) || { types: {}, notMakeup: [] };
+    return categoryTable;
+}
+
+// The second barcode look-up (UPCitemdb), through the site's own function api/upc-lookup (UPCitemdb refuses browser pages).
+// Answers { candidates, note }: note says why nothing came (no sign-in, daily limit, not a valid barcode...).
+async function upcLookup(code, getToken, table) {
+    if (!getToken || !gtinValid(code)) return { candidates: [], note: gtinValid(code) ? "" : "its last digit does not match (check the digits)" };
+    let token = "";
+    try { token = await getToken(); } catch (error) { token = ""; }
+    if (!token) return { candidates: [], note: "" };
+    const control = new AbortController();
+    const timer = setTimeout(() => control.abort(), LOOKUP_TIMEOUT_MS + 2000);
+    try {
+        const answer = await fetch("/api/upc-lookup", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token }, body: JSON.stringify({ code }), signal: control.signal });
+        const json = await answer.json().catch(() => ({}));
+        if (!answer.ok) return { candidates: [], note: String(json.error || "").slice(0, 200) };
+        return { candidates: (json.items || []).map((item) => fromUpcItemDb(item, code, table)).filter(Boolean), note: "" };
+    } catch (error) { return { candidates: [], note: "" }; }
+    finally { clearTimeout(timer); }
+}
+
 let catalogue = null;
 export async function loadCatalogue() {
     if (catalogue) return catalogue;
@@ -186,16 +213,23 @@ export async function loadCatalogue() {
 }
 
 // Everything found for what the admin typed or scanned, best first, parts of the same product merged.
-export async function lookupProduct(text) {
+// options.getToken: the admin's sign-in token, for the second barcode look-up (UPCitemdb) when Open Beauty Facts has nothing.
+export async function lookupProduct(text, options = {}) {
     const query = queryKind(text);
     if (query.kind === "empty") return { query, candidates: [] };
-    const list = await loadCatalogue();
+    const [list, table] = await Promise.all([loadCatalogue(), loadCategoryTable()]);
     const found = [];
+    let note = "";
     if (query.kind === "barcode") {
         let json = await getJson(offProductUrl(query.value));
         // a 12-digit UPC-A code is often stored as the 13-digit EAN form (a leading 0): ask once more in that form
         if (!(json && json.status === 1) && query.value.length === 12) json = await getJson(offProductUrl("0" + query.value));
-        const hit = json && json.status === 1 ? fromOpenBeautyFacts(json.product) : null;
+        let hit = json && json.status === 1 ? fromOpenBeautyFacts(json.product, table) : null;
+        if (!hit) {
+            const upc = await upcLookup(query.value, options.getToken, table);
+            hit = upc.candidates[0] || null;
+            if (!hit && upc.note) note = `UPCitemdb: ${upc.note}`;
+        }
         if (hit) {
             hit.score = 1;                                                  // the barcode itself matched
             found.push(hit);
@@ -205,11 +239,11 @@ export async function lookupProduct(text) {
     } else {
         found.push(...searchCatalogue(query.value, list, 5));
         const json = await getJson(offSearchUrl(query.value));
-        const products = (json && Array.isArray(json.products) ? json.products : []).map(fromOpenBeautyFacts).filter(Boolean)
+        const products = (json && Array.isArray(json.products) ? json.products : []).map((p) => fromOpenBeautyFacts(p, table)).filter(Boolean)
             .map((c) => ({ ...c, score: Math.round(scoreCandidate(query.value, c) * 100) / 100 }));
         found.push(...products.slice(0, 5));
     }
-    return { query, candidates: mergeCandidates(found).slice(0, 6) };
+    return { query, candidates: mergeCandidates(found).slice(0, 6), note };
 }
 
 // What PubChem knows about an ingredient name: other names, a technical description and the compound page.

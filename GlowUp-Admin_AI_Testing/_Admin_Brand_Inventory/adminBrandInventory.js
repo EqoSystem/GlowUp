@@ -64,6 +64,8 @@ import { wireWindow } from "../_Shared/adminWindow.js";
 import { applyRole, brandPageOf, groupByType, bulkAllowed } from "../_Shared/sourceEdit.js";
 import { gs1Hint, VERIFIED_BY_GS1 } from "../_Shared/gs1Hint.js";
 import { mountProductQuickFill } from "./productQuickFill.js";
+import { mountShadeFinder } from "./productShades.js";
+import { brandFor } from "../_Shared/smartAdd.js";
 import {
     barcodeDigits, originEntry, originsAfterFill, uncheckedFields, markChecked, cleanOrigins, similarProducts, similarBrands,
     reviewReason, skippedLine, repeatedNames, FILL_FIELDS, STATE_WORDS, METHODS, DETECTED, NEEDS_REVIEW, VERIFIED, TYPED, REVIEW_CHANGES, waiting
@@ -82,8 +84,11 @@ let fieldOrigins = {};
 let ingredientsRaw = { text: "", from: "" };
 const ORIGIN_INPUTS = {
     name: ["productNameInput"], brand: ["productBrandInput"], cosmeticType: ["productTypeInput", "productTypeOtherInput"],
-    imageUrl: ["productImageInput"], barcode: ["productBarcodeInput"], fdaNumber: ["productFdaInput"], ingredients: ["productIngredientsInput"]
+    imageUrl: ["productImageInput"], barcode: ["productBarcodeInput"], fdaNumber: ["productFdaInput"], ingredients: ["productIngredientsInput"],
+    shades: ["productShadeEditor"]
 };
+// the shade's NAME from a source (Makeup API), by colour; saved as shadeNames next to shades (a name is not a printed code)
+let shadeNameByHex = {};
 const MAX_SHADES = 100;
 const SHADE_STRIP_FROM = 11;
 const MAX_TAGS = 10;
@@ -383,6 +388,15 @@ document.addEventListener("DOMContentLoaded", async () => {
         noteRaw: (text, from) => { ingredientsRaw = { text: String(text || "").slice(0, 4000), from: String(from || "").slice(0, 120) }; paintRawIngredients(); saveDraft(); },
         openExisting: (product) => { productModal.close(); openProductForm(product); }
     });
+    mountShadeFinder({
+        button: el("productShadeFind"), status: el("productShadeFindStatus"),
+        readForm: readProductForm, room: () => MAX_SHADES - formShades.length,
+        addShades: (list, fromProduct) => {
+            list.forEach((s) => { formShades.push(s.hex); formShadeCodes.push(s.code || ""); if (s.name) shadeNameByHex[s.hex.toUpperCase()] = s.name; });
+            fieldOrigins = { ...fieldOrigins, shades: originEntry(NEEDS_REVIEW, `Makeup API: ${fromProduct}`.slice(0, 80), "lookup") };
+            renderShadeEditor(); paintOrigins(); saveDraft();
+        }
+    });
     el("productShadeEditor").addEventListener("click", onShadeClick);
     el("productShadeEditor").addEventListener("input", onShadeInput);
     el("productShadeEditor").addEventListener("change", onShadeChange);
@@ -613,6 +627,11 @@ async function loadInventory() {
                 imageUrl: String(data.imageUrl || ""),
                 ingredientNotes: Array.isArray(data.ingredientNotes) ? data.ingredientNotes : [],
                 fieldOrigins: cleanOrigins(data.fieldOrigins),
+                shadeNameByHex: (Array.isArray(data.shades) ? data.shades : []).reduce((map, hex, at) => {
+                    const name = Array.isArray(data.shadeNames) ? String(data.shadeNames[at] || "").slice(0, 60) : "";
+                    if (name && typeof hex === "string") map[hex.toUpperCase()] = name;
+                    return map;
+                }, {}),
                 ingredientsRaw: String(data.ingredientsRaw || "").slice(0, 4000),
                 ingredientsRawFrom: String(data.ingredientsRawFrom || "").slice(0, 120),
                 reviewState: String(data.reviewState || ""),
@@ -1909,7 +1928,8 @@ function readProductForm() {
         name: el("productNameInput").value.trim(),
         brand: brand ? brand.name : (el("productBrandInput").value === NEW_BRAND ? pendingBrandName : ""),
         cosmeticType: type, imageUrl: el("productImageInput").value.trim(), barcode: el("productBarcodeInput").value.trim(),
-        fdaNumber: el("productFdaInput").value.trim(), ingredients: toList(el("productIngredientsInput").value)
+        fdaNumber: el("productFdaInput").value.trim(), ingredients: toList(el("productIngredientsInput").value),
+        shades: formShades.slice()
     };
 }
 const originKeyOf = (id) => Object.keys(ORIGIN_INPUTS).find((key) => ORIGIN_INPUTS[key].includes(id)) || "";
@@ -1996,7 +2016,7 @@ function saveDraft() {
         const draft = { at: Date.now(), brandId: el("productBrandInput").value, brandName: pendingBrandName };
         DRAFT_IDS.forEach((id) => { draft[id] = el(id).value; });
         draft.shades = formShades.slice(0, 100); draft.codes = formShadeCodes.slice(0, 100);
-        draft.origins = fieldOrigins; draft.raw = ingredientsRaw;
+        draft.origins = fieldOrigins; draft.raw = ingredientsRaw; draft.shadeNames = shadeNameByHex;
         if (!draft.productNameInput.trim() && !draft.productIngredientsInput.trim() && !draft.productBarcodeInput.trim()) { localStorage.removeItem(DRAFT_KEY); return; }
         localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     } catch (error) {                                                        }
@@ -2025,6 +2045,7 @@ function restoreDraft(draft) {
     formShades = Array.isArray(draft.shades) ? draft.shades.filter((s) => typeof s === "string") : [];
     formShadeCodes = formShades.map((_, at) => (Array.isArray(draft.codes) && typeof draft.codes[at] === "string" ? draft.codes[at] : ""));
     fieldOrigins = cleanOrigins(draft.origins);
+    shadeNameByHex = draft.shadeNames && typeof draft.shadeNames === "object" ? Object.fromEntries(Object.entries(draft.shadeNames).filter(([k, v]) => /^#[0-9A-F]{6}$/.test(k) && typeof v === "string").map(([k, v]) => [k, v.slice(0, 60)])) : {};
     ingredientsRaw = draft.raw && typeof draft.raw.text === "string" ? { text: draft.raw.text.slice(0, 4000), from: String(draft.raw.from || "").slice(0, 120) } : { text: "", from: "" };
     paintOrigins(); paintRawIngredients();
     renderShadeEditor(); showOtherTypeBox(); showBrandHint(); showIngredientSummary(); showBarcodeCheck(); showNameClash(); paintCounters();
@@ -2516,6 +2537,7 @@ function openProductForm(product, brandId) {
     pendingBrandName = "";
     quickFill.reset();
     fieldOrigins = product ? { ...product.fieldOrigins } : {};
+    shadeNameByHex = product ? { ...product.shadeNameByHex } : {};
     ingredientsRaw = product && product.ingredientsRaw ? { text: product.ingredientsRaw, from: product.ingredientsRawFrom } : { text: "", from: "" };
     paintOrigins();
     paintRawIngredients();
@@ -2541,7 +2563,7 @@ function fillProductFromQuick(found, { partial } = {}) {
     if (has("name")) el("productNameInput").value = found.name.slice(0, 100);
     if (has("brand") || !partial) {
         const key = compactName(found.brand || "");
-        const listed = key ? brands.find((b) => [b.name, ...(b.aliases || [])].some((n) => compactName(n) === key)) : null;
+        const listed = key ? brandFor(found.brand, brands) : null;           // exact, or one brand whose name starts with it
         const select = el("productBrandInput");
         const stale = select.querySelector(`option[value="${NEW_BRAND}"]`);
         if (stale) stale.remove();
@@ -2891,6 +2913,7 @@ async function saveProduct(event) {
         ingredientsRaw: ingredientsRaw.text, ingredientsRawFrom: ingredientsRaw.text ? ingredientsRaw.from : "",
 
         shadeCodes: shadeCodes.some(Boolean) ? shadeCodes : [],
+        shadeNames: shades.some((h) => shadeNameByHex[String(h).toUpperCase()]) ? shades.map((h) => shadeNameByHex[String(h).toUpperCase()] || "") : [],
 
         ingredientIds: Array.from(new Set(ingredients.map(libraryIdOf).filter(Boolean))),
         ingredientCount: ingredients.length,

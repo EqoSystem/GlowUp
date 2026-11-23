@@ -44,21 +44,73 @@ function typeFor(name, categoryWords) {
 }
 
 // One Open Beauty Facts product (the API's "product" object) as a candidate, or null when it has no name.
-export function fromOpenBeautyFacts(p) {
+// The category table built from Open Beauty Facts' own category list (tools/obfCategories.mjs -> _Shared/data/obfCategories.json):
+// { types: { "en:lipsticks": "Lipstick", ... }, notMakeup: ["en:lip-balms", ...] }. Optional: without it the words decide.
+export function typeFromCategories(tags, table) {
+    const types = (table && table.types) || {};
+    for (const tag of tags || []) { const t = types[String(tag)]; if (t) return t; }
+    return "";
+}
+export function outsideCategory(tags, table) {
+    const outside = new Set((table && table.notMakeup) || []);
+    const hit = (tags || []).map(String).find((t) => outside.has(t));
+    return hit ? hit.replace(/^[a-z]{2}:/, "").replace(/-/g, " ") : "";
+}
+
+export function fromOpenBeautyFacts(p, table) {
     if (!p || typeof p !== "object") return null;
     const name = clean(p.product_name_en || p.product_name);
     if (!name) return null;
     const brand = clean(String(p.brands || "").split(",")[0]);
-    const categories = (Array.isArray(p.categories_tags) ? p.categories_tags : []).map((t) => String(t).replace(/^[a-z]{2}:/, "").replace(/-/g, " "));
+    const tags = Array.isArray(p.categories_tags) ? p.categories_tags : [];
+    const categories = tags.map((t) => String(t).replace(/^[a-z]{2}:/, "").replace(/-/g, " "));
+    const fromTable = typeFromCategories(tags, table);
+    const outside = fromTable ? "" : outsideCategory(tags, table);
     const ingredients = ingredientsFromText(p.ingredients_text_en || p.ingredients_text || "");
     const code = clean(p.code);
     const image = /^https:\/\//i.test(String(p.image_front_url || "")) ? String(p.image_front_url) : "";
     return {
         origin: "openbeautyfacts", originLabel: "Open Beauty Facts",
-        name, brand, cosmeticType: typeFor(name, categories), ingredients,
+        name, brand, cosmeticType: fromTable || typeFor(name, categories), ingredients,
         ingredientsText: clean(p.ingredients_text_en || p.ingredients_text).slice(0, 4000),
+        outsideCategory: outside,
         barcode: barcodeKey(code) ? code.replace(/\D/g, "") : "", fdaNumber: "", imageUrl: image,
-        sources: code ? [offPageUrl(code)] : [], note: ingredients.length ? "" : "No ingredient list on Open Beauty Facts."
+        sources: code ? [offPageUrl(code)] : [],
+        note: [ingredients.length ? "" : "No ingredient list on Open Beauty Facts.", outside ? `Open Beauty Facts files it under "${outside}" (not make-up).` : ""].filter(Boolean).join(" ")
+    };
+}
+
+// ---- UPCitemdb (second barcode look-up, through the website's own api/upc-lookup function) ----
+
+// A barcode whose last digit matches the GS1 check digit (EAN-8, UPC-A, EAN-13, GTIN-14). A mistyped code fails here,
+// so it never uses up the free look-ups (100 a day).
+export function gtinValid(code) {
+    const digits = String(code || "").replace(/\D/g, "");
+    if (![8, 12, 13, 14].includes(digits.length)) return false;
+    let sum = 0;
+    for (let i = digits.length - 2, weight = 3; i >= 0; i--, weight = weight === 3 ? 1 : 3) sum += Number(digits[i]) * weight;
+    return (10 - (sum % 10)) % 10 === Number(digits[digits.length - 1]);
+}
+export const upcItemPage = (code) => `https://www.upcitemdb.com/upc/${encodeURIComponent(String(code || "").replace(/\D/g, ""))}`;
+
+// One UPCitemdb item as a candidate. It gives a title, a brand, a shop category and pictures: never an ingredient list.
+export function fromUpcItemDb(item, code, table) {
+    if (!item || typeof item !== "object") return null;
+    const brand = clean(item.brand);
+    let name = clean(item.title);
+    if (!name) return null;
+    if (brand && name.toLowerCase().startsWith(brand.toLowerCase() + " ")) name = name.slice(brand.length + 1).trim();
+    // shop titles add selling words after a colon and the size ("... - 141 Very Black - 0.43 fl oz: Thickening, ..."): drop both
+    name = name.split(/:\s/)[0].replace(/\s*[\-,]\s*\d+([\.,]\d+)?\s*(fl\.?\s*oz|oz|ml|g)\b\.?/gi, "").trim();
+    const categoryWords = String(item.category || "").split(/[>,&]/).map(clean).filter(Boolean);
+    const barcode = String(code || item.ean || item.upc || "").replace(/\D/g, "");
+    const image = (Array.isArray(item.images) ? item.images : []).find((u) => /^https:\/\//i.test(String(u))) || "";
+    return {
+        origin: "upcitemdb", originLabel: "UPCitemdb",
+        name: name.slice(0, 100), brand, cosmeticType: typeFor(name, categoryWords), ingredients: [], ingredientsText: "",
+        barcode: barcodeKey(barcode) ? barcode : "", fdaNumber: "", imageUrl: image,
+        sources: barcode ? [upcItemPage(barcode)] : [],
+        note: "UPCitemdb gives the name and the brand, not the ingredient list." + (item.category ? ` Shop category: ${clean(item.category).slice(0, 80)}.` : "")
     };
 }
 
@@ -141,10 +193,19 @@ export function mergeCandidates(list) {
 }
 
 // The brand of the inventory a candidate belongs to (by name or other name), or null: then a new brand is offered.
+// A strong match is the exact name or other name; or else ONE brand whose name begins with the other ("Maybelline" and
+// "Maybelline New York"), at least 5 letters long. Two or more such brands = ambiguous = null (the admin chooses).
 export function brandFor(name, brands) {
     const key = compactName(name);
     if (!key) return null;
-    return (brands || []).find((b) => !b.binned && [b.name, ...(b.aliases || [])].some((n) => compactName(n) === key)) || null;
+    const live = (brands || []).filter((b) => !b.binned);
+    const exact = live.find((b) => [b.name, ...(b.aliases || [])].some((n) => compactName(n) === key));
+    if (exact) return exact;
+    const prefix = live.filter((b) => [b.name, ...(b.aliases || [])].some((n) => {
+        const k = compactName(n);
+        return k && Math.min(k.length, key.length) >= 5 && (k.startsWith(key) || key.startsWith(k));
+    }));
+    return prefix.length === 1 ? prefix[0] : null;
 }
 
 // Where to read more about a candidate on the maker's own pages: the brand's CONFIRMED website from the inventory (an admin checked that

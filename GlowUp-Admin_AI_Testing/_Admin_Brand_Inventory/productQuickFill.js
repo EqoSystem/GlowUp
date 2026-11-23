@@ -3,6 +3,7 @@
 // Every value put into the form is marked "Detected" with the source it came from (capture.js); a value already in the form is
 // never replaced unless the admin ticks it in the comparison window.
 import { escapeHtml } from "../_Shared/adminCommon.js";
+import { auth } from "../_Database/firebase-console.js";
 import { icon, dialogFrame, askConfirm } from "../_Shared/adminShell.js";
 import { lookupProduct, scanBarcode, readLabelPhoto, pickPhotos, readTextFromFile, barcodeFromPhoto } from "../_Shared/quickFill.js";
 import { openPhoneLink } from "../_Shared/phoneLink.js";
@@ -60,13 +61,13 @@ export function mountProductQuickFill({ brands, products, readForm, fill, openEx
         status(query.kind === "barcode" ? `Looking up barcode ${query.value}...` : `Looking for "${query.value}"...`);
         el("productQuickFind").disabled = true;
         try {
-            const { candidates } = await lookupProduct(text);
+            const { candidates, note } = await lookupProduct(text, { getToken: () => (auth.currentUser ? auth.currentUser.getIdToken() : "") });
             if (candidates.length === 0) {
                 // no match is not the end: the barcode is kept in the form and the next way in is offered
                 if (query.kind === "barcode") {
                     const current = readForm();
                     if (!current.barcode) { fill({ barcode: query.value }, { partial: true }); noteOrigins([{ key: "barcode", apply: true, from: "Scanned or typed barcode" }], "barcode", 1); }
-                    status(`Nothing is known about barcode ${query.value} yet. It is kept in the Barcode box. Next: take a photo of the ingredient list (or choose photos), then type the name.`, "warn");
+                    status(`Nothing is known about barcode ${query.value} yet (Open Beauty Facts and UPCitemdb were asked${note ? "; " + note : ""}). It is kept in the Barcode box. Next: take a photo of the ingredient list (or choose photos), then type the name.`, "warn");
                 } else status("Nothing found. Check the spelling, try the brand and the product name, or take a photo of the ingredient list.", "warn");
                 paint([]);
                 return;

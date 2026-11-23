@@ -36,7 +36,8 @@ export const FILL_FIELDS = [
     { key: "imageUrl", label: "Product photo link", critical: false },
     { key: "barcode", label: "Barcode", critical: true },
     { key: "fdaNumber", label: "FDA registration number", critical: true },
-    { key: "ingredients", label: "Ingredients", critical: true }
+    { key: "ingredients", label: "Ingredients", critical: true },
+    { key: "shades", label: "Shades", critical: false }          // colours for AR Try-On; never filled by Quick fill itself
 ];
 const FIELD_KEYS = new Set(FILL_FIELDS.map((f) => f.key));
 export const fieldLabel = (key) => (FILL_FIELDS.find((f) => f.key === key) || { label: key }).label;
