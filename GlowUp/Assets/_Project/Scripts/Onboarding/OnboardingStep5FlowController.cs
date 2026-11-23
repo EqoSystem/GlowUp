@@ -36,7 +36,7 @@ namespace GlowUp.Onboarding
         [SerializeField] private TMP_InputField allergens;
 
         [Header("Dropdown options (editable)")]
-        [SerializeField] private string[] skinTypeOptions = { "Oily", "Normal", "Dry", "Mix" };
+        [SerializeField] private string[] skinTypeOptions = { "Normal", "Dry", "Oily", "Mix", "Sensitive" };
         [SerializeField] private string[] skinToneOptions = { "Fair", "Light", "Medium", "Tan", "Deep", "Dark" };
 
         [Header("Edit mode")]
@@ -90,7 +90,7 @@ namespace GlowUp.Onboarding
         static void Fill(TMP_Dropdown d, string[] options)
         {
             if (d == null) return;
-            d.ClearOptions(); d.AddOptions(options.ToList());
+            d.ClearOptions(); d.AddOptions(options.Select(SkinTypeNames.Display).ToList());          // "Mix" reads "Combination"; the stored value stays "Mix"
         }
 
         void Start()

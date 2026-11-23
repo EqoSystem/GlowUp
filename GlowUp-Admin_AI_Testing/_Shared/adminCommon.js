@@ -20,11 +20,14 @@ export const DASHBOARD_PAGE = "../_Admin_Dashboard/adminDashboard.html";
 export const REQUIRE_ADMIN_RECORD = true;
 
 
+// The official skin types (23 Nov 2026): Normal, Dry, Oily, Combination, Sensitive. "Mix" stays the stored word of Combination
+// (ingredients and the app's saved profiles carry it); only the label changed.
 export const SKIN_TYPES = [
-    { value: "Oily", label: "Oily" },
     { value: "Normal", label: "Normal" },
     { value: "Dry", label: "Dry" },
-    { value: "Mix", label: "Mix (combination)" }
+    { value: "Oily", label: "Oily" },
+    { value: "Mix", label: "Combination" },
+    { value: "Sensitive", label: "Sensitive" }
 ];
 
 

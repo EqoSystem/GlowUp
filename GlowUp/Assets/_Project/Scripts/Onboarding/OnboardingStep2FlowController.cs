@@ -48,7 +48,7 @@ namespace GlowUp.Onboarding
                     string type = SkinTypeFinder.Result(answers);
                     sheet.Show("Your skin type", SkinTypeFinder.Explain(type), new System.Collections.Generic.List<ChoiceSheet.Choice>
                     {
-                        new ChoiceSheet.Choice("Use " + (type == SkinTypeFinder.Mix ? "Mix" : type), () => { if (skinTypeGroup != null) skinTypeGroup.Select(type, true); sheet.Hide(); Refresh(); }, true),
+                        new ChoiceSheet.Choice("Use " + SkinTypeNames.Display(type), () => { if (skinTypeGroup != null) skinTypeGroup.Select(type, true); sheet.Hide(); Refresh(); }, true),
                         new ChoiceSheet.Choice("Answer again", () => { answers.Clear(); Ask(0); })
                     }, SkinTypeFinder.SourceNote);
                     return;

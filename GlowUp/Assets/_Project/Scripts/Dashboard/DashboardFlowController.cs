@@ -227,7 +227,7 @@ namespace GlowUp.Dashboard
             if (p != null && DateTime.TryParse(p.birthday, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dob))
                 birthday = dob.ToString(birthdayFormat, CultureInfo.CurrentCulture);
             Set(birthdayValue, birthday);
-            Set(skinTypeValue, p != null && !string.IsNullOrWhiteSpace(p.skinType) ? p.skinType : notSet);
+            Set(skinTypeValue, p != null && !string.IsNullOrWhiteSpace(p.skinType) ? GlowUp.Onboarding.SkinTypeNames.Display(p.skinType) : notSet);
             Set(skinToneValue, p != null && !string.IsNullOrWhiteSpace(p.skinTone) ? p.skinTone : notSet);
             Set(allergensValue, p != null && p.knownAllergens != null && p.knownAllergens.Count > 0 ? string.Join(", ", p.knownAllergens) : noAllergens);
 
@@ -238,14 +238,14 @@ namespace GlowUp.Dashboard
             }
             if (accountEmailText != null) accountEmailText.text = p != null ? p.email : "";
             string Listed(List<string> items, string none) => items != null && items.Count > 0 ? string.Join(", ", items) : none;
-            Set(skinTypeFact, p != null && !string.IsNullOrWhiteSpace(p.skinType) ? p.skinType : notSet);
+            Set(skinTypeFact, p != null && !string.IsNullOrWhiteSpace(p.skinType) ? GlowUp.Onboarding.SkinTypeNames.Display(p.skinType) : notSet);
             Set(skinToneFact, p != null && !string.IsNullOrWhiteSpace(p.skinTone) ? p.skinTone : notSet);
             Set(conditionFact, Listed(p?.skinConditions, "None"));
             Set(allergensFact, Listed(p?.knownAllergens, noAllergens));
             if (skinProfileText != null)
             {
                 string List(List<string> items, string none) => items != null && items.Count > 0 ? string.Join(", ", items) : none;
-                skinProfileText.text = "<b>Skin type:</b> " + (p != null && !string.IsNullOrWhiteSpace(p.skinType) ? p.skinType : notSet)
+                skinProfileText.text = "<b>Skin type:</b> " + (p != null && !string.IsNullOrWhiteSpace(p.skinType) ? GlowUp.Onboarding.SkinTypeNames.Display(p.skinType) : notSet)
                     + "\n<b>Skin tone:</b> " + (p != null && !string.IsNullOrWhiteSpace(p.skinTone) ? p.skinTone : notSet)
                     + "\n<b>Chronic skin condition:</b> " + List(p?.skinConditions, "None")
                     + "\n<b>Allergens:</b> " + List(p?.knownAllergens, noAllergens);

@@ -2550,3 +2550,7 @@ body:not(.layout-editing) .board.two-sides > .panel[data-side="side"] { grid-col
 .capture-photos figure { margin: 0; }
 .capture-photos img { width: 100%; height: auto; border-radius: var(--radius-sm); border: 1px solid var(--border); display: block; }
 .capture-photos figcaption { font-size: var(--fs-sm); color: var(--muted); margin-top: calc(4 * var(--u)); }
+
+/* Skin conditions list: the "Users can pick it" tick under each condition (23 Nov 2026) */
+.lists-pick { display: inline-flex; align-items: center; gap: calc(6 * var(--u)); font-size: var(--fs-sm); color: var(--text-2); }
+.lists-pick input { margin: 0; }

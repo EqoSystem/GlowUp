@@ -17,6 +17,7 @@ namespace GlowUp.Data
         public string label = "";                // what users read; the admin can rename it
         public List<string> keywords = new List<string>();   // lower-case words the app looks for in what a user saved
         public bool retired;                     // hidden from the pickers, but still matches what is already saved
+        public bool chronic;                     // conditions only: offered to users as a Chronic Skin Condition (the rest are only used by the ingredient rules)
     }
 
     [Serializable]
@@ -60,6 +61,8 @@ namespace GlowUp.Data
 
         static ListItem Make(string id, string label, params string[] keywords) =>
             new ListItem { id = id, label = label, keywords = new List<string>(keywords) };
+        static ListItem Chronic(string id, string label, params string[] keywords) =>
+            new ListItem { id = id, label = label, keywords = new List<string>(keywords), chronic = true };
 
         static List<ListItem> BuiltInAllergens() => new List<ListItem>
         {
@@ -72,15 +75,41 @@ namespace GlowUp.Data
             Make("nut", "Nut-derived oils", "nut")
         };
 
+        // The official lists (owner, 23 November 2026). The first 15 are the Chronic Skin Conditions users pick from; the rest are the
+        // general Skin Conditions, used only by the ingredient rules. Ids never change (ingredients carry them); the ids that existed
+        // before (acne, eczema, psoriasis, rosacea, seborrheic, melasma, contact) keep their words, so old rules and saved profiles still match.
         static List<ListItem> BuiltInConditions() => new List<ListItem>
         {
+            Chronic("atopic", "Atopic Dermatitis", "atopic", "eczema"),
+            Chronic("psoriasis", "Psoriasis", "psoriasis"),
+            Chronic("rosacea", "Rosacea", "rosacea"),
+            Chronic("seborrheic", "Seborrheic Dermatitis", "seborrheic"),
+            Chronic("allergiccontact", "Allergic Contact Dermatitis", "allergic contact", "contact"),
+            Chronic("irritantcontact", "Irritant Contact Dermatitis", "irritant contact", "contact"),
+            Chronic("hidradenitis", "Hidradenitis Suppurativa", "hidradenitis"),
+            Chronic("lichenplanus", "Lichen Planus", "lichen planus"),
+            Chronic("chronicurticaria", "Chronic Urticaria", "chronic urticaria", "urticaria", "hives"),
+            Chronic("alopecia", "Alopecia Areata", "alopecia"),
+            Chronic("vitiligo", "Vitiligo", "vitiligo"),
+            Chronic("prurigo", "Chronic Prurigo", "prurigo"),
+            Chronic("lupus", "Cutaneous Lupus Erythematosus", "lupus"),
+            Chronic("lichensclerosus", "Lichen Sclerosus", "lichen sclerosus"),
+            Chronic("ichthyosis", "Ichthyosis", "ichthyosis"),
             Make("acne", "Acne", "acne"),
-            Make("eczema", "Eczema (Atopic Dermatitis)", "eczema", "atopic"),
-            Make("psoriasis", "Psoriasis", "psoriasis"),
-            Make("rosacea", "Rosacea", "rosacea"),
-            Make("seborrheic", "Seborrheic Dermatitis", "seborrheic"),
-            Make("melasma", "Melasma / Hyperpigmentation", "melasma", "hyperpigmentation"),
-            Make("contact", "Contact Dermatitis", "contact")
+            Make("eczema", "Eczema", "eczema", "atopic"),
+            Make("contact", "Contact Dermatitis", "contact"),
+            Make("folliculitis", "Folliculitis", "folliculitis"),
+            Make("fungal", "Fungal Skin Infection", "fungal", "tinea", "ringworm"),
+            Make("bacterial", "Bacterial Skin Infection", "bacterial"),
+            Make("viral", "Viral Skin Infection", "viral"),
+            Make("urticaria", "Urticaria (Hives)", "urticaria", "hives"),
+            Make("melasma", "Melasma", "melasma", "hyperpigmentation"),
+            Make("hyperpigmentation", "Hyperpigmentation", "hyperpigmentation"),
+            Make("keratosispilaris", "Keratosis Pilaris", "keratosis pilaris"),
+            Make("scabies", "Scabies", "scabies"),
+            Make("impetigo", "Impetigo", "impetigo"),
+            Make("warts", "Skin Warts", "wart"),
+            Make("coldsores", "Cold Sores", "cold sore")
         };
 
         static List<ListItem> BuiltInHighlights() => new List<ListItem>
@@ -109,7 +138,12 @@ namespace GlowUp.Data
         public static List<string> AllergenLabels() => AllergenItems.Where(i => !i.retired && !string.IsNullOrWhiteSpace(i.label)).Select(i => i.label).ToList();
 
         /// <summary>The skin conditions to offer (not retired), in the admin's order.</summary>
-        public static List<string> ConditionLabels() => ConditionItems.Where(i => !i.retired && !string.IsNullOrWhiteSpace(i.label)).Select(i => i.label).ToList();
+        public static List<string> ConditionLabels()
+        {
+            List<ListItem> all = ConditionItems;
+            bool anyFlag = all.Any(i => i.chronic);         // a list saved before the chronic flag existed offers every condition, as it always did
+            return all.Where(i => !i.retired && !string.IsNullOrWhiteSpace(i.label) && (!anyFlag || i.chronic)).Select(i => i.label).ToList();
+        }
 
         /// <summary>
         /// Every allergen family, retired ones too, as { id, word, word, ... } with lower-case words: a user's saved allergen
@@ -224,6 +258,7 @@ namespace GlowUp.Data
                 if (id.Length == 0 || label.Length == 0) continue;
                 var item = new ListItem { id = id, label = label };
                 if (map.TryGetValue("retired", out object r) && r is bool retired) item.retired = retired;
+                if (map.TryGetValue("chronic", out object c) && c is bool chronic) item.chronic = chronic;
                 if (map.TryGetValue("keywords", out object k) && k is IEnumerable words && !(k is string))
                     foreach (object w in words) if (w != null && w.ToString().Trim().Length > 0) item.keywords.Add(w.ToString().Trim().ToLowerInvariant());
                 items.Add(item);

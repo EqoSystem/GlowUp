@@ -28,14 +28,40 @@ export const BUILT_IN = {
         { id: "essentialoil", label: "Essential oils", keywords: ["essential oil", "essential oils"] },
         { id: "nut", label: "Nut-derived oils", keywords: ["nut"] }
     ],
+    // The official lists (23 Nov 2026). chronic: true = offered to users as a Chronic Skin Condition (the 15 first); the rest are the
+    // general Skin Conditions, used by the ingredient rules only. The ids that existed before (acne, eczema, psoriasis, rosacea,
+    // seborrheic, melasma, contact) are kept, so every ingredient rule and saved profile still matches.
     conditions: [
+        { id: "atopic", label: "Atopic Dermatitis", keywords: ["atopic", "eczema"], chronic: true },
+        { id: "psoriasis", label: "Psoriasis", keywords: ["psoriasis"], chronic: true },
+        { id: "rosacea", label: "Rosacea", keywords: ["rosacea"], chronic: true },
+        { id: "seborrheic", label: "Seborrheic Dermatitis", keywords: ["seborrheic"], chronic: true },
+        { id: "allergiccontact", label: "Allergic Contact Dermatitis", keywords: ["allergic contact", "contact"], chronic: true },
+        { id: "irritantcontact", label: "Irritant Contact Dermatitis", keywords: ["irritant contact", "contact"], chronic: true },
+        { id: "hidradenitis", label: "Hidradenitis Suppurativa", keywords: ["hidradenitis"], chronic: true },
+        { id: "lichenplanus", label: "Lichen Planus", keywords: ["lichen planus"], chronic: true },
+        { id: "chronicurticaria", label: "Chronic Urticaria", keywords: ["chronic urticaria", "urticaria", "hives"], chronic: true },
+        { id: "alopecia", label: "Alopecia Areata", keywords: ["alopecia"], chronic: true },
+        { id: "vitiligo", label: "Vitiligo", keywords: ["vitiligo"], chronic: true },
+        { id: "prurigo", label: "Chronic Prurigo", keywords: ["prurigo"], chronic: true },
+        { id: "lupus", label: "Cutaneous Lupus Erythematosus", keywords: ["lupus"], chronic: true },
+        { id: "lichensclerosus", label: "Lichen Sclerosus", keywords: ["lichen sclerosus"], chronic: true },
+        { id: "ichthyosis", label: "Ichthyosis", keywords: ["ichthyosis"], chronic: true },
         { id: "acne", label: "Acne", keywords: ["acne"] },
-        { id: "eczema", label: "Eczema (Atopic Dermatitis)", keywords: ["eczema", "atopic"] },
-        { id: "psoriasis", label: "Psoriasis", keywords: ["psoriasis"] },
-        { id: "rosacea", label: "Rosacea", keywords: ["rosacea"] },
-        { id: "seborrheic", label: "Seborrheic Dermatitis", keywords: ["seborrheic"] },
-        { id: "melasma", label: "Melasma / Hyperpigmentation", keywords: ["melasma", "hyperpigmentation"] },
-        { id: "contact", label: "Contact Dermatitis", keywords: ["contact"] }
+        { id: "eczema", label: "Eczema", keywords: ["eczema", "atopic"] },
+        { id: "contact", label: "Contact Dermatitis", keywords: ["contact"] },
+        { id: "folliculitis", label: "Folliculitis", keywords: ["folliculitis"] },
+        { id: "fungal", label: "Fungal Skin Infection", keywords: ["fungal", "tinea", "ringworm"] },
+        { id: "bacterial", label: "Bacterial Skin Infection", keywords: ["bacterial"] },
+        { id: "viral", label: "Viral Skin Infection", keywords: ["viral"] },
+        { id: "urticaria", label: "Urticaria (Hives)", keywords: ["urticaria", "hives"] },
+        { id: "melasma", label: "Melasma", keywords: ["melasma", "hyperpigmentation"] },
+        { id: "hyperpigmentation", label: "Hyperpigmentation", keywords: ["hyperpigmentation"] },
+        { id: "keratosispilaris", label: "Keratosis Pilaris", keywords: ["keratosis pilaris"] },
+        { id: "scabies", label: "Scabies", keywords: ["scabies"] },
+        { id: "impetigo", label: "Impetigo", keywords: ["impetigo"] },
+        { id: "warts", label: "Skin Warts", keywords: ["wart"] },
+        { id: "coldsores", label: "Cold Sores", keywords: ["cold sore"] }
     ],
     highlights: [
         { id: "keyActive", label: "Key active", keywords: [] },
@@ -54,7 +80,9 @@ export function cleanItem(raw) {
     const seen = new Set();
     const keywords = (Array.isArray(row.keywords) ? row.keywords : []).map((k) => text(k, 30).toLowerCase())
         .filter((k) => k.length >= 2 && !seen.has(k) && seen.add(k)).slice(0, MAX_KEYWORDS);
-    return { id, label, keywords, retired: row.retired === true };
+    const item = { id, label, keywords, retired: row.retired === true };
+    if (row.chronic === true) item.chronic = true;          // only conditions carry it
+    return item;
 }
 
 function cleanList(raw, fallback) {

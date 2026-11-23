@@ -65,7 +65,7 @@ namespace GlowUp.Data
         public List<string> highlights = new List<string>();          // ids of the custom highlights the admin website lists (config/lists)
         public List<string> aliases = new List<string>();
         public List<string> allergenTags = new List<string>();        // fragrance, paraben, sulfate, formaldehyde, lanolin, essentialoil, nut
-        public List<string> avoidForSkinTypes = new List<string>();   // Oily, Normal, Dry, Mix
+        public List<string> avoidForSkinTypes = new List<string>();   // Oily, Normal, Dry, Mix (Combination), Sensitive
         public List<string> avoidForConditions = new List<string>();  // acne, eczema, psoriasis, rosacea, seborrheic, melasma, contact
         public List<string> goodForSkinTypes = new List<string>();
         public List<string> goodForConditions = new List<string>();

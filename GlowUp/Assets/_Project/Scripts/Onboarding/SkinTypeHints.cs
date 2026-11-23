@@ -13,7 +13,8 @@ namespace GlowUp.Onboarding
             { "Oily",   "Feels: greasy by midday.\nLooks: shiny, visible pores." },
             { "Normal", "Feels: comfortable, balanced.\nLooks: even, rarely shiny." },
             { "Dry",    "Feels: tight after washing.\nLooks: rough, dull or flaky." },
-            { "Mix",    "Feels: oily T-zone, drier cheeks.\nLooks: shiny nose and forehead." }
+            { "Mix",    "Feels: oily T-zone, drier cheeks.\nLooks: shiny nose and forehead." },
+            { "Sensitive", "Feels: stings, burns or itches easily.\nLooks: often red or blotchy." }
         };
 
         public static string For(string value) => value != null && Back.TryGetValue(value, out string words) ? words : "";

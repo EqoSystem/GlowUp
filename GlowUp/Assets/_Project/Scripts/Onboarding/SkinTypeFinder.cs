@@ -77,17 +77,11 @@ namespace GlowUp.Onboarding
         public const string Title = "Where these lists come from";
 
         public const string Body =
-            "<b>Skin types</b> (Oily, Normal, Dry, Mix): the four everyday types named by the American Academy of Dermatology. "
-            + "Sensitive skin is covered on the allergies step, by the ingredients you react to.\n\n"
-            + "<b>Chronic skin conditions</b>: long-lasting conditions that make-up ingredients are known to affect, as described by the "
-            + "American Academy of Dermatology and DermNet (New Zealand):\n"
-            + "• <b>Acne</b>: blocked pores and inflamed pimples, mostly on the face. Heavy, pore-clogging make-up can make it worse.\n"
-            + "• <b>Eczema (atopic dermatitis)</b>: dry, itchy, easily irritated skin. Fragrance and some preservatives can set it off.\n"
-            + "• <b>Psoriasis</b>: thick, scaly patches from skin renewing too fast. Irritation can bring new patches.\n"
-            + "• <b>Rosacea</b>: lasting redness and flushing of the cheeks and nose. Alcohol and fragrance are common triggers.\n"
-            + "• <b>Seborrheic dermatitis</b>: red, flaky skin where skin is oily (sides of the nose, brows, hairline).\n"
-            + "• <b>Melasma / hyperpigmentation</b>: brown patches, often on the cheeks and forehead. Sun makes them darker.\n"
-            + "• <b>Contact dermatitis</b>: a red, itchy rash where a substance touched the skin, from irritation or an allergy.\n\n"
+            "<b>Skin types</b>: Normal, Dry, Oily, Combination and Sensitive. These are GlowUp's official skin types.\n\n"
+            + "<b>Chronic skin conditions</b>: GlowUp's official list of long-lasting skin conditions that make-up ingredients can affect: "
+            + "Atopic Dermatitis, Psoriasis, Rosacea, Seborrheic Dermatitis, Allergic Contact Dermatitis, Irritant Contact Dermatitis, "
+            + "Hidradenitis Suppurativa, Lichen Planus, Chronic Urticaria, Alopecia Areata, Vitiligo, Chronic Prurigo, "
+            + "Cutaneous Lupus Erythematosus, Lichen Sclerosus and Ichthyosis.\n\n"
             + TypeSources + "\n\n"
             + "<b>Allergens</b>: the ingredient families most often behind cosmetic reactions in patch testing (fragrance, preservatives "
             + "such as parabens and formaldehyde releasers, lanolin and others), from the American Contact Dermatitis Society's lists.\n\n"

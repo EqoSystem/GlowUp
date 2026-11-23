@@ -18,7 +18,7 @@ import { BUILT_IN, MAX_ITEMS, MAX_LABEL, normalizeLists, cleanItem, slugId, chec
 
 export const KINDS = {
     allergens: { title: "Allergen families", one: "allergen family", words: true, intro: "A user who picked one of these in the app is warned about every ingredient marked with it. The words are what the app looks for in the user's own text." },
-    conditions: { title: "Chronic skin conditions", one: "chronic skin condition", words: true, intro: "Each condition can be marked Avoid or Good on an ingredient. The words are what the app looks for in a user's saved condition." },
+    conditions: { title: "Skin conditions", one: "skin condition", words: true, intro: "Each condition can be marked Avoid or Good on an ingredient. Tick \"Users can pick it\" for the Chronic Skin Conditions people choose from in the app; the others are only used by the ingredient rules. The words are what the app looks for in a user's saved condition." },
     highlights: { title: "Highlights", one: "highlight", words: false, intro: "A highlighted ingredient shows up among the chips of a scan result, even when it is safe. Key active and Umbrella term are built in." }
 };
 
@@ -70,7 +70,7 @@ async function saveLists(next) {
     const serverVersion = latest.exists() ? Math.max(0, Math.floor(Number(latest.data().version) || 0)) : 0;
     if (serverVersion !== current.version) { await loadLists(true); throw new Error("The lists were changed somewhere else in the meantime. They were loaded again: look at them and repeat your change."); }
     const version = serverVersion + 1;
-    const body = (items) => items.map((item) => ({ id: item.id, label: item.label, keywords: item.keywords, retired: item.retired === true }));
+    const body = (items) => items.map((item) => ({ id: item.id, label: item.label, keywords: item.keywords, retired: item.retired === true, chronic: item.chronic === true }));
     await setDoc(ref, { version, updatedAt: serverTimestamp(), allergens: body(next.allergens), conditions: body(next.conditions), highlights: body(next.highlights) });
     current = Object.assign(normalizeLists({ version, allergens: next.allergens, conditions: next.conditions, highlights: next.highlights }), { exists: true });
 }
@@ -128,10 +128,22 @@ export function openListManager(kind, context) {
         const addNote = make("p", "field-hint lists-add-note");
         addNote.setAttribute("role", "status");
 
+        const official = make("button", "btn", "Use the official list"); official.type = "button";
+        official.hidden = kind !== "conditions";
+        official.addEventListener("click", async () => {
+            if (!(await askConfirm({ title: "Use the official list?", message: "The official 15 chronic skin conditions and 15 general skin conditions replace the ones listed here. Conditions that are not in the official list stay, as general conditions, so no ingredient rule loses its condition. Nothing is saved until you press Save list.", confirmLabel: "Use official list" }))) return;
+            const officialIds = new Set(BUILT_IN.conditions.map((i) => i.id.toLowerCase()));
+            const old = new Map(work.map((i) => [i.id.toLowerCase(), i]));
+            const next = BUILT_IN.conditions.map((i) => Object.assign({ retired: false }, i, { keywords: i.keywords.slice(), retired: old.has(i.id.toLowerCase()) ? old.get(i.id.toLowerCase()).retired === true : false }));
+            work.filter((i) => !officialIds.has(i.id.toLowerCase())).forEach((i) => next.push(Object.assign({}, i, { chronic: false })));
+            work.splice(0, work.length, ...next.slice(0, MAX_ITEMS));
+            mark(); paint();
+            note.textContent = "The official list is ready. Press Save list to publish it.";
+        });
         const actions = make("div", "modal-actions");
         const cancel = make("button", "cancel-btn", "Close"); cancel.type = "button";
         const save = make("button", "save-btn", "Save list"); save.type = "button"; save.disabled = true;
-        actions.append(cancel, save);
+        actions.append(official, cancel, save);
         frame.box.append(intro, reach, rows, addBox, addNote, note, actions);
 
         const mark = () => { dirty = true; save.disabled = false; note.textContent = ""; };
@@ -169,6 +181,15 @@ export function openListManager(kind, context) {
                     middle.appendChild(keys);
                 }
 
+                if (kind === "conditions") {
+                    const pick = make("label", "lists-pick");
+                    const box = make("input"); box.type = "checkbox"; box.checked = item.chronic === true;
+                    box.setAttribute("aria-label", `Users can pick ${item.label} as a chronic skin condition`);
+                    box.addEventListener("change", () => { item.chronic = box.checked; mark(); });
+                    pick.append(box, make("span", "", " Users can pick it"));
+                    middle.appendChild(pick);
+                }
+
                 const count = usedBy(item);
                 const meta = make("span", "lists-meta");
                 meta.append(make("code", "", item.id), make("span", "", count === 0 ? "not used" : `used by ${count}`));
@@ -203,7 +224,7 @@ export function openListManager(kind, context) {
                 addButton.textContent = "Add anyway";
                 return;
             }
-            work.push({ id: slugId(label, work.map((item) => item.id)), label, keywords: spec.words ? (keys.length ? keys : [label.toLowerCase()]) : [], retired: false });
+            work.push({ id: slugId(label, work.map((item) => item.id)), label, keywords: spec.words ? (keys.length ? keys : [label.toLowerCase()]) : [], retired: false, chronic: kind === "conditions" });
             addLabel.value = ""; addWords.value = ""; addNote.textContent = ""; pendingWarning = ""; addButton.textContent = "Add";
             mark(); paint();
             addLabel.focus();
@@ -221,7 +242,7 @@ export function openListManager(kind, context) {
                 if (verdict.error) { note.textContent = verdict.error; return; }
             }
             const next = work.map((item) => {
-                const clean = cleanItem({ id: item.id, label: item.label, keywords: item.keywords, retired: item.retired });
+                const clean = cleanItem({ id: item.id, label: item.label, keywords: item.keywords, retired: item.retired, chronic: item.chronic });
                 if (!clean) return null;
                 if (spec.words) keepOldName(clean, firstLabels.get(item.id));
                 if (spec.words && clean.keywords.length === 0) clean.keywords = [clean.label.toLowerCase()];

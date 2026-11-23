@@ -10,7 +10,8 @@ const equal = (a, b, what) => check(JSON.stringify(a) === JSON.stringify(b), `${
 
 const empty = normalizeLists(null);
 equal(empty.allergens.map((i) => i.id), BUILT_IN.allergens.map((i) => i.id), "no document: the built-in allergen families");
-equal(empty.conditions.length, 7, "no document: the seven built-in skin conditions");
+equal(empty.conditions.length, 30, "no document: the 30 official skin conditions (15 chronic, 15 general)");
+check(empty.conditions.filter((i) => i.chronic).length === 15, "no document: 15 of them are offered to users as chronic skin conditions");
 equal(empty.highlights.map((i) => i.id), ["keyActive", "umbrella"], "no document: the two built-in highlights");
 equal(empty.version, 0, "no document: version 0");
 
@@ -39,7 +40,7 @@ const conditions = BUILT_IN.conditions.map((i) => Object.assign({ retired: false
 check(checkItem(conditions, "", [], null).error !== "", "an empty name is refused");
 check(checkItem(conditions, "acne", [], null).error !== "", "the same name in other letters is refused");
 check(checkItem(conditions, "ACNE ", [], null).error !== "", "capitals and spaces do not make a new name");
-check(checkItem(conditions, "Eczema (Atopic Dermatitis)", [], null).error !== "", "an existing label is refused");
+check(checkItem(conditions, "Atopic Dermatitis", [], null).error !== "", "an existing label is refused");
 equal(checkItem(conditions, "Dandruff", ["dandruff"], null), { error: "", warnings: [] }, "a new name passes cleanly");
 check(checkItem(conditions, "Rosacia", [], null).warnings.length === 1, "a look-alike (one letter off) is a warning, not a refusal");
 check(checkItem(conditions, "Eczema", [], null).error !== "", "a name that is an existing id is refused");

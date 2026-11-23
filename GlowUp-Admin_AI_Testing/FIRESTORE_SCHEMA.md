@@ -342,3 +342,8 @@ In [_Shared/adminCommon.js](_Shared/adminCommon.js), `REQUIRE_ADMIN_RECORD` is `
 An admin account cannot read users' profiles or scan histories. Everything not listed is refused.
 
 The rules in [firestore.rules](firestore.rules) were previously checked on the local Firestore emulator (126 checks) and published to the project on 9 October 2026. Publish this updated file before using AI ingredient suggestions; until then, Firestore will reject the app's new suggestions.
+
+## Official skin lists (23 November 2026)
+
+- **Skin types** (ingredient fit and user profile): Normal, Dry, Oily, Combination, Sensitive. The stored word of Combination stays `Mix` (ingredients and saved profiles carry it); only the label changed. `Sensitive` is new.
+- **`config/lists` conditions**: 30 official items. Each item may carry `chronic: true` = offered to users as a Chronic Skin Condition (the 15 chronic ones); the other 15 are general Skin Conditions used only by the ingredient rules. Ids never change; the ids that existed before (acne, eczema, psoriasis, rosacea, seborrheic, melasma, contact) are kept. A list saved before the flag existed offers every condition to users until it is replaced (Ingredient Curator > conditions list > "Use the official list" > Save list).

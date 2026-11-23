@@ -45,7 +45,7 @@ namespace GlowUp.Scan
         };
 
         static readonly string[] AllergenTags = { "fragrance", "paraben", "sulfate", "formaldehyde", "lanolin", "essentialoil", "nut" };
-        static readonly string[] SkinTypes = { "Oily", "Normal", "Dry", "Mix" };
+        static readonly string[] SkinTypes = { "Oily", "Normal", "Dry", "Mix", "Sensitive" };
         static readonly string[] Conditions = { "acne", "eczema", "psoriasis", "rosacea", "seborrheic", "melasma", "contact" };
         static readonly string[] RiskLevels = { "safe", "caution", "harmful" };
 
@@ -125,7 +125,7 @@ namespace GlowUp.Scan
             q.Append("\"cautionNote\":\"a short phrase that completes the sentence 'It ...', or empty\",");
             q.Append("\"regulatoryNote\":\"if a regulator (US FDA, FDA Philippines / ASEAN Cosmetic Directive, EU) prohibits or restricts it in cosmetics, say which one and how; otherwise empty\",");
             q.Append("\"allergenTags\":[any of: fragrance, paraben, sulfate, formaldehyde, lanolin, essentialoil, nut],");
-            q.Append("\"avoidForSkinTypes\":[any of: Oily, Normal, Dry, Mix],\"goodForSkinTypes\":[any of: Oily, Normal, Dry, Mix],");
+            q.Append("\"avoidForSkinTypes\":[any of: Oily, Normal, Dry, Mix, Sensitive],\"goodForSkinTypes\":[any of: Oily, Normal, Dry, Mix, Sensitive],");
             q.Append("\"avoidForConditions\":[any of: acne, eczema, psoriasis, rosacea, seborrheic, melasma, contact],");
             q.Append("\"goodForConditions\":[any of: acne, eczema, psoriasis, rosacea, seborrheic, melasma, contact],");
             q.Append("\"minAge\":0,\"keyActive\":false,\"umbrella\":false,\"aliases\":[\"other spellings used on labels\"],");

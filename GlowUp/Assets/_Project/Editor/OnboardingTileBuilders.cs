@@ -24,21 +24,34 @@ namespace GlowUp.EditorTools
             var scene = SceneBuilderCore.Open("OnboardingStep2Scene");
             var c = BuildChrome(2, "Skin Type Selection");
 
-            const float cellH = 260, gap = 16;
+            const float cellH = 210, gap = 16, wideH = 170;
             var grid = TileGrid(c.card, "SkinTypeTiles", gap);
             RemoveBrokenScripts(grid.gameObject);
             Top(grid, c.card, HeaderBottom, 2 * cellH + gap);
             grid.GetComponent<GridLayoutGroup>().cellSize = new Vector2((InnerWidth - gap) / 2f, cellH);
 
             // each tile: OuterPanel (frame, subtitle at the bottom) > InnerPanel (skin texture, skin type name inside)
-            var oily = SkinTile(grid, "OilyCard", "OilyText", "Oily", "Oil Control Needed", SkinTextureFactory.Oily, "Shiny T-zone, visible pores");
+            // the official skin types (23 Nov 2026), in this order: Normal, Dry, Oily, Combination, Sensitive. A tile's VALUE is what is saved;
+            // "Mix" stays the saved word of Combination, so old profiles and ingredient rules keep working.
             var normal = SkinTile(grid, "NormalCard", "NormalText", "Normal", "Balanced Skin", SkinTextureFactory.Normal, "Comfortable, few concerns");
             var dry = SkinTile(grid, "DryCard", "DryText", "Dry", "Needs Hydration", SkinTextureFactory.Dry, "Tight, rough or flaky");
+            var oily = SkinTile(grid, "OilyCard", "OilyText", "Oily", "Oil Control Needed", SkinTextureFactory.Oily, "Shiny T-zone, visible pores");
             var mix = SkinTile(grid, "MixCard", "MixText", "Mix", "Combination Zones", SkinTextureFactory.Mix, "Oily T-zone, dry cheeks");
+            SetTileTitle(mix, "MixText", "Combination");
+            // the fifth tile spans the row under the grid
+            var sensitive = SkinTile(grid, "SensitiveCard", "SensitiveText", "Sensitive", "Reacts Easily", SkinTextureFactory.Dry, "Stings, itches or flushes easily");
+            var sensitiveRoot = sensitive.transform;
+            sensitiveRoot.SetParent(c.card, false);
+            Top(sensitiveRoot, c.card, HeaderBottom + 2 * cellH + gap + gap, wideH);
+            // the five names share one size that fits "Combination" and the short window of a tile
+            foreach (var pair in new (SelectableTile tile, string name)[] { (normal, "NormalText"), (dry, "DryText"), (oily, "OilyText"), (mix, "MixText"), (sensitive, "SensitiveText") })
+                foreach (TMP_Text t in pair.tile.GetComponentsInChildren<TMP_Text>(true))
+                    if (t.name == pair.name) { t.fontSize = 46; t.enableAutoSizing = true; t.fontSizeMin = 30; t.fontSizeMax = 46; t.alignment = TextAlignmentOptions.Bottom; }   // below the hint pill a new user sees
+            Transform sensitiveBadge = sensitiveRoot.Find("InfoBadge"); if (sensitiveBadge != null) Object.DestroyImmediate(sensitiveBadge.gameObject);   // its window is too short for a hint pill
             var group = SceneBuilderCore.Ensure<TileSelectionGroup>(grid.gameObject);
-            SetArray(group, "tiles", new Object[] { oily, normal, dry, mix });
+            SetArray(group, "tiles", new Object[] { normal, dry, oily, mix, sensitive });
 
-            float y = HeaderBottom + 2 * cellH + gap + 18;
+            float y = HeaderBottom + 2 * cellH + gap + gap + wideH + 14;
             // panel revision (22 Nov 2026): help is on the page, the user never has to look it up elsewhere
             var finder = HelpLink(c.card, "SkinTypeFinderButton", "Find my skin type", y, true);
             var sources = HelpLink(c.card, "SkinListSourcesButton", "Where lists come from", y, false);
@@ -51,7 +64,7 @@ namespace GlowUp.EditorTools
             Top(desc.transform, c.card, y, 44); Role(desc.transform, ThemeRole.SecondaryText); y += 54;
 
             var panel = ChecklistBuilder.Build(c.card, "ConditionsPanel", y,
-                new[] { "Acne", "Eczema (Atopic Dermatitis)", "Psoriasis", "Rosacea", "Seborrheic Dermatitis", "Melasma / Hyperpigmentation", "Contact Dermatitis" },
+                new[] { "Atopic Dermatitis", "Psoriasis", "Rosacea", "Seborrheic Dermatitis", "Allergic Contact Dermatitis", "Irritant Contact Dermatitis", "Hidradenitis Suppurativa", "Lichen Planus", "Chronic Urticaria", "Alopecia Areata", "Vitiligo", "Chronic Prurigo", "Cutaneous Lupus Erythematosus", "Lichen Sclerosus", "Ichthyosis" },
                 "Not listed? Add it here", null, null, null, c.feedback);
 
             var go = SceneBuilderCore.EnsureRoot("OnboardingStep2FlowController");
@@ -337,6 +350,12 @@ namespace GlowUp.EditorTools
         //  Skin type tile: the same composition as the skin-tone tile, with the close-up skin
         //  texture shown inside the INNER panel instead of a solid colour
         // =====================================================================================
+        /// <summary>Changes only the words a tile shows (its saved value stays what the tile was made with).</summary>
+        static void SetTileTitle(SelectableTile tile, string textObjectName, string words)
+        {
+            foreach (TMP_Text t in tile.GetComponentsInChildren<TMP_Text>(true)) if (t.name == textObjectName) t.text = words;
+        }
+
         static SelectableTile SkinTile(Transform grid, string cardName, string titleName, string title, string subtitle, Sprite face, string badgeText)
         {
             GameObject existingRoot = SceneBuilderCore.FindInScene(cardName);

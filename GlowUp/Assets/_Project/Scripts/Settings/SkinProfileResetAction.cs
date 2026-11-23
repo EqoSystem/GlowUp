@@ -59,7 +59,7 @@ namespace GlowUp.AppSettings
         void Show(UserProfileData p)
         {
             if (currentProfileText == null) return;
-            string type = p != null && !string.IsNullOrWhiteSpace(p.skinType) ? p.skinType : notSet;
+            string type = p != null && !string.IsNullOrWhiteSpace(p.skinType) ? GlowUp.Onboarding.SkinTypeNames.Display(p.skinType) : notSet;
             string tone = p != null && !string.IsNullOrWhiteSpace(p.skinTone) ? p.skinTone : notSet;
             int conditions = p != null && p.skinConditions != null ? p.skinConditions.Count : 0;
             int allergens = p != null ? p.RealAllergens().Count : 0;

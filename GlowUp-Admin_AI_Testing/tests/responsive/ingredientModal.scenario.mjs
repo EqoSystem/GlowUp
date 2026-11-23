@@ -233,7 +233,7 @@ try {
         await page.click(".ing-head h3");
         await page.evaluate(() => { document.getElementById("ingBody").scrollTop = 0; document.querySelector(".ing-close").focus(); });
         const trail = [];
-        for (let i = 0; i < 90; i++) {
+        for (let i = 0; i < 260; i++) {
             await page.keyboard.press("Tab");
             const info = await page.evaluate(() => { const a = document.activeElement; const r = a.getBoundingClientRect(); return { inside: !!a.closest("#addIngredientModal"), top: Math.round(r.top + document.getElementById("ingBody").scrollTop), where: a.closest(".ing-body") ? "body" : a.closest(".ing-nav") ? "nav" : a.closest(".ing-foot") ? "foot" : "head", id: a.id || a.className }; });
             trail.push(info);
