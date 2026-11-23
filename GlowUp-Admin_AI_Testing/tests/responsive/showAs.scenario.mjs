@@ -4,7 +4,7 @@
 import { launch, openPage } from "./harness.mjs";
 let checks = 0, failed = 0;
 const ok = (good, what) => { checks++; if (!good) { failed++; console.log("FAILED: " + what); } };
-const NOT_DATA = new Set(["notes", "tools", "import", "batch", "ai-drafts"]);
+const NOT_DATA = new Set(["notes", "tools", "import", "ai-drafts"]);
 const browser = await launch();
 const lacking = [];
 try {

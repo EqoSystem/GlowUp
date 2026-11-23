@@ -27,6 +27,22 @@ export function parseBarcodes(text) {
     return { kind, codes: codes.slice(0, MAX_BARCODES), tooMany: Math.max(0, codes.length - MAX_BARCODES), invalid, duplicates, entries: entries.length };
 }
 
+// The same reading as parseBarcodes, entry by entry, for the Batch Lookup window: every typed entry keeps its place and says what
+// it is. state: "valid" (looked up), "duplicate" (the same barcode again, zeros ignored), "invalid" (not 8 to 14 digits).
+export function parseEntries(text) {
+    const entries = String(text || "").split(/[\r\n,;\t|]+/)
+        .map((e) => e.replace(/^["'`\s]+|["'`\s]+$/g, "").trim()).filter(Boolean).filter((e) => !HEADER.test(e));
+    const seen = new Set();
+    return entries.map((entry) => {
+        const digits = entry.replace(/[\s-]/g, "");
+        if (!/^\d{8,14}$/.test(digits)) return { raw: entry.slice(0, 40), code: "", state: "invalid" };
+        const key = barcodeKey(digits) || digits.replace(/^0+/, "");
+        if (seen.has(key)) return { raw: entry, code: digits, state: "duplicate" };
+        seen.add(key);
+        return { raw: entry, code: digits, state: "valid" };
+    });
+}
+
 // One look-up result as an import record (the shape saveImportedProducts reads).
 export function recordFromCandidate(candidate, code) {
     const c = candidate || {};

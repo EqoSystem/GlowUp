@@ -647,7 +647,7 @@ namespace GlowUp.EditorTools
         /// One control of the bottom row (phase 1B): the whole slot is the button; inside it a round disc with the icon, and the name under it
         /// (it gets smaller, then wraps, never runs out). The caption is the button's only text, so LabelOf finds it.
         /// </summary>
-        static Button ControlButton(Transform slotParent, string name, Sprite icon, string caption, ThemeRole fill, ThemeRole ink, bool outline,
+        internal static Button ControlButton(Transform slotParent, string name, Sprite icon, string caption, ThemeRole fill, ThemeRole ink, bool outline,
                                     out TextMeshProUGUI captionText)
         {
             GameObject slot = A.Node(slotParent, name.Replace("Button", "Slot"));

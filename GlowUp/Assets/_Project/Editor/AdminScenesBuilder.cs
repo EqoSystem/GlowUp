@@ -36,7 +36,7 @@ namespace GlowUp.EditorTools
         // =====================================================================================
         //  Login: the "Admin?" row (closed by default) with ONE gold Staff / Admin Access button
         // =====================================================================================
-        const float ToggleBottom = 142;          // above the legal line (56 + 70 high) with a gap
+        const float ToggleBottom = 166;          // above the legal line (56 + 70 high) with a gap
 
         public static void AddLoginAccordion(Transform card, float y)
         {
@@ -465,6 +465,8 @@ namespace GlowUp.EditorTools
         // =====================================================================================
         //  3. Capture: camera / photos / gallery, then the review form
         // =====================================================================================
+        const float BottomBlock = 660;          // space under the camera view of the capture screen: controls, role chips, thumbnails, Read & review
+
         [MenuItem("GlowUp/Build Scene/16c Staff Capture", false, 129)]
         public static void BuildCapture()
         {
@@ -477,7 +479,7 @@ namespace GlowUp.EditorTools
             GameObject cap = A.Node(card, "CapturePanel");
             A.Fill(cap.transform);
             Image viewport = A.RawPanel(cap.transform, "CameraViewport", new Color32(30, 26, 25, 255), 48f);
-            A.TopStrip(viewport.transform, A.HeaderBottom, 860);
+            A.Between(viewport.transform, A.HeaderBottom, BottomBlock);
             viewport.gameObject.AddComponent<Mask>().showMaskGraphic = true;
             GameObject mirror = A.Node(viewport.transform, "MirrorRoot");
             A.Fill(mirror.transform);
@@ -490,43 +492,75 @@ namespace GlowUp.EditorTools
             var preview = previewObject.GetComponent<RawImage>(); preview.raycastTarget = false;
             previewObject.AddComponent<AspectRatioFitter>().aspectMode = AspectRatioFitter.AspectMode.FitInParent;
             previewObject.SetActive(false);
+
+            // Layout copied from the user's AI Smart Scan camera (SmartScanSceneBuilder): the scan frame (guiding mesh, corner brackets,
+            // sweeping line) inset in the picture, round torch button on the right edge, the hint as a pill at the bottom of the picture,
+            // and under the picture one row: Gallery | round capture disc | Type it in. Everything is anchored, so it follows the screen.
             GameObject frame = A.Node(viewport.transform, "ScanFrame", typeof(Image));
-            A.At(frame.transform, A.MC, new Vector2(0, 40), new Vector2(700, 520));
-            var frameImage = frame.GetComponent<Image>(); frameImage.sprite = IconFactory.ScanFrame; frameImage.type = Image.Type.Simple; frameImage.color = new Color(1, 1, 1, 0.9f); frameImage.raycastTarget = false;
-            Image laser = A.RawPanel(frame.transform, "ScanLine", new Color(0.95f, 0.36f, 0.58f, 0.95f), 12f);
-            laser.sprite = IconFactory.ScanLine; laser.type = Image.Type.Simple; laser.raycastTarget = false;
-            A.At(laser.transform, A.MC, Vector2.zero, new Vector2(620, 22));
+            A.Fill(frame.transform, 56, 196, 56, 200);          // top inset leaves room for the Focus / Lighting / Clear Image card and the torch button
+            var frameImage = frame.GetComponent<Image>(); frameImage.sprite = IconFactory.ScanFrame; frameImage.type = Image.Type.Sliced; frameImage.preserveAspect = false;
+            frameImage.color = Color.white; frameImage.raycastTarget = false;
+            Image mesh = A.RawIcon(frame.transform, "GuideMesh", IconFactory.GuideMesh, 64, new Color(1, 1, 1, 0.22f));
+            mesh.type = Image.Type.Tiled; mesh.preserveAspect = false; mesh.raycastTarget = false;
+            A.Fill(mesh.transform, 12, 12, 12, 12);
+            Image laser = A.RawIcon(frame.transform, "ScanLine", IconFactory.ScanLine, 26, new Color(0.95f, 0.36f, 0.58f, 0.95f));
+            laser.preserveAspect = false; laser.raycastTarget = false;
+            var laserRect = laser.rectTransform;
+            laserRect.anchorMin = new Vector2(0, 0.5f); laserRect.anchorMax = new Vector2(1, 0.5f); laserRect.pivot = A.MC;
+            laserRect.anchoredPosition = Vector2.zero; laserRect.sizeDelta = new Vector2(-40, 26);
             var sweep = SceneBuilderCore.Ensure<ScanLineSweep>(frame);
-            A.Set(sweep, "line", laser.rectTransform); A.Set(sweep, "area", (RectTransform)frame.transform);
+            A.Set(sweep, "line", laserRect); A.Set(sweep, "area", (RectTransform)frame.transform);
 
-            Image hintBack = A.RawPanel(viewport.transform, "HintBackdrop", new Color(0, 0, 0, 0.5f), 36f);
-            A.TopStrip(hintBack.transform, 24, 64, 90, 90); hintBack.raycastTarget = false;
-            TextMeshProUGUI hint = A.RawLabel(hintBack.transform, "HintText", "Keep the product in frame", 28, Color.white, FontRole.Body, TextAlignmentOptions.Center);
-            A.Fill(hint.transform, 18, 0, 18, 0); A.Shrink(hint, 20);
+            Image hintBack = A.RawPanel(viewport.transform, "HintBackdrop", new Color(0, 0, 0, 0.5f), 60f);
+            A.BottomStrip(hintBack.transform, 46, 104, 56, 56); hintBack.raycastTarget = false;
+            TextMeshProUGUI hint = A.RawLabel(hintBack.transform, "HintText", "Keep the product in frame", 30, Color.white, FontRole.Label, TextAlignmentOptions.Center, true);
+            A.Fill(hint.transform, 34, 6, 34, 6);
 
-            // Focus / Lighting / Clear Image: ticks that turn green from the live camera picture (Take Photo mock-up)
+            // the round torch button on the right edge of the picture (same button as the user's sun / flashlight)
+            Button torch = SmartScanSceneBuilder.CameraButton(viewport.transform, "TorchButton", IconFactory.Bolt, out Image torchIcon);
+            A.At(torch.transform, A.TR, new Vector2(-24, -24), new Vector2(92, 92));
+
+            // Focus / Lighting / Clear Image: ticks that turn green from the live camera picture (photo mode); top left, clear of the frame
             Image checkBack = A.RawPanel(viewport.transform, "ChecklistCard", new Color(1, 1, 1, 0.88f), 36f);
-            A.BottomStrip(checkBack.transform, 24, 168, 120, 120); checkBack.raycastTarget = false;
+            A.At(checkBack.transform, A.TL, new Vector2(24, -24), new Vector2(380, 168)); checkBack.raycastTarget = false;
             string[] checkNames = { "Focus", "Lighting", "Clear Image" };
             var checkTicks = new Image[3];
             for (int i = 0; i < 3; i++)
             {
                 TextMeshProUGUI cl = A.RawLabel(checkBack.transform, "CheckLabel_" + checkNames[i], checkNames[i], 28, new Color(0.25f, 0.20f, 0.21f), FontRole.Label, TextAlignmentOptions.MidlineLeft);
-                A.TopStrip(cl.transform, 14 + i * 50, 46, 28, 90); A.Shrink(cl, 20);
+                A.TopStrip(cl.transform, 14 + i * 50, 46, 28, 76); A.Shrink(cl, 20);
                 checkTicks[i] = A.RawIcon(checkBack.transform, "CheckTick_" + checkNames[i], IconFactory.Check, 36, new Color(0.70f, 0.66f, 0.67f));
                 A.At(checkTicks[i].transform, A.TR, new Vector2(-30, -(14 + i * 50 + 5)), new Vector2(36, 36));
             }
 
-            float controlsY = A.HeaderBottom + 880;
-            Button galleryBtn = A.IconButton(cap.transform, "GalleryButton", IconFactory.Document, 112, 56, ThemeRole.MainText, ThemeRole.SurfaceAlt);
-            A.At(galleryBtn.transform, A.TL, new Vector2(80, -controlsY - 20), new Vector2(112, 112));
-            Button shutter = A.IconButton(cap.transform, "ShutterButton", IconFactory.CameraIcon, 150, 64, ThemeRole.ButtonText, ThemeRole.ButtonFill);
-            A.At(shutter.transform, A.TC, new Vector2(0, -controlsY), new Vector2(150, 150));
-            Button torch = A.IconButton(cap.transform, "TorchButton", IconFactory.Bolt, 112, 56, ThemeRole.MainText, ThemeRole.SurfaceAlt);
-            A.At(torch.transform, A.TR, new Vector2(-80, -controlsY - 20), new Vector2(112, 112));
+            // ---- under the picture, from the bottom up: Read & review, thumbnails, role chips, then the row of controls ----
+            GameObject controlBar = A.Node(cap.transform, "ControlBar");
+            A.BottomStrip(controlBar.transform, 396, 250);
+            A.HStack(controlBar, 0, 0, 0, 0, 0, TextAnchor.MiddleCenter).childForceExpandHeight = true;
+            GameObject leftSide = A.Node(controlBar.transform, "LeftControls");
+            A.Size(leftSide.transform, -1, -1, 1, 1);
+            A.HStack(leftSide, 6, 0, 6, 0, 0, TextAnchor.MiddleCenter, true).childForceExpandHeight = true;
+            GameObject shutterSlot = A.Node(controlBar.transform, "ShutterSlot");
+            A.Size(shutterSlot.transform, 240, 240, 0, 0);
+            Image disc = A.RawPanel(shutterSlot.transform, "ShutterButton", new Color32(255, 185, 213, 255), 190f);
+            disc.raycastTarget = true;
+            A.At(disc.transform, A.MC, Vector2.zero, new Vector2(190, 190));
+            Color32 ink = new Color32(58, 47, 48, 255);
+            Image shutterIcon = A.RawIcon(disc.transform, "Icon", IconFactory.CameraIcon, 56, ink);
+            shutterIcon.rectTransform.anchoredPosition = new Vector2(0, 26);
+            TextMeshProUGUI shutterLabel = A.RawLabel(disc.transform, "Label", "Capture", 23, ink, FontRole.Button, TextAlignmentOptions.Center);
+            A.At(shutterLabel.transform, A.MC, new Vector2(0, -34), new Vector2(154, 40));
+            A.Shrink(shutterLabel, 17); shutterLabel.raycastTarget = false;
+            Button shutter = disc.gameObject.AddComponent<Button>(); shutter.targetGraphic = disc;
+            SceneBuilderCore.Ensure<ButtonPressFeedback>(disc.gameObject);
+            GameObject rightSide = A.Node(controlBar.transform, "RightControls");
+            A.Size(rightSide.transform, -1, -1, 1, 1);
+            A.HStack(rightSide, 6, 6, 0, 0, 0, TextAnchor.MiddleCenter, true).childForceExpandHeight = true;
+            Button galleryBtn = SmartScanSceneBuilder.ControlButton(leftSide.transform, "GalleryButton", IconFactory.Document, "Gallery", ThemeRole.SurfaceAlt, ThemeRole.MainText, true, out _);
+            Button typeInstead = SmartScanSceneBuilder.ControlButton(rightSide.transform, "TypeInsteadButton", IconFactory.Pencil, "Type it in", ThemeRole.Surface, ThemeRole.MainText, true, out _);
 
             GameObject roles = A.Node(cap.transform, "RoleBar");
-            A.TopStrip(roles.transform, controlsY + 170, 76);
+            A.BottomStrip(roles.transform, 310, 72);
             A.HStack(roles, 10, 0, 0, 0, 0, TextAnchor.MiddleCenter);
             string[] roleNames = { "Front", "Back", "Ingredients", "Barcode", "Shade" };
             var roleButtons = new Button[roleNames.Length];
@@ -537,7 +571,7 @@ namespace GlowUp.EditorTools
             }
 
             GameObject thumbs = A.Node(cap.transform, "Thumbnails");
-            A.TopStrip(thumbs.transform, controlsY + 262, 150);
+            A.BottomStrip(thumbs.transform, 148, 150);
             A.HStack(thumbs, 12, 0, 0, 0, 0, TextAnchor.MiddleLeft);
             GameObject thumb = A.Node(thumbs.transform, "ThumbTemplate", typeof(Image));
             Image thumbBack = thumb.GetComponent<Image>(); Kit.StyleRounded(thumbBack); thumbBack.color = Color.white; SceneBuilderCore.Themed(thumb, ThemeRole.SurfaceAlt);
@@ -551,9 +585,7 @@ namespace GlowUp.EditorTools
             A.At(remove.transform, A.TR, new Vector2(4, 4), new Vector2(48, 48));
 
             Button cont = A.PillButton(cap.transform, "ContinueButton", "Read & review", 38, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Check);
-            A.BottomStrip(cont.transform, 120, 116);
-            Button typeInstead = A.LinkButton(cap.transform, "TypeInsteadButton", "Type details instead", 30, ThemeRole.AccentText);
-            A.BottomStrip(typeInstead.transform, 34, 76, 200, 200);
+            A.BottomStrip(cont.transform, 24, 108);
 
             // ---------------- batch list (Batch Mode) ----------------
             GameObject batch = A.Node(card, "BatchPanel");

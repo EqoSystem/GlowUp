@@ -72,6 +72,7 @@ import {
 } from "../_Shared/capture.js";
 import { loadCatalogue, lookupProduct } from "../_Shared/quickFill.js";
 import { parseBarcodes, lookupBatch, batchSummary } from "../_Shared/batchBarcodes.js";
+import { openBatchLookup } from "./batchLookup.js";
 
 const OTHER_TYPE = "__other__";
 let paintCounters = () => { };              // character counters under the form fields (charLimit.js)
@@ -352,12 +353,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("addBrandForm").addEventListener("submit", saveBrand);
     el("productForm").addEventListener("submit", saveProduct);
     el("chooseInventoryFileBtn").addEventListener("click", () => el("inventoryFileInput").click());
-    const batchButton = el("inventoryBatchBtn"), batchText = el("inventoryBatchText");
-    if (batchButton && batchText) batchButton.addEventListener("click", () => {
-        const parsed = parseBarcodes(batchText.value);
-        if (parsed.kind !== "barcodes") { notify("Paste barcodes (8 to 14 digits), one per line or separated by commas.", "info"); batchText.focus(); return; }
-        importInventoryFile(new File([batchText.value], "Pasted barcodes.txt", { type: "text/plain" }));
-    });
+    const batchLookupBtn = el("batchLookupBtn");
+    if (batchLookupBtn) batchLookupBtn.addEventListener("click", () => openBatchLookup({
+        lookup: (code) => lookupProduct(code, { getToken: () => (auth.currentUser ? auth.currentUser.getIdToken() : "") }),
+        existing: (code) => everyProduct.find((p) => !p.binned && barcodeKey(p.barcode) === barcodeKey(code)) || null,
+        importRecords: (records) => saveInventoryDraft({ products: records, brands: [] }, "Batch lookup.txt", () => {}),
+        notify
+    }));
     el("inventoryDropBox").addEventListener("click", () => el("inventoryFileInput").click());
     el("inventoryFileInput").addEventListener("change", (event) => {
         const file = event.target.files && event.target.files[0];

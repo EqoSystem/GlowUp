@@ -153,12 +153,35 @@ th .th-line small { font-weight: 500; letter-spacing: 0; text-transform: none; m
 .contains-note { margin-left: calc(8 * var(--u)); font-size: var(--fs-xs); color: var(--muted); font-style: italic; white-space: nowrap; }
 
 /* Batch barcodes: a folded paste box under the file drop (23 Nov 2026) */
-.import-batch { margin-top: 0; }
-.import-batch > summary { cursor: pointer; font-weight: 700; color: var(--text); padding: calc(6 * var(--u)) 0; }
-.import-batch textarea { display: block; width: 100%; box-sizing: border-box; margin: calc(8 * var(--u)) 0; padding: calc(10 * var(--u)) calc(12 * var(--u)); font: inherit; font-family: ui-monospace, Consolas, monospace; border: 1px solid var(--border, #cdbcbc); border-radius: calc(10 * var(--u)); background: var(--surface, #fff); color: var(--text); resize: vertical; }
-.import-batch .field-hint { display: block; }
 
-/* Batch barcodes panel: sits under the import panel, same width; touch-size button (44 px guideline) */
-.batch-panel .import-batch { display: flex; flex-direction: column; gap: calc(8 * var(--u)); }
-.batch-panel .import-batch textarea { margin: 0; min-height: calc(96 * var(--u)); }
-.batch-panel #inventoryBatchBtn { align-self: flex-start; min-height: 44px; }
+/* Batch Lookup: a drawer on the right on wide screens, a full-screen sheet on a phone (inventory page only) */
+.drawer-overlay { justify-content: flex-end; align-items: stretch; padding: 0; }
+.modal-content.drawer { width: min(calc(560 * var(--u)), 100%); height: 100%; max-height: 100%; border-radius: var(--radius) 0 0 var(--radius); padding: 0; display: flex; flex-direction: column; overflow: hidden; animation: drawer-in .22s var(--ease); }
+@keyframes drawer-in { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .modal-content.drawer { animation: none; } }
+@media (max-width: 640px) { .modal-content.drawer { width: 100%; border-radius: 0; } }
+.drawer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: calc(12 * var(--u)); padding: calc(20 * var(--u)) calc(20 * var(--u)) calc(14 * var(--u)); border-bottom: 1px solid var(--border); }
+.drawer-titles { min-width: 0; }
+.drawer-close { flex: none; min-width: 44px; min-height: 44px; }
+.drawer-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: calc(16 * var(--u)) calc(20 * var(--u)) calc(20 * var(--u)); }
+.bl-enter, .bl-results { display: flex; flex-direction: column; gap: calc(12 * var(--u)); }
+.bl-enter[hidden], .bl-results[hidden] { display: none; }
+.bl-enter textarea { width: 100%; box-sizing: border-box; min-height: calc(180 * var(--u)); padding: calc(10 * var(--u)) calc(12 * var(--u)); font: inherit; font-family: ui-monospace, Consolas, monospace; border: 1px solid var(--border); border-radius: calc(10 * var(--u)); background: var(--surface); color: var(--text); resize: vertical; }
+.bl-enter textarea:focus { outline: none; border-color: var(--accent); }
+.bl-actions, .bl-importbar, .bl-tools { display: flex; flex-wrap: wrap; align-items: center; gap: calc(8 * var(--u)); }
+.bl-actions { justify-content: space-between; }
+.bl-actions .btn, .bl-actions .save-btn, .bl-importbar .save-btn, .bl-importbar .cancel-btn, .bl-tools .btn { min-height: 44px; }
+.bl-summary { display: flex; flex-wrap: wrap; gap: calc(6 * var(--u)); }
+.bl-summary .chip { margin: 0; }
+.bl-selectall { display: inline-flex; align-items: center; gap: calc(8 * var(--u)); min-height: 44px; margin-right: auto; font-size: var(--fs-sm); }
+.bl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: calc(6 * var(--u)); }
+.bl-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: calc(8 * var(--u)) calc(10 * var(--u)); padding: calc(8 * var(--u)) calc(10 * var(--u)); border: 1px solid var(--border); border-radius: calc(10 * var(--u)); background: var(--surface-2, var(--surface)); }
+.bl-main { display: flex; flex-direction: column; min-width: 0; }
+.bl-code { font-family: ui-monospace, Consolas, monospace; font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.bl-name, .bl-why { font-size: var(--fs-xs); color: var(--muted); overflow-wrap: anywhere; }
+.bl-row .chip { margin: 0; }
+.bl-row-actions { display: inline-flex; align-items: center; gap: calc(4 * var(--u)); }
+.bl-row .icon-btn, .bl-row .btn { min-height: 44px; min-width: 44px; }
+.bl-importbar { position: sticky; bottom: 0; justify-content: flex-end; padding-top: calc(10 * var(--u)); background: var(--surface); border-top: 1px solid var(--border); }
+.bl-importbar .field-hint { margin-right: auto; }
+@media (max-width: 640px) { .bl-row { grid-template-columns: auto minmax(0, 1fr) auto; } .bl-row-actions { grid-column: 2 / -1; } .bl-importbar .save-btn, .bl-importbar .cancel-btn { flex: 1 1 100%; } }

@@ -1,5 +1,5 @@
-// Batch barcodes (23 Nov 2026): a pasted list of barcodes is looked up, checked in "Check before saving", and saved as Pending with
-// leading zeros kept and every value marked Detected from the barcode look-up. A barcode nobody knows is reported, not invented.
+// Batch Lookup (23 Nov 2026): a toolbar button opens a drawer; pasted barcodes are counted, looked up, listed with a status,
+// and only the selected, found ones are saved, as Pending, with leading zeros kept and every value marked Detected.
 // Every outside answer is made up by the test.
 import { launch, openPage } from "./harness.mjs";
 
@@ -26,37 +26,54 @@ try {
         await ctx.route("**/api/upc-lookup", (route) => route.fulfill({ status: 404, contentType: "application/json", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify({ found: 0, items: [] }) }));
         await settle(800);
 
-        // a plain sentence is refused without any look-up
-        await page.evaluate(() => { document.querySelector(".import-batch").open = true; });
-        await page.fill("#inventoryBatchText", "just some words");
-        await page.click("#inventoryBatchBtn");
-        await page.waitForTimeout(300);
-        ok(asked.length === 0, `${width}px: words are not looked up as barcodes`);
+        ok(await page.locator("[data-panel=batch]").count() === 0, `${width}px: no permanent Batch panel in the sidebar`);
+        ok(await page.locator("#batchLookupBtn").count() === 1, `${width}px: Batch Lookup button is in the Inventory toolbar`);
+        await page.evaluate(() => document.getElementById("batchLookupBtn").click());
+        await page.waitForSelector(".batch-drawer");
+        const box = await page.evaluate(() => { const r = document.querySelector(".batch-drawer").getBoundingClientRect(); return { l: r.left, w: r.width, h: r.height, vw: window.innerWidth, vh: window.innerHeight }; });
+        ok(box.l + box.w <= box.vw + 1 && box.h <= box.vh + 1, `${width}px: the drawer fits the screen`);
+        ok(width > 640 ? box.w < box.vw : box.w >= box.vw - 1, `${width}px: drawer on a wide screen, full width on a phone`);
+        ok(await page.isDisabled(".batch-drawer .bl-actions .save-btn"), `${width}px: Look up is disabled with nothing entered`);
 
-        await page.fill("#inventoryBatchText", "Barcode\n0041554239416\n3600531652294\n0041554239416\n8001234567893");
-        await page.click("#inventoryBatchBtn");
-        await page.waitForSelector(".import-cover.ready", { timeout: 15000 });
+        await page.fill("#batchLookupText", "Barcode\n0041554239416\n3600531652294\n0041554239416\n8001234567893\n123");
+        const counts = await page.textContent(".bl-counts");
+        ok(/5 entered: 3 valid, 1 duplicate, 1 invalid/.test(counts), `${width}px: counts are live (${counts})`);
+        ok(!(await page.isDisabled(".batch-drawer .bl-actions .save-btn")), `${width}px: Look up is enabled`);
+        await page.click(".batch-drawer .bl-actions .save-btn");
+        await page.waitForFunction(() => /Done:/.test(document.querySelector(".bl-progress").textContent), null, { timeout: 15000 });
         ok(asked.filter((c) => c === "0041554239416").length === 1, `${width}px: a repeated barcode is looked up once`);
-        ok(asked.includes("3600531652294") && asked.includes("8001234567893"), `${width}px: every different barcode is looked up (${asked.join(",")})`);
-        await page.click(".import-cover .btn.primary");
-        await page.waitForSelector(".import-check");
-        const checkText = await page.textContent(".import-check");
-        ok(/Batch Great Lash Mascara/.test(checkText) && /Batch Matte Lip Tint/.test(checkText), `${width}px: the found products are listed to check before saving`);
-        await page.click(".import-check [data-save]");
-        await page.waitForSelector(".import-check", { state: "detached", timeout: 8000 });
-        await page.waitForTimeout(500);
+        const statuses = await page.evaluate(() => Array.from(document.querySelectorAll(".bl-row")).map((r) => r.dataset.status).join(","));
+        ok(statuses === "found,found,duplicate,notfound,invalid" || ["found", "duplicate", "notfound", "invalid"].every((s) => statuses.includes(s)), `${width}px: each row has a status (${statuses})`);
+        ok(await page.locator(".bl-row[data-status=found] input:checked").count() === 2, `${width}px: found rows start selected`);
+        ok(await page.locator(".bl-row .btn", { hasText: "Retry" }).count() === 1, `${width}px: a not-found row can be retried`);
+
+        // nothing is saved before the import is confirmed
+        const before = await page.evaluate(() => Array.from(window.__STORE.keys()).filter((k) => k.startsWith("products/")).length);
+        await page.evaluate(() => Array.from(document.querySelectorAll(".bl-row[data-status=found] input")).slice(1).forEach((i) => i.click()));
+        ok(await page.locator(".bl-summary .chip", { hasText: "Selected" }).textContent().then((t) => /^1 /.test(t.trim())), `${width}px: the summary counts the selection`);
+        await page.click(".batch-drawer .bl-importbar .save-btn");
+        await page.waitForSelector(".modal-overlay:last-of-type .modal-actions .save-btn");
+        await page.click(".modal-overlay:last-of-type .modal-actions .save-btn");
+        await page.waitForFunction((n) => Array.from(window.__STORE.keys()).filter((k) => k.startsWith("products/")).length > n, before, { timeout: 8000 });
         const saved = await page.evaluate(() => {
             const out = [];
             for (const [k, v] of window.__STORE) if (k.startsWith("products/") && /^Batch /.test(v.name || "")) out.push(JSON.parse(JSON.stringify(v)));
             return out;
         });
-        ok(saved.length === 2, `${width}px: two products were saved (${saved.length})`);
-        const lash = saved.find((p) => /Great Lash/.test(p.name));
+        ok(saved.length === 1, `${width}px: only the selected product was saved (${saved.length})`);
+        const lash = saved[0];
         ok(lash && lash.barcode === "0041554239416", `${width}px: the barcode keeps its leading zero (${lash && lash.barcode})`);
         ok(lash && lash.status === "Pending" && lash.reviewed === false, `${width}px: saved products wait for review`);
-        ok(lash && lash.fieldOrigins && lash.fieldOrigins.ingredients && lash.fieldOrigins.ingredients.state === "detected" && /Barcode look-up/.test(lash.fieldOrigins.ingredients.from), `${width}px: values are Detected, from the barcode look-up (${lash && lash.fieldOrigins && lash.fieldOrigins.ingredients && lash.fieldOrigins.ingredients.from})`);
-        ok(lash && lash.brandName === "Batchbrand", `${width}px: the brand came from the look-up`);
+        ok(lash && lash.fieldOrigins && lash.fieldOrigins.ingredients && lash.fieldOrigins.ingredients.state === "detected", `${width}px: values are Detected`);
+        ok(await page.locator(".bl-row[data-status=found]").count() === 1, `${width}px: the unselected found row stays in the list`);
         ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `${width}px: no sideways scroll`);
+
+        // Escape asks before throwing results away; Discard closes
+        await page.keyboard.press("Escape");
+        await page.waitForSelector(".modal-overlay:last-of-type .modal-actions .cancel-btn");
+        await page.click(".modal-overlay:last-of-type .modal-actions .save-btn");
+        await page.waitForSelector(".batch-drawer", { state: "detached", timeout: 3000 });
+        ok(true, `${width}px: Escape then Discard closes the drawer`);
         ok(errors.length === 0, `${width}px: no page errors: ` + errors.slice(0, 3).join(" | "));
         await ctx.close();
     }

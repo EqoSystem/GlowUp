@@ -99,20 +99,6 @@
             </section>
 
 
-            <section class="panel import-panel batch-panel" data-panel="batch" data-label="Batch barcodes" data-w="4" data-right>
-                <div class="panel-head">
-                    <h3 class="panel-title">Batch barcodes</h3>
-                </div>
-                <div class="import-batch">
-                
-                    
-                    <label for="inventoryBatchText" class="field-hint">One barcode per line, or separated by commas (8 to 14 digits, zeros kept). Up to 100 at a time. Each one is looked up, then you check the list before anything is saved as Pending.</label>
-                    <textarea id="inventoryBatchText" rows="5" spellcheck="false" autocomplete="off" placeholder="0041554239416&#10;3600531652294"></textarea>
-                    <button type="button" class="btn" id="inventoryBatchBtn"><i data-icon="search"></i>Look up barcodes</button>
-                
-                </div>
-            </section>
-
             <section class="panel bare" data-panel="counts" data-label="Counts" data-w="8" data-source="inventoryCounts">
                 <div class="stat-row">
                     <button type="button" class="stat" data-drill="brands" data-tip-title="Brands" data-tip="Show the list of brands only." data-tip-preview="Click a brand to see its products."><span class="stat-icon"><i data-icon="tag"></i></span><span><span class="stat-value skeleton" id="statBrands">00</span><span class="stat-title">Brands</span></span></button>
@@ -140,7 +126,7 @@
                     <button type="button" class="guide-badge" data-tip-title="How to use this list" data-tip="Click a product to see everything about it; double-click to edit it. Click a brand to open or close it. The app only uses Active products of Active brands." data-tip-preview="Drag rows onto a folder or the Recycle bin. The small box in front of a name picks it; Ctrl+click picks several.">i</button>
                     <span class="panel-count" hidden id="inventoryCountLine"></span>
                     <span class="search-status" id="inventorySearchStatus" role="status" hidden><span id="inventorySearchStatusText"></span><button type="button" class="search-status-clear" id="inventorySearchStatusClear" aria-label="Clear the search"><i data-icon="x"></i></button></span>
-                    <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most scanned, newest, type, or what needs attention first." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i><span class="btn-label">Sort</span><span class="sort-now" id="sortNow"></span></button> <button type="button" class="btn" id="filterMenuBtn" aria-haspopup="dialog" aria-expanded="false" data-tip-title="Filters" data-tip="Narrow the list by kind, status and a few facts at once, then press Apply filters." data-tip-preview="Nothing is read from the database: it only looks through what is already loaded."><i data-icon="sliders"></i><span class="btn-label">Filters</span><span class="sort-now" id="filterNow"></span></button></span>
+                    <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most scanned, newest, type, or what needs attention first." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i><span class="btn-label">Sort</span><span class="sort-now" id="sortNow"></span></button> <button type="button" class="btn" id="batchLookupBtn" aria-haspopup="dialog"><i data-icon="barcode"></i><span class="btn-label">Batch Lookup</span></button> <button type="button" class="btn" id="filterMenuBtn" aria-haspopup="dialog" aria-expanded="false" data-tip-title="Filters" data-tip="Narrow the list by kind, status and a few facts at once, then press Apply filters." data-tip-preview="Nothing is read from the database: it only looks through what is already loaded."><i data-icon="sliders"></i><span class="btn-label">Filters</span><span class="sort-now" id="filterNow"></span></button></span>
                     <span class="shelf" id="inventoryShelf"></span>
                     <span class="shelf" id="inventoryShelfAdd"></span>
                     <span id="inventoryQuick"></span>

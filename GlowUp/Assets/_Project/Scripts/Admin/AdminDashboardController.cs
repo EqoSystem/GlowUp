@@ -82,6 +82,7 @@ namespace GlowUp.Admin
             Hook(tipsButton, () => { if (tipsPanel != null) tipsPanel.Show(); });
             Hook(flashChip, () => { ScannerPrefs.Flash = !ScannerPrefs.Flash; });
             SubmissionStore.Changed += Paint;
+            WebsitePresence.Changed += Paint;
             ScannerPrefs.Changed += Paint;
             ConnectivityMonitor.ConnectivityChanged += OnConnection;
             Paint();
@@ -96,19 +97,23 @@ namespace GlowUp.Admin
                 return;
             }
             SubmissionStore.Start();
+            WebsitePresence.Start();
             Paint();
             // the catalogue on the phone: duplicate warnings and brand matching while capturing (no admin data here)
             try { await BrandRepository.LoadActive(true); await ProductRepository.LoadActive(true); } catch (System.Exception) { }
         }
 
-        void OnDestroy() { BatchQueue.Changed -= Paint; SubmissionStore.Changed -= Paint; ScannerPrefs.Changed -= Paint; ConnectivityMonitor.ConnectivityChanged -= OnConnection; }
+        void OnDestroy() { BatchQueue.Changed -= Paint; SubmissionStore.Changed -= Paint; WebsitePresence.Changed -= Paint; ScannerPrefs.Changed -= Paint; ConnectivityMonitor.ConnectivityChanged -= OnConnection; }
 
         void OnConnection(bool online) { Paint(); }
 
         static void OpenSubmissions() { AdminSubmissionsController.OpenId = ""; SceneNavigator.Go("AdminSubmissionsScene"); }
 
+        float nextPresence;
+
         void Update()
         {
+            if (Time.unscaledTime >= nextPresence) { nextPresence = Time.unscaledTime + 20f; WebsitePresence.Recheck(); }   // a closed site sends no snapshot: re-check the age
             if (!Input.GetKeyDown(KeyCode.Escape)) return;
             if (tipsPanel != null && tipsPanel.IsOpen) { tipsPanel.Hide(); return; }                  // Back closes the tips first
             if (confirmDialog != null && !confirmDialog.IsOpen) AskSignOut();                          // then Back = leave staff mode (asked first)
@@ -137,10 +142,11 @@ namespace GlowUp.Admin
             if (batchText != null) batchText.text = waiting > 0 ? $"Batch: {waiting} waiting ({readyNow} ready)" : "";
 
             // live status bar: what the listener and the connection report, never assumed
-            bool online = ConnectivityMonitor.Online;
-            string sync = online ? SubmissionStore.SyncState : "Offline";
+            // "Online" = this phone has a connection AND at least one admin has the website open (see WebsitePresence)
+            bool online = ConnectivityMonitor.Online && WebsitePresence.AnyOpen;
+            string sync = ConnectivityMonitor.Online ? SubmissionStore.SyncState : "Offline";
             int attention = SubmissionStore.NeedsAttention();
-            string syncWord = !online ? "Offline" : attention > 0 ? "Needs attention" : sync;
+            string syncWord = !ConnectivityMonitor.Online ? "Offline" : attention > 0 ? "Needs attention" : sync;
             if (onlineText != null) onlineText.text = online ? "Online" : "Offline";
             if (onlineDot != null) onlineDot.color = online ? syncedColor : offlineColor;
             if (totalScansText != null) totalScansText.text = "Total Scans: " + (SubmissionStore.Loaded ? SubmissionStore.Items.Count.ToString() : "-");
