@@ -153,7 +153,12 @@ th .th-line small { font-weight: 500; letter-spacing: 0; text-transform: none; m
 .contains-note { margin-left: calc(8 * var(--u)); font-size: var(--fs-xs); color: var(--muted); font-style: italic; white-space: nowrap; }
 
 /* Batch barcodes: a folded paste box under the file drop (23 Nov 2026) */
-.import-batch { margin-top: calc(14 * var(--u)); }
+.import-batch { margin-top: 0; }
 .import-batch > summary { cursor: pointer; font-weight: 700; color: var(--text); padding: calc(6 * var(--u)) 0; }
 .import-batch textarea { display: block; width: 100%; box-sizing: border-box; margin: calc(8 * var(--u)) 0; padding: calc(10 * var(--u)) calc(12 * var(--u)); font: inherit; font-family: ui-monospace, Consolas, monospace; border: 1px solid var(--border, #cdbcbc); border-radius: calc(10 * var(--u)); background: var(--surface, #fff); color: var(--text); resize: vertical; }
 .import-batch .field-hint { display: block; }
+
+/* Batch barcodes panel: sits under the import panel, same width; touch-size button (44 px guideline) */
+.batch-panel .import-batch { display: flex; flex-direction: column; gap: calc(8 * var(--u)); }
+.batch-panel .import-batch textarea { margin: 0; min-height: calc(96 * var(--u)); }
+.batch-panel #inventoryBatchBtn { align-self: flex-start; min-height: 44px; }

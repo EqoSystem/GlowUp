@@ -93,17 +93,25 @@
                     <span><strong>Drop a PDF, Excel, or Word file here</strong><small id="inventoryImportHint">Reads brand, product, cosmetic type, ingredients, source links, and shade colors. Imported entries are saved as Pending for admin review.</small></span>
                 </button>
                 <p class="import-types">Accepted: PDF (.pdf), Excel (.xlsx, .xls), Word (.docx), CSV (.csv), text (.txt). Any size: a long file is read in parts.</p>
-                <details class="import-batch">
-                    <summary>Batch barcodes: paste a list</summary>
-                    <label for="inventoryBatchText" class="field-hint">One barcode per line, or separated by commas (8 to 14 digits, zeros kept). Up to 100 at a time. Each one is looked up, then you check the list before anything is saved as Pending.</label>
-                    <textarea id="inventoryBatchText" rows="5" spellcheck="false" autocomplete="off" placeholder="0041554239416&#10;3600531652294"></textarea>
-                    <button type="button" class="btn" id="inventoryBatchBtn"><i data-icon="search"></i>Look up barcodes</button>
-                </details>
                 <p class="field-hint import-status" id="inventoryImportStatus" role="status" aria-live="polite"></p>
 
                 <div class="import-flags" id="inventoryImportFlags" hidden></div>
             </section>
 
+
+            <section class="panel import-panel batch-panel" data-panel="batch" data-label="Batch barcodes" data-w="4" data-right>
+                <div class="panel-head">
+                    <h3 class="panel-title">Batch barcodes</h3>
+                </div>
+                <div class="import-batch">
+                
+                    
+                    <label for="inventoryBatchText" class="field-hint">One barcode per line, or separated by commas (8 to 14 digits, zeros kept). Up to 100 at a time. Each one is looked up, then you check the list before anything is saved as Pending.</label>
+                    <textarea id="inventoryBatchText" rows="5" spellcheck="false" autocomplete="off" placeholder="0041554239416&#10;3600531652294"></textarea>
+                    <button type="button" class="btn" id="inventoryBatchBtn"><i data-icon="search"></i>Look up barcodes</button>
+                
+                </div>
+            </section>
 
             <section class="panel bare" data-panel="counts" data-label="Counts" data-w="8" data-source="inventoryCounts">
                 <div class="stat-row">
