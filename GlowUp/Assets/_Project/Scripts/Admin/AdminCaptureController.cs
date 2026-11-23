@@ -369,8 +369,9 @@ namespace GlowUp.Admin
             foreach (string key in new[] { "name", "brand", "cosmeticType" })
                 if (!draft.Get(key).Has) { Notice($"{CaptureDraft.Label(key)} is needed. Type it from the pack."); FocusField(key); return; }
             string type = draft.Get("cosmeticType").value, name = draft.Get("name").value;
-            if (!ProductScope.IsMakeup(type, name) && !ProductScope.IsMakeup("", type))
-            { Notice("GlowUp lists make-up and face products only. Check the category (for example Lipstick, Foundation, Mascara)."); FocusField("cosmeticType"); return; }
+            // the same rule as the user's live scan: only a product that is clearly not make-up is stopped; an unclear one goes to the website to be decided
+            ProductScope.Verdict scope = ProductScope.Judge(type, name);
+            if (scope.IsNotMakeup) { Notice(ProductScope.StopMessage(scope)); FocusField("cosmeticType"); return; }
             if (editing != null)
             {   // a batch item: it is kept in the batch, and sent with "Send ready"
                 editing.state = ""; BatchQueue.Touch();

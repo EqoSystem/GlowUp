@@ -6,13 +6,13 @@ namespace GlowUp.Admin
 {
     /// <summary>
     /// "Online" on the staff dashboard means: at least one admin has the website open. The website marks admins/{uid}.lastActiveAt
-    /// (server time) every two minutes while a page is open and visible, so a record newer than five minutes means a page is open.
+    /// (server time) every 30 seconds while a page is open, so a record newer than two minutes means a page is open.
     /// This listens to the admins collection live (staff are admins, so the rules allow the read) and re-checks the age while it
     /// waits, because silence does not produce a snapshot. Nothing is written.
     /// </summary>
     public static class WebsitePresence
     {
-        const double FreshSeconds = 5 * 60;
+        const double FreshSeconds = 120;
         public static event Action Changed;
         public static bool AnyOpen { get; private set; }
 

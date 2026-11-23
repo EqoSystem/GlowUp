@@ -92,10 +92,10 @@ function leaveToLogin(address) {
 // (firestore.rules let an admin write that one field of their own record, and only the server's time).
 let heartbeatTimer = 0;
 function startHeartbeat(user) {
-    const beat = () => { if (!document.hidden) updateDoc(doc(db, "admins", user.uid), { lastActiveAt: serverTimestamp() }).catch(() => { }); };
+    const beat = () => { updateDoc(doc(db, "admins", user.uid), { lastActiveAt: serverTimestamp() }).catch(() => { }); };
     beat();
     window.clearInterval(heartbeatTimer);
-    heartbeatTimer = window.setInterval(beat, 2 * 60 * 1000);
+    heartbeatTimer = window.setInterval(beat, 30 * 1000);   // the phone app shows "Online" while a beat is under 2 minutes old; an open background tab still beats (slowed to about 1 a minute)
     document.addEventListener("visibilitychange", () => { if (!document.hidden) beat(); });
 }
 

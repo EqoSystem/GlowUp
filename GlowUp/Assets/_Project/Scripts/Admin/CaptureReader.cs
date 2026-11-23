@@ -59,6 +59,9 @@ namespace GlowUp.Admin
             OpenBeautyFacts.Result off = await OpenBeautyFacts.Find(digits);
             if (off.answered && (off.found || off.productName.Length > 0))
             {
+                // the same rule as the user's live scan (ProductScope.Judge): a product that is clearly not make-up is stopped, with the same words
+                ProductScope.Verdict verdict = ProductScope.Judge("", off.productName);
+                if (verdict.IsNotMakeup) { d.Save(); return ProductScope.StopMessage(verdict) + " Nothing was taken from this barcode."; }
                 d.Offer("name", off.productName, "Open Beauty Facts", "barcode", false);
                 d.Offer("brand", off.brandName, "Open Beauty Facts", "barcode", false);
                 if (off.ingredientText.Length > 0) TakeIngredients(d, off.ingredientText, "Open Beauty Facts", "barcode", false);

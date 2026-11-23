@@ -63,9 +63,17 @@ namespace GlowUp.Admin
             catch (Exception) { return ""; }
         }
 
+        const string SessionKey = "glowup.lastSession";
+
+        /// <summary>True when the last session on this phone was a staff session (set once the database has granted access, cleared on any sign-out or customer sign-in). Only decides where the app opens; the dashboard still asks the database.</summary>
+        public static bool LastSessionWasStaff => UnityEngine.PlayerPrefs.GetString(SessionKey, "") == "staff";
+        public static void RememberStaffSession() { UnityEngine.PlayerPrefs.SetString(SessionKey, "staff"); UnityEngine.PlayerPrefs.Save(); }
+        public static void ForgetStaffSession() { if (LastSessionWasStaff) { UnityEngine.PlayerPrefs.DeleteKey(SessionKey); UnityEngine.PlayerPrefs.Save(); } }
+
         /// <summary>Signs the staff session out (the customer login starts clean).</summary>
         public static void SignOut()
         {
+            ForgetStaffSession();
             try { FirebaseAuth.DefaultInstance?.SignOut(); } catch (Exception) { }
             GlowUp.Auth.AdminAccount.Forget();
             SubmissionStore.Stop();

@@ -3,6 +3,8 @@ using GlowUp.AppSettings;
 using GlowUp.Common;
 using GlowUp.Data;
 using GlowUp.Net;
+using GlowUp.Performance;
+using GlowUp.Scan;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -24,8 +26,9 @@ namespace GlowUp.Admin
         [Header("Scanner preview")]
         [SerializeField] private Button previewButton;
         [SerializeField] private Button flashChip;
-        [SerializeField] private TextMeshProUGUI flashChipLabel;
-        [SerializeField] private TextMeshProUGUI autoFocusChipLabel;
+        [SerializeField] private RectTransform previewRect, belowRect;   // the camera view, and everything under it (moves down when the view grows)
+        [SerializeField] private TextMeshProUGUI hintText;
+        [SerializeField] private CameraFeedController cameraFeed;        // the live camera view (same component as the AI Smart Scan)
         [SerializeField] private RectTransform guideFrame;
 
         [Header("Capture")]
@@ -68,8 +71,10 @@ namespace GlowUp.Admin
         async void Start()
         {
             if (rowTemplate != null) rowTemplate.SetActive(false);
-            Hook(scanButton, () => OpenCapture(CaptureDraft.Mode.Barcode));
-            Hook(captureButton, () => OpenCapture(CaptureDraft.Mode.Photo));
+            // The camera view has two shapes: short and wide for a barcode (Scan), tall for a photo of the pack (Camera). A button for the
+            // shape that is not showing switches to it; the button of the shape that is showing starts that capture. Tapping the view starts it too.
+            Hook(scanButton, () => { if (photoView) SetPhotoView(false); else OpenCapture(CaptureDraft.Mode.Barcode); });
+            Hook(captureButton, () => { if (!photoView) SetPhotoView(true); else OpenCapture(CaptureDraft.Mode.Photo); });
             Hook(galleryButton, () => OpenCapture(CaptureDraft.Mode.Gallery));
             Hook(manualButton, () => OpenCapture(CaptureDraft.Mode.Manual));
             Hook(resumeButton, () => { CaptureDraft d = CaptureDraft.Current; AdminCaptureController.StartMode = d.ModeValue; AdminCaptureController.Resume = true; SceneNavigator.Go(captureScene); });
@@ -77,7 +82,7 @@ namespace GlowUp.Admin
             BatchQueue.Changed += Paint;
             Hook(viewAllButton, OpenSubmissions);
             Hook(statusBar, OpenSubmissions);
-            Hook(previewButton, () => OpenCapture(CaptureDraft.Mode.Barcode));
+            Hook(previewButton, () => OpenCapture(photoView ? CaptureDraft.Mode.Photo : CaptureDraft.Mode.Barcode));
             Hook(settingsButton, () => SceneNavigator.Go(settingsScene));
             Hook(tipsButton, () => { if (tipsPanel != null) tipsPanel.Show(); });
             Hook(flashChip, () => { ScannerPrefs.Flash = !ScannerPrefs.Flash; });
@@ -96,6 +101,8 @@ namespace GlowUp.Admin
                 SceneNavigator.Go(loginScene);
                 return;
             }
+            StaffAccess.RememberStaffSession();
+            if (cameraFeed != null) cameraFeed.StartCamera();                // the live camera view (asks for the camera the first time)
             SubmissionStore.Start();
             WebsitePresence.Start();
             Paint();
@@ -111,8 +118,31 @@ namespace GlowUp.Admin
 
         float nextPresence;
 
+        const float PhotoExtra = 200f, GrowSeconds = 0.22f;
+        bool photoView;
+        float grown;                       // 0 = barcode shape, PhotoExtra = photo shape
+        float baseHeight = -1f;
+
+        void SetPhotoView(bool photo)
+        {
+            photoView = photo;
+            if (hintText != null) hintText.text = photo ? "Show the front: the brand and the product's name" : "Align the barcode, or take a photo";
+        }
+
+        void GrowView()
+        {
+            if (previewRect == null) return;
+            if (baseHeight < 0f) baseHeight = previewRect.sizeDelta.y;
+            float target = photoView ? PhotoExtra : 0f;
+            if (Mathf.Approximately(grown, target)) return;
+            grown = PerformanceSettings.ReduceEffects ? target : Mathf.MoveTowards(grown, target, PhotoExtra / GrowSeconds * Time.unscaledDeltaTime);
+            previewRect.sizeDelta = new Vector2(previewRect.sizeDelta.x, baseHeight + grown);
+            if (belowRect != null) belowRect.offsetMax = new Vector2(belowRect.offsetMax.x, -grown);
+        }
+
         void Update()
         {
+            GrowView();
             if (Time.unscaledTime >= nextPresence) { nextPresence = Time.unscaledTime + 20f; WebsitePresence.Recheck(); }   // a closed site sends no snapshot: re-check the age
             if (!Input.GetKeyDown(KeyCode.Escape)) return;
             if (tipsPanel != null && tipsPanel.IsOpen) { tipsPanel.Hide(); return; }                  // Back closes the tips first
@@ -151,8 +181,7 @@ namespace GlowUp.Admin
             if (onlineDot != null) onlineDot.color = online ? syncedColor : offlineColor;
             if (totalScansText != null) totalScansText.text = "Total Scans: " + (SubmissionStore.Loaded ? SubmissionStore.Items.Count.ToString() : "-");
             if (syncText != null) { syncText.text = syncWord; syncText.color = syncWord == "Synced" ? syncedColor : syncWord == "Offline" ? offlineColor : busyColor; }
-            if (flashChipLabel != null) flashChipLabel.text = ScannerPrefs.Flash ? "Flash On" : "Flash Off";
-            if (autoFocusChipLabel != null) autoFocusChipLabel.text = ScannerPrefs.AutoFocus ? "Auto Focus" : "Manual Focus";
+            if (flashChip != null && flashChip.targetGraphic != null) flashChip.targetGraphic.color = ScannerPrefs.Flash ? new Color(0.95f, 0.36f, 0.58f, 0.9f) : new Color(0, 0, 0, 0.5f);   // pink = light will be on when scanning
             if (guideFrame != null) guideFrame.gameObject.SetActive(ScannerPrefs.GuideFrame);
 
             PaintRecent();

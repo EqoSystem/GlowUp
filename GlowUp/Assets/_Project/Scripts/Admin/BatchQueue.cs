@@ -39,12 +39,12 @@ namespace GlowUp.Admin
 
         static string PathOf(string uid) => Path.Combine(Application.persistentDataPath, "staff_batch_" + uid + ".json");
 
-        /// <summary>The same test the single capture uses: a name, a brand and a make-up category.</summary>
+        /// <summary>The same test the single capture uses: a name, a brand, a category, and not clearly something other than make-up.</summary>
         public static bool Complete(CaptureDraft d)
         {
             if (d == null || !d.Get("name").Has || !d.Get("brand").Has || !d.Get("cosmeticType").Has) return false;
             string type = d.Get("cosmeticType").value, name = d.Get("name").value;
-            return ProductScope.IsMakeup(type, name) || ProductScope.IsMakeup("", type);
+            return !ProductScope.Judge(type, name).IsNotMakeup;          // the user's live-scan rule: only a clearly not-make-up product is refused
         }
 
         public static void EnsureLoaded()
