@@ -109,7 +109,7 @@ namespace GlowUp.EditorTools
             A.Set(c, "backButton", s.back); A.Set(c, "emailInput", email); A.Set(c, "passwordInput", pw);
             A.Set(c, "signInButton", signIn); A.Set(c, "signInLabel", A.LabelOf(signIn)); A.Set(c, "forgotButton", forgot);
             A.Set(c, "customerLoginButton", customer);
-            A.Finish(s);
+            A.Controller<StaffSkin>("StaffSkin"); A.Finish(s);
         }
 
         // =====================================================================================
@@ -252,7 +252,7 @@ namespace GlowUp.EditorTools
             A.Set(c, "totalScansText", total); A.Set(c, "syncText", syncWord);
             A.Set(c, "recentContent", (RectTransform)list.transform); A.Set(c, "rowTemplate", template); A.Set(c, "emptyText", empty);
             A.Set(c, "viewAllButton", viewAll);
-            A.Finish(s);
+            A.Controller<StaffSkin>("StaffSkin"); A.Finish(s);
         }
 
         /// <summary>One of the four round entry buttons with its caption under it; the middle one (Scan) is larger and filled.</summary>
@@ -327,7 +327,7 @@ namespace GlowUp.EditorTools
             A.Set(c, "backButton", s.back); A.Set(c, "accountNameText", accountName); A.Set(c, "accountEmailText", accountEmail);
             A.Set(c, "prefsButton", prefs); A.Set(c, "submissionsButton", subs); A.Set(c, "websiteButton", web); A.Set(c, "aboutButton", about);
             A.Set(c, "signOutButton", signOut); A.Set(c, "aboutCaption", aboutCaption); A.Set(c, "confirmDialog", confirm);
-            A.Finish(s);
+            A.Controller<StaffSkin>("StaffSkin"); A.Finish(s);
         }
 
         /// <summary>A settings row: icon tile, title, caption and (when it opens something) a chevron. The whole row is the button.</summary>
@@ -379,7 +379,7 @@ namespace GlowUp.EditorTools
             A.Set(c, "backButton", s.back); A.Set(c, "flashToggle", flash); A.Set(c, "autoFocusToggle", focus);
             A.Set(c, "scanLineToggle", line); A.Set(c, "guideFrameToggle", guide); A.Set(c, "batchToggle", batch);
             A.Set(c, "qualityButton", quality); A.Set(c, "qualityValue", qualityValue);
-            A.Finish(s);
+            A.Controller<StaffSkin>("StaffSkin"); A.Finish(s);
         }
 
         /// <summary>The shared shell of a preferences row (icon tile, title, caption). With `chevron` it is a button that opens or cycles something.</summary>
@@ -654,7 +654,7 @@ namespace GlowUp.EditorTools
             A.Set(c, "rawText", raw); A.Set(c, "addPhotosButton", addPhotos);
             A.Set(c, "submitButton", submit); A.Set(c, "submitLabel", A.LabelOf(submit));
             A.Set(c, "afterSubmit", after); A.Set(c, "viewStatusButton", viewStatus); A.Set(c, "newCaptureButton", again);
-            A.Finish(s);
+            A.Controller<StaffSkin>("StaffSkin"); A.Finish(s);
         }
 
         static string Placeholder(string key)
@@ -728,7 +728,7 @@ namespace GlowUp.EditorTools
             A.Set(c, "content", content); A.Set(c, "rowTemplate", template); A.Set(c, "emptyText", empty);
             A.Set(c, "detailPanel", detail.panel); A.Set(c, "detailName", dName); A.Set(c, "detailBrand", dBrand); A.Set(c, "detailStatus", dStatus);
             A.Set(c, "detailInfo", dInfo); A.Set(c, "detailNote", dNote); A.Set(c, "openWebsiteButton", openWeb);
-            A.Finish(s);
+            A.Controller<StaffSkin>("StaffSkin"); A.Finish(s);
         }
 
         // =====================================================================================

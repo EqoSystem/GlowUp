@@ -21,7 +21,19 @@ namespace GlowUp.Theme
 
         public ThemeProfile Profile => profile;
         public bool IsDark { get; private set; }
-        public ThemeProfile.Palette Palette => profile != null ? profile.Get(IsDark) : new ThemeProfile.Palette();
+        /// <summary>A screen group may re-colour the LIGHT palette (the staff scanner uses the pink look of its mock-up). Null = the app's own palette.
+        /// Dark mode is never re-coloured. Set and cleared by StaffSkin; the customer screens never set it.</summary>
+        public static Func<ThemeProfile.Palette, ThemeProfile.Palette> Skin;
+        public static void SkinChanged() { if (Instance != null) ThemeChanged?.Invoke(Instance.IsDark); }
+
+        public ThemeProfile.Palette Palette
+        {
+            get
+            {
+                ThemeProfile.Palette p = profile != null ? profile.Get(IsDark) : new ThemeProfile.Palette();
+                return Skin != null && !IsDark ? Skin(p) : p;
+            }
+        }
 
         void Awake()
         {
