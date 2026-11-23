@@ -406,10 +406,10 @@ namespace GlowUp.Auth
                 // "Sign Up" always starts a sign-up of its own: an account left in the draft by an earlier, abandoned one is not taken over
                 if (OnboardingSession.HasAccount) OnboardingSession.ForgetAccount();
             }
-            catch (Exception e) { Debug.LogWarning("Sign Up: draft reset failed: " + e.Message); }
-            try { ContextualHintController.MarkNewUser(true); } catch (Exception e) { Debug.LogWarning("Sign Up: hint flag failed: " + e.Message); }
+            catch (Exception) { }
+            try { ContextualHintController.MarkNewUser(true); } catch (Exception) { }
             try { if (signUpButton != null) ButtonBusy.Set(signUpButton, signUpButton.GetComponentInChildren<TMP_Text>(true), true, msgOpeningSignUp); }
-            catch (Exception e) { Debug.LogWarning("Sign Up: busy look failed: " + e.Message); }
+            catch (Exception) { }
             StartCoroutine(OpenSignUp());
         }
 
@@ -417,12 +417,11 @@ namespace GlowUp.Auth
         System.Collections.IEnumerator OpenSignUp()
         {
             string from = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-            try { SceneNavigator.Go(onboardingScene); } catch (Exception e) { Debug.LogWarning("Sign Up: Go failed: " + e.Message); }
+            try { SceneNavigator.Go(onboardingScene); } catch (Exception) { }
             float until = Time.unscaledTime + 1.5f;
             while (Time.unscaledTime < until) yield return null;
             if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == from && !ScreenTransition.IsBusy && !string.IsNullOrEmpty(onboardingScene))
             {
-                Debug.LogWarning("Sign Up: the change did not start; loading the screen directly");
                 UnityEngine.SceneManagement.SceneManager.LoadScene(onboardingScene);
             }
         }

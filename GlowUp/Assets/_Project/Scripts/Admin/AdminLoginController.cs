@@ -27,7 +27,6 @@ namespace GlowUp.Admin
         [SerializeField] private TextMeshProUGUI signInLabel;
         [SerializeField] private Button forgotButton;
         [SerializeField] private Button customerLoginButton;
-        [SerializeField] private TextMeshProUGUI messageText;
 
         [Header("Scenes")]
         [SerializeField] private string customerLoginScene = "LogInScene";
@@ -136,11 +135,11 @@ namespace GlowUp.Admin
             if (signInLabel != null) signInLabel.text = on ? signingInText : signInText;
         }
 
+        /// <summary>Messages are toasts only (aligned and kept clear of the fields by the toast's own placement); no text box on the card.</summary>
         void Say(string text, bool problem)
         {
-            if (messageText == null) return;
-            messageText.text = text ?? "";
-            messageText.gameObject.SetActive(!string.IsNullOrEmpty(text));
+            if (string.IsNullOrWhiteSpace(text)) return;
+            StaffToast.Show(this, problem ? FormalToast.Kind.Warning : FormalToast.Kind.Info, text);
         }
     }
 }

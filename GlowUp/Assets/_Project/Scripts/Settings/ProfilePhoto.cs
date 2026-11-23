@@ -160,7 +160,7 @@ namespace GlowUp.AppSettings
             {
                 Action next;
                 lock (work) { if (work.Count == 0) return; next = work.Dequeue(); }
-                try { next(); } catch (Exception e) { Debug.LogException(e); }
+                try { next(); } catch (Exception) { }
             }
         }
     }

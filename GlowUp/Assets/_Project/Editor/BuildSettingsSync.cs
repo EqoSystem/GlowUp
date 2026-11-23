@@ -26,7 +26,7 @@ namespace GlowUp.EditorTools
             "OnboardingStep4Scene", "OnboardingStep5Scene", "TermsAndConditionScene", "UserDashboardScene",
             "RecentScanActivitiesScene", "AiSmartAnalysisScene", "LoadingScene", "AiSmartAnalysisResultScene", "ARTryOnScene",
             "SettingsScene", "NotificationsScene",
-            "AdminLoginScene", "AdminDashboardScene", "AdminCaptureScene", "AdminSubmissionsScene"
+            "AdminLoginScene", "AdminDashboardScene", "AdminCaptureScene", "AdminSubmissionsScene", "AdminSettingsScene", "AdminScannerPrefsScene"
         };
 
         static BuildSettingsSync()

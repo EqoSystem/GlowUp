@@ -20,7 +20,7 @@ namespace GlowUp.Admin
         [SerializeField] private Button staffButton;
         [SerializeField] private string staffScene = "AdminLoginScene";
         [SerializeField] private string closedText = "Admin?";
-        [SerializeField] private string openText = "Admin? (tap to hide)";
+        [SerializeField] private string openText = "Admin?";
         [SerializeField] private float animationSeconds = 0.22f;
 
         static bool reopen;                  // the staff sign-in was opened from here: show the row open on return

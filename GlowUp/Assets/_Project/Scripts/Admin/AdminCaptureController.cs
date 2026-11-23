@@ -44,18 +44,29 @@ namespace GlowUp.Admin
         [SerializeField] private Button continueButton;
         [SerializeField] private TextMeshProUGUI continueLabel;
         [SerializeField] private Button typeInsteadButton;
+        [SerializeField] private Button tipsButton;
+        [SerializeField] private OverlayPanel tipsPanel;
+        [SerializeField] private ScanLineSweep scanLine;
+        [SerializeField] private GameObject checklist;                  // Focus / Lighting / Clear Image, live from the camera
+        [SerializeField] private Image checkFocus;
+        [SerializeField] private Image checkLighting;
+        [SerializeField] private Image checkClear;
 
         [Header("Review form (one row per value)")]
         [SerializeField] private GameObject formPanel;
         [SerializeField] private TMP_InputField[] fieldInputs;   // name, brand, cosmeticType, barcode, ingredients, shade
         [SerializeField] private TextMeshProUGUI[] fieldStates;
         [SerializeField] private Button[] checkButtons;
-        [SerializeField] private TextMeshProUGUI noticeText;
+        [SerializeField] private RawImage resultThumb;                  // the scan result card at the top of the form
+        [SerializeField] private TextMeshProUGUI resultName;
+        [SerializeField] private TextMeshProUGUI resultSub;
+        [SerializeField] private TextMeshProUGUI resultPillText;
+        [SerializeField] private Image resultPill;
+        [SerializeField] private Button tryAgainButton;
         [SerializeField] private TextMeshProUGUI rawText;
         [SerializeField] private Button addPhotosButton;
         [SerializeField] private Button submitButton;
         [SerializeField] private TextMeshProUGUI submitLabel;
-        [SerializeField] private TextMeshProUGUI resultText;
         [SerializeField] private GameObject afterSubmit;
         [SerializeField] private Button viewStatusButton;
         [SerializeField] private Button newCaptureButton;
@@ -70,7 +81,9 @@ namespace GlowUp.Admin
 
         CaptureDraft draft;
         string role = "Front";
-        bool scanning, busy, torchOn, painting;
+        bool scanning, busy, torchOn, painting, flashPending, focusPending;
+        float nextCheck, steadySince;
+        static readonly Color Good = new Color(0.20f, 0.62f, 0.42f), Idle = new Color(0.70f, 0.66f, 0.67f);
         float nextRead, cameraAskedAt;
         readonly List<GameObject> thumbs = new List<GameObject>();
 
@@ -85,6 +98,8 @@ namespace GlowUp.Admin
             Hook(galleryButton, PickFromGallery);
             Hook(shutterButton, () => _ = Shutter());
             Hook(torchButton, ToggleTorch);
+            Hook(tipsButton, () => { if (tipsPanel != null) tipsPanel.Show(); });
+            Hook(tryAgainButton, TryAgain);
             Hook(continueButton, () => _ = ReadAndReview());
             Hook(typeInsteadButton, () => ShowForm("Type the details you have. The rest stays Missing for the website to fill."));
             Hook(addPhotosButton, () => ShowCapture(CaptureDraft.Mode.Photo));
@@ -130,21 +145,35 @@ namespace GlowUp.Admin
                 else { cameraFeed.StartCamera(); cameraAskedAt = Time.realtimeSinceStartup; }
             }
             scanning = barcode;
-            Hint(barcode ? (CaptureReader.CanReadBarcodes ? "Align the barcode within the frame. It reads by itself." : "This phone cannot read barcodes here: take a photo, or type the digits.")
-                : gallery ? "Tap Add photo, then say what each photo shows. Photos stay on this phone; up to 3 small copies go to the reviewer."
-                : "Choose what the photo shows, then tap the round button. Front, ingredient list and barcode give the best result.");
+            Pill(barcode ? "Align the barcode within the frame" : gallery ? "Choose photos from your gallery" : "Keep the product in frame");
+            if (barcode && !CaptureReader.CanReadBarcodes) Warn("This phone cannot read barcodes here: take a photo, or type the digits.");
+            if (scanFrame != null) scanFrame.gameObject.SetActive(ScannerPrefs.GuideFrame && !gallery);
+            if (scanLine != null) scanLine.Allowed = barcode;
+            if (checklist != null) checklist.SetActive(!gallery && !barcode);
+            flashPending = !gallery && ScannerPrefs.Flash && !torchOn;
+            focusPending = !gallery && ScannerPrefs.AutoFocus;
             PaintRoles(); PaintThumbs();
         }
 
         void Update()
         {
-            if (Input.GetKeyDown(KeyCode.Escape) && !(confirmDialog != null && confirmDialog.IsOpen)) { Back(); return; }
+            if (Input.GetKeyDown(KeyCode.Escape))
+            {
+                if (tipsPanel != null && tipsPanel.IsOpen) { tipsPanel.Hide(); return; }          // Back closes the tips first
+                if (!(confirmDialog != null && confirmDialog.IsOpen)) { Back(); return; }
+            }
             if (capturePanel == null || !capturePanel.activeSelf || cameraFeed == null || StartMode == CaptureDraft.Mode.Gallery) return;
 
             if (!cameraFeed.IsPlaying && cameraAskedAt > 0 && Time.realtimeSinceStartup - cameraAskedAt > 4f)
             {
                 cameraAskedAt = 0;
-                Hint("The camera is not available. Allow GlowUp to use the camera in the phone's Settings, or use Upload from Gallery or Type details instead.");
+                Warn("The camera is not available. Allow GlowUp to use the camera in the phone's Settings, or use Upload from Gallery or Type details instead.");
+            }
+            if (cameraFeed.IsPlaying)
+            {
+                if (flashPending) { flashPending = false; torchOn = true; if (!Flashlight.TrySet(true, out string why)) { torchOn = false; if (!string.IsNullOrEmpty(why)) Info(why); } }
+                if (focusPending) { focusPending = false; cameraFeed.Refocus(); }
+                if (checklist != null && checklist.activeSelf && Time.unscaledTime >= nextCheck) { nextCheck = Time.unscaledTime + 0.3f; PaintChecklist(); }
             }
             if (scanning && !busy && cameraFeed.IsPlaying && Time.realtimeSinceStartup >= nextRead)
             {
@@ -258,7 +287,7 @@ namespace GlowUp.Admin
             if (capturePanel != null) capturePanel.SetActive(false);
             if (formPanel != null) formPanel.SetActive(true);
             if (titleText != null) titleText.text = StartMode == CaptureDraft.Mode.Manual && CaptureDraft.Photos.Count == 0 ? "Manual Entry" : "Review & Submit";
-            if (noticeText != null) noticeText.text = notice ?? "";
+            if (!string.IsNullOrWhiteSpace(notice)) Info(notice);
             PaintForm();
         }
 
@@ -281,9 +310,28 @@ namespace GlowUp.Admin
             if (rawText != null)
                 rawText.text = draft.rawText.Length > 0 ? $"Text as read ({draft.rawFrom}):\n{draft.rawText}" :
                     CaptureDraft.Photos.Count > 0 ? $"{CaptureDraft.Photos.Count} photo(s) attached." : "No photos. Add photos so the reviewer can compare.";
-            if (noticeText != null && !string.IsNullOrEmpty(draft.duplicateOf) && !noticeText.text.Contains("Already in GlowUp"))
-                noticeText.text = $"Already in GlowUp as \"{draft.duplicateName}\". Submit only for a different version (size, shade, formula). " + noticeText.text;
+            PaintResultCard(string.IsNullOrEmpty(draft.submittedId) ? null : "submitted");
             painting = false;
+        }
+
+        /// <summary>The "Scan Result" card at the top of the form: the first photo, the name, the barcode or brand, and one status pill.</summary>
+        void PaintResultCard(string submitted)
+        {
+            CaptureDraft.Field name = draft.Get("name"), brand = draft.Get("brand"), code = draft.Get("barcode");
+            if (resultName != null) resultName.text = name.Has ? name.value : "Product name needed";
+            if (resultSub != null) resultSub.text = code.Has ? "Barcode " + code.value : brand.Has ? brand.value : "No barcode yet";
+            if (resultThumb != null)
+            {
+                Texture t = CaptureDraft.Photos.Count > 0 ? CaptureDraft.Photos[0].Value : null;
+                resultThumb.texture = t; resultThumb.color = t != null ? Color.white : new Color(1, 1, 1, 0f);
+            }
+            string pill; Color tint;
+            if (submitted != null) { pill = "Submitted"; tint = Good; }
+            else if (!string.IsNullOrEmpty(draft.duplicateOf)) { pill = "Already in GlowUp"; tint = Found; }
+            else if (name.Has && name.state != "typed") { pill = "Product Found"; tint = Good; }
+            else { pill = "Details needed"; tint = Missing; }
+            if (resultPillText != null) { resultPillText.text = pill; resultPillText.color = tint; }
+            if (resultPill != null) resultPill.color = new Color(tint.r, tint.g, tint.b, 0.16f);
         }
 
         async Task Submit()
@@ -310,7 +358,6 @@ namespace GlowUp.Admin
             busy = true;
             if (submitButton != null) submitButton.interactable = false;               // one tap = one submission
             if (submitLabel != null) submitLabel.text = "Submitting...";
-            if (resultText != null) resultText.text = "Sending to the website...";
             SubmissionStore.Outcome o;
             try { o = await SubmissionStore.Submit(draft); }
             catch (Exception) { o = new SubmissionStore.Outcome { message = "It was not submitted. Check the connection and try again." }; }
@@ -325,21 +372,23 @@ namespace GlowUp.Admin
             else
             {
                 if (submitButton != null) submitButton.interactable = true;
-                if (submitLabel != null) submitLabel.text = "Submit to Website";
-                if (resultText != null) resultText.text = o.message;
+                if (submitLabel != null) submitLabel.text = "Save Product";
+                Warn(o.message);
             }
         }
 
         void ShowSubmitted(bool confirmed, string extra)
         {
             if (submitButton != null) submitButton.gameObject.SetActive(false);
+            if (tryAgainButton != null) tryAgainButton.gameObject.SetActive(false);
             if (afterSubmit != null) afterSubmit.SetActive(true);
             string when = DateTimeOffset.FromUnixTimeSeconds(Math.Max(draft.submittedUnix, 1)).ToLocalTime().ToString("d MMM yyyy, HH:mm");
-            if (resultText != null)
-                resultText.text = (confirmed || SubmissionStore.Find(draft.submittedId) != null
-                    ? $"Submitted. Reference {draft.submittedId} · {when}. Status: Pending review on the website."
-                    : $"Saved as Not yet synced. Reference {draft.submittedId}. It is sent by itself when the connection allows.")
-                    + (string.IsNullOrEmpty(extra) ? "" : " " + extra);
+            bool sent = confirmed || SubmissionStore.Find(draft.submittedId) != null;
+            PaintResultCard("submitted");
+            if (resultSub != null) resultSub.text = (sent ? "Pending review on the website" : "Not yet synced") + " · " + when;
+            if (resultPillText != null && !sent) { resultPillText.text = "Not yet synced"; resultPillText.color = Found; }
+            if (sent) StaffToast.Ok(this, "Submitted. It is waiting for review on the website.");
+            else StaffToast.Warn(this, "Saved as Not yet synced. It is sent by itself when the connection allows." + (string.IsNullOrEmpty(extra) ? "" : " " + extra));
         }
 
         // ======================= small parts =======================
@@ -382,8 +431,35 @@ namespace GlowUp.Admin
             if (continueLabel != null) continueLabel.text = CaptureDraft.Photos.Count > 0 ? $"Read & review ({CaptureDraft.Photos.Count})" : "Read & review";
         }
 
-        void Hint(string text) { if (hintText != null) hintText.text = text ?? ""; }
-        void Notice(string text) { if (noticeText != null) noticeText.text = text ?? ""; }
+        // 23 Nov 2026: this screen says things with the app's toast only (FormalToast places it and keeps it clear of buttons); the pill
+        // on the camera is a fixed instruction, and nothing is written to the device log.
+        void Pill(string text) { if (hintText != null) hintText.text = text ?? ""; }
+        void Info(string text) { StaffToast.Info(this, text); }
+        void Warn(string text) { StaffToast.Warn(this, text); }
+        void Hint(string text) { StaffToast.Info(this, text); }
+        void Notice(string text) { StaffToast.Warn(this, text); }
+
+        void TryAgain()
+        {
+            CaptureDraft.Clear(); CaptureDraft.ReleasePhotos();
+            CaptureDraft.Mode again = StartMode == CaptureDraft.Mode.Manual ? CaptureDraft.Mode.Photo : StartMode;
+            draft = CaptureDraft.Start(again, false);
+            ShowCapture(again);
+        }
+
+        /// <summary>Focus (the picture holds still), Lighting (neither dark nor blown out), Clear Image (both): measured live from the camera.</summary>
+        void PaintChecklist()
+        {
+            if (cameraFeed == null || !cameraFeed.Grab()) return;
+            float brightness = cameraFeed.MeasureBrightness();
+            bool still = cameraFeed.LastMotion < 0.035f;
+            steadySince = still ? (steadySince > 0 ? steadySince : Time.unscaledTime) : 0f;
+            bool focus = still && Time.unscaledTime - steadySince >= 0.5f;
+            bool light = brightness > 0.22f && brightness < 0.93f;
+            if (checkFocus != null) checkFocus.color = focus ? Good : Idle;
+            if (checkLighting != null) checkLighting.color = light ? Good : Idle;
+            if (checkClear != null) checkClear.color = focus && light ? Good : Idle;
+        }
         void FocusField(string key)
         {
             int i = Array.IndexOf(CaptureDraft.Keys, key);

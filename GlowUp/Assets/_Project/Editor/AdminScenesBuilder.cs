@@ -28,12 +28,16 @@ namespace GlowUp.EditorTools
             BuildDashboard();
             BuildCapture();
             BuildSubmissions();
-            Debug.Log("[GlowUp] Staff scenes built: AdminLoginScene, AdminDashboardScene, AdminCaptureScene, AdminSubmissionsScene.");
+            BuildSettings();
+            BuildScannerPrefs();
+            Debug.Log("[GlowUp] Staff scenes built: AdminLoginScene, AdminDashboardScene, AdminCaptureScene, AdminSubmissionsScene, AdminSettingsScene, AdminScannerPrefsScene.");
         }
 
         // =====================================================================================
         //  Login: the "Admin?" row (closed by default) with ONE gold Staff / Admin Access button
         // =====================================================================================
+        const float ToggleBottom = 142;          // above the legal line (56 + 70 high) with a gap
+
         public static void AddLoginAccordion(Transform card, float y)
         {
             Transform old = Kit.Loose(card.root, "AdminAccordion");
@@ -41,25 +45,25 @@ namespace GlowUp.EditorTools
             Transform oldController = Kit.Loose(card.root, "AdminAccessAccordion");
             if (oldController != null && oldController.GetComponent<Canvas>() == null && oldController.parent == null) Object.DestroyImmediate(oldController.gameObject);
 
+            // 23 Nov 2026 (owner's mark-up): the row sits at the BOTTOM of the card, just above the legal line, and opens UPWARDS into the
+            // free space under the Google button. Everything is anchored to the card bottom, so it follows any screen height.
             GameObject root = A.Node(card, "AdminAccordion");
-            A.TopStrip(root.transform, y, 300, Kit.PadX, Kit.PadX);
+            A.Fill(root.transform, Kit.PadX, 0, Kit.PadX, 0);
 
             Button toggle = A.LinkButton(root.transform, "AdminToggle", "Admin?", 32, ThemeRole.SecondaryText);
-            A.At(toggle.transform, A.TC, Vector2.zero, new Vector2(320, 84));
+            A.BottomStrip(toggle.transform, ToggleBottom, 84, 0, 0);
             TextMeshProUGUI toggleLabel = A.LabelOf(toggle);
             toggleLabel.text = "Admin?";
-            A.Fill(toggleLabel.transform, 0, 0, 56, 0);
-            toggleLabel.alignment = TextAlignmentOptions.MidlineRight;
+            A.Fill(toggleLabel.transform, 0, 0, 0, 0);
+            toggleLabel.alignment = TextAlignmentOptions.Center;
             Image chevron = A.Icon(toggle.transform, "Chevron", IconFactory.ChevronDown, 40, ThemeRole.SecondaryText);
-            A.At(chevron.transform, A.MR, new Vector2(-6, 0), new Vector2(40, 40));
+            A.At(chevron.transform, A.MC, new Vector2(78, 0), new Vector2(40, 40));
 
             GameObject panelObject = A.Node(root.transform, "StaffAccessPanel", typeof(CanvasGroup));
-            A.TopStrip(panelObject.transform, 92, 200, 0, 0);
-            ((RectTransform)panelObject.transform).pivot = new Vector2(0.5f, 1f);
+            A.BottomStrip(panelObject.transform, ToggleBottom + 84 + 8, 112, 0, 0);
+            ((RectTransform)panelObject.transform).pivot = new Vector2(0.5f, 0f);          // grows upwards from the row
             Button staff = A.PillButton(panelObject.transform, "StaffAccessButton", "Staff / Admin Access", 36, ThemeRole.Gold, ThemeRole.Background, IconFactory.Scan);
-            A.TopStrip(staff.transform, 0, 120, 0, 0);
-            TextMeshProUGUI helper = A.Label(panelObject.transform, "HelperText", "For authorized personnel registering products.", 28, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center, true);
-            A.TopStrip(helper.transform, 132, 56, 0, 0);
+            A.Fill(staff.transform, 0, 0, 0, 0);
             panelObject.SetActive(false);
 
             var accordion = SceneBuilderCore.Ensure<AdminAccessAccordion>(root);
@@ -96,11 +100,6 @@ namespace GlowUp.EditorTools
             A.TopStrip(forgot.transform, 904, 84, x, 500);
             A.LabelOf(forgot).alignment = TextAlignmentOptions.MidlineLeft;
 
-            TextMeshProUGUI message = A.Label(card, "MessageText", "", 30, ThemeRole.Warning, FontRole.Body, TextAlignmentOptions.Center, true);
-            A.TopStrip(message.transform, 996, 100, x, x);
-            A.ShrinkWrapped(message, 24);
-            message.gameObject.SetActive(false);
-
             Button signIn = A.PillButton(card, "SignInButton", "Sign In", 40, ThemeRole.ButtonFill, ThemeRole.ButtonText);
             A.TopStrip(signIn.transform, 1110, Kit.ButtonHeight, x, x);
             Button customer = A.LinkButton(card, "CustomerLoginButton", "Back to customer login", 32, ThemeRole.AccentText);
@@ -109,109 +108,331 @@ namespace GlowUp.EditorTools
             var c = A.Controller<AdminLoginController>("AdminLoginController");
             A.Set(c, "backButton", s.back); A.Set(c, "emailInput", email); A.Set(c, "passwordInput", pw);
             A.Set(c, "signInButton", signIn); A.Set(c, "signInLabel", A.LabelOf(signIn)); A.Set(c, "forgotButton", forgot);
-            A.Set(c, "customerLoginButton", customer); A.Set(c, "messageText", message);
+            A.Set(c, "customerLoginButton", customer);
             A.Finish(s);
         }
 
         // =====================================================================================
-        //  2. Capture dashboard (deliberately small)
+        //  2. Scanner dashboard ("Scan Product", from the owner's mock-up of 23 Nov 2026)
         // =====================================================================================
+        const float SwitchWidth = 116, SwitchHeight = 64;
+
         [MenuItem("GlowUp/Build Scene/16b Staff Dashboard", false, 128)]
         public static void BuildDashboard()
         {
             A.AppScreen s = A.Begin("AdminDashboardScene", "", false, "AdminDashboardCard");
             Transform card = s.card;
 
-            TextMeshProUGUI logo = A.Label(card, "LogoText", "Glow Up", 72, ThemeRole.Gold, FontRole.Title, TextAlignmentOptions.MidlineLeft);
-            A.TopStrip(logo.transform, 36, 96, 56, 200);
-            Button signOut = A.IconButton(card, "SignOutButton", IconFactory.SignOut, 92, 52, ThemeRole.MainText, ThemeRole.SurfaceAlt);
-            A.At(signOut.transform, A.TR, new Vector2(-36, -38), new Vector2(92, 92));
+            // ---- header: Glow Up | Admin Scanner, settings on the right ----
+            TextMeshProUGUI logo = A.Label(card, "LogoText", "Glow Up", 64, ThemeRole.Gold, FontRole.Title, TextAlignmentOptions.MidlineLeft);
+            A.At(logo.transform, A.TL, new Vector2(56, -40), new Vector2(300, 92));
+            A.Shrink(logo, 44);
+            Image divider = A.Panel(card, "HeaderDivider", ThemeRole.Gold, 0.6f, 2f);
+            divider.sprite = IconFactory.Square; divider.type = Image.Type.Simple;
+            A.At(divider.transform, A.TL, new Vector2(372, -60), new Vector2(3, 52));
+            TextMeshProUGUI adminLabel = A.Label(card, "AdminScannerText", "Admin Scanner", 30, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.MidlineLeft);
+            A.At(adminLabel.transform, A.TL, new Vector2(396, -40), new Vector2(380, 92));
+            A.Shrink(adminLabel, 22);
+            Button settings = A.IconButton(card, "SettingsButton", IconFactory.Gear, 92, 52, ThemeRole.AccentText, ThemeRole.SurfaceAlt);
+            A.At(settings.transform, A.TR, new Vector2(-36, -38), new Vector2(92, 92));
 
-            TextMeshProUGUI welcome = A.Label(card, "WelcomeText", "Welcome, Staff!", 54, ThemeRole.Heading, FontRole.Heading);
-            A.TopStrip(welcome.transform, 150, 72, 56, 56);
-            TextMeshProUGUI account = A.Label(card, "AccountText", "staff@example.com · Admin", 30, ThemeRole.SecondaryText, FontRole.Body);
-            A.TopStrip(account.transform, 222, 46, 56, 56);
-            A.Shrink(account, 22);
+            TextMeshProUGUI title = A.Label(card, "ScreenTitle", "Scan Product", 64, ThemeRole.Heading, FontRole.Title, TextAlignmentOptions.Center);
+            A.TopStrip(title.transform, 160, 84, 56, 56); A.Shrink(title, 44);
+            TextMeshProUGUI sub = A.Label(card, "SubtitleText", "Align the barcode or take a photo", 30, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center);
+            A.TopStrip(sub.transform, 246, 48, 56, 56); A.Shrink(sub, 22);
 
-            // ---- Product Registration: the four ways in ----
-            Image reg = A.Panel(card, "RegistrationPanel", ThemeRole.SurfaceAlt, 0.9f, 48f);
-            A.TopStrip(reg.transform, 290, 830);
-            TextMeshProUGUI regTitle = A.Label(reg.transform, "TitleText", "Product Registration", 40, ThemeRole.Heading, FontRole.Heading);
-            A.TopStrip(regTitle.transform, 22, 56, 36, 36);
-            TextMeshProUGUI regSub = A.Label(reg.transform, "SubtitleText", "Choose how you want to add a product. It goes to the website for review.", 27, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            A.TopStrip(regSub.transform, 80, 70, 36, 36);
-            Button scan = Tile(reg.transform, "ScanBarcodeTile", IconFactory.Scan, "Scan Barcode", "Identify products automatically", 0, 0);
-            Button capture = Tile(reg.transform, "CaptureProductTile", IconFactory.CameraIcon, "Capture Product", "Take product and label photos", 1, 0);
-            Button gallery = Tile(reg.transform, "UploadGalleryTile", IconFactory.Document, "Upload from Gallery", "Use existing photos", 0, 1);
-            Button manual = Tile(reg.transform, "ManualEntryTile", IconFactory.Pencil, "Manual Entry", "For products the reader cannot identify", 1, 1);
+            // ---- the scanner preview: tapping it starts a barcode scan ----
+            GameObject viewportObject = A.Node(card, "ScannerPreview", typeof(Image), typeof(Button));
+            Image viewport = viewportObject.GetComponent<Image>();
+            Kit.StyleRounded(viewport); Kit.SetRadius(viewport, 48f); viewport.color = new Color32(46, 36, 36, 255);
+            viewportObject.GetComponent<Button>().targetGraphic = viewport;
+            viewportObject.GetComponent<Button>().transition = Selectable.Transition.None;
+            A.TopStrip(viewportObject.transform, 316, 520, 56, 56);
+            GameObject frame = A.Node(viewportObject.transform, "GuideFrame", typeof(Image));
+            A.At(frame.transform, A.MC, new Vector2(0, 22), new Vector2(500, 320));
+            Image frameImage = frame.GetComponent<Image>(); frameImage.sprite = IconFactory.ScanFrame; frameImage.type = Image.Type.Simple; frameImage.color = new Color(1, 1, 1, 0.92f); frameImage.raycastTarget = false;
+            Image laser = A.RawPanel(frame.transform, "ScanLine", new Color(0.95f, 0.36f, 0.58f, 0.95f), 12f);
+            laser.sprite = IconFactory.ScanLine; laser.type = Image.Type.Simple; laser.raycastTarget = false;
+            A.At(laser.transform, A.MC, Vector2.zero, new Vector2(440, 22));
+            var sweep = SceneBuilderCore.Ensure<ScanLineSweep>(frame);
+            A.Set(sweep, "line", laser.rectTransform); A.Set(sweep, "area", (RectTransform)frame.transform);
+
+            Button flashChip = A.PillButton(viewportObject.transform, "FlashChip", "Flash Off", 26, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Bolt, 0.9f);
+            A.At(flashChip.transform, A.TL, new Vector2(24, -24), new Vector2(210, 64));
+            A.Shrink(A.LabelOf(flashChip), 20);
+            Image focusChip = A.RawPanel(viewportObject.transform, "AutoFocusChip", new Color(0, 0, 0, 0.45f), 40f);
+            A.At(focusChip.transform, A.BC, new Vector2(0, 24), new Vector2(280, 60));
+            focusChip.raycastTarget = false;
+            TextMeshProUGUI focusLabel = A.RawLabel(focusChip.transform, "Label", "Auto Focus", 26, Color.white, FontRole.Label, TextAlignmentOptions.Center);
+            A.Fill(focusLabel.transform, 12, 0, 12, 0); A.Shrink(focusLabel, 18);
+
+            // ---- the four ways in: Gallery, Scan, Camera, Manual ----
+            float rowTop = 874;
+            Button gallery = ModeButton(card, "GalleryButton", IconFactory.Document, "Gallery", 0, rowTop, false);
+            Button scan = ModeButton(card, "ScanButton", IconFactory.Scan, "Scan", 1, rowTop, true);
+            Button capture = ModeButton(card, "CameraButton", IconFactory.CameraIcon, "Camera", 2, rowTop, false);
+            Button manual = ModeButton(card, "ManualButton", IconFactory.Pencil, "Manual", 3, rowTop, false);
+
+            // ---- View Tips ----
+            GameObject tipsObject = A.Node(card, "ViewTipsButton", typeof(Image), typeof(Button));
+            Image tipsBack = tipsObject.GetComponent<Image>(); Kit.StyleRounded(tipsBack); Kit.SetRadius(tipsBack, 60f); tipsBack.color = Color.white;
+            SceneBuilderCore.Themed(tipsObject, ThemeRole.SurfaceAlt);
+            tipsObject.GetComponent<Button>().targetGraphic = tipsBack;
+            A.TopStrip(tipsObject.transform, 1094, 112, 56, 56);
+            Image tipsIcon = A.IconTile(tipsObject.transform, "BulbTile", IconFactory.Bulb, 72, 40, ThemeRole.Background, ThemeRole.AccentText);
+            A.At(tipsIcon.transform.parent, A.ML, new Vector2(26, 0), new Vector2(72, 72));
+            TextMeshProUGUI tipsTitle = A.Label(tipsObject.transform, "TipsTitle", "View Tips", 34, ThemeRole.MainText, FontRole.Heading, TextAlignmentOptions.MidlineLeft);
+            A.Fill(tipsTitle.transform, 122, 54, 96, 6); A.Shrink(tipsTitle, 24);
+            TextMeshProUGUI tipsCaption = A.Label(tipsObject.transform, "TipsCaption", "Get the best scan result", 26, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.MidlineLeft);
+            A.Fill(tipsCaption.transform, 122, 6, 96, 54); A.Shrink(tipsCaption, 19);
+            Image tipsChevron = A.Icon(tipsObject.transform, "Chevron", IconFactory.ChevronRight, 40, ThemeRole.SecondaryText);
+            A.At(tipsChevron.transform, A.MR, new Vector2(-28, 0), new Vector2(40, 40));
 
             Button resume = A.PillButton(card, "ResumeButton", "Unsent capture: tap to continue", 28, ThemeRole.Background, ThemeRole.AccentText, IconFactory.History);
-            A.TopStrip(resume.transform, 1136, 78);
+            A.TopStrip(resume.transform, 1220, 74, 56, 56);
             A.Shrink(A.LabelOf(resume), 22);
             resume.gameObject.SetActive(false);
 
-            // ---- live status (from the database listener) ----
-            Image status = A.Panel(card, "StatusPanel", ThemeRole.Background, 1f, 40f);
-            A.TopStrip(status.transform, 1228, 132);
-            A.Outline(status.transform, ThemeRole.Gold, 40f, 0.5f);
-            Image dot = A.RawPanel(status.transform, "StatusDot", new Color(0.62f, 0.55f, 0.56f), 14f);
-            A.At(dot.transform, A.TL, new Vector2(34, -36), new Vector2(26, 26));
-            TextMeshProUGUI statusTitle = A.Label(status.transform, "StatusTitle", "Connecting...", 34, ThemeRole.MainText, FontRole.Heading);
-            A.TopStrip(statusTitle.transform, 20, 50, 76, 30);
-            TextMeshProUGUI statusDetail = A.Label(status.transform, "StatusDetail", "Product details are read on the phone and prepared for review on the website.", 25, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            A.TopStrip(statusDetail.transform, 68, 60, 76, 30);
-            A.ShrinkWrapped(statusDetail, 20);
-
-            // ---- recent submissions ----
-            TextMeshProUGUI recentTitle = A.Label(card, "RecentTitle", "Recent Submissions", 38, ThemeRole.Heading, FontRole.Heading);
-            A.TopStrip(recentTitle.transform, 1378, 56, 56, 260);
+            // ---- recent submissions (live) ----
+            TextMeshProUGUI recentTitle = A.Label(card, "RecentTitle", "Recent Submissions", 36, ThemeRole.Heading, FontRole.Heading);
+            A.TopStrip(recentTitle.transform, 1312, 56, 56, 290); A.Shrink(recentTitle, 26);
             Button viewAll = A.LinkButton(card, "ViewAllButton", "View all", 30, ThemeRole.AccentText);
-            A.At(viewAll.transform, A.TR, new Vector2(-48, -1374), new Vector2(200, 64));
+            A.At(viewAll.transform, A.TR, new Vector2(-48, -1308), new Vector2(220, 64));
             GameObject list = A.Node(card, "RecentList");
-            A.Between(list.transform, 1442, 150);                      // up to the bottom buttons; rows that do not fit are clipped (short phones)
+            A.Between(list.transform, 1376, 170);
             list.AddComponent<RectMask2D>();
             A.VStack(list, 8);
             GameObject template = Row(list.transform, "RowTemplate", 96);
             TextMeshProUGUI empty = A.Label(list.transform, "EmptyText", "Loading your submissions...", 28, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center, true);
             A.Size(empty, height: 96);
 
-            // ---- bottom: submissions + the website (everything else lives there) ----
-            Button navSubs = A.PillButton(card, "SubmissionsButton", "Submissions", 32, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.ListIcon);
-            A.BottomStrip(navSubs.transform, 30, 104, P, 520);
-            Button website = A.PillButton(card, "OpenWebsiteButton", "Open Admin Website", 30, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.ExternalLink);
-            A.BottomStrip(website.transform, 30, 104, 480, P);
+            // ---- the live status bar: Online | Total Scans | Synced ----
+            GameObject bar = A.Node(card, "StatusBar", typeof(Image), typeof(Button));
+            Image barBack = bar.GetComponent<Image>(); Kit.StyleRounded(barBack); Kit.SetRadius(barBack, 60f); barBack.color = Color.white;
+            SceneBuilderCore.Themed(bar, ThemeRole.SurfaceAlt);
+            bar.GetComponent<Button>().targetGraphic = barBack;
+            A.BottomStrip(bar.transform, 34, 110, 56, 56);
+            RectTransform left = A.Share(A.Node(bar.transform, "OnlinePart").transform, 0f, 0.27f);
+            RectTransform mid = A.Share(A.Node(bar.transform, "ScansPart").transform, 0.27f, 0.68f);
+            RectTransform right = A.Share(A.Node(bar.transform, "SyncPart").transform, 0.68f, 1f);
+            Image dot = A.RawPanel(left, "OnlineDot", new Color(0.20f, 0.62f, 0.42f), 12f);
+            A.At(dot.transform, A.ML, new Vector2(26, 0), new Vector2(18, 18));
+            TextMeshProUGUI online = A.Label(left, "OnlineText", "Online", 26, ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.MidlineLeft);
+            A.Fill(online.transform, 54, 0, 6, 0); A.Shrink(online, 18);
+            Image layers = A.Icon(mid, "ScansIcon", IconFactory.ListIcon, 34, ThemeRole.AccentText);
+            A.At(layers.transform, A.ML, new Vector2(14, 0), new Vector2(34, 34));
+            TextMeshProUGUI total = A.Label(mid, "TotalScansText", "Total Scans: 0", 26, ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.MidlineLeft);
+            A.Fill(total.transform, 62, 0, 6, 0); A.Shrink(total, 18);
+            Image syncIcon = A.Icon(right, "SyncIcon", IconFactory.Sync, 34, ThemeRole.AccentText);
+            A.At(syncIcon.transform, A.ML, new Vector2(14, 0), new Vector2(34, 34));
+            TextMeshProUGUI syncWord = A.Label(right, "SyncText", "Synced", 26, ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.MidlineLeft);
+            A.Fill(syncWord.transform, 58, 0, 10, 0); A.Shrink(syncWord, 18);
+            foreach (float at in new[] { 0.27f, 0.68f })
+            {
+                Image line = A.Panel(bar.transform, "Divider", ThemeRole.Gold, 0.5f, 2f);
+                line.sprite = IconFactory.Square; line.type = Image.Type.Simple; line.raycastTarget = false;
+                RectTransform lrt = line.rectTransform; lrt.anchorMin = new Vector2(at, 0.24f); lrt.anchorMax = new Vector2(at, 0.76f); lrt.sizeDelta = new Vector2(2, 0); lrt.anchoredPosition = Vector2.zero;
+            }
 
+            var tips = TipsPopup(s, "TipsPanel");
             var confirm = ConfirmPopup(s, "ConfirmPanel");
             var c = A.Controller<AdminDashboardController>("AdminDashboardController");
-            A.Set(c, "welcomeText", welcome); A.Set(c, "accountText", account); A.Set(c, "signOutButton", signOut); A.Set(c, "confirmDialog", confirm);
+            A.Set(c, "settingsButton", settings); A.Set(c, "confirmDialog", confirm);
+            A.Set(c, "previewButton", viewportObject.GetComponent<Button>()); A.Set(c, "flashChip", flashChip); A.Set(c, "flashChipLabel", A.LabelOf(flashChip));
+            A.Set(c, "autoFocusChipLabel", focusLabel); A.Set(c, "guideFrame", (RectTransform)frame.transform);
             A.Set(c, "scanButton", scan); A.Set(c, "captureButton", capture); A.Set(c, "galleryButton", gallery); A.Set(c, "manualButton", manual);
             A.Set(c, "resumeButton", resume); A.Set(c, "resumeText", A.LabelOf(resume));
-            A.Set(c, "statusTitle", statusTitle); A.Set(c, "statusDetail", statusDetail); A.Set(c, "statusDot", dot);
+            A.Set(c, "tipsButton", tipsObject.GetComponent<Button>()); A.Set(c, "tipsPanel", tips);
+            A.Set(c, "statusBar", bar.GetComponent<Button>()); A.Set(c, "onlineText", online); A.Set(c, "onlineDot", dot);
+            A.Set(c, "totalScansText", total); A.Set(c, "syncText", syncWord);
             A.Set(c, "recentContent", (RectTransform)list.transform); A.Set(c, "rowTemplate", template); A.Set(c, "emptyText", empty);
-            A.Set(c, "viewAllButton", viewAll); A.Set(c, "websiteButton", website); A.Set(c, "navSubmissions", navSubs);
+            A.Set(c, "viewAllButton", viewAll);
             A.Finish(s);
         }
 
-        static Button Tile(Transform parent, string name, Sprite icon, string title, string description, int col, int row)
+        /// <summary>One of the four round entry buttons with its caption under it; the middle one (Scan) is larger and filled.</summary>
+        static Button ModeButton(Transform parent, string name, Sprite icon, string label, int index, float top, bool primary)
         {
-            const float w = 410, h = 300, gap = 20, left = 30, top = 172;
-            GameObject go = A.Node(parent, name, typeof(Image), typeof(Button));
-            Image img = go.GetComponent<Image>(); Kit.StyleRounded(img); img.color = Color.white;
-            SceneBuilderCore.Themed(go, ThemeRole.Background);
-            A.At(go.transform, A.TL, new Vector2(left + col * (w + gap), -(top + row * (h + gap))), new Vector2(w, h));
-            ((RectTransform)go.transform).pivot = new Vector2(0, 1);
-            ((RectTransform)go.transform).anchoredPosition = new Vector2(left + col * (w + gap), -(top + row * (h + gap)));
-            A.Outline(go.transform, ThemeRole.Accent, 48f, 0.35f);
-            Image disc = A.Panel(go.transform, "IconDisc", ThemeRole.SurfaceAlt, 1f, 60f);
-            A.At(disc.transform, A.TC, new Vector2(0, -26), new Vector2(116, 116));
-            Image ic = A.Icon(disc.transform, "Icon", icon, 62, ThemeRole.AccentText);
-            A.At(ic.transform, A.MC, Vector2.zero, new Vector2(62, 62));
-            TextMeshProUGUI t = A.Label(go.transform, "TitleText", title, 32, ThemeRole.MainText, FontRole.Heading, TextAlignmentOptions.Center);
-            A.TopStrip(t.transform, 156, 50, 14, 14); A.Shrink(t, 24);
-            TextMeshProUGUI d = A.Label(go.transform, "DescriptionText", description, 24, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Top, true);
-            A.TopStrip(d.transform, 210, 74, 22, 22); A.ShrinkWrapped(d, 19);
-            var b = go.GetComponent<Button>(); b.targetGraphic = img;
+            float column = (1000f - 2 * 56f) / 4f, cx = 56f + column * (index + 0.5f);
+            float size = primary ? 150 : 124;
+            Button b = primary ? A.IconButton(parent, name, icon, size, 72, ThemeRole.ButtonText, ThemeRole.ButtonFill)
+                               : A.IconButton(parent, name, icon, size, 58, ThemeRole.AccentText, ThemeRole.SurfaceAlt);
+            A.At(b.transform, A.TL, new Vector2(cx - size / 2f, -(top + (150f - size) / 2f)), new Vector2(size, size));
+            TextMeshProUGUI caption = A.Label(parent, name.Replace("Button", "Caption"), label, 28, primary ? ThemeRole.AccentText : ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.Center);
+            A.At(caption.transform, A.TL, new Vector2(cx - column / 2f, -(top + 160)), new Vector2(column, 46));
+            A.Shrink(caption, 20);
             return b;
+        }
+
+        // =====================================================================================
+        //  Scan Tips (a pop-up on the dashboard and on the capture screen)
+        // =====================================================================================
+        static OverlayPanel TipsPopup(A.AppScreen s, string name)
+        {
+            A.AppPopup p = A.Overlay(s, name, "Scan Tips");
+            A.At(p.box, A.MC, new Vector2(0, 40), new Vector2(940, 1090));
+            string[] titles = { "Avoid glare", "Keep it steady", "Use good lighting", "Include the whole item" };
+            string[] texts = { "Tilt the product to reduce reflections.", "Hold your phone still while scanning.", "Make sure the product is well lit.", "Keep the entire product inside the frame." };
+            Sprite[] icons = { IconFactory.Sparkle, IconFactory.CameraIcon, IconFactory.Sun, IconFactory.Scan };
+            for (int i = 0; i < 4; i++)
+            {
+                float y = 140 + i * 196;
+                Image tile = A.IconTile(p.box, "TipIcon" + (i + 1), icons[i], 112, 58, ThemeRole.SurfaceAlt, ThemeRole.AccentText);
+                A.At(tile.transform.parent, A.TL, new Vector2(48, -y), new Vector2(112, 112));
+                TextMeshProUGUI t = A.Label(p.box, "TipTitle" + (i + 1), titles[i], 36, ThemeRole.MainText, FontRole.Heading, TextAlignmentOptions.MidlineLeft);
+                A.TopStrip(t.transform, y, 56, 190, 48); A.Shrink(t, 26);
+                TextMeshProUGUI d = A.Label(p.box, "TipText" + (i + 1), texts[i], 28, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+                A.TopStrip(d.transform, y + 58, 60, 190, 48); A.ShrinkWrapped(d, 20);
+            }
+            Button gotIt = A.PillButton(p.box, "GotItButton", "Got it", 38, ThemeRole.ButtonFill, ThemeRole.ButtonText);
+            A.BottomStrip(gotIt.transform, 44, 116, 48, 48);
+            UnityEditor.Events.UnityEventTools.AddPersistentListener(gotIt.onClick, p.panel.Hide);
+            return p.panel;
+        }
+
+        // =====================================================================================
+        //  Settings + Scanner Preferences (from the owner's mock-up)
+        // =====================================================================================
+        [MenuItem("GlowUp/Build Scene/16e Staff Settings", false, 131)]
+        public static void BuildSettings()
+        {
+            A.AppScreen s = A.Begin("AdminSettingsScene", "Settings", true, "AdminSettingsCard");
+            Transform card = s.card;
+
+            Image account = A.Panel(card, "AccountCard", ThemeRole.SurfaceAlt, 1f, 56f);
+            A.TopStrip(account.transform, A.HeaderBottom, 150, 56, 56);
+            Image avatar = A.IconTile(account.transform, "Avatar", IconFactory.User, 96, 52, ThemeRole.Background, ThemeRole.AccentText);
+            A.At(avatar.transform.parent, A.ML, new Vector2(28, 0), new Vector2(96, 96));
+            TextMeshProUGUI accountName = A.Label(account.transform, "AccountNameText", "Admin", 38, ThemeRole.MainText, FontRole.Heading, TextAlignmentOptions.MidlineLeft);
+            A.Fill(accountName.transform, 150, 78, 28, 12); A.Shrink(accountName, 26);
+            TextMeshProUGUI accountEmail = A.Label(account.transform, "AccountEmailText", "staff@example.com", 27, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.MidlineLeft);
+            A.Fill(accountEmail.transform, 150, 14, 28, 72); A.Shrink(accountEmail, 18);
+
+            float y = A.HeaderBottom + 190;
+            Button prefs = SettingsRow(card, "ScannerPreferencesRow", IconFactory.Gauge, "Scanner Preferences", "Flash, Auto Focus, Scan Line", y, true, out _); y += 138;
+            Button subs = SettingsRow(card, "SubmissionsRow", IconFactory.ListIcon, "Submissions", "Your captures and their review status", y, true, out _); y += 138;
+            Button web = SettingsRow(card, "WebsiteRow", IconFactory.ExternalLink, "Open Admin Website", "Brands, ingredients and approvals", y, true, out _); y += 138;
+            Button about = SettingsRow(card, "AboutRow", IconFactory.Info, "About GlowUp", "Version", y, false, out TextMeshProUGUI aboutCaption);
+
+            Button signOut = A.PillButton(card, "SignOutButton", "Sign Out", 36, ThemeRole.SurfaceAlt, ThemeRole.AccentText, IconFactory.SignOut);
+            A.BottomStrip(signOut.transform, 44, 112, 56, 56);
+
+            var confirm = ConfirmPopup(s, "ConfirmPanel");
+            var c = A.Controller<AdminSettingsController>("AdminSettingsController");
+            A.Set(c, "backButton", s.back); A.Set(c, "accountNameText", accountName); A.Set(c, "accountEmailText", accountEmail);
+            A.Set(c, "prefsButton", prefs); A.Set(c, "submissionsButton", subs); A.Set(c, "websiteButton", web); A.Set(c, "aboutButton", about);
+            A.Set(c, "signOutButton", signOut); A.Set(c, "aboutCaption", aboutCaption); A.Set(c, "confirmDialog", confirm);
+            A.Finish(s);
+        }
+
+        /// <summary>A settings row: icon tile, title, caption and (when it opens something) a chevron. The whole row is the button.</summary>
+        static Button SettingsRow(Transform card, string name, Sprite icon, string title, string caption, float y, bool chevron, out TextMeshProUGUI captionText)
+        {
+            GameObject go = A.Node(card, name, typeof(Image), typeof(Button));
+            Image back = go.GetComponent<Image>(); Kit.StyleRounded(back); Kit.SetRadius(back, 56f); back.color = Color.white;
+            SceneBuilderCore.Themed(go, ThemeRole.SurfaceAlt);
+            go.GetComponent<Button>().targetGraphic = back;
+            A.TopStrip(go.transform, y, 120, 56, 56);
+            Image tile = A.IconTile(go.transform, "IconTile", icon, 76, 42, ThemeRole.Background, ThemeRole.AccentText);
+            A.At(tile.transform.parent, A.ML, new Vector2(26, 0), new Vector2(76, 76));
+            TextMeshProUGUI t = A.Label(go.transform, "TitleText", title, 34, ThemeRole.MainText, FontRole.Heading, TextAlignmentOptions.MidlineLeft);
+            A.Fill(t.transform, 124, 58, chevron ? 90 : 28, 8); A.Shrink(t, 24);
+            captionText = A.Label(go.transform, "CaptionText", caption, 26, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.MidlineLeft);
+            A.Fill(captionText.transform, 124, 8, chevron ? 90 : 28, 62); A.Shrink(captionText, 18);
+            if (chevron)
+            {
+                Image ch = A.Icon(go.transform, "Chevron", IconFactory.ChevronRight, 40, ThemeRole.SecondaryText);
+                A.At(ch.transform, A.MR, new Vector2(-28, 0), new Vector2(40, 40));
+            }
+            return go.GetComponent<Button>();
+        }
+
+        [MenuItem("GlowUp/Build Scene/16f Staff Scanner Preferences", false, 132)]
+        public static void BuildScannerPrefs()
+        {
+            A.AppScreen s = A.Begin("AdminScannerPrefsScene", "Scanner Preferences", true, "AdminScannerPrefsCard");
+            Transform card = s.card;
+            float y = A.HeaderBottom + 10;
+            Toggle flash = PrefRow(card, "FlashRow", IconFactory.Bolt, "Flash", "Turn on flash for darker areas", y, true); y += 134;
+            Toggle focus = PrefRow(card, "AutoFocusRow", IconFactory.Scan, "Auto Focus", "Automatically focus on the barcode", y, true); y += 134;
+            PrefInfoRow(card, "ScanModeRow", IconFactory.ListIcon, "Scan Mode", "Barcode & QR Code", y); y += 134;
+            Toggle line = PrefRow(card, "ScanLineRow", IconFactory.Minus, "Scan Line", "Show the scanning guide line", y, true); y += 134 + 36;
+
+            TextMeshProUGUI photoTitle = A.Label(card, "PhotoOptionsTitle", "Photo Options", 32, ThemeRole.SecondaryText, FontRole.Heading, TextAlignmentOptions.MidlineLeft);
+            A.TopStrip(photoTitle.transform, y, 52, 70, 56); y += 62;
+            GameObject qualityRow = PrefRowShell(card, "ImageQualityRow", IconFactory.CameraIcon, "Image Quality", "Size of the copies sent to the reviewer", y, true);
+            Button quality = qualityRow.GetComponent<Button>();
+            TextMeshProUGUI qualityValue = A.Label(qualityRow.transform, "ValueText", "High Quality", 26, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.MidlineRight);
+            A.At(qualityRow.transform.Find("Chevron"), A.MR, new Vector2(-26, 0), new Vector2(40, 40));
+            A.At(qualityValue.transform, A.MR, new Vector2(-76, 0), new Vector2(220, 52));
+            A.Shrink(qualityValue, 18);
+            y += 134;
+            Toggle guide = PrefRow(card, "GuideFrameRow", IconFactory.ScanFrame, "Show Guide Frame", "Show the corner frame on the camera", y, true);
+
+            var c = A.Controller<AdminScannerPrefsController>("AdminScannerPrefsController");
+            A.Set(c, "backButton", s.back); A.Set(c, "flashToggle", flash); A.Set(c, "autoFocusToggle", focus);
+            A.Set(c, "scanLineToggle", line); A.Set(c, "guideFrameToggle", guide);
+            A.Set(c, "qualityButton", quality); A.Set(c, "qualityValue", qualityValue);
+            A.Finish(s);
+        }
+
+        /// <summary>The shared shell of a preferences row (icon tile, title, caption). With `chevron` it is a button that opens or cycles something.</summary>
+        static GameObject PrefRowShell(Transform card, string name, Sprite icon, string title, string caption, float y, bool chevron)
+        {
+            GameObject go = A.Node(card, name, typeof(Image), typeof(Button));
+            Image back = go.GetComponent<Image>(); Kit.StyleRounded(back); Kit.SetRadius(back, 56f); back.color = Color.white;
+            SceneBuilderCore.Themed(go, ThemeRole.SurfaceAlt);
+            go.GetComponent<Button>().targetGraphic = back;
+            A.TopStrip(go.transform, y, 120, 56, 56);
+            Image tile = A.IconTile(go.transform, "IconTile", icon, 76, 42, ThemeRole.Background, ThemeRole.AccentText);
+            A.At(tile.transform.parent, A.ML, new Vector2(26, 0), new Vector2(76, 76));
+            TextMeshProUGUI t = A.Label(go.transform, "TitleText", title, 33, ThemeRole.MainText, FontRole.Heading, TextAlignmentOptions.MidlineLeft);
+            A.Fill(t.transform, 124, 58, 170, 8); A.Shrink(t, 22);
+            TextMeshProUGUI cap = A.Label(go.transform, "CaptionText", caption, 25, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.MidlineLeft);
+            A.Fill(cap.transform, 124, 8, 170, 62); A.Shrink(cap, 17);
+            if (chevron)
+            {
+                Image ch = A.Icon(go.transform, "Chevron", IconFactory.ChevronRight, 40, ThemeRole.SecondaryText);
+                A.At(ch.transform, A.MR, new Vector2(-28, 0), new Vector2(40, 40));
+            }
+            return go;
+        }
+
+        /// <summary>A row with an on/off switch on the right (the whole row toggles it).</summary>
+        static Toggle PrefRow(Transform card, string name, Sprite icon, string title, string caption, float y, bool unused)
+        {
+            GameObject row = PrefRowShell(card, name, icon, title, caption, y, false);
+            Object.DestroyImmediate(row.GetComponent<Button>());                           // the switch itself is the control
+            Toggle t = Switch(row.transform, "Switch", true);
+            A.At(t.transform, A.MR, new Vector2(-28, 0), new Vector2(SwitchWidth, SwitchHeight));
+            return t;
+        }
+
+        /// <summary>A row that only shows a value (no control).</summary>
+        static void PrefInfoRow(Transform card, string name, Sprite icon, string title, string caption, float y)
+        {
+            GameObject row = PrefRowShell(card, name, icon, title, caption, y, false);
+            Object.DestroyImmediate(row.GetComponent<Button>());
+            Image lock_ = A.Icon(row.transform, "Info", IconFactory.Check, 40, ThemeRole.AccentText);
+            A.At(lock_.transform, A.MR, new Vector2(-34, 0), new Vector2(40, 40));
+        }
+
+        /// <summary>An on/off switch: a round track with a knob that slides. Its animation is on its ToggleSwitch.</summary>
+        static Toggle Switch(Transform parent, string name, bool on)
+        {
+            GameObject go = A.Node(parent, name, typeof(Image), typeof(Toggle), typeof(GlowUp.AppSettings.ToggleSwitch));
+            A.Size(go.transform, SwitchWidth, SwitchHeight);
+            Image hit = go.GetComponent<Image>();
+            Kit.StyleRounded(hit); hit.color = new Color(1, 1, 1, 0.004f);
+            Image track = A.RawPanel(go.transform, "Track", new Color32(196, 180, 181, 255), SwitchHeight);
+            A.Fill(track.transform, 0, 4, 0, 4);
+            Image knob = A.RawPanel(track.transform, "Knob", new Color32(250, 247, 242, 255), 46f);
+            A.At(knob.transform, A.MC, new Vector2(on ? 28 : -28, 0), new Vector2(44, 44));
+            Toggle toggle = go.GetComponent<Toggle>();
+            toggle.transition = Selectable.Transition.None; toggle.targetGraphic = track; toggle.graphic = null; toggle.isOn = on;
+            var view = go.GetComponent<GlowUp.AppSettings.ToggleSwitch>();
+            A.Set(view, "track", track); A.Set(view, "knob", knob.rectTransform); A.Set(view, "knobImage", knob); A.Set(view, "knobTravel", 28f);
+            return toggle;
         }
 
         /// <summary>A submission row: name and brand on the left, the status pill and the time on the right (filled by SubmissionRows).</summary>
@@ -243,6 +464,8 @@ namespace GlowUp.EditorTools
         {
             A.AppScreen s = A.Begin("AdminCaptureScene", "Scan Barcode", true, "AdminCaptureCard");
             Transform card = s.card;
+            Button tipsButton = A.IconButton(card, "TipsButton", IconFactory.Bulb, 92, 52, ThemeRole.AccentText, ThemeRole.SurfaceAlt);
+            A.At(tipsButton.transform, A.TR, new Vector2(-28, -28), new Vector2(92, 92));
 
             // ---------------- capture panel ----------------
             GameObject cap = A.Node(card, "CapturePanel");
@@ -264,11 +487,29 @@ namespace GlowUp.EditorTools
             GameObject frame = A.Node(viewport.transform, "ScanFrame", typeof(Image));
             A.At(frame.transform, A.MC, new Vector2(0, 40), new Vector2(700, 520));
             var frameImage = frame.GetComponent<Image>(); frameImage.sprite = IconFactory.ScanFrame; frameImage.type = Image.Type.Simple; frameImage.color = new Color(1, 1, 1, 0.9f); frameImage.raycastTarget = false;
-            TextMeshProUGUI hint = A.RawLabel(viewport.transform, "HintText", "Align the barcode within the frame", 28, Color.white, FontRole.Body, TextAlignmentOptions.Center, true);
-            A.BottomStrip(hint.transform, 24, 104, 40, 40);
-            Image hintBack = A.RawPanel(viewport.transform, "HintBackdrop", new Color(0, 0, 0, 0.45f), 36f);
-            A.BottomStrip(hintBack.transform, 20, 112, 30, 30);
-            hintBack.transform.SetSiblingIndex(hint.transform.GetSiblingIndex());
+            Image laser = A.RawPanel(frame.transform, "ScanLine", new Color(0.95f, 0.36f, 0.58f, 0.95f), 12f);
+            laser.sprite = IconFactory.ScanLine; laser.type = Image.Type.Simple; laser.raycastTarget = false;
+            A.At(laser.transform, A.MC, Vector2.zero, new Vector2(620, 22));
+            var sweep = SceneBuilderCore.Ensure<ScanLineSweep>(frame);
+            A.Set(sweep, "line", laser.rectTransform); A.Set(sweep, "area", (RectTransform)frame.transform);
+
+            Image hintBack = A.RawPanel(viewport.transform, "HintBackdrop", new Color(0, 0, 0, 0.5f), 36f);
+            A.TopStrip(hintBack.transform, 24, 64, 90, 90); hintBack.raycastTarget = false;
+            TextMeshProUGUI hint = A.RawLabel(hintBack.transform, "HintText", "Keep the product in frame", 28, Color.white, FontRole.Body, TextAlignmentOptions.Center);
+            A.Fill(hint.transform, 18, 0, 18, 0); A.Shrink(hint, 20);
+
+            // Focus / Lighting / Clear Image: ticks that turn green from the live camera picture (Take Photo mock-up)
+            Image checkBack = A.RawPanel(viewport.transform, "ChecklistCard", new Color(1, 1, 1, 0.88f), 36f);
+            A.BottomStrip(checkBack.transform, 24, 168, 120, 120); checkBack.raycastTarget = false;
+            string[] checkNames = { "Focus", "Lighting", "Clear Image" };
+            var checkTicks = new Image[3];
+            for (int i = 0; i < 3; i++)
+            {
+                TextMeshProUGUI cl = A.RawLabel(checkBack.transform, "CheckLabel_" + checkNames[i], checkNames[i], 28, new Color(0.25f, 0.20f, 0.21f), FontRole.Label, TextAlignmentOptions.MidlineLeft);
+                A.TopStrip(cl.transform, 14 + i * 50, 46, 28, 90); A.Shrink(cl, 20);
+                checkTicks[i] = A.RawIcon(checkBack.transform, "CheckTick_" + checkNames[i], IconFactory.Check, 36, new Color(0.70f, 0.66f, 0.67f));
+                A.At(checkTicks[i].transform, A.TR, new Vector2(-30, -(14 + i * 50 + 5)), new Vector2(36, 36));
+            }
 
             float controlsY = A.HeaderBottom + 880;
             Button galleryBtn = A.IconButton(cap.transform, "GalleryButton", IconFactory.Document, 112, 56, ThemeRole.MainText, ThemeRole.SurfaceAlt);
@@ -312,8 +553,23 @@ namespace GlowUp.EditorTools
             GameObject form = A.Node(card, "FormPanel");
             A.Between(form.transform, A.HeaderBottom, 30, 30, 30);
             A.Scroll(form.transform, "FormScrollView", out RectTransform content, 14, 12, 18, 6, 40);
-            TextMeshProUGUI notice = A.Label(content, "NoticeText", "", 28, ThemeRole.AccentText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            Fit(notice);
+            GameObject resultCard = A.Node(content, "ScanResultCard", typeof(Image));
+            Image resultBack = resultCard.GetComponent<Image>(); Kit.StyleRounded(resultBack); Kit.SetRadius(resultBack, 56f); resultBack.color = Color.white;
+            SceneBuilderCore.Themed(resultCard, ThemeRole.SurfaceAlt);
+            A.Size(resultBack, -1, 236);
+            Image thumbFrame = A.Panel(resultCard.transform, "ThumbFrame", ThemeRole.Background, 1f, 36f);
+            A.At(thumbFrame.transform, A.ML, new Vector2(24, 0), new Vector2(170, 170));
+            GameObject thumbPic = A.Node(thumbFrame.transform, "Picture", typeof(RawImage));
+            A.Fill(thumbPic.transform, 8, 8, 8, 8);
+            var resultThumb = thumbPic.GetComponent<RawImage>(); resultThumb.color = new Color(1, 1, 1, 0); resultThumb.raycastTarget = false;
+            TextMeshProUGUI resultName = A.Label(resultCard.transform, "ResultNameText", "Product name needed", 34, ThemeRole.Heading, FontRole.Heading, TextAlignmentOptions.TopLeft, true);
+            A.TopStrip(resultName.transform, 20, 56, 212, 24); A.Shrink(resultName, 22);
+            TextMeshProUGUI resultSub = A.Label(resultCard.transform, "ResultSubText", "No barcode yet", 26, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.MidlineLeft);
+            A.TopStrip(resultSub.transform, 82, 40, 212, 24); A.Shrink(resultSub, 18);
+            Image resultPill = A.RawPanel(resultCard.transform, "ResultPill", new Color(0.2f, 0.62f, 0.42f, 0.16f), 28f);
+            A.At(resultPill.transform, A.BL, new Vector2(212, 24), new Vector2(300, 48));
+            TextMeshProUGUI resultPillText = A.RawLabel(resultPill.transform, "ResultPillText", "Product Found", 24, new Color(0.2f, 0.62f, 0.42f), FontRole.Label, TextAlignmentOptions.Center);
+            A.Fill(resultPillText.transform, 10, 0, 10, 0); A.Shrink(resultPillText, 17);
             string[] keys = CaptureDraft.Keys;
             var inputs = new TMP_InputField[keys.Length]; var states = new TextMeshProUGUI[keys.Length]; var checks = new Button[keys.Length];
             for (int i = 0; i < keys.Length; i++)
@@ -332,16 +588,17 @@ namespace GlowUp.EditorTools
                 A.Size(inputs[i], -1, tall ? 260 : Kit.FieldHeight);
                 checks[i] = A.LinkButton(content, "Check_" + keys[i], "Mark checked against the pack", 26, ThemeRole.AccentText);
                 A.Size(checks[i], -1, 64);
-                A.LabelOf(checks[i]).alignment = TextAlignmentOptions.MidlineRight;
+                A.LabelOf(checks[i]).alignment = TextAlignmentOptions.MidlineRight; A.LabelOf(checks[i]).margin = new Vector4(0, 0, 30, 0);          // clear of the scroll bar
             }
             TextMeshProUGUI raw = A.Label(content, "RawText", "No photos. Add photos so the reviewer can compare.", 24, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             Fit(raw);
             Button addPhotos = A.PillButton(content, "AddPhotosButton", "Add photos", 30, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.CameraIcon);
             A.Size(addPhotos, -1, 96);
-            Button submit = A.PillButton(content, "SubmitButton", "Submit to Website", 38, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Check);
+            Button submit = A.PillButton(content, "SubmitButton", "Save Product", 38, ThemeRole.ButtonFill, ThemeRole.ButtonText);
             A.Size(submit, -1, 124);
-            TextMeshProUGUI result = A.Label(content, "ResultText", "", 28, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            Fit(result);
+            Button tryAgain = A.PillButton(content, "TryAgainButton", "Try Again", 36, ThemeRole.Background, ThemeRole.AccentText, IconFactory.Sync);
+            A.Size(tryAgain, -1, 112);
+            Kit.EnsureOutline(tryAgain.transform, "Outline", ThemeRole.Accent);
             GameObject after = A.Node(content, "AfterSubmit");
             A.Size(after.AddComponent<LayoutElement>(), -1, 108);
             Button viewStatus = A.PillButton(after.transform, "ViewStatusButton", "View status", 32, ThemeRole.ButtonFill, ThemeRole.ButtonText);
@@ -351,19 +608,24 @@ namespace GlowUp.EditorTools
             after.SetActive(false);
             form.SetActive(false);
 
+            var tips = TipsPopup(s, "TipsPanel");
             var confirm = ConfirmPopup(s, "ConfirmPanel");
             var c = A.Controller<AdminCaptureController>("AdminCaptureController");
             var camera = SceneBuilderCore.Ensure<CameraFeedController>(c.gameObject);
             A.Set(camera, "display", display); A.Set(camera, "viewport", viewport.rectTransform); A.Set(camera, "mirrorRoot", mirror.transform);
             A.Set(c, "backButton", s.back); A.Set(c, "titleText", s.title); A.Set(c, "confirmDialog", confirm);
             A.Set(c, "capturePanel", cap); A.Set(c, "cameraFeed", camera); A.Set(c, "galleryPreview", preview); A.Set(c, "scanFrame", (RectTransform)frame.transform);
-            A.Set(c, "hintText", hint); A.Set(c, "galleryButton", galleryBtn); A.Set(c, "shutterButton", shutter); A.Set(c, "torchButton", torch);
+            A.Set(c, "hintText", hint); A.Set(c, "tipsButton", tipsButton); A.Set(c, "tipsPanel", tips); A.Set(c, "scanLine", sweep);
+            A.Set(c, "checklist", checkBack.gameObject); A.Set(c, "checkFocus", checkTicks[0]); A.Set(c, "checkLighting", checkTicks[1]); A.Set(c, "checkClear", checkTicks[2]);
+            A.Set(c, "galleryButton", galleryBtn); A.Set(c, "shutterButton", shutter); A.Set(c, "torchButton", torch);
             A.Set(c, "roleBar", roles); Kit.SetArray(c, "roleButtons", roleButtons);
             A.Set(c, "thumbsContent", (RectTransform)thumbs.transform); A.Set(c, "thumbTemplate", thumb);
             A.Set(c, "continueButton", cont); A.Set(c, "continueLabel", A.LabelOf(cont)); A.Set(c, "typeInsteadButton", typeInstead);
             A.Set(c, "formPanel", form); Kit.SetArray(c, "fieldInputs", inputs); Kit.SetArray(c, "fieldStates", states); Kit.SetArray(c, "checkButtons", checks);
-            A.Set(c, "noticeText", notice); A.Set(c, "rawText", raw); A.Set(c, "addPhotosButton", addPhotos);
-            A.Set(c, "submitButton", submit); A.Set(c, "submitLabel", A.LabelOf(submit)); A.Set(c, "resultText", result);
+            A.Set(c, "resultThumb", resultThumb); A.Set(c, "resultName", resultName); A.Set(c, "resultSub", resultSub);
+            A.Set(c, "resultPillText", resultPillText); A.Set(c, "resultPill", resultPill); A.Set(c, "tryAgainButton", tryAgain);
+            A.Set(c, "rawText", raw); A.Set(c, "addPhotosButton", addPhotos);
+            A.Set(c, "submitButton", submit); A.Set(c, "submitLabel", A.LabelOf(submit));
             A.Set(c, "afterSubmit", after); A.Set(c, "viewStatusButton", viewStatus); A.Set(c, "newCaptureButton", again);
             A.Finish(s);
         }

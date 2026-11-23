@@ -18,10 +18,15 @@ namespace GlowUp.Admin
     public class AdminDashboardController : MonoBehaviour
     {
         [Header("Header")]
-        [SerializeField] private TextMeshProUGUI welcomeText;
-        [SerializeField] private TextMeshProUGUI accountText;
-        [SerializeField] private Button signOutButton;
+        [SerializeField] private Button settingsButton;
         [SerializeField] private ConfirmDialog confirmDialog;
+
+        [Header("Scanner preview")]
+        [SerializeField] private Button previewButton;
+        [SerializeField] private Button flashChip;
+        [SerializeField] private TextMeshProUGUI flashChipLabel;
+        [SerializeField] private TextMeshProUGUI autoFocusChipLabel;
+        [SerializeField] private RectTransform guideFrame;
 
         [Header("Capture")]
         [SerializeField] private Button scanButton;
@@ -30,11 +35,15 @@ namespace GlowUp.Admin
         [SerializeField] private Button manualButton;
         [SerializeField] private Button resumeButton;
         [SerializeField] private TextMeshProUGUI resumeText;
+        [SerializeField] private Button tipsButton;
+        [SerializeField] private OverlayPanel tipsPanel;
 
-        [Header("Live status")]
-        [SerializeField] private TextMeshProUGUI statusTitle;
-        [SerializeField] private TextMeshProUGUI statusDetail;
-        [SerializeField] private Image statusDot;
+        [Header("Live status bar")]
+        [SerializeField] private Button statusBar;
+        [SerializeField] private TextMeshProUGUI onlineText;
+        [SerializeField] private Image onlineDot;
+        [SerializeField] private TextMeshProUGUI totalScansText;
+        [SerializeField] private TextMeshProUGUI syncText;
         [SerializeField] private Color syncedColor = new Color(0.20f, 0.62f, 0.42f);
         [SerializeField] private Color busyColor = new Color(0.85f, 0.60f, 0.15f);
         [SerializeField] private Color offlineColor = new Color(0.62f, 0.55f, 0.56f);
@@ -46,14 +55,11 @@ namespace GlowUp.Admin
         [SerializeField] private Button viewAllButton;
         [SerializeField] private int recentRows = 3;
 
-        [Header("Bottom bar and website")]
-        [SerializeField] private Button websiteButton;
-        [SerializeField] private Button navSubmissions;
-
         [Header("Scenes")]
         [SerializeField] private string loginScene = "AdminLoginScene";
         [SerializeField] private string captureScene = "AdminCaptureScene";
         [SerializeField] private string submissionsScene = "AdminSubmissionsScene";
+        [SerializeField] private string settingsScene = "AdminSettingsScene";
 
         readonly List<GameObject> rows = new List<GameObject>();
 
@@ -65,11 +71,15 @@ namespace GlowUp.Admin
             Hook(galleryButton, () => OpenCapture(CaptureDraft.Mode.Gallery));
             Hook(manualButton, () => OpenCapture(CaptureDraft.Mode.Manual));
             Hook(resumeButton, () => { CaptureDraft d = CaptureDraft.Current; AdminCaptureController.StartMode = d.ModeValue; AdminCaptureController.Resume = true; SceneNavigator.Go(captureScene); });
-            Hook(viewAllButton, () => { AdminSubmissionsController.OpenId = ""; SceneNavigator.Go(submissionsScene); });
-            Hook(navSubmissions, () => { AdminSubmissionsController.OpenId = ""; SceneNavigator.Go(submissionsScene); });
-            Hook(websiteButton, OpenWebsite);
-            Hook(signOutButton, AskSignOut);
+            Hook(viewAllButton, OpenSubmissions);
+            Hook(statusBar, OpenSubmissions);
+            Hook(previewButton, () => OpenCapture(CaptureDraft.Mode.Barcode));
+            Hook(settingsButton, () => SceneNavigator.Go(settingsScene));
+            Hook(tipsButton, () => { if (tipsPanel != null) tipsPanel.Show(); });
+            Hook(flashChip, () => { ScannerPrefs.Flash = !ScannerPrefs.Flash; });
             SubmissionStore.Changed += Paint;
+            ScannerPrefs.Changed += Paint;
+            ConnectivityMonitor.ConnectivityChanged += OnConnection;
             Paint();
 
             StaffAccess.Result r = await StaffAccess.Verify();
@@ -87,11 +97,17 @@ namespace GlowUp.Admin
             try { await BrandRepository.LoadActive(true); await ProductRepository.LoadActive(true); } catch (System.Exception) { }
         }
 
-        void OnDestroy() { SubmissionStore.Changed -= Paint; }
+        void OnDestroy() { SubmissionStore.Changed -= Paint; ScannerPrefs.Changed -= Paint; ConnectivityMonitor.ConnectivityChanged -= OnConnection; }
+
+        void OnConnection(bool online) { Paint(); }
+
+        static void OpenSubmissions() { AdminSubmissionsController.OpenId = ""; SceneNavigator.Go("AdminSubmissionsScene"); }
 
         void Update()
         {
-            if (Input.GetKeyDown(KeyCode.Escape) && confirmDialog != null && !confirmDialog.IsOpen) AskSignOut();   // Back = leave staff mode (asked first)
+            if (!Input.GetKeyDown(KeyCode.Escape)) return;
+            if (tipsPanel != null && tipsPanel.IsOpen) { tipsPanel.Hide(); return; }                  // Back closes the tips first
+            if (confirmDialog != null && !confirmDialog.IsOpen) AskSignOut();                          // then Back = leave staff mode (asked first)
         }
 
         static void Hook(Button b, UnityEngine.Events.UnityAction a) { if (b != null) b.onClick.AddListener(a); }
@@ -107,26 +123,23 @@ namespace GlowUp.Admin
         void Paint()
         {
             if (this == null) return;
-            string email = StaffAccess.Email;
-            if (welcomeText != null) welcomeText.text = "Welcome, Staff!";
-            if (accountText != null) accountText.text = string.IsNullOrEmpty(email) ? "Staff account" : email + " · Admin";
-
             CaptureDraft d = CaptureDraft.Current;
             bool unsent = d.HasContent && string.IsNullOrEmpty(d.submittedId);
             if (resumeButton != null) resumeButton.gameObject.SetActive(unsent);
             if (resumeText != null) resumeText.text = unsent ? $"Unsent capture: {(d.Get("name").Has ? d.Get("name").value : "no name yet")}. Tap to continue." : "";
 
-            // live status: what the listener reports, never assumed
-            string sync = ConnectivityMonitor.Online ? SubmissionStore.SyncState : "Offline";
-            int attention = SubmissionStore.NeedsAttention(), pending = SubmissionStore.Count("Pending");
-            string title = !ConnectivityMonitor.Online ? "Offline" : attention > 0 ? "Needs attention" : sync == "Synced" ? "Synced" : sync;
-            if (statusTitle != null) statusTitle.text = title;
-            if (statusDetail != null)
-                statusDetail.text = !SubmissionStore.Loaded && sync != "Offline" ? "Connecting to the website..."
-                    : attention > 0 ? $"{attention} submission{(attention == 1 ? " was" : "s were")} sent back with notes. {pending} waiting for review."
-                    : sync == "Offline" ? "Captures are kept on this phone and sent when you are back online."
-                    : $"Ready. {pending} waiting for review on the website. Updates here by themselves.";
-            if (statusDot != null) statusDot.color = title == "Synced" ? syncedColor : title == "Offline" ? offlineColor : busyColor;
+            // live status bar: what the listener and the connection report, never assumed
+            bool online = ConnectivityMonitor.Online;
+            string sync = online ? SubmissionStore.SyncState : "Offline";
+            int attention = SubmissionStore.NeedsAttention();
+            string syncWord = !online ? "Offline" : attention > 0 ? "Needs attention" : sync;
+            if (onlineText != null) onlineText.text = online ? "Online" : "Offline";
+            if (onlineDot != null) onlineDot.color = online ? syncedColor : offlineColor;
+            if (totalScansText != null) totalScansText.text = "Total Scans: " + (SubmissionStore.Loaded ? SubmissionStore.Items.Count.ToString() : "-");
+            if (syncText != null) { syncText.text = syncWord; syncText.color = syncWord == "Synced" ? syncedColor : syncWord == "Offline" ? offlineColor : busyColor; }
+            if (flashChipLabel != null) flashChipLabel.text = ScannerPrefs.Flash ? "Flash On" : "Flash Off";
+            if (autoFocusChipLabel != null) autoFocusChipLabel.text = ScannerPrefs.AutoFocus ? "Auto Focus" : "Manual Focus";
+            if (guideFrame != null) guideFrame.gameObject.SetActive(ScannerPrefs.GuideFrame);
 
             PaintRecent();
         }
@@ -152,15 +165,8 @@ namespace GlowUp.Admin
             if (emptyText != null)
             {
                 emptyText.gameObject.SetActive(n == 0);
-                emptyText.text = SubmissionStore.Loaded ? "No submissions yet. Scan or photograph a product to start." : "Loading your submissions...";
+                emptyText.text = SubmissionStore.Loaded ? "No submissions yet." : "Loading your submissions...";
             }
-        }
-
-        void OpenWebsite()
-        {
-            const string message = "This opens the GlowUp admin website in your browser, for brands, ingredients, inventory and approvals. Your unsent capture stays on this phone.";
-            if (confirmDialog != null) confirmDialog.Ask("Open the admin website?", message, "Open website", () => Application.OpenURL(StaffAccess.WebsiteHome), false, "Stay here");
-            else Application.OpenURL(StaffAccess.WebsiteHome);
         }
 
         void AskSignOut()

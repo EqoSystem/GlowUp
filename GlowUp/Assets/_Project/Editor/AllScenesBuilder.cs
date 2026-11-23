@@ -46,7 +46,9 @@ namespace GlowUp.EditorTools
             new Step("Staff Sign-In", AdminScenesBuilder.BuildStaffLogin),
             new Step("Staff Dashboard", AdminScenesBuilder.BuildDashboard),
             new Step("Staff Capture", AdminScenesBuilder.BuildCapture),
-            new Step("Staff Submissions", AdminScenesBuilder.BuildSubmissions)
+            new Step("Staff Submissions", AdminScenesBuilder.BuildSubmissions),
+            new Step("Staff Settings", AdminScenesBuilder.BuildSettings),
+            new Step("Staff Scanner Preferences", AdminScenesBuilder.BuildScannerPrefs)
         };
 
         [MenuItem("GlowUp/Build Scene/All Scenes", false, 90)]

@@ -228,7 +228,7 @@ namespace GlowUp.Admin
                     foreach (var p in CaptureDraft.Photos)
                     {
                         if (photos.Count >= 3 || p.Value == null) break;
-                        string b64 = Convert.ToBase64String(SmallJpeg(p.Value, 640, 60));
+                        string b64 = Convert.ToBase64String(SmallJpeg(p.Value, ScannerPrefs.EvidenceSide, ScannerPrefs.EvidenceQuality));
                         if (total + b64.Length > 800000) break;                 // a document holds at most 1 MB
                         total += b64.Length;
                         photos.Add(new Dictionary<string, object> { { "role", p.Key }, { "jpeg", b64 } });
