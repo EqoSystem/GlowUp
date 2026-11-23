@@ -148,7 +148,8 @@ export function mountProductQuickFill({ brands, products, readForm, fill, openEx
         const files = await pickPhotos();
         if (!files.length) return;
         const urls = files.map((f) => URL.createObjectURL(f));
-        const finish = () => { urls.forEach((u) => URL.revokeObjectURL(u)); frame.close(); };
+        let closed = false;                       // Close, Escape or the backdrop also stops reading the photos still waiting
+        const finish = () => { closed = true; urls.forEach((u) => URL.revokeObjectURL(u)); frame.close(); };
         const frame = dialogFrame("Read product photos", finish);
         frame.box.classList.add("wide", "qf-photos");
         frame.box.insertAdjacentHTML("beforeend", `
@@ -164,7 +165,7 @@ export function mountProductQuickFill({ brands, products, readForm, fill, openEx
         readButton.addEventListener("click", async () => {
             readButton.disabled = true;
             let ingredientsTaken = false;
-            for (let at = 0; at < files.length; at++) {
+            for (let at = 0; at < files.length && !closed; at++) {
                 const role = frame.box.querySelector(`[data-role="${at}"]`).value;
                 const say = (text, tone) => { const p = frame.box.querySelector(`[data-state="${at}"]`); p.textContent = text; p.className = "field-hint" + (tone ? " " + tone : ""); };
                 if (role === "skip") { say("Not read."); continue; }
@@ -172,12 +173,14 @@ export function mountProductQuickFill({ brands, products, readForm, fill, openEx
                     if (role === "barcode") {
                         say("Looking for the bars...");
                         const code = await barcodeFromPhoto(files[at]);
+                        if (closed) break;
                         if (!code) { say("No barcode found. Take it closer, straight on, with the bars sharp.", "warn"); continue; }
                         say(`Barcode ${code}: looked up in the form.`, "ok");
                         el("productQuickInput").value = code;
                         await find(code);
                     } else if (role === "ingredients") {
                         const read = await readTextFromFile(files[at], (t) => say(t));
+                        if (closed) break;
                         if (!read || read.ingredients.length < 2) { say("No ingredient list was found. Take it closer, straight on, with the whole list sharp.", "warn"); continue; }
                         if (ingredientsTaken) { say(`${read.ingredients.length} ingredients read; the list from the photo above is already in the form.`, "warn"); continue; }
                         const sure = read.confidence >= OCR_SURE;
