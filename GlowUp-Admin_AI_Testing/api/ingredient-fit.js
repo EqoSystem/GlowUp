@@ -77,7 +77,7 @@ function readAnswer(answer, allergens, conditions) {
     const avoidForConditions = pick(data.avoidForConditions, conditions.map((c) => c.id));
     const opened = openedSites(candidate);
     const sources = (Array.isArray(data.sources) ? data.sources : []).slice(0, 6).map((s) => ({ title: String((s && s.title) || "").slice(0, 120), url: String((s && s.url) || "").slice(0, 400) }))
-        .filter((s) => /^https:\/\//.test(s.url) && opened.some((site) => hostOf(s.url) === site || hostOf(s.url).endsWith("." + site) || site.endsWith("." + hostOf(s.url))))
+        .filter((s) => /^https:\/\//.test(s.url) && opened.includes(hostOf(s.url)))      // the exact site only: no parent or sub-domain is accepted
         .map((s) => `${s.title || hostOf(s.url)} | ${s.url}`);
     if (sources.length === 0 || (allergenTags.length + avoidForSkinTypes.length + avoidForConditions.length) === 0) return { found: false };
     return { found: true, allergenTags, avoidForSkinTypes, avoidForConditions, why: String(data.why || "").replace(/\s+/g, " ").trim().slice(0, 300), sources };

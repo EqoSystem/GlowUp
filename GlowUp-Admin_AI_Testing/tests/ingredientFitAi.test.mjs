@@ -16,6 +16,8 @@ ok(evidenceProblem("caution", good.sources) === "", "a DermNet page passes the w
 
 const invented = readAnswer(reply({ allergenTags: ["fragrance"], avoidForSkinTypes: [], avoidForConditions: [], why: "x", sources: [{ title: "Blog", url: "https://madeup-blog.example/post" }] }, ["dermnetnz.org"]), allergens, conditions);
 ok(!invented.found, "a link the search never opened is dropped, and with it the answer");
+const sub = readAnswer(reply({ allergenTags: ["fragrance"], avoidForSkinTypes: [], avoidForConditions: [], why: "x", sources: [{ title: "D", url: "https://evil.dermnetnz.org/a" }] }, ["dermnetnz.org"]), allergens, conditions);
+ok(!sub.found, "a sub-domain of an opened site is not the opened site");
 ok(!readAnswer(reply({ allergenTags: [], avoidForSkinTypes: [], avoidForConditions: [], why: "", sources: [{ title: "D", url: "https://dermnetnz.org/a" }] }, ["dermnetnz.org"]), allergens, conditions).found, "no flags = not found");
 ok(!readAnswer({ candidates: [{ content: { parts: [{ text: "I am not sure." }] } }] }, allergens, conditions).found, "plain text with no JSON = not found");
 ok(!readAnswer(null, allergens, conditions).found, "empty answer = not found");
