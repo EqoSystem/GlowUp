@@ -155,7 +155,8 @@ async function autoDetails() {
             const base = { name, techName: "", aliases: k.aliasList, fitAuto: false, allergenTags: [], avoidForSkinTypes: [], avoidForConditions: [], goodForSkinTypes: [], goodForConditions: [], sources: [] };
             const fit = autoFitPatch(base, conditionIds, allergenIds, refs) || {};
             const sources = Array.from(new Set([k.page ? "PubChem | " + k.page : "", fit.sources ? REF_CREDIT : "", k.job ? REF_CREDIT : ""].filter(Boolean))).slice(0, 10);
-            const complete = !!(k.page && k.guess && k.job);
+            // auto-approval only for a name that a product an admin already accepted lists: a name from a Pending (app or file) product only creates an entry for review
+            const complete = !!(k.page && k.guess && k.job && x.trusted);
             const kind = k.guess ? k.guess.name.split("/")[0].trim() : "";
             const data = Object.assign({
                 name, aliases: aliasesWithInci(name, "", k.aliasList), classificationId: k.guess ? k.guess.id : "", purpose: k.job,
@@ -599,7 +600,8 @@ async function loadIngredients() {
                 if (seen.has(key)) return;
                 seen.add(key);
                 productUse.set(key, (productUse.get(key) || 0) + 1);
-                if (!listedBy.has(key)) listedBy.set(key, { key, name: listed, products: [] });
+                if (!listedBy.has(key)) listedBy.set(key, { key, name: listed, products: [], trusted: false });
+                if (String(d.data().status || "").toLowerCase() !== "pending") listedBy.get(key).trusted = true;
                 listedBy.get(key).products.push([String(d.data().brandName || "").trim(), String(d.data().name || "").trim()].filter((x) => x).join(": "));
             });
         });
