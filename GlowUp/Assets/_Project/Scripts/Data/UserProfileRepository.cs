@@ -302,6 +302,7 @@ namespace GlowUp.Data
             { "age", p.age }, { "skinType", p.skinType ?? "" }, { "skinTone", p.skinTone ?? "" },
             { "skinConditions", p.skinConditions ?? new List<string>() },
             { "knownAllergens", p.knownAllergens ?? new List<string>() },
+            { "sensitiveReactions", p.sensitiveReactions ?? new List<string>() },
             { "termsAccepted", p.termsAccepted }, { "healthConsentAtUnix", p.healthConsentAtUnix }, { "theme", p.theme ?? "light" },
             { "createdAt", FieldValue.ServerTimestamp }
         };

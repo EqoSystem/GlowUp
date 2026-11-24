@@ -121,9 +121,9 @@ namespace GlowUp.Onboarding
         [SerializeField] private string msgOwnMailApp = "Gmail is not on this phone, so your email app opened.";
         [SerializeField] private string msgNoMailApp = "No email app was found on this phone. Please check your email manually.";
         [SerializeField] private string msgWaiting = "Waiting for you to confirm this email.";
-        [SerializeField] private string sendAgainText = "Send again";
+        [SerializeField] private string sendAgainText = "Resend";
         [Tooltip("{0} = seconds left")]
-        [SerializeField] private string sendAgainWaitText = "Send again in {0} s";
+        [SerializeField] private string sendAgainWaitText = "Resend {0}s";
         [SerializeField] private string changeTitle = "Use another email?";
         [TextArea(2, 4)] [SerializeField] private string changeMessage = "The sign-up for {0} is dropped and you can type another email and password. Everything else you filled in stays.";
         [SerializeField] private string changeConfirm = "Use another";

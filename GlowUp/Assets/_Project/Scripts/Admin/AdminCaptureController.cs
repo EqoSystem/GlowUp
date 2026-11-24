@@ -78,6 +78,8 @@ namespace GlowUp.Admin
         [SerializeField] private Button tryAgainButton;
         [SerializeField] private TextMeshProUGUI rawText;
         [SerializeField] private Button addPhotosButton;
+        [Tooltip("Find missing details: looks the product up by name and brand on the web (brand, category, ingredient list)")]
+        [SerializeField] private Button findDetailsButton;
         [SerializeField] private Button submitButton;
         [SerializeField] private TextMeshProUGUI submitLabel;
         [SerializeField] private GameObject afterSubmit;
@@ -128,6 +130,7 @@ namespace GlowUp.Admin
             BatchQueue.Changed += PaintBatch;
             Hook(typeInsteadButton, () => ShowForm("Type the details you have. The rest stays Missing for the website to fill."));
             Hook(addPhotosButton, () => ShowCapture(CaptureDraft.Mode.Photo));
+            Hook(findDetailsButton, () => _ = FindMissing());
             Hook(submitButton, () => _ = Submit());
             Hook(viewStatusButton, () => { AdminSubmissionsController.OpenId = draft.submittedId; Finish(submissionsScene); });
             Hook(newCaptureButton, () => { CaptureDraft.Clear(); CaptureDraft.ReleasePhotos(); Resume = false; SceneNavigator.Go(SceneNavigatorCurrent()); });
@@ -437,7 +440,28 @@ namespace GlowUp.Admin
                 rawText.text = draft.rawText.Length > 0 ? $"Text as read ({draft.rawFrom}):\n{draft.rawText}" :
                     CaptureDraft.Photos.Count > 0 ? $"{CaptureDraft.Photos.Count} photo(s) attached." : "No photos. Add photos so the reviewer can compare.";
             PaintResultCard(string.IsNullOrEmpty(draft.submittedId) ? null : "submitted");
+            // offered while a detail the web may know is missing and there is a name or brand to search by
+            if (findDetailsButton != null)
+                findDetailsButton.gameObject.SetActive(string.IsNullOrEmpty(draft.submittedId) && (draft.Get("name").Has || draft.Get("brand").Has)
+                    && (!draft.Get("ingredients").Has || !draft.Get("brand").Has || !draft.Get("cosmeticType").Has));
             painting = false;
+        }
+
+        /// <summary>"Find missing details": looks this product up on the web by name and brand (see CaptureReader.FillMissing). Needs review, never final.</summary>
+        async Task FindMissing()
+        {
+            if (busy) return;
+            busy = true;
+            if (findDetailsButton != null) findDetailsButton.interactable = false;
+            Info("Searching the web for this product...");
+            string said;
+            try { said = await CaptureReader.FillMissing(draft); }
+            catch (Exception) { said = "The online look-up failed. Try again, or type the details."; }
+            busy = false;
+            if (this == null) return;
+            if (findDetailsButton != null) findDetailsButton.interactable = true;
+            Info(said);
+            PaintForm();
         }
 
         /// <summary>The "Scan Result" card at the top of the form: the first photo, the name, the barcode or brand, and one status pill.</summary>

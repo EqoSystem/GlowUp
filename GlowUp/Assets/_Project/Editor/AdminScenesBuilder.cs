@@ -102,7 +102,7 @@ namespace GlowUp.EditorTools
 
             Button signIn = A.PillButton(card, "SignInButton", "Sign In", 40, ThemeRole.ButtonFill, ThemeRole.ButtonText);
             A.TopStrip(signIn.transform, 1110, Kit.ButtonHeight, x, x);
-            Button customer = A.LinkButton(card, "CustomerLoginButton", "Back to customer login", 32, ThemeRole.AccentText);
+            Button customer = A.LinkButton(card, "CustomerLoginButton", "Back to User Log-In", 32, ThemeRole.AccentText);
             A.BottomStrip(customer.transform, 60, 84, x, x);
 
             var c = A.Controller<AdminLoginController>("AdminLoginController");
@@ -672,6 +672,11 @@ namespace GlowUp.EditorTools
             Fit(raw);
             Button addPhotos = A.PillButton(content, "AddPhotosButton", "Add photos", 30, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.CameraIcon);
             A.Size(addPhotos, -1, 96);
+            // 24 Nov 2026: a photo that shows only the name has no ingredient list; this looks the product up on the web by name and brand
+            Button findDetails = A.PillButton(content, "FindDetailsButton", "Find missing details", 30, ThemeRole.Background, ThemeRole.AccentText, IconFactory.Sparkle);
+            A.Size(findDetails, -1, 96);
+            Kit.EnsureOutline(findDetails.transform, "Outline", ThemeRole.Accent);
+            findDetails.gameObject.SetActive(false);
             Button submit = A.PillButton(content, "SubmitButton", "Save Product", 38, ThemeRole.ButtonFill, ThemeRole.ButtonText);
             A.Size(submit, -1, 124);
             Button tryAgain = A.PillButton(content, "TryAgainButton", "Try Again", 36, ThemeRole.Background, ThemeRole.AccentText, IconFactory.Sync);
@@ -704,7 +709,7 @@ namespace GlowUp.EditorTools
             A.Set(c, "formPanel", form); Kit.SetArray(c, "fieldInputs", inputs); Kit.SetArray(c, "fieldStates", states); Kit.SetArray(c, "checkButtons", checks);
             A.Set(c, "resultThumb", resultThumb); A.Set(c, "resultName", resultName); A.Set(c, "resultSub", resultSub);
             A.Set(c, "resultPillText", resultPillText); A.Set(c, "resultPill", resultPill); A.Set(c, "tryAgainButton", tryAgain);
-            A.Set(c, "rawText", raw); A.Set(c, "addPhotosButton", addPhotos);
+            A.Set(c, "rawText", raw); A.Set(c, "addPhotosButton", addPhotos); A.Set(c, "findDetailsButton", findDetails);
             A.Set(c, "submitButton", submit); A.Set(c, "submitLabel", A.LabelOf(submit));
             A.Set(c, "afterSubmit", after); A.Set(c, "viewStatusButton", viewStatus); A.Set(c, "newCaptureButton", again);
             A.Controller<StaffSkin>("StaffSkin"); A.Finish(s);

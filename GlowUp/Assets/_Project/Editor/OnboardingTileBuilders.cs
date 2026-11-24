@@ -1,5 +1,6 @@
 using GlowUp.Common;
 using GlowUp.Onboarding;
+using GlowUp.Scan;
 using GlowUp.Theme;
 using TMPro;
 using UnityEditor;
@@ -54,7 +55,11 @@ namespace GlowUp.EditorTools
             float y = HeaderBottom + 2 * cellH + gap + gap + wideH + 14;
             // panel revision (22 Nov 2026): help is on the page, the user never has to look it up elsewhere
             var finder = HelpLink(c.card, "SkinTypeFinderButton", "Find my skin type", y, true);
-            var sources = HelpLink(c.card, "SkinListSourcesButton", "Where lists come from", y, false);
+            // "Where lists come from" was removed (24 Nov 2026): that belongs in the paper, not in the app. Its half of the row now holds "How it reacts"
+            // (Sensitive skin only); alone, "Find my skin type" spans the whole row.
+            Transform oldSources = Loose(c.card, "SkinListSourcesButton"); if (oldSources != null) Object.DestroyImmediate(oldSources.gameObject);
+            var reactionsOpen = HelpLink(c.card, "SensitiveReactionsButton", "How it reacts", y, false);
+            reactionsOpen.gameObject.SetActive(false);
             y += 132 + 28;
             var head = TextOn(c.card, "SkinConditionHeaderText", "Chronic Skin Conditions (Optional)", HeaderSize, TextAlignmentOptions.MidlineLeft);
             SetText(head, "Chronic Skin Conditions (Optional)", HeaderSize, TextAlignmentOptions.MidlineLeft);
@@ -67,12 +72,41 @@ namespace GlowUp.EditorTools
                 new[] { "Atopic Dermatitis", "Psoriasis", "Rosacea", "Seborrheic Dermatitis", "Allergic Contact Dermatitis", "Irritant Contact Dermatitis", "Hidradenitis Suppurativa", "Lichen Planus", "Chronic Urticaria", "Alopecia Areata", "Vitiligo", "Chronic Prurigo", "Cutaneous Lupus Erythematosus", "Lichen Sclerosus", "Ichthyosis" },
                 "Not listed? Add it here", null, null, null, c.feedback);
 
+            // ---- "How does your skin react?": optional, opens when Sensitive is chosen (or from "How it reacts"); one tick row per reaction ----
+            Transform oldReact = Loose(c.canvas, "ReactionsPanel");
+            if (oldReact != null) Object.DestroyImmediate(oldReact.gameObject);
+            AppKit.AppPopup react = AppKit.Overlay(new AppKit.AppScreen { canvas = c.canvas }, "ReactionsPanel", "How does your skin react?");
+            AppKit.At(react.box, AppKit.MC, new Vector2(0, 30), new Vector2(900, 1260));
+            TextMeshProUGUI reactHint = AppKit.Label(react.box, "HintText", "Optional. Tick any that apply, or skip. It helps GlowUp flag ingredients that may set your skin off.",
+                30, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            AppKit.TopStrip(reactHint.transform, 130, 100, 48, 48);
+            var reactRows = new Object[SensitiveReactions.All.Length]; var reactTicks = new Object[SensitiveReactions.All.Length];
+            for (int i = 0; i < SensitiveReactions.All.Length; i++)
+            {
+                Button row = AppKit.PillButton(react.box, "ReactionRow" + i, SensitiveReactions.All[i].label, 32, ThemeRole.SurfaceAlt, ThemeRole.MainText);
+                AppKit.TopStrip(row.transform, 250 + i * 132, 118, 48, 48);
+                Transform content = row.transform.Find("Content");
+                AppKit.Fill(content, 40, 0, 130, 0);                                           // room on the right for the tick: the words never run under it
+                content.GetComponent<HorizontalLayoutGroup>().childAlignment = TextAnchor.MiddleLeft;
+                Image tick = AppKit.Icon(row.transform, "Tick", IconFactory.Check, 56, ThemeRole.Accent);
+                AppKit.At(tick.transform, AppKit.TR, new Vector2(-40, -31), new Vector2(56, 56));
+                tick.gameObject.SetActive(false);
+                reactRows[i] = row; reactTicks[i] = tick.gameObject;
+            }
+            Button reactSkip = AppKit.PillButton(react.box, "SkipButton", "Skip", 36, ThemeRole.SurfaceAlt, ThemeRole.MainText);
+            AppKit.BottomStrip(reactSkip.transform, 44, 108, 48, 462);
+            Button reactDone = AppKit.PillButton(react.box, "DoneButton", "Done", 36, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Check);
+            AppKit.BottomStrip(reactDone.transform, 44, 108, 462, 48);
+
             var go = SceneBuilderCore.EnsureRoot("OnboardingStep2FlowController");
             var ctl = SceneBuilderCore.Ensure<OnboardingStep2FlowController>(go);
             SceneBuilderCore.SetField(ctl, "skinTypeGroup", group); SceneBuilderCore.SetField(ctl, "conditions", panel);
             SceneBuilderCore.SetField(ctl, "continueButton", c.cont); SceneBuilderCore.SetField(ctl, "continueAnimator", c.anim);
             SceneBuilderCore.SetField(ctl, "backButton", c.back); SceneBuilderCore.SetField(ctl, "feedbackText", c.feedback);
-            SceneBuilderCore.SetField(ctl, "finderButton", finder); SceneBuilderCore.SetField(ctl, "listSourcesButton", sources);
+            SceneBuilderCore.SetField(ctl, "finderButton", finder);
+            SceneBuilderCore.SetField(ctl, "reactionsButton", reactionsOpen); SceneBuilderCore.SetField(ctl, "reactionsPanel", react.panel);
+            SetArray(ctl, "reactionRows", reactRows); SetArray(ctl, "reactionTicks", reactTicks);
+            SceneBuilderCore.SetField(ctl, "reactionsDone", reactDone); SceneBuilderCore.SetField(ctl, "reactionsSkip", reactSkip);
 
             FinishScene(); SceneBuilderCore.Save(scene);
             Debug.Log("[GlowUp] OnboardingStep2Scene built. Tile = OuterPanel (frame) > InnerPanel (FaceTexture + skin type name); the subtitle sits in the frame; InfoBadge is a hint for new users.");
@@ -138,20 +172,50 @@ namespace GlowUp.EditorTools
             Transform oldSelfie = Loose(c.canvas, "SelfiePanel");
             if (oldSelfie != null) Object.DestroyImmediate(oldSelfie.gameObject);
             AppKit.AppPopup selfie = AppKit.Overlay(new AppKit.AppScreen { canvas = c.canvas }, "SelfiePanel", "Find my tone");
-            AppKit.At(selfie.box, AppKit.MC, new Vector2(0, 40), new Vector2(920, 1240));
-            GameObject frame = AppKit.Node(selfie.box, "PreviewFrame", typeof(RectMask2D), typeof(Image));
-            AppKit.At(frame.transform, AppKit.TC, new Vector2(0, -130), new Vector2(640, 640));
-            frame.GetComponent<Image>().color = new Color(0, 0, 0, 0.08f);
-            GameObject previewObject = AppKit.Node(frame.transform, "Preview", typeof(RawImage));
-            AppKit.Fill(previewObject.transform);
+            AppKit.At(selfie.box, AppKit.MC, new Vector2(0, 20), new Vector2(920, 1500));
+            // (24 Nov 2026) the live view is the AI Smart Scan screen's camera component on the FRONT camera, without the scan grid or the moving line.
+            // Bands from the top: viewport 130-890 | status 900-990 | result row 1000-1130 | delete link 1150-1230 | the two buttons at the bottom.
+            Image viewport = AppKit.RawPanel(selfie.box, "CameraViewport", new Color32(30, 26, 25, 255), 48f);
+            AppKit.TopStrip(viewport.transform, 130, 760, 48, 48);
+            viewport.gameObject.AddComponent<Mask>().showMaskGraphic = true;
+            GameObject mirror = AppKit.Node(viewport.transform, "MirrorRoot");
+            AppKit.Fill(mirror.transform);
+            GameObject displayObject = AppKit.Node(mirror.transform, "CameraDisplay", typeof(RawImage));
+            AppKit.Fill(displayObject.transform);
+            var cameraDisplay = displayObject.GetComponent<RawImage>();
+            cameraDisplay.color = new Color(0, 0, 0, 0); cameraDisplay.raycastTarget = false;          // invisible until the camera runs
+            GameObject resultObject = AppKit.Node(viewport.transform, "ResultImage", typeof(RawImage));
+            AppKit.Fill(resultObject.transform);
+            var resultImage = resultObject.GetComponent<RawImage>(); resultImage.raycastTarget = false;
+            resultObject.SetActive(false);
+            // the box on the frozen photo: the part of the face that was read (placed by SkinToneSelfie)
+            Image sampleBox = AppKit.Panel(viewport.transform, "SampleBox", ThemeRole.Gold, 0.12f, 16f);
+            sampleBox.raycastTarget = false;
+            AppKit.Outline(sampleBox.transform, ThemeRole.Gold, 16f);
+            sampleBox.gameObject.SetActive(false);
             TextMeshProUGUI selfieStatus = AppKit.Label(selfie.box, "StatusText", "", 30, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            AppKit.Fill(selfieStatus.transform, 48, 330, 48, 800);
-            AppKit.ShrinkWrapped(selfieStatus, 24);
-            Button deleteSelfie = AppKit.PillButton(selfie.box, "DeleteSelfieButton", "Delete my selfie", 32, ThemeRole.SurfaceAlt, ThemeRole.Warning);
-            AppKit.BottomStrip(deleteSelfie.transform, 172, 100, 48, 48);
+            AppKit.TopStrip(selfieStatus.transform, 902, 90, 56, 56);
+            AppKit.ShrinkWrapped(selfieStatus, 22);
+            // how the tone was set: the colour found in the box, then the nearest of the six tones
+            GameObject resultRow = AppKit.Node(selfie.box, "ResultRow");
+            AppKit.TopStrip(resultRow.transform, 1004, 128, 48, 48);
+            Image foundSwatch = AppKit.Panel(resultRow.transform, "FoundSwatch", ThemeRole.SurfaceAlt, 1f, 56f);
+            AppKit.At(foundSwatch.transform, AppKit.TL, new Vector2(0, -10), new Vector2(108, 108));
+            AppKit.Outline(foundSwatch.transform, ThemeRole.Accent, 56f);
+            TextMeshProUGUI foundLabel = AppKit.Label(resultRow.transform, "FoundLabel", "Skin colour found", 28, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.MidlineLeft, true);
+            AppKit.Fill(foundLabel.transform, 124, 0, 470, 0);
+            Image toneSwatch = AppKit.Panel(resultRow.transform, "ToneSwatch", ThemeRole.SurfaceAlt, 1f, 56f);
+            AppKit.At(toneSwatch.transform, AppKit.TR, new Vector2(-340, -10), new Vector2(108, 108));
+            AppKit.Outline(toneSwatch.transform, ThemeRole.Accent, 56f);
+            TextMeshProUGUI toneLabel = AppKit.Label(resultRow.transform, "ToneLabel", "Closest tone", 28, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.MidlineLeft, true);
+            AppKit.Fill(toneLabel.transform, 480, 0, 0, 0);
+            foreach (Image swatch in new[] { foundSwatch, toneSwatch }) { var themed = swatch.GetComponent<ThemedGraphic>(); if (themed != null) Object.DestroyImmediate(themed); }   // their colour is set from the photo
+            resultRow.SetActive(false);
+            Button deleteSelfie = AppKit.LinkButton(selfie.box, "DeleteSelfieButton", "Delete my selfie", 30, ThemeRole.Warning);
+            AppKit.TopStrip(deleteSelfie.transform, 1150, 76, 48, 48);
             Button selfieClose = AppKit.PillButton(selfie.box, "CloseButton", "Close", 36, ThemeRole.SurfaceAlt, ThemeRole.MainText);
             AppKit.BottomStrip(selfieClose.transform, 44, 108, 48, 462);
-            Button selfieTake = AppKit.PillButton(selfie.box, "TakePhotoButton", "Take photo", 36, ThemeRole.ButtonFill, ThemeRole.ButtonText);
+            Button selfieTake = AppKit.PillButton(selfie.box, "TakePhotoButton", "Take photo", 36, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.CameraIcon);
             AppKit.BottomStrip(selfieTake.transform, 44, 108, 462, 48);
 
             Transform oldConsent = Loose(c.canvas, "SelfieConsentPanel");
@@ -175,7 +239,15 @@ namespace GlowUp.EditorTools
 
             var selfieTone = SceneBuilderCore.Ensure<SkinToneSelfie>(SceneBuilderCore.EnsureRoot("SkinToneSelfie"));
             SceneBuilderCore.SetField(selfieTone, "openButton", selfieOpen); SceneBuilderCore.SetField(selfieTone, "toneGroup", group);
-            SceneBuilderCore.SetField(selfieTone, "panel", selfie.panel); SceneBuilderCore.SetField(selfieTone, "preview", previewObject.GetComponent<RawImage>());
+            SceneBuilderCore.SetField(selfieTone, "panel", selfie.panel);
+            var selfieCamera = SceneBuilderCore.Ensure<GlowUp.Scan.CameraFeedController>(selfieTone.gameObject);
+            SceneBuilderCore.SetField(selfieCamera, "display", cameraDisplay); SceneBuilderCore.SetField(selfieCamera, "viewport", viewport.rectTransform);
+            SceneBuilderCore.SetField(selfieCamera, "mirrorRoot", mirror.transform); SceneBuilderCore.SetField(selfieCamera, "useFrontCamera", true);
+            SceneBuilderCore.SetField(selfieCamera, "tapToFocus", false);
+            SceneBuilderCore.SetField(selfieTone, "cameraFeed", selfieCamera); SceneBuilderCore.SetField(selfieTone, "resultImage", resultImage);
+            SceneBuilderCore.SetField(selfieTone, "sampleBox", sampleBox.rectTransform); SceneBuilderCore.SetField(selfieTone, "resultRow", resultRow);
+            SceneBuilderCore.SetField(selfieTone, "foundSwatch", foundSwatch); SceneBuilderCore.SetField(selfieTone, "toneSwatch", toneSwatch);
+            SceneBuilderCore.SetField(selfieTone, "foundLabel", foundLabel); SceneBuilderCore.SetField(selfieTone, "toneLabel", toneLabel);
             SceneBuilderCore.SetField(selfieTone, "statusText", selfieStatus); SceneBuilderCore.SetField(selfieTone, "takeButton", selfieTake);
             SceneBuilderCore.SetField(selfieTone, "closeButton", selfieClose); SceneBuilderCore.SetField(selfieTone, "deleteButton", deleteSelfie);
             SceneBuilderCore.SetField(selfieTone, "consentDialog", consentDialog);

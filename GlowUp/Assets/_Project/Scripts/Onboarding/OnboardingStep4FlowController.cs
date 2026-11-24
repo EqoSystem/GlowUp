@@ -124,6 +124,7 @@ namespace GlowUp.Onboarding
                 // be loaded it saved an empty one, which wiped the name, the email and the record of the Terms being accepted.
                 await UserProfileRepository.SaveSkinProfile(OnboardingSession.SkinType, OnboardingSession.SkinTone,
                     new List<string>(OnboardingSession.SkinConditions), new List<string>(OnboardingSession.Allergens));
+                await UserProfileRepository.SaveSensitiveReactions(OnboardingSession.SkinType == "Sensitive" ? new List<string>(OnboardingSession.SensitiveReactions) : new List<string>());
 
                 // items the user typed that were not on the lists go to the admin website for review, as at sign-up
                 string uid = UserProfileRepository.ActiveUid;

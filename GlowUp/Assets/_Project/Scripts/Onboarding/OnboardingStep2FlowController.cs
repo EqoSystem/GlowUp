@@ -1,5 +1,6 @@
 using GlowUp.Common;
 using GlowUp.Data;
+using GlowUp.Scan;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -21,18 +22,78 @@ namespace GlowUp.Onboarding
         [Header("Help on the page (panel revision, 22 Nov 2026)")]
         [Tooltip("Not sure? Find your type: three questions that choose the skin type (SkinTypeFinder)")]
         [SerializeField] private Button finderButton;
-        [Tooltip("Where these lists come from (SkinListSources)")]
-        [SerializeField] private Button listSourcesButton;
+        [Header("How does your skin react? (optional, Sensitive skin only; 24 Nov 2026)")]
+        [Tooltip("Opens the panel again; shown only while Sensitive is chosen")]
+        [SerializeField] private Button reactionsButton;
+        [SerializeField] private OverlayPanel reactionsPanel;
+        [Tooltip("One row per reaction, in the order of SensitiveReactions.All")]
+        [SerializeField] private Button[] reactionRows;
+        [Tooltip("The tick drawn on a row while its reaction is chosen")]
+        [SerializeField] private GameObject[] reactionTicks;
+        [SerializeField] private Button reactionsDone;
+        [SerializeField] private Button reactionsSkip;
 
         void Awake()
         {
             Calm();
-            if (skinTypeGroup != null) skinTypeGroup.Changed += _ => Refresh();
+            if (skinTypeGroup != null) skinTypeGroup.Changed += OnSkinTypeChanged;
             if (conditions != null) conditions.CustomAdded += t => { if (!OnboardingSession.CustomConditions.Contains(t)) OnboardingSession.CustomConditions.Add(t); };
             if (continueButton != null) continueButton.onClick.AddListener(OnContinue);
             if (backButton != null) backButton.onClick.AddListener(GoBack);
             if (finderButton != null) finderButton.onClick.AddListener(OpenFinder);
-            if (listSourcesButton != null) listSourcesButton.onClick.AddListener(OpenListSources);
+            if (reactionsButton != null) reactionsButton.onClick.AddListener(OpenReactions);
+            if (reactionsDone != null) reactionsDone.onClick.AddListener(CloseReactions);
+            if (reactionsSkip != null) reactionsSkip.onClick.AddListener(() => { picked.Clear(); PaintReactions(); CloseReactions(); });
+            for (int i = 0; reactionRows != null && i < reactionRows.Length && i < SensitiveReactions.All.Length; i++)
+            {
+                string id = SensitiveReactions.All[i].id;
+                if (reactionRows[i] != null) reactionRows[i].onClick.AddListener(() => { if (!picked.Remove(id)) picked.Add(id); PaintReactions(); });
+            }
+        }
+
+        // ---- "How does your skin react?": optional, only for Sensitive skin. Opens once by itself when Sensitive is chosen; the button beside "Find my skin type" opens it again. ----
+        readonly System.Collections.Generic.List<string> picked = new System.Collections.Generic.List<string>();
+        bool askedThisChoice;
+
+        void OnSkinTypeChanged(string value)
+        {
+            Refresh();
+            bool sensitive = string.Equals(value, "Sensitive", System.StringComparison.OrdinalIgnoreCase);
+            ShowReactionsButton(sensitive);
+            if (!sensitive) { askedThisChoice = false; return; }
+            if (!askedThisChoice && picked.Count == 0) { askedThisChoice = true; OpenReactions(); }
+        }
+
+        RectTransform finderRect; Vector2 finderAnchorMax, finderOffsetMax;
+
+        /// <summary>"Find my skin type" shares its row with "How it reacts" (Sensitive only); alone it spans the whole row.</summary>
+        void ShowReactionsButton(bool on)
+        {
+            if (reactionsButton != null) reactionsButton.gameObject.SetActive(on);
+            if (finderButton == null) return;
+            if (finderRect == null) { finderRect = (RectTransform)finderButton.transform; finderAnchorMax = finderRect.anchorMax; finderOffsetMax = finderRect.offsetMax; }
+            finderRect.anchorMax = new Vector2(on ? finderAnchorMax.x : 1f, finderAnchorMax.y);
+            finderRect.offsetMax = new Vector2(on ? finderOffsetMax.x : -finderRect.offsetMin.x, finderOffsetMax.y);
+        }
+
+        void OpenReactions()
+        {
+            if (reactionsPanel == null) return;
+            PaintReactions();
+            reactionsPanel.Show();
+        }
+
+        void CloseReactions()
+        {
+            OnboardingSession.SensitiveReactions = SensitiveReactions.Clean(picked);
+            OnboardingSession.SaveDraft();
+            if (reactionsPanel != null) reactionsPanel.Hide();
+        }
+
+        void PaintReactions()
+        {
+            for (int i = 0; reactionTicks != null && i < reactionTicks.Length && i < SensitiveReactions.All.Length; i++)
+                if (reactionTicks[i] != null) reactionTicks[i].SetActive(picked.Contains(SensitiveReactions.All[i].id));
         }
 
         /// <summary>Three questions, one per page of the sheet; the result selects the matching tile (the user can still pick another).</summary>
@@ -64,14 +125,6 @@ namespace GlowUp.Onboarding
                 sheet.Show($"Question {q + 1} of {SkinTypeFinder.Questions.Length}", question.text, choices, "General guidance, not a diagnosis.");
             }
             Ask(0);
-        }
-
-        void OpenListSources()
-        {
-            ChoiceSheet sheet = ChoiceSheet.Get(listSourcesButton.transform);
-            if (sheet == null) return;
-            sheet.Show(SkinListSources.Title, SkinListSources.Body,
-                new System.Collections.Generic.List<ChoiceSheet.Choice> { new ChoiceSheet.Choice("Got it", sheet.Hide, true) }, SkinListSources.Note);
         }
 
         /// <summary>
@@ -115,6 +168,9 @@ namespace GlowUp.Onboarding
             _ = ListsRepository.Refresh();
             if (skinTypeGroup != null && !string.IsNullOrEmpty(OnboardingSession.SkinType)) skinTypeGroup.Select(OnboardingSession.SkinType, false);
             if (conditions != null) conditions.SetSelected(OnboardingSession.SkinConditions);
+            picked.Clear(); picked.AddRange(SensitiveReactions.Clean(OnboardingSession.SensitiveReactions));
+            PaintReactions();
+            ShowReactionsButton(string.Equals(OnboardingSession.SkinType, "Sensitive", System.StringComparison.OrdinalIgnoreCase));
             // the Google notice is a banner at the top of the page (New13 item 5C); the line under Add holds that row's own hints only
             OnboardingNotices.OneLine(feedbackText);
             if (feedbackText != null) feedbackText.text = "";
@@ -142,6 +198,7 @@ namespace GlowUp.Onboarding
             if (skinTypeGroup == null || string.IsNullOrEmpty(skinTypeGroup.Value)) { OnboardingNotices.Error(feedbackText, msgChooseSkinType); return; }
             OnboardingSession.SkinType = skinTypeGroup.Value;
             OnboardingSession.SkinConditions = conditions != null ? conditions.Selected : new System.Collections.Generic.List<string>();
+            OnboardingSession.SensitiveReactions = string.Equals(skinTypeGroup.Value, "Sensitive", System.StringComparison.OrdinalIgnoreCase) ? SensitiveReactions.Clean(picked) : new System.Collections.Generic.List<string>();
             OnboardingSession.SaveDraft();
             SceneNavigator.Go(nextScene);
         }

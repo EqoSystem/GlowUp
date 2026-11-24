@@ -80,9 +80,9 @@ namespace GlowUp.AppSettings
             if (clearSavedProfileBeforeQuiz && profile != null)
             {
                 profile.skinType = ""; profile.skinTone = "";
-                profile.skinConditions = new List<string>(); profile.knownAllergens = new List<string>();
+                profile.skinConditions = new List<string>(); profile.knownAllergens = new List<string>(); profile.sensitiveReactions = new List<string>();
                 // the four skin fields only: the account itself is never written from here (7 November 2026)
-                try { await UserProfileRepository.SaveSkinProfile("", "", new List<string>(), new List<string>()); }
+                try { await UserProfileRepository.SaveSkinProfile("", "", new List<string>(), new List<string>()); await UserProfileRepository.SaveSensitiveReactions(new List<string>()); }
                 catch (Exception e) { { } }
             }
             // New17: the retake goes through Steps 1 to 5 with the saved answers filled in (email and password locked), and ends with

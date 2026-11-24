@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using GlowUp.Data;
+using GlowUp.Net;
 using GlowUp.Scan;
 using UnityEngine;
 
@@ -113,6 +114,43 @@ namespace GlowUp.Admin
             }
             d.Save();
             return said.Count > 0 ? "Read: " + string.Join(", ", said) + ". Check them against the pack." : "Text was read, but no product details were recognised in it.";
+        }
+
+        /// <summary>The least certainty at which an online match is trusted (the same idea as the user's scan: a wrong product is worse than none).</summary>
+        const float MinimumWebConfidence = 0.6f;
+
+        /// <summary>
+        /// "Find missing details" on Review &amp; Submit (24 Nov 2026): the photo had the name (maybe the brand) but no ingredient list. The AI web search
+        /// (the same one the user's scan uses, with its limits) looks for THIS product by name and brand and brings back the brand, the category and the
+        /// ingredient list as a credible page publishes them. Every value comes in as "Needs review" with the page it came from; nothing the staff
+        /// member typed or confirmed is replaced. A barcode or a shade code is never invented: most local products have neither online, so those are
+        /// read from the pack (Barcode / Shade photo) or typed. Returns one calm line for the status.
+        /// </summary>
+        public static async Task<string> FillMissing(CaptureDraft d)
+        {
+            CaptureDraft.Field name = d.Get("name"), brand = d.Get("brand"), kind = d.Get("cosmeticType"), list = d.Get("ingredients");
+            if (!name.Has && !brand.Has) return "Type the product name first (or take a photo of the front), then try again.";
+            if (list.Has && brand.Has && kind.Has) return "The name, brand, category and ingredients are filled. A barcode or shade code is read from the pack, not found online.";
+            if (!ConnectivityMonitor.Online) return "No connection. Try again when the phone is online.";
+            if (!ProductAiAdvisor.Available) return "The online look-up is not set up on this phone.";
+            if (!AiBudget.TakeLookUp()) return "The online look-up limit is reached for now. Try again later.";
+
+            ProductAiAdvisor.WebMatch match = await ProductAiAdvisor.FindTyped(name.value, brand.value, kind.value);
+            if (match == null) return "The online look-up did not answer. Try again, or type the details.";
+            if (match.notMakeup) return ProductScope.StopMessage(ProductScope.Judge(match.cosmeticType, match.productName)) + " Nothing was taken.";
+            if (!match.same || match.confidence < MinimumWebConfidence)
+                return match.question.Length > 0 ? match.question : "The web did not show this exact product, so nothing was filled. Add the brand or take a photo of the ingredient list.";
+
+            string page = match.list != null && match.list.sources != null && match.list.sources.Count > 0 ? match.list.sources[0] : match.page;
+            string title = (page ?? "").Split('|')[0].Trim();
+            string from = "Web search" + (title.Length > 0 ? ": " + title : "");
+            var filled = new List<string>();
+            if (!brand.Has && d.Offer("brand", match.brandName, from, "web", true)) filled.Add("brand");
+            if (!kind.Has && d.Offer("cosmeticType", match.cosmeticType, from, "web", true)) filled.Add("category");
+            if (!list.Has && match.list != null && match.list.found && match.list.ingredients.Count >= 2
+                && TakeIngredients(d, string.Join(", ", match.list.ingredients), from, "web", true)) filled.Add("ingredient list");
+            d.Save();
+            return filled.Count > 0 ? "Found online: " + string.Join(", ", filled) + ". Check each against the pack." : "The product was found, but the page published no ingredient list. Take a photo of the list, or type it.";
         }
 
         /// <summary>The ingredient list in the order printed. The text exactly as read is kept next to it for the reviewer.</summary>

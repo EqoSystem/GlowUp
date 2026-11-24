@@ -20,6 +20,8 @@ namespace GlowUp.Onboarding
         public static string SkinType = "", SkinTone = "";
         public static List<string> SkinConditions = new List<string>();
         public static List<string> Allergens = new List<string>();
+        /// <summary>Optional answer to "How does your skin react?" (ids of SensitiveReactions.All); only kept while the skin type is Sensitive.</summary>
+        public static List<string> SensitiveReactions = new List<string>();
         public static bool HealthConsent;             // the second box on the Terms page was ticked: set just before the profile is saved, never persisted
         public static string Password = "";           // never persisted
         // Items the user typed that were not in the lists. Sent to the database for review after the account exists.
@@ -113,6 +115,7 @@ namespace GlowUp.Onboarding
                 SkinType = profile.skinType ?? ""; SkinTone = profile.skinTone ?? "";
                 SkinConditions = new List<string>(profile.skinConditions ?? new List<string>());
                 Allergens = new List<string>(profile.knownAllergens ?? new List<string>());
+                SensitiveReactions = new List<string>(profile.sensitiveReactions ?? new List<string>());
             }
             SaveDraft();
         }
@@ -136,6 +139,7 @@ namespace GlowUp.Onboarding
             PlayerPrefs.SetString(Prefix + "Tone", SkinTone);
             PlayerPrefs.SetString(Prefix + "Cond", string.Join("|", SkinConditions));
             PlayerPrefs.SetString(Prefix + "Allergens", string.Join("|", Allergens));
+            PlayerPrefs.SetString(Prefix + "React", string.Join("|", SensitiveReactions));
             PlayerPrefs.SetString(Prefix + "Account", AccountUid ?? "");
             PlayerPrefs.SetInt(Prefix + "AccountMadeHere", AccountMadeHere ? 1 : 0);
             // a quiz retake is remembered too: after a restart it is still ONLY the quiz (Steps 2 to 4), never the account steps
@@ -158,6 +162,7 @@ namespace GlowUp.Onboarding
             SkinTone = PlayerPrefs.GetString(Prefix + "Tone", SkinTone);
             SkinConditions = Split(PlayerPrefs.GetString(Prefix + "Cond", ""));
             Allergens = Split(PlayerPrefs.GetString(Prefix + "Allergens", ""));
+            SensitiveReactions = Split(PlayerPrefs.GetString(Prefix + "React", ""));
             AccountUid = PlayerPrefs.GetString(Prefix + "Account", AccountUid ?? "");
             AccountMadeHere = PlayerPrefs.GetInt(Prefix + "AccountMadeHere", AccountMadeHere ? 1 : 0) == 1;
             Retake = PlayerPrefs.GetInt(Prefix + "Retake", Retake ? 1 : 0) == 1;
@@ -169,9 +174,9 @@ namespace GlowUp.Onboarding
         {
             Social = false; AccountUid = ""; AccountMadeHere = false;
             FirstName = MiddleName = LastName = Username = Email = BirthdayIso = SkinType = SkinTone = Password = "";
-            Age = 0; SkinConditions = new List<string>(); Allergens = new List<string>();
+            Age = 0; SkinConditions = new List<string>(); Allergens = new List<string>(); SensitiveReactions = new List<string>();
             CustomConditions = new List<string>(); CustomAllergens = new List<string>();
-            foreach (var k in new[] { "First", "Middle", "Last", "User", "Email", "Birthday", "Age", "Type", "Tone", "Cond", "Allergens", "Account", "AccountMadeHere", "Retake", "RetakeReturn", "RetakeDetails" })
+            foreach (var k in new[] { "First", "Middle", "Last", "User", "Email", "Birthday", "Age", "Type", "Tone", "Cond", "Allergens", "React", "Account", "AccountMadeHere", "Retake", "RetakeReturn", "RetakeDetails" })
                 PlayerPrefs.DeleteKey(Prefix + k);
             PlayerPrefs.Save();
         }
@@ -189,6 +194,7 @@ namespace GlowUp.Onboarding
             username = Username, email = Email, birthday = BirthdayIso, age = Age,
             skinType = SkinType, skinTone = SkinTone,
             skinConditions = new List<string>(SkinConditions), knownAllergens = new List<string>(Allergens),
+            sensitiveReactions = string.Equals(SkinType, "Sensitive", System.StringComparison.OrdinalIgnoreCase) ? new List<string>(SensitiveReactions) : new List<string>(),
             termsAccepted = true, createdAtUnix = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
             healthConsentAtUnix = HealthConsent ? DateTimeOffset.UtcNow.ToUnixTimeSeconds() : 0
         };

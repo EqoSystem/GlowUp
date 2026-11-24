@@ -1,21 +1,23 @@
-using System.Collections;
 using System.Collections.Generic;
 using GlowUp.AppSettings;
 using GlowUp.Common;
+using GlowUp.Scan;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-#if UNITY_ANDROID && !UNITY_EDITOR
-using UnityEngine.Android;
-#endif
 
 namespace GlowUp.Onboarding
 {
     /// <summary>
-    /// "Find my tone with a selfie" on Step 3 (panel revision, 22 Nov 2026). The user agrees first (what is read, what is kept), the front
-    /// camera shows a live picture, a tap on Take photo reads the colour of the skin in the middle and selects the nearest tone tile
-    /// (SkinToneMatch). The user can still pick another tile: lighting changes what a camera sees.
-    /// The picture is kept in the app's own folder on THIS phone, small, and never sent anywhere (no AI, no database). "Delete my selfie" removes it.
+    /// "Find my tone with a selfie" on Step 3 (panel revision, 22 Nov 2026; flow redone 24 Nov 2026).
+    ///  1. The user agrees first (what is read, what is kept).
+    ///  2. The FRONT camera shows a live picture through the same camera component as the AI Smart Scan screen (CameraFeedController),
+    ///     with no scan grid and no moving line. Tap Take photo.
+    ///  3. The picture freezes and the panel SHOWS HOW the tone was found: a box on the photo marks the part of the face that was read, then
+    ///     two swatches: the skin colour found there, and the nearest of the six tones (SkinToneMatch, measured in CIE Lab).
+    ///  4. "Use tone" selects that tone tile and closes; "Retake" goes back to the live picture. The user can still pick another tile:
+    ///     lighting changes what a camera sees.
+    /// The picture is kept small in the app's own folder on THIS phone and never sent anywhere (no AI, no database). "Delete my selfie" removes it.
     /// Every object is in the scene (SelfiePanel) so it can be restyled; every sentence is a field.
     /// </summary>
     public class SkinToneSelfie : MonoBehaviour
@@ -25,9 +27,20 @@ namespace GlowUp.Onboarding
         [SerializeField] private TileSelectionGroup toneGroup;
         [Header("The pop-up (SelfiePanel)")]
         [SerializeField] private OverlayPanel panel;
-        [SerializeField] private RawImage preview;
+        [SerializeField] private CameraFeedController cameraFeed;
+        [Tooltip("The frozen photo shown after Take photo (same size as the live view)")]
+        [SerializeField] private RawImage resultImage;
+        [Tooltip("The box drawn on the frozen photo: the part of the face that was read")]
+        [SerializeField] private RectTransform sampleBox;
+        [SerializeField] private GameObject resultRow;
+        [SerializeField] private Image foundSwatch;
+        [SerializeField] private Image toneSwatch;
+        [SerializeField] private TextMeshProUGUI foundLabel;
+        [SerializeField] private TextMeshProUGUI toneLabel;
         [SerializeField] private TextMeshProUGUI statusText;
+        [Tooltip("Take photo; after a photo it reads \"Use tone\"")]
         [SerializeField] private Button takeButton;
+        [Tooltip("Close; after a photo it reads \"Retake\"")]
         [SerializeField] private Button closeButton;
         [SerializeField] private Button deleteButton;
         [Tooltip("Asks for the user's agreement before the camera starts (ConfirmDialog)")]
@@ -39,91 +52,95 @@ namespace GlowUp.Onboarding
         [SerializeField] private string consentAgree = "I agree";
         [SerializeField] private string consentCancel = "Cancel";
         [SerializeField] private string msgGuide = "Face the window or a lamp, take off glasses, and keep your face in the middle. Then tap Take photo.";
+        [SerializeField] private string msgStarting = "Starting the front camera...";
         [SerializeField] private string msgNoCamera = "The camera is not available. Allow it in the phone settings, or choose the tone yourself.";
-        [SerializeField] private string msgResult = "Your skin looks like {0}. It is selected for you: change it if it does not look right.";
+        [SerializeField] private string msgResult = "GlowUp read the box on your face. Your skin looks like {0}. Tap Use tone, or Retake if the light was poor.";
+        [SerializeField] private string msgFoundLabel = "Skin colour found";
+        [SerializeField] private string msgToneLabel = "Closest tone: {0}";
         [SerializeField] private string msgKept = "The photo is kept on this phone.";
         [SerializeField] private string msgDeleted = "Your selfie was deleted from this phone.";
-        [SerializeField] private float permissionWaitSeconds = 12f;
+        [SerializeField] private string wordTake = "Take photo", wordUse = "Use tone", wordClose = "Close", wordRetake = "Retake";
 
-        WebCamTexture cam;
-        Coroutine starting;
+        /// <summary>The middle part of the picture that is read, as fractions of its width (the height follows, so the box is square).</summary>
+        const float BoxLeft = 0.36f, BoxWidth = 0.28f;
         const string ConsentKey = "glowup.selfie.consent";
+
+        Texture2D frozen;                 // the photo shown on the result card (destroyed when the card closes)
+        int foundIndex = -1;              // the tone tile that fits; -1 = no result yet
+        bool cameraReady;
+
+        bool ShowingResult => foundIndex >= 0;
 
         void Awake()
         {
             if (openButton != null) openButton.onClick.AddListener(Open);
-            if (takeButton != null) takeButton.onClick.AddListener(Take);
-            if (closeButton != null) closeButton.onClick.AddListener(Close);
+            if (takeButton != null) takeButton.onClick.AddListener(OnRight);
+            if (closeButton != null) closeButton.onClick.AddListener(OnLeft);
             if (deleteButton != null) deleteButton.onClick.AddListener(DeletePhoto);
-            if (panel != null) panel.Closed += StopCamera;
+            if (panel != null) panel.Closed += Reset;
+            if (cameraFeed != null) cameraFeed.Started += OnCameraStarted;
             RefreshDelete();
         }
 
-        void OnDestroy() { StopCamera(); }
+        void OnDestroy()
+        {
+            if (cameraFeed != null) cameraFeed.Started -= OnCameraStarted;
+            Reset();
+        }
 
         void Open()
         {
             bool agreed = false;
             try { agreed = PlayerPrefs.GetInt(ConsentKey, 0) == 1; } catch (System.Exception) { }
-            if (agreed || consentDialog == null) { StartCamera(); return; }
+            if (agreed || consentDialog == null) { StartLive(); return; }
             consentDialog.Ask(consentTitle, consentBody, consentAgree, () =>
             {
                 try { PlayerPrefs.SetInt(ConsentKey, 1); PlayerPrefs.Save(); } catch (System.Exception) { }
-                StartCamera();
+                StartLive();
             }, false, consentCancel);
         }
 
-        void StartCamera()
+        /// <summary>The live front-camera picture (also used by Retake).</summary>
+        void StartLive()
         {
-            if (starting != null) StopCoroutine(starting);
-            if (panel != null) panel.Show();
-            Say(msgGuide);
-            if (takeButton != null) takeButton.interactable = false;
-            starting = StartCoroutine(Starting());
+            ClearResult();
+            cameraReady = false;
+            if (panel != null && !panel.IsOpen) panel.Show();
+            Say(msgStarting);
+            SetWords();
+            if (cameraFeed != null) cameraFeed.StartCamera(); else Say(msgNoCamera);
         }
 
-        IEnumerator Starting()
+        void OnCameraStarted(bool ok, string message)
         {
-#if UNITY_ANDROID && !UNITY_EDITOR
-            if (!Permission.HasUserAuthorizedPermission(Permission.Camera))
-            {
-                Permission.RequestUserPermission(Permission.Camera);
-                float until = Time.unscaledTime + permissionWaitSeconds;
-                while (!Permission.HasUserAuthorizedPermission(Permission.Camera) && Time.unscaledTime < until) yield return null;
-            }
-#endif
-            yield return CameraHandover.WaitUntilFree();
-            if (!CameraPermission.Granted || WebCamTexture.devices.Length == 0) { Say(msgNoCamera); yield break; }
-            string name = WebCamTexture.devices[0].name;
-            foreach (WebCamDevice d in WebCamTexture.devices) if (d.isFrontFacing) { name = d.name; break; }
-            cam = new WebCamTexture(name, 640, 480, 30);
-            cam.Play();
-            float wait = Time.unscaledTime + 6f;
-            while (cam != null && cam.width < 100 && Time.unscaledTime < wait) yield return null;
-            if (cam == null || cam.width < 100) { Say(msgNoCamera); yield break; }
-            if (preview != null)
-            {
-                preview.texture = cam;
-                preview.rectTransform.localEulerAngles = new Vector3(0, 0, -cam.videoRotationAngle);
-                preview.uvRect = cam.videoVerticallyMirrored ? new Rect(0, 1, 1, -1) : new Rect(0, 0, 1, 1);
-            }
-            if (takeButton != null) takeButton.interactable = true;
+            if (this == null || ShowingResult) return;
+            cameraReady = ok;
+            Say(ok ? msgGuide : (string.IsNullOrEmpty(message) ? msgNoCamera : message));
+            SetWords();
         }
+
+        // the two buttons change their words with the step: [Close | Take photo] before a photo, [Retake | Use tone] after it
+        void OnLeft() { if (ShowingResult) StartLive(); else Close(); }
+        void OnRight() { if (ShowingResult) UseTone(); else Take(); }
 
         void Take()
         {
-            if (cam == null || cam.width < 100) return;
-            int w = cam.width, h = cam.height;
-            Color32[] all = cam.GetPixels32();
-            // a grid of points inside the middle of the picture (where a face held in the middle has cheeks and forehead)
+            if (cameraFeed == null || !cameraFeed.IsPlaying) { Say(msgNoCamera); return; }
+            Texture2D photo = cameraFeed.CaptureUpright(cameraFeed.Viewport, 720);
+            if (photo == null) { Say(msgNoCamera); return; }
+            int w = photo.width, h = photo.height;
+            // the box that is read: a square in the middle of the picture (where a face held in the middle has cheeks and forehead)
+            float heightFraction = Mathf.Clamp(BoxWidth * w / Mathf.Max(1, h), 0.05f, 0.9f);
+            float boxBottom = 0.5f - heightFraction / 2f;
+            int x0 = (int)(w * BoxLeft), x1 = (int)(w * (BoxLeft + BoxWidth)), y0 = (int)(h * boxBottom), y1 = (int)(h * (boxBottom + heightFraction));
+            Color32[] all = photo.GetPixels32();
             var points = new List<Color32>();
-            int x0 = (int)(w * 0.38f), x1 = (int)(w * 0.62f), y0 = (int)(h * 0.38f), y1 = (int)(h * 0.62f);
             for (int y = y0; y < y1; y += 3) for (int x = x0; x < x1; x += 3) points.Add(all[y * w + x]);
-            int index = SkinToneMatch.Nearest(SkinToneMatch.Median(points));
-            string tone = index >= 0 ? SkinToneMatch.Names[index] : "";
-            if (!string.IsNullOrEmpty(tone) && toneGroup != null) toneGroup.Select(tone, true);
+            Color32 found = SkinToneMatch.Median(points);
+            foundIndex = SkinToneMatch.Nearest(found);
+            string tone = foundIndex >= 0 ? SkinToneMatch.Names[foundIndex] : "";
 
-            // the kept picture: a small square from the middle, JPEG
+            // the kept picture: a small square from the middle, JPEG (as before)
             int side = Mathf.Min(w, h), size = 256;
             var square = new Texture2D(size, size, TextureFormat.RGB24, false);
             for (int y = 0; y < size; y++)
@@ -133,20 +150,67 @@ namespace GlowUp.Onboarding
             bool kept = SelfieStore.Save(square.EncodeToJPG(80));
             Destroy(square);
             RefreshDelete();
+
+            // freeze the picture and show how the tone was found
+            if (cameraFeed != null) cameraFeed.StopCamera();
+            if (frozen != null) Destroy(frozen);
+            frozen = photo;
+            if (resultImage != null) { resultImage.texture = frozen; resultImage.gameObject.SetActive(true); }
+            if (sampleBox != null)
+            {
+                sampleBox.anchorMin = new Vector2(BoxLeft, boxBottom); sampleBox.anchorMax = new Vector2(BoxLeft + BoxWidth, boxBottom + heightFraction);
+                sampleBox.offsetMin = sampleBox.offsetMax = Vector2.zero;
+                sampleBox.gameObject.SetActive(true);
+            }
+            if (foundSwatch != null) foundSwatch.color = found;
+            if (toneSwatch != null && foundIndex >= 0) toneSwatch.color = SkinToneMatch.Palette[foundIndex];
+            if (foundLabel != null) foundLabel.text = msgFoundLabel;
+            if (toneLabel != null) toneLabel.text = string.Format(msgToneLabel, tone);
+            if (resultRow != null) resultRow.SetActive(true);
             Say(string.Format(msgResult, tone) + (kept ? " " + msgKept : ""));
-            StopCamera();
+            SetWords();
+        }
+
+        void UseTone()
+        {
+            if (foundIndex >= 0 && toneGroup != null) toneGroup.Select(SkinToneMatch.Names[foundIndex], true);
+            Close();
         }
 
         void DeletePhoto() { SelfieStore.Delete(); RefreshDelete(); Say(msgDeleted); }
         void RefreshDelete() { if (deleteButton != null) deleteButton.gameObject.SetActive(SelfieStore.Exists); }
-        void Close() { StopCamera(); if (panel != null) panel.Hide(); }
+        void Close() { Reset(); if (panel != null) panel.Hide(); }
         void Say(string text) { if (statusText != null) statusText.text = text; }
 
-        void StopCamera()
+        void SetWords()
         {
-            if (starting != null) { StopCoroutine(starting); starting = null; }
-            if (cam != null) { try { cam.Stop(); } catch (System.Exception) { } Destroy(cam); cam = null; CameraHandover.Released(); }
-            if (preview != null) preview.texture = null;
+            SetLabel(takeButton, ShowingResult ? wordUse : wordTake);
+            SetLabel(closeButton, ShowingResult ? wordRetake : wordClose);
+            if (takeButton != null) takeButton.interactable = ShowingResult || cameraReady;
+        }
+
+        static void SetLabel(Button b, string words)
+        {
+            if (b == null) return;
+            TextMeshProUGUI label = b.GetComponentInChildren<TextMeshProUGUI>(true);
+            if (label != null) label.text = words;
+        }
+
+        void ClearResult()
+        {
+            foundIndex = -1;
+            if (resultImage != null) { resultImage.texture = null; resultImage.gameObject.SetActive(false); }
+            if (sampleBox != null) sampleBox.gameObject.SetActive(false);
+            if (resultRow != null) resultRow.SetActive(false);
+            if (frozen != null) { Destroy(frozen); frozen = null; }
+        }
+
+        /// <summary>The camera is released and the frozen photo dropped (the panel closes, the page goes away, or Back is pressed).</summary>
+        void Reset()
+        {
+            if (cameraFeed != null) cameraFeed.StopCamera();
+            ClearResult();
+            cameraReady = false;
         }
     }
 }

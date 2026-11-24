@@ -263,6 +263,7 @@ namespace GlowUp.Onboarding
             {
                 await GlowUp.Data.UserProfileRepository.SaveSkinProfile(OnboardingSession.SkinType, OnboardingSession.SkinTone,
                     new List<string>(OnboardingSession.SkinConditions), new List<string>(OnboardingSession.Allergens));
+                await GlowUp.Data.UserProfileRepository.SaveSensitiveReactions(OnboardingSession.SkinType == "Sensitive" ? new List<string>(OnboardingSession.SensitiveReactions) : new List<string>());
                 if (OnboardingSession.RetakeWithDetails)
                     await GlowUp.Data.UserProfileRepository.SavePersonalDetails(OnboardingSession.FirstName, OnboardingSession.MiddleName,
                         OnboardingSession.LastName, OnboardingSession.BirthdayIso, OnboardingSession.Age);

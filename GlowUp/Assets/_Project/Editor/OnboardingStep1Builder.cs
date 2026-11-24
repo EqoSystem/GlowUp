@@ -119,6 +119,8 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(ctl, "confirmedButton", confirmedButton);
             SceneBuilderCore.SetField(ctl, "openGmailButton", openGmailButton);
             SceneBuilderCore.SetField(ctl, "sendAgainButton", sendAgainButton); SceneBuilderCore.SetField(ctl, "sendAgainLabel", AppKit.LabelOf(sendAgainButton));
+            SceneBuilderCore.ReplaceText(ctl, "sendAgainText", "Resend", "Send again");                // one word on the button (24 Nov 2026)
+            SceneBuilderCore.ReplaceText(ctl, "sendAgainWaitText", "Resend {0}s", "Send again in {0} s");
             SceneBuilderCore.SetField(ctl, "codeGroup", lastCodeGroup); SceneBuilderCore.SetField(ctl, "codeInput", lastCodeInput); SceneBuilderCore.SetField(ctl, "codeButton", lastCodeButton);
             SceneBuilderCore.SetField(ctl, "changeEmailButton", changeEmailButton); SceneBuilderCore.SetField(ctl, "useAnotherEmailButton", useAnotherEmail);
             // "Use another email?" is asked with the same pop-up as "Leave sign-up?"
@@ -157,45 +159,49 @@ namespace GlowUp.EditorTools
             if (old != null) Object.DestroyImmediate(old.gameObject);
 
             AppKit.AppPopup p = AppKit.Overlay(new AppKit.AppScreen { canvas = canvas }, "ConfirmEmailPanel", "Confirm your email");
-            AppKit.At(p.box, AppKit.MC, new Vector2(0, 40), new Vector2(900, 1250));        // taller: room for "Open Gmail" and, since 22 Nov 2026, the 6-digit code
-
-            Image disc = AppKit.Panel(p.box, "MailDisc", ThemeRole.SurfaceAlt, 1f, 120f);
-            AppKit.At(disc.transform, AppKit.TC, new Vector2(0, -128), new Vector2(120, 120));
-            AppKit.Icon(disc.transform, "Icon", IconFactory.Mail, 64, ThemeRole.MainText);
+            AppKit.At(p.box, AppKit.MC, new Vector2(0, 40), new Vector2(900, 1180));
+            // Layout (24 Nov 2026, from the top; every block has its own band, so nothing overlaps and the keyboard never covers the code row):
+            //   mail disc 40-150 | message 170-380 | status 390-474 | code row 500-620 | three icon buttons 1180-340-104 | primary 1180-44-120
+            Image disc = AppKit.Panel(p.box, "MailDisc", ThemeRole.SurfaceAlt, 1f, 110f);
+            AppKit.At(disc.transform, AppKit.TC, new Vector2(0, -112), new Vector2(110, 110));
+            AppKit.Icon(disc.transform, "Icon", IconFactory.Mail, 58, ThemeRole.MainText);
 
             message = AppKit.Label(p.box, "MessageText",
                 "We sent a message to name@example.com. Open it and tap the link in it, then come back here. This page goes on by itself once the email is confirmed.",
                 31, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            AppKit.TopStrip(message.transform, 270, 200, 48, 48);
+            AppKit.TopStrip(message.transform, 180, 200, 48, 48);
             AppKit.ShrinkWrapped(message, 24);
 
             status = AppKit.Label(p.box, "StatusText", "Not confirmed yet. Open the message and tap its link (look in the spam folder too).",
                                   27, ThemeRole.AccentText, FontRole.Body, TextAlignmentOptions.Top, true);
-            AppKit.TopStrip(status.transform, 478, 96, 48, 48);
+            AppKit.TopStrip(status.transform, 392, 84, 48, 48);
             AppKit.ShrinkWrapped(status, 21);
 
-            // a shortcut only: the user taps it to open the Gmail app (nothing opens by itself; checking the mail another way still works)
-            openGmail = AppKit.PillButton(p.box, "OpenGmailButton", "Open Gmail", 32, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Mail);
-            AppKit.BottomStrip(openGmail.transform, 360, 100, 48, 48);
-            confirmed = AppKit.PillButton(p.box, "ConfirmedButton", "I have confirmed", 36, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Check);
-            AppKit.BottomStrip(confirmed.transform, 232, 116, 48, 48);
-            sendAgain = AppKit.PillButton(p.box, "SendAgainButton", "Send again", 32, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Mail);
-            AppKit.BottomStrip(sendAgain.transform, 116, 100, 48, 48);
-            changeEmail = AppKit.LinkButton(p.box, "ChangeEmailButton", "Use another email", 28, ThemeRole.AccentText);
-            AppKit.BottomStrip(changeEmail.transform, 34, 64, 48, 48);
-
-            // ---- 22 Nov 2026 (panel): the 6-digit code. Hidden until GlowUp's server has mailed one (the controller shows it); the link above still works ----
+            // ---- the 6-digit code row: hidden until GlowUp's server has mailed one (the controller shows it); the link in the e-mail still works ----
             GameObject codeGroup = AppKit.Node(p.box, "CodeGroup");
-            AppKit.TopStrip(codeGroup.transform, 590, 200, 48, 48);
-            TextMeshProUGUI codeLabel = AppKit.Label(codeGroup.transform, "CodeLabel", "Or type the 6-digit code from the same email", 27, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            AppKit.TopStrip(codeLabel.transform, 0, 44, 0, 0);
-            TMP_InputField codeInput = SceneBuilderCore.MakeInput(codeGroup.transform, "CodeInputField", "000000", AppKit.TL, Vector2.zero, new Vector2(500, 110));
-            AppKit.At(codeInput.transform, AppKit.TL, new Vector2(0, -60), new Vector2(500, 110));
+            AppKit.TopStrip(codeGroup.transform, 500, 120, 48, 48);
+            TMP_InputField codeInput = SceneBuilderCore.MakeInput(codeGroup.transform, "CodeInputField", "6-digit code", AppKit.TL, Vector2.zero, new Vector2(660, 110));
+            AppKit.At(codeInput.transform, AppKit.TL, new Vector2(0, -5), new Vector2(660, 110));
             codeInput.contentType = TMP_InputField.ContentType.IntegerNumber; codeInput.characterLimit = 6;
-            Button codeButton = AppKit.PillButton(codeGroup.transform, "CodeButton", "Confirm code", 32, ThemeRole.ButtonFill, ThemeRole.ButtonText);
-            AppKit.At(codeButton.transform, AppKit.TR, new Vector2(0, -60), new Vector2(300, 110));
+            StyleInput(codeInput, "6-digit code", ThemeRole.InputBackground);          // without this the typed digits were white on a light field (not visible)
+            if (codeInput.textComponent != null) { codeInput.textComponent.alignment = TextAlignmentOptions.Center; codeInput.textComponent.fontSize = 46; codeInput.textComponent.characterSpacing = 10; }
+            if (codeInput.placeholder is TMP_Text codePh) { codePh.alignment = TextAlignmentOptions.Center; codePh.fontSize = 32; }
+            Button codeButton = AppKit.IconButton(codeGroup.transform, "CodeButton", IconFactory.Check, 110, 58, ThemeRole.ButtonText, ThemeRole.ButtonFill);
+            AppKit.At(codeButton.transform, AppKit.TR, new Vector2(0, -5), new Vector2(110, 110));
             codeGroup.SetActive(false);
             lastCodeGroup = codeGroup; lastCodeInput = codeInput; lastCodeButton = codeButton;
+
+            // ---- three equal icon buttons with one word each (24 Nov 2026) ----
+            GameObject actions = AppKit.Node(p.box, "ActionRow");
+            AppKit.BottomStrip(actions.transform, 188, 104, 48, 48);
+            AppKit.HStack(actions, 16, 0, 0, 0, 0, TextAnchor.MiddleCenter, true);
+            openGmail = AppKit.PillButton(actions.transform, "OpenGmailButton", "Gmail", 30, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Mail);
+            sendAgain = AppKit.PillButton(actions.transform, "SendAgainButton", "Resend", 30, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Sync);
+            changeEmail = AppKit.PillButton(actions.transform, "ChangeEmailButton", "Change", 30, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Swap);
+            foreach (Button b in new[] { openGmail, sendAgain, changeEmail }) AppKit.Size(b, -1, 104, 1);
+
+            confirmed = AppKit.PillButton(p.box, "ConfirmedButton", "Confirmed", 38, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Check);
+            AppKit.BottomStrip(confirmed.transform, 48, 120, 48, 48);
             return p.panel;
         }
 
