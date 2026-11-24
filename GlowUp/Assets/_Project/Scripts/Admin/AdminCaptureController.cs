@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using GlowUp.AppSettings;
 using GlowUp.Common;
+using GlowUp.Data;
 using GlowUp.Net;
 using GlowUp.Scan;
 using TMPro;
@@ -384,6 +386,34 @@ namespace GlowUp.Admin
             if (titleText != null) titleText.text = StartMode == CaptureDraft.Mode.Manual && CaptureDraft.Photos.Count == 0 ? "Manual Entry" : "Review & Submit";
             if (!string.IsNullOrWhiteSpace(notice)) Info(notice);
             PaintForm();
+            if (IngredientRepository.Count == 0) _ = LoadFlagsThenPaint();
+        }
+
+        /// <summary>The ingredient list of the website is read once (phone copy first), so the flags can be shown beside the Ingredients value.</summary>
+        async Task LoadFlagsThenPaint()
+        {
+            try { await IngredientRepository.LoadAll(); } catch (Exception) { return; }
+            if (this != null && formPanel != null && formPanel.activeSelf && IngredientRepository.Count > 0) PaintForm();
+        }
+
+        /// <summary>" · 2 flagged: Linalool, Parfum +1": the listed ingredients the website already flags (allergen family, skin type or skin condition),
+        /// automatic flags included. Empty when the list is not loaded yet, or nothing in it is flagged.</summary>
+        static string FlagNote(string list)
+        {
+            if (string.IsNullOrWhiteSpace(list) || IngredientRepository.Count == 0) return "";
+            var flagged = new List<string>();
+            foreach (string part in list.Split(new[] { ',', ';', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                string typed = part.Trim();
+                if (typed.Length < 2) continue;
+                IngredientData d = IngredientRepository.Find(typed);
+                if (d == null) continue;
+                int flags = (d.allergenTags?.Count ?? 0) + (d.avoidForSkinTypes?.Count ?? 0) + (d.avoidForConditions?.Count ?? 0);
+                string shown = string.IsNullOrEmpty(d.name) ? typed : d.name;
+                if (flags > 0 && !flagged.Contains(shown)) flagged.Add(shown);
+            }
+            if (flagged.Count == 0) return "";
+            return $" · {flagged.Count} flagged: " + string.Join(", ", flagged.Take(3)) + (flagged.Count > 3 ? $" +{flagged.Count - 3}" : "");
         }
 
         void PaintForm()
@@ -396,7 +426,8 @@ namespace GlowUp.Admin
                 if (fieldStates != null && i < fieldStates.Length && fieldStates[i] != null)
                 {
                     string state = !f.Has ? "Missing" : f.state == "verified" ? "Checked" : f.state == "typed" ? "Typed" : f.state == "review" ? "Needs review" : "Detected";
-                    fieldStates[i].text = state + (f.Has && !string.IsNullOrEmpty(f.from) && f.state != "typed" ? " · " + f.from : "");
+                    fieldStates[i].text = state + (f.Has && !string.IsNullOrEmpty(f.from) && f.state != "typed" ? " · " + f.from : "")
+                        + (CaptureDraft.Keys[i] == "ingredients" && f.Has ? FlagNote(f.value) : "");
                     fieldStates[i].color = !f.Has ? Missing : f.state == "verified" ? Checked : f.state == "typed" ? Typed : Found;
                 }
                 if (checkButtons != null && i < checkButtons.Length && checkButtons[i] != null)
