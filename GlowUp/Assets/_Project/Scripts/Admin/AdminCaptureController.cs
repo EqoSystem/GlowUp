@@ -245,9 +245,76 @@ namespace GlowUp.Admin
                 ShowForm(await CaptureReader.FromBarcode(draft, code, true));
                 return;
             }
-            CaptureDraft.Photos.Add(new KeyValuePair<string, Texture2D>(role, photo));
-            Hint($"{role} photo added ({CaptureDraft.Photos.Count}). Take another, or tap Read & review.");
+            if (!ShowPhotoCheck(photo, role))
+            {
+                CaptureDraft.Photos.Add(new KeyValuePair<string, Texture2D>(role, photo));
+                Hint($"{role} photo added ({CaptureDraft.Photos.Count}). Take another, or tap Read & review.");
+                PaintThumbs();
+            }
+        }
+
+        // ---- "Check your photo" (the same card the user's scan uses): the admin looks at the photo and boxes the product detail before it is kept ----
+        PhotoPreview photoCheck;
+        Texture2D checking;
+        string checkingRole;
+
+        /// <summary>Opens the card over the capture screen. False when it cannot be built (no canvas): the caller then keeps the photo as before.</summary>
+        bool ShowPhotoCheck(Texture2D photo, string forRole)
+        {
+            if (photoCheck == null)
+            {
+                photoCheck = PhotoPreview.Build(capturePanel != null ? capturePanel.transform : transform, hintText, "Check your photo",
+                    "Frame the product detail (name, shade, ingredient list). The admin reads this photo, not the OCR.", "Retake", "Use photo", "Not now");
+                if (photoCheck == null) return false;
+                photoCheck.Retake += DropChecked;
+                photoCheck.NotNow += DropChecked;
+                photoCheck.Closed += DropChecked;
+                photoCheck.Use += KeepChecked;
+            }
+            checking = photo; checkingRole = forRole;
+            photoCheck.Show(photo, false);
+            return true;
+        }
+
+        void DropChecked()
+        {
+            if (photoCheck != null) photoCheck.Hide();
+            if (checking != null) Destroy(checking);
+            checking = null;
+            Hint("Photo dropped. Take it again.");
+        }
+
+        void KeepChecked()
+        {
+            if (checking == null) return;
+            Texture2D keep = checking;
+            Rect area = photoCheck.CropArea;
+            if (area.width < 0.999f || area.height < 0.999f)
+            {
+                Texture2D cut = CutTo(keep, area);
+                if (cut != null) { Destroy(keep); keep = cut; }
+            }
+            checking = null;
+            photoCheck.Hide();
+            CaptureDraft.Photos.Add(new KeyValuePair<string, Texture2D>(checkingRole, keep));
+            Hint($"{checkingRole} photo added ({CaptureDraft.Photos.Count}). Take another, or tap Read & review.");
             PaintThumbs();
+        }
+
+        /// <summary>The part of the photo inside `area` (0..1, bottom-left origin) as a new readable texture.</summary>
+        static Texture2D CutTo(Texture2D source, Rect area)
+        {
+            int x = Mathf.Clamp(Mathf.RoundToInt(area.x * source.width), 0, source.width - 1);
+            int y = Mathf.Clamp(Mathf.RoundToInt(area.y * source.height), 0, source.height - 1);
+            int w = Mathf.Clamp(Mathf.RoundToInt(area.width * source.width), 16, source.width - x);
+            int h = Mathf.Clamp(Mathf.RoundToInt(area.height * source.height), 16, source.height - y);
+            try
+            {
+                var cut = new Texture2D(w, h, TextureFormat.RGBA32, false);
+                cut.SetPixels(source.GetPixels(x, y, w, h)); cut.Apply();
+                return cut;
+            }
+            catch (Exception) { return null; }
         }
 
         void PickFromGallery()
