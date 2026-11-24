@@ -249,7 +249,7 @@ namespace GlowUp.EditorTools
             var selfieCamera = SceneBuilderCore.Ensure<GlowUp.Scan.CameraFeedController>(selfieTone.gameObject);
             SceneBuilderCore.SetField(selfieCamera, "display", cameraDisplay); SceneBuilderCore.SetField(selfieCamera, "viewport", viewport.rectTransform);
             SceneBuilderCore.SetField(selfieCamera, "mirrorRoot", mirror.transform); SceneBuilderCore.SetField(selfieCamera, "useFrontCamera", true);
-            SceneBuilderCore.SetField(selfieCamera, "tapToFocus", false);
+            AdminScenesBuilder.FocusLockControl(viewport.transform, selfieCamera);          // the padlock of the AI Smart Scan camera, top centre (manual focus)
             SceneBuilderCore.SetField(selfieTone, "cameraFeed", selfieCamera); SceneBuilderCore.SetField(selfieTone, "resultImage", resultImage);
             SceneBuilderCore.SetField(selfieTone, "sampleBox", sampleBox.rectTransform); SceneBuilderCore.SetField(selfieTone, "resultRow", resultRow);
             SceneBuilderCore.SetField(selfieTone, "foundSwatch", foundSwatch); SceneBuilderCore.SetField(selfieTone, "toneSwatch", toneSwatch);

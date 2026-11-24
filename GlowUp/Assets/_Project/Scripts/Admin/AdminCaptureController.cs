@@ -121,7 +121,6 @@ namespace GlowUp.Admin
             Resume = false;
 
             if (aiConfig != null && ProductAiAdvisor.Config == null) ProductAiAdvisor.Config = aiConfig;
-            if (cameraFeed != null) FocusModeBar.Attach(cameraFeed);          // Auto / Manual focus, top centre of the live view
             Hook(backButton, Back);
             Hook(galleryButton, PickFromGallery);
             Hook(shutterButton, () => _ = Shutter());

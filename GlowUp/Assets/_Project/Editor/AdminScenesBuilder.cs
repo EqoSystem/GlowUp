@@ -533,7 +533,7 @@ namespace GlowUp.EditorTools
 
             // Focus / Lighting / Clear Image: ticks that turn green from the live camera picture (photo mode); top left, clear of the frame
             Image checkBack = A.RawPanel(viewport.transform, "ChecklistCard", new Color(1, 1, 1, 0.88f), 36f);
-            A.At(checkBack.transform, A.TL, new Vector2(24, -24), new Vector2(380, 168)); checkBack.raycastTarget = false;
+            A.At(checkBack.transform, A.TL, new Vector2(24, -24), new Vector2(310, 168)); checkBack.raycastTarget = false;
             string[] checkNames = { "Focus", "Lighting", "Clear Image" };
             var checkTicks = new Image[3];
             for (int i = 0; i < 3; i++)
@@ -686,6 +686,7 @@ namespace GlowUp.EditorTools
             var c = A.Controller<AdminCaptureController>("AdminCaptureController");
             var camera = SceneBuilderCore.Ensure<CameraFeedController>(c.gameObject);
             A.Set(camera, "display", display); A.Set(camera, "viewport", viewport.rectTransform); A.Set(camera, "mirrorRoot", mirror.transform);
+            FocusLockControl(viewport.transform, camera);
             A.Set(c, "backButton", s.back); A.Set(c, "titleText", s.title); A.Set(c, "confirmDialog", confirm);
             A.Set(c, "capturePanel", cap); A.Set(c, "cameraFeed", camera); A.Set(c, "galleryPreview", preview); A.Set(c, "scanFrame", (RectTransform)frame.transform);
             A.Set(c, "hintText", hint); A.Set(c, "tipsButton", tipsButton); A.Set(c, "tipsPanel", tips); A.Set(c, "scanLine", sweep);
@@ -782,6 +783,42 @@ namespace GlowUp.EditorTools
         // =====================================================================================
         //  shared: a Yes / Cancel pop-up (ConfirmDialog), a round input field
         // =====================================================================================
+        /// <summary>
+        /// The focus control of the user's AI Smart Scan camera (24 Nov 2026), put on a staff or selfie camera: a round padlock button at the TOP CENTRE of the
+        /// live view (open padlock = the camera focuses by itself, gold closed padlock = focus held where you tapped), a short note under it, and the ring that
+        /// shows where a tap focused. A tap on the picture focuses there and holds it; the padlock releases it. The button is hidden on a camera that cannot hold
+        /// its focus. The same ScanFocusAssistant and CameraFeedController settings as the Smart Scan screen.
+        /// </summary>
+        internal static void FocusLockControl(Transform viewport, CameraFeedController camera)
+        {
+            GameObject focusHelper = A.Node(viewport, "FocusAssistant", typeof(GlowUp.Scan.ScanFocusAssistant));
+            A.Fill(focusHelper.transform);
+            Button focusLock = SmartScanSceneBuilder.CameraButton(focusHelper.transform, "FocusLockButton", IconFactory.LockOpen, out Image focusLockIcon);
+            A.At(focusLock.transform, A.TC, new Vector2(0, -24), new Vector2(92, 92));
+            Image focusNote = A.RawPanel(focusHelper.transform, "FocusNote", new Color(0, 0, 0, 0.72f), 40f);
+            focusNote.raycastTarget = false;
+            A.At(focusNote.transform, A.TC, new Vector2(0, -126), new Vector2(560, 72));
+            TextMeshProUGUI focusNoteText = A.RawLabel(focusNote.transform, "NoteText", "Focus locked. Tap the padlock to release it.", 26, Color.white, FontRole.Label, TextAlignmentOptions.Center, true);
+            A.Fill(focusNoteText.transform, 22, 6, 22, 6);
+            A.ShrinkWrapped(focusNoteText, 20);
+            CanvasGroup focusNoteGroup = SceneBuilderCore.Ensure<CanvasGroup>(focusNote.gameObject);
+            focusNoteGroup.blocksRaycasts = false; focusNoteGroup.interactable = false;
+            focusNote.gameObject.SetActive(false);
+            var assistant = focusHelper.GetComponent<GlowUp.Scan.ScanFocusAssistant>();
+            A.Set(assistant, "lockButton", focusLock); A.Set(assistant, "lockIcon", focusLockIcon);
+            A.Set(assistant, "lockedSprite", IconFactory.LockClosed); A.Set(assistant, "freeSprite", IconFactory.LockOpen);
+            A.Set(assistant, "lockBackground", focusLock.targetGraphic);
+            A.Set(assistant, "note", focusNoteGroup); A.Set(assistant, "noteText", focusNoteText);
+            Image focusRing = A.RawIcon(viewport, "FocusRing", IconFactory.RingThin, 170, new Color(1f, 0.86f, 0.5f, 1f));
+            focusRing.raycastTarget = false;
+            A.At(focusRing.transform, A.MC, Vector2.zero, new Vector2(170, 170));
+            focusRing.gameObject.SetActive(false);
+            A.Set(camera, "focusRing", focusRing.rectTransform);
+            A.Set(camera, "tapToFocus", true);
+            A.Set(camera, "tapLocksFocus", true);
+            A.Set(assistant, "cameraFeed", camera);
+        }
+
         static GlowUp.AppSettings.ConfirmDialog ConfirmPopup(A.AppScreen s, string name)
         {
             A.AppPopup p = A.Overlay(s, name, "Are you sure?");
