@@ -1,5 +1,6 @@
 // Automatic allergy / skin flags: what the rules say, and that nothing is invented for an unknown ingredient.
-import { suggestFit, autoFitPatch, hasNoFit } from "../_Shared/ingredientFit.js";
+import { readFileSync } from "node:fs";
+import { suggestFit, autoFitPatch, autoDetailsPatch, hasNoFit } from "../_Shared/ingredientFit.js";
 import { BUILT_IN } from "../_Shared/listRules.js";
 let checks = 0, failed = 0;
 const ok = (cond, text) => { checks++; if (!cond) { failed++; console.log("FAIL: " + text); } };
@@ -38,5 +39,25 @@ ok(autoFitPatch(Object.assign({}, fresh, { goodForSkinTypes: ["Dry"] }), conditi
 ok(autoFitPatch(Object.assign({}, fresh, { fitAuto: true }), conditionIds, allergenIds) === null, "already automatic: not written twice");
 ok(autoFitPatch({ name: "Water", allergenTags: [], avoidForSkinTypes: [], avoidForConditions: [] }, conditionIds, allergenIds) === null, "no rule, no write");
 ok(hasNoFit(fresh) && !hasNoFit({ allergenTags: ["nut"] }), "hasNoFit");
+
+// ---- the reference table (CureSkin CC BY 4.0 + BEAUTEE MIT) ----
+const refs = JSON.parse(readFileSync(new URL("../_Shared/data/ingredientRefs.json", import.meta.url), "utf8"));
+ok(Object.keys(refs.items).length > 1000 && refs.credits.some((c) => /CC BY 4.0/.test(c)), "the table holds over 1000 ingredients and carries the CC BY credit");
+const ad = suggestFit(["Alcohol Denat"], refs);
+ok(ad.avoidForSkinTypes.includes("Dry") && ad.rules.includes("ref-drying-alcohol"), "table: a drying alcohol");
+const imy = suggestFit(["Isopropyl Myristate"], refs);
+ok(imy.avoidForConditions.includes("acne") && imy.avoidForSkinTypes.includes("Oily") && imy.avoidForConditions.includes("folliculitis"), "table: comedogenic 5 and a fungal-acne substrate");
+const water = suggestFit(["Aqua"], refs), glyc = suggestFit(["Glycerin"], refs);
+ok(water.rules.length === 0 && glyc.rules.length === 0, "table: reported-safe ingredients get no flag");
+const unassessed = Object.entries(refs.items).find(([, r]) => r[1] === null && r[2] === null && !r[3] && !r[4] && r[5] === "");
+ok(unassessed && suggestFit([unassessed[0]], refs).rules.length === 0, "table: 'not assessed' (blank) never becomes a flag");
+const lin = autoFitPatch({ name: "Linalool", allergenTags: [], avoidForSkinTypes: [], avoidForConditions: [], goodForSkinTypes: [], goodForConditions: [], sources: [] }, conditionIds, allergenIds, refs);
+ok(lin && lin.sources.some((x) => /CC BY 4.0/.test(x)), "a flag from the table adds the CureSkin credit to Sources");
+ok(lin.avoidForConditions.every((id) => conditionIds.includes(id)), "table: every condition id is on the official list");
+// details: an empty purpose and a PubChem page; never over an admin's words
+const gl = autoDetailsPatch({ name: "Glycerin", purpose: "", sources: [] }, refs, 120);
+ok(gl && gl.purpose === "Humectant" && gl.sources.some((x) => /pubchem\.ncbi\.nlm\.nih\.gov\/compound\/\d+/.test(x)), "details: purpose and PubChem page filled");
+ok(autoDetailsPatch({ name: "Glycerin", purpose: "Keeps skin moist", sources: ["PubChem | https://pubchem.ncbi.nlm.nih.gov/compound/753"] }, refs, 120) === null, "details: an admin's purpose and an existing PubChem page are left alone");
+ok(autoDetailsPatch({ name: "Glycerin", purpose: "" }, null, 120) === null, "details: no table, no patch");
 console.log(failed === 0 ? `ALL PASSED  (checks made: ${checks})` : `${failed} FAILED of ${checks}`);
 process.exit(failed === 0 ? 0 : 1);

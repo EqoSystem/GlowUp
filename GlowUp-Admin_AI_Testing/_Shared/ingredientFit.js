@@ -57,13 +57,25 @@ const RULES = [
       allergen: "", types: ["Oily"], conditions: ["acne", "folliculitis", "seborrheic"] }
 ];
 
+// ---- the reference table (_Shared/data/ingredientRefs.json, built by tools/buildIngredientRefs.mjs) ----
+// Columns: function, fungalAcne (1 = Malassezia substrate, 0 = reported safe, null = not assessed), comedogenic (0-5 or null), fragrance, euAllergen,
+// alcohol ("d" drying | "f" fatty | ""), pregnancyCaution, pubchemCid. null means NOT ASSESSED, never "safe": it produces no flag.
+// Data: CureSkin "Indian Skincare Ingredient Flags" (CC BY 4.0) and BEAUTEE's PubChem ids (MIT). The credit goes into every ingredient it flags.
+export const REF_CREDIT = "CureSkin Indian Skincare Decoder (CC BY 4.0) | https://cureskin.com/indianskincaredecoder/dataset";
+const refKey = (name) => String(name || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+function refRow(names, refs) {
+    if (!refs || !refs.items) return null;
+    for (const n of names) { const row = refs.items[refKey(n)]; if (row) return row; }
+    return null;
+}
+
 const normal = (value) => String(value === null || value === undefined ? "" : value).toLowerCase().replace(/\s+/g, " ").trim();
 
 /**
  * What the rules say about ONE ingredient. `names` = its name, INCI name and aliases.
  * Returns { allergenTags, avoidForSkinTypes, avoidForConditions, why: [text], rules: [id] } (all arrays empty when no rule knows it).
  */
-export function suggestFit(names) {
+export function suggestFit(names, refs) {
     const list = (Array.isArray(names) ? names : [names]).map(normal).filter((n) => n.length > 1);
     const out = { allergenTags: [], avoidForSkinTypes: [], avoidForConditions: [], why: [], rules: [] };
     const add = (into, values) => values.forEach((v) => { if (v && !into.includes(v)) into.push(v); });
@@ -72,7 +84,29 @@ export function suggestFit(names) {
         add(out.allergenTags, [rule.allergen]); add(out.avoidForSkinTypes, rule.types); add(out.avoidForConditions, rule.conditions);
         out.why.push(rule.why); out.rules.push(rule.id);
     });
+    const row = refRow(list, refs);
+    if (row) {
+        const [, fungal, comedogenic, fragrance, eu, alcohol] = row;
+        const note = (text, id) => { out.why.push(text + " (CureSkin, CC BY 4.0)"); out.rules.push(id); };
+        if (fragrance === 1 || eu === 1) { add(out.allergenTags, ["fragrance"]); add(out.avoidForSkinTypes, ["Sensitive"]); add(out.avoidForConditions, FRAGRANCE_CONDITIONS); note("Listed as a fragrance or EU-declared allergen.", "ref-fragrance"); }
+        if (alcohol === "d") { add(out.avoidForSkinTypes, ["Dry", "Sensitive"]); add(out.avoidForConditions, ["rosacea", "atopic", "eczema", "irritantcontact"]); note("A drying alcohol that can dehydrate the skin barrier.", "ref-drying-alcohol"); }
+        if (typeof comedogenic === "number" && comedogenic >= 3) { add(out.avoidForSkinTypes, ["Oily"]); add(out.avoidForConditions, ["acne"]); note(`Published comedogenic rating ${comedogenic} of 5.`, "ref-comedogenic"); }
+        // fungal acne is folliculitis caused by Malassezia yeast; the general condition "folliculitis" carries it (it is not a user-chosen chronic condition)
+        if (fungal === 1) { add(out.avoidForConditions, ["folliculitis"]); note("Reported as food for Malassezia yeast (fungal acne).", "ref-fungal-acne"); }
+    }
     return out;
+}
+
+/** The ingredient's usual job in a formula (CureSkin's wording), or "" when the table does not know it. */
+export function refFunction(names, refs) {
+    const row = refRow((Array.isArray(names) ? names : [names]).map(normal), refs);
+    return row ? String(row[0] || "") : "";
+}
+
+/** The PubChem compound page of the ingredient ("Name | url" as a Sources line), or "". */
+export function refPubchemSource(names, refs) {
+    const row = refRow((Array.isArray(names) ? names : [names]).map(normal), refs);
+    return row && row[7] ? `PubChem | https://pubchem.ncbi.nlm.nih.gov/compound/${row[7]}` : "";
 }
 
 /** True when the ingredient has no flag of any kind yet (nobody and no rule has said anything). */
@@ -86,11 +120,29 @@ export function hasNoFit(item) {
  * The write for an ingredient with no flags yet: the flags the rules found, marked "auto" so an admin reviews them.
  * Returns null when there is nothing to write (a reviewed human choice is never touched; no rule = no write).
  */
-export function autoFitPatch(item, allowedConditionIds, allowedAllergenIds) {
+export function autoFitPatch(item, allowedConditionIds, allowedAllergenIds, refs) {
     if (!item || item.fitAuto === true || !hasNoFit(item)) return null;
-    const fit = suggestFit([item.name, item.techName].concat(Array.isArray(item.aliases) ? item.aliases : []));
+    const fit = suggestFit([item.name, item.techName].concat(Array.isArray(item.aliases) ? item.aliases : []), refs);
     if (fit.rules.length === 0) return null;
     const conditions = fit.avoidForConditions.filter((id) => !allowedConditionIds || allowedConditionIds.includes(id));
     const allergens = fit.allergenTags.filter((id) => !allowedAllergenIds || allowedAllergenIds.includes(id));
-    return { allergenTags: allergens, avoidForSkinTypes: fit.avoidForSkinTypes, avoidForConditions: conditions, fitAuto: true, fitAutoWhy: fit.why.join(" ").slice(0, 400) };
+    const patch = { allergenTags: allergens, avoidForSkinTypes: fit.avoidForSkinTypes, avoidForConditions: conditions, fitAuto: true, fitAutoWhy: fit.why.join(" ").slice(0, 400) };
+    if (fit.rules.some((id) => id.startsWith("ref-"))) patch.sources = Array.from(new Set((Array.isArray(item.sources) ? item.sources : []).concat(REF_CREDIT))).slice(0, 10);
+    return patch;
+}
+
+/**
+ * Details the table can fill without anyone typing: an EMPTY purpose (the ingredient's usual job) and a PubChem page in Sources.
+ * Never replaces something an admin wrote. Returns null when there is nothing to add.
+ */
+export function autoDetailsPatch(item, refs, maxPurpose) {
+    if (!item || !refs) return null;
+    const names = [item.name, item.techName].concat(Array.isArray(item.aliases) ? item.aliases : []);
+    const patch = {};
+    const job = refFunction(names, refs);
+    if (job && !String(item.purpose || "").trim()) patch.purpose = job.split("/")[0].trim().slice(0, maxPurpose || 120);
+    const page = refPubchemSource(names, refs);
+    const have = Array.isArray(item.sources) ? item.sources : [];
+    if (page && !have.some((line) => /pubchem\.ncbi\.nlm\.nih\.gov\/compound\//i.test(String(line)))) patch.sources = have.concat(page).slice(0, 10);
+    return Object.keys(patch).length ? patch : null;
 }

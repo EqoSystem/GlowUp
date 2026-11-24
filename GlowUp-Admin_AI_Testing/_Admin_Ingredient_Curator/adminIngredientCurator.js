@@ -56,7 +56,7 @@ import { mountSourceLinks, countSaved } from "./sourceLinks.js";
 import { lookupIngredient } from "../_Shared/quickFill.js";
 import { suggestClassification, friendlyStarter, pubchemPage as pubchemCompoundPage } from "../_Shared/smartAdd.js";
 import { SOURCE_LINK_FIELDS } from "../_Shared/fieldSources.js";
-import { autoFitPatch, hasNoFit } from "../_Shared/ingredientFit.js";
+import { autoFitPatch, autoDetailsPatch, hasNoFit } from "../_Shared/ingredientFit.js";
 import { FIELD_GUIDE, SOURCES, linksFor, allSourcesFor, addReference, labelBareUrls, pubchemLookupUrl, firstCompoundId, pubchemPageUrl, insertPaste } from "../_Shared/fieldSources.js";
 import { aliasesWithInci, firstAlias, needsClassification, MAX_PURPOSE, CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING } from "../_Shared/classificationRules.js";
 
@@ -87,9 +87,18 @@ const hasCredibleSource = (item) => !NEVER_AUTO.includes(item.via) && (item.risk
 // SOURCED flags for ingredients no built-in rule knows: the server asks Gemini with web search and returns flags only with a page the search opened.
 // The page must also pass the website's own evidence tiers (regulator, medical or scientific body). At most 6 ingredients per page load; one that has
 // been asked is marked (fitAiChecked) so it is not asked again. A failed request marks nothing.
-async function sourcedFlags(conditionIds, allergenIds) {
+// The reference table (CureSkin CC BY 4.0 + BEAUTEE MIT, built by tools/buildIngredientRefs.mjs): read once; without it only the built-in rules run.
+let ingredientRefs;
+async function loadRefs() {
+    if (ingredientRefs !== undefined) return ingredientRefs;
+    try { const r = await fetch(new URL("../_Shared/data/ingredientRefs.json", import.meta.url).href, { credentials: "omit" }); ingredientRefs = r.ok ? await r.json() : null; }
+    catch (error) { ingredientRefs = null; }
+    return ingredientRefs;
+}
+
+async function sourcedFlags(conditionIds, allergenIds, refs) {
     const options = (kind) => allOptions(kind).map((o) => ({ id: o.value, label: o.label }));
-    const waiting = everyIngredient.filter((item) => !item.binned && !item.fitAuto && !item.fitAiChecked && hasNoFit(item) && item.name.length >= 3 && !autoFitPatch(item, conditionIds, allergenIds)).slice(0, 6);
+    const waiting = everyIngredient.filter((item) => !item.binned && !item.fitAuto && !item.fitAiChecked && hasNoFit(item) && item.name.length >= 3 && !autoFitPatch(item, conditionIds, allergenIds, refs)).slice(0, 6);
     if (waiting.length === 0 || !auth.currentUser) return;
     let flagged = 0;
     for (const item of waiting) {
@@ -475,7 +484,15 @@ async function loadIngredients() {
     // (EU fragrance allergens, sulfates, formaldehyde releasers, ...). The app uses them at once; the card says "set automatically" until an admin saves it.
     if (!TEST_MODE) {
         const conditionIds = allOptions("conditions").map((o) => o.value), allergenIds = allOptions("allergens").map((o) => o.value);
-        const todo = everyIngredient.map((item) => ({ item, patch: item.binned ? null : autoFitPatch(item, conditionIds, allergenIds) })).filter((x) => x.patch);
+        const refs = await loadRefs();
+        // flags from the rules and the reference table, then the details the table can fill (an empty purpose, a PubChem page); never over an admin's own words
+        const todo = everyIngredient.map((item) => {
+            if (item.binned) return { item, patch: null };
+            const fit = autoFitPatch(item, conditionIds, allergenIds, refs);
+            const details = autoDetailsPatch(fit ? Object.assign({}, item, fit) : item, refs, MAX_PURPOSE);
+            const patch = Object.assign({}, fit || {}, details || {});
+            return { item, patch: Object.keys(patch).length ? patch : null };
+        }).filter((x) => x.patch);
         if (todo.length > 0) {
             try {
                 for (let i = 0; i < todo.length; i += BATCH_LIMIT) {
@@ -484,12 +501,12 @@ async function loadIngredients() {
                     await batch.commit();
                 }
                 todo.forEach((x) => Object.assign(x.item, x.patch));
-                notify(`${many(todo.length, "ingredient was", "ingredients were")} flagged automatically for allergens and skin conditions. Check them: each card says what the flag is based on.`, "ok");
+                notify(`${many(todo.length, "ingredient was", "ingredients were")} filled in automatically (allergen and skin flags, purpose, PubChem page). Check them: each card says what a flag is based on.`, "ok");
             } catch (error) {
                 console.warn("Automatic flags did not work: ", error);
             }
         }
-        await sourcedFlags(conditionIds, allergenIds);
+        await sourcedFlags(conditionIds, allergenIds, refs);
     }
 
 
