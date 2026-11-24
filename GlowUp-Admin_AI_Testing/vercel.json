@@ -58,6 +58,9 @@
     "api/email-otp.js": {
       "maxDuration": 15
     },
+    "api/ingredient-fit.js": {
+      "maxDuration": 30
+    },
     "api/delete-auth-user.js": {
       "maxDuration": 30
     },

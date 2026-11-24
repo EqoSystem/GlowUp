@@ -56,7 +56,7 @@ import { mountSourceLinks, countSaved } from "./sourceLinks.js";
 import { lookupIngredient } from "../_Shared/quickFill.js";
 import { suggestClassification, friendlyStarter, pubchemPage as pubchemCompoundPage } from "../_Shared/smartAdd.js";
 import { SOURCE_LINK_FIELDS } from "../_Shared/fieldSources.js";
-import { autoFitPatch } from "../_Shared/ingredientFit.js";
+import { autoFitPatch, hasNoFit } from "../_Shared/ingredientFit.js";
 import { FIELD_GUIDE, SOURCES, linksFor, allSourcesFor, addReference, labelBareUrls, pubchemLookupUrl, firstCompoundId, pubchemPageUrl, insertPaste } from "../_Shared/fieldSources.js";
 import { aliasesWithInci, firstAlias, needsClassification, MAX_PURPOSE, CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING } from "../_Shared/classificationRules.js";
 
@@ -83,6 +83,35 @@ const NEVER_AUTO = ["document-import", "snapshot"];
 
 const hasCredibleSource = (item) => !NEVER_AUTO.includes(item.via) && (item.riskLevel === "caution" || item.riskLevel === "harmful")
     && evidenceProblem(item.riskLevel, item.sources) === "";
+
+// SOURCED flags for ingredients no built-in rule knows: the server asks Gemini with web search and returns flags only with a page the search opened.
+// The page must also pass the website's own evidence tiers (regulator, medical or scientific body). At most 6 ingredients per page load; one that has
+// been asked is marked (fitAiChecked) so it is not asked again. A failed request marks nothing.
+async function sourcedFlags(conditionIds, allergenIds) {
+    const options = (kind) => allOptions(kind).map((o) => ({ id: o.value, label: o.label }));
+    const waiting = everyIngredient.filter((item) => !item.binned && !item.fitAuto && !item.fitAiChecked && hasNoFit(item) && item.name.length >= 3 && !autoFitPatch(item, conditionIds, allergenIds)).slice(0, 6);
+    if (waiting.length === 0 || !auth.currentUser) return;
+    let flagged = 0;
+    for (const item of waiting) {
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const answer = await fetch("/api/ingredient-fit", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+                body: JSON.stringify({ name: item.name, aliases: item.aliases.slice(0, 6), allergens: options("allergens"), conditions: options("conditions") }), signal: AbortSignal.timeout(30000) });
+            if (!answer.ok) { if (answer.status === 503 || answer.status === 401 || answer.status === 429) return; continue; }
+            const found = await answer.json();
+            let data = { fitAiChecked: true };
+            if (found.found && evidenceProblem("caution", found.sources) === "") {
+                const sources = Array.from(new Set(item.sources.concat(found.sources))).slice(0, 10);
+                data = { fitAiChecked: true, fitAuto: true, fitAutoWhy: String(found.why || "").slice(0, 400), allergenTags: found.allergenTags.filter((id) => allergenIds.includes(id)),
+                    avoidForSkinTypes: found.avoidForSkinTypes, avoidForConditions: found.avoidForConditions.filter((id) => conditionIds.includes(id)), sources, fitAutoAt: serverTimestamp() };
+            }
+            await updateDoc(doc(db, "ingredients", item.id), data);
+            if (data.fitAuto) { Object.assign(item, data); flagged++; }
+            else item.fitAiChecked = true;
+        } catch (error) { console.warn("A sourced flag lookup did not work: ", error); }
+    }
+    if (flagged > 0) notify(`${many(flagged, "ingredient was", "ingredients were")} flagged from sources found on the web. Check them: each card names the source.`, "ok");
+}
 
 let everyIngredient = [];
 let ingredients = [];
@@ -407,6 +436,7 @@ async function loadIngredients() {
                 webSearched: data.webSearched === true,
                 autoApproved: data.autoApproved === true,
                 fitAuto: data.fitAuto === true,
+                fitAiChecked: data.fitAiChecked === true,
                 fitAutoWhy: String(data.fitAutoWhy || ""),
                 folder: cleanFolder(data.folder),
                 binned: data.binned === true,
@@ -459,6 +489,7 @@ async function loadIngredients() {
                 console.warn("Automatic flags did not work: ", error);
             }
         }
+        await sourcedFlags(conditionIds, allergenIds);
     }
 
 
