@@ -64,16 +64,17 @@ namespace GlowUp.Onboarding
             if (!askedThisChoice && picked.Count == 0) { askedThisChoice = true; OpenReactions(); }
         }
 
-        RectTransform finderRect; Vector2 finderAnchorMax, finderOffsetMax;
+        RectTransform finderRect;
 
         /// <summary>"Find my skin type" shares its row with "How it reacts" (Sensitive only); alone it spans the whole row.</summary>
         void ShowReactionsButton(bool on)
         {
             if (reactionsButton != null) reactionsButton.gameObject.SetActive(on);
             if (finderButton == null) return;
-            if (finderRect == null) { finderRect = (RectTransform)finderButton.transform; finderAnchorMax = finderRect.anchorMax; finderOffsetMax = finderRect.offsetMax; }
-            finderRect.anchorMax = new Vector2(on ? finderAnchorMax.x : 1f, finderAnchorMax.y);
-            finderRect.offsetMax = new Vector2(on ? finderOffsetMax.x : -finderRect.offsetMin.x, finderOffsetMax.y);
+            if (finderRect == null) finderRect = (RectTransform)finderButton.transform;
+            // the whole row by default (the scene is built that way); the left half while "How it reacts" takes the right half
+            finderRect.anchorMax = new Vector2(on ? 0.5f : 1f, finderRect.anchorMax.y);
+            finderRect.offsetMax = new Vector2(on ? -8f : -finderRect.offsetMin.x, finderRect.offsetMax.y);
         }
 
         void OpenReactions()

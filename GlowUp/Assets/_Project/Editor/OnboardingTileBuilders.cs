@@ -55,6 +55,7 @@ namespace GlowUp.EditorTools
             float y = HeaderBottom + 2 * cellH + gap + gap + wideH + 14;
             // panel revision (22 Nov 2026): help is on the page, the user never has to look it up elsewhere
             var finder = HelpLink(c.card, "SkinTypeFinderButton", "Find my skin type", y, true);
+            { var fr = (RectTransform)finder.transform; fr.anchorMax = new Vector2(1f, 1f); fr.offsetMax = new Vector2(-fr.offsetMin.x, fr.offsetMax.y); }   // the whole row; the controller halves it while "How it reacts" shows
             // "Where lists come from" was removed (24 Nov 2026): that belongs in the paper, not in the app. Its half of the row now holds "How it reacts"
             // (Sensitive skin only); alone, "Find my skin type" spans the whole row.
             Transform oldSources = Loose(c.card, "SkinListSourcesButton"); if (oldSources != null) Object.DestroyImmediate(oldSources.gameObject);
@@ -203,12 +204,12 @@ namespace GlowUp.EditorTools
             AppKit.At(foundSwatch.transform, AppKit.TL, new Vector2(0, -10), new Vector2(108, 108));
             AppKit.Outline(foundSwatch.transform, ThemeRole.Accent, 56f);
             TextMeshProUGUI foundLabel = AppKit.Label(resultRow.transform, "FoundLabel", "Skin colour found", 28, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.MidlineLeft, true);
-            AppKit.Fill(foundLabel.transform, 124, 0, 470, 0);
+            AppKit.Fill(foundLabel.transform, 124, 0, 430, 0);
             Image toneSwatch = AppKit.Panel(resultRow.transform, "ToneSwatch", ThemeRole.SurfaceAlt, 1f, 56f);
-            AppKit.At(toneSwatch.transform, AppKit.TR, new Vector2(-340, -10), new Vector2(108, 108));
+            AppKit.At(toneSwatch.transform, AppKit.TL, new Vector2(424, -10), new Vector2(108, 108));
             AppKit.Outline(toneSwatch.transform, ThemeRole.Accent, 56f);
             TextMeshProUGUI toneLabel = AppKit.Label(resultRow.transform, "ToneLabel", "Closest tone", 28, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.MidlineLeft, true);
-            AppKit.Fill(toneLabel.transform, 480, 0, 0, 0);
+            AppKit.Fill(toneLabel.transform, 548, 0, 0, 0);
             foreach (Image swatch in new[] { foundSwatch, toneSwatch }) { var themed = swatch.GetComponent<ThemedGraphic>(); if (themed != null) Object.DestroyImmediate(themed); }   // their colour is set from the photo
             resultRow.SetActive(false);
             Button deleteSelfie = AppKit.LinkButton(selfie.box, "DeleteSelfieButton", "Delete my selfie", 30, ThemeRole.Warning);

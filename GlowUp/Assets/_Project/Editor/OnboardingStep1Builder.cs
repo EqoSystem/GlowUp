@@ -159,27 +159,24 @@ namespace GlowUp.EditorTools
             if (old != null) Object.DestroyImmediate(old.gameObject);
 
             AppKit.AppPopup p = AppKit.Overlay(new AppKit.AppScreen { canvas = canvas }, "ConfirmEmailPanel", "Confirm your email");
-            AppKit.At(p.box, AppKit.MC, new Vector2(0, 40), new Vector2(900, 1180));
+            AppKit.At(p.box, AppKit.MC, new Vector2(0, 40), new Vector2(900, 930));
             // Layout (24 Nov 2026, from the top; every block has its own band, so nothing overlaps and the keyboard never covers the code row):
-            //   mail disc 40-150 | message 170-380 | status 390-474 | code row 500-620 | three icon buttons 1180-340-104 | primary 1180-44-120
-            Image disc = AppKit.Panel(p.box, "MailDisc", ThemeRole.SurfaceAlt, 1f, 110f);
-            AppKit.At(disc.transform, AppKit.TC, new Vector2(0, -112), new Vector2(110, 110));
-            AppKit.Icon(disc.transform, "Icon", IconFactory.Mail, 58, ThemeRole.MainText);
+            //   title 34-114 | message 150-350 | status 360-444 | code row 460-580 | three icon buttons 638-742 | primary 762-882 (box 930 high)
 
             message = AppKit.Label(p.box, "MessageText",
                 "We sent a message to name@example.com. Open it and tap the link in it, then come back here. This page goes on by itself once the email is confirmed.",
                 31, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            AppKit.TopStrip(message.transform, 180, 200, 48, 48);
+            AppKit.TopStrip(message.transform, 150, 200, 48, 48);
             AppKit.ShrinkWrapped(message, 24);
 
             status = AppKit.Label(p.box, "StatusText", "Not confirmed yet. Open the message and tap its link (look in the spam folder too).",
                                   27, ThemeRole.AccentText, FontRole.Body, TextAlignmentOptions.Top, true);
-            AppKit.TopStrip(status.transform, 392, 84, 48, 48);
+            AppKit.TopStrip(status.transform, 360, 84, 48, 48);
             AppKit.ShrinkWrapped(status, 21);
 
             // ---- the 6-digit code row: hidden until GlowUp's server has mailed one (the controller shows it); the link in the e-mail still works ----
             GameObject codeGroup = AppKit.Node(p.box, "CodeGroup");
-            AppKit.TopStrip(codeGroup.transform, 500, 120, 48, 48);
+            AppKit.TopStrip(codeGroup.transform, 460, 120, 48, 48);
             TMP_InputField codeInput = SceneBuilderCore.MakeInput(codeGroup.transform, "CodeInputField", "6-digit code", AppKit.TL, Vector2.zero, new Vector2(660, 110));
             AppKit.At(codeInput.transform, AppKit.TL, new Vector2(0, -5), new Vector2(660, 110));
             codeInput.contentType = TMP_InputField.ContentType.IntegerNumber; codeInput.characterLimit = 6;
