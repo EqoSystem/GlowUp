@@ -295,3 +295,34 @@ export function friendlyStarter(name, classificationName) {
     const article = /^[aeiou]/.test(kind) ? "an" : "a";
     return `${clean(name)} is ${article} ${kind} used in make-up.`;
 }
+
+// ---- the Open Beauty Facts make-up dump that ships with the site (_Shared/data/obfMakeup.json, built by tools/buildObfMakeup.mjs) ----
+// A row is [code, name, brand, type, ingredient text]. Looking a batch of hundreds up here needs no network and has no rate limit.
+export function fromObfDump(row) {
+    if (!Array.isArray(row) || row.length < 5) return null;
+    const [code, name, brand, type, text] = row.map((v) => clean(v));
+    if (!name) return null;
+    const ingredients = ingredientsFromText(text);
+    return {
+        origin: "openbeautyfacts", originLabel: "Open Beauty Facts (local copy)",
+        name, brand, cosmeticType: type, ingredients, ingredientsText: text.slice(0, 4000), outsideCategory: "",
+        barcode: code.replace(/\D/g, ""), fdaNumber: "", imageUrl: "", sources: code ? [offPageUrl(code)] : [],
+        note: ingredients.length ? "" : "No ingredient list on Open Beauty Facts."
+    };
+}
+
+// The row for a barcode (zeros ignored, so a 12-digit UPC-A finds its 13-digit EAN form), or null.
+export function findInObfDump(code, dump) {
+    const key = barcodeKey(code);
+    const items = (dump && dump.items) || [];
+    if (!key) return null;
+    if (!dump.byKey) Object.defineProperty(dump, "byKey", { value: new Map(items.map((row) => [barcodeKey(row[0]), row]).filter(([k]) => k)), enumerable: false });
+    const row = dump.byKey.get(key);
+    return row ? fromObfDump(row) : null;
+}
+
+export function searchObfDump(typed, dump, most = 5) {
+    return ((dump && dump.items) || []).map(fromObfDump).filter(Boolean)
+        .map((c) => ({ c, s: scoreCandidate(typed, c) }))
+        .filter((x) => x.s >= 0.6).sort((a, b) => b.s - a.s).slice(0, most).map((x) => ({ ...x.c, score: Math.round(x.s * 100) / 100 }));
+}

@@ -5,7 +5,7 @@ import { dialogFrame, icon } from "./adminShell.js";
 import {
     queryKind, offProductUrl, offSearchUrl, fromOpenBeautyFacts, searchCatalogue, mergeCandidates,
     pubchemSynonymsUrl, pubchemDescriptionUrl, aliasesFromPubchem, descriptionFromPubchem, ingredientsFromText, scoreCandidate,
-    fromUpcItemDb, gtinValid
+    fromUpcItemDb, gtinValid, findInObfDump, searchObfDump
 } from "./smartAdd.js";
 
 const ZXING = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js";
@@ -205,6 +205,14 @@ async function upcLookup(code, getToken, table) {
     finally { clearTimeout(timer); }
 }
 
+let obfDump = null;
+// The Open Beauty Facts make-up copy that ships with the site: asked FIRST, so a batch of hundreds needs no network call for what it holds.
+export async function loadObfDump() {
+    if (obfDump) return obfDump;
+    obfDump = (await getJson(new URL("../_Shared/data/obfMakeup.json", import.meta.url).href)) || { items: [] };
+    return obfDump;
+}
+
 let catalogue = null;
 export async function loadCatalogue() {
     if (catalogue) return catalogue;
@@ -217,14 +225,15 @@ export async function loadCatalogue() {
 export async function lookupProduct(text, options = {}) {
     const query = queryKind(text);
     if (query.kind === "empty") return { query, candidates: [] };
-    const [list, table] = await Promise.all([loadCatalogue(), loadCategoryTable()]);
+    const [list, table, dump] = await Promise.all([loadCatalogue(), loadCategoryTable(), loadObfDump()]);
     const found = [];
     let note = "";
     if (query.kind === "barcode") {
-        let json = await getJson(offProductUrl(query.value));
+        const local = findInObfDump(query.value, dump);
+        let json = local ? null : await getJson(offProductUrl(query.value));
         // a 12-digit UPC-A code is often stored as the 13-digit EAN form (a leading 0): ask once more in that form
-        if (!(json && json.status === 1) && query.value.length === 12) json = await getJson(offProductUrl("0" + query.value));
-        let hit = json && json.status === 1 ? fromOpenBeautyFacts(json.product, table) : null;
+        if (!local && !(json && json.status === 1) && query.value.length === 12) json = await getJson(offProductUrl("0" + query.value));
+        let hit = local || (json && json.status === 1 ? fromOpenBeautyFacts(json.product, table) : null);
         if (!hit) {
             const upc = await upcLookup(query.value, options.getToken, table);
             hit = upc.candidates[0] || null;
@@ -238,6 +247,7 @@ export async function lookupProduct(text, options = {}) {
         }
     } else {
         found.push(...searchCatalogue(query.value, list, 5));
+        found.push(...searchObfDump(query.value, dump, 5));
         const json = await getJson(offSearchUrl(query.value));
         const products = (json && Array.isArray(json.products) ? json.products : []).map((p) => fromOpenBeautyFacts(p, table)).filter(Boolean)
             .map((c) => ({ ...c, score: Math.round(scoreCandidate(query.value, c) * 100) / 100 }));
