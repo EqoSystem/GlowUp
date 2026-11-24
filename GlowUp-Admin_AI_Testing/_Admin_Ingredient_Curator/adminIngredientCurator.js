@@ -537,6 +537,8 @@ async function loadIngredients() {
         return;
     }
 
+    // paint the list now: the automatic steps below make web requests (up to 30 s each) and must not keep the page on its loading rows
+    afterChange();
 
     if (AUTO_APPROVE_AI && !TEST_MODE) {
         const fresh = everyIngredient.filter((item) => needsReview(item) && !item.binned && hasCredibleSource(item));

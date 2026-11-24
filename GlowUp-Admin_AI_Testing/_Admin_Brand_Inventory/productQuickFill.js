@@ -5,7 +5,7 @@
 import { escapeHtml } from "../_Shared/adminCommon.js";
 import { auth } from "../_Database/firebase-console.js";
 import { icon, dialogFrame, askConfirm } from "../_Shared/adminShell.js";
-import { lookupProduct, scanBarcode, readLabelPhoto, pickPhotos, readTextFromFile, barcodeFromPhoto } from "../_Shared/quickFill.js";
+import { lookupProduct, readLabelPhoto, pickPhotos, readTextFromFile, barcodeFromPhoto } from "../_Shared/quickFill.js";
 import { openPhoneLink } from "../_Shared/phoneLink.js";
 import { brandFor, existingProduct, queryKind, officialLinks } from "../_Shared/smartAdd.js";
 import {
@@ -216,12 +216,6 @@ export function mountProductQuickFill({ brands, products, readForm, fill, openEx
         const fillButton = event.target.closest("[data-fill]"), openButton = event.target.closest("[data-open]");
         if (fillButton) useCandidate(shown[Number(fillButton.dataset.fill)]);
         if (openButton) { const same = existingProduct(shown[Number(openButton.dataset.open)], products(), brands()); if (same) openExisting(same); }
-    });
-    el("productQuickScan").addEventListener("click", async () => {
-        const digits = await scanBarcode({ title: "Scan the product's barcode" });
-        if (!digits) { status("No barcode was read. Type the digits under the bars in the box above, or choose a photo of the barcode.", "warn"); return; }
-        el("productQuickInput").value = digits;
-        find(digits);
     });
     el("productQuickLabel").addEventListener("click", async () => {
         try {

@@ -34,6 +34,7 @@ import { collection, doc, serverTimestamp, getDoc } from "https://www.gstatic.co
 
 import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed, onSnapshot } from "../_Shared/adminStore.js";
 import { TEST_MODE } from "../_Shared/adminClassifications.js";
+import { startAppScans } from "./appScans.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
     statusBadge, toneBadge, statusGuide, normalizeStatus, notify, describeError, setBusy, setFormError, originLabel, sourceLinks, sourceGuideHtml, COSMETIC_TYPES, STATUSES,
@@ -441,6 +442,10 @@ function startInventoryLive() {
         loadInventory().finally(() => { inventoryLiveRefresh = false; });
     }, (error) => console.error(`Error watching ${name} for inventory cards: `, error)));
     ["brands", "products", "ingredients", "productIngredientSuggestions"].forEach(watch);
+    inventoryLiveStops.push(startAppScans({
+        host: el("appScansList"), count: el("appScansCount"),
+        onOpen: (id) => { const found = everyProduct.find((p) => p.id === id); if (found) openProductForm(found, found.brandId); }
+    }));
 }
 
 const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) {                      } };

@@ -98,6 +98,14 @@
                 <div class="import-flags" id="inventoryImportFlags" hidden></div>
             </section>
 
+            <section class="panel app-scans-panel" data-panel="appScans" data-label="Scanned by the app" data-w="4" data-right>
+                <div class="panel-head">
+                    <h3 class="panel-title">Scanned by the app</h3>
+                    <span class="panel-count" id="appScansCount"></span>
+                </div>
+                <div class="app-scan-list" id="appScansList" role="status" aria-live="polite"></div>
+            </section>
+
 
             <section class="panel bare" data-panel="counts" data-label="Counts" data-w="8" data-source="inventoryCounts">
                 <div class="stat-row">
@@ -275,9 +283,8 @@
                             <button type="button" class="btn primary" id="productQuickFind">Find</button>
                         </div>
                         <div class="qf-tools">
-                            <button type="button" class="btn" id="productQuickScan"><i data-icon="barcode"></i>Scan barcode</button>
-                            <button type="button" class="btn" id="productQuickLabel"><i data-icon="camera"></i>Photo of ingredient list</button>
-                            <button type="button" class="btn" id="productQuickPhotos"><i data-icon="image"></i>Photos from gallery</button>
+                            <button type="button" class="btn" id="productQuickLabel"><i data-icon="camera"></i>Ingredient photo</button>
+                            <button type="button" class="btn" id="productQuickPhotos"><i data-icon="image"></i>Gallery photos</button>
                             <button type="button" class="btn" id="productQuickPhone"><i data-icon="phone"></i>Use my phone</button>
                         </div>
                         <p class="field-hint qf-status" id="productQuickStatus" role="status" aria-live="polite"></p>
