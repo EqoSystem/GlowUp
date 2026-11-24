@@ -56,6 +56,7 @@ import { mountSourceLinks, countSaved } from "./sourceLinks.js";
 import { lookupIngredient } from "../_Shared/quickFill.js";
 import { suggestClassification, friendlyStarter, pubchemPage as pubchemCompoundPage } from "../_Shared/smartAdd.js";
 import { SOURCE_LINK_FIELDS } from "../_Shared/fieldSources.js";
+import { autoFitPatch } from "../_Shared/ingredientFit.js";
 import { FIELD_GUIDE, SOURCES, linksFor, allSourcesFor, addReference, labelBareUrls, pubchemLookupUrl, firstCompoundId, pubchemPageUrl, insertPaste } from "../_Shared/fieldSources.js";
 import { aliasesWithInci, firstAlias, needsClassification, MAX_PURPOSE, CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING } from "../_Shared/classificationRules.js";
 
@@ -405,6 +406,8 @@ async function loadIngredients() {
                 via: String(data.via || "").trim().toLowerCase(),
                 webSearched: data.webSearched === true,
                 autoApproved: data.autoApproved === true,
+                fitAuto: data.fitAuto === true,
+                fitAutoWhy: String(data.fitAutoWhy || ""),
                 folder: cleanFolder(data.folder),
                 binned: data.binned === true,
                 binnedAt: since ? since.getTime() : 0,
@@ -433,6 +436,27 @@ async function loadIngredients() {
                 notify(`${many(fresh.length, "ingredient with a credible source was", "ingredients with a credible source were")} approved automatically.`, "ok");
             } catch (error) {
                 console.warn("Automatic approval did not work: ", error);
+            }
+        }
+    }
+
+
+    // AUTOMATIC FLAGS: an ingredient nobody has flagged yet gets the allergen family, skin types and skin conditions the rules know for it
+    // (EU fragrance allergens, sulfates, formaldehyde releasers, ...). The app uses them at once; the card says "set automatically" until an admin saves it.
+    if (!TEST_MODE) {
+        const conditionIds = allOptions("conditions").map((o) => o.value), allergenIds = allOptions("allergens").map((o) => o.value);
+        const todo = everyIngredient.map((item) => ({ item, patch: item.binned ? null : autoFitPatch(item, conditionIds, allergenIds) })).filter((x) => x.patch);
+        if (todo.length > 0) {
+            try {
+                for (let i = 0; i < todo.length; i += BATCH_LIMIT) {
+                    const batch = writeBatch(db);
+                    todo.slice(i, i + BATCH_LIMIT).forEach((x) => batch.update(doc(db, "ingredients", x.item.id), Object.assign({}, x.patch, { fitAutoAt: serverTimestamp() })));
+                    await batch.commit();
+                }
+                todo.forEach((x) => Object.assign(x.item, x.patch));
+                notify(`${many(todo.length, "ingredient was", "ingredients were")} flagged automatically for allergens and skin conditions. Check them: each card says what the flag is based on.`, "ok");
+            } catch (error) {
+                console.warn("Automatic flags did not work: ", error);
             }
         }
     }
@@ -876,6 +900,7 @@ function detailOf(item, inBin) {
     item.avoidForConditions.forEach((t) => chips.push(`<span class="chip warn">Avoid: ${escapeHtml(labelOf(allOptions("conditions"), t))}</span>`));
     item.goodForSkinTypes.forEach((t) => chips.push(`<span class="chip good">Good: ${escapeHtml(labelOf(SKIN_TYPES, t))} skin</span>`));
     item.goodForConditions.forEach((t) => chips.push(`<span class="chip good">Good: ${escapeHtml(labelOf(allOptions("conditions"), t))}</span>`));
+    if (item.fitAuto) chips.push(`<span class="chip review" data-tip="${escapeHtml(item.fitAutoWhy || "Set by GlowUp's rules from the ingredient name.")} Press Edit to correct it; saving marks the flags as checked.">flags set automatically: check</span>`);
     if (chips.length > 0) facts.push(["For the app", chips.join("")]);
 
     if (productUseKnown) { const used = usedInProducts(item); facts.push(["In products", used === 0 ? "Not in any listed product yet" : many(used, "listed product", "listed products")]); }
@@ -1583,6 +1608,7 @@ async function saveIngredient(event) {
         goodForSkinTypes: goodTypes,
         avoidForConditions: avoidConditions,
         goodForConditions: goodConditions,
+        fitAuto: false,
         updatedAt: serverTimestamp()
     };
 
