@@ -58,6 +58,9 @@
     "api/email-otp.js": {
       "maxDuration": 15
     },
+    "api/delete-auth-user.js": {
+      "maxDuration": 30
+    },
     "api/mcp.js": {
       "maxDuration": 10,
       "includeFiles": "_Shared/data/fdaCatalogue.json"

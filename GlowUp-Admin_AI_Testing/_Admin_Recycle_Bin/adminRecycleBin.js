@@ -356,14 +356,27 @@ function saveCopy(documents) {
 async function purgeUsers(entries) {
     const sure = await askConfirm({
         title: `Delete permanently: ${many(entries.length, "user", "users")}?`,
-        message: "Their GlowUp profile (skin profile, settings, photo) is taken out of the database. Their sign-in account is not removed by this. This cannot be undone. A copy is saved to your computer first.",
+        message: "Their GlowUp profile (skin profile, settings, photo) is taken out of the database and their sign-in account is removed from Firebase Authentication, so they can no longer sign in. This cannot be undone. A copy is saved to your computer first.",
         items: entries.map((x) => nameOf(x) + (x.email ? " (" + x.email + ")" : "")), confirmLabel: "Delete permanently", danger: true
     });
     if (!sure) return;
     if (!saveCopy(entries.map((x) => ({ collection: "users", id: x.id, data: x.raw }))) && !(await askConfirm({ title: "The copy could not be saved", message: "Delete anyway, without a copy?", confirmLabel: "Delete without a copy", danger: true }))) return;
     try {
-        await runBatches(entries.map((x) => ({ ref: doc(db, "users", x.id) })));
-        notify(`${many(entries.length, "user", "users")} deleted for good. A copy is in your Downloads folder.`, "ok");
+        // the sign-in (Firebase Authentication) accounts go first, through the server; the profile is deleted only for accounts that are gone
+        let results = null;
+        try {
+            const token = await auth.currentUser.getIdToken();
+            const answer = await fetch("/api/delete-auth-user", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+                body: JSON.stringify({ uids: entries.map((x) => x.id) }), signal: AbortSignal.timeout(30000) });
+            if (answer.ok) results = (await answer.json()).results || {};
+        } catch (e) { console.warn("Sign-in accounts could not be removed: ", e); }
+        let removable = entries;
+        if (results) removable = entries.filter((x) => results[x.id] === "removed");
+        else if (!(await askConfirm({ title: "Sign-in accounts could not be removed", message: "The server that removes sign-in accounts did not answer (it may not be set up yet). Delete only the profiles from the database? The sign-in accounts would stay in Firebase Authentication.", confirmLabel: "Delete profiles only", danger: true }))) { picked.clear(); return; }
+        if (removable.length > 0) await runBatches(removable.map((x) => ({ ref: doc(db, "users", x.id) })));
+        const skipped = entries.length - removable.length;
+        notify(skipped > 0 ? `${many(removable.length, "user", "users")} deleted for good. ${many(skipped, "was", "were")} kept because the sign-in account could not be removed.`
+            : `${many(entries.length, "user", "users")} deleted for good, with ${entries.length === 1 ? "the" : "their"} sign-in ${entries.length === 1 ? "account" : "accounts"}. A copy is in your Downloads folder.`, skipped > 0 ? "error" : "ok");
     } catch (error) {
         console.error("Error deleting users: ", error);
         notify("Not everything was deleted. " + describeError(error), "error");
