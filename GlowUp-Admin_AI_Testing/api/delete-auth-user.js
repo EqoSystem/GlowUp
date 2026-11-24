@@ -3,7 +3,7 @@
 // The browser can only delete Firestore documents; deleting somebody else's Auth account needs the service account, so it happens here.
 // Safety (all checked on the server): the caller is an active admin; every uid has a users/{uid} document that is in the Recycle Bin
 // (inBin true, status "deleted"); no uid is the caller's own or has an admins/{uid} document. At most 25 uids per request.
-// A uid whose Auth account is already gone counts as removed. Environment variable: FIREBASE_SERVICE_ACCOUNT (already used by email-otp).
+// A uid with no profile, or with an admins/ or adminRequests/ document, is refused. A uid whose Auth account is already gone counts as removed. Environment variable: FIREBASE_SERVICE_ACCOUNT (already used by email-otp).
 // Free plan: a few small calls per request; no Cloud Functions, no billing.
 const crypto = require("crypto");
 const { adminUid } = require("./_adminAuth");
@@ -62,14 +62,15 @@ async function exists(token, path) {
 async function removeOne(token, uid, callerUid) {
     if (uid === callerUid) return "refused: your own account";
     if ((await exists(token, "admins/" + encodeURIComponent(uid))).found) return "refused: an admin account";
+    if ((await exists(token, "adminRequests/" + encodeURIComponent(uid))).found) return "refused: an admin request";
     const u = await exists(token, "users/" + encodeURIComponent(uid));
-    // the profile may already be gone when an earlier attempt removed it first; then the Auth account is all that is left
-    if (u.found) {
-        const f = u.fields;
-        const inBin = f.inBin && f.inBin.booleanValue === true;
-        const status = f.status && f.status.stringValue;
-        if (!inBin || status !== "deleted") return "refused: not in the Recycle Bin";
-    }
+    // fail closed: no profile in the Recycle Bin, no deletion. (The browser deletes the profile only AFTER this succeeds, so a retry
+    // after a half-finished attempt still finds the profile and gets "removed" from the USER_NOT_FOUND answer below.)
+    if (!u.found) return "refused: not in the Recycle Bin";
+    const f = u.fields;
+    const inBin = f.inBin && f.inBin.booleanValue === true;
+    const status = f.status && f.status.stringValue;
+    if (!inBin || status !== "deleted") return "refused: not in the Recycle Bin";
     const r = await timed(`https://identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts:delete`,
         { method: "POST", headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" }, body: JSON.stringify({ localId: uid }) }, 8);
     if (r.ok) return "removed";
