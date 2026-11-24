@@ -61,6 +61,9 @@
     "api/ingredient-fit.js": {
       "maxDuration": 30
     },
+    "api/product-list.js": {
+      "maxDuration": 30
+    },
     "api/delete-auth-user.js": {
       "maxDuration": 30
     },

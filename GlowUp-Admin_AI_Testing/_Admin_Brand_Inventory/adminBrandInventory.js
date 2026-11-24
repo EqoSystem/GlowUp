@@ -71,6 +71,7 @@ import {
     reviewReason, skippedLine, repeatedNames, FILL_FIELDS, STATE_WORDS, METHODS, DETECTED, NEEDS_REVIEW, VERIFIED, TYPED, REVIEW_CHANGES, waiting
 } from "../_Shared/capture.js";
 import { loadCatalogue, lookupProduct } from "../_Shared/quickFill.js";
+import { waitingForList, suggestionFrom, LISTS_PER_LOAD } from "../_Shared/productListFill.js";
 import { parseBarcodes, lookupBatch, batchSummary } from "../_Shared/batchBarcodes.js";
 import { openBatchLookup } from "./batchLookup.js";
 
@@ -577,6 +578,42 @@ async function onIngredientSuggestionClick(event) {
     }
 }
 
+let listFillRunning = false;
+
+// AUTOMATIC ingredient lists (24 Nov 2026). For up to LISTS_PER_LOAD pending products that have no list: api/product-list.js searches the web (admin sign-in,
+// sources checked on the server), and a result it can stand behind is QUEUED as a suggestion, never written into the product. Each product is tried once
+// (listAiChecked), so a product the web does not know is not asked again and again. It runs when an admin opens this page (the free plan has no server trigger).
+async function autoFillLists() {
+    if (listFillRunning || !auth.currentUser) return;
+    const waiting = waitingForList(everyProduct, ingredientSuggestions, (p) => !notMakeup(p.cosmeticType, p.name)).slice(0, LISTS_PER_LOAD);
+    if (waiting.length === 0) return;
+    listFillRunning = true;
+    let queued = 0;
+    try {
+        for (const product of waiting) {
+            try {
+                const token = await auth.currentUser.getIdToken();
+                const answer = await fetch("/api/product-list", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+                    body: JSON.stringify({ name: product.name, brand: product.brandName, kind: product.cosmeticType }), signal: AbortSignal.timeout(35000) });
+                if (!answer.ok) { if (answer.status === 503 || answer.status === 401 || answer.status === 429) return; continue; }   // not set up, signed out, too fast: try again next time
+                const found = await answer.json();
+                if (found && found.found) {
+                    const made = suggestionFrom(product, found, auth.currentUser.uid);
+                    const ref = await addDoc(collection(db, "productIngredientSuggestions"), made);
+                    ingredientSuggestions.push({ id: ref.id, productId: made.productId, productName: made.productName, brandName: made.brandName, ingredients: made.ingredients, sources: made.sources });
+                    queued++;
+                }
+                await updateDoc(doc(db, "products", product.id), { listAiChecked: true, listAiCheckedAt: serverTimestamp() });
+                product.listAiChecked = true;
+            } catch (error) { console.warn("An ingredient list look-up did not work: ", error); }
+        }
+    } finally { listFillRunning = false; }
+    if (queued > 0) {
+        renderIngredientSuggestions();
+        notify(`${many(queued, "ingredient list was", "ingredient lists were")} found on the web for products that had none. Check each one under Web ingredient lists to review: it names the page.`, "ok");
+    }
+}
+
 async function loadInventory() {
     const body = el("inventoryTableBody");
     try {
@@ -643,6 +680,7 @@ async function loadInventory() {
                 }, {}),
                 ingredientsRaw: String(data.ingredientsRaw || "").slice(0, 4000),
                 ingredientsRawFrom: String(data.ingredientsRawFrom || "").slice(0, 120),
+                listAiChecked: data.listAiChecked === true,
                 reviewState: String(data.reviewState || ""),
                 captureMethod: String(data.captureMethod || ""),
                 evidenceCount: toWholeNumber(data.evidenceCount),
@@ -726,6 +764,9 @@ async function loadInventory() {
         }
 
     }
+
+    // a product that arrived without an ingredient list gets one looked up on the web by itself; the result waits for an admin in "Web ingredient lists to review"
+    if (!TEST_MODE) autoFillLists().catch((error) => console.warn("The automatic ingredient look-up did not work: ", error));
 
     sortOut();
     fillBrandSelects();
