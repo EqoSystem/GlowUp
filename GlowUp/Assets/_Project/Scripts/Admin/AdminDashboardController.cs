@@ -75,8 +75,8 @@ namespace GlowUp.Admin
             if (rowTemplate != null) rowTemplate.SetActive(false);
             // The camera view has two shapes: short and wide for a barcode (Scan), tall for a photo of the pack (Camera). A button for the
             // shape that is not showing switches to it; the button of the shape that is showing starts that capture. Tapping the view starts it too.
-            Hook(scanButton, () => { if (photoView) SetPhotoView(false); else OpenCapture(CaptureDraft.Mode.Barcode); });
-            Hook(captureButton, () => { if (!photoView) SetPhotoView(true); else OpenCapture(CaptureDraft.Mode.Photo); });
+            Hook(scanButton, () => OpenCapture(CaptureDraft.Mode.Barcode));          // 24 Nov 2026: one tap opens the barcode scanner (the dashboard has no camera view of its own)
+            Hook(captureButton, () => OpenCapture(CaptureDraft.Mode.Photo));
             Hook(galleryButton, () => OpenCapture(CaptureDraft.Mode.Gallery));
             Hook(manualButton, () => OpenCapture(CaptureDraft.Mode.Manual));
             Hook(resumeButton, () => { CaptureDraft d = CaptureDraft.Current; AdminCaptureController.StartMode = d.ModeValue; AdminCaptureController.Resume = true; SceneNavigator.Go(captureScene); });
@@ -105,7 +105,6 @@ namespace GlowUp.Admin
                 return;
             }
             StaffAccess.RememberStaffSession();
-            if (cameraFeed != null) cameraFeed.StartCamera();                // the live camera view (asks for the camera the first time)
             SubmissionStore.Start();
             WebsitePresence.Start();
             Paint();

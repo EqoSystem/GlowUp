@@ -152,55 +152,17 @@ namespace GlowUp.EditorTools
 
             TextMeshProUGUI title = A.Label(card, "ScreenTitle", "Scan Product", 64, ThemeRole.Heading, FontRole.Title, TextAlignmentOptions.Center);
             A.TopStrip(title.transform, 160, 84, 56, 56); A.Shrink(title, 44);
-            TextMeshProUGUI sub = A.Label(card, "SubtitleText", "Align the barcode or take a photo", 30, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center);
+            TextMeshProUGUI sub = A.Label(card, "SubtitleText", "Choose how to add a product", 30, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center);
             A.TopStrip(sub.transform, 246, 48, 56, 56); A.Shrink(sub, 22);
 
-            // ---- the scanner preview: tapping it starts a barcode scan ----
-            GameObject viewportObject = A.Node(card, "ScannerPreview", typeof(Image), typeof(Button));
-            Image viewport = viewportObject.GetComponent<Image>();
-            Kit.StyleRounded(viewport); Kit.SetRadius(viewport, 48f); viewport.color = new Color32(46, 36, 36, 255);
-            viewportObject.GetComponent<Button>().targetGraphic = viewport;
-            viewportObject.GetComponent<Button>().transition = Selectable.Transition.None;
-            A.TopStrip(viewportObject.transform, 316, 520, 56, 56);
-            // The live camera view of the user's AI Smart Scan (same parts and look): the camera picture inside the rounded view, the scan frame
-            // (guiding mesh, corner brackets, sweeping line), the round flashlight button on the right edge and the hint pill at the bottom.
-            // Tapping the view opens the barcode scanner. The ways in below (Gallery, Scan, Camera, Manual) are unchanged.
-            viewport.gameObject.AddComponent<Mask>().showMaskGraphic = true;
-            GameObject mirror = A.Node(viewportObject.transform, "MirrorRoot");
-            A.Fill(mirror.transform);
-            GameObject displayObject = A.Node(mirror.transform, "CameraDisplay", typeof(RawImage));
-            A.Fill(displayObject.transform);
-            var display = displayObject.GetComponent<RawImage>();
-            display.color = new Color(0, 0, 0, 0); display.raycastTarget = false;          // invisible until the camera runs
-            GameObject frame = A.Node(viewportObject.transform, "GuideFrame", typeof(Image));
-            A.Fill(frame.transform, 56, 130, 56, 40);
-            Image frameImage = frame.GetComponent<Image>(); frameImage.sprite = IconFactory.ScanFrame; frameImage.type = Image.Type.Sliced; frameImage.preserveAspect = false;
-            frameImage.color = Color.white; frameImage.raycastTarget = false;
-            Image mesh = A.RawIcon(frame.transform, "GuideMesh", IconFactory.GuideMesh, 64, new Color(1, 1, 1, 0.22f));
-            mesh.type = Image.Type.Tiled; mesh.preserveAspect = false; mesh.raycastTarget = false;
-            A.Fill(mesh.transform, 12, 12, 12, 12);
-            Image laser = A.RawIcon(frame.transform, "ScanLine", IconFactory.ScanLine, 26, Color.white);
-            laser.preserveAspect = false; laser.raycastTarget = false;
-            var laserRect = laser.rectTransform;
-            laserRect.anchorMin = new Vector2(0, 0.5f); laserRect.anchorMax = new Vector2(1, 0.5f); laserRect.pivot = A.MC;
-            laserRect.anchoredPosition = Vector2.zero; laserRect.sizeDelta = new Vector2(-40, 26);
-            var sweep = SceneBuilderCore.Ensure<ScanLineSweep>(frame);
-            A.Set(sweep, "line", laserRect); A.Set(sweep, "area", (RectTransform)frame.transform);
-
-            Image hintBack = A.RawPanel(viewportObject.transform, "HintPill", new Color(0, 0, 0, 0.5f), 60f);
-            A.BottomStrip(hintBack.transform, 24, 84, 56, 56); hintBack.raycastTarget = false;
-            TextMeshProUGUI focusLabel = A.RawLabel(hintBack.transform, "HintText", "Align the barcode, or take a photo", 28, Color.white, FontRole.Label, TextAlignmentOptions.Center, true);
-            A.Fill(focusLabel.transform, 30, 4, 30, 4);
-
-            Button flashChip = SmartScanSceneBuilder.CameraButton(viewportObject.transform, "FlashChip", IconFactory.Bolt, out Image flashIcon);
-            A.At(flashChip.transform, A.TR, new Vector2(-24, -24), new Vector2(92, 92));
-
+            // 24 Nov 2026: the dashboard has NO live camera view any more. The camera opens only on the capture screen (Scan = barcode, Camera = photo),
+            // so nothing holds the camera, flickers or drains the battery while the staff member is only choosing what to do.
             // Everything under the camera view sits in one container, so choosing Camera can make the view taller and push it all down together.
             GameObject belowObject = A.Node(card, "BelowPreview");
             A.Fill(belowObject.transform);
             Transform belowRoot = belowObject.transform;
             // ---- the four ways in: Gallery, Scan, Camera, Manual ----
-            float rowTop = 874;
+            float rowTop = 330;
             Button gallery = ModeButton(belowRoot, "GalleryButton", IconFactory.Document, "Gallery", 0, rowTop, false);
             Button scan = ModeButton(belowRoot, "ScanButton", IconFactory.Scan, "Scan", 1, rowTop, true);
             Button capture = ModeButton(belowRoot, "CameraButton", IconFactory.CameraIcon, "Camera", 2, rowTop, false);
@@ -211,7 +173,7 @@ namespace GlowUp.EditorTools
             Image tipsBack = tipsObject.GetComponent<Image>(); Kit.StyleRounded(tipsBack); Kit.SetRadius(tipsBack, 60f); tipsBack.color = Color.white;
             SceneBuilderCore.Themed(tipsObject, ThemeRole.SurfaceAlt);
             tipsObject.GetComponent<Button>().targetGraphic = tipsBack;
-            A.TopStrip(tipsObject.transform, 1094, 112, 56, 56);
+            A.TopStrip(tipsObject.transform, 626, 112, 56, 56);
             Image tipsIcon = A.IconTile(tipsObject.transform, "BulbTile", IconFactory.Bulb, 72, 40, ThemeRole.Background, ThemeRole.AccentText);
             A.At(tipsIcon.transform.parent, A.ML, new Vector2(26, 0), new Vector2(72, 72));
             TextMeshProUGUI tipsTitle = A.Label(tipsObject.transform, "TipsTitle", "View Tips", 34, ThemeRole.MainText, FontRole.Heading, TextAlignmentOptions.MidlineLeft);
@@ -227,7 +189,7 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.Themed(importObject, ThemeRole.Background);
             importObject.GetComponent<Button>().targetGraphic = importBack;
             Kit.EnsureOutline(importObject.transform, "Outline", ThemeRole.Accent, 60f);
-            A.TopStrip(importObject.transform, 1226, 112, 56, 56);
+            A.TopStrip(importObject.transform, 764, 112, 56, 56);
             Image importIcon = A.IconTile(importObject.transform, "ImportTile", IconFactory.Document, 72, 40, ThemeRole.SurfaceAlt, ThemeRole.AccentText);
             A.At(importIcon.transform.parent, A.ML, new Vector2(26, 0), new Vector2(72, 72));
             TextMeshProUGUI importTitle = A.Label(importObject.transform, "ImportTitle", "Import file", 34, ThemeRole.MainText, FontRole.Heading, TextAlignmentOptions.MidlineLeft);
@@ -239,21 +201,21 @@ namespace GlowUp.EditorTools
 
             // two small buttons share one row: the unsent single capture (left) and the batch waiting to be sent (right)
             Button resume = A.PillButton(belowRoot, "ResumeButton", "Unsent capture", 26, ThemeRole.Background, ThemeRole.AccentText, IconFactory.History);
-            A.At(resume.transform, A.TL, new Vector2(56, -1366), new Vector2(436, 74));
+            A.At(resume.transform, A.TL, new Vector2(56, -910), new Vector2(436, 74));
             A.Shrink(A.LabelOf(resume), 18);
             resume.gameObject.SetActive(false);
             Button batchBtn = A.PillButton(belowRoot, "BatchButton", "Batch waiting", 26, ThemeRole.Background, ThemeRole.AccentText, IconFactory.ListIcon);
-            A.At(batchBtn.transform, A.TL, new Vector2(508, -1366), new Vector2(436, 74));
+            A.At(batchBtn.transform, A.TL, new Vector2(508, -910), new Vector2(436, 74));
             A.Shrink(A.LabelOf(batchBtn), 18);
             batchBtn.gameObject.SetActive(false);
 
             // ---- recent submissions (live) ----
             TextMeshProUGUI recentTitle = A.Label(belowRoot, "RecentTitle", "Recent Submissions", 36, ThemeRole.Heading, FontRole.Heading);
-            A.TopStrip(recentTitle.transform, 1458, 56, 56, 290); A.Shrink(recentTitle, 26);
+            A.TopStrip(recentTitle.transform, 1014, 56, 56, 290); A.Shrink(recentTitle, 26);
             Button viewAll = A.LinkButton(belowRoot, "ViewAllButton", "View all", 30, ThemeRole.AccentText);
-            A.At(viewAll.transform, A.TR, new Vector2(-48, -1454), new Vector2(220, 64));
+            A.At(viewAll.transform, A.TR, new Vector2(-48, -1010), new Vector2(220, 64));
             GameObject list = A.Node(belowRoot, "RecentList");
-            A.Between(list.transform, 1522, 170);
+            A.Between(list.transform, 1078, 170);
             list.AddComponent<RectMask2D>();
             A.VStack(list, 8);
             GameObject template = Row(list.transform, "RowTemplate", 96);
@@ -292,11 +254,8 @@ namespace GlowUp.EditorTools
             var tips = TipsPopup(s, "TipsPanel");
             var confirm = ConfirmPopup(s, "ConfirmPanel");
             var c = A.Controller<AdminDashboardController>("AdminDashboardController");
-            var camera = SceneBuilderCore.Ensure<CameraFeedController>(c.gameObject);
-            A.Set(camera, "display", display); A.Set(camera, "viewport", viewport.rectTransform); A.Set(camera, "mirrorRoot", mirror.transform);
             A.Set(c, "settingsButton", settings); A.Set(c, "confirmDialog", confirm);
-            A.Set(c, "previewButton", viewportObject.GetComponent<Button>()); A.Set(c, "flashChip", flashChip); A.Set(c, "cameraFeed", camera); A.Set(c, "previewRect", (RectTransform)viewportObject.transform); A.Set(c, "belowRect", (RectTransform)belowObject.transform); A.Set(c, "hintText", focusLabel);
-            A.Set(c, "guideFrame", (RectTransform)frame.transform);
+            A.Set(c, "belowRect", (RectTransform)belowObject.transform);
             A.Set(c, "scanButton", scan); A.Set(c, "captureButton", capture); A.Set(c, "galleryButton", gallery); A.Set(c, "manualButton", manual);
             A.Set(c, "resumeButton", resume); A.Set(c, "resumeText", A.LabelOf(resume)); A.Set(c, "batchButton", batchBtn); A.Set(c, "batchText", A.LabelOf(batchBtn));
             A.Set(c, "tipsButton", tipsObject.GetComponent<Button>()); A.Set(c, "tipsPanel", tips);
