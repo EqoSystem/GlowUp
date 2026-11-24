@@ -27,6 +27,9 @@ namespace GlowUp.Admin
         [SerializeField] private TextMeshProUGUI signInLabel;
         [SerializeField] private Button forgotButton;
         [SerializeField] private Button customerLoginButton;
+        [Tooltip("The line at the bottom: what signing in lets staff do, with the Privacy Policy and Terms and Conditions as links")]
+        [SerializeField] private TextMeshProUGUI legalText;
+        [SerializeField] private string legalScene = "TermsAndConditionScene";
 
         [Header("Scenes")]
         [SerializeField] private string customerLoginScene = "LogInScene";
@@ -47,6 +50,9 @@ namespace GlowUp.Admin
             if (customerLoginButton != null) customerLoginButton.onClick.AddListener(Back);
             if (signInButton != null) signInButton.onClick.AddListener(() => SignIn());
             if (forgotButton != null) forgotButton.onClick.AddListener(() => Forgot());
+            // clearing the email clears the password too: a password never stays behind for an address that is gone
+            if (emailInput != null) emailInput.onValueChanged.AddListener(v => { if (string.IsNullOrEmpty(v) && passwordInput != null && !string.IsNullOrEmpty(passwordInput.text)) passwordInput.text = ""; });
+            LegalLinks();
             Say("", false);
 
             // a staff session that is still signed in (app reopened): checked again on the server, never trusted from the phone
@@ -67,6 +73,24 @@ namespace GlowUp.Admin
         }
 
         void Back() { SceneNavigator.Go(customerLoginScene); }
+
+        /// <summary>"Signing in lets you add and send product data to GlowUp. Read the Privacy Policy and the Terms and Conditions that apply." Both names are links.</summary>
+        void LegalLinks()
+        {
+            if (legalText == null) return;
+            string hex = UnityEngine.ColorUtility.ToHtmlStringRGB(GlowUp.Common.RuntimeTheme.Palette.accentText);
+            legalText.richText = true;
+            legalText.text = "Signing in lets you add and send product data to GlowUp. Read the <link=\"privacy\"><color=#" + hex + "><u>" + GlowUp.Common.UiWording.PrivacyPolicy
+                + "</u></color></link> and the <link=\"terms\"><color=#" + hex + "><u>" + GlowUp.Common.UiWording.TermsAndConditions + "</u></color></link> that apply.";
+            legalText.enableWordWrapping = true;
+            legalText.raycastTarget = true;
+            GlowUp.Common.TextLinkClicks clicks = legalText.GetComponent<GlowUp.Common.TextLinkClicks>() ?? legalText.gameObject.AddComponent<GlowUp.Common.TextLinkClicks>();
+            clicks.Clicked = id =>
+            {
+                GlowUp.Onboarding.TermsAcceptanceFlowController.OpenReadOnlyFromLogin(id == "terms" ? GlowUp.Common.UiWording.TermsAndConditions : GlowUp.Common.UiWording.PrivacyPolicy);
+                SceneNavigator.Go(legalScene);
+            };
+        }
 
         async void SignIn()
         {

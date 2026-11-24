@@ -75,6 +75,14 @@ namespace GlowUp.Scan
         [Tooltip("FOCUS LOCK. On = a tap on the picture focuses on that spot and KEEPS the focus there until it is released (ReleaseFocus, the padlock button of the scan screen). Off = after a tap the camera goes back to focusing by itself.")]
         [SerializeField] private bool tapLocksFocus = false;
 
+        /// <summary>Tapping the picture focuses on the spot (the Auto / Manual focus pill turns this on for Manual).</summary>
+        public bool TapToFocus { get => tapToFocus; set => tapToFocus = value; }
+        /// <summary>On: a tap holds the focus there (Manual focus). Off: the camera goes back to focusing by itself after a moment (Auto).</summary>
+        public bool TapLocksFocus { get => tapLocksFocus; set => tapLocksFocus = value; }
+        /// <summary>The circle that shows where the camera focuses; a screen without one can hand one over.</summary>
+        public bool HasFocusRing => focusRing != null;
+        public void SetFocusRing(RectTransform ring) { focusRing = ring; }
+
         public bool IsPlaying => cam != null && cam.isPlaying && cam.width > 32;
         /// <summary>The size of the picture the camera really gives, in its own pixels (it may differ from the size that was asked for). 0 x 0 while it is off.</summary>
         public Vector2Int PictureSize => IsPlaying ? new Vector2Int(cam.width, cam.height) : Vector2Int.zero;

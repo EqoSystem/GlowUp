@@ -114,12 +114,15 @@ namespace GlowUp.EditorTools
             Button signIn = A.PillButton(card, "SignInButton", "Sign In", 40, ThemeRole.ButtonFill, ThemeRole.ButtonText);
             A.TopStrip(signIn.transform, 1110, Kit.ButtonHeight, x, x);
             Button customer = A.LinkButton(card, "CustomerLoginButton", "Back to User Log-In", 32, ThemeRole.AccentText);
-            A.BottomStrip(customer.transform, 60, 84, x, x);
+            A.BottomStrip(customer.transform, 190, 84, x, x);
+            // 24 Nov 2026: the legal line of the user Log-In page, for staff: what signing in lets this account do, and where to read the rules
+            TextMeshProUGUI legal = A.Label(card, "LegalText", "Signing in lets you add and send product data to GlowUp. Read the Privacy Policy and the Terms and Conditions that apply.", 28, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Center, true);
+            A.BottomStrip(legal.transform, 50, 132, x, x);
 
             var c = A.Controller<AdminLoginController>("AdminLoginController");
             A.Set(c, "backButton", s.back); A.Set(c, "emailInput", email); A.Set(c, "passwordInput", pw);
             A.Set(c, "signInButton", signIn); A.Set(c, "signInLabel", A.LabelOf(signIn)); A.Set(c, "forgotButton", forgot);
-            A.Set(c, "customerLoginButton", customer);
+            A.Set(c, "customerLoginButton", customer); A.Set(c, "legalText", legal);
             A.Controller<StaffSkin>("StaffSkin"); A.Finish(s);
         }
 
@@ -218,23 +221,39 @@ namespace GlowUp.EditorTools
             Image tipsChevron = A.Icon(tipsObject.transform, "Chevron", IconFactory.ChevronRight, 40, ThemeRole.SecondaryText);
             A.At(tipsChevron.transform, A.MR, new Vector2(-28, 0), new Vector2(40, 40));
 
+            // ---- Import file (24 Nov 2026): a drop-box style tile for a Word, PDF, Excel, JSON, CSV or TXT list of products with ingredients ----
+            GameObject importObject = A.Node(belowRoot, "ImportFileButton", typeof(Image), typeof(Button));
+            Image importBack = importObject.GetComponent<Image>(); Kit.StyleRounded(importBack); Kit.SetRadius(importBack, 60f); importBack.color = Color.white;
+            SceneBuilderCore.Themed(importObject, ThemeRole.Background);
+            importObject.GetComponent<Button>().targetGraphic = importBack;
+            Kit.EnsureOutline(importObject.transform, "Outline", ThemeRole.Accent, 60f);
+            A.TopStrip(importObject.transform, 1226, 112, 56, 56);
+            Image importIcon = A.IconTile(importObject.transform, "ImportTile", IconFactory.Document, 72, 40, ThemeRole.SurfaceAlt, ThemeRole.AccentText);
+            A.At(importIcon.transform.parent, A.ML, new Vector2(26, 0), new Vector2(72, 72));
+            TextMeshProUGUI importTitle = A.Label(importObject.transform, "ImportTitle", "Import file", 34, ThemeRole.MainText, FontRole.Heading, TextAlignmentOptions.MidlineLeft);
+            A.Fill(importTitle.transform, 122, 54, 96, 6); A.Shrink(importTitle, 24);
+            TextMeshProUGUI importCaption = A.Label(importObject.transform, "ImportCaption", "Word, PDF, Excel, JSON, CSV or TXT", 26, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.MidlineLeft);
+            A.Fill(importCaption.transform, 122, 6, 96, 54); A.Shrink(importCaption, 19);
+            Image importPlus = A.Icon(importObject.transform, "ImportPlus", IconFactory.Plus, 40, ThemeRole.AccentText);
+            A.At(importPlus.transform, A.MR, new Vector2(-28, 0), new Vector2(40, 40));
+
             // two small buttons share one row: the unsent single capture (left) and the batch waiting to be sent (right)
             Button resume = A.PillButton(belowRoot, "ResumeButton", "Unsent capture", 26, ThemeRole.Background, ThemeRole.AccentText, IconFactory.History);
-            A.At(resume.transform, A.TL, new Vector2(56, -1220), new Vector2(436, 74));
+            A.At(resume.transform, A.TL, new Vector2(56, -1366), new Vector2(436, 74));
             A.Shrink(A.LabelOf(resume), 18);
             resume.gameObject.SetActive(false);
             Button batchBtn = A.PillButton(belowRoot, "BatchButton", "Batch waiting", 26, ThemeRole.Background, ThemeRole.AccentText, IconFactory.ListIcon);
-            A.At(batchBtn.transform, A.TL, new Vector2(508, -1220), new Vector2(436, 74));
+            A.At(batchBtn.transform, A.TL, new Vector2(508, -1366), new Vector2(436, 74));
             A.Shrink(A.LabelOf(batchBtn), 18);
             batchBtn.gameObject.SetActive(false);
 
             // ---- recent submissions (live) ----
             TextMeshProUGUI recentTitle = A.Label(belowRoot, "RecentTitle", "Recent Submissions", 36, ThemeRole.Heading, FontRole.Heading);
-            A.TopStrip(recentTitle.transform, 1312, 56, 56, 290); A.Shrink(recentTitle, 26);
+            A.TopStrip(recentTitle.transform, 1458, 56, 56, 290); A.Shrink(recentTitle, 26);
             Button viewAll = A.LinkButton(belowRoot, "ViewAllButton", "View all", 30, ThemeRole.AccentText);
-            A.At(viewAll.transform, A.TR, new Vector2(-48, -1308), new Vector2(220, 64));
+            A.At(viewAll.transform, A.TR, new Vector2(-48, -1454), new Vector2(220, 64));
             GameObject list = A.Node(belowRoot, "RecentList");
-            A.Between(list.transform, 1376, 170);
+            A.Between(list.transform, 1522, 170);
             list.AddComponent<RectMask2D>();
             A.VStack(list, 8);
             GameObject template = Row(list.transform, "RowTemplate", 96);
@@ -242,32 +261,33 @@ namespace GlowUp.EditorTools
             A.Size(empty, height: 96);
 
             // ---- the live status bar: Online | Total Scans | Synced ----
-            GameObject bar = A.Node(card, "StatusBar", typeof(Image), typeof(Button));
-            Image barBack = bar.GetComponent<Image>(); Kit.StyleRounded(barBack); Kit.SetRadius(barBack, 60f); barBack.color = Color.white;
+            // 24 Nov 2026: only Total Scans can be tapped. It is the one pink button with an arrow; Online and Synced are plain status words on a
+            // quiet bar (no fill on their own, no arrow), so what is a button and what is only information is clear at a glance.
+            GameObject bar = A.Node(card, "StatusBar", typeof(Image));
+            Image barBack = bar.GetComponent<Image>(); Kit.StyleRounded(barBack); Kit.SetRadius(barBack, 60f); barBack.color = Color.white; barBack.raycastTarget = false;
             SceneBuilderCore.Themed(bar, ThemeRole.SurfaceAlt);
-            bar.GetComponent<Button>().targetGraphic = barBack;
             A.BottomStrip(bar.transform, 34, 110, 56, 56);
             RectTransform left = A.Share(A.Node(bar.transform, "OnlinePart").transform, 0f, 0.27f);
-            RectTransform mid = A.Share(A.Node(bar.transform, "ScansPart").transform, 0.27f, 0.68f);
-            RectTransform right = A.Share(A.Node(bar.transform, "SyncPart").transform, 0.68f, 1f);
+            GameObject scansButtonObject = A.Node(bar.transform, "ScansPart", typeof(Image), typeof(Button));
+            RectTransform mid = A.Share(scansButtonObject.transform, 0.27f, 0.74f, 6, 8, 8);
+            Image scansBack = scansButtonObject.GetComponent<Image>(); Kit.StyleRounded(scansBack); Kit.SetRadius(scansBack, 48f); scansBack.color = Color.white;
+            SceneBuilderCore.Themed(scansButtonObject, ThemeRole.ButtonFill);
+            scansButtonObject.GetComponent<Button>().targetGraphic = scansBack;
+            RectTransform right = A.Share(A.Node(bar.transform, "SyncPart").transform, 0.74f, 1f);
             Image dot = A.RawPanel(left, "OnlineDot", new Color(0.20f, 0.62f, 0.42f), 12f);
             A.At(dot.transform, A.ML, new Vector2(26, 0), new Vector2(18, 18));
-            TextMeshProUGUI online = A.Label(left, "OnlineText", "Online", 26, ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.MidlineLeft);
+            TextMeshProUGUI online = A.Label(left, "OnlineText", "Online", 26, ThemeRole.SecondaryText, FontRole.Label, TextAlignmentOptions.MidlineLeft);
             A.Fill(online.transform, 54, 0, 6, 0); A.Shrink(online, 18);
-            Image layers = A.Icon(mid, "ScansIcon", IconFactory.ListIcon, 34, ThemeRole.AccentText);
-            A.At(layers.transform, A.ML, new Vector2(14, 0), new Vector2(34, 34));
-            TextMeshProUGUI total = A.Label(mid, "TotalScansText", "Total Scans: 0", 26, ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.MidlineLeft);
-            A.Fill(total.transform, 62, 0, 6, 0); A.Shrink(total, 18);
-            Image syncIcon = A.Icon(right, "SyncIcon", IconFactory.Sync, 34, ThemeRole.AccentText);
+            Image layers = A.Icon(mid, "ScansIcon", IconFactory.ListIcon, 34, ThemeRole.ButtonText);
+            A.At(layers.transform, A.ML, new Vector2(22, 0), new Vector2(34, 34));
+            TextMeshProUGUI total = A.Label(mid, "TotalScansText", "Total Scans: 0", 26, ThemeRole.ButtonText, FontRole.Label, TextAlignmentOptions.MidlineLeft);
+            A.Fill(total.transform, 70, 0, 58, 0); A.Shrink(total, 18);
+            Image go = A.Icon(mid, "ScansArrow", IconFactory.ChevronRight, 30, ThemeRole.ButtonText);
+            A.At(go.transform, A.MR, new Vector2(-24, 0), new Vector2(30, 30));
+            Image syncIcon = A.Icon(right, "SyncIcon", IconFactory.Sync, 34, ThemeRole.SecondaryText);
             A.At(syncIcon.transform, A.ML, new Vector2(14, 0), new Vector2(34, 34));
-            TextMeshProUGUI syncWord = A.Label(right, "SyncText", "Synced", 26, ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.MidlineLeft);
+            TextMeshProUGUI syncWord = A.Label(right, "SyncText", "Synced", 26, ThemeRole.SecondaryText, FontRole.Label, TextAlignmentOptions.MidlineLeft);
             A.Fill(syncWord.transform, 58, 0, 10, 0); A.Shrink(syncWord, 18);
-            foreach (float at in new[] { 0.27f, 0.68f })
-            {
-                Image line = A.Panel(bar.transform, "Divider", ThemeRole.Gold, 0.5f, 2f);
-                line.sprite = IconFactory.Square; line.type = Image.Type.Simple; line.raycastTarget = false;
-                RectTransform lrt = line.rectTransform; lrt.anchorMin = new Vector2(at, 0.24f); lrt.anchorMax = new Vector2(at, 0.76f); lrt.sizeDelta = new Vector2(2, 0); lrt.anchoredPosition = Vector2.zero;
-            }
 
             var tips = TipsPopup(s, "TipsPanel");
             var confirm = ConfirmPopup(s, "ConfirmPanel");
@@ -280,10 +300,10 @@ namespace GlowUp.EditorTools
             A.Set(c, "scanButton", scan); A.Set(c, "captureButton", capture); A.Set(c, "galleryButton", gallery); A.Set(c, "manualButton", manual);
             A.Set(c, "resumeButton", resume); A.Set(c, "resumeText", A.LabelOf(resume)); A.Set(c, "batchButton", batchBtn); A.Set(c, "batchText", A.LabelOf(batchBtn));
             A.Set(c, "tipsButton", tipsObject.GetComponent<Button>()); A.Set(c, "tipsPanel", tips);
-            A.Set(c, "statusBar", bar.GetComponent<Button>()); A.Set(c, "onlineText", online); A.Set(c, "onlineDot", dot);
+            A.Set(c, "statusBar", scansButtonObject.GetComponent<Button>()); A.Set(c, "onlineText", online); A.Set(c, "onlineDot", dot);
             A.Set(c, "totalScansText", total); A.Set(c, "syncText", syncWord);
             A.Set(c, "recentContent", (RectTransform)list.transform); A.Set(c, "rowTemplate", template); A.Set(c, "emptyText", empty);
-            A.Set(c, "viewAllButton", viewAll);
+            A.Set(c, "viewAllButton", viewAll); A.Set(c, "importButton", importObject.GetComponent<Button>());
             A.Controller<StaffSkin>("StaffSkin"); A.Finish(s);
         }
 
@@ -720,7 +740,7 @@ namespace GlowUp.EditorTools
             A.Set(c, "formPanel", form); Kit.SetArray(c, "fieldInputs", inputs); Kit.SetArray(c, "fieldStates", states); Kit.SetArray(c, "checkButtons", checks);
             A.Set(c, "resultThumb", resultThumb); A.Set(c, "resultName", resultName); A.Set(c, "resultSub", resultSub);
             A.Set(c, "resultPillText", resultPillText); A.Set(c, "resultPill", resultPill); A.Set(c, "tryAgainButton", tryAgain);
-            A.Set(c, "rawText", raw); A.Set(c, "addPhotosButton", addPhotos); A.Set(c, "findDetailsButton", findDetails);
+            A.Set(c, "rawText", raw); A.Set(c, "addPhotosButton", addPhotos); A.Set(c, "findDetailsButton", findDetails); A.Set(c, "aiConfig", AppTiles.AiConfig());
             A.Set(c, "submitButton", submit); A.Set(c, "submitLabel", A.LabelOf(submit));
             A.Set(c, "afterSubmit", after); A.Set(c, "viewStatusButton", viewStatus); A.Set(c, "newCaptureButton", again);
             A.Controller<StaffSkin>("StaffSkin"); A.Finish(s);

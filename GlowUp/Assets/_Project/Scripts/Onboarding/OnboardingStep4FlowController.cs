@@ -30,14 +30,18 @@ namespace GlowUp.Onboarding
         [SerializeField] private Button findDermatologistButton;
         [SerializeField] private string dermatologistUrl = "https://www.google.com/maps/search/dermatologist+near+me";
         [SerializeField] private string noticeTitle = "Before you continue";
-        [TextArea(3, 6)] [SerializeField] private string noticeBody = "The allergens you picked are used only to flag products on this phone. GlowUp cannot diagnose an allergy: a dermatologist can test which ingredients you react to, and it is wise to see one if a product ever burns, itches or swells. This is information, not medical advice.";
+        [TextArea(3, 6)] [SerializeField] private string noticeBody = "<b>Your allergens stay on this phone.</b> GlowUp only uses them to flag products.\n\nGlowUp <b>cannot diagnose</b> an allergy. A dermatologist can test which ingredients you react to. See one if a product burns, itches or swells.\n\nThis is information, not medical advice.";
         [SerializeField] private string noticeAgreeLabel = "I agree";
         [SerializeField] private string noticeBackLabel = "Back";
         [Tooltip("Shown while nothing is selected")]
         [SerializeField] private string msgChooseOne = "Select at least one, or tick \"No known allergens\", to continue.";
 
+        // the short, direct wording of 24 Nov 2026 replaces the longer paragraph an earlier scene build saved
+        const string DirectBody = "<b>Your allergens stay on this phone.</b> GlowUp only uses them to flag products.\n\nGlowUp <b>cannot diagnose</b> an allergy. A dermatologist can test which ingredients you react to. See one if a product burns, itches or swells.\n\nThis is information, not medical advice.";
+
         void Awake()
         {
+            noticeBody = DirectBody;
             OnboardingNotices.OneLine(feedbackText);          // the hint line above Continue stays one line (New13 item 5)
             if (allergens != null)
             {

@@ -161,13 +161,18 @@ namespace GlowUp.EditorTools
 
             // ---- 22 Nov 2026 (panel): the help row under the tiles: a selfie suggests the tone, a sheet says where the tones come from ----
             Button selfieOpen = HelpLink(c.card, "SelfieToneButton", "Find my tone with a selfie", 0, true);
-            Button toneSources = HelpLink(c.card, "SkinToneSourcesButton", "Where tones come from", 0, false);
-            foreach (Button help in new[] { selfieOpen, toneSources })
+            // 24 Nov 2026: "Where tones come from" is gone (it belongs in the paper's literature review, docs/SOURCES_REGISTER.md); the selfie button takes the whole row
+            Transform oldToneSources = Loose(c.card, "SkinToneSourcesButton");
+            if (oldToneSources != null) Object.DestroyImmediate(oldToneSources.gameObject);
             {
-                var hr = (RectTransform)help.transform;
-                bool left = help == selfieOpen;
-                hr.anchorMin = new Vector2(left ? 0f : 0.5f, 0f); hr.anchorMax = new Vector2(left ? 0.5f : 1f, 0f); hr.pivot = new Vector2(0.5f, 0f);
-                hr.offsetMin = new Vector2(left ? PadX : 8f, FooterTop + 8f); hr.offsetMax = new Vector2(left ? -8f : -PadX, FooterTop + 8f + 132f);
+                var hr = (RectTransform)selfieOpen.transform;
+                hr.anchorMin = new Vector2(0f, 0f); hr.anchorMax = new Vector2(1f, 0f); hr.pivot = new Vector2(0.5f, 0f);
+                hr.offsetMin = new Vector2(PadX, FooterTop + 8f); hr.offsetMax = new Vector2(-PadX, FooterTop + 8f + 132f);
+                Transform oldIcon = selfieOpen.transform.Find("SelfieIcon"); if (oldIcon != null) Object.DestroyImmediate(oldIcon.gameObject);
+                Image cam = Icon(selfieOpen.transform, "SelfieIcon", IconFactory.CameraIcon, 54);
+                var cr = cam.rectTransform; cr.anchorMin = cr.anchorMax = new Vector2(0f, 0.5f); cr.pivot = new Vector2(0.5f, 0.5f); cr.anchoredPosition = new Vector2(80f, 0f);
+                SceneBuilderCore.Themed(cam.gameObject, ThemeRole.AccentText);
+                var camText = selfieOpen.GetComponentInChildren<TextMeshProUGUI>(); camText.rectTransform.offsetMin = new Vector2(130, 6); camText.rectTransform.offsetMax = new Vector2(-60, -6);
             }
 
             Transform oldSelfie = Loose(c.canvas, "SelfiePanel");
@@ -258,7 +263,6 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(ctl, "skinToneGroup", group);
             SceneBuilderCore.SetField(ctl, "continueButton", c.cont); SceneBuilderCore.SetField(ctl, "continueAnimator", c.anim);
             SceneBuilderCore.SetField(ctl, "backButton", c.back); SceneBuilderCore.SetField(ctl, "feedbackText", c.feedback);
-            SceneBuilderCore.SetField(ctl, "toneSourcesButton", toneSources);
 
             FinishScene(); SceneBuilderCore.Save(scene);
             Debug.Log("[GlowUp] OnboardingStep3Scene built. Tile = OuterPanel (frame) > InnerPanel (tone colour) > tone name; SubtitleText = description in the frame.");

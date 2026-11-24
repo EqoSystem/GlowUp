@@ -18,7 +18,7 @@ namespace GlowUp.Admin
     /// </summary>
     public static class BatchQueue
     {
-        public const int MaxItems = 40;
+        public const int MaxItems = 300;       // 24 Nov 2026: a file import can hold hundreds of products
 
         public class Item
         {

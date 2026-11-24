@@ -71,6 +71,7 @@ namespace GlowUp.Onboarding
 
         void Awake()
         {
+            skinToneOptions = SkinToneMatch.Names;           // the one skin tone list of the app (Step 3 tiles, the selfie match, shade advice, this page)
             Fill(skinType, skinTypeOptions); Fill(skinTone, skinToneOptions);
             foreach (var f in new[] { firstName, middleName, lastName, email, conditions, allergens })
                 if (f != null) f.onValueChanged.AddListener(_ => Refresh());

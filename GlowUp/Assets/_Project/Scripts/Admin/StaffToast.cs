@@ -13,8 +13,13 @@ namespace GlowUp.Admin
         public static void Show(Component on, FormalToast.Kind kind, string message)
         {
             if (on == null || string.IsNullOrWhiteSpace(message)) return;
-            TMP_Text font = on.GetComponentInParent<Canvas>() != null ? on.GetComponentInParent<Canvas>().rootCanvas.GetComponentInChildren<TMP_Text>(true) : null;
-            FormalToast toast = FormalToast.OnScreen(on.transform, font);
+            // A staff controller sits at the scene root, outside any Canvas: GetComponentInParent found nothing and every staff toast was dropped
+            // (no message after a wrong password, none from Find missing details). The scene's own canvas is used then.
+            Canvas canvas = on.GetComponentInParent<Canvas>();
+            if (canvas == null) canvas = Object.FindObjectOfType<Canvas>();
+            if (canvas == null) return;
+            TMP_Text font = canvas.rootCanvas.GetComponentInChildren<TMP_Text>(true);
+            FormalToast toast = FormalToast.OnScreen(canvas.transform, font);
             if (toast != null) toast.Show(kind, message);
         }
 

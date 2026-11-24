@@ -26,8 +26,8 @@ namespace GlowUp.Notifications
             badge.raycastTarget = false;
             var rt = badge.rectTransform;
             rt.anchorMin = rt.anchorMax = new Vector2(1f, 1f); rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.anchoredPosition = new Vector2(-14f, -14f); rt.sizeDelta = new Vector2(46f, 46f);
-            count = RuntimeUiKit.Label(badge.transform, "Count", "", 26, GlowUp.Theme.ContrastInk.On(p.warning), RuntimeTheme.Font(GlowUp.Theme.FontRole.Label, GetComponentInChildren<TMP_Text>(true)));
+            rt.anchoredPosition = new Vector2(8f, 8f); rt.sizeDelta = new Vector2(38f, 38f);   // on the corner, mostly outside the bell: the bell itself is never covered
+            count = RuntimeUiKit.Label(badge.transform, "Count", "", 22, GlowUp.Theme.ContrastInk.On(p.warning), RuntimeTheme.Font(GlowUp.Theme.FontRole.Label, GetComponentInChildren<TMP_Text>(true)));
             count.fontStyle = FontStyles.Bold; count.enableWordWrapping = false;
             RuntimeUiKit.Stretch(count.rectTransform);
             badge.gameObject.SetActive(false);
@@ -48,7 +48,7 @@ namespace GlowUp.Notifications
             if (badge == null) return;
             badge.gameObject.SetActive(n > 0);
             count.text = n > 99 ? "99+" : n.ToString();
-            badge.rectTransform.sizeDelta = new Vector2(n > 9 ? 62f : 46f, 46f);
+            badge.rectTransform.sizeDelta = new Vector2(n > 9 ? 52f : 38f, 38f);
         }
     }
 }

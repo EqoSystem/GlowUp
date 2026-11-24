@@ -43,6 +43,7 @@ before it goes into the paper.
 | An unflagged ingredient is never called safe | engine and website | Wording of regulator and CIR safety assessments |
 | The nearest of six skin tones is chosen by CIE Lab colour distance (not RGB) from the middle of a selfie; lighting can mislead it, so the user keeps the last word and sees how the tone was found | `Onboarding/SkinToneMatch.cs`, `SkinToneSelfie.cs` | CIE 1976 L*a*b* colour space and colour-difference standard (from memory); the 2023 to 2024 skin tone estimation studies in section E |
 | "Find missing details": the AI web search looks a product up by name and brand and brings back brand, category and ingredient list marked Needs review, with the page it came from | `Admin/CaptureReader.cs` (FillMissing), `Scan/ProductAiAdvisor.cs` | Grounded AI search for product data; the Open Beauty Facts and related-systems items in section E |
+| The app has ONE skin tone list of six (Fair, Light, Medium, Tan, Deep, Dark), kept in `SkinToneMatch.Names` and read by Step 3, the selfie match, the profile page and shade advice. It is the project's own simplification for make-up shade matching: it is NOT an official standard (see the skin tone references in section E) | `Onboarding/SkinToneMatch.cs`, `Scan/ShadeAdvisor.cs`, `Onboarding/OnboardingStep5FlowController.cs` | Fitzpatrick scale, Monk Skin Tone Scale and the Philippine Fitzpatrick studies of section E; the app's six names are only loosely matched to them |
 
 ## D. Tools and services (Related Systems)
 
@@ -58,6 +59,8 @@ before it goes into the paper.
 | MobileNet picture model | Recognising a pack by its look | Foreign | Apache 2.0 (from memory) | Project record |
 | Makeup API (makeup-api.herokuapp.com) | Shades and colours (allowed by the site's CSP) | Foreign | Free API | From memory |
 | ZXing and Tesseract.js (in the browser) | Barcode and label reading on the website | Foreign | Apache 2.0 (from memory) | From memory |
+| Android document picker (`ACTION_OPEN_DOCUMENT`) | "Import file" on the staff scanner: only the chosen file is handed over, no storage permission | Foreign (Google) | Android platform API | Project record |
+| Office Open XML (.docx, .xlsx) and PDF text streams, read with .NET `System.IO.Compression` | "Import file": product lists from Word, Excel and text PDFs (a scanned PDF has no text and is refused) | Standards (ECMA-376, ISO 32000), written from memory | Open formats | Not checked against the standards text |
 
 ## E. Related literature and studies, 2023 to now (found by web search, 24 Nov 2026)
 
@@ -98,14 +101,28 @@ full reference from the page itself before it goes into the paper. "Supports" sa
 | 2022 | "Cosmetic preservative labeling in Philippine products in accordance with Philippine regulations" (Contact Dermatitis, 2022: before 2023, background; found that MCI/MI, formaldehyde and parabens are common, some labels were wrong, and Philippine rules do not cap preservatives as EU rules do) | https://lup.lub.lu.se/record/8dbaa3fb-9d02-47ec-a749-787429137d4b | Why a label can be wrong, and why the app never calls an unflagged ingredient safe |
 | 2012 | "Cosmetic intolerance syndrome in a Filipino woman: A case report" (Journal of the Philippine Dermatological Society; before 2023, background) | https://search.bvsalud.org/gim/resource/en/wpr-633029 | Fragrance, formaldehyde and nickel reactions in a Filipino patient |
 
+### Skin tone references (added 24 Nov 2026, found by web search; open each link and copy the full reference)
+
+| Year | Item (as the search returned it) | Link | Supports in GlowUp |
+|---|---|---|---|
+| 2023 | "Beyond Skin Tone: A Multidimensional Measure of Apparent Skin Color" (arXiv preprint) | https://arxiv.org/pdf/2309.05148 | Why one tone name is a simplification of skin colour |
+| 2023 to 2024 | "Which Skin Tone Measures are the Most Inclusive? An Investigation of Skin Tone Measures for Machine Learning" (Google Research; the search says it is to appear in the ACM Journal of Responsible Computing) | https://research.google/pubs/which-skin-tone-measures-are-the-most-inclusive-an-investigation-of-skin-tone-measures-for-machine-learning/ | Compares Fitzpatrick, Fenty and Monk scales: Fitzpatrick was seen as less inclusive |
+| background | Monk Skin Tone Scale, 10 shades, open source, built with Google (Wikipedia entry; a primary page still has to be found) | https://www.Wikipedia.com/wiki/Monk_Skin_Tone_Scale | A ten-shade alternative to the app's six names |
+| background | The Fitzpatrick Scale (EyeWiki): sun reaction, types I to VI, not a measure of skin colour | https://eyewiki.aao.org/The_Fitzpatrick_Scale | Why the six tiles describe how skin reacts to sun (burns, tans) as well as colour |
+| 2025 | Prevalence, epidemiology and clinical characteristics of melasma (Philippine Medical Association PDF): Filipino patients mostly Fitzpatrick type IV | https://www.philippinemedicalassociation.org/wp-content/uploads/2025/08/1-Prevalence-Epidemiology-and-Clinical-Characteristic-of-Melasma.pdf | Filipino skin tones sit mostly in the middle and darker tiles (Medium, Tan, Deep) |
+| 2015 | "Comparison of skin color between two Asian populations: according to latitude and UV exposure" (PubMed 25573440; before 2023, background) | https://pubmed.ncbi.nlm.nih.gov/25573440/ | CIELAB and ITA measures of Asian skin colour |
+
+Finding of the search: no national skin tone classification for Filipinos exists; Philippine studies use the Fitzpatrick scale. The six tones of the app are therefore the project's own list. They are not "official": the paper should say so and cite the scales above as the nearest standards.
+
 ### Still missing (search again before the paper is finished)
 - A Philippine **peer-reviewed study from 2023 or later** on cosmetic allergy or contact dermatitis: none came up. Try PubMed and the Journal of the Philippine Dermatological Society archive.
 - A **peer-reviewed accuracy study of OCR on cosmetic ingredient labels** (2023 or later): none came up, only app store listings and one thesis.
 - A **peer-reviewed study of Open Beauty Facts data quality**: none came up.
 - A **Philippine thesis or study on a skincare or cosmetic ingredient app** (2023 or later): only press and product pages came up.
-- A **Filipino skin tone or skin type study**: not searched yet.
+- A **Filipino skin tone or skin type study**: searched 24 Nov 2026: none for a classification; only Fitzpatrick-based clinical studies (see the skin tone references).
 - The **underlying references of the CureSkin flags** (Malassezia substrate lists, comedogenicity ratings): open the CureSkin page and cite those directly.
 
 ## F. Changes to this register
 - 24 Nov 2026: created. Covers everything added up to app v0.98.5 and the website deploy of 24 Nov 2026, plus the Sensitive reactions work.
 - 24 Nov 2026 (later): section E filled with 2023-or-later literature found by web search (titles and links only; full references still to be copied from each page); rows added for the Find my tone panel, the Find missing details button and the Sensitive reactions panel.
+- 24 Nov 2026 (third): skin tone references added (and the finding that the six-tone list is the project's own); rows for the one-tone-list rule, the Android document picker and the file formats read by Import file.

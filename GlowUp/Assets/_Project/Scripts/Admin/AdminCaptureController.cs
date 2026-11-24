@@ -80,6 +80,8 @@ namespace GlowUp.Admin
         [SerializeField] private Button addPhotosButton;
         [Tooltip("Find missing details: looks the product up by name and brand on the web (brand, category, ingredient list)")]
         [SerializeField] private Button findDetailsButton;
+        [Tooltip("The AI settings Find missing details uses. The loading screen sets them for the whole app, but a staff session that reopens straight into this screen never passes it.")]
+        [SerializeField] private GlowUp.Scanning.GeminiApiConfig aiConfig;
         [SerializeField] private Button submitButton;
         [SerializeField] private TextMeshProUGUI submitLabel;
         [SerializeField] private GameObject afterSubmit;
@@ -118,6 +120,8 @@ namespace GlowUp.Admin
             }
             Resume = false;
 
+            if (aiConfig != null && ProductAiAdvisor.Config == null) ProductAiAdvisor.Config = aiConfig;
+            if (cameraFeed != null) FocusModeBar.Attach(cameraFeed);          // Auto / Manual focus, top centre of the live view
             Hook(backButton, Back);
             Hook(galleryButton, PickFromGallery);
             Hook(shutterButton, () => _ = Shutter());

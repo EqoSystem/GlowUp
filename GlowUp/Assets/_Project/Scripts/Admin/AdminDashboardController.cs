@@ -39,6 +39,8 @@ namespace GlowUp.Admin
         [SerializeField] private Button resumeButton;
         [SerializeField] private TextMeshProUGUI resumeText;
         [SerializeField] private Button batchButton;
+        [Tooltip("Import file: a Word, PDF, Excel, JSON, CSV or TXT list of products with ingredients becomes the batch")]
+        [SerializeField] private Button importButton;
         [SerializeField] private TextMeshProUGUI batchText;
         [SerializeField] private Button tipsButton;
         [SerializeField] private OverlayPanel tipsPanel;
@@ -79,6 +81,7 @@ namespace GlowUp.Admin
             Hook(manualButton, () => OpenCapture(CaptureDraft.Mode.Manual));
             Hook(resumeButton, () => { CaptureDraft d = CaptureDraft.Current; AdminCaptureController.StartMode = d.ModeValue; AdminCaptureController.Resume = true; SceneNavigator.Go(captureScene); });
             Hook(batchButton, () => { AdminCaptureController.OpenBatch = true; SceneNavigator.Go(captureScene); });
+            Hook(importButton, ImportFile);
             BatchQueue.Changed += Paint;
             Hook(viewAllButton, OpenSubmissions);
             Hook(statusBar, OpenSubmissions);
@@ -108,6 +111,23 @@ namespace GlowUp.Admin
             Paint();
             // the catalogue on the phone: duplicate warnings and brand matching while capturing (no admin data here)
             try { await BrandRepository.LoadActive(true); await ProductRepository.LoadActive(true); } catch (System.Exception) { }
+        }
+
+        bool importing;
+
+        /// <summary>Import file: pick a file, add its products to the batch as "Needs review", then show the batch to check and send.</summary>
+        void ImportFile()
+        {
+            if (importing) return;
+            importing = true;
+            StaffToast.Info(this, "Choose a file with your product list.");
+            ProductFileImport.Pick((added, message) =>
+            {
+                importing = false;
+                if (this == null) return;
+                if (!string.IsNullOrEmpty(message)) { if (added > 0) StaffToast.Ok(this, message); else StaffToast.Warn(this, message); }
+                if (added > 0) { AdminCaptureController.OpenBatch = true; SceneNavigator.Go(captureScene); }
+            });
         }
 
         void OnDestroy() { BatchQueue.Changed -= Paint; SubmissionStore.Changed -= Paint; WebsitePresence.Changed -= Paint; ScannerPrefs.Changed -= Paint; ConnectivityMonitor.ConnectivityChanged -= OnConnection; }

@@ -77,7 +77,60 @@ namespace GlowUp.AppSettings
             if (confirmLabel != null) confirmLabel.text = confirmText;
             if (cancelLabel != null) cancelLabel.text = string.IsNullOrEmpty(cancelText) ? defaultCancelText : cancelText;
             if (panel != null) panel.Show();
+            Relayout();
             Paint();            // after Show(): the button's own theme colour is applied when it becomes active
+        }
+
+        // ---- the readable layout (24 Nov 2026): every question pop-up of the app (the allergen notice, Leave sign-up?, log out, delete, ...) gets
+        //      the same direct layout, whatever its scene built: a bold title, text at 38 (it was 31), the box as tall as its text needs, any extra
+        //      button as a full-width row, and the two answers side by side at 44 dp height, the main one pink. ----
+        const float SideMargin = 56f, TitleBand = 190f, AnswerHeight = 132f, ExtraHeight = 124f, RowGap = 22f, BottomMargin = 48f;
+
+        void Relayout()
+        {
+            RectTransform box = messageText != null ? messageText.transform.parent as RectTransform : null;
+            if (box == null || confirmButton == null || cancelButton == null) return;
+            if (confirmButton.transform.parent != box || cancelButton.transform.parent != box || box.GetComponent<LayoutGroup>() != null) return;       // a pop-up laid out some other way keeps its own layout
+            float width = box.rect.width > 100f ? box.rect.width : 900f;
+
+            if (titleText != null) { titleText.fontStyle = FontStyles.Bold; }
+            messageText.enableAutoSizing = false; messageText.fontSize = 38f; messageText.lineSpacing = 12f; messageText.paragraphSpacing = 16f;
+            messageText.alignment = TextAlignmentOptions.TopLeft; messageText.enableWordWrapping = true; messageText.richText = true;
+
+            // buttons that are neither answer nor the X: stacked above the answers
+            var extras = new System.Collections.Generic.List<RectTransform>();
+            foreach (Button b in box.GetComponentsInChildren<Button>(true))
+            {
+                if (b == confirmButton || b == cancelButton || b.name == "CloseButton" || !b.gameObject.activeSelf) continue;
+                extras.Add((RectTransform)b.transform);
+            }
+
+            float answersTop = BottomMargin + AnswerHeight;
+            float extrasTop = answersTop + (extras.Count > 0 ? RowGap : 0f) + extras.Count * ExtraHeight + Mathf.Max(0, extras.Count - 1) * 16f;
+            SetRow((RectTransform)cancelButton.transform, 0f, 0.5f, SideMargin, RowGap * 0.5f, BottomMargin, AnswerHeight);
+            SetRow((RectTransform)confirmButton.transform, 0.5f, 1f, RowGap * 0.5f, SideMargin, BottomMargin, AnswerHeight);
+            for (int i = 0; i < extras.Count; i++)
+                SetRow(extras[i], 0f, 1f, SideMargin, SideMargin, answersTop + RowGap + i * (ExtraHeight + 16f), ExtraHeight);
+            foreach (TextMeshProUGUI label in new[] { confirmLabel, cancelLabel })
+                if (label != null) { label.enableAutoSizing = false; label.fontSize = 36f; label.enableWordWrapping = true; label.fontStyle = label == confirmLabel ? FontStyles.Bold : FontStyles.Normal; }
+            foreach (RectTransform extra in extras)
+            {
+                TextMeshProUGUI label = extra.GetComponentInChildren<TextMeshProUGUI>(true);
+                if (label != null) { label.enableAutoSizing = false; label.fontSize = 34f; }
+            }
+
+            float textHeight = messageText.GetPreferredValues(messageText.text, width - 2f * SideMargin, 0f).y;
+            float below = extrasTop + 36f;
+            RectTransform text = messageText.rectTransform;
+            text.anchorMin = Vector2.zero; text.anchorMax = Vector2.one;
+            text.offsetMin = new Vector2(SideMargin, below); text.offsetMax = new Vector2(-SideMargin, -TitleBand);
+            box.sizeDelta = new Vector2(box.sizeDelta.x, Mathf.Clamp(TitleBand + textHeight + below + 12f, 560f, 1600f));
+        }
+
+        static void SetRow(RectTransform rt, float from, float to, float left, float right, float bottom, float height)
+        {
+            rt.anchorMin = new Vector2(from, 0f); rt.anchorMax = new Vector2(to, 0f); rt.pivot = new Vector2(0.5f, 0f);
+            rt.offsetMin = new Vector2(left, bottom); rt.offsetMax = new Vector2(-right, bottom + height);
         }
 
         void Confirm()

@@ -15,8 +15,6 @@ namespace GlowUp.Onboarding
         [SerializeField] private TextMeshProUGUI feedbackText;
         [SerializeField] private string nextScene = SceneNames.Onboarding4;
         [SerializeField] private string previousScene = SceneNames.Onboarding2;
-        [Tooltip("Where the skin tones come from (SkinListSources.ToneBody)")]
-        [SerializeField] private Button toneSourcesButton;
         [SerializeField] private string msgChooseTone = "Please choose your skin tone to continue.";
 
         void Awake()
@@ -24,15 +22,6 @@ namespace GlowUp.Onboarding
             if (skinToneGroup != null) skinToneGroup.Changed += _ => Refresh();
             if (continueButton != null) continueButton.onClick.AddListener(OnContinue);
             if (backButton != null) backButton.onClick.AddListener(() => SceneNavigator.Go(previousScene));
-            if (toneSourcesButton != null) toneSourcesButton.onClick.AddListener(OpenToneSources);
-        }
-
-        void OpenToneSources()
-        {
-            ChoiceSheet sheet = ChoiceSheet.Get(toneSourcesButton.transform);
-            if (sheet == null) return;
-            sheet.Show(SkinListSources.ToneTitle, SkinListSources.ToneBody,
-                new System.Collections.Generic.List<ChoiceSheet.Choice> { new ChoiceSheet.Choice("Got it", sheet.Hide, true) }, SkinListSources.Note);
         }
 
         void Start()

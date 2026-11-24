@@ -68,6 +68,7 @@ namespace GlowUp.Onboarding
         Texture2D frozen;                 // the photo shown on the result card (destroyed when the card closes)
         int foundIndex = -1;              // the tone tile that fits; -1 = no result yet
         bool cameraReady;
+        FocusModeBar focusBar;
 
         bool ShowingResult => foundIndex >= 0;
 
@@ -79,6 +80,7 @@ namespace GlowUp.Onboarding
             if (deleteButton != null) deleteButton.onClick.AddListener(DeletePhoto);
             if (panel != null) panel.Closed += Reset;
             if (cameraFeed != null) cameraFeed.Started += OnCameraStarted;
+            if (cameraFeed != null) focusBar = FocusModeBar.Attach(cameraFeed);     // 24 Nov 2026: manual focus for the selfie
             RefreshDelete();
         }
 
@@ -105,6 +107,7 @@ namespace GlowUp.Onboarding
         {
             ClearResult();
             cameraReady = false;
+            if (focusBar != null) focusBar.gameObject.SetActive(true);
             if (panel != null && !panel.IsOpen) panel.Show();
             Say(msgStarting);
             SetWords();
@@ -167,6 +170,7 @@ namespace GlowUp.Onboarding
             if (foundLabel != null) foundLabel.text = msgFoundLabel;
             if (toneLabel != null) toneLabel.text = string.Format(msgToneLabel, tone);
             if (resultRow != null) resultRow.SetActive(true);
+            if (focusBar != null) focusBar.gameObject.SetActive(false);
             Say(string.Format(msgResult, tone) + (kept ? " " + msgKept : ""));
             SetWords();
         }

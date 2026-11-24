@@ -15,7 +15,7 @@ namespace GlowUp.Scan
         public const string Lips = "Lips", Cheeks = "Cheeks", Eyes = "Eyes", Face = "Face", Brows = "Brows";
         /// <summary>The parts of the face, in the order of the AR Try-On tabs. Brows can only be shown by live face tracking.</summary>
         public static readonly string[] Areas = { Lips, Cheeks, Eyes, Face, Brows };
-        static readonly string[] Tones = { "Fair", "Light", "Medium", "Tan", "Deep", "Dark" };
+        static string[] Tones => GlowUp.Onboarding.SkinToneMatch.Names;     // the one skin tone list of the app
 
         // the skin-tone colours used on the onboarding tiles (also the base for foundation suggestions)
         static readonly string[] ToneHex = { "#F7F4E2", "#F2DEC9", "#D4A86F", "#B69772", "#9D855D", "#5F453B" };
