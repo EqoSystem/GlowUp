@@ -188,6 +188,8 @@ function config() {
 }
 
 async function readBody(req) {
+    // Vercel already parsed a form post (the link page's button) into an object: turn it back into "t=..." so the button branch below sees it
+    if (req.body && typeof req.body === "object" && typeof req.body.t === "string" && req.body.idToken === undefined) return "t=" + encodeURIComponent(req.body.t);
     if (req.body !== undefined && req.body !== null) return typeof req.body === "string" ? req.body : JSON.stringify(req.body);
     let size = 0; const parts = [];
     for await (const chunk of req) { size += chunk.length; if (size > MAX_BODY) return null; parts.push(chunk); }

@@ -496,15 +496,13 @@ namespace GlowUp.Onboarding
         async Task OfferCode()
         {
             if (codeGroup == null) return;
-            codeGroup.SetActive(false);
+            // The code box is shown at once: a slow or failed first request must not hide it (the e-mail may still arrive with a code).
+            // A wrong or unchecked code says so in the status line; the link in the e-mail stays the other way.
+            codeGroup.SetActive(true);
+            if (codeInput != null) codeInput.text = "";
             var outcome = await GlowUp.Security.EmailOtpClient.Send();
             if (this == null) return;
-            if (outcome == GlowUp.Security.EmailOtpClient.Outcome.Ok || outcome == GlowUp.Security.EmailOtpClient.Outcome.Wait)
-            {
-                codeGroup.SetActive(true);
-                if (codeInput != null) codeInput.text = "";
-                if (outcome == GlowUp.Security.EmailOtpClient.Outcome.Wait && confirmStatusText != null) confirmStatusText.text = msgCodeWait;
-            }
+            if (outcome == GlowUp.Security.EmailOtpClient.Outcome.Wait && confirmStatusText != null) confirmStatusText.text = msgCodeWait;
         }
 
         async Task VerifyCode()
