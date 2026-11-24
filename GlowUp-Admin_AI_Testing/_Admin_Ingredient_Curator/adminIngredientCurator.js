@@ -56,7 +56,7 @@ import { mountSourceLinks, countSaved } from "./sourceLinks.js";
 import { lookupIngredient } from "../_Shared/quickFill.js";
 import { suggestClassification, friendlyStarter, pubchemPage as pubchemCompoundPage } from "../_Shared/smartAdd.js";
 import { SOURCE_LINK_FIELDS } from "../_Shared/fieldSources.js";
-import { autoFitPatch, autoDetailsPatch, hasNoFit } from "../_Shared/ingredientFit.js";
+import { autoFitPatch, autoDetailsPatch, hasNoFit, refFunction, REF_CREDIT } from "../_Shared/ingredientFit.js";
 import { FIELD_GUIDE, SOURCES, linksFor, allSourcesFor, addReference, labelBareUrls, pubchemLookupUrl, firstCompoundId, pubchemPageUrl, insertPaste } from "../_Shared/fieldSources.js";
 import { aliasesWithInci, firstAlias, needsClassification, MAX_PURPOSE, CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING } from "../_Shared/classificationRules.js";
 
@@ -120,6 +120,80 @@ async function sourcedFlags(conditionIds, allergenIds, refs) {
         } catch (error) { console.warn("A sourced flag lookup did not work: ", error); }
     }
     if (flagged > 0) notify(`${many(flagged, "ingredient was", "ingredients were")} flagged from sources found on the web. Check them: each card names the source.`, "ok");
+}
+
+// AUTOMATIC DETAILS (24 Nov 2026): nobody types an ingredient's details. For (a) an ingredient that products list but has no entry yet and (b) an
+// entry whose other names / chemical description / classification are empty, the page asks PubChem (free, public), the reference table (CureSkin,
+// BEAUTEE) and the built-in rules, and writes what they know with their pages as the source links. At most 8 per page load; each is tried ONCE
+// (a new entry is created even when PubChem knows nothing, as "needs review"; an old entry is marked detailsAutoChecked). The risk level is NEVER
+// set here (only an admin sets it from a source). An entry is approved by itself only when PubChem, the reference table AND the classification all
+// found something; otherwise it waits in "needs review" with the missing boxes empty: that is the only case the admin has to look at.
+const AUTO_DETAILS_PER_LOAD = 8;
+async function autoDetails() {
+    if (TEST_MODE || !auth.currentUser) return 0;
+    const refs = await loadRefs();
+    const conditionIds = allOptions("conditions").map((o) => o.value), allergenIds = allOptions("allergens").map((o) => o.value);
+    const classes = classifications();
+    const knowledge = async (name, known) => {
+        const found = await lookupIngredient(name).catch(() => null);
+        const aliasList = Array.from(new Set((found ? found.aliases : []).concat(known || []))).filter((a) => sameKey(a) !== sameKey(name)).slice(0, 6);
+        const names = [name].concat(aliasList);
+        const job = refFunction(names, refs).split("/")[0].trim().slice(0, MAX_PURPOSE);
+        const chemical = found ? String(found.chemical || "").slice(0, 600) : "";
+        const guess = suggestClassification(name, chemical + " " + job, classes);
+        const page = found && found.cid ? pubchemCompoundPage(found.cid) : "";
+        return { found, aliasList, job, chemical, guess, page, names };
+    };
+    let made = 0, filled = 0, left = AUTO_DETAILS_PER_LOAD;
+    for (const x of fromProducts) {
+        if (left <= 0) break;
+        left--;
+        const name = String(x.name).replace(/\s+/g, " ").trim().slice(0, 80);
+        if (name.length < 2) continue;
+        try {
+            const k = await knowledge(name, []);
+            const base = { name, techName: "", aliases: k.aliasList, fitAuto: false, allergenTags: [], avoidForSkinTypes: [], avoidForConditions: [], goodForSkinTypes: [], goodForConditions: [], sources: [] };
+            const fit = autoFitPatch(base, conditionIds, allergenIds, refs) || {};
+            const sources = Array.from(new Set([k.page ? "PubChem | " + k.page : "", fit.sources ? REF_CREDIT : "", k.job ? REF_CREDIT : ""].filter(Boolean))).slice(0, 10);
+            const complete = !!(k.page && k.guess && k.job);
+            const kind = k.guess ? k.guess.name.split("/")[0].trim() : "";
+            const data = Object.assign({
+                name, aliases: aliasesWithInci(name, "", k.aliasList), classificationId: k.guess ? k.guess.id : "", purpose: k.job,
+                description: friendlyStarter(name, kind), chemicalDescription: k.chemical, riskLevel: "", cautionNote: "", commonUses: "", minAge: 0,
+                sources, folder: "", source: "ai", via: "product-auto", reviewed: complete, webSearched: false,
+                createdAt: serverTimestamp(), updatedAt: serverTimestamp(), detailsAutoChecked: true
+            }, fit);
+            if (k.page) { data.aliasesSourceUrl = k.page; if (k.chemical) data.chemicalSourceUrl = k.page; }
+            if (complete) Object.assign(data, { autoApproved: true, reviewedAt: serverTimestamp() });
+            await addDoc(collection(db, "ingredients"), data);
+            made++;
+        } catch (error) { console.warn("An automatic ingredient entry did not work: ", error); }
+    }
+    for (const item of everyIngredient) {
+        if (left <= 0) break;
+        if (item.binned || item.detailsAutoChecked || item.name.length < 3) continue;
+        const needsAny = item.aliases.length <= 1 || !item.chemicalDescription || !item.classificationId;
+        if (!needsAny) continue;
+        left--;
+        try {
+            const k = await knowledge(item.name, item.aliases);
+            const patch = { detailsAutoChecked: true };
+            if (item.aliases.length <= 1 && k.aliasList.length > 0) { patch.aliases = aliasesWithInci(item.name, item.techName, k.aliasList); if (k.page && !item.sourceLinks.aliases) patch.aliasesSourceUrl = k.page; }
+            if (!item.chemicalDescription && k.chemical) { patch.chemicalDescription = k.chemical; if (k.page && !item.sourceLinks.chemicalDescription) patch.chemicalSourceUrl = k.page; }
+            if (!item.classificationId && k.guess) patch.classificationId = k.guess.id;
+            if (!item.purpose && k.job) patch.purpose = k.job;
+            if (!item.description && k.guess) { const text = friendlyStarter(item.name, k.guess.name.split("/")[0].trim()); if (text) patch.description = text; }
+            if (k.page && !item.sources.some((s) => /pubchem/i.test(s))) patch.sources = item.sources.concat("PubChem | " + k.page).slice(0, 10);
+            patch.updatedAt = serverTimestamp();
+            await updateDoc(doc(db, "ingredients", item.id), patch);
+            Object.assign(item, patch, { aliases: patch.aliases || item.aliases });
+            if (Object.keys(patch).length > 3) filled++;
+        } catch (error) { console.warn("Automatic ingredient details did not work: ", error); }
+    }
+    if (made + filled > 0) {
+        notify(`${made > 0 ? many(made, "ingredient entry was", "ingredient entries were") + " created from product lists" : ""}${made > 0 && filled > 0 ? " and " : ""}${filled > 0 ? many(filled, "entry was", "entries were") + " completed" : ""} automatically (PubChem, reference table). Only the ones marked "needs review" are left for you.`, "ok");
+    }
+    return made + filled;
 }
 
 let everyIngredient = [];
@@ -446,6 +520,7 @@ async function loadIngredients() {
                 autoApproved: data.autoApproved === true,
                 fitAuto: data.fitAuto === true,
                 fitAiChecked: data.fitAiChecked === true,
+                detailsAutoChecked: data.detailsAutoChecked === true,
                 fitAutoWhy: String(data.fitAutoWhy || ""),
                 folder: cleanFolder(data.folder),
                 binned: data.binned === true,
@@ -534,6 +609,7 @@ async function loadIngredients() {
         fromProducts = Array.from(listedBy.values()).filter((x) => x.key.length >= 2 && !known.has(x.key)).sort((a, b) => b.products.length - a.products.length || a.name.localeCompare(b.name));
         fdaBrands = Array.from(checkedBrands).filter((name) => name).sort((a, b) => a.localeCompare(b));
         productUseKnown = true;
+        autoDetails().then((n) => { if (n > 0) return loadIngredients(); }).catch(() => { });
     } catch (error) {
         console.warn("Could not read the products: ", error);
         productUseKnown = false;
