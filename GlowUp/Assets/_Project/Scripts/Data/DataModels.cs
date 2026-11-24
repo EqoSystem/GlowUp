@@ -13,6 +13,8 @@ namespace GlowUp.Data
         public string skinType, skinTone;
         public List<string> skinConditions = new List<string>();
         public List<string> knownAllergens = new List<string>();
+        /// <summary>Optional, only with skin type Sensitive: how the skin reacts (ids of SensitiveReactions.All). Empty = not answered.</summary>
+        public List<string> sensitiveReactions = new List<string>();
         public bool termsAccepted;
         public long healthConsentAtUnix;        // when the user agreed (second box on the Terms page) that their skin and allergy details are kept; 0 = not given
         public string theme = "light";

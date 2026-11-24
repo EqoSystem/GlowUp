@@ -28,6 +28,7 @@ Make-up scanner app (Unity) plus an admin website. Both share one Firestore data
 - Never read excluded folders (see `.graphifyignore`): `Library`, `Temp`, `Plugins`, `StreamingAssets`, `Firebase`, backups, SDKs.
 - Never print secrets: the AI key line in `SecureProfileStore.cs`, `.env*`, admin password.
 - Do not move or delete anything under `GlowUp/Assets/` outside the Unity Editor (`.meta` files).
+- Every data source, outside service, library or ingredient/skin rule added to the app or website gets a row in `docs/SOURCES_REGISTER.md` in the same change (paper: Review of Related Literature). Never write a citation you have not seen.
 - After large changes, run `/graphify . --update`.
 - Commit a checkpoint before edits.
 - Routes, screens, modals, sheets, drawers, transitions: follow `docs/NAVIGATION_RULES.md`, and end each such change with

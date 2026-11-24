@@ -36,6 +36,9 @@ namespace GlowUp.Scan
             string skinType = (profile.skinType ?? "").Trim();
             var conditions = (profile.skinConditions ?? new List<string>()).Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
             var allergens = profile.RealAllergens();          // "No known allergens" is an answer, not something to look for
+            // the optional "How does your skin react?" answer (Sensitive skin only): a reaction that points at an allergen family joins the allergens
+            var reactions = SensitiveReactions.Of(profile);
+            foreach (var r in reactions) if (r.allergen != null && !allergens.Contains(r.allergen)) allergens.Add(r.allergen);
 
             var typeConflicts = new List<string>(); var typePositives = new List<string>();
             var allergenHits = new List<string>(); var allergenLabels = new List<string>();
@@ -104,6 +107,18 @@ namespace GlowUp.Scan
                     {
                         conditionPositives.Add(shown); if (!conditionPositiveNames.Contains(ShortCondition(condition))) conditionPositiveNames.Add(ShortCondition(condition));
                     }
+                }
+
+                // 3b) the reactions the user described (Sensitive skin): the same avoid-lists, worded as the reaction
+                foreach (var reaction in reactions)
+                {
+                    bool hit = (reaction.condition != null && MatchesCondition(data.avoidForConditions, reaction.condition))
+                        || (reaction.skinType != null && Has(data.avoidForSkinTypes, reaction.skinType));
+                    string said = $"May trigger your reaction: {reaction.label.ToLowerInvariant()}.";
+                    if (!hit || reasons.Contains(said)) continue;
+                    level = Worse(level, "caution");
+                    reasons.Add(said);
+                    conditionConflicts.Add(shown); if (!conditionNames.Contains(reaction.label)) conditionNames.Add(reaction.label);
                 }
 
                 // 4) age

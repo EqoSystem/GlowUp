@@ -224,6 +224,37 @@ namespace GlowUp.Data
         }
 
         [Serializable]
+        public class ReactionsPatch { public List<string> sensitiveReactions = new List<string>(); }
+
+        /// <summary>Saves the optional "How does your skin react?" answer: this one field only, merged into the account document (the four skin
+        /// fields and the rest of the document stay as they are). Works offline: the write is queued like the skin quiz answers.</summary>
+        public static async Task SaveSensitiveReactions(List<string> ids)
+        {
+            string uid = UidForTests ?? ActiveUid;
+            if (string.IsNullOrEmpty(uid)) return;
+            List<string> clean = GlowUp.Scan.SensitiveReactions.Clean(ids);
+            if (Current != null && Belongs(Current, uid)) { Current.sensitiveReactions = new List<string>(clean); OfflineCache.Save(CacheKey, Current); }
+            string path = "users/" + uid;
+            var patch = new Dictionary<string, object> { { "sensitiveReactions", new List<string>(clean) } };
+            if (SkinWriteForTests != null) { await SkinWriteForTests(path, patch); return; }
+            var queued = new ReactionsPatch { sensitiveReactions = new List<string>(clean) };
+            if (ConnectivityMonitor.Online && await FirebaseBootstrap.Ready)
+            {
+                try
+                {
+                    Task write = FirebaseFirestore.DefaultInstance.Document(path).SetAsync(patch, SetOptions.MergeAll);
+                    if (await write.Within(SaveWaitSeconds)) return;
+                    TaskScheduler main = SynchronizationContext.Current != null ? TaskScheduler.FromCurrentSynchronizationContext() : TaskScheduler.Default;
+                    _ = write.ContinueWith(t => { try { SyncQueue.EnqueueSet(path, queued); } catch (Exception late) { { } } },
+                        CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, main);
+                    return;
+                }
+                catch (Exception e) { { } }
+            }
+            SyncQueue.EnqueueSet(path, queued);
+        }
+
+        [Serializable]
         public class PersonalDetailsPatch
         {
             public string firstName = "", middleName = "", lastName = "", birthday = "";
@@ -301,7 +332,7 @@ namespace GlowUp.Data
                 username = f.Str("username"), email = f.Str("email"), birthday = f.Str("birthday"),
                 age = f.Int("age"),
                 skinType = f.Str("skinType"), skinTone = f.Str("skinTone"),
-                skinConditions = f.List("skinConditions"), knownAllergens = f.List("knownAllergens"),
+                skinConditions = f.List("skinConditions"), knownAllergens = f.List("knownAllergens"), sensitiveReactions = f.List("sensitiveReactions"),
                 termsAccepted = f.Bool("termsAccepted"), healthConsentAtUnix = f.Long("healthConsentAtUnix"), theme = f.Str("theme", "light")
             };
         }
