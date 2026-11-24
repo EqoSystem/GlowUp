@@ -22,5 +22,11 @@ ok(!readAnswer(reply({ allergenTags: [], avoidForSkinTypes: [], avoidForConditio
 ok(!readAnswer({ candidates: [{ content: { parts: [{ text: "I am not sure." }] } }] }, allergens, conditions).found, "plain text with no JSON = not found");
 ok(!readAnswer(null, allergens, conditions).found, "empty answer = not found");
 ok(evidenceProblem("caution", ["Some blog | https://madeup-blog.example/post"]) !== "", "a blog page does not pass the evidence tiers");
+// two-step: the cited URL must be exactly one the search API returned
+const pages = [{ title: "DermNet", url: "https://dermnetnz.org/topics/contact", text: "x" }];
+const two = readAnswer({ candidates: [{ content: { parts: [{ text: JSON.stringify({ allergenTags: ["fragrance"], avoidForSkinTypes: [], avoidForConditions: [], why: "w", sources: [{ title: "D", url: "https://dermnetnz.org/topics/contact" }] }) }] } }] }, allergens, conditions, pages);
+ok(two.found && two.sources.length === 1, "two-step: a URL the search API returned is accepted (no grounding data needed)");
+const twoBad = readAnswer({ candidates: [{ content: { parts: [{ text: JSON.stringify({ allergenTags: ["fragrance"], avoidForSkinTypes: [], avoidForConditions: [], why: "w", sources: [{ title: "D", url: "https://dermnetnz.org/topics/other" }] }) }] } }] }, allergens, conditions, pages);
+ok(!twoBad.found, "two-step: a URL that was not in the returned pages is dropped, even on the same site");
 console.log(failed === 0 ? `ALL PASSED  (checks made: ${checks})` : `${failed} FAILED of ${checks}`);
 process.exit(failed === 0 ? 0 : 1);
