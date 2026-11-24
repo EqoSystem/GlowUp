@@ -102,6 +102,11 @@ namespace GlowUp.AR
         UserProfileData profile;
         ShadeButton selected;
         readonly List<GameObject> pickerRows = new List<GameObject>();
+        // 24 Nov 2026 (owner): several products at once. The look = the products picked from a list (the dashboard's drag, Recent Scans, "try on all"):
+        // the one being edited is `record` (its shade, finish and part show in the controls); every other product of the look is worn on its own part of the face.
+        readonly List<ScanRecord> look = new List<ScanRecord>();
+        [SerializeField] private string lookFormat = "Trying {0} products: {1}";
+        [SerializeField] private string lookPickHint = "Tap the products to wear together. A tick means it is on. Only one product can colour the same part of the face.";
 
         void Awake()
         {
@@ -159,6 +164,12 @@ namespace GlowUp.AR
             if (this == null) return;
 
             record = ProductScope.CanTryOn(ScanSession.TryOn) ? ScanSession.TryOn : null;      // make-up only
+            if (ScanSession.TryOnSet != null && ScanSession.TryOnSet.Count > 1)
+            {
+                look.Clear();
+                foreach (ScanRecord r in ScanSession.TryOnSet) if (r != null && ProductScope.CanTryOn(r) && !look.Contains(r)) look.Add(r);
+                if (look.Count > 1) { if (record == null || !look.Contains(record)) record = look[0]; } else look.Clear();
+            }
             ShowProduct();
             if (record == null) OpenPicker();
         }
@@ -271,6 +282,8 @@ namespace GlowUp.AR
                 productText.text = record == null ? productNone
                     : string.Format(productFormat, record.Title, string.IsNullOrWhiteSpace(record.cosmeticType) ? "Cosmetic" : record.cosmeticType);
 
+            if (productText != null && look.Count > 1 && record != null)
+                productText.text = string.Format(lookFormat, look.Count, string.Join(", ", look.ConvertAll(r => r.Title))) + System.Environment.NewLine + string.Format(productFormat, record.Title, string.IsNullOrWhiteSpace(record.cosmeticType) ? "Cosmetic" : record.cosmeticType);
             string area = record != null ? ShadeAdvisor.AreaFor(record.cosmeticType) : ShadeAdvisor.Lips;
             if (areaTabs != null) areaTabs.Select(Array.IndexOf(ShadeAdvisor.Areas, area), false);
             RefreshAreaTabs();
@@ -303,6 +316,44 @@ namespace GlowUp.AR
             // start on the product's first shade, or the first recommended one
             ShadeButton first = FirstWithShade(productShadeButtons) ?? FirstWithShade(recommendedShadeButtons);
             if (first != null && record != null) Select(first); else { selected = null; if (makeup != null) makeup.Clear(); }
+            WearTheRestOfTheLook();
+        }
+
+        /// <summary>Every other product of the look goes on its own part of the face, in its first shade and its own finish.</summary>
+        void WearTheRestOfTheLook()
+        {
+            if (makeup == null) return;
+            makeup.ClearExtras();
+            if (look.Count < 2) return;
+            foreach (ScanRecord other in look)
+            {
+                if (other == null || other == record) continue;
+                string hex = ShadeAdvisor.IsFacePowder(other.cosmeticType) ? ShadeAdvisor.PowderShade
+                    : !string.IsNullOrWhiteSpace(other.shadeHex) ? other.shadeHex
+                    : other.productShades != null && other.productShades.Count > 0 ? other.productShades[0] : "";
+                if (!ColorUtility.TryParseHtmlString(hex, out Color colour)) continue;
+                string finish = ArTexturePreference.Choose(other.finish, other.cosmeticType, finishNames, defaultFinish, out ArTexturePreference.Source _);
+                makeup.SetExtra(ShadeAdvisor.AreaFor(other.cosmeticType), colour, finish);
+            }
+        }
+
+        /// <summary>A tap in the picker while a look is being made: the product joins the look or leaves it (the last one has to stay).</summary>
+        void ToggleInLook(ProductTileView tile)
+        {
+            ScanRecord r = tile.Data as ScanRecord;
+            if (r == null) return;
+            if (look.Contains(r))
+            {
+                if (look.Count <= 1) return;
+                look.Remove(r);
+                tile.SetSelectedForRemoval(false);
+                if (record == r) record = look[look.Count - 1];
+            }
+            else { look.Add(r); record = r; tile.SetSelectedForRemoval(true); }
+            ScanSession.TryOn = record;
+            ShowProduct();
+            foreach (GameObject row in pickerRows)
+                if (row != null && row.TryGetComponent(out ProductTileView t) && t.Data is ScanRecord rr) t.SetSelectedForRemoval(look.Contains(rr));
         }
 
         void ShowRecommended(string area)
@@ -469,10 +520,17 @@ namespace GlowUp.AR
                     tile.gameObject.name = "Pick_" + r.Title;
                     tile.gameObject.SetActive(true);
                     tile.Bind(r, r.Title, r.brandName, string.IsNullOrWhiteSpace(r.cosmeticType) ? "Cosmetic" : r.cosmeticType, typeIcons != null ? typeIcons.For(r.cosmeticType) : null);
-                    tile.Clicked += Pick; tile.TryOnClicked += Pick;
+                    if (fromSet)
+                    {
+                        if (look.Count == 0 && record != null) look.Add(record);
+                        tile.SetSelectedForRemoval(look.Contains(r));
+                        tile.Clicked += ToggleInLook; tile.TryOnClicked += ToggleInLook;
+                    }
+                    else { tile.Clicked += Pick; tile.TryOnClicked += Pick; }
                     pickerRows.Add(tile.gameObject);
                 }
-            if (pickerEmptyText != null) { pickerEmptyText.gameObject.SetActive(saved.Count == 0); pickerEmptyText.text = words.Length > 0 ? msgNothingFound : msgNoMakeup; }
+            if (fromSet && saved.Count > 1 && pickerEmptyText != null) { pickerEmptyText.gameObject.SetActive(true); pickerEmptyText.text = lookPickHint; }
+            else if (pickerEmptyText != null) { pickerEmptyText.gameObject.SetActive(saved.Count == 0); pickerEmptyText.text = words.Length > 0 ? msgNothingFound : msgNoMakeup; }
         }
 
         void Pick(ProductTileView tile)

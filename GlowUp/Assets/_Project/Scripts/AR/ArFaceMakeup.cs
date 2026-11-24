@@ -245,11 +245,16 @@ namespace GlowUp.AR
             {
                 Material layer = colour[i];
                 if (layer == null) continue;
-                bool on = has && choices.Area == Areas[i] && (i != Brows || browMaskReady);
+                bool main = has && choices.Area == Areas[i] && (i != Brows || browMaskReady);
+                // a look of several products: another product of the look colours this part when the main product does not
+                Color layerShade = shade; float layerFinish = choices.FinishOpacity; bool other = false;
+                if (!main && !(has && choices.Area == Areas[i]) && (i != Brows || browMaskReady) && choices.TryExtra(Areas[i], out Color extraShade, out float extraFinish))
+                { other = true; layerShade = Color.Lerp(extraShade, Color.white, 0.02f); layerFinish = extraFinish; }
+                bool on = main || other;
                 float full = Mathf.Clamp01(choices.Intensity * choices.MaxOpacityFor(Areas[i]) * strengthScale);
-                float alpha = on ? Mathf.Clamp01(full * choices.FinishOpacity) * Mathf.Clamp01(Presence) : 0f;
+                float alpha = on ? Mathf.Clamp01(full * layerFinish) * Mathf.Clamp01(Presence) : 0f;
                 // a layer that is fading out keeps its own colour while it fades
-                var target = on ? new Color(shade.r, shade.g, shade.b, alpha) : new Color(shown[i].r, shown[i].g, shown[i].b, 0f);
+                var target = on ? new Color(layerShade.r, layerShade.g, layerShade.b, alpha) : new Color(shown[i].r, shown[i].g, shown[i].b, 0f);
                 shown[i] = Color.Lerp(shown[i], target, t);
                 layer.SetColor(colourProperty, shown[i]);
                 // push the smoothed skin base (not for lips or brows: they have their own)
@@ -257,7 +262,7 @@ namespace GlowUp.AR
                 // phase 3A: the thin layer of the shade itself (the shader's second pass); more for a shade the tint cannot lighten to
                 if (layer.HasProperty(PigmentId))
                     layer.SetFloat(PigmentId, usePigment ? GuidedPigment.Share(shown[i], i < 3 ? skinBaseNow : SkinUnderFor(i), Mathf.Max(i == 0 ? 0f : pigmentParts, MakeupQuality.Pigment(i)), MakeupQuality.ExtraForLighter(i, pigmentForLighter)) : 0f);   // 18 Nov 2026: per cosmetic type
-                if (on) { active = i; activeShare = full > 0.001f ? Mathf.Clamp01(shown[i].a / full) : 0f; }
+                if (main) { active = i; activeShare = full > 0.001f ? Mathf.Clamp01(shown[i].a / full) : 0f; }
             }
 
             shownLayer = has ? active : -1;

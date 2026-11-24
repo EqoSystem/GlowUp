@@ -126,6 +126,9 @@ namespace GlowUp.AppSettings
                 photo = RuntimeUiKit.Box(mask.transform, "Photo", Color.white, false);
                 photo.raycastTarget = false; photo.preserveAspect = true;
                 RuntimeUiKit.Stretch(photo.rectTransform);
+                // 24 Nov 2026 (owner: the Edit badge collided with the photo): the photo goes UNDER the pencil badge, not over it
+                Transform badge = avatar.transform.Find("EditBadge");
+                if (badge != null) mask.transform.SetSiblingIndex(badge.GetSiblingIndex());
                 holder = mask.transform;
             }
             else photo = holder.Find("Photo").GetComponent<Image>();

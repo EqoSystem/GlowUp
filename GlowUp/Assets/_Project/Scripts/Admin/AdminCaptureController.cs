@@ -237,12 +237,15 @@ namespace GlowUp.Admin
             ShowForm(said);
         }
 
+        [SerializeField] private AutoBrighten brighten;      // 24 Nov 2026: the sun button on the live view
+
         async Task Shutter()
         {
             if (busy || cameraFeed == null || !cameraFeed.IsPlaying) { Hint("The camera is not ready yet."); return; }
             if (CaptureDraft.Photos.Count >= CaptureDraft.MaxPhotos) { Hint($"At most {CaptureDraft.MaxPhotos} photos. Remove one, or continue."); return; }
             Texture2D photo = cameraFeed.CaptureUpright(scanFrame, 1600);
             if (photo == null) { Hint("The picture could not be taken. Hold still and try again."); return; }
+            if (brighten != null && brighten.On && StartMode != CaptureDraft.Mode.Barcode) AutoBrighten.Enhance(photo);       // the sun button: an even, brighter label photo
             if (StartMode == CaptureDraft.Mode.Barcode)
             {
                 busy = true; Hint("Reading the barcode in the photo...");
@@ -293,7 +296,22 @@ namespace GlowUp.Admin
             Hint("Photo dropped. Take it again.");
         }
 
-        void KeepChecked()
+        /// <summary>
+        /// 24 Nov 2026 (owner): a photo of a pack that is clearly not make-up (skin care, body wash, hair) is refused as soon as it is chosen, with the live scan's
+        /// words, not only when the form is saved. Reads the front text; "" = fine. Ingredient and barcode photos are not judged (their words say nothing about the kind).
+        /// </summary>
+        static async Task<string> NotMakeupPhoto(Texture2D tex, string photoRole)
+        {
+            if (tex == null || photoRole == "Ingredients" || photoRole == "Back" || photoRole == "Barcode" || !CaptureReader.CanReadText) return "";
+            try
+            {
+                ProductScope.Verdict v = ProductScope.JudgeLabel(await CaptureReader.Text(tex));
+                return v.IsNotMakeup ? ProductScope.StopMessage(v) : "";
+            }
+            catch (Exception) { return ""; }
+        }
+
+        async void KeepChecked()
         {
             if (checking == null) return;
             Texture2D keep = checking;
@@ -305,6 +323,10 @@ namespace GlowUp.Admin
             }
             checking = null;
             photoCheck.Hide();
+            Hint("Checking the photo...");
+            string refused = await NotMakeupPhoto(keep, checkingRole);
+            if (this == null) { Destroy(keep); return; }
+            if (refused.Length > 0) { Destroy(keep); Hint(refused + " The photo was not added."); return; }
             CaptureDraft.Photos.Add(new KeyValuePair<string, Texture2D>(checkingRole, keep));
             Hint($"{checkingRole} photo added ({CaptureDraft.Photos.Count}). Take another, or tap Read & review.");
             PaintThumbs();
@@ -330,11 +352,18 @@ namespace GlowUp.Admin
         {
             if (ScannerPrefs.BatchMode && StartMode == CaptureDraft.Mode.Gallery) { PickBatch(); return; }
             if (CaptureDraft.Photos.Count >= CaptureDraft.MaxPhotos) { Hint($"At most {CaptureDraft.MaxPhotos} photos. Remove one first."); return; }
-            GalleryPicker.Pick(tex =>
+            GalleryPicker.Pick(async tex =>
             {
                 if (this == null) { if (tex != null) Destroy(tex); return; }
                 if (tex == null) { Hint("No photo was chosen."); return; }
                 string r = StartMode == CaptureDraft.Mode.Barcode ? "Barcode" : role;
+                if (r != "Barcode")
+                {
+                    Hint("Checking the photo...");
+                    string refused = await NotMakeupPhoto(tex, r);
+                    if (this == null) { Destroy(tex); return; }
+                    if (refused.Length > 0) { Destroy(tex); Hint(refused + " The photo was not added."); return; }
+                }
                 CaptureDraft.Photos.Add(new KeyValuePair<string, Texture2D>(r, tex));
                 if (galleryPreview != null) { galleryPreview.texture = tex; galleryPreview.gameObject.SetActive(true); }
                 if (StartMode == CaptureDraft.Mode.Barcode) { _ = ReadAndReview(); return; }

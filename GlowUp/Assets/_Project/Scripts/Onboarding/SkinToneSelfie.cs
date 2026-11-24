@@ -65,6 +65,8 @@ namespace GlowUp.Onboarding
         const float BoxLeft = 0.36f, BoxWidth = 0.28f;
         const string ConsentKey = "glowup.selfie.consent";
 
+        [SerializeField] private AutoBrighten brighten;     // 24 Nov 2026: the sun button (live veil; evens out the photo shown after the capture)
+        Texture2D enhanced;               // the brightened copy of the frozen photo, while Auto brighten is on
         Texture2D frozen;                 // the photo shown on the result card (destroyed when the card closes)
         int foundIndex = -1;              // the tone tile that fits; -1 = no result yet
         bool cameraReady;
@@ -79,12 +81,14 @@ namespace GlowUp.Onboarding
             if (deleteButton != null) deleteButton.onClick.AddListener(DeletePhoto);
             if (panel != null) panel.Closed += Reset;
             if (cameraFeed != null) cameraFeed.Started += OnCameraStarted;
+            if (brighten != null) brighten.Changed += OnBrighten;
             RefreshDelete();
         }
 
         void OnDestroy()
         {
             if (cameraFeed != null) cameraFeed.Started -= OnCameraStarted;
+            if (brighten != null) brighten.Changed -= OnBrighten;
             Reset();
         }
 
@@ -105,6 +109,7 @@ namespace GlowUp.Onboarding
         {
             ClearResult();
             cameraReady = false;
+            if (brighten != null) brighten.ShowVeil(true);
             if (panel != null && !panel.IsOpen) panel.Show();
             Say(msgStarting);
             SetWords();
@@ -154,8 +159,15 @@ namespace GlowUp.Onboarding
             // freeze the picture and show how the tone was found
             if (cameraFeed != null) cameraFeed.StopCamera();
             if (frozen != null) Destroy(frozen);
+            // 24 Nov 2026 (owner: the photo came out flipped): the live selfie view is a mirror, so the kept picture is turned the same way
+            if (cameraFeed != null && cameraFeed.ShowsMirrored)
+            {
+                for (int y = 0; y < h; y++) System.Array.Reverse(all, y * w, w);
+                photo.SetPixels32(all); photo.Apply();
+            }
             frozen = photo;
-            if (resultImage != null) { resultImage.texture = frozen; resultImage.gameObject.SetActive(true); }
+            if (brighten != null) brighten.ShowVeil(false);
+            ShowFrozen();
             if (sampleBox != null)
             {
                 sampleBox.anchorMin = new Vector2(BoxLeft, boxBottom); sampleBox.anchorMax = new Vector2(BoxLeft + BoxWidth, boxBottom + heightFraction);
@@ -169,6 +181,21 @@ namespace GlowUp.Onboarding
             if (resultRow != null) resultRow.SetActive(true);
             Say(string.Format(msgResult, tone) + (kept ? " " + msgKept : ""));
             SetWords();
+        }
+
+        /// <summary>The photo on the result card: evened out while Auto brighten is on, as taken otherwise. The tone was read from the untouched photo.</summary>
+        void ShowFrozen()
+        {
+            if (resultImage == null || frozen == null) return;
+            if (enhanced != null) { Destroy(enhanced); enhanced = null; }
+            if (brighten != null && brighten.On) enhanced = AutoBrighten.Enhanced(frozen);
+            resultImage.texture = enhanced != null ? enhanced : frozen;
+            resultImage.gameObject.SetActive(true);
+        }
+
+        void OnBrighten(bool on)
+        {
+            if (ShowingResult) ShowFrozen(); else if (brighten != null) brighten.ShowVeil(true);
         }
 
         void UseTone()
@@ -203,6 +230,7 @@ namespace GlowUp.Onboarding
             if (sampleBox != null) sampleBox.gameObject.SetActive(false);
             if (resultRow != null) resultRow.SetActive(false);
             if (frozen != null) { Destroy(frozen); frozen = null; }
+            if (enhanced != null) { Destroy(enhanced); enhanced = null; }
         }
 
         /// <summary>The camera is released and the frozen photo dropped (the panel closes, the page goes away, or Back is pressed).</summary>

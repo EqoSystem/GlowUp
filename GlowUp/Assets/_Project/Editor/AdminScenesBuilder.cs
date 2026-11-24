@@ -687,6 +687,8 @@ namespace GlowUp.EditorTools
             var camera = SceneBuilderCore.Ensure<CameraFeedController>(c.gameObject);
             A.Set(camera, "display", display); A.Set(camera, "viewport", viewport.rectTransform); A.Set(camera, "mirrorRoot", mirror.transform);
             FocusLockControl(viewport.transform, camera);
+            GlowUp.Scan.AutoBrighten brightenControl = AutoBrightenControl(viewport.transform, camera, new Vector2(-24, -132));
+            A.Set(c, "brighten", brightenControl);
             A.Set(c, "backButton", s.back); A.Set(c, "titleText", s.title); A.Set(c, "confirmDialog", confirm);
             A.Set(c, "capturePanel", cap); A.Set(c, "cameraFeed", camera); A.Set(c, "galleryPreview", preview); A.Set(c, "scanFrame", (RectTransform)frame.transform);
             A.Set(c, "hintText", hint); A.Set(c, "tipsButton", tipsButton); A.Set(c, "tipsPanel", tips); A.Set(c, "scanLine", sweep);
@@ -789,6 +791,30 @@ namespace GlowUp.EditorTools
         /// shows where a tap focused. A tap on the picture focuses there and holds it; the padlock releases it. The button is hidden on a camera that cannot hold
         /// its focus. The same ScanFocusAssistant and CameraFeedController settings as the Smart Scan screen.
         /// </summary>
+        /// <summary>
+        /// The sun button of "auto brighten" on a live camera view (24 Nov 2026): top right, under the torch (or in the corner when `offset` says so).
+        /// A white veil over the picture (under every button) is what lifts a dim picture while it is on.
+        /// </summary>
+        internal static GlowUp.Scan.AutoBrighten AutoBrightenControl(Transform viewport, CameraFeedController camera, Vector2 offset)
+        {
+            GameObject host = A.Node(viewport, "AutoBrighten", typeof(GlowUp.Scan.AutoBrighten));
+            A.Fill(host.transform);
+            Image veil = A.RawPanel(host.transform, "BrightenVeil", new Color(1, 1, 1, 0.22f), 0f);
+            veil.raycastTarget = false;
+            A.Fill(veil.transform);
+            veil.gameObject.SetActive(false);
+            // the veil sits right above the camera picture, below the checklist, the hint and every round button
+            Transform picture = camera != null && camera.Display != null ? camera.Display.transform : null;
+            while (picture != null && picture.parent != viewport) picture = picture.parent;
+            veil.transform.SetParent(viewport, false);
+            if (picture != null) veil.transform.SetSiblingIndex(picture.GetSiblingIndex() + 1);
+            Button sun = SmartScanSceneBuilder.CameraButton(host.transform, "BrightenButton", IconFactory.Sun, out Image sunIcon);
+            A.At(sun.transform, A.TR, offset, new Vector2(92, 92));
+            var brighten = host.GetComponent<GlowUp.Scan.AutoBrighten>();
+            A.Set(brighten, "button", sun); A.Set(brighten, "icon", sunIcon); A.Set(brighten, "background", sun.targetGraphic); A.Set(brighten, "veil", veil);
+            return brighten;
+        }
+
         internal static void FocusLockControl(Transform viewport, CameraFeedController camera)
         {
             GameObject focusHelper = A.Node(viewport, "FocusAssistant", typeof(GlowUp.Scan.ScanFocusAssistant));

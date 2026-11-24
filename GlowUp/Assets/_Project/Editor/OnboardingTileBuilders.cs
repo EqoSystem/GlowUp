@@ -195,10 +195,7 @@ namespace GlowUp.EditorTools
             var resultImage = resultObject.GetComponent<RawImage>(); resultImage.raycastTarget = false;
             resultObject.SetActive(false);
             // the box on the frozen photo: the part of the face that was read (placed by SkinToneSelfie)
-            Image sampleBox = AppKit.Panel(viewport.transform, "SampleBox", ThemeRole.Gold, 0.12f, 16f);
-            sampleBox.raycastTarget = false;
-            AppKit.Outline(sampleBox.transform, ThemeRole.Gold, 16f);
-            sampleBox.gameObject.SetActive(false);
+            // 24 Nov 2026 (owner): no square guide on the result picture; the tone is still read from the middle of the photo
             TextMeshProUGUI selfieStatus = AppKit.Label(selfie.box, "StatusText", "", 30, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             AppKit.TopStrip(selfieStatus.transform, 902, 90, 56, 56);
             AppKit.ShrinkWrapped(selfieStatus, 22);
@@ -249,9 +246,11 @@ namespace GlowUp.EditorTools
             var selfieCamera = SceneBuilderCore.Ensure<GlowUp.Scan.CameraFeedController>(selfieTone.gameObject);
             SceneBuilderCore.SetField(selfieCamera, "display", cameraDisplay); SceneBuilderCore.SetField(selfieCamera, "viewport", viewport.rectTransform);
             SceneBuilderCore.SetField(selfieCamera, "mirrorRoot", mirror.transform); SceneBuilderCore.SetField(selfieCamera, "useFrontCamera", true);
+            GlowUp.Scan.AutoBrighten selfieBrighten = AdminScenesBuilder.AutoBrightenControl(viewport.transform, selfieCamera, new Vector2(-24, -24));
+            SceneBuilderCore.SetField(selfieTone, "brighten", selfieBrighten);
             AdminScenesBuilder.FocusLockControl(viewport.transform, selfieCamera);          // the padlock of the AI Smart Scan camera, top centre (manual focus)
             SceneBuilderCore.SetField(selfieTone, "cameraFeed", selfieCamera); SceneBuilderCore.SetField(selfieTone, "resultImage", resultImage);
-            SceneBuilderCore.SetField(selfieTone, "sampleBox", sampleBox.rectTransform); SceneBuilderCore.SetField(selfieTone, "resultRow", resultRow);
+            SceneBuilderCore.SetField(selfieTone, "resultRow", resultRow);
             SceneBuilderCore.SetField(selfieTone, "foundSwatch", foundSwatch); SceneBuilderCore.SetField(selfieTone, "toneSwatch", toneSwatch);
             SceneBuilderCore.SetField(selfieTone, "foundLabel", foundLabel); SceneBuilderCore.SetField(selfieTone, "toneLabel", toneLabel);
             SceneBuilderCore.SetField(selfieTone, "statusText", selfieStatus); SceneBuilderCore.SetField(selfieTone, "takeButton", selfieTake);

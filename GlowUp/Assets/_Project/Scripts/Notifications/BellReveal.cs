@@ -17,6 +17,7 @@ namespace GlowUp.Notifications
         [SerializeField] private Image unreadDot;             // a small dot on the gear, shown while the bell is hidden
         [SerializeField] private float outX = -128f;          // where the bell stands when it is out (its place before 22 Nov 2026)
         [SerializeField] private float stayOutSeconds = 6f;
+        [SerializeField] private bool alwaysOut = true;     // 24 Nov 2026 (owner): no hide-and-slide effect; the bell is always shown beside the gear
 
         public bool IsOut { get; private set; }
         Vector2 home;
@@ -29,7 +30,8 @@ namespace GlowUp.Notifications
             home = gear.anchoredPosition;
             group = bell.GetComponent<CanvasGroup>() ?? bell.gameObject.AddComponent<CanvasGroup>();
             bell.SetSiblingIndex(Mathf.Max(0, gear.GetSiblingIndex()));      // drawn under the gear
-            Place(0f);
+            IsOut = alwaysOut;
+            Place(alwaysOut ? 1f : 0f);
         }
 
         void OnEnable() { InboxService.Ensure(); InboxService.Changed += PaintDot; PaintDot(); }
@@ -38,7 +40,7 @@ namespace GlowUp.Notifications
         /// <summary>Slides the bell out (first tap on the gear). Returns false when it was already out (the tap then opens Settings).</summary>
         public bool Reveal()
         {
-            if (!enabled) return false;
+            if (!enabled || alwaysOut) return false;
             if (IsOut) { RestartTimer(); return false; }
             IsOut = true;
             Slide(1f);
@@ -46,7 +48,7 @@ namespace GlowUp.Notifications
             return true;
         }
 
-        public void Tuck() { if (!IsOut) return; IsOut = false; Slide(0f); }
+        public void Tuck() { if (alwaysOut || !IsOut) return; IsOut = false; Slide(0f); }
 
         void RestartTimer()
         {

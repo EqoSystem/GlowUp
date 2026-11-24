@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using GlowUp.Scan;
 using UnityEngine;
 using UnityEngine.UI;
@@ -87,6 +88,22 @@ namespace GlowUp.AR
         /// <summary>0 = none, 1 = full strength.</summary>
         public void SetIntensity(float value) { intensity = Mathf.Clamp01(value); }
         public void Clear() { shade = Color.clear; }
+
+        // ---- a LOOK of several products (24 Nov 2026, owner): the other products of the look, one per part of the face ----
+        // The product being edited (area, shade, finish above) is the main one; every other product of the look is shown on ITS part
+        // of the face with its own shade and the solidity of its own finish. A part the main product uses is never taken by an extra.
+        readonly Dictionary<string, KeyValuePair<Color, float>> extras = new Dictionary<string, KeyValuePair<Color, float>>();
+        public void ClearExtras() { extras.Clear(); }
+        public void SetExtra(string part, Color colour, string finishName)
+        {
+            if (string.IsNullOrEmpty(part) || colour.a <= 0.01f) return;
+            extras[part] = new KeyValuePair<Color, float>(colour, FindFinish(finishName).opacity);
+        }
+        public bool TryExtra(string part, out Color colour, out float opacity)
+        {
+            if (part != null && extras.TryGetValue(part, out KeyValuePair<Color, float> e)) { colour = e.Key; opacity = e.Value; return true; }
+            colour = Color.clear; opacity = 0f; return false;
+        }
         /// <summary>matte, satin, glossy, shimmer or metallic (a name from the list "Finishes").</summary>
         public void SetFinish(string finishName) { look = FindFinish(finishName); }
 
