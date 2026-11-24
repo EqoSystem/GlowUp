@@ -698,7 +698,8 @@ async function loadInventory() {
             if (data.name) curatedList.push({
                 id: d.id, name: String(data.name), techName: String(data.techName || ""), aliases: asArray(data.aliases),
                 riskLevel: String(data.riskLevel || ""), source: String(data.source || "").trim().toLowerCase(),
-                reviewed: data.reviewed === true, generic: data.generic === true
+                reviewed: data.reviewed === true, generic: data.generic === true,
+                flags: asArray(data.allergenTags).length + asArray(data.avoidForSkinTypes).length + asArray(data.avoidForConditions).length
             });
         });
         curatedList.sort((a, b) => a.name.localeCompare(b.name));
@@ -1142,6 +1143,15 @@ function cleanShade(value) {
     return /^#[0-9A-F]{6}$/.test(text) ? text : null;
 }
 
+
+// Listed ingredients the Curator already flags for an allergen, a skin type or a skin condition (the app's review form says the same).
+function flaggedIngredients(names) {
+    const byKey = new Map();
+    curatedList.forEach((entry) => { if (entry.flags > 0) [entry.name, entry.techName, ...entry.aliases].forEach((n) => { const k = sameKey(n); if (k && !byKey.has(k)) byKey.set(k, entry.name); }); });
+    const out = [];
+    (names || []).forEach((n) => { const shown = byKey.get(sameKey(n)); if (shown && !out.includes(shown)) out.push(shown); });
+    return out;
+}
 
 function notCurated(ingredientNames) {
     return curatorKnown ? ingredientNames.filter((n) => !curatedKeys.has(sameKey(n))) : [];
@@ -1699,7 +1709,8 @@ function detailRow(p, brand, columns) {
         const chips = p.ingredients.slice(0, SHOWN_INGREDIENTS).map((name) => (missing.has(sameKey(name))
             ? `<span class="chip warn" data-tip="Not in the Ingredient Curator yet.">${escapeHtml(name)}</span>` : `<span class="chip">${escapeHtml(name)}</span>`)).join("");
         const rest = p.ingredients.length - SHOWN_INGREDIENTS;
-        facts.push(["Ingredients", `<span class="muted">${p.ingredients.length} listed${missing.size > 0 ? ` · ${missing.size} not in the Ingredient Curator (amber)` : ""}</span><br>${chips}${rest > 0 ? `<span class="muted small">and ${rest} more</span>` : ""}`]);
+        const flagged = flaggedIngredients(p.ingredients);
+        facts.push(["Ingredients", `<span class="muted">${p.ingredients.length} listed${missing.size > 0 ? ` · ${missing.size} not in the Ingredient Curator (amber)` : ""}${flagged.length > 0 ? ` · ${flagged.length} flagged: ${escapeHtml(flagged.slice(0, 3).join(", "))}${flagged.length > 3 ? ` +${flagged.length - 3}` : ""}` : ""}</span><br>${chips}${rest > 0 ? `<span class="muted small">and ${rest} more</span>` : ""}`]);
     }
     if (p.shades.length > 0) {
         const coded = (p.shadeCodes || []).filter(Boolean).length;
@@ -2680,6 +2691,8 @@ function showIngredientSummary() {
         const shown = missing.slice(0, 6).join(", ") + (missing.length > 6 ? ` and ${missing.length - 6} more` : "");
         text += ` ${missing.length} not in the Ingredient Curator yet: ${shown}. The app may still know them from its built-in list; add them to the Curator to control the wording.`;
     }
+    const flagged = flaggedIngredients(names);
+    if (flagged.length > 0) text += ` ${flagged.length} flagged for allergens, skin types or conditions: ${flagged.slice(0, 4).join(", ")}${flagged.length > 4 ? ` and ${flagged.length - 4} more` : ""}.`;
     if (names.length < 4) text += " The app needs at least 4 ingredients to recognise a scan as this product.";
     const repeats = repeatedNames(el("productIngredientsInput").value);
     if (repeats.length) text += ` Listed twice: ${repeats.slice(0, 5).join(", ")}${repeats.length > 5 ? " and more" : ""}. Each is kept once; check the pack in case one is a different ingredient.`;
