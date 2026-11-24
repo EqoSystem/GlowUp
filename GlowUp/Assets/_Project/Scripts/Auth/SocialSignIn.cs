@@ -54,22 +54,24 @@ namespace GlowUp.Auth
         public static async Task<Outcome> WithGoogle()
         {
             // 1. inside the app (no browser)
-            NativeGoogleSignIn.Answer native = await NativeGoogleSignIn.RequestToken();
+            Task<NativeGoogleSignIn.Answer> asking = NativeGoogleSignIn.RequestToken();
+            // the phone's sheet gets 3 minutes; an answer that never comes is reported (step 1) instead of leaving the page silent
+            if (await Task.WhenAny(asking, Task.Delay(180000)) != asking) return new Outcome { Problem = DidNotComplete + " (step 1: no answer from the phone)" };
+            NativeGoogleSignIn.Answer native = asking.Result;
             if (native.result == NativeGoogleSignIn.Result.Cancelled) return new Outcome { Cancelled = true };
             if (native.result == NativeGoogleSignIn.Result.Token)
             {
                 try
                 {
                     Credential credential = GoogleAuthProvider.GetCredential(native.idToken, null);
-                    AuthResult signedIn = await FirebaseAuth.DefaultInstance.SignInAndRetrieveDataWithCredentialAsync(credential);
+                    AuthResult signedIn = await FirebaseAuth.DefaultInstance.SignInAndRetrieveDataWithCredentialAsync(credential).OrTimeout(40f, "Signing in with Google");
                     return new Outcome { User = signedIn != null ? signedIn.User : FirebaseAuth.DefaultInstance.CurrentUser };
                 }
                 catch (Exception e) { return Failed(e, "Google"); }
             }
             if (native.result == NativeGoogleSignIn.Result.Failed)
             {
-                { }
-                return new Outcome { Problem = DidNotComplete };
+                return new Outcome { Problem = DidNotComplete + " (step 1: " + native.detail.Trim() + ")" };
             }
             // 2. NO BROWSER any more (10 November 2026). The old fallback opened Google's page in the phone's browser and came back through
             //    glowup-admin-portal.firebaseapp.com/__/auth/handler. Browsers that partition or clear storage (Brave with Shields, private
@@ -77,7 +79,7 @@ namespace GlowUp.Auth
             //    app cannot style or recover from. A clear message is shown instead.
             if (native.result == NativeGoogleSignIn.Result.NoAccount) return new Outcome { Problem = NoGoogleAccount };
             { }
-            return new Outcome { Problem = GoogleUnavailable };
+            return new Outcome { Problem = GoogleUnavailable + " (step 1: " + native.result + " " + native.detail.Trim() + ")" };
         }
 
         /// <summary>No Google account on the phone (or none was picked).</summary>
@@ -144,7 +146,8 @@ namespace GlowUp.Auth
             // The raw text is only logged (above), never shown. The sign-in page opens in the phone's browser; a browser that blocks or splits
             // its storage (Brave with Shields, strict privacy modes, some in-app browsers) makes Firebase answer "missing initial state".
             string detail = (firebase != null ? firebase.Message : "") + " " + e.Message + " " + (e.InnerException != null ? e.InnerException.Message : "");
-            return new Outcome { Problem = BlockedByBrowser(detail) ? BrowserBlocking : DidNotComplete };
+            string shown = (firebase != null ? "firebase " + code + ": " : e.GetType().Name + ": ") + (firebase != null ? firebase.Message : e.Message);
+            return new Outcome { Problem = BlockedByBrowser(detail) ? BrowserBlocking : DidNotComplete + " (step 2: " + (shown.Length > 120 ? shown.Substring(0, 120) : shown) + ")" };
         }
     }
 }

@@ -19,7 +19,7 @@ namespace GlowUp.EditorTools
     public static class AndroidApkBuilder
     {
         public const string OutputFolder = "Builds";
-        public const string FileName = "GlowUp.104.apk";       // the owner's build number, 24 November 2026 (version 0.98.6): Sensitive reactions, front-camera tone panel, Find missing details
+        public const string FileName = "GlowUp.105.apk";       // the owner's build number, 24 November 2026 (version 0.98.7): Google sign-in failures name their step
 
         [MenuItem("GlowUp/Build Android APK", false, 300)]
         static void BuildFromMenu()

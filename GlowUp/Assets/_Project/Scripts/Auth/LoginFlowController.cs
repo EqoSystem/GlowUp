@@ -450,14 +450,14 @@ namespace GlowUp.Auth
 
                 UserProfileRepository.OfflineEmail = null;
                 UserProfileData profile = null;
-                try { profile = await UserProfileRepository.Load(); }
+                try { var loading = UserProfileRepository.Load(); if (await Task.WhenAny(loading, Task.Delay(20000)) == loading) profile = loading.Result; }
                 catch (Exception e) { { } }
                 if (this == null) return;
                 if (HasSkinProfile(profile)) SceneNavigator.Go(dashboardScene);       // already has a skin profile: straight to the dashboard
                 else if (FinishedSignUp(profile)) RetakeQuizOnly();                   // a finished account whose quiz was reset: the quiz only
                 else StartSocialSignUp(outcome.User);                                  // no skin profile yet: the skin quiz (Onboarding Step 2)
             }
-            catch (Exception e) { { } FailWithRetry(SocialSignIn.DidNotComplete, name); }
+            catch (Exception e) { FailWithRetry(SocialSignIn.DidNotComplete + " (step 3: " + e.GetType().Name + ": " + e.Message + ")", name); }
             finally { socialBusy = false; }
         }
 
