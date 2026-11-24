@@ -96,6 +96,7 @@ namespace GlowUp.Admin
 
         CaptureDraft draft;
         string role = "Front";
+        bool finding;
         bool scanning, busy, torchOn, painting, flashPending, focusPending;
         float nextCheck, steadySince;
         static readonly Color Good = new Color(0.20f, 0.62f, 0.42f), Idle = new Color(0.70f, 0.66f, 0.67f);
@@ -450,18 +451,55 @@ namespace GlowUp.Admin
         /// <summary>"Find missing details": looks this product up on the web by name and brand (see CaptureReader.FillMissing). Needs review, never final.</summary>
         async Task FindMissing()
         {
-            if (busy) return;
-            busy = true;
+            // its own flag: a stuck reader flag must never make this button silent. Every tap answers with a message.
+            if (finding) { Info("Still searching. One moment..."); return; }
+            finding = true;
             if (findDetailsButton != null) findDetailsButton.interactable = false;
             Info("Searching the web for this product...");
+            SearchingMarks(true);
             string said;
-            try { said = await CaptureReader.FillMissing(draft); }
-            catch (Exception) { said = "The online look-up failed. Try again, or type the details."; }
-            busy = false;
+            try
+            {
+                Task<string> look = CaptureReader.FillMissing(draft);
+                said = await Task.WhenAny(look, Task.Delay(60000)) == look ? look.Result : "The online look-up took too long. Try again.";
+            }
+            catch (Exception e) { said = "The online look-up failed (" + e.GetType().Name + "). Try again, or type the details."; }
+            finding = false;
             if (this == null) return;
+            SearchingMarks(false);
             if (findDetailsButton != null) findDetailsButton.interactable = true;
             Info(said);
             PaintForm();
+        }
+
+        // ---- "Find missing details": a turning ring inside every field that is still empty, so the admin sees that data is being fetched ----
+        readonly System.Collections.Generic.List<GameObject> searchRings = new System.Collections.Generic.List<GameObject>();
+
+        /// <summary>on: a ring and "Searching..." on each field the look-up can fill (brand, category, ingredients) and that has no value. off: all removed.</summary>
+        void SearchingMarks(bool on)
+        {
+            foreach (GameObject g in searchRings) if (g != null) Destroy(g);
+            searchRings.Clear();
+            if (!on && fieldInputs != null)
+                foreach (TMP_InputField f in fieldInputs) if (f != null && f.placeholder != null) f.placeholder.gameObject.SetActive(string.IsNullOrEmpty(f.text));
+            if (!on || fieldInputs == null) return;
+            string[] fillable = { "brand", "cosmeticType", "ingredients" };
+            for (int i = 0; i < fieldInputs.Length && i < CaptureDraft.Keys.Length; i++)
+            {
+                if (fieldInputs[i] == null || System.Array.IndexOf(fillable, CaptureDraft.Keys[i]) < 0 || draft.Get(CaptureDraft.Keys[i]).Has) continue;
+                Color tint = fieldStates != null && i < fieldStates.Length && fieldStates[i] != null ? fieldStates[i].color : Missing;
+                Image ring = RuntimeUiKit.Icon(fieldInputs[i].transform, "SearchingRing", RuntimeIcons.SpinnerArc, tint, 44);
+                // the ring's pivot is its own centre, so it turns on the spot; it sits at the right edge of the field, level with the first line
+                // of text (the middle of a one-line field, the top of the tall ingredients box)
+                RectTransform rt = ring.rectTransform;
+                bool tall = ((RectTransform)fieldInputs[i].transform).rect.height > 200f;
+                rt.anchorMin = rt.anchorMax = new Vector2(1f, tall ? 1f : 0.5f); rt.pivot = new Vector2(0.5f, 0.5f);
+                rt.anchoredPosition = new Vector2(-52f, tall ? -52f : 0f);
+                ring.gameObject.AddComponent<Spinner>();
+                if (fieldInputs[i].placeholder != null) fieldInputs[i].placeholder.gameObject.SetActive(false);      // a long hint would run under the ring
+                searchRings.Add(ring.gameObject);
+                if (fieldStates != null && i < fieldStates.Length && fieldStates[i] != null) fieldStates[i].text = "Searching the web...";
+            }
         }
 
         /// <summary>The "Scan Result" card at the top of the form: the first photo, the name, the barcode or brand, and one status pill.</summary>

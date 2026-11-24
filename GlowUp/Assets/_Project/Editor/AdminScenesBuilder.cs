@@ -96,6 +96,17 @@ namespace GlowUp.EditorTools
             A.TopStrip(pwLabel.transform, 696, 54, x + 12, x);
             TMP_InputField pw = Field(card, "PasswordInputField", "Enter your password", 758, x, TMP_InputField.ContentType.Password);
             Kit.AddEye(pw);
+            // 24 Nov 2026: the same input rules as the user Log-In page: no spaces (with a message line), placeholder away on tap, the phone's saved-account list kept quiet
+            TextMeshProUGUI fieldNote = A.Label(card, "FieldNoteText", "", 30, ThemeRole.Warning, FontRole.Body, TextAlignmentOptions.Center);
+            A.TopStrip(fieldNote.transform, 1000, 52, x, x);
+            var emailRules = SceneBuilderCore.Ensure<GlowUp.Common.InputFieldBehaviour>(email.gameObject);
+            SceneBuilderCore.SetField(emailRules, "characterLimit", Kit.EmailLimit);
+            SceneBuilderCore.SetField(emailRules, "contentType", (int)TMP_InputField.ContentType.EmailAddress);
+            Kit.AddSpaceGuard(email, fieldNote, "Spaces are not allowed in the email.", Kit.EmailLimit);
+            var pwRules = SceneBuilderCore.Ensure<GlowUp.Common.InputFieldBehaviour>(pw.gameObject);
+            SceneBuilderCore.SetField(pwRules, "characterLimit", 64);
+            SceneBuilderCore.SetField(pwRules, "contentType", (int)TMP_InputField.ContentType.Password);
+            Kit.AddSpaceGuard(pw, fieldNote, "Spaces are not allowed in the password.");
             Button forgot = A.LinkButton(card, "ForgotPasswordButton", "Forgot Password?", 32, ThemeRole.SecondaryText);
             A.TopStrip(forgot.transform, 904, 84, x, 500);
             A.LabelOf(forgot).alignment = TextAlignmentOptions.MidlineLeft;
