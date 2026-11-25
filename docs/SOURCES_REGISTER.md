@@ -25,7 +25,7 @@ before it goes into the paper.
 
 | Rule in GlowUp | Source | Origin | Where | Checked |
 |---|---|---|---|---|
-| 26 fragrance allergens that must be named on a label (linalool, limonene, citral, eugenol, ...) | EU Cosmetics Regulation (EC) No 1223/2009, Annex III, and later amendments | Foreign (EU) | `_Shared/ingredientFit.js` (EU_FRAGRANCE_ALLERGENS) | From memory: open the regulation and the latest amendment before citing, the list changed in 2023 |
+| 26 fragrance allergens that must be named on a label (linalool, limonene, citral, eugenol, ...) | EU Cosmetics Regulation (EC) No 1223/2009, Annex III, and later amendments | Foreign (EU) | `_Shared/ingredientFit.js` (EU_FRAGRANCE_ALLERGENS) | From memory: open the regulation and the latest amendment before citing: Regulation (EU) 2023/1545 (https://eur-lex.europa.eu/eli/reg/2023/1545) extends the list to more than 80 fragrance allergens, and `ingredientFit.js` still holds the 26 |
 | Skin sensitiser classification (formaldehyde releasers, isothiazolinones, lanolin) | EU CosIng database, SCCS opinions, ECHA classification (H317 "may cause an allergic skin reaction") | Foreign (EU) | `_Shared/ingredientFit.js`, ingredient field `frequentUseAllergy` | From memory |
 | Cosmetic products must be notified with the Philippine FDA | Republic Act 9711 (FDA Act of 2009) and ASEAN Cosmetic Directive | Local (PH) and regional | Why the app checks FDA status | From memory: confirm article numbers |
 | Health and allergy data of a person is kept only with their consent | Data Privacy Act of 2012 (Republic Act 10173) | Local (PH) | Terms page second box (`healthConsentAtUnix`), "nothing about the profile goes to the AI" rule | From memory: confirm applicable sections |
@@ -39,11 +39,11 @@ before it goes into the paper.
 | Denatured alcohol, menthol and camphor irritate sensitive and rosacea skin | same | Reviews on rosacea triggers and irritant contact dermatitis |
 | Pore-clogging esters and butters for acne-prone and oily skin; yeast-feeding oils for folliculitis | same | Comedogenicity rating studies; Malassezia (fungal acne) folliculitis reviews |
 | Parabens, lanolin, essential oils, nut oils as allergen families | same, `listRules.js` | Contact allergy to cosmetic ingredients (patch-test studies), fragrance allergy |
-| Sensitive skin shown in different ways (redness, stinging, itching, breakouts, tightness, reacts to products) | `Scan/SensitiveReactions.cs` | Sensitive skin subtypes and the Baumann Skin Type system (from memory: four kinds of sensitive skin: acne, rosacea, burning/stinging, contact allergy); sensitive skin definitions from the International Forum for the Study of Itch |
+| Sensitive skin shown in different ways (redness, stinging, itching, breakouts, tightness, reacts to products) | `Scan/SensitiveReactions.cs` | Sensitive skin subtypes and the Baumann Skin Type system (from memory: four kinds of sensitive skin: acne, rosacea, burning/stinging, contact allergy) |
 | An unflagged ingredient is never called safe | engine and website | Wording of regulator and CIR safety assessments |
-| The nearest of six skin tones is chosen by CIE Lab colour distance (not RGB) from the middle of a selfie; lighting can mislead it, so the user keeps the last word and sees how the tone was found | `Onboarding/SkinToneMatch.cs`, `SkinToneSelfie.cs` | CIE 1976 L*a*b* colour space and colour-difference standard (from memory); the 2023 to 2024 skin tone estimation studies in section E |
+| The nearest of six skin tones is chosen by CIE Lab colour distance (not RGB) from the middle of a selfie; lighting can mislead it, so the user keeps the last word and sees how the tone was found | `Onboarding/SkinToneMatch.cs`, `SkinToneSelfie.cs` | CIE 1976 L*a*b* colour space and colour-difference standard (from memory); the 2024 skin tone estimation studies in section E |
 | "Find missing details": the AI web search looks a product up by name and brand and brings back brand, category and ingredient list marked Needs review, with the page it came from | `Admin/CaptureReader.cs` (FillMissing), `Scan/ProductAiAdvisor.cs` | Grounded AI search for product data; the Open Beauty Facts and related-systems items in section E |
-| The app has ONE skin tone list of six (Fair, Light, Medium, Tan, Deep, Dark), kept in `SkinToneMatch.Names` and read by Step 3, the selfie match, the profile page and shade advice. It is the project's own simplification for make-up shade matching: it is NOT an official standard (see the skin tone references in section E) | `Onboarding/SkinToneMatch.cs`, `Scan/ShadeAdvisor.cs`, `Onboarding/OnboardingStep5FlowController.cs` | Fitzpatrick scale, Monk Skin Tone Scale and the Philippine Fitzpatrick studies of section E; the app's six names are only loosely matched to them |
+| The app has ONE skin tone list of six (Fair, Light, Medium, Tan, Deep, Dark), kept in `SkinToneMatch.Names` and read by Step 3, the selfie match, the profile page and shade advice. It is the project's own simplification for make-up shade matching: it is NOT an official standard (see the skin tone references in section E) | `Onboarding/SkinToneMatch.cs`, `Scan/ShadeAdvisor.cs`, `Onboarding/OnboardingStep5FlowController.cs` | Fitzpatrick scale, Monk Skin Tone Scale and the Philippine Fitzpatrick studies (section E here; the 2025 to 2026 scale comparisons in `Paper_Revisions_2026-11-22.md` section 2); the app's six names are only loosely matched to them |
 | A pending product that arrived with no ingredient list gets one looked up on the web by itself (AI web search, once per product, up to 3 each time an admin opens Brand and Inventory). The result is never written into the product: it is queued in "Web ingredient lists to review" with the page it came from, and only a page the search really opened counts; ingredient databases (INCIDecoder, EWG, CosDNA, CosIng) are refused as a source | `api/product-list.js`, `_Shared/productListFill.js`, `adminBrandInventory.js` (autoFillLists) | Grounded AI search for product data; the Open Beauty Facts and related-systems items in section E; the Open Beauty Facts warning that its own ingredient parser is not reliable |
 
 ## D. Tools and services (Related Systems)
@@ -63,67 +63,105 @@ before it goes into the paper.
 | Android document picker (`ACTION_OPEN_DOCUMENT`) | "Import file" on the staff scanner: only the chosen file is handed over, no storage permission | Foreign (Google) | Android platform API | Project record |
 | Office Open XML (.docx, .xlsx) and PDF text streams, read with .NET `System.IO.Compression` | "Import file": product lists from Word, Excel and text PDFs (a scanned PDF has no text and is refused) | Standards (ECMA-376, ISO 32000), written from memory | Open formats | Not checked against the standards text |
 
-## E. Related literature and studies, 2023 to now (found by web search, 24 Nov 2026)
+## E. Related literature and studies, 2024 to now (found by web search, 24 and 25 Nov 2026)
 
 Rule of the register: only items whose **title and link were returned by a search** are listed. Authors, volume and DOI were NOT checked: open each link and copy the
 full reference from the page itself before it goes into the paper. "Supports" says which part of GlowUp the item can back up.
 
-### Foreign studies and regulations (2023 or later)
+### Foreign studies and regulations (2024 or later)
 
 | Year | Item (as the search returned it) | Link | Supports in GlowUp |
 |---|---|---|---|
-| 2023 | Commission Regulation (EU) 2023/1545, amending Annex III of Regulation (EC) 1223/2009: individual labelling of more than 80 fragrance allergens (in force 16 Aug 2023; products that do not comply may not be placed on the EU market after 31 Jul 2026, products already on the market may stay until 31 Jul 2028, per the Commission page) | https://eur-lex.europa.eu/eli/reg/2023/1545 and https://single-market-economy.ec.europa.eu/sectors/cosmetics/cosmetic-products-specific-topics/fragrance-allergens-labelling_en | The fragrance allergen family and the EU allergen list in `ingredientFit.js` (which still holds the shorter list of 26: update it to the 2023 list) |
 | 2024 | "Contact sensitization to fragrance mix I and fragrance mix II among European dermatitis patients: A systematic review" (Botvid et al., Contact Dermatitis, per the search summary) | https://cris.fau.de/publications/325469756 | Fragrance as an allergen family; why the app flags it |
 | 2024 | "Fragrance Contact Allergy – A Review Focusing on Patch Testing" (Sukakul, Bruze, Svedman; Acta Dermato-Venereologica, per the search summary) | https://pmc.ncbi.nlm.nih.gov/articles/PMC11334351/ | Same; limits of a "fragrance" label |
 | 2024 | Systematic review of cosmetic contact allergens: patch-test positivity 13% to 100% over 13 studies (reported by HealthDay; the journal article itself still has to be found) | https://www.healthday.com/dermatology-special/patch-test-positivity-rate-varies-from-13-to-100-percent-for-cosmetics | Common cosmetic allergens (nickel, fragrance mix I, cobalt, PPD, balsam of Peru) |
 | recent | "What is New in Contact Allergy To Cosmetics for Physicians, Cosmetologists, and Cosmetic Users?" (PMC review; year to confirm on the page) | https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12552389/ | Patch testing as the reference method; why the app is a screening aid, not a diagnosis |
-| 2023 | Review of new cosmetic sensitisers seen in 2022 (Current Allergy & Clinical Immunology, June 2023, per the search summary) | https://lirias.kuleuven.be/retrieve/758240 | Sensitiser list; carmine in lipsticks |
-| 2023 | Systematic review in Clinical, Cosmetic and Investigational Dermatology arguing that sensitive skin subtypes should be classified by pathogenesis (title and authors to find on the journal site) | search again: "sensitive skin subtypes pathogenesis systematic review Clinical, Cosmetic and Investigational Dermatology 2023" | The **Sensitive skin reactions** question (`SensitiveReactions.cs`) |
 | 2025 | Annals of Dermatology review noting Baumann's four sensitive-skin types: allergic, rosacea, acne, stinging (per the search summary; title to confirm) | search again: "Baumann sensitive skin four types allergic rosacea acne stinging Annals of Dermatology 2025" | Same |
 | 2025 | Frontiers in Medicine paper with expert recommendations on diagnostic criteria for sensitive skin (title to confirm) | https://pmc.ncbi.nlm.nih.gov/articles/PMC12419229 | Same |
-| background | "Definition of Sensitive Skin: An Expert Position Paper from the Special Interest Group on Sensitive Skin of the International Forum for the Study of Itch" (before 2023; the definition most papers use) | search the title on PubMed | Why "Sensitive" is one skin type with many reactions |
 | 2025 | Review in Journal of Fungi on Malassezia folliculitis ("fungal acne"): antifungals are the mainstay, relapses are common, often misdiagnosed as acne | https://mdpi.com/2309-608X/11/9/662 | Fungal-acne flag (folliculitis) from the CureSkin table |
 | 2026 | "Malassezia Folliculitis Presentation, Diagnosis, and Treatment: A Review of Fungal Acne" (Journal of Drugs in Dermatology) | https://jddonline.com/articles/malassezia-folliculitis-presentation-diagnosis-treatment-review-of-fungal-acne-S1545961626P9751X | Same |
 | 2024 | "Skin Tone Estimation under Diverse Lighting Conditions" (Mbatha et al., Journal of Imaging, DOI 10.3390/jimaging10050109, per the search summary): a CNN on the 10-point Monk Skin Tone Scale; accuracy is uneven across tones | https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11122461/ | The selfie "Find my tone" panel and its limits (lighting changes what a camera sees) |
 | 2024 | "Colorimetric skin tone scale for improved accuracy and reduced perceptual bias of human skin tone annotations" (arXiv preprint) | https://arxiv.org/pdf/2410.21005 | Measuring tone by colour, not by eye |
-| 2023 | Smartphone camera distance and angle versus measured skin-tone colour (Cronin et al., per the search summary; link to find) | search again: "Cronin smartphone camera distance angle skin tone color 2023" | Why the selfie is only a suggestion |
-| 2023 | "ARCosmetics: a real-time augmented reality cosmetics try-on system" (smartphone landmark stabilisation) | https://research.buaa.edu.cn/en/publications/arcosmetics-a-real-time-augmented-reality-cosmetics-try-on-system/ | AR Try-On (face landmarks, smoothing) |
 | 2025 | Frontiers in Virtual Reality consumer study of cosmetic try-on apps: informativeness drives intention to use (title to confirm) | search again: "Frontiers in Virtual Reality cosmetic try-on app informativeness playfulness intention" | Why AR Try-On is a feature users value |
 | 2025 to 2026 | "Mobile Application That Uses Retrieve Augment Generate with Computer Vision to Detect Potentially Harmful Cosmetic Ingredients for People with Skin Conditions" (IADT thesis, not peer reviewed) | https://onshow.iadt.ie/sites/default/files/2026-05/Laura%20Hofmanova%20Thesis.pdf | A related system: OCR plus AI to flag ingredients for skin conditions |
 | 2025 | PMC review of AI-driven personalised skincare (early platforms used questionnaires; newer ones use more data) | https://pmc.ncbi.nlm.nih.gov/articles/PMC12085869/ | Related systems: personalised recommendation |
-| 2022 to 2025 | Open Beauty Facts project pages: crowd-sourced data under ODbL, nightly exports, a warning that its experimental ingredient parser is not reliable for allergens | https://wiki.openfoodfacts.org/Open_Beauty_Facts and https://openfoodfacts.github.io/openfoodfacts-server/reference/api-tutorials/scanning-cosmetics-pet-food-and-other-products | Why Open Beauty Facts lists are "Detected", never "Checked", and an admin reviews them |
+| live page | Open Beauty Facts project pages: crowd-sourced data under ODbL, nightly exports, a warning that its experimental ingredient parser is not reliable for allergens | https://wiki.openfoodfacts.org/Open_Beauty_Facts and https://openfoodfacts.github.io/openfoodfacts-server/reference/api-tutorials/scanning-cosmetics-pet-food-and-other-products | Why Open Beauty Facts lists are "Detected", never "Checked", and an admin reviews them |
 
 ### Local (Philippines)
 
 | Year | Item (as the search returned it) | Link | Supports in GlowUp |
 |---|---|---|---|
 | 2025 | FDA Philippines Circular No. 2025-002 (March 2025) amending the ASEAN Cosmetic Directive; reported by a third-party news site, so confirm on the official page | https://www.fda.gov.ph (cosmetics circulars) | Why the app checks FDA status; ingredient restrictions |
-| 2018 | FDA Circular No. 2018-009 (updated ASEAN Cosmetic Directive annexes) and the product information file guideline (before 2023, background) | https://www.fda.gov.ph/?p=63733 and related FDA pages | Same |
-| 2022 | "Cosmetic preservative labeling in Philippine products in accordance with Philippine regulations" (Contact Dermatitis, 2022: before 2023, background; found that MCI/MI, formaldehyde and parabens are common, some labels were wrong, and Philippine rules do not cap preservatives as EU rules do) | https://lup.lub.lu.se/record/8dbaa3fb-9d02-47ec-a749-787429137d4b | Why a label can be wrong, and why the app never calls an unflagged ingredient safe |
-| 2012 | "Cosmetic intolerance syndrome in a Filipino woman: A case report" (Journal of the Philippine Dermatological Society; before 2023, background) | https://search.bvsalud.org/gim/resource/en/wpr-633029 | Fragrance, formaldehyde and nickel reactions in a Filipino patient |
 
-### Skin tone references (added 24 Nov 2026, found by web search; open each link and copy the full reference)
+### Skin tone references, 2024 or later (added 24 Nov 2026, found by web search; open each link and copy the full reference)
 
 | Year | Item (as the search returned it) | Link | Supports in GlowUp |
 |---|---|---|---|
-| 2023 | "Beyond Skin Tone: A Multidimensional Measure of Apparent Skin Color" (arXiv preprint) | https://arxiv.org/pdf/2309.05148 | Why one tone name is a simplification of skin colour |
-| 2023 to 2024 | "Which Skin Tone Measures are the Most Inclusive? An Investigation of Skin Tone Measures for Machine Learning" (Google Research; the search says it is to appear in the ACM Journal of Responsible Computing) | https://research.google/pubs/which-skin-tone-measures-are-the-most-inclusive-an-investigation-of-skin-tone-measures-for-machine-learning/ | Compares Fitzpatrick, Fenty and Monk scales: Fitzpatrick was seen as less inclusive |
-| background | Monk Skin Tone Scale, 10 shades, open source, built with Google (Wikipedia entry; a primary page still has to be found) | https://www.Wikipedia.com/wiki/Monk_Skin_Tone_Scale | A ten-shade alternative to the app's six names |
-| background | The Fitzpatrick Scale (EyeWiki): sun reaction, types I to VI, not a measure of skin colour | https://eyewiki.aao.org/The_Fitzpatrick_Scale | Why the six tiles describe how skin reacts to sun (burns, tans) as well as colour |
 | 2025 | Prevalence, epidemiology and clinical characteristics of melasma (Philippine Medical Association PDF): Filipino patients mostly Fitzpatrick type IV | https://www.philippinemedicalassociation.org/wp-content/uploads/2025/08/1-Prevalence-Epidemiology-and-Clinical-Characteristic-of-Melasma.pdf | Filipino skin tones sit mostly in the middle and darker tiles (Medium, Tan, Deep) |
-| 2015 | "Comparison of skin color between two Asian populations: according to latitude and UV exposure" (PubMed 25573440; before 2023, background) | https://pubmed.ncbi.nlm.nih.gov/25573440/ | CIELAB and ITA measures of Asian skin colour |
 
 Finding of the search: no national skin tone classification for Filipinos exists; Philippine studies use the Fitzpatrick scale. The six tones of the app are therefore the project's own list. They are not "official": the paper should say so and cite the scales above as the nearest standards.
 
 ### Still missing (search again before the paper is finished)
-- A Philippine **peer-reviewed study from 2023 or later** on cosmetic allergy or contact dermatitis: none came up. Try PubMed and the Journal of the Philippine Dermatological Society archive.
-- A **peer-reviewed accuracy study of OCR on cosmetic ingredient labels** (2023 or later): none came up, only app store listings and one thesis.
+- A Philippine **peer-reviewed study from 2024 or later** on cosmetic allergy or contact dermatitis: none came up. Try PubMed and the Journal of the Philippine Dermatological Society archive.
+- A **peer-reviewed accuracy study of OCR on cosmetic ingredient labels** (2024 or later): none came up, only app store listings and one thesis.
 - A **peer-reviewed study of Open Beauty Facts data quality**: none came up.
-- A **Philippine thesis or study on a skincare or cosmetic ingredient app** (2023 or later): only press and product pages came up.
+- A **Philippine thesis or study on a skincare or cosmetic ingredient app** (2024 or later): only press and product pages came up.
 - A **Filipino skin tone or skin type study**: searched 24 Nov 2026: none for a classification; only Fitzpatrick-based clinical studies (see the skin tone references).
 - The **underlying references of the CureSkin flags** (Malassezia substrate lists, comedogenicity ratings): open the CureSkin page and cite those directly.
 
+## G. Panel questions: evidence noted for the paper (searched 25 Nov 2026, paper NOT yet edited)
+
+Dermalytics API: GlowUp does not use it (no mention in code or documents). A web search did not confirm what it is.
+
+### G1. Why an admin checks more than one website (project record, first-hand)
+
+No single source holds everything a product record needs:
+
+| Source | Gives | Does not give | Measured limit |
+|---|---|---|---|
+| FDA Philippines portal | Notification (registration), brand, product name, variants, company, validity | Ingredient list | No documented public API; refuses default client names (HTTP 403, 11 Oct 2026); rate limit (HTTP 429); 12 to 30 s a search |
+| Open Beauty Facts | Barcode, name, brand, some ingredient lists | Official status; completeness | Edited by volunteers; about 1 in 100 name searches matched for the Philippine brand list (12 to 13 Oct 2026) |
+| UPCitemdb (trial) | Product title and brand from a barcode | Ingredient list | 100 look-ups a day, 6 a minute |
+| Brand's own site | Ingredient list of that market's pack | Philippine registration; many brands publish no list | Some refused automated reading (HTTP 403 or 404); US or UK pages may differ from the Philippine pack |
+| PubChem, EU CosIng, EU regulation | What an ingredient is, or whether it is restricted | Which ingredients are in a product | See `DATA_SOURCE_POLICY.md` |
+
+Brand list result (13 Oct 2026): of 391 catalogue entries, 95 had an ingredient list and 296 did not.
+
+Reducing the work, already built: Quick fill, Batch Barcode Lookup (up to 100 codes), file import (PDF, Excel, Word, CSV, TXT), queued web ingredient lists, phone capture with batch mode. Time saved has NOT been measured (`AUTOMATION_AUDIT.md` section 7): do not claim a figure before timing one-by-one entry against batch entry.
+
+### G2. Why automated programs are refused by websites (literature; open each link before citing)
+
+These study AI crawlers and web publishers in general, NOT cosmetic brand sites. Items marked "company or news" are not peer reviewed. A refusal can also come from a missing public API, a rate limit or a script-only page, so do not say every official site blocks AI.
+
+| Year | Item (as the search returned it) | Link |
+|---|---|---|
+| 2024, revised later | "Somesite I Used To Crawl: Awareness, Agency and Efficacy in Protecting Content Creators From AI Crawlers" (Liu et al., arXiv) | https://arxiv.org/html/2411.15091v2 |
+| 2025 | "Is Misinformation More Open?" (Steinacker-Olsztyn, Gosain, Dao, arXiv): robots.txt blocking of AI crawlers by reputable sites rose from 23% (Sept 2023) to nearly 60% (May 2025), per the search summary | https://arxiv.org/html/2510.10315v3 |
+| 2025 | Cloudflare press release: choice to allow or deny AI crawlers on new domains (company) | https://cloudflare.com/press-releases/2025/cloudflare-just-changed-how-ai-crawlers-scrape-the-internet-at-large |
+| 2025 | MIT Technology Review: Cloudflare blocks AI bots by default (news) | https://www.technologyreview.com/2025/07/01/1119498/cloudflare-will-now-by-default-block-ai-bots-from-crawling-its-clients-websites/ |
+
+### G3. Label reading and related systems (added to section E topics)
+
+| Year | Item (as the search returned it) | Link |
+|---|---|---|
+| 2025 | Harmful ingredient detection from cosmetic products, mobile OCR (Sayallar and Sayar, Signal, Image and Video Processing) | https://unpaywall.org/10.1007%2FS11760-025-03923-0 |
+| recent | "Real-time food allergen detection using OCR-enhanced machine learning techniques" (PeerJ Computer Science; food, not cosmetics) | https://peerj.com/articles/cs-3338 |
+
+### G4. Where the other lists are backed
+
+- Skin tone, skin type, chronic conditions, AR finishes: `Paper_Revisions_2026-11-22.md` section 2. Studies in this register follow the same limit: 2024 or later.
+- Sensitivities and allergens: section E.
+
+### G5. Gaps (no suitable source found yet)
+
+- Barcode scanning against manual typing in a consumer app: only clinical and vendor material came up.
+- Batch upload against one-by-one entry (time, errors): only vendor material came up. Our own timed test would be the strongest evidence.
+- Fragmented or inconsistent cosmetic product data: only advocacy and news (PIRG, Bloomberg 2024), no peer-reviewed study.
+- Philippine study on any of the above: none found.
+
 ## F. Changes to this register
+- 25 Nov 2026 (later): studies from 2023 and earlier removed from sections E and G (owner's rule: 2024 or later). Laws and standards in section B stay.
+- 25 Nov 2026: section G added (panel questions: batch upload, many websites, blocked bots, label reading, gaps). Paper not edited.
 - 24 Nov 2026: created. Covers everything added up to app v0.98.5 and the website deploy of 24 Nov 2026, plus the Sensitive reactions work.
 - 24 Nov 2026 (later): section E filled with 2023-or-later literature found by web search (titles and links only; full references still to be copied from each page); rows added for the Find my tone panel, the Find missing details button and the Sensitive reactions panel.
 - 24 Nov 2026 (third): skin tone references added (and the finding that the six-tone list is the project's own); rows for the one-tone-list rule, the Android document picker and the file formats read by Import file.
