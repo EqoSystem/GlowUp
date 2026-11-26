@@ -2,6 +2,7 @@
 // list, and the look-ups (Open Beauty Facts, the FDA Philippines list that ships with the site, PubChem).
 // The decisions live in smartAdd.js; this file only talks to the camera, the network and the screen.
 import { dialogFrame, icon } from "./adminShell.js";
+import { hazardCodes } from "./fitReasons.js";
 import {
     queryKind, offProductUrl, offSearchUrl, fromOpenBeautyFacts, searchCatalogue, mergeCandidates,
     pubchemSynonymsUrl, pubchemDescriptionUrl, aliasesFromPubchem, descriptionFromPubchem, ingredientsFromText, scoreCandidate,
@@ -254,6 +255,20 @@ export async function lookupProduct(text, options = {}) {
         found.push(...products.slice(0, 5));
     }
     return { query, candidates: mergeCandidates(found).slice(0, 6), note };
+}
+
+// The skin hazard codes PubChem lists for a compound. ok = false only when PubChem could not be asked (no entry = no codes).
+export async function lookupHazards(cid) {
+    const page = `https://pubchem.ncbi.nlm.nih.gov/compound/${Number(cid)}#section=Safety-and-Hazards`;
+    const control = new AbortController();
+    const timer = setTimeout(() => control.abort(), LOOKUP_TIMEOUT_MS);
+    try {
+        const response = await fetch(`https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/${Number(cid)}/JSON?heading=GHS+Classification`, { signal: control.signal, credentials: "omit" });
+        if (response.status === 404) return { ok: true, codes: [], url: page };
+        if (!response.ok) return { ok: false, codes: [], url: page };
+        return { ok: true, codes: hazardCodes(await response.json()), url: page };
+    } catch (error) { return { ok: false, codes: [], url: page }; }
+    finally { clearTimeout(timer); }
 }
 
 // What PubChem knows about an ingredient name: other names, a technical description and the compound page.

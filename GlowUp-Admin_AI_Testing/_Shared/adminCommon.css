@@ -2487,6 +2487,8 @@ body:not(.layout-editing) .board.two-sides > .panel[data-side="side"] { grid-col
 .qf-bar input { flex: 1 1 auto; min-width: 0; }
 .qf-tools { display: flex; flex-wrap: wrap; gap: calc(8 * var(--u)); margin-top: calc(10 * var(--u)); }
 .qf-tools .btn, .qf-bar .btn { min-height: calc(44 * var(--u)); }
+.fit-why { display: grid; gap: calc(4 * var(--u)); margin-top: calc(6 * var(--u)); overflow-wrap: anywhere; }
+.fit-why:empty { display: none; }
 .qf-status { min-height: 1.2em; margin-top: calc(8 * var(--u)); }
 .qf-status.ok { color: var(--ok); }
 .qf-status.warn { color: var(--warn); }

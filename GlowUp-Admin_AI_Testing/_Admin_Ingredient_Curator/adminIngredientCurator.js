@@ -53,10 +53,11 @@ import { loadClassifications, classifications, classificationName, openClassific
 import { makeCombo } from "../_Shared/adminSelect.js";
 import { wireWindow } from "../_Shared/adminWindow.js";
 import { mountSourceLinks, countSaved } from "./sourceLinks.js";
-import { lookupIngredient } from "../_Shared/quickFill.js";
+import { lookupIngredient, lookupHazards } from "../_Shared/quickFill.js";
+import { planFit } from "../_Shared/fitReasons.js";
 import { suggestClassification, friendlyStarter, pubchemPage as pubchemCompoundPage } from "../_Shared/smartAdd.js";
 import { SOURCE_LINK_FIELDS } from "../_Shared/fieldSources.js";
-import { autoFitPatch, autoDetailsPatch, hasNoFit, refFunction, REF_CREDIT } from "../_Shared/ingredientFit.js";
+import { autoFitPatch, autoDetailsPatch, suggestFit, refFunction, REF_CREDIT } from "../_Shared/ingredientFit.js";
 import { FIELD_GUIDE, SOURCES, linksFor, allSourcesFor, addReference, labelBareUrls, pubchemLookupUrl, firstCompoundId, pubchemPageUrl, insertPaste } from "../_Shared/fieldSources.js";
 import { aliasesWithInci, firstAlias, needsClassification, MAX_PURPOSE, CLASSIFICATION_REQUIRED_ON_EXISTING, PURPOSE_REQUIRED_ON_EXISTING } from "../_Shared/classificationRules.js";
 
@@ -84,9 +85,6 @@ const NEVER_AUTO = ["document-import", "snapshot"];
 const hasCredibleSource = (item) => !NEVER_AUTO.includes(item.via) && (item.riskLevel === "caution" || item.riskLevel === "harmful")
     && evidenceProblem(item.riskLevel, item.sources) === "";
 
-// SOURCED flags for ingredients no built-in rule knows: the server asks Gemini with web search and returns flags only with a page the search opened.
-// The page must also pass the website's own evidence tiers (regulator, medical or scientific body). At most 6 ingredients per page load; one that has
-// been asked is marked (fitAiChecked) so it is not asked again. A failed request marks nothing.
 // The reference table (CureSkin CC BY 4.0 + BEAUTEE MIT, built by tools/buildIngredientRefs.mjs): read once; without it only the built-in rules run.
 let ingredientRefs;
 async function loadRefs() {
@@ -94,32 +92,6 @@ async function loadRefs() {
     try { const r = await fetch(new URL("../_Shared/data/ingredientRefs.json", import.meta.url).href, { credentials: "omit" }); ingredientRefs = r.ok ? await r.json() : null; }
     catch (error) { ingredientRefs = null; }
     return ingredientRefs;
-}
-
-async function sourcedFlags(conditionIds, allergenIds, refs) {
-    const options = (kind) => allOptions(kind).map((o) => ({ id: o.value, label: o.label }));
-    const waiting = everyIngredient.filter((item) => !item.binned && !item.fitAuto && !item.fitAiChecked && hasNoFit(item) && item.name.length >= 3 && !autoFitPatch(item, conditionIds, allergenIds, refs)).slice(0, 6);
-    if (waiting.length === 0 || !auth.currentUser) return;
-    let flagged = 0;
-    for (const item of waiting) {
-        try {
-            const token = await auth.currentUser.getIdToken();
-            const answer = await fetch("/api/ingredient-fit", { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
-                body: JSON.stringify({ name: item.name, aliases: item.aliases.slice(0, 6), allergens: options("allergens"), conditions: options("conditions") }), signal: AbortSignal.timeout(30000) });
-            if (!answer.ok) { if (answer.status === 503 || answer.status === 401 || answer.status === 429) return; continue; }
-            const found = await answer.json();
-            let data = { fitAiChecked: true };
-            if (found.found && evidenceProblem("caution", found.sources) === "") {
-                const sources = Array.from(new Set(item.sources.concat(found.sources))).slice(0, 10);
-                data = { fitAiChecked: true, fitAuto: true, fitAutoWhy: String(found.why || "").slice(0, 400), allergenTags: found.allergenTags.filter((id) => allergenIds.includes(id)),
-                    avoidForSkinTypes: found.avoidForSkinTypes, avoidForConditions: found.avoidForConditions.filter((id) => conditionIds.includes(id)), sources, fitAutoAt: serverTimestamp() };
-            }
-            await updateDoc(doc(db, "ingredients", item.id), data);
-            if (data.fitAuto) { Object.assign(item, data); flagged++; }
-            else item.fitAiChecked = true;
-        } catch (error) { console.warn("A sourced flag lookup did not work: ", error); }
-    }
-    if (flagged > 0) notify(`${many(flagged, "ingredient was", "ingredients were")} flagged from sources found on the web. Check them: each card names the source.`, "ok");
 }
 
 // AUTOMATIC DETAILS (24 Nov 2026): nobody types an ingredient's details. For (a) an ingredient that products list but has no entry yet and (b) an
@@ -156,7 +128,8 @@ async function autoDetails() {
             const fit = autoFitPatch(base, conditionIds, allergenIds, refs) || {};
             const sources = Array.from(new Set([k.page ? "PubChem | " + k.page : "", fit.sources ? REF_CREDIT : "", k.job ? REF_CREDIT : ""].filter(Boolean))).slice(0, 10);
             // auto-approval only for a name that a product an admin already accepted lists: a name from a Pending (app or file) product only creates an entry for review
-            const complete = !!(k.page && k.guess && k.job && x.trusted);
+            // and only when a rule judged it: an entry nobody and no rule has judged must not count as safe in the app
+            const complete = !!(k.page && k.guess && k.job && x.trusted && fit.fitAuto);
             const kind = k.guess ? k.guess.name.split("/")[0].trim() : "";
             const data = Object.assign({
                 name, aliases: aliasesWithInci(name, "", k.aliasList), classificationId: k.guess ? k.guess.id : "", purpose: k.job,
@@ -408,6 +381,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
     el("ingredientNameInput").addEventListener("input", () => sourceUi.refresh());
     el("ingredientQuickBtn").addEventListener("click", quickFillIngredient);
+    // Enter in the name box fills too. It never runs by itself on leaving the box: the form would move under the admin's pointer.
+    el("ingredientNameInput").addEventListener("input", () => forgetSkinFit(true));
+    el("ingredientNameInput").addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); quickFillIngredient(); } });
     wirePasteTidy();
     wireLimited();
     el("ingredientAliasesInput").addEventListener("input", showNameClash);
@@ -584,7 +560,6 @@ async function loadIngredients() {
                 console.warn("Automatic flags did not work: ", error);
             }
         }
-        await sourcedFlags(conditionIds, allergenIds, refs);
     }
 
 
@@ -680,6 +655,72 @@ function manageClassifications() {
     });
 }
 
+// SKIN DECISIONS of Quick fill (26 Nov 2026): GlowUp's name rules and PubChem's skin hazard codes tick the allergen families, the
+// "Avoid" skin types and conditions, with the reason under each group (fitReasons.js). Only an untouched group is ticked, nothing is
+// saved here, and what Quick fill ticked is taken back when the name changes.
+let fitRun = 0, autoTicked = null;
+
+function paintWhy(id, notes) {
+    el(id).innerHTML = notes.map((n) => `<p class="field-hint">${escapeHtml(n.text)}${/^https:\/\//.test(n.url) ? ` <a class="source-link" href="${escapeHtml(n.url)}" target="_blank" rel="noopener noreferrer">Source</a>` : ""}</p>`).join("");
+}
+
+function forgetSkinFit(takeBack) {
+    fitRun++;
+    if (takeBack && autoTicked) {
+        const without = (list, gone) => list.filter((v) => !gone.includes(v));
+        writeChecks(el("allergenTagsChecks"), without(readChecks(el("allergenTagsChecks")), autoTicked.allergens));
+        [["skinTypesFit", autoTicked.types], ["conditionsFit", autoTicked.conditions]].forEach(([id, gone]) => {
+            const now = readFit(el(id));
+            writeFit(el(id), without(now.avoid, gone), now.good);
+        });
+        if (autoTicked.umbrella) el("ingredientUmbrellaInput").checked = false;
+        const box = el("ingredientSourcesInput");
+        box.value = box.value.split("\n").filter((line) => !autoTicked.sources.includes(line.trim())).join("\n");
+        paintSourceCount();
+    }
+    autoTicked = null;
+    ["allergenWhy", "skinTypesWhy", "conditionsWhy", "riskWhy"].forEach((id) => { el(id).innerHTML = ""; });
+}
+
+async function fillSkinFit(name, found, filled) {
+    const run = ++fitRun;
+    const refs = await loadRefs();
+    const hazards = found && found.cid ? await lookupHazards(found.cid) : { ok: false, codes: [], url: "" };
+    // a late answer is dropped: the form was closed or reopened, or the name is another one now
+    if (run !== fitRun || el("addIngredientModal").style.display === "none" || el("ingredientNameInput").value.replace(/\s+/g, " ").trim() !== name) return false;
+    const plan = planFit({ rules: suggestFit([name].concat(toList(el("ingredientAliasesInput").value)), refs), hazards });
+    const known = (kind, ids) => ids.filter((id) => allOptions(kind).some((o) => o.value === id));
+    const done = { allergens: [], types: [], conditions: [], umbrella: false, sources: [] };
+    const kept = { text: "Left as you set it. What was found:", url: "" };
+
+    const allergens = known("allergens", plan.allergenTags);
+    if (readChecks(el("allergenTagsChecks")).length > 0) plan.notes.allergens.unshift(kept);
+    else if (allergens.length) { writeChecks(el("allergenTagsChecks"), allergens); done.allergens = allergens; filled.push("allergen family"); }
+
+    [["skinTypesFit", plan.avoidForSkinTypes, "types", "skinTypes", "skin types"], ["conditionsFit", known("conditions", plan.avoidForConditions), "conditions", "conditions", "skin conditions"]].forEach(([id, avoid, key, note, label]) => {
+        const now = readFit(el(id));
+        if (now.avoid.length + now.good.length > 0) plan.notes[note].unshift(kept);
+        else if (avoid.length) { writeFit(el(id), avoid, []); done[key] = avoid; filled.push(label); }
+    });
+
+    if (plan.umbrella && !el("ingredientUmbrellaInput").checked) { el("ingredientUmbrellaInput").checked = true; done.umbrella = true; filled.push("umbrella term"); }
+
+    const box = el("ingredientSourcesInput");
+    plan.sources.forEach((line) => {
+        const lines = box.value.split("\n").map((x) => x.trim()).filter(Boolean);
+        const next = lines.concat(line).join("\n");
+        if (!lines.includes(line) && lines.length < 10 && next.length <= (box.maxLength > 0 ? box.maxLength : 900)) { box.value = next; done.sources.push(line); }
+    });
+    paintSourceCount();
+
+    autoTicked = done;
+    paintWhy("allergenWhy", plan.notes.allergens);
+    paintWhy("skinTypesWhy", plan.notes.skinTypes);
+    paintWhy("conditionsWhy", plan.notes.conditions);
+    paintWhy("riskWhy", plan.notes.risk);
+    return true;
+}
+
 // Quick fill: empty boxes only. PubChem gives other names and the technical description (with its page as the source
 // link of those boxes); the classification is chosen from words in the name. The risk level is never set here.
 async function quickFillIngredient() {
@@ -687,6 +728,8 @@ async function quickFillIngredient() {
     const name = el("ingredientNameInput").value.replace(/\s+/g, " ").trim();
     if (name.length < 3) { status("Type the INCI name first (at least 3 letters).", "warn"); el("ingredientNameInput").focus(); return; }
     const button = el("ingredientQuickBtn");
+    if (button.disabled) return;
+    forgetSkinFit(true);
     setBusy(button, true, "Looking up...");
     status(`Looking up "${name}" on PubChem...`);
     const filled = [];
@@ -706,9 +749,10 @@ async function quickFillIngredient() {
         }
         if (className && empty("ingredientPurposeInput")) put("ingredientPurposeInput", className.split("/")[0].trim().slice(0, MAX_PURPOSE), "purpose");
         put("ingredientDescInput", friendlyStarter(name, className.split("/")[0].trim()), "a first plain-words sentence");
+        if (!(await fillSkinFit(name, found, filled))) { status(""); return; }
         showNameClash(); paintLimited(); paintSourceCount();
         if (filled.length === 0) status(found ? "Nothing new to fill: the boxes already have text, or PubChem has nothing more." : `PubChem does not know "${name}". Check the spelling, or fill the boxes by hand.`, "warn");
-        else status(`Filled: ${filled.join(", ")}. Read each box and correct it before saving. Risk level is still yours to set from a source.`, "ok");
+        else status(`Filled: ${filled.join(", ")}. Read each box and the notes under the groups, then press Save. Nothing is saved yet.`, "ok");
     } catch (error) { status("The look-up did not finish. Check the internet connection and try again.", "warn"); }
     finally { setBusy(button, false); }
 }
@@ -1616,6 +1660,7 @@ function openIngredientForm(item) {
     setFormError(form, "");
     form.querySelectorAll(".paste-note").forEach((note) => note.remove());
     editingIngredientId = item ? item.id : null;
+    forgetSkinFit(false);
     differentIds = new Set(item ? item.differentFrom : []);
     assisted = null;
     fieldFound = {};

@@ -20,6 +20,23 @@ const EU_FRAGRANCE_ALLERGENS = [
     "methyl 2-octynoate", "alpha-isomethyl ionone", "evernia prunastri", "evernia furfuracea", "fragrance", "parfum", "perfume", "aroma"
 ];
 
+// The page behind each rule, opened and read on 26 Nov 2026 (docs/SOURCES_REGISTER.md says what each one supports). "" = none read yet.
+const DERM = "https://dermnetnz.org/topics/";
+export const RULE_SOURCES = {
+    "eu-fragrance": `DermNet: Fragrance allergy | ${DERM}fragrance-allergy`,
+    "paraben": `DermNet: Contact reactions to cosmetics | ${DERM}contact-reactions-to-cosmetics`,
+    "sulfate": `DermNet: Irritant contact dermatitis | ${DERM}irritant-contact-dermatitis`,
+    "formaldehyde": `DermNet: Formaldehyde allergy | ${DERM}formaldehyde-allergy`,
+    "lanolin": `DermNet: Contact reactions to lanolin | ${DERM}contact-reactions-to-lanolin`,
+    "essential-oil": `DermNet: Allergic contact dermatitis to essential oils | ${DERM}allergic-contact-dermatitis-to-essential-oils`,
+    "nut": "",
+    "alcohol-denat": "National Rosacea Society: Skin care and cosmetics | https://www.rosacea.org/patients/skincare",
+    "cooling": "American Academy of Dermatology: Rosacea triggers | https://www.aad.org/public/diseases/rosacea/triggers/tips",
+    "isothiazolinone": `DermNet: Methylisothiazolinone allergy | ${DERM}methylisothiazolinone-allergy`,
+    "pore-clogging": ""
+};
+const UMBRELLA_WORDS = ["fragrance", "parfum", "perfume", "aroma"];
+
 const word = (name, term) => new RegExp("(^|[^a-z0-9])" + term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "([^a-z0-9]|$)").test(name);
 
 const RULES = [
@@ -77,22 +94,28 @@ const normal = (value) => String(value === null || value === undefined ? "" : va
  */
 export function suggestFit(names, refs) {
     const list = (Array.isArray(names) ? names : [names]).map(normal).filter((n) => n.length > 1);
-    const out = { allergenTags: [], avoidForSkinTypes: [], avoidForConditions: [], why: [], rules: [] };
+    const out = { allergenTags: [], avoidForSkinTypes: [], avoidForConditions: [], why: [], rules: [], details: [] };
     const add = (into, values) => values.forEach((v) => { if (v && !into.includes(v)) into.push(v); });
     RULES.forEach((rule) => {
         if (!list.some((n) => rule.test(n))) return;
         add(out.allergenTags, [rule.allergen]); add(out.avoidForSkinTypes, rule.types); add(out.avoidForConditions, rule.conditions);
         out.why.push(rule.why); out.rules.push(rule.id);
+        out.details.push({ why: rule.why, source: RULE_SOURCES[rule.id] || "", allergen: rule.allergen, types: rule.types, conditions: rule.conditions,
+            umbrella: list.some((n) => UMBRELLA_WORDS.includes(n)) });
     });
     const row = refRow(list, refs);
     if (row) {
         const [, fungal, comedogenic, fragrance, eu, alcohol] = row;
-        const note = (text, id) => { out.why.push(text + " (CureSkin, CC BY 4.0)"); out.rules.push(id); };
-        if (fragrance === 1 || eu === 1) { add(out.allergenTags, ["fragrance"]); add(out.avoidForSkinTypes, ["Sensitive"]); add(out.avoidForConditions, FRAGRANCE_CONDITIONS); note("Listed as a fragrance or EU-declared allergen.", "ref-fragrance"); }
-        if (alcohol === "d") { add(out.avoidForSkinTypes, ["Dry", "Sensitive"]); add(out.avoidForConditions, ["rosacea", "atopic", "eczema", "irritantcontact"]); note("A drying alcohol that can dehydrate the skin barrier.", "ref-drying-alcohol"); }
-        if (typeof comedogenic === "number" && comedogenic >= 3) { add(out.avoidForSkinTypes, ["Oily"]); add(out.avoidForConditions, ["acne"]); note(`Published comedogenic rating ${comedogenic} of 5.`, "ref-comedogenic"); }
+        const note = (text, id, allergen, types, conditions) => {
+            add(out.allergenTags, [allergen]); add(out.avoidForSkinTypes, types); add(out.avoidForConditions, conditions);
+            out.why.push(text + " (CureSkin, CC BY 4.0)"); out.rules.push(id);
+            out.details.push({ why: text, source: REF_CREDIT, allergen, types, conditions, umbrella: false });
+        };
+        if (fragrance === 1 || eu === 1) note("Listed as a fragrance or EU-declared allergen.", "ref-fragrance", "fragrance", ["Sensitive"], FRAGRANCE_CONDITIONS);
+        if (alcohol === "d") note("A drying alcohol that can dehydrate the skin barrier.", "ref-drying-alcohol", "", ["Dry", "Sensitive"], ["rosacea", "atopic", "eczema", "irritantcontact"]);
+        if (typeof comedogenic === "number" && comedogenic >= 3) note(`Published comedogenic rating ${comedogenic} of 5.`, "ref-comedogenic", "", ["Oily"], ["acne"]);
         // fungal acne is folliculitis caused by Malassezia yeast; the general condition "folliculitis" carries it (it is not a user-chosen chronic condition)
-        if (fungal === 1) { add(out.avoidForConditions, ["folliculitis"]); note("Reported as food for Malassezia yeast (fungal acne).", "ref-fungal-acne"); }
+        if (fungal === 1) note("Reported as food for Malassezia yeast (fungal acne).", "ref-fungal-acne", "", [], ["folliculitis"]);
     }
     return out;
 }

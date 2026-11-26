@@ -164,8 +164,7 @@
                 <button type="button" class="icon-btn ing-close" data-close aria-label="Close"><i data-icon="x"></i></button>
             </header>
             <nav class="ing-nav" aria-label="Sections of this form">
-                <button type="button" class="ing-nav-btn" data-jump="ingredientQuickFill" aria-current="true">Quick fill</button>
-                <button type="button" class="ing-nav-btn" data-jump="secUsers">What app users read</button>
+                <button type="button" class="ing-nav-btn" data-jump="secUsers" aria-current="true">What app users read</button>
                 <button type="button" class="ing-nav-btn" data-jump="secNames">Other names and sources</button>
                 <button type="button" class="ing-nav-btn" data-jump="secJudge">How the app judges it</button>
             </nav>
@@ -174,15 +173,6 @@
                     <p class="modal-intro ing-intro">The first boxes are what app users read. The rest tells the app how to judge the ingredient for each user; leave any of it empty and the app uses its own built-in knowledge.</p>
                     <p class="review-note" id="ingredientReviewNote" style="display: none;"></p>
 
-                    <section class="ing-section qf-section" id="ingredientQuickFill" aria-labelledby="ingredientQuickFillTitle">
-                        <h4 class="ing-section-title" id="ingredientQuickFillTitle">Quick fill</h4>
-                        <p class="field-hint">Type the INCI name below and press Fill. Empty boxes are filled from PubChem (NIH) and the classification is chosen from the name; boxes you typed in are left alone. Risk level is never filled for you: it needs a regulator or medical source.</p>
-                        <div class="qf-tools">
-                            <button type="button" class="btn primary" id="ingredientQuickBtn"><i data-icon="sparkle"></i>Fill from the name</button>
-                        </div>
-                        <p class="field-hint qf-status" id="ingredientQuickStatus" role="status" aria-live="polite"></p>
-                    </section>
-
                     <section class="ing-section" id="secUsers" aria-labelledby="secUsersTitle">
                         <h4 class="ing-section-title" id="secUsersTitle">What app users read</h4>
                         <div class="ing-grid">
@@ -190,6 +180,9 @@
                                 <div class="label-row"><label for="ingredientNameInput">INCI name <span class="required" aria-hidden="true">*</span></label></div>
                                 <input type="text" id="ingredientNameInput" maxlength="80" placeholder="e.g., Aqua" autocomplete="off" aria-required="true" aria-describedby="ingredientNameHint">
                                 <div class="hint-row"><p class="field-hint" id="ingredientNameHint">Only the one official name printed on labels, for example Aqua. Do not add other names here (not "Aqua / Water"): put Water, Eau under Also known as.</p></div>
+                                <div class="qf-tools"><button type="button" class="btn primary" id="ingredientQuickBtn" aria-describedby="ingredientQuickHint"><i data-icon="sparkle"></i>Fill from the name</button></div>
+                                <p class="field-hint" id="ingredientQuickHint">Fills empty boxes from PubChem and GlowUp's rules, with the reason under each group. Press the button, or Enter in the name box. Nothing is saved until you press Save.</p>
+                                <p class="field-hint qf-status" id="ingredientQuickStatus" role="status" aria-live="polite"></p>
                             </div>
                             <div class="field half">
                                 <div class="label-row">
@@ -252,6 +245,7 @@
                                     <option value="caution">Caution</option>
                                     <option value="harmful">Harmful</option>
                                 </select>
+                                <div class="fit-why" id="riskWhy"></div>
                             </div>
                             <div class="field half">
                                 <div class="label-row"><label for="ingredientMinAgeInput">Minimum Age</label></div>
@@ -286,11 +280,13 @@
                                     <span class="label-actions"><span class="info-slot" data-info="A user who picked that allergen in the app is warned about this ingredient." data-info-label="About Allergen Family"></span><button type="button" class="icon-btn small list-edit" data-list-edit="allergens" aria-label="Edit the allergen families list"><i data-icon="edit"></i></button></span>
                                 </div>
                                 <div class="checks pills" id="allergenTagsChecks"></div>
+                                <div class="fit-why" id="allergenWhy"></div>
                             </div>
 
                             <div class="field full" role="group" aria-labelledby="skinTypesLabel">
                                 <div class="label-row"><span class="label-text" id="skinTypesLabel">Skin Types</span></div>
                                 <div class="fit-list" id="skinTypesFit"></div>
+                                <div class="fit-why" id="skinTypesWhy"></div>
                             </div>
                             <div class="field full" role="group" aria-labelledby="conditionsLabel">
                                 <div class="label-row">
@@ -298,6 +294,7 @@
                                     <span class="label-actions"><span class="info-slot" data-info="Choose Avoid or Good only where this ingredient matters; leave the rest on Neutral." data-info-label="About Chronic Skin Conditions"></span><button type="button" class="icon-btn small list-edit" data-list-edit="conditions" aria-label="Edit the chronic skin conditions list"><i data-icon="edit"></i></button></span>
                                 </div>
                                 <div class="fit-list" id="conditionsFit"></div>
+                                <div class="fit-why" id="conditionsWhy"></div>
                             </div>
                         </div>
                     </section>

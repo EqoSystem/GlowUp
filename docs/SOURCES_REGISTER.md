@@ -213,3 +213,25 @@ These replaced Adawiyah; An et al. (2023); Kim & Lee (2022); Patel & Shah (2021)
 - Removed, no replacement: Santiago-Rivera (2025). No trace of the article or journal in web search or Crossref; the link was only the Watsons home page (HTTP 403 to automated fetch).
 - Corrected: Gallardo et al. (2024) is in Isabela State University Linker: Journal of Engineering, Computing and Technology, 1(1), 108–114. The study classifies skin and non-skin samples, not skin tones. https://ejournals.ph/article.php?id=30971
 - Confirmed: Nguyen & Akter (2025), abstract and index record only. https://ideas.repec.org/a/bfy/oajhmn/v11y2025i1p26-35id2621.html
+
+## Quick fill skin decisions (26 November 2026)
+
+Pages below were opened and read on 26 November 2026. A page supports that the substance is an allergen or irritant. Which GlowUp skin types
+and conditions a rule then ticks is GlowUp's own mapping, not dermatologist-validated, and not every ticked row is named on the page.
+
+| Rule or data | Page | What it supports | Used in |
+|---|---|---|---|
+| Fragrance | https://dermnetnz.org/topics/fragrance-allergy | Fragrance allergy is an allergic contact dermatitis | `_Shared/ingredientFit.js` |
+| Parabens | https://dermnetnz.org/topics/contact-reactions-to-cosmetics | Lists parabens among preservatives causing cosmetic reactions | same |
+| Sulfates (detergents as irritants) | https://dermnetnz.org/topics/irritant-contact-dermatitis | Soaps and detergents are common irritants. Studies on SLS in atopic skin disagree | same |
+| Formaldehyde and releasers | https://dermnetnz.org/topics/formaldehyde-allergy | Formaldehyde is a sensitiser and irritant | same |
+| Lanolin | https://dermnetnz.org/topics/contact-reactions-to-lanolin | Lanolin contact allergy. Does not support the acne or oily-skin ticks | same |
+| Essential oils | https://dermnetnz.org/topics/allergic-contact-dermatitis-to-essential-oils | Allergic contact dermatitis to essential oils | same |
+| Isothiazolinones | https://dermnetnz.org/topics/methylisothiazolinone-allergy | Methylisothiazolinone allergy | same |
+| Alcohol and rosacea | https://www.rosacea.org/patients/skincare | Patient survey: alcohol 66 percent, fragrance 30, menthol 21 named as irritants | same |
+| Menthol, camphor and rosacea | https://www.aad.org/public/diseases/rosacea/triggers/tips | Lists alcohol, camphor, fragrance and menthol | same |
+| Nut-derived oils | no page read | Allergen tag by botanical name only | same |
+| Pore-clogging esters and butters | no medical page read | The app says "no source page for this rule yet"; the CureSkin rating above covers listed names | same |
+| Skin hazard codes H315 (irritation) and H317 (allergic skin reaction) | PubChem PUG View "GHS Classification" (ECHA C&L notifications), https://pubchem.ncbi.nlm.nih.gov | Self-reported hazard of the pure substance, not of the amount in make-up. GlowUp uses a code at 50 percent of notifiers or more. H315 ticks Sensitive and irritant contact dermatitis; H317 ticks Sensitive and allergic contact dermatitis (GlowUp's mapping) | `_Shared/fitReasons.js` (website Quick fill) |
+| Page-load AI flag search switched off | `api/ingredient-fit.js` no longer called by the Ingredient Curator | No daily AI search used for skin flags | `_Admin_Ingredient_Curator` |
+

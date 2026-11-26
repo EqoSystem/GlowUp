@@ -84,6 +84,7 @@ try {
     const sizes = [["360", 360, 740, 1], ["768", 768, 900, 1], ["1024", 1024, 800, 1], ["1440", 1440, 900, 1], ["zoom200", 720, 450, 1], ["text125", 1024, 800, 1.25]];
     for (const theme of ["light", "dark"]) for (const [label, width, height, scale] of sizes) {
         const { page, errors, settle } = await openPage(browser, "cur", { width, height, theme });
+        await page.route("https://pubchem.ncbi.nlm.nih.gov/**", (route) => route.fulfill({ status: 200, headers: { "access-control-allow-origin": "*" }, contentType: "application/json", body: "{}" }));
         await settle(500);
         if (scale !== 1) await page.evaluate((s) => document.documentElement.style.setProperty("--scale", String(s)), scale);
         await page.click("#addIngredientBtn");
@@ -96,8 +97,8 @@ try {
         ok(await page.locator("#addIngredientModal .modal-actions").evaluate((n) => { const r = n.getBoundingClientRect(); return Math.abs(r.right - n.closest(".ing-modal").getBoundingClientRect().right) < 40; }), `${tag}: Cancel and Save are at the bottom right`);
         const order = await page.evaluate(() => Array.from(document.querySelectorAll(".ing-modal .modal-actions button")).map((b) => b.textContent.trim()));
         ok(order[0] === "Cancel" && order[1] === "Save Ingredient", `${tag}: Cancel is left of Save`);
-        ok(await page.locator(".ing-nav-btn").count() === 4, `${tag}: Quick fill and three sections in the bar`);
-        ok(await page.evaluate(() => Array.from(document.querySelectorAll(".ing-section-title")).map((h) => h.textContent).join("|") === "Quick fill|What app users read|Other names and sources|How the app judges it"), `${tag}: Quick fill and the three section names are kept`);
+        ok(await page.locator(".ing-nav-btn").count() === 3, `${tag}: three sections in the bar`);
+        ok(await page.evaluate(() => Array.from(document.querySelectorAll(".ing-section-title")).map((h) => h.textContent).join("|") === "What app users read|Other names and sources|How the app judges it"), `${tag}: the three section names are kept`);
 
         ok(await page.evaluate(() => Array.from(document.querySelectorAll(".ing-modal .field")).every((f) => f.firstElementChild && f.firstElementChild.classList.contains("label-row"))), `${tag}: every field starts with a label row`);
         ok(await page.evaluate(() => Array.from(document.querySelectorAll(".ing-modal .label-row > label[for]")).every((l) => document.getElementById(l.htmlFor))), `${tag}: every label points at its box`);
@@ -145,6 +146,37 @@ try {
     }
 
 
+    // Quick fill's skin decisions (26 Nov 2026): fills on leaving the name box, gives a reason per group, takes its ticks back, saves nothing.
+    for (const width of [1100, 390]) {
+        const { page, errors, settle } = await openPage(browser, "cur", { width, height: 800 });
+        await settle(400);
+        const cors = { "access-control-allow-origin": "*" };
+        await page.route("https://pubchem.ncbi.nlm.nih.gov/rest/**", (route) => {
+            const url = route.request().url();
+            if (url.includes("pug_view")) return route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify({ Record: { Information: [{ String: "H317 (61.7%): May cause an allergic skin reaction" }] } }) });
+            if (url.includes("synonyms")) return route.fulfill({ status: 200, headers: cors, contentType: "application/json", body: JSON.stringify({ InformationList: { Information: [{ CID: 999, Synonym: ["Testolinum"] }] } }) });
+            return route.fulfill({ status: 404, headers: cors, body: "" });
+        });
+        await page.click("#addIngredientBtn");
+        await page.waitForSelector("#addIngredientForm", { state: "visible" });
+        await page.fill("#ingredientNameInput", "Testolinum");
+        await page.keyboard.press("Enter");
+        await page.waitForSelector("#conditionsWhy p", { state: "attached", timeout: 8000 });
+        const picked = () => page.evaluate(() => Array.from(document.querySelectorAll("#skinTypesFit .fit-row, #conditionsFit .fit-row")).filter((r) => r.querySelector('input[value="avoid"]:checked')).map((r) => r.dataset.value).join());
+        ok(await picked() === "Sensitive,allergiccontact,contact", `${width}: H317 ticks Sensitive and allergic contact dermatitis (got ${await picked()})`);
+        const why = await page.evaluate(() => ["allergenWhy", "skinTypesWhy", "conditionsWhy", "riskWhy"].map((id) => document.getElementById(id).textContent));
+        ok(/Not filled/.test(why[0]) && /H317/.test(why[1]) && /H317/.test(why[2]) && /Not filled/.test(why[3]), `${width}: every group says why`);
+        ok(await page.locator("#skinTypesWhy a.source-link[target=_blank]").count() === 1, `${width}: the reason links its page`);
+        ok(/Nothing is saved yet/.test(await page.textContent("#ingredientQuickStatus")), `${width}: the summary says nothing is saved`);
+        const found = await layoutProblems(page);
+        ok(found.problems.length === 0, `${width}: filled form layout ${found.problems.join("; ")}`);
+        if (SHOTS) { await page.locator("#skinTypesWhy").scrollIntoViewIfNeeded(); await page.screenshot({ path: path.join(SHOTS, `quickfill-${width}.png`) }); await page.evaluate(() => { document.getElementById("ingBody").scrollTop = 0; }); await page.screenshot({ path: path.join(SHOTS, `quickfill-${width}-top.png`) }); }
+        await page.fill("#ingredientNameInput", "Other name");
+        ok(await picked() === "" && await page.textContent("#skinTypesWhy") === "", `${width}: a new name takes the ticks and reasons back`);
+        ok(errors.filter((e) => !/404/.test(e)).length === 0, `${width}: no page errors ${errors.join("; ")}`);
+        await page.context().close();
+    }
+
     {
         const { page, errors, settle } = await openPage(browser, "cur", { width: 1100, height: 800 });
         await settle(400);
@@ -162,7 +194,7 @@ try {
         ok(await page.evaluate(() => { const a = document.getElementById("secJudgeTitle").getBoundingClientRect().top, b = document.getElementById("ingBody").getBoundingClientRect().top; return a >= b - 1 && a < b + 120; }), "and the section's title is at the top of the body, not hidden");
         await page.evaluate(() => { document.getElementById("ingBody").scrollTop = 0; });
         await page.waitForTimeout(200);
-        ok(await page.locator('.ing-nav-btn[data-jump="ingredientQuickFill"][aria-current="true"]').count() === 1, "scrolling back up moves the mark back");
+        ok(await page.locator('.ing-nav-btn[data-jump="secUsers"][aria-current="true"]').count() === 1, "scrolling back up moves the mark back");
 
 
         const purpose = '[data-field-sources="purpose"]';
