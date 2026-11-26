@@ -13,9 +13,9 @@ You are a research assistant for GlowUp, a make-up scanner app. I attached a pho
 2. Use web search. Read the pack in the photo first, then search the brand's own website, the FDA Philippines product search (verification.fda.gov.ph), and the maker's ingredient page. Never invent a value. If you cannot find a field, write `not found`.
 3. Never write a link you did not open. Every link must start with `https://`.
 4. The ingredient list must be copied in label order from the pack or the maker's page, as INCI names, separated by `|`. Do not translate, reorder or add ingredients.
-5. SHADES are hex colours like `#C2185B`, separated by `|`. Only give shades you can see or find a colour value for. Otherwise `not found`.
-6. BARCODE is the digits under the barcode only (6 to 14 digits). FDA_REGISTRATION_NUMBER is copied exactly from the FDA page. FDA_PH_LINK must be on fda.gov.ph.
-7. Use the field names exactly as written, in capitals, followed by a colon. One field after another. No bullets, no bold, no extra commentary inside the files.
+5. Shades: open the product's page on the brand's own website (the Philippine site first), find its shade selector, and list EVERY shade code or shade name code shown there in SHADE_CODES, in the page's order, separated by `|` (for example `110 | 115 | 220`). Check the list is complete. SHADES holds hex colours like `#C2185B` only when a page publishes the value itself. Never estimate a colour from a photo or swatch: write `not found`.
+6. BARCODE is the digits under the barcode of the photographed pack only (6 to 14 digits), not of another shade. FDA_REGISTRATION_NUMBER is copied exactly from the FDA page. FDA_PH_LINK must be on fda.gov.ph.
+7. Write every link whole, with no spaces or line breaks inside it. Use the field names exactly as written, in capitals, followed by a colon. One field after another. No bullets, no bold, no extra commentary inside the files.
 
 ## Evidence rules for ingredients
 Every decision must come from a page you opened, or from the table below. Your own opinion or memory is not a source.
@@ -72,7 +72,8 @@ PRODUCT_NAME:
 OTHER_NAMES: 
 COSMETIC_TYPE: (one of the types in rule 1)
 DESCRIPTION: (one or two sentences, at most 400 characters)
-SHADES: 
+SHADES: (hex values only, or not found)
+SHADE_CODES: (every shade code from the brand page, separated by |)
 MINIMUM_AGE: (a whole number, or not found)
 BARCODE: 
 PRODUCT_PHOTO_LINK: (https:// direct link to a picture of the pack)
@@ -111,8 +112,8 @@ Condition list (write them exactly like this): Atopic Dermatitis, Psoriasis, Ros
 
 ## Output
 At the end of your search, save each file and give me a download link. Choose ONE format and use it for all files, in this order of preference:
-1. PDF, with the text exactly as in the layouts above, in plain text, no tables, no pictures.
-2. If you cannot make a PDF: `.txt` with the same text.
+1. `.txt`, with the text exactly as in the layouts above. Plain text keeps long links in one piece.
+2. If you cannot make a `.txt` file: PDF with the same text, no tables, no pictures.
 3. For Excel or CSV instead: one sheet per file. Row 1 holds the field names (BRAND_NAME, PRODUCT_NAME, and so on), one record per row. Start a sheet with the line `SHEET: Inventory` or `SHEET: Ingredients`. Put brands and products in one sheet, ingredients in another.
 
 After the files, list in two lines which fields you wrote `not found` for.

@@ -13,7 +13,7 @@ import { MAKEUP_TYPES } from "./glowupRules.js";
 
 export const KEYS = {
     BRAND: ["BRAND_NAME", "OTHER_NAMES", "MARKET", "OFFICIAL_WEBSITE", "WEBSITE_EVIDENCE", "LOGO_LINK", "PICTURE_LINK"],
-    PRODUCT: ["BRAND_NAME", "PRODUCT_NAME", "OTHER_NAMES", "COSMETIC_TYPE", "DESCRIPTION", "SHADES", "MINIMUM_AGE", "BARCODE", "PRODUCT_PHOTO_LINK", "FDA_PH_LINK", "FDA_REGISTRATION_NUMBER", "INGREDIENTS", "SOURCES"],
+    PRODUCT: ["BRAND_NAME", "PRODUCT_NAME", "OTHER_NAMES", "COSMETIC_TYPE", "DESCRIPTION", "SHADES", "SHADE_CODES", "MINIMUM_AGE", "BARCODE", "PRODUCT_PHOTO_LINK", "FDA_PH_LINK", "FDA_REGISTRATION_NUMBER", "INGREDIENTS", "SOURCES"],
     INGREDIENT: ["NAME", "LABEL_NAME", "OTHER_NAMES", "DESCRIPTION", "TECHNICAL_DESCRIPTION", "CAUTION_NOTE", "COMMON_USES", "MINIMUM_AGE", "RISK_LEVEL",
         "ALLERGEN_FAMILY", "AVOID_WITH_CONDITIONS", "GOOD_FOR_CONDITIONS", "AVOID_FOR_SKIN_TYPES", "GOOD_FOR_SKIN_TYPES", "HIGHLIGHTS", "SOURCES"]
 };
@@ -157,6 +157,16 @@ function sheetRecords(text) {
 }
 
 
+// A product keeps a shade code only beside its colour, and a file often has codes with no published colour. So the codes are written at the end of the
+// description, where the admin sees them on "Check before saving" and on the product form, and adds each colour with its code there.
+function withShadeCodes(description, rawCodes) {
+    const codes = listOf(rawCodes, 20, 60).map(shadeCodeOf).filter(Boolean);
+    if (codes.length === 0) return value(description, 400);
+    const line = `Shade codes: ${codes.join(", ")}`.slice(0, 400);
+    const text = value(description, Math.max(0, 400 - line.length - 1));
+    return text ? `${text} ${line}` : line;
+}
+
 function product(f) {
     const kind = value(f.COSMETIC_TYPE, 60);
     const fda = httpsLinks(f.FDA_PH_LINK, 1).find((u) => /(^|\.)fda\.gov\.ph$/i.test(new URL(u).hostname)) || "";
@@ -164,7 +174,7 @@ function product(f) {
     return {
         brandName: value(f.BRAND_NAME, 60), productName: value(f.PRODUCT_NAME, 100),
         cosmeticType: MAKEUP_TYPES.find((t) => t.toLowerCase() === kind.toLowerCase()) || kind,
-        description: value(f.DESCRIPTION, 400),
+        description: withShadeCodes(f.DESCRIPTION, f.SHADE_CODES),
         ingredients: listOf(f.INGREDIENTS, 100, 80),
         shades: listOf(f.SHADES, 40, 100).map(hexOf).filter((s, i, all) => s && all.indexOf(s) === i).slice(0, 100),
         fdaVerifiedLink: fda,

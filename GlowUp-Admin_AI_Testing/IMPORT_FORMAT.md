@@ -16,7 +16,7 @@ notes. Any other document is still read by the AI as before.
 `WEBSITE_EVIDENCE` (not stored), `LOGO_LINK`, `PICTURE_LINK`
 
 ## Product
-`BRAND_NAME`, `PRODUCT_NAME`, `OTHER_NAMES`, `COSMETIC_TYPE` (one of the 17 make-up types), `DESCRIPTION`, `SHADES` (`#RRGGBB` only),
+`BRAND_NAME`, `PRODUCT_NAME`, `OTHER_NAMES`, `COSMETIC_TYPE` (one of the 17 make-up types), `DESCRIPTION`, `SHADES` (`#RRGGBB` only), `SHADE_CODES` (printed codes; added to the end of the description, the admin sets each colour on the product form),
 `MINIMUM_AGE`, `BARCODE`, `PRODUCT_PHOTO_LINK`, `FDA_PH_LINK` (a fda.gov.ph page), `FDA_REGISTRATION_NUMBER` (the FDA Philippines notification number; letters, digits and . , # ( ) _ - /), `INGREDIENTS` (INCI, printed order), `SOURCES` (https pages)
 
 ## Ingredient
