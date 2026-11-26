@@ -19,7 +19,7 @@ export const KEYS = {
 };
 const ALL_KEYS = Array.from(new Set([].concat(KEYS.BRAND, KEYS.PRODUCT, KEYS.INGREDIENT)));
 const MARKETS = ["Global", "Local", "Asia", "Europe", "North America"];
-const SKIN_TYPES = ["Oily", "Normal", "Dry", "Mix"];
+const SKIN_TYPES = ["Oily", "Normal", "Dry", "Mix", "Sensitive"];
 const RISKS = ["safe", "caution", "harmful"];
 const NOTHING = new Set(["", "n/a", "na", "none", "null", "-", "--", "unknown", "not found", "not available", "not stated"]);
 

@@ -151,5 +151,7 @@ equal(pairShades(["#111111", "#222222", "#333333"], ["1", "2", "3"], 2), { shade
 }
 
 console.log("checks made: " + checks);
+equal(parseImportText("=== INGREDIENT ===\nNAME: Linalool\nAVOID_FOR_SKIN_TYPES: Sensitive | Dry").draft.ingredients[0].avoidSkinTypes,
+    ["Sensitive", "Dry"], "the Sensitive skin type is read");
 console.log(failed === 0 ? "ALL PASSED" : failed + " FAILED");
 process.exit(failed === 0 ? 0 : 1);

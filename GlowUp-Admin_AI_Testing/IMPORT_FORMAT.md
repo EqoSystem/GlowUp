@@ -29,7 +29,7 @@ regulator or medical source states it (harmful = prohibited or restricted by a r
 such as an allergen or irritant at normal use; safe = no concern stated). Leave it `N/A` when no source says.
 
 Words the lists accept: allergen families Fragrance, Parabens, Sulfates, Formaldehyde releasers, Lanolin, Essential oils, Nut-derived oils;
-conditions Acne, Eczema, Psoriasis, Rosacea, Seborrheic Dermatitis, Melasma, Contact Dermatitis; skin types Oily, Normal, Dry, Mix;
+conditions as in `_Shared/listRules.js` (official lists); skin types Oily, Normal, Dry, Mix, Sensitive;
 highlights Key active, Umbrella term. A word that matches no list item is left out and named in the import report.
 
 Imported products and ingredients arrive as **Pending / waiting for review** (source ai, not reviewed). The app uses an unreviewed
