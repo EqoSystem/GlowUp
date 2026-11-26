@@ -167,3 +167,49 @@ These study AI crawlers and web publishers in general, NOT cosmetic brand sites.
 - 24 Nov 2026 (third): skin tone references added (and the finding that the six-tone list is the project's own); rows for the one-tone-list rule, the Android document picker and the file formats read by Import file.
 - 24 Nov 2026 (fourth): row for the automatic ingredient list look-up of products that arrive without one (`api/product-list.js`).
 - 24 Nov 2026 (fifth): the Ingredient Curator now writes ingredient details by itself (other names, chemical description, classification, purpose, flags) from PubChem, the CureSkin/BEAUTEE reference table and the built-in rules; no new source, no risk level set automatically (`autoDetails` in `adminIngredientCurator.js`).
+
+## Used in the revised paper (25 November 2026), not listed above
+
+APA entries as printed in the References of GlowUp_FinalPaper_REVISED_2026-11-25.
+
+- Brzozowska, J. M. (2025). Baumann Skin Type Questionnaire (BSTQ): Creation and validation of the Polish language version – part one. Advances in Dermatology and Allergology, 42(2), 190–196. https://doi.org/10.5114/ada.2025.149544
+- Chalupczak, N. V., & Lipner, S. R. (2025). Malassezia folliculitis: An underdiagnosed mimicker of acneiform eruptions. Journal of Fungi, 11(9), Article 662. https://doi.org/10.3390/jof11090662
+- Cook, C. M., Howard, J. J., Rabbitt, L. R., Shuggi, I. M., Sirotin, Y. B., Tipton, J. L., & Vemury, A. R. (2024). Colorimetric skin tone scale for improved accuracy and reduced perceptual bias of human skin tone annotations [Preprint]. arXiv. https://arxiv.org/abs/2410.21005
+- Kına, E. (2025). Real-time food allergen detection using OCR-enhanced machine learning techniques. PeerJ Computer Science, 11, Article e3338. https://doi.org/10.7717/peerj-cs.3338
+- Leng, M., Qi, P., Li, R., Gong, F., & Wei, Z. (2025). Burden of immune-related skin diseases worldwide, 1991–2021: Insights and prediction from the Global Burden of Disease Study. Frontiers in Immunology, 16, Article 1668840. https://doi.org/10.3389/fimmu.2025.1668840
+- Micheletto, V., Accardi, S., Fici, A., Piccoli, F., Rossi, C., Bilucaglia, M., Russo, V., & Zito, M. (2025). Enjoy it! Cosmetic try-on apps and augmented reality, the impact of enjoyment, informativeness and ease of use. Frontiers in Virtual Reality, 6, Article 1515937. https://doi.org/10.3389/frvir.2025.1515937
+- Pandhi, D., Inamadar, A. C., Saraswat, A., De, A., Parthasaradhi, A., Chandrasekhar, B. S., Kohli, M., Shenoy, M., Rajagopalan, M., Banodkar, P., Panda, S., Poojary, S., Thakor, P., Shah, R., & Rayasam, S. (2025). Spectrum of sensitive skin in India: A collaborative expert position statement. Frontiers in Medicine, 12, Article 1625172. https://doi.org/10.3389/fmed.2025.1625172
+
+## Added to the paper, 25 November 2026 (second round: new features)
+
+Journal items and the NIST report were checked against Crossref, the preprint against arXiv, the NPC advisory against its PDF. The FDA portal and Open Beauty Facts entries are web pages that were not opened in this pass. Open each before the defense.
+
+- Benthem de Grave, R., Bull, C. N., Monjardino de Souza Monteiro, D., Margariti, E., McMurchy, G., Hutchinson, J. W., & Smeddinck, J. D. (2024). Smartphone apps for food purchase choices: Scoping review of designs, opportunities, and challenges. Journal of Medical Internet Research, 26, Article e45904. https://doi.org/10.2196/45904
+- Çiftlikçi, M. S., Çakmak, Y., Kalaycı, T. A., Abut, F., Akay, M. F., & Kızıldağ, M. (2025). A new large language model for attribute extraction in e-commerce product categorization. Electronics, 14(10), Article 1930. https://doi.org/10.3390/electronics14101930
+- Food and Drug Administration Philippines. (n.d.). FDA verification portal. https://verification.fda.gov.ph/
+- Kyyrö, E., & Fränti, P. (2026). Using the consistency of LLM for better attribute value extraction. Applied Computing and Intelligence, 6(2), 173–185. https://doi.org/10.3934/aci.2026010
+- Liu, A. (2026). Accuracy and reliability of large language models in cosmetic chemistry and skin health: A benchmarking study [Preprint]. arXiv. https://arxiv.org/abs/2608.14631
+- Marques, P., Váz, P., Silva, J., Martins, P., & Abbasi, M. (2025). Real-time gesture-based hand landmark detection for optimized mobile photo capture and synchronization. Electronics, 14(4), Article 704. https://doi.org/10.3390/electronics14040704
+- National Privacy Commission. (2024). Guidelines on child-oriented transparency (NPC Advisory No. 2024-03). https://privacy.gov.ph/wp-content/uploads/2024/12/Advisory-2024.12.17-Guidelines-on-Child-Oriented-Transparency-w-SGD.pdf
+- Open Food Facts. (n.d.). Open Beauty Facts. https://wiki.openfoodfacts.org/Open_Beauty_Facts
+- Temoshok, D., Fenton, J. L., Choong, Y.-Y., Lefkovitz, N., Regenscheid, A., Galluzzo, R., & Richer, J. P. (2025). Digital identity guidelines: Authentication and authenticator management (NIST Special Publication 800-63B-4). National Institute of Standards and Technology. https://doi.org/10.6028/NIST.SP.800-63B-4
+
+## Added to the paper, 25 November 2026 (third round: replacing pre-2024 and unverifiable references)
+
+These replaced Adawiyah; An et al. (2023); Kim & Lee (2022); Patel & Shah (2021); Gulati et al. (2023); Syu et al. (2023); Velasco et al. (2023) and the 2021 to 2023 FDA items. Journal and conference items were checked against Crossref, the preprint against arXiv. The FDA circular title and address are as a web search returned them; the page refused the automated fetch and must be opened by hand. Diloy et al. (2023, MakeApp) stays: no local replacement of 2024 or later was found.
+
+- Food and Drug Administration Philippines. (2024). FDA Circular No. 2024-005: Updates and amendments to the ASEAN Cosmetic Directive (ACD) as adopted during the 38th ASEAN Cosmetic Committee (ACC) meeting and its related meetings. https://www.fda.gov.ph/fda-circular-no-2024-0005-updates-and-amendments-to-the-asean-cosmetic-directive-acd-as-adopted-during-the-38th-asean-cosmetic-committee-acc-meeting-and-its-related-meetings/
+- Lanitha, B., R, A., V R, J., P P, P., & P, S. (2026). A smart virtual makeup try-on and recommender system using artificial intelligence and augmented reality. In 2026 International Conference on Intelligent Processing, Hardware, Electronics, and Radio Systems (CIPHER) (pp. 1–6). IEEE. https://doi.org/10.1109/cipher70417.2026.11523751
+- Liu, H.-I., Galindo, M., Xie, H., Wong, L.-K., Shuai, H.-H., Li, Y.-H., & Cheng, W.-H. (2024). Lightweight deep learning for resource-constrained environments: A survey [Preprint]. arXiv. https://arxiv.org/abs/2404.07236
+- Nirupama, & Virupakshappa. (2024). MobileNet-V2: An enhanced skin disease classification by attention and multi-scale features. Journal of Imaging Informatics in Medicine, 38(3), 1734–1754. https://doi.org/10.1007/s10278-024-01271-y
+- Supe, A. S., Agaskar, V. A., Mestry, R. R., & Rokade, K. B. (2025). DermaTech: Skincare product recommendation system based on machine learning and deep learning. Cureus Journal of Computer Science. https://doi.org/10.7759/s44389-025-03706-1
+- Torthienchai, N., & Chuaikaew, K. (2025). The influence of artificial intelligence in product recommendation systems and brand value on consumer purchase intention on marketplace e-commerce platforms. International Journal of Innovative Research and Scientific Studies, 8(6), 2549–2556. https://doi.org/10.53894/ijirss.v8i6.10138
+- Vinutha, M., Dayananda, R. B., & Kamath, A. (2024). Personalized skincare product recommendation system using content-based machine learning. In 2024 4th International Conference on Intelligent Technologies (CONIT) (pp. 1–6). IEEE. https://doi.org/10.1109/conit61985.2024.10626458
+
+## Reference check, 25 November 2026 (links of four references)
+
+- Added (replaces Thakur): Hasibuan, D. A. F. (2025). The impact of perceived usefulness, convenience, and perceived augmentation on purchase intention: A study of virtual try-on for cosmetic products. Journal The Winners, 26(2), 133–146. https://doi.org/10.21512/tw.v26i2.13634 (journal page and Crossref record read; abstract only).
+- Removed: Thakur (2024), JETIR2311461. The link holds another paper (Vaidya et al., "Cosmetic Consumption Amongst the Youth In India", November 2023).
+- Removed, no replacement: Santiago-Rivera (2025). No trace of the article or journal in web search or Crossref; the link was only the Watsons home page (HTTP 403 to automated fetch).
+- Corrected: Gallardo et al. (2024) is in Isabela State University Linker: Journal of Engineering, Computing and Technology, 1(1), 108–114. The study classifies skin and non-skin samples, not skin tones. https://ejournals.ph/article.php?id=30971
+- Confirmed: Nguyen & Akter (2025), abstract and index record only. https://ideas.repec.org/a/bfy/oajhmn/v11y2025i1p26-35id2621.html
