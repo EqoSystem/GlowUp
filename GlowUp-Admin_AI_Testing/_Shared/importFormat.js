@@ -37,7 +37,9 @@ const httpsUrl = (raw) => {
     const t = squeeze(raw).replace(/[),.;]+$/, "");
     try { const u = new URL(t); return u.protocol === "https:" && !u.username && !u.password && u.hostname.includes(".") ? u.href : ""; } catch (error) { return ""; }
 };
-const httpsLinks = (raw, most) => listOf(raw, 500, most * 2).map(httpsUrl).filter((u, i, all) => u && all.indexOf(u) === i).slice(0, most);
+// A PDF breaks a long address over several lines: join them again, unless the next line starts another link or a "|".
+const unwrap = (raw) => String(raw == null ? "" : raw).trim().replace(/[ \t]*\r?\n[ \t]*(?!https:\/\/|\||\s)/g, "");
+const httpsLinks = (raw, most) => listOf(unwrap(raw), 500, most * 2).map(httpsUrl).filter((u, i, all) => u && all.indexOf(u) === i).slice(0, most);
 const age = (raw) => { const n = Number(squeeze(raw)); return Number.isInteger(n) && n > 0 && n < 100 ? n : 0; };
 
 
@@ -91,7 +93,7 @@ export function pairShades(rawShades, rawCodes, most = 24) {
 
 
 function homePage(raw) {
-    const url = httpsUrl(raw);
+    const url = httpsUrl(unwrap(raw));
     if (!url) return "";
     const host = new URL(url).hostname.toLowerCase().replace(/^www\./, "");
     return host === "vertexaisearch.cloud.google.com" || host.endsWith("duckduckgo.com") ? "" : "https://" + new URL(url).host + "/";

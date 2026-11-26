@@ -153,5 +153,7 @@ equal(pairShades(["#111111", "#222222", "#333333"], ["1", "2", "3"], 2), { shade
 console.log("checks made: " + checks);
 equal(parseImportText("=== INGREDIENT ===\nNAME: Linalool\nAVOID_FOR_SKIN_TYPES: Sensitive | Dry").draft.ingredients[0].avoidSkinTypes,
     ["Sensitive", "Dry"], "the Sensitive skin type is read");
+const wrapped = parseImportText("=== PRODUCT ===\nBRAND_NAME: Ab\nPRODUCT_NAME: Cd\nPRODUCT_PHOTO_LINK: https://a.example.com/x\n y.jpg?h=1\n 2\nSOURCES: https://a.example.com/lumi-f\n oundation |\n https://b.example.com/\nINGREDIENTS: Talc").draft.products[0];
+equal([wrapped.imageUrl, wrapped.sources], ["https://a.example.com/xy.jpg?h=12", ["https://a.example.com/lumi-foundation", "https://b.example.com/"]], "a link a PDF broke over lines is joined again");
 console.log(failed === 0 ? "ALL PASSED" : failed + " FAILED");
 process.exit(failed === 0 ? 0 : 1);
