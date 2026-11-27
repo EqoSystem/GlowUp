@@ -8,7 +8,7 @@ import { launch, openPage } from "./harness.mjs";
 
 let checks = 0, failed = 0;
 const ok = (cond, what) => { checks++; if (!cond) { failed++; console.log("FAILED: " + what); } };
-const echo = { active: "default", profiles: [{ id: "echo1", name: "Echo", appearance: {}, pages: { dashboard: { ver: 7, fit: true, order: [], size: {} } } }] };
+const echo = { active: "default", profiles: [{ id: "echo1", name: "Echo", appearance: {}, pages: { dashboard: { ver: 8, fit: true, order: [], size: {} } } }] };
 
 const browser = await launch();
 try {

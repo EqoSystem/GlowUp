@@ -7,9 +7,10 @@ import { db, auth } from "../_Database/firebase-console.js";
 import { collection, doc, query, where, serverTimestamp, addDoc as rawAddDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { updateDoc, onSnapshot } from "../_Shared/adminStore.js";
 import { escapeHtml, notify, describeError } from "../_Shared/adminCommon.js";
-import { dialogFrame, askConfirm, askText, icon, paginate, renderPager } from "../_Shared/adminShell.js";
+import { askConfirm, askText, icon, paginate, renderPager } from "../_Shared/adminShell.js";
 import { openReplyDrawer } from "../_Shared/replyDrawer.js";
 import { openPhoneLink } from "../_Shared/phoneLink.js";
+import { pageView } from "../_Shared/planViews.js";
 import { lookupIngredient, lookupHazards } from "../_Shared/quickFill.js";
 import { suggestFit } from "../_Shared/ingredientFit.js";
 import { planFit } from "../_Shared/fitReasons.js";
@@ -19,7 +20,7 @@ import { runImport, reviewRows, countResults, STEPS, RESULT_WORDS, FLAGGED, NO_R
 export const NEW_PRODUCT = "New product";
 const el = (id) => document.getElementById(id);
 const make = (tag, className, text) => { const n = document.createElement(tag); if (className) n.className = className; if (text != null) n.textContent = text; return n; };
-const TONE = { [FLAGGED]: "warn", [NO_RULE]: "muted", [NOT_IDENTIFIED]: "bad" };
+const TONE = { [FLAGGED]: "warn", [NO_RULE]: "", [NOT_IDENTIFIED]: "bad" };
 const lineUrl = (line) => { const t = String(line || ""); const u = t.slice(t.lastIndexOf("|") + 1).trim(); return /^https:\/\//i.test(u) ? u : ""; };
 const lineTitle = (line) => { const t = String(line || ""); const at = t.lastIndexOf("|"); return (at > 0 ? t.slice(0, at) : t).trim(); };
 const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch (error) { return url; } };
@@ -60,7 +61,7 @@ async function draftIngredient(name) {
  *   approve(product)          approves one product (asks first); resolves true when it was approved
  *   toBin(product)            moves one product to the Recycle bin
  *   openProduct(product)      opens the product form (to add a list by hand)
- *   openBatch()  openFile()   the existing Many barcodes drawer and file import
+ *   openBatch()               the existing Many barcodes drawer (file import sits inside the panel)
  *   reload()                  reads the lists again
  */
 export function mountSearchImport(deps) {
@@ -71,13 +72,18 @@ export function mountSearchImport(deps) {
     let reports = [];
 
     // ---------- the three ways to import ----------
+    const fileBox = el("siFile"), searchRow = queryBox.parentElement;
+    const showMode = (mode) => {
+        tabs.forEach((t) => t.setAttribute("aria-selected", String(t.dataset.siTab === mode)));
+        fileBox.hidden = mode !== "file"; searchRow.hidden = mode === "file";
+        if (mode === "one") queryBox.focus();
+    };
+    // a file picked from anywhere (the tab, the + menu, a shortcut) shows its progress under "From a file"
+    el("inventoryFileInput").addEventListener("change", () => showMode("file"));
     tabs.forEach((tab) => tab.addEventListener("click", () => {
         if (busy) return;
-        const mode = tab.dataset.siTab;
-        if (mode === "many") { deps.openBatch(); return; }
-        if (mode === "file") { deps.openFile(); return; }
-        tabs.forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
-        queryBox.focus();
+        if (tab.dataset.siTab === "many") { deps.openBatch(); return; }
+        showMode(tab.dataset.siTab);
     }));
     phone.addEventListener("click", () => openPhoneLink({ title: "Scan with your phone", what: "barcode", onValue: (value) => { queryBox.value = String(value || "").trim(); queryBox.focus(); } }));
     queryBox.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); start(); } });
@@ -227,13 +233,13 @@ export function mountSearchImport(deps) {
     // ---------- Product review ----------
     function openReview(product) {
         let names = product.ingredients.slice();
-        let dirty = false, filter = "all", working = false;
+        let dirty = false, filter = "all", working = false, unfolded = false;
         const leave = async () => {
             if (working) return;
             if (dirty && !(await askConfirm({ title: "Discard changes?", message: "The corrected names are not saved.", confirmLabel: "Discard", cancelLabel: "Keep editing" }))) return;
             frame.close(); paintQueue();
         };
-        const frame = dialogFrame("Product review", leave);
+        const frame = pageView("Product review", leave);
         frame.box.classList.add("review-window");
         const head = frame.box.querySelector("h3");
         const top = make("div", "rv-head");
@@ -241,21 +247,27 @@ export function mountSearchImport(deps) {
         back.addEventListener("click", leave);
         head.textContent = product.name;
         top.append(back, head, make("span", "small muted", product.brandName), make("span", "chip warn", "Pending"));
-        frame.box.prepend(top);
         const sources = make("p", "rv-sources small");
         const links = (product.sources || []).map((s) => lineUrl(s) ? `<a href="${escapeHtml(lineUrl(s))}" target="_blank" rel="noopener noreferrer">${escapeHtml(lineTitle(s) && lineTitle(s) !== lineUrl(s) ? lineTitle(s) : hostOf(lineUrl(s)))} ↗</a>` : "").filter(Boolean);
         sources.innerHTML = "Sources: " + (links.length ? links.join(" &nbsp; ") : `<span class="muted">none saved</span>`);
         const chips = make("div", "rv-filter"); chips.setAttribute("role", "tablist");
         const tableWrap = make("div", "table-container");
         const foot = make("div", "rv-foot");
-        frame.box.append(sources, chips, tableWrap, foot);
+        const headCard = make("div", "panel"), bodyCard = make("div", "panel"), footCard = make("div", "panel");
+        headCard.append(top, sources); bodyCard.append(chips, tableWrap); footCard.append(foot);
+        frame.box.replaceChildren(headCard, bodyCard, footCard);
 
         const paint = () => {
             const rows = reviewRows(names, deps.library());
             const c = countResults(rows);
             chips.innerHTML = [["all", `All ${c.all}`], [FLAGGED, `Flagged ${c[FLAGGED]}`], [NO_RULE, `No rule matched ${c[NO_RULE]}`], [NOT_IDENTIFIED, `Not identified ${c[NOT_IDENTIFIED]}`]]
                 .map(([id, words]) => `<button type="button" class="chip-btn${filter === id ? " on" : ""}" data-rv-filter="${id}" aria-selected="${filter === id}">${escapeHtml(words)}</button>`).join("");
-            const shown = rows.filter((r) => filter === "all" || r.result === filter);
+            const picked = rows.filter((r) => filter === "all" || r.result === filter);
+            // problems come first: in "All", the quiet rows after the first one are folded behind "N more rows"
+            const quiet = picked.filter((r) => r.result === NO_RULE);
+            const folded = filter === "all" && !unfolded && quiet.length > 2 ? quiet.slice(1) : [];
+            const shown = picked.filter((r) => !folded.includes(r));
+            const more = folded.length ? `<tr><td>${folded.length} more rows</td><td><span class="chip ${TONE[NO_RULE]}">${RESULT_WORDS[NO_RULE]}</span></td><td>-</td><td></td><td class="actions"><button type="button" class="btn" data-rv-more>Show</button></td></tr>` : "";
             tableWrap.innerHTML = `<table class="admin-table rv-table"><thead><tr><th>Ingredient</th><th>Result</th><th>Caution for</th><th>Why and source</th><th></th></tr></thead><tbody>${
                 shown.map((r) => `<tr><td>${r.result === NOT_IDENTIFIED ? `"${escapeHtml(r.name)}"<div class="small muted">as read from the list</div>` : escapeHtml(r.entry ? r.entry.name : r.name)}</td>
                     <td><span class="chip ${TONE[r.result]}">${RESULT_WORDS[r.result]}</span></td>
@@ -263,13 +275,14 @@ export function mountSearchImport(deps) {
                     <td>${escapeHtml(r.why)}${r.source && r.source.url ? ` <a href="${escapeHtml(r.source.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(hostOf(r.source.url))} ↗</a>` : ""}</td>
                     <td class="actions">${r.result === NOT_IDENTIFIED ? `<button type="button" class="btn" data-rv-fix="${escapeHtml(r.name)}">Fix name</button>`
                         : `<a class="btn" href="../_Admin_Ingredient_Curator/adminIngredientCurator.html?q=${encodeURIComponent(r.entry ? r.entry.name : r.name)}" target="_blank" rel="noopener">Open</a>`}</td></tr>`).join("")
-                || `<tr><td colspan="5" class="table-message">Nothing in this group.</td></tr>`}</tbody></table>`;
+                + more || `<tr><td colspan="5" class="table-message">Nothing in this group.</td></tr>`}</tbody></table>`;
             const unknown = c[NOT_IDENTIFIED];
             foot.innerHTML = `<p class="small muted">${unknown ? `${unknown} ingredient${unknown === 1 ? " is" : "s are"} not identified. If approved now, ${unknown === 1 ? "it shows" : "they show"} as "Not checked" in the app.` : "Every ingredient was identified."}</p>
                 <div class="modal-actions"><button type="button" class="btn" data-rv="bin">${icon("trash")}Send to Recycle Bin</button><button type="button" class="btn" data-rv="later">Save for later</button><button type="button" class="save-btn" data-rv="approve">Approve all</button></div>`;
         };
         chips.addEventListener("click", (event) => { const b = event.target.closest("[data-rv-filter]"); if (b) { filter = b.dataset.rvFilter; paint(); } });
         tableWrap.addEventListener("click", async (event) => {
+            if (event.target.closest("[data-rv-more]")) { unfolded = true; paint(); return; }
             const fix = event.target.closest("[data-rv-fix]");
             if (!fix) return;
             const was = fix.dataset.rvFix;
@@ -300,7 +313,8 @@ export function mountSearchImport(deps) {
 
     // ---------- User report: a "New product" sent from the app ----------
     function openReport(r) {
-        const frame = dialogFrame("User report: new product", () => { frame.close(); paintQueue(); });
+        const leave = () => { frame.close(); paintQueue(); };
+        const frame = pageView("User report: new product", leave);
         frame.box.classList.add("review-window");
         const body = make("div", "ur-body");
         body.innerHTML = `<div class="ur-grid">
@@ -313,8 +327,14 @@ export function mountSearchImport(deps) {
         const closeBtn = make("button", "btn", "Close report"); closeBtn.type = "button";
         const reply = make("button", "btn", "Reply"); reply.type = "button"; reply.disabled = !r.uid;
         const importBtn = make("button", "save-btn", "Search and import this"); importBtn.type = "button";
-        actions.append(closeBtn, reply, importBtn);
-        frame.box.append(body, actions);
+        actions.append(closeBtn, reply, make("span", "spacer"), importBtn);
+        const headCard = make("div", "panel"), bodyCard = make("div", "panel"), footCard = make("div", "panel");
+        const top = make("div", "rv-head");
+        const back = make("button", "btn"); back.type = "button"; back.innerHTML = `${icon("left")}Queue`;
+        back.addEventListener("click", leave);
+        top.append(back, frame.box.querySelector("h3"), make("span", "chip warn", "New"));
+        headCard.append(top); bodyCard.append(body); footCard.append(actions);
+        frame.box.replaceChildren(headCard, bodyCard, footCard);
         closeBtn.addEventListener("click", async () => { closeBtn.disabled = true; await closeReport(r, false); frame.close(); paintQueue(); openNext(`report:${r.id}`); });
         reply.addEventListener("click", () => { frame.close(); openReplyDrawer({ id: r.id, uid: r.uid, category: NEW_PRODUCT, message: r.message, userName: r.userName }, { onSent: () => paintQueue() }); });
         importBtn.addEventListener("click", () => {

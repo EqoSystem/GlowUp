@@ -1246,11 +1246,6 @@ tr.detail-row > td { padding: 0 calc(12 * var(--u)) calc(12 * var(--u)); backgro
 .import-status:empty { display: none; }
 .import-panel .import-dropbox { flex-direction: column; justify-content: center; text-align: center; min-height: calc(190 * var(--u)); padding: calc(22 * var(--u)) calc(18 * var(--u)); gap: calc(12 * var(--u)); }
 .import-panel .import-drop-icon svg.ic { width: calc(34 * var(--u)); height: calc(34 * var(--u)); }
-.app-scan-list { display: flex; flex-direction: column; gap: calc(6 * var(--u)); max-height: calc(320 * var(--u)); overflow-y: auto; }
-.app-scan-row { display: flex; flex-direction: column; align-items: flex-start; gap: calc(2 * var(--u)); width: 100%; padding: calc(10 * var(--u)) calc(12 * var(--u)); text-align: left; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius, 10px); color: inherit; cursor: pointer; }
-.app-scan-row:hover, .app-scan-row:focus-visible { border-color: var(--accent); }
-.app-scan-name { font-weight: 600; overflow-wrap: anywhere; }
-.app-scan-meta { color: var(--muted); font-size: var(--fs-xs); overflow-wrap: anywhere; }
 .import-panel .import-dropbox strong { font-size: var(--fs-md); line-height: 1.35; }
 .import-panel .import-dropbox small { font-size: var(--fs-sm); }
 .import-types { margin: calc(10 * var(--u)) 0 0; font-size: var(--fs-sm); font-weight: 600; color: var(--text-2); }
@@ -2561,3 +2556,10 @@ body:not(.layout-editing) .board.two-sides > .panel[data-side="side"] { grid-col
 /* Skin conditions list: the "Users can pick it" tick under each condition (23 Nov 2026) */
 .lists-pick { display: inline-flex; align-items: center; gap: calc(6 * var(--u)); font-size: var(--fs-sm); color: var(--text-2); }
 .lists-pick input { margin: 0; }
+
+/* "Needs your attention: N" (redesign plan, pages 29 and 34): the label that stands in for the large notes panel */
+.attention-label { border: 0; border-radius: calc(999 * var(--u)); padding: calc(5 * var(--u)) calc(12 * var(--u)); min-height: calc(32 * var(--u)); font: inherit; font-size: var(--fs-xs); font-weight: 600; cursor: pointer; background: color-mix(in srgb, var(--warn) 18%, var(--surface)); color: var(--text); order: 5; }
+.attention-label.quiet { background: var(--surface-2); color: var(--text-2); }
+@media (pointer: coarse) { .attention-label { min-height: 44px; } }
+.attention-window { width: min(calc(820 * var(--u)), 96vw); max-height: 88vh; overflow: auto; }
+.attention-window .modal-actions { margin-top: calc(12 * var(--u)); }

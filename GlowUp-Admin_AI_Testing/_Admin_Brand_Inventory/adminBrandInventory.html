@@ -45,6 +45,15 @@
 
 
 
+            <section class="panel bare" data-panel="counts" data-label="Counts" data-w="12" data-source="inventoryCounts">
+                <div class="stat-row">
+                    <button type="button" class="stat" data-drill="brands" data-tip-title="Brands" data-tip="Show the list of brands only." data-tip-preview="Click a brand to see its products."><span class="stat-icon"><i data-icon="tag"></i></span><span><span class="stat-value skeleton" id="statBrands">00</span><span class="stat-title">Brands</span></span></button>
+                    <button type="button" class="stat" data-drill="types" data-tip-title="Products" data-tip="Show every product, grouped by cosmetic type, A to Z." data-tip-preview="All on one page."><span class="stat-icon"><i data-icon="lipstick"></i></span><span><span class="stat-value skeleton" id="statProducts">00</span><span class="stat-title">Products</span></span></button>
+                    <button type="button" class="stat" data-show="review" data-tip-title="Waiting for review" data-tip="Entries the app added from a scan or that were imported, and products whose kind is not clear. The app does not use them until you have dealt with them." data-tip-preview="Click: the table shows only these."><span class="stat-icon"><i data-icon="inbox"></i></span><span><span class="stat-value skeleton" id="statReview">00</span><span class="stat-title">Waiting for review</span></span></button>
+                    <button type="button" class="stat" data-show="nolist" data-tip-title="No ingredient list" data-tip="Products without an ingredient list: the app cannot check or recommend them." data-tip-preview="Click: the table shows only these."><span class="stat-icon"><i data-icon="alert"></i></span><span><span class="stat-value skeleton" id="statNoList">00</span><span class="stat-title">No ingredient list</span></span></button>
+                </div>
+            </section>
+
             <section class="panel search-import" id="siPanel" data-panel="searchImport" data-label="Search and import" data-w="12">
                 <div class="panel-head wraps">
                     <h3 class="panel-title">Search and import</h3>
@@ -54,6 +63,18 @@
                         <button type="button" class="chip-btn" role="tab" data-si-tab="file" aria-selected="false">From a file</button>
                     </div>
                     <span class="spacer"></span>
+                </div>
+                <div class="si-file" id="siFile" hidden>
+                    <button type="button" class="btn" id="chooseInventoryFileBtn"><i data-icon="upload"></i>Choose file</button>
+                    <input id="inventoryFileInput" type="file" accept=".pdf,.xlsx,.xls,.docx,.csv,.txt,text/csv,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+                <button type="button" id="inventoryDropBox" class="import-dropbox" aria-describedby="inventoryImportHint">
+                    <span class="import-drop-icon"><i data-icon="upload"></i></span>
+                    <span><strong>Drop a PDF, Excel, or Word file here</strong><small id="inventoryImportHint">Reads brand, product, cosmetic type, ingredients, source links, and shade colors. Imported entries are saved as Pending for admin review.</small></span>
+                </button>
+                <p class="import-types">Accepted: PDF (.pdf), Excel (.xlsx, .xls), Word (.docx), CSV (.csv), text (.txt). Any size: a long file is read in parts.</p>
+                <p class="field-hint import-status" id="inventoryImportStatus" role="status" aria-live="polite"></p>
+
+                <div class="import-flags" id="inventoryImportFlags" hidden></div>
                 </div>
                 <div class="si-row">
                     <label class="sr-only" for="siQuery">Brand, product name or barcode</label>
@@ -85,14 +106,6 @@
                 <div class="pager" id="rqPager"></div>
             </section>
 
-            <section class="panel notes-panel" data-panel="notes" data-label="Needs your attention" data-w="12">
-                <div class="panel-head">
-                    <h3 class="panel-title">Needs your attention</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Needs your attention" data-tip="Everything on this page that needs a decision, with the most important first: red = urgent, amber = check, blue = next step, green = good, grey = tip. Press a line's button to do it." data-tip-preview="Fold the panel with its arrow; it stays folded until you open it.">i</button>
-                    <span class="spacer"></span>
-                </div>
-                <div class="notes-list" id="notesList" aria-live="polite"><div class="sk sk-note" aria-hidden="true"></div><div class="sk sk-note" aria-hidden="true"></div><div class="sk sk-note" aria-hidden="true"></div><span class="sr-only">Looking at what needs you...</span></div>
-            </section>
 
 
 
@@ -121,42 +134,11 @@
                 </div>
             </section>
 
-            <section class="panel import-panel" data-panel="import" data-label="Import brand and product file" data-w="4" data-right>
-                <div class="panel-head">
-                    <h3 class="panel-title">Import from a file</h3>
-                    <span class="spacer"></span>
-                    <button type="button" class="btn" id="chooseInventoryFileBtn"><i data-icon="upload"></i>Choose file</button>
-                    <input id="inventoryFileInput" type="file" accept=".pdf,.xlsx,.xls,.docx,.csv,.txt,text/csv,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
-                </div>
-                <button type="button" id="inventoryDropBox" class="import-dropbox" aria-describedby="inventoryImportHint">
-                    <span class="import-drop-icon"><i data-icon="upload"></i></span>
-                    <span><strong>Drop a PDF, Excel, or Word file here</strong><small id="inventoryImportHint">Reads brand, product, cosmetic type, ingredients, source links, and shade colors. Imported entries are saved as Pending for admin review.</small></span>
-                </button>
-                <p class="import-types">Accepted: PDF (.pdf), Excel (.xlsx, .xls), Word (.docx), CSV (.csv), text (.txt). Any size: a long file is read in parts.</p>
-                <p class="field-hint import-status" id="inventoryImportStatus" role="status" aria-live="polite"></p>
-
-                <div class="import-flags" id="inventoryImportFlags" hidden></div>
-            </section>
-
-            <section class="panel app-scans-panel" data-panel="appScans" data-label="Scanned by the app" data-w="4" data-right>
-                <div class="panel-head">
-                    <h3 class="panel-title">Scanned by the app</h3>
-                    <span class="panel-count" id="appScansCount"></span>
-                </div>
-                <div class="app-scan-list" id="appScansList" role="status" aria-live="polite"></div>
-            </section>
 
 
-            <section class="panel bare" data-panel="counts" data-label="Counts" data-w="8" data-source="inventoryCounts">
-                <div class="stat-row">
-                    <button type="button" class="stat" data-drill="brands" data-tip-title="Brands" data-tip="Show the list of brands only." data-tip-preview="Click a brand to see its products."><span class="stat-icon"><i data-icon="tag"></i></span><span><span class="stat-value skeleton" id="statBrands">00</span><span class="stat-title">Brands</span></span></button>
-                    <button type="button" class="stat" data-drill="types" data-tip-title="Products" data-tip="Show every product, grouped by cosmetic type, A to Z." data-tip-preview="All on one page."><span class="stat-icon"><i data-icon="lipstick"></i></span><span><span class="stat-value skeleton" id="statProducts">00</span><span class="stat-title">Products</span></span></button>
-                    <button type="button" class="stat" data-show="review" data-tip-title="Waiting for review" data-tip="Entries the app added from a scan or that were imported, and products whose kind is not clear. The app does not use them until you have dealt with them." data-tip-preview="Click: the table shows only these."><span class="stat-icon"><i data-icon="inbox"></i></span><span><span class="stat-value skeleton" id="statReview">00</span><span class="stat-title">Waiting for review</span></span></button>
-                    <button type="button" class="stat" data-show="out" data-tip-title="Not make-up" data-tip="Skin care, hair, body, nail and fragrance products. GlowUp is for make-up only." data-tip-preview="Click: the table shows only these, ready to go to the Recycle bin."><span class="stat-icon"><i data-icon="ban"></i></span><span><span class="stat-value skeleton" id="statOut">00</span><span class="stat-title">Not make-up</span></span></button>
-                </div>
-            </section>
 
-            <section class="panel ingredient-suggestions" id="ingredientSuggestionsPanel" hidden data-panel="suggestions" data-label="AI ingredient suggestions" data-w="8" data-source="ingredientSuggestions">
+
+            <section class="panel ingredient-suggestions" id="ingredientSuggestionsPanel" hidden data-panel="suggestions" data-label="AI ingredient suggestions" data-w="12" data-source="ingredientSuggestions">
                 <div class="panel-head">
                     <h3 class="panel-title">Web ingredient lists to review</h3>
                     <span class="panel-count" id="ingredientSuggestionsCount"></span>
@@ -166,7 +148,7 @@
             </section>
 
 
-            <section class="panel" data-panel="table" data-label="Inventory table" data-w="8" data-source="products">
+            <section class="panel" data-panel="table" data-label="Inventory table" data-w="12" data-source="products">
 
 
                 <div class="panel-head wraps">
@@ -209,6 +191,14 @@
 
                 <div class="w-bar sel-bar" id="inventoryBar" hidden></div>
                 <div class="table-foot"><span class="spacer"></span><div class="pager" id="inventoryPager"></div></div>
+            </section>
+            <section class="panel notes-panel" data-panel="notes" data-label="Needs your attention" data-w="12" hidden>
+                <div class="panel-head">
+                    <h3 class="panel-title">Needs your attention</h3>
+                    <button type="button" class="guide-badge" data-tip-title="Needs your attention" data-tip="Everything on this page that needs a decision, with the most important first: red = urgent, amber = check, blue = next step, green = good, grey = tip. Press a line's button to do it." data-tip-preview="Fold the panel with its arrow; it stays folded until you open it.">i</button>
+                    <span class="spacer"></span>
+                </div>
+                <div class="notes-list" id="notesList" aria-live="polite"><div class="sk sk-note" aria-hidden="true"></div><div class="sk sk-note" aria-hidden="true"></div><div class="sk sk-note" aria-hidden="true"></div><span class="sr-only">Looking at what needs you...</span></div>
             </section>
         </div>
     </main>

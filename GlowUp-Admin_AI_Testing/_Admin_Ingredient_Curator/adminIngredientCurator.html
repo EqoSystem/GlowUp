@@ -45,14 +45,6 @@
 
 
 
-            <section class="panel notes-panel" data-panel="notes" data-label="Needs your attention" data-w="12">
-                <div class="panel-head">
-                    <h3 class="panel-title">Needs your attention</h3>
-                    <button type="button" class="guide-badge" data-tip-title="Needs your attention" data-tip="Everything on this page that needs a decision, with the most important first: red = urgent, amber = check, blue = next step, green = good, grey = tip. Press a line's button to do it." data-tip-preview="Fold the panel with its arrow; it stays folded until you open it.">i</button>
-                    <span class="spacer"></span>
-                </div>
-                <div class="notes-list" id="notesList" aria-live="polite"><div class="sk sk-note" aria-hidden="true"></div><div class="sk sk-note" aria-hidden="true"></div><div class="sk sk-note" aria-hidden="true"></div><span class="sr-only">Looking at what needs you...</span></div>
-            </section>
 
 
 
@@ -76,39 +68,36 @@
             </section>
 
 
-            <section class="panel import-panel" data-panel="import" data-label="Import ingredient file" data-w="4" data-right>
-                <div class="panel-head">
-                    <h3 class="panel-title">Import ingredients</h3>
-                    <span class="spacer"></span>
-                    <button type="button" class="btn" id="chooseIngredientFileBtn"><i data-icon="upload"></i>Choose file</button>
-                    <input id="ingredientFileInput" type="file" accept=".pdf,.xlsx,.xls,.docx,.csv,.txt,text/csv,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
-                </div>
-                <button type="button" id="ingredientDropBox" class="import-dropbox" aria-describedby="ingredientImportHint">
-                    <span class="import-drop-icon"><i data-icon="upload"></i></span>
-                    <span><strong>Drop a PDF, Excel, or Word file here</strong><small id="ingredientImportHint">Only ingredient data is accepted: name, INCI name, other names and description. Brand and product data in the file is ignored.</small></span>
-                </button>
-                <p class="import-types">Accepted: PDF (.pdf), Excel (.xlsx), Word (.docx), CSV (.csv), text (.txt). Any size: a long file is read in parts.</p>
-                <p class="field-hint import-status" id="ingredientImportStatus" role="status" aria-live="polite">Entries are saved as Pending for your review.</p>
-            </section>
 
 
 
-            <section class="panel bare" data-panel="counts" data-label="Counts" data-w="8" data-source="curatorCounts">
+
+
+            <section class="panel bare" data-panel="counts" data-label="Counts" data-w="12" data-source="curatorCounts">
 
                 <div class="stat-row" id="curatorStats">
                     <button type="button" class="stat" data-source="" data-risk="" data-tip-title="Ingredients" data-tip="Show every ingredient." data-tip-preview="Click: the list shows only these."><span class="stat-icon"><i data-icon="flask"></i></span><span><span class="stat-value skeleton" id="curatorStatAll">00</span><span class="stat-title">Ingredients</span></span></button>
                     <button type="button" class="stat" data-source="review" data-risk="" data-tip-title="Waiting for review" data-tip="Found by the app's AI lookup and not checked yet. The app uses their warnings but never counts them as proof of safety." data-tip-preview="Click: the list shows only these."><span class="stat-icon"><i data-icon="inbox"></i></span><span><span class="stat-value skeleton" id="curatorStatReview">00</span><span class="stat-title">Waiting for review</span></span></button>
-                    <button type="button" class="stat" data-source="" data-risk="harmful" data-tip-title="Harmful" data-tip="Ingredients marked Harmful here." data-tip-preview="Click: the list shows only these."><span class="stat-icon"><i data-icon="alert"></i></span><span><span class="stat-value skeleton" id="curatorStatHarmful">00</span><span class="stat-title">Harmful</span></span></button>
-                    <button type="button" class="stat" data-source="" data-risk="caution" data-tip-title="Caution" data-tip="Ingredients marked Caution here." data-tip-preview="Click: the list shows only these."><span class="stat-icon"><i data-icon="shield"></i></span><span><span class="stat-value skeleton" id="curatorStatCaution">00</span><span class="stat-title">Caution</span></span></button>
                     <button type="button" class="stat" data-source="" data-risk="r:flagged"><span class="stat-icon"><i data-icon="flag"></i></span><span><span class="stat-value skeleton" id="curatorStatFlagged">00</span><span class="stat-title">Flagged</span></span></button>
                     <button type="button" class="stat" data-source="" data-risk="r:none"><span class="stat-icon"><i data-icon="check"></i></span><span><span class="stat-value skeleton" id="curatorStatNoRule">00</span><span class="stat-title">No rule matched</span></span></button>
                     <button type="button" class="stat" data-source="" data-risk="r:unknown"><span class="stat-icon"><i data-icon="alert"></i></span><span><span class="stat-value skeleton" id="curatorStatUnknown">00</span><span class="stat-title">Not identified</span></span></button>
-                    <button type="button" class="stat" data-source="products" data-risk="" data-tip-title="From products, not explained" data-tip="Ingredients the inventory's products list that have no entry here yet. The app uses its built-in knowledge for them." data-tip-preview="Click: the list shows only these."><span class="stat-icon"><i data-icon="lipstick"></i></span><span><span class="stat-value skeleton" id="curatorStatFromProducts">00</span><span class="stat-title">From products, not explained</span></span></button>
                 </div>
             </section>
 
+            <section class="panel cur-queue" data-panel="reviewQueue" data-label="Review queue" data-w="12">
+                <div class="panel-head wraps">
+                    <h3 class="panel-title">Review queue</h3>
+                    <div class="si-tabs" role="group" aria-label="What waits">
+                        <button type="button" class="chip-btn" data-cq="waiting" aria-pressed="false">Waiting <span id="cqWaiting">0</span></button>
+                        <button type="button" class="chip-btn" data-cq="unknown" aria-pressed="false">Not identified <span id="cqUnknown">0</span></button>
+                        <button type="button" class="chip-btn" data-cq="auto" aria-pressed="false">Set automatically <span id="cqAuto">0</span></button>
+                    </div>
+                    <span class="spacer"></span>
+                    <button type="button" class="save-btn" id="cqApprove">Approve selected</button>
+                </div>
+            </section>
 
-            <section class="panel" data-panel="list" data-label="Ingredient list" data-w="8" data-source="ingredients" data-no-fold>
+            <section class="panel" data-panel="list" data-label="Ingredient list" data-w="12" data-source="ingredients" data-no-fold>
 
 
                 <div class="panel-head wraps">
@@ -119,22 +108,25 @@
                     <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most harmful, waiting for review, most used, or newest." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i><span class="btn-label">Sort</span><span class="sort-now" id="sortNow"></span></button></span>
                     <span class="shelf" id="ingredientShelf"></span>
 
-                    <select id="ingredientRiskFilter" class="toolbar-select head-select" aria-label="Show one risk level" hidden>
-                        <option value="">Any risk level</option>
+                    
+                    <select id="ingredientClassFilter" class="toolbar-select head-select" aria-label="Show one classification"><option value="">Any classification</option></select>
+                    <select id="ingredientRiskFilter" class="toolbar-select head-select" aria-label="Show one result or risk level">
+                        <option value="">Any result</option>
+                        <option value="r:flagged">Flagged</option>
+                        <option value="r:none">No rule matched</option>
+                        <option value="r:unknown">Not identified</option>
                         <option value="harmful">Harmful</option>
                         <option value="caution">Caution</option>
                         <option value="safe">Safe</option>
                         <option value="auto">App decides</option>
-                        <option value="r:flagged">Result: Flagged</option>
-                        <option value="r:none">Result: No rule matched</option>
-                        <option value="r:unknown">Result: Not identified</option>
                     </select>
-                    <select id="ingredientClassFilter" class="toolbar-select head-select" aria-label="Show one classification"><option value="">Any classification</option></select>
                     <button type="button" class="icon-btn small" id="manageClassBtn" aria-label="Manage classifications"><i data-icon="sliders"></i></button>
                     <span class="shelf" id="ingredientShelfAdd"></span>
                     <span class="shelf" id="ingredientShelfEnd"></span>
                     <span id="ingredientQuick"></span>
                     <span class="spacer"></span>
+                    <button type="button" class="btn" id="chooseIngredientFileBtn"><i data-icon="upload"></i>Import a file</button>
+                    <input id="ingredientFileInput" type="file" accept=".pdf,.xlsx,.xls,.docx,.csv,.txt,text/csv,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
                     <div class="segmented" hidden id="listLayoutSwitch" role="group" aria-label="How the ingredients are listed">
                         <button type="button" class="seg" data-layout="rows" aria-pressed="true" data-tip-title="Rows" data-tip="One ingredient per line: INCI name, first alias, classification and how the app judges it."><i data-icon="list"></i>Rows</button>
                         <button type="button" class="seg" data-layout="cards" aria-pressed="false" data-tip-title="Cards" data-tip="Ingredients as cards, several side by side."><i data-icon="layers"></i>Cards</button>
@@ -144,12 +136,26 @@
                         <div class="pager" id="ingredientPagerTop" data-head-end></div>
                     </div>
                 </div>
+                <button type="button" id="ingredientDropBox" class="import-dropbox" hidden aria-describedby="ingredientImportHint">
+                    <span class="import-drop-icon"><i data-icon="upload"></i></span>
+                    <span><strong>Drop a PDF, Excel, or Word file here</strong><small id="ingredientImportHint">Only ingredient data is accepted: name, INCI name, other names and description. Brand and product data in the file is ignored.</small></span>
+                </button>
+                <p class="field-hint import-status" id="ingredientImportStatus" role="status" aria-live="polite"></p>
+                <div class="cur-columns" aria-hidden="true"><span class="cur-name">INCI name</span><span class="cur-cells"><span>Classification</span><span>Result</span><span>Caution for</span><span>Source</span><span>Status</span></span><span class="cur-end"></span></div>
                 <div class="ingredients-list as-rows" id="ingredientsList">
                     <div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div><div class="sk sk-card"><i class="sk-cap w70"></i><i class="sk-cap w45 thin"></i></div>
                 </div>
 
                 <div class="w-bar sel-bar" id="ingredientBar" hidden></div>
                 <div class="table-foot"><span class="spacer"></span><div class="pager" id="ingredientPager"></div></div>
+            </section>
+            <section class="panel notes-panel" data-panel="notes" data-label="Needs your attention" data-w="12" hidden>
+                <div class="panel-head">
+                    <h3 class="panel-title">Needs your attention</h3>
+                    <button type="button" class="guide-badge" data-tip-title="Needs your attention" data-tip="Everything on this page that needs a decision, with the most important first: red = urgent, amber = check, blue = next step, green = good, grey = tip. Press a line's button to do it." data-tip-preview="Fold the panel with its arrow; it stays folded until you open it.">i</button>
+                    <span class="spacer"></span>
+                </div>
+                <div class="notes-list" id="notesList" aria-live="polite"><div class="sk sk-note" aria-hidden="true"></div><div class="sk sk-note" aria-hidden="true"></div><div class="sk sk-note" aria-hidden="true"></div><span class="sr-only">Looking at what needs you...</span></div>
             </section>
         </div>
     </main>
@@ -257,6 +263,23 @@
                                 <div class="label-row"><label for="ingredientMinAgeInput">Minimum Age</label></div>
                                 <input type="number" id="ingredientMinAgeInput" min="0" max="99" step="1" placeholder="0 = no age limit">
                             </div>
+                            <div class="field full" role="group" aria-labelledby="allergenLabel">
+                                <div class="label-row">
+                                    <span class="label-text" id="allergenLabel">Allergen Family</span>
+                                    <span class="label-actions"><span class="info-slot" data-info="A user who picked that allergen in the app is warned about this ingredient." data-info-label="About Allergen Family"></span><button type="button" class="icon-btn small list-edit" data-list-edit="allergens" aria-label="Edit the allergen families list"><i data-icon="edit"></i></button></span>
+                                </div>
+                                <div class="checks pills" id="allergenTagsChecks"></div>
+                                <div class="fit-why" id="allergenWhy"></div>
+                            </div>
+                            <div class="field full" role="group" aria-labelledby="skinTypesLabel">
+                                <div class="label-row"><span class="label-text" id="skinTypesLabel">Caution for skin types</span></div>
+                                <div class="fit-list chips" id="skinTypesFit"></div>
+                                <div class="fit-why" id="skinTypesWhy"></div>
+                            </div>
+                            <details class="good-fit">
+                                <summary>Good for skin types (optional, typed by an admin with a source)</summary>
+                                <div class="fit-list chips" id="skinTypesFitGood"></div>
+                            </details>
                             <div class="field full">
                                 <div class="label-row"><label for="ingredientCautionInput">Caution Note</label></div>
                                 <textarea id="ingredientCautionInput" rows="1" class="limited one-line" spellcheck="true" maxlength="160" placeholder="e.g., can clog pores" aria-describedby="ingredientCautionHint"></textarea>
@@ -280,20 +303,7 @@
                                 </div>
                                 <div class="checks pills" id="highlightTagsChecks"></div>
                             </div>
-                            <div class="field full" role="group" aria-labelledby="allergenLabel">
-                                <div class="label-row">
-                                    <span class="label-text" id="allergenLabel">Allergen Family</span>
-                                    <span class="label-actions"><span class="info-slot" data-info="A user who picked that allergen in the app is warned about this ingredient." data-info-label="About Allergen Family"></span><button type="button" class="icon-btn small list-edit" data-list-edit="allergens" aria-label="Edit the allergen families list"><i data-icon="edit"></i></button></span>
-                                </div>
-                                <div class="checks pills" id="allergenTagsChecks"></div>
-                                <div class="fit-why" id="allergenWhy"></div>
-                            </div>
 
-                            <div class="field full" role="group" aria-labelledby="skinTypesLabel">
-                                <div class="label-row"><span class="label-text" id="skinTypesLabel">Caution for skin types</span></div>
-                                <div class="fit-list" id="skinTypesFit"></div>
-                                <div class="fit-why" id="skinTypesWhy"></div>
-                            </div>
                             <div class="fit-kept" hidden aria-hidden="true">
                                 <!-- chronic skin conditions are no longer asked by the app (27 Nov 2026): kept hidden so saved values stay as they are -->
                                 <div class="fit-list" id="conditionsFit"></div>

@@ -34,7 +34,6 @@ import { collection, doc, serverTimestamp, getDoc } from "https://www.gstatic.co
 
 import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed, onSnapshot } from "../_Shared/adminStore.js";
 import { TEST_MODE } from "../_Shared/adminClassifications.js";
-import { startAppScans } from "./appScans.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
     statusBadge, toneBadge, statusGuide, normalizeStatus, notify, describeError, setBusy, setFormError, originLabel, sourceLinks, sourceGuideHtml, COSMETIC_TYPES, STATUSES,
@@ -77,6 +76,7 @@ import { waitingForList, suggestionFrom, LISTS_PER_LOAD } from "../_Shared/produ
 import { parseBarcodes, lookupBatch, batchSummary } from "../_Shared/batchBarcodes.js";
 import { openBatchLookup } from "./batchLookup.js";
 import { mountSearchImport } from "./searchImport.js";
+import { attentionLabel } from "../_Shared/planViews.js";
 
 const OTHER_TYPE = "__other__";
 let paintCounters = () => { };              // character counters under the form fields (charLimit.js)
@@ -403,6 +403,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         openExisting: (product) => { productModal.close(); openProductForm(product); }
     });
     // Search and import + Review queue (redesign plan, 27 Nov 2026): one panel, one button; imports, app scans and user reports in one queue
+    attentionLabel(el("inventorySearchStatus").closest(".panel-head").querySelector(".spacer"), el("notesList"));
     searchImport = mountSearchImport({
         lookup: (text) => lookupProduct(text, { getToken: () => (auth.currentUser ? auth.currentUser.getIdToken() : "") }),
         library: () => curatedList,
@@ -414,7 +415,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         toBin: (p) => moveToBin(["p:" + p.id]),
         openProduct: (p) => openProductForm(p),
         openBatch: () => { const b = el("batchLookupBtn"); if (b) b.click(); },
-        openFile: () => el("inventoryFileInput").click(),
         reload: () => loadInventory()
     });
     mountShadeFinder({
@@ -459,10 +459,6 @@ function startInventoryLive() {
         loadInventory().finally(() => { inventoryLiveRefresh = false; });
     }, (error) => console.error(`Error watching ${name} for inventory cards: `, error)));
     ["brands", "products", "ingredients", "productIngredientSuggestions"].forEach(watch);
-    inventoryLiveStops.push(startAppScans({
-        host: el("appScansList"), count: el("appScansCount"),
-        onOpen: (id) => { const found = everyProduct.find((p) => p.id === id); if (found) openProductForm(found, found.brandId); }
-    }));
 }
 
 const saveView = () => { try { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); } catch (error) {                      } };
@@ -854,9 +850,9 @@ function afterChange() {
 function fillReviewFilter() {
     const select = el("reviewFilterSelect");
     const asked = new URLSearchParams(window.location.search).get("show");
-    const wanted = select.dataset.ready ? select.value : (asked === "review" || asked === "out" ? asked : "");
+    const wanted = select.dataset.ready ? select.value : (asked === "review" || asked === "out" || asked === "nolist" ? asked : "");
     select.dataset.ready = "1";
-    select.innerHTML = `<option value="">Everything</option><option value="review">Waiting for review (${reviewCount()})</option><option value="out">Not make-up (${outsideCount()})</option>`;
+    select.innerHTML = `<option value="">Everything</option><option value="review">Waiting for review (${reviewCount()})</option><option value="nolist">No ingredient list</option><option value="out">Not make-up (${outsideCount()})</option>`;
     select.value = wanted;
 }
 
@@ -1263,9 +1259,9 @@ function paintStats() {
     set("statBrands", brand ? 1 : folder ? new Set(mine.map((p) => p.brandId)).size : brands.filter((b) => !brandOut(b)).length);
     set("statProducts", mine.length);
     set("statReview", brand || folder ? mine.filter(waits).length + (brand && brand.needsReview ? 1 : 0) : reviewCount());
-    set("statOut", brand || folder ? products.filter((p) => isOut(p) && inFocus(p)).length : outsideCount());
+    set("statNoList", mine.filter((p) => p.ingredients.length === 0).length);
     const where = brand ? brand.name : folder ? `"${folder}"` : "";
-    [["statBrands", "Brands"], ["statProducts", "Products"], ["statReview", "Waiting for review"], ["statOut", "Not make-up"]].forEach(([id, title]) => {
+    [["statBrands", "Brands"], ["statProducts", "Products"], ["statReview", "Waiting for review"], ["statNoList", "No ingredient list"]].forEach(([id, title]) => {
         const label = el(id).parentElement.querySelector(".stat-title");
         if (label) label.textContent = where ? `${title} · ${where}` : title;
     });
@@ -1561,7 +1557,7 @@ function renderList(now) {
     }
 
     const base = (p) => (show === "out" ? isOut(p) : !isOut(p)) && (!folder || sameKey(p.folder) === sameKey(folder))
-        && (show !== "review" || waits(p)) && (!quick || QUICK[quick].test(p)) && facetOk(p);
+        && (show !== "review" || waits(p)) && (show !== "nolist" || p.ingredients.length === 0) && (!quick || QUICK[quick].test(p)) && facetOk(p);
 
 
     const productMatches = (p) => matchesSearch(typed, [...productTexts(p), ...(p.ingredients || [])]);
@@ -1590,7 +1586,7 @@ function renderList(now) {
             const hit = !term || brandMatches(brand);
             const rows = mine.filter((p) => base(p) && (hit || productMatches(p))).sort(order);
 
-            const belongs = show === "out" ? out : show === "review" ? brand.needsReview : !folder && !quick;
+            const belongs = show === "out" ? out : show === "review" ? brand.needsReview : show === "nolist" ? false : !folder && !quick;
             if (rows.length === 0 && !(belongs && hit)) return;
             const lines = rows.map((p) => productRow(p, brand, false));
             if (mine.length === 0) lines.push(`<tr class="note-row" data-brand="${escapeHtml(brand.id)}"><td colspan="${columns}" class="muted small">No products yet. Point at the brand and press +.</td></tr>`);
@@ -1628,6 +1624,7 @@ function renderList(now) {
         : quick ? "No product like that. Click the chip above to show all again."
         : folder ? `"${escapeHtml(folder)}" is empty. Drag products onto its chip above.`
         : show === "review" ? "Nothing is waiting for review."
+        : show === "nolist" ? "Every listed product has an ingredient list."
         : show === "out" ? "Every listed product is make-up."
         : "Nothing to show.";
     body.innerHTML = html.length > 0 ? html.join("") : `<tr><td colspan="${columns}" class="table-message">${nothing}</td></tr>`;

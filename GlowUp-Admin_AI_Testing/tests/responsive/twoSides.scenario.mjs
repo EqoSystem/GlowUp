@@ -6,7 +6,7 @@ let checks = 0, failed = 0;
 const ok = (cond, what) => { checks++; if (!cond) { failed++; console.log("FAILED: " + what); } };
 const browser = await launch();
 try {
-    for (const key of ["dash", "inv", "cur"]) {
+    for (const key of ["dash"]) {       // inventory and curator are one column since the redesign plan (pages 29 and 34)
         const { page, ctx } = await openPage(browser, key, { width: 1440, height: 900 });
         await page.waitForTimeout(700);
         ok(await page.evaluate(() => document.querySelector(".board").classList.contains("two-sides")), `${key}: the board has two sides and a divider`);

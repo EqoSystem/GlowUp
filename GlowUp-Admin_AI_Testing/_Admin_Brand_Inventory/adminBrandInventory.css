@@ -210,13 +210,20 @@ th .th-line small { font-weight: 500; letter-spacing: 0; text-transform: none; m
 .count-pill:empty { display: none; }
 .count-pill { display: inline-block; margin-left: calc(6 * var(--u)); padding: 0 calc(8 * var(--u)); border-radius: 999px; background: var(--surface-3); color: var(--text-2); font-size: .8em; vertical-align: middle; }
 .rq-table td.actions, .rv-table td.actions { text-align: right; white-space: nowrap; }
-.review-window { width: min(calc(1100 * var(--u)), 96vw); max-height: 92vh; overflow: auto; }
+.plan-view { display: grid; gap: calc(16 * var(--u)); align-content: start; padding: calc(20 * var(--u)) calc(26 * var(--u)); }
+.plan-view > .panel { padding: calc(16 * var(--u)) calc(18 * var(--u)); min-width: 0; }
+.si-file { margin-top: calc(10 * var(--u)); display: grid; gap: calc(8 * var(--u)); justify-items: start; }
+.si-file[hidden], .si-row[hidden] { display: none; }
+.si-file .import-dropbox { width: 100%; }
 .rv-head { display: flex; gap: calc(10 * var(--u)); align-items: center; flex-wrap: wrap; }
 .rv-head h3 { margin: 0; }
 .rv-sources a { margin-right: calc(10 * var(--u)); }
 .rv-filter { display: flex; gap: calc(6 * var(--u)); flex-wrap: wrap; margin: calc(10 * var(--u)) 0; }
 .rv-foot { display: flex; justify-content: space-between; gap: calc(12 * var(--u)); align-items: center; flex-wrap: wrap; margin-top: calc(12 * var(--u)); }
 .rv-foot .modal-actions { margin: 0; }
+.rv-foot { margin-top: 0; }
+.plan-view .rv-filter { margin-top: 0; }
+.plan-view .modal-actions { flex-wrap: wrap; }
 .ur-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 3fr); gap: calc(12 * var(--u)); margin-bottom: calc(10 * var(--u)); }
 .ur-value { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: calc(10 * var(--u)) calc(12 * var(--u)); overflow-wrap: anywhere; }
 .ur-text { margin-bottom: calc(8 * var(--u)); white-space: pre-wrap; }
@@ -227,3 +234,4 @@ th .th-line small { font-weight: 500; letter-spacing: 0; text-transform: none; m
     .ur-grid { grid-template-columns: 1fr; }
     .si-row > .save-btn { flex: 1 1 100%; }
 }
+@media (max-width: 720px) { .search-import .si-tabs { width: 100%; max-width: 100%; flex-wrap: wrap; } }

@@ -1,3 +1,4 @@
+import { attentionLabel } from "../_Shared/planViews.js";
 
 
 
@@ -246,6 +247,7 @@ const sortNow = () => SORTS.find((s) => s.id === view.sort) || SORTS[0];
 
 
 const QUICK = {
+    auto: { label: "Set automatically", test: (item) => item.fitAuto },
     broken: { label: "Broken \"Used in\" text", test: (item) => item.usesBroken },
     noNote: { label: "Flagged without a caution note", test: (item) => (item.riskLevel === "harmful" || item.riskLevel === "caution") && !item.cautionNote },
     unused: { label: "Not in any listed product", test: (item) => productUseKnown && usedInProducts(item) === 0 },
@@ -333,6 +335,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     ]);
     el("ingredientSourceFilter").addEventListener("change", fromFirstPage);
     el("ingredientRiskFilter").addEventListener("change", fromFirstPage);
+    document.querySelectorAll("[data-cq]").forEach((b) => b.addEventListener("click", () => showQueue(b.dataset.cq)));
+    el("cqApprove").addEventListener("click", () => {
+        const keys = Array.from(el("ingredientsList").querySelectorAll(".ingredient-card.is-picked")).map((card) => card.dataset.key);
+        if (!keys.length) { notify("Tick the ingredients to approve first.", "info"); return; }
+        approveSelectedIngredients(keys);
+    });
+    attentionLabel(el("chooseIngredientFileBtn"), el("notesList"));
     el("ingredientClassFilter").addEventListener("change", fromFirstPage);
     el("manageClassBtn").addEventListener("click", manageClassifications);
     wirePurposeAndClassification();
@@ -926,14 +935,12 @@ function paintStats() {
     const tiles = [
         { label: "Ingredients", value: ingredients.length, iconName: "flask", source: "", risk: "", tip: "Show every ingredient." },
         { label: "Waiting for review", value: ingredients.filter(needsReview).length, iconName: "inbox", source: "review", risk: "", tip: "Found by the app's AI lookup and not checked yet. The app uses their warnings but never counts them as proof of safety." },
-        { label: "Harmful", value: ingredients.filter((i) => i.riskLevel === "harmful").length, iconName: "alert", source: "", risk: "harmful", tip: "Ingredients marked Harmful here." },
-        { label: "Caution", value: ingredients.filter((i) => i.riskLevel === "caution").length, iconName: "shield", source: "", risk: "caution", tip: "Ingredients marked Caution here." },
         { label: "Flagged", value: ingredients.filter((i) => resultOf(i) === "flagged").length, iconName: "flag", source: "", risk: "r:flagged", tip: "" },
         { label: "No rule matched", value: ingredients.filter((i) => resultOf(i) === "none").length, iconName: "check", source: "", risk: "r:none", tip: "" },
         { label: "Not identified", value: ingredients.filter((i) => resultOf(i) === "unknown").length, iconName: "alert", source: "", risk: "r:unknown", tip: "" },
-        { label: "From products, not explained", value: fromProducts.length, iconName: "lipstick", source: FROM_PRODUCTS, risk: "", tip: "Ingredients the inventory's products list that have no entry here yet. The app uses its built-in knowledge for them." }
     ];
 
+    paintQueueTabs(inBin, source, risk);
     const buttons = Array.from(el("curatorStats").querySelectorAll(".stat"));
     tiles.forEach((t, index) => {
         const button = buttons[index];
@@ -942,6 +949,23 @@ function paintStats() {
         if (value) { value.textContent = String(t.value); value.classList.remove("skeleton"); }
         button.classList.toggle("on", !inBin && t.source === source && t.risk === risk && !!(source || risk));
     });
+}
+
+// the Review queue of page 34: what waits, what is not identified, what the rules set by themselves
+function paintQueueTabs(inBin, source, risk) {
+    const counts = { cqWaiting: ingredients.filter(needsReview).length, cqUnknown: ingredients.filter((i) => resultOf(i) === "unknown").length, cqAuto: ingredients.filter((i) => i.fitAuto).length };
+    Object.entries(counts).forEach(([id, n]) => { el(id).textContent = String(n); });
+    const on = inBin ? "" : source === "review" ? "waiting" : risk === "r:unknown" ? "unknown" : quick === "auto" ? "auto" : "";
+    document.querySelectorAll("[data-cq]").forEach((b) => { b.setAttribute("aria-pressed", String(b.dataset.cq === on)); b.classList.toggle("on", b.dataset.cq === on); });
+}
+
+function showQueue(name) {
+    const was = document.querySelector(`[data-cq="${name}"]`).getAttribute("aria-pressed") === "true";
+    el("ingredientSearchInput").value = "";
+    el("ingredientSourceFilter").value = !was && name === "waiting" ? "review" : "";
+    el("ingredientRiskFilter").value = !was && name === "unknown" ? "r:unknown" : "";
+    quick = !was && name === "auto" ? "auto" : "";
+    if (org.view.kind !== "all") org.show({ kind: "all" }); else fromFirstPage();
 }
 
 function renderIngredients() {
@@ -1036,6 +1060,16 @@ function cardOf(item, inBin) {
         if (review) buttons.push(actionButton("row-btn approve", "approve", item.id, icon("check"), "Approve", "You have checked this entry: the app may now trust it like one typed here.", "To correct it first, open it and press Edit: saving also approves it."));
         buttons.push(actionButton("row-btn danger", "bin", item.id, BIN_ICON, "Recycle bin", "Remove this ingredient.", "It goes to the Recycle bin and can be restored."));
     }
+    const judged = judgeEntry({ ...item, identified: resultOf(item) !== "unknown" });
+    const word = { flagged: "Flagged", none: "No rule matched", unknown: "Not identified" }[resultOf(item)];
+    const tone = { flagged: "warn", none: "", unknown: "bad" }[resultOf(item)];
+    const cautions = judged.cautionFor || [];
+    const link = (item.sources || []).map((line) => String(line).slice(String(line).lastIndexOf("|") + 1).trim()).find((url) => /^https:\/\//i.test(url)) || "";
+    const host = link ? link.replace(/^https:\/\/(www\.)?/i, "").split("/")[0] : "";
+    const columns = `<span class="cur-result"><span class="chip ${tone}">${word}</span></span>`
+        + `<span class="cur-caution">${cautions.length ? escapeHtml(cautions[0]) + (cautions.length > 1 ? ` +${cautions.length - 1}` : "") : "-"}</span>`
+        + `<span class="cur-source">${link ? `<a class="source-link" href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(host)}</a>` : "none"}</span>`
+        + `<span class="cur-status"><span class="chip ${review ? "warn" : "good"}">${review ? "Pending" : "Live"}</span></span>`;
     return `
         <article class="ingredient-card${review ? " needs-review" : ""}${open ? " open" : ""}" data-id="${escapeHtml(item.id)}" data-key="${escapeHtml(item.id)}" data-drag tabindex="0" aria-expanded="${open}">
             <header class="card-head">
@@ -1044,7 +1078,7 @@ function cardOf(item, inBin) {
                 <span class="spacer"></span>
                 <div class="btn-group row-actions">${buttons.join("")}</div>
             </header>
-            <div class="card-sub"><p class="ingredient-tech">${escapeHtml(firstAlias(item))}</p><span class="class-cell">${classCell(item)}</span>${review ? statusBadge("Pending") : ""}${toneBadge(RISK_NAMES[item.riskLevel || "auto"], toneOfRisk(item.riskLevel), riskText)}</div>
+            <div class="card-sub"><p class="ingredient-tech">${escapeHtml(firstAlias(item))}</p><span class="class-cell">${classCell(item)}</span>${inBin ? "" : columns}${review ? statusBadge("Pending") : ""}${toneBadge(RISK_NAMES[item.riskLevel || "auto"], toneOfRisk(item.riskLevel), riskText)}</div>
             ${open ? detailOf(item, inBin) : ""}
         </article>`;
 }
@@ -1116,35 +1150,44 @@ function toggleDetails(id) {
 
 
 
+// Page 35: "Caution for skin types" is a row of tick chips; "Good for skin types" is a second, folded row (`<id>Good`).
+// A type is never both: ticking one side unticks the other.
+const goodHost = (container) => el(container.id + "Good");
+
 function renderFit(container, group, options) {
-    container.innerHTML = options.map((o, i) => {
-        const name = `fit_${group}_${i}`;
-        const choice = (value, label, cls, tip) => `<label class="fit-choice ${cls}"><input type="radio" aria-label="${tip}" name="${name}" value="${value}"${value === "" ? " checked" : ""}><span>${label}</span></label>`;
-        return `<fieldset class="fit-row" data-value="${escapeHtml(o.value)}"><legend class="sr-only">${escapeHtml(o.label)}</legend><span class="fit-name" aria-hidden="true">${escapeHtml(o.label)}</span><span class="fit-choices">`
-            + choice("avoid", "Avoid", "avoid", "The app warns users with this") + choice("", "Neutral", "none", "No effect either way") + choice("good", "Good", "good", "The app counts it as a plus for users with this")
-            + `</span></fieldset>`;
-    }).join("");
+    const chips = (kind, tip) => options.map((o) => `<label class="fit-row fit-chip" data-value="${escapeHtml(o.value)}"><input type="checkbox" value="${kind}" aria-label="${tip}: ${escapeHtml(o.label)}"><span>${escapeHtml(o.label)}</span></label>`).join("");
+    container.innerHTML = chips("avoid", "Caution");
+    const good = goodHost(container);
+    if (good) good.innerHTML = chips("good", "Good for");
+    [[container, good], [good, container]].forEach(([from, other]) => {
+        if (!from || !other) return;
+        from.onchange = (event) => {
+            if (!event.target.checked) return;
+            const row = event.target.closest(".fit-row");
+            const twin = row && Array.from(other.querySelectorAll(".fit-row")).find((x) => x.dataset.value === row.dataset.value);
+            if (twin) twin.querySelector("input").checked = false;
+        };
+    });
 }
 
 
 function readFit(container) {
-    const result = { avoid: [], good: [] };
-    container.querySelectorAll(".fit-row").forEach((row) => {
-        const picked = row.querySelector("input:checked");
-        if (picked && result[picked.value]) result[picked.value].push(row.dataset.value);
-    });
-    return result;
+    const ticked = (host) => host ? Array.from(host.querySelectorAll(".fit-row")).filter((row) => row.querySelector("input:checked")).map((row) => row.dataset.value) : [];
+    // the hidden skin-condition list has no "Good" row of its own: its saved values are kept by writeFit below
+    const good = goodHost(container);
+    return { avoid: ticked(container), good: good ? ticked(good) : JSON.parse(container.dataset.good || "[]") };
 }
 
 
 function writeFit(container, avoid, good) {
     const lower = (list) => new Set((Array.isArray(list) ? list : []).map((v) => String(v).toLowerCase()));
     const no = lower(avoid), yes = lower(good);
-    container.querySelectorAll(".fit-row").forEach((row) => {
-        const key = row.dataset.value.toLowerCase();
-        const want = no.has(key) ? "avoid" : yes.has(key) ? "good" : "";
-        row.querySelectorAll("input").forEach((input) => { input.checked = input.value === want; });
-    });
+    const set = (host, wanted) => host && host.querySelectorAll(".fit-row").forEach((row) => { row.querySelector("input").checked = wanted.has(row.dataset.value.toLowerCase()); });
+    set(container, no);
+    const goodRows = goodHost(container);
+    set(goodRows, yes);
+    if (!goodRows) container.dataset.good = JSON.stringify(Array.isArray(good) ? good : []);
+    else if (yes.size) goodRows.closest("details").open = true;
 }
 
 

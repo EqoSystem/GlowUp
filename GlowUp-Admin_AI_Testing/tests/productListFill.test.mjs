@@ -43,3 +43,4 @@ ok("answer: duplicates removed, curly braces cleaned", () => {
     assert.equal(r.found, true); assert.equal(r.ingredients.length, 5);
 });
 console.log(`product list fill: ${n} checks passed`);
+console.log("ALL PASSED");

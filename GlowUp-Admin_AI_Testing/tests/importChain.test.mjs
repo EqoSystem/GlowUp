@@ -62,3 +62,4 @@ await assert.rejects(runImport("nothing", { lookupProduct: async () => ({ candid
 passed++;
 
 console.log(`importChain: ${passed} checks passed`);
+console.log("ALL PASSED");

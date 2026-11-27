@@ -34,7 +34,7 @@ const SAVED_AT_KEY = "glowup.layouts.savedAt";        // when this browser last 
 const MET_KEY = "glowup.layouts.synced.";             // + uid: this browser has synced with that admin's copy before
 
 
-const POSITIONS_VERSION = 7;
+const POSITIONS_VERSION = 8;
 const MAX_PROFILES = 4;
 const MAX_ADDED = 12;
 const FONTS = [
