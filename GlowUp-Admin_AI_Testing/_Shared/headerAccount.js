@@ -27,6 +27,7 @@ export const KINDS = [
     { key: "bug", label: "Bug", icon: "bug", match: (category) => category === "Bug" },
     { key: "suggestion", label: "Suggestion", icon: "bulb", match: (category) => category === "Suggestion" },
     { key: "wrong", label: "Wrong Scan", icon: "camera", match: (category) => category === "Wrong scan result" },
+    { key: "product", label: "New product", icon: "box", match: (category) => category === "New product" },      // app Send for Review (27 Nov 2026)
     { key: "other", label: "Others", icon: "inbox", match: () => true }          // anything else
 ];
 export const kindOf = (category) => KINDS.find((kind) => kind.match(String(category || ""))) || KINDS[KINDS.length - 1];
@@ -140,7 +141,7 @@ function paintBadge() {
     bellBtn.setAttribute("aria-label", n > 0 ? `Notifications, ${n} new` : "Notifications");
 }
 
-const KIND_WORDS = { bug: "Bug report", suggestion: "Suggestion", wrong: "Wrong scan result", other: "Other report" };
+const KIND_WORDS = { bug: "Bug report", suggestion: "Suggestion", wrong: "Wrong scan result", product: "New product", other: "Other report" };
 const dayStart = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); };
 
 function paintNotifications(panel) {
@@ -190,6 +191,8 @@ function paintNotifications(panel) {
                 item.addEventListener("click", () => {
                     closePop(false);
                     if (!r.read) markRead([r.id]);
+                    // a "New product" report opens in the inventory's Review queue (one place for every review)
+                    if (r.category === "New product") { window.location.href = new URL("../_Admin_Brand_Inventory/adminBrandInventory.html#report=" + encodeURIComponent(r.id), import.meta.url).href; return; }
                     openReplyDrawer({ id: r.id, uid: r.uid, userName: r.userName, category: r.category, message: r.message });
                 });
                 group.append(item);

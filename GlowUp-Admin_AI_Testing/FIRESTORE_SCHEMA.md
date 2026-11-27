@@ -307,6 +307,17 @@ Written by the app after every scan. It holds no user id, name or email.
 
 The Dashboard's "Total Scans Today" counts notes since midnight on the computer showing the dashboard. "Flagged Allergens" counts today's notes where `allergenFlagged` is yes.
 
+### `supportReports/{id}`: kind "New product" (27 November 2026)
+
+The app's Send for Review screen writes a support report with `category: "New product"` and, besides the usual fields (uid, userName, message,
+status "new", appVersion, device, createdAtUnix, createdAt), five text fields: `barcode` (digits only, 0 to 14), `brand` (up to 60), `productName`
+(up to 100), `ingredientText` (up to 4000, read on the phone and confirmed by the user) and `note` (up to 500). At least a barcode or a product
+name. No photo, no `lastScan`, nothing about the skin profile. Only admins read it. The website shows it in the inventory's Review queue;
+"Close report" sets status "handled"; a reply goes to `users/{uid}/notifications` as before.
+
+Ingredients created by Search and import carry `source: "import"`, `via: "search-import"`, `reviewed: false` and `identified` (false when
+neither PubChem nor a GlowUp rule knew the name: the app shows it as "Not checked").
+
 ### `allergenSuggestions/{id}` and `conditionSuggestions/{id}`
 
 | Field | Type | Notes |

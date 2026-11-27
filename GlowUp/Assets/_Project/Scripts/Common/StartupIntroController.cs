@@ -275,8 +275,6 @@ namespace GlowUp.Common
             {
                 bool firebase = await FirebaseBootstrap.Ready;
                 FirebaseUser user = firebase ? FirebaseAuth.DefaultInstance.CurrentUser : null;
-                // the app was closed in staff mode: open the staff dashboard again (it checks the database), not the customer account kept on this phone
-                if (user != null && GlowUp.Admin.StaffAccess.LastSessionWasStaff) return "AdminDashboardScene";
                 UserProfileData saved = UserProfileRepository.Cached();
                 bool hasProfile = saved != null && !string.IsNullOrWhiteSpace(saved.skinType);
                 if (user != null && hasProfile) return dashboardScene;

@@ -41,10 +41,11 @@ namespace GlowUp.Tests
         }
 
         [Test]
-        public void TheListSourcesNameEveryBuiltInCondition()
+        public void TheListSourcesNoLongerOfferChronicSkinConditions()
         {
-            foreach (string c in new[] { "Acne", "Eczema", "Psoriasis", "Rosacea", "Seborrheic", "Melasma", "Contact dermatitis" })
-                StringAssert.Contains(c.ToLowerInvariant(), SkinListSources.Body.ToLowerInvariant());
+            // chronic skin conditions were removed from the app on 27 Nov 2026 (owner: no basis or use in the application)
+            StringAssert.DoesNotContain("chronic skin conditions", SkinListSources.Body.ToLowerInvariant());
+            StringAssert.Contains("skin types", SkinListSources.Body.ToLowerInvariant());
             StringAssert.Contains("not a medical", SkinListSources.Note.ToLowerInvariant());
         }
 

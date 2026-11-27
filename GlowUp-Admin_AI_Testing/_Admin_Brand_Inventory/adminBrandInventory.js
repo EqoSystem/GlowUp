@@ -76,6 +76,7 @@ import { loadCatalogue, lookupProduct } from "../_Shared/quickFill.js";
 import { waitingForList, suggestionFrom, LISTS_PER_LOAD } from "../_Shared/productListFill.js";
 import { parseBarcodes, lookupBatch, batchSummary } from "../_Shared/batchBarcodes.js";
 import { openBatchLookup } from "./batchLookup.js";
+import { mountSearchImport } from "./searchImport.js";
 
 const OTHER_TYPE = "__other__";
 let paintCounters = () => { };              // character counters under the form fields (charLimit.js)
@@ -83,6 +84,7 @@ const NO_BRAND = "__none__";
 const NEW_BRAND = "__newbrand__";          // Quick fill found a brand that is not listed: it is added when the product is saved
 let pendingBrandName = "";
 let quickFill = { reset() {} };
+let searchImport = { refresh() {} };
 // where each value of the open product form came from, and whether a person has checked it (capture.js); saved as fieldOrigins
 let fieldOrigins = {};
 // the ingredient statement exactly as the source or the photo gave it (kept as evidence; the list itself is what the app uses)
@@ -399,6 +401,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         noteOrigins: (rows, method, score) => { fieldOrigins = originsAfterFill(fieldOrigins, rows, method, score); paintOrigins(); saveDraft(); },
         noteRaw: (text, from) => { ingredientsRaw = { text: String(text || "").slice(0, 4000), from: String(from || "").slice(0, 120) }; paintRawIngredients(); saveDraft(); },
         openExisting: (product) => { productModal.close(); openProductForm(product); }
+    });
+    // Search and import + Review queue (redesign plan, 27 Nov 2026): one panel, one button; imports, app scans and user reports in one queue
+    searchImport = mountSearchImport({
+        lookup: (text) => lookupProduct(text, { getToken: () => (auth.currentUser ? auth.currentUser.getIdToken() : "") }),
+        library: () => curatedList,
+        pending: () => everyProduct.filter((p) => p.needsReview && !p.binned && !isOut(p)),
+        saveRecord: (record) => saveInventoryDraft({ products: [record], brands: [] }, "Search and import.txt", () => {}),
+        findSaved: (found) => everyProduct.find((p) => !p.binned && ((found.barcode && barcodeKey(p.barcode) && barcodeKey(p.barcode) === barcodeKey(found.barcode))
+            || (sameKey(p.name) === sameKey(found.name) && sameKey(p.brandName) === sameKey(found.brand)))) || null,
+        approve: async (p) => { await approveSelectedInventory(["p:" + p.id]); const now = itemOf("p:" + p.id); return !!now && !now.needsReview; },
+        toBin: (p) => moveToBin(["p:" + p.id]),
+        openProduct: (p) => openProductForm(p),
+        openBatch: () => { const b = el("batchLookupBtn"); if (b) b.click(); },
+        openFile: () => el("inventoryFileInput").click(),
+        reload: () => loadInventory()
     });
     mountShadeFinder({
         button: el("productShadeFind"), status: el("productShadeFindStatus"),
@@ -742,6 +759,8 @@ async function loadInventory() {
             if (data.name) curatedList.push({
                 id: d.id, name: String(data.name), techName: String(data.techName || ""), aliases: asArray(data.aliases),
                 riskLevel: String(data.riskLevel || ""), source: String(data.source || "").trim().toLowerCase(),
+                allergenTags: asArray(data.allergenTags), avoidForSkinTypes: asArray(data.avoidForSkinTypes), sources: asArray(data.sources),
+                cautionNote: String(data.cautionNote || ""), identified: data.identified !== false,
                 reviewed: data.reviewed === true, generic: data.generic === true,
                 flags: asArray(data.allergenTags).length + asArray(data.avoidForSkinTypes).length + asArray(data.avoidForConditions).length
             });
@@ -904,8 +923,10 @@ async function approveSelectedInventory(keys) {
     try {
         await saveOrReload(ops);
         notify(`${many(names.length, "entry was", "entries were")} approved.`, "ok");
+        return true;
     } catch (error) {
         notify("The selected entries were not approved. " + describeError(error), "error");
+        return false;
     }
 }
 
@@ -1278,6 +1299,7 @@ function paintToolbar() {
 }
 
 function renderInventory() {
+    searchImport.refresh();
     paintStats();
     paintLayout();
     paintToolbar();

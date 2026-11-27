@@ -43,12 +43,7 @@ namespace GlowUp.EditorTools
             new Step("AR Try-On", ArTryOnSceneBuilder.Build),
             new Step("Settings", SettingsSceneBuilder.Build),
             new Step("Notifications", NotificationsSceneBuilder.Build),
-            new Step("Staff Sign-In", AdminScenesBuilder.BuildStaffLogin),
-            new Step("Staff Dashboard", AdminScenesBuilder.BuildDashboard),
-            new Step("Staff Capture", AdminScenesBuilder.BuildCapture),
-            new Step("Staff Submissions", AdminScenesBuilder.BuildSubmissions),
-            new Step("Staff Settings", AdminScenesBuilder.BuildSettings),
-            new Step("Staff Scanner Preferences", AdminScenesBuilder.BuildScannerPrefs)
+            new Step("Send for Review", SendForReviewSceneBuilder.Build)
         };
 
         [MenuItem("GlowUp/Build Scene/All Scenes", false, 90)]

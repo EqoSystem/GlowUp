@@ -146,6 +146,8 @@ namespace GlowUp.Result
         [Tooltip("The same button in the calm outline style: shown for a result with nothing flagged, so AR Try-On stays the one pink next step")]
         [SerializeField] private Button dermatologistQuietButton;
         [SerializeField] private string dermatologistUrl = "https://www.google.com/maps/search/dermatologist+near+me";
+        [Tooltip("Shown above the verdict when the scan added the product to GlowUp as Pending")]
+        [SerializeField] private string msgSentForReview = "Not in GlowUp yet. Sent to the admins for review.";
         [Tooltip("The advice in this last card. Every result ends with the dermatologist line here (it is no longer repeated inside \"Why this result?\")")]
         [TextArea] [SerializeField] private string flaggedAdvice = "This product has ingredients that may not suit you. " + ProductScope.DermatologistLine;
         [TextArea] [SerializeField] private string standardAdvice = ProductScope.DermatologistLine;
@@ -293,7 +295,9 @@ namespace GlowUp.Result
             Set(dateText, string.Format(dateFormat, ScanHistoryRepository.FormatTime(record.scannedAtUnix)));
             if (typeIcon != null && typeIcons != null) { var s = typeIcons.For(record.cosmeticType); if (s != null) typeIcon.sprite = s; }
             if (status != null) status.Bind(record.status);
-            Set(summaryText, record.summary);
+            // a product that was not in GlowUp and was added as Pending by this scan: one line says so (redesign plan, 27 Nov 2026)
+            bool sentForReview = !string.IsNullOrEmpty(record.id) && ScannedProductPublisher.SentForReview.Contains(record.id);
+            Set(summaryText, sentForReview ? msgSentForReview + "\n" + ProductScope.CurrentWording(record.summary) : ProductScope.CurrentWording(record.summary));
             Set(explanationText, ExplanationShown());
 
             if (skinType != null) skinType.Bind(record.skinTypeMatch);
@@ -308,7 +312,7 @@ namespace GlowUp.Result
             ShowShades();
 
             if (dermatologistCard != null) dermatologistCard.SetActive(true);
-            Set(dermatologistText, record.dermatologistAdvised ? flaggedAdvice : standardAdvice);
+            Set(dermatologistText, ProductScope.CurrentWording(record.dermatologistAdvised ? flaggedAdvice : standardAdvice));
             // ONE pink next step per screen: the filled dermatologist button only when something is flagged
             bool urgent = IsFlagged(record) || record.dermatologistAdvised;
             if (dermatologistButton != null) dermatologistButton.gameObject.SetActive(urgent || dermatologistQuietButton == null);
@@ -558,7 +562,7 @@ namespace GlowUp.Result
                 if (p.Length == 0) continue;
                 if (p.StartsWith("<b>FDA Philippines</b>", StringComparison.Ordinal)) continue;
                 if (p.StartsWith("<b>Where the ingredient list came from</b>", StringComparison.Ordinal)) continue;
-                if (p == ProductScope.DermatologistLine) continue;
+                if (p == ProductScope.DermatologistLine || p == ProductScope.OldDermatologistLine) continue;
                 kept.Add(p);
             }
             return string.Join("\n\n", kept);

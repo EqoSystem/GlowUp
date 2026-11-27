@@ -549,11 +549,24 @@ service cloud.firestore {
     // A signed-in user may CREATE their own report only (their own uid, status "new", a message of 3 to 2000 characters, one of three
     // kinds). Nobody but an admin may read, change or delete a report. "lastScan" is there only when the user switched it on.
     match /supportReports/{reportId} {
+      // "New product" (27 November 2026, app Send for Review): text only, confirmed by the user. barcode, brand, productName,
+      // ingredientText and note; at least a barcode or a product name. Nothing about the skin profile, no photo.
       allow create: if signedIn()
-        && request.resource.data.keys().hasOnly(['uid', 'userName', 'category', 'message', 'status', 'appVersion', 'device', 'createdAtUnix', 'createdAt', 'lastScan'])
+        && request.resource.data.keys().hasOnly(['uid', 'userName', 'category', 'message', 'status', 'appVersion', 'device', 'createdAtUnix', 'createdAt', 'lastScan',
+             'barcode', 'brand', 'productName', 'ingredientText', 'note'])
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.status == 'new'
-        && request.resource.data.category in ['Bug', 'Wrong scan result', 'Suggestion', 'Other']     // Suggestion: 11 November 2026 (app Settings > Contact support)
+        && request.resource.data.category in ['Bug', 'Wrong scan result', 'Suggestion', 'Other', 'New product']     // Suggestion: 11 November 2026 (app Settings > Contact support)
+        && (request.resource.data.category == 'New product'
+            || !request.resource.data.keys().hasAny(['barcode', 'brand', 'productName', 'ingredientText', 'note']))
+        && (request.resource.data.category != 'New product'
+            || ((request.resource.data.get('barcode', '').size() > 0 || request.resource.data.get('productName', '').size() > 0)
+                && !('lastScan' in request.resource.data)))
+        && request.resource.data.get('barcode', '') is string && request.resource.data.get('barcode', '').matches('[0-9]{0,14}')
+        && request.resource.data.get('brand', '') is string && request.resource.data.get('brand', '').size() <= 60
+        && request.resource.data.get('productName', '') is string && request.resource.data.get('productName', '').size() <= 100
+        && request.resource.data.get('ingredientText', '') is string && request.resource.data.get('ingredientText', '').size() <= 4000
+        && request.resource.data.get('note', '') is string && request.resource.data.get('note', '').size() <= 500
         && request.resource.data.get('userName', '') is string && request.resource.data.get('userName', '').size() <= 100
         && request.resource.data.message is string
         && request.resource.data.message.size() >= 3

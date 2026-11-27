@@ -419,7 +419,7 @@ namespace GlowUp.EditorTools
             // ---- the optional Barcode card (11 November 2026): only when the pack's name could not be read but a barcode is there,
             //      or from "Use a barcode" in Type it in. The number is big and editable; Find product looks it up. ----
             A.AppPopup bar = A.Overlay(s, "BarcodeCardPanel", "Barcode");
-            A.At(bar.box, A.MC, new Vector2(0, 120), new Vector2(940, 1060));
+            A.At(bar.box, A.MC, new Vector2(0, 120), new Vector2(940, 1200));      // 1200: room for "Send for review" (27 Nov 2026)
             TMP_InputField barNumber = SceneBuilderCore.MakeInput(bar.box, "NumberField", "Barcode digits", A.TC, Vector2.zero, new Vector2(800, 128));
             A.TopStrip(barNumber.transform, 132, 128, 48, 48);
             Kit.StyleInput(barNumber, "Barcode digits", ThemeRole.InputBackground);
@@ -445,12 +445,16 @@ namespace GlowUp.EditorTools
             A.TopStrip(barPhoto.transform, 696, 112, 48, 48);
             A.Outline(barPhoto.transform, ThemeRole.Accent, 112f);
             A.Shrink(A.LabelOf(barPhoto), 22);
+            Button barReview = A.PillButton(bar.box, "SendForReviewButton", "Send for review", 32, ThemeRole.Background, ThemeRole.AccentText);
+            A.TopStrip(barReview.transform, 830, 112, 48, 48);
+            A.Outline(barReview.transform, ThemeRole.Accent, 112f);
+            barReview.gameObject.SetActive(false);                               // only when GlowUp cannot find the product
             Button barCancel = A.PillButton(bar.box, "CancelButton", "Cancel", 34, ThemeRole.SurfaceAlt, ThemeRole.MainText);
             A.BottomStrip(barCancel.transform, 44, 112, 48, 48);
             var barView = SceneBuilderCore.Ensure<ScanBarcodeCardView>(bar.root);
             A.Set(barView, "panel", bar.panel); A.Set(barView, "numberInput", barNumber); A.Set(barView, "feedbackText", barFeedback);
             A.Set(barView, "nameRow", barNameRow); A.Set(barView, "nameInput", barName);
-            A.Set(barView, "findButton", barFind); A.Set(barView, "photoButton", barPhoto); A.Set(barView, "cancelButton", barCancel);
+            A.Set(barView, "findButton", barFind); A.Set(barView, "photoButton", barPhoto); A.Set(barView, "cancelButton", barCancel); A.Set(barView, "reviewButton", barReview);
 
             // ---- controller (kept across rebuilds: thresholds, messages and camera corrections live here) ----
             var controller = A.Controller<SmartScanFlowController>("SmartScanFlowController");

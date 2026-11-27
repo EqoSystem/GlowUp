@@ -38,7 +38,7 @@ namespace GlowUp.Onboarding
         [SerializeField] private TextMeshProUGUI feedbackText;
 
         [Range(0f, 0.2f)] [SerializeField] private float bottomThreshold = 0.03f;
-        [SerializeField] private string healthText = "I agree that GlowUp keeps my skin type, skin tone, chronic skin conditions and allergies, to personalise my results (sensitive personal information)";
+        [SerializeField] private string healthText = "I agree that GlowUp keeps my skin type, skin tone, skin reactions and allergies, to personalise my results (sensitive personal information)";
         [SerializeField] private string readLabel = "I have read and agree to the Privacy Policy and the Terms and Conditions";
         [SerializeField] private string dashboardScene = SceneNames.Dashboard;
         [SerializeField] private string previousScene = SceneNames.Onboarding5;
@@ -87,7 +87,7 @@ namespace GlowUp.Onboarding
             if (readToggle != null) { readToggle.isOn = false; readToggle.interactable = false; readToggle.onValueChanged.AddListener(_ => OnToggled()); }
             if (toggleLabel != null) toggleLabel.text = readLabel;
             if (healthToggle != null) { healthToggle.isOn = false; healthToggle.interactable = false; healthToggle.onValueChanged.AddListener(_ => OnToggled()); }
-            if (healthLabel != null) healthLabel.text = healthText.Replace("skin tone, skin conditions", "skin tone, chronic skin conditions");   // 22 Nov 2026: the one name everywhere
+            if (healthLabel != null) healthLabel.text = healthText.Replace("skin tone, chronic skin conditions", "skin tone, skin reactions").Replace("skin tone, skin conditions", "skin tone, skin reactions");   // 22 Nov 2026: the one name everywhere
             if (continueButton != null) continueButton.onClick.AddListener(() => _ = Create());
             if (backButton != null) backButton.onClick.AddListener(() => SceneNavigator.Go(previousScene));
         }

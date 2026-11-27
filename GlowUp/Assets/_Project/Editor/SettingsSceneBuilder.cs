@@ -406,7 +406,7 @@ namespace GlowUp.EditorTools
             // =====================================================================================
             Transform skin = TileSection(content, scroll, "SkinProfileSection", "Skin Profile", "Skin type, tone, allergens", IconFactory.Sparkle, SettingsIconAnimator.Style.Sparkle, 4);
             GameObject skinBlock = Block(skin, "SkinProfileBlock", 16);
-            TextMeshProUGUI skinCurrent = A.Label(skinBlock.transform, "CurrentProfileText", "Skin type: Mix\nSkin tone: Medium\nChronic skin conditions: 1   |   Allergens: 2",
+            TextMeshProUGUI skinCurrent = A.Label(skinBlock.transform, "CurrentProfileText", "Skin type: Mix\nSkin tone: Medium\nSkin reactions: 1   |   Allergens: 2",
                                                   32, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             TextMeshProUGUI skinHint = A.Label(skinBlock.transform, "HintText", "Skin changed, or picked the wrong type? Take the skin quiz again. Your answers are replaced when you finish it.",
                                                RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
@@ -429,12 +429,9 @@ namespace GlowUp.EditorTools
             TextMeshProUGUI warnHeader = A.Label(triggerGroup.transform, "WarnMeAboutText", "Warn me about", 30, ThemeRole.SecondaryText, FontRole.Heading);
             A.Size(warnHeader, -1, 70);
 
-            string[] triggerKeys = { "allergens", "harmful", "acne", "eczema", "psoriasis", "rosacea", "seborrheic", "melasma", "contact" };
-            string[] triggerTitles =
-            {
-                "My allergens", "Banned or harmful ingredients", "Acne triggers", "Eczema flare-up triggers", "Psoriasis flare-up triggers",
-                "Rosacea triggers", "Seborrheic dermatitis triggers", "Melasma and dark-spot triggers", "Contact dermatitis triggers"
-            };
+            // the skin-condition switches were removed with the chronic skin conditions (27 Nov 2026)
+            string[] triggerKeys = { "allergens", "harmful" };
+            string[] triggerTitles = { "My allergens", "Banned or harmful ingredients" };
             var triggerToggles = new Toggle[triggerKeys.Length];
             for (int i = 0; i < triggerKeys.Length; i++)
                 triggerToggles[i] = SwitchRow(triggerGroup.transform, "Trigger_" + triggerKeys[i], triggerTitles[i], null, i < 2, 84);

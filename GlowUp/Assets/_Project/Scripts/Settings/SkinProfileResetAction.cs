@@ -31,12 +31,12 @@ namespace GlowUp.AppSettings
 
         [Header("Wording")]
         [Tooltip("{0} = skin type, {1} = skin tone, {2} = number of skin conditions, {3} = number of allergens")]
-        [SerializeField] private string profileFormat = "Skin type: {0}\nSkin tone: {1}\nChronic skin conditions: {2}   |   Allergens: {3}";
+        [SerializeField] private string profileFormat = "Skin type: {0}\nSkin tone: {1}\nSkin reactions: {2}   |   Allergens: {3}";
         [SerializeField] private string notSet = "not set";
         [SerializeField] private string noneSaved = "none";
         [SerializeField] private string confirmTitle = "Retake the skin quiz?";
         [SerializeField] private string confirmMessage = "You go through Steps 1 to 5 again with your current answers filled in. Change what you like; your email and password stay locked.\n\nOn the last step, Save edits keeps the changes and Cancel discards them.";
-        [SerializeField] private string confirmMessageWhenClearing = "Your saved skin type, skin tone, chronic skin conditions and allergens are cleared now and the quiz starts empty.\n\nYour name, email, birthday and scan history are not changed.";
+        [SerializeField] private string confirmMessageWhenClearing = "Your saved skin type, skin tone, skin reactions and allergens are cleared now and the quiz starts empty.\n\nYour name, email, birthday and scan history are not changed.";
         [SerializeField] private string confirmButtonText = "Retake Quiz";
 
         UserProfileData profile;
@@ -61,16 +61,16 @@ namespace GlowUp.AppSettings
             if (currentProfileText == null) return;
             string type = p != null && !string.IsNullOrWhiteSpace(p.skinType) ? GlowUp.Onboarding.SkinTypeNames.Display(p.skinType) : notSet;
             string tone = p != null && !string.IsNullOrWhiteSpace(p.skinTone) ? p.skinTone : notSet;
-            int conditions = p != null && p.skinConditions != null ? p.skinConditions.Count : 0;
+            int conditions = GlowUp.Scan.SensitiveReactions.Of(p).Count;     // the optional skin reactions (chronic skin conditions removed 27 Nov 2026)
             int allergens = p != null ? p.RealAllergens().Count : 0;
             // 22 Nov 2026: "Chronic skin condition" is the name everywhere (scenes saved before keep the older word otherwise)
-            string format = profileFormat.Replace("\nSkin conditions:", "\nChronic skin conditions:");
+            string format = profileFormat.Replace("Chronic skin conditions:", "Skin reactions:").Replace("Skin conditions:", "Skin reactions:");
             currentProfileText.text = string.Format(format, type, tone, conditions == 0 ? noneSaved : conditions.ToString(), allergens == 0 ? noneSaved : allergens.ToString());
         }
 
         void Ask()
         {
-            string message = (clearSavedProfileBeforeQuiz ? confirmMessageWhenClearing : confirmMessage).Replace("skin tone, skin conditions", "skin tone, chronic skin conditions");
+            string message = (clearSavedProfileBeforeQuiz ? confirmMessageWhenClearing : confirmMessage).Replace("skin tone, chronic skin conditions", "skin tone, skin reactions").Replace("skin tone, skin conditions", "skin tone, skin reactions");
             if (confirm != null) confirm.Ask(confirmTitle, message, confirmButtonText, Retake);
             else Retake();
         }

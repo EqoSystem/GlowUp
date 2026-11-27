@@ -158,8 +158,12 @@ namespace GlowUp.EditorTools
             for (int i = 0; i < social.Length; i++)
                 TopAt(social[i].transform, card, (i - (social.Length - 1) / 2f) * (SocialSize + SocialGap), y, SocialSize, SocialSize);
 
-            // 23 Nov 2026 (staff plan): the small "Admin?" row under Google, above the legal line; closed by default
-            AdminScenesBuilder.AddLoginAccordion(card, y + SocialSize + 30);
+            // The "Admin?" row was removed with the app's Admin Scanner (redesign plan, 27 Nov 2026): admins log in on the website only.
+            foreach (string gone in new[] { "AdminAccordion", "AdminAccessAccordion" })
+            {
+                Transform old = Kit.Loose(card.root, gone);
+                if (old != null && old.GetComponent<Canvas>() == null) Object.DestroyImmediate(old.gameObject);
+            }
 
             // legal text + links: anchored to the panel bottom
             BottomAt(termsText, card, 0, 56, Inner, 70, 28);

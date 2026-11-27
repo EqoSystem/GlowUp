@@ -70,6 +70,20 @@ namespace GlowUp.Notifications
             if (now == uid) return;
             Stop();
             uid = now;
+            Attach();
+        }
+
+        int generation;               // raised by Stop(): a watcher of an older set of listeners does nothing
+        int retries;
+
+        /// <summary>
+        /// Starts the three live listeners for the signed-in account. Real time (27 Nov 2026 fix): a listener that the server ends
+        /// with an error (a permission check made before the sign-in had settled, a dropped connection the SDK gives up on) used
+        /// to stay dead until the app restarted, so a reply to a report only appeared after a restart. Each listener is now
+        /// watched and the set is attached again after a short pause, as long as the same account is signed in.
+        /// </summary>
+        void Attach()
+        {
             if (string.IsNullOrEmpty(uid)) { Loaded = false; dirty = true; return; }
             hidden = LoadSet(HiddenKey + uid); readHere = LoadSet(ReadKey + uid);
             var db = FirebaseFirestore.DefaultInstance;
@@ -89,11 +103,31 @@ namespace GlowUp.Notifications
                     dirty = true;
                 });
             announcementListener = db.Collection("announcements").OrderByDescending("createdAt").Limit(Limit)
-                .Listen(snap => { announcements.Clear(); foreach (var d in snap.Documents) announcements.Add(Read(d, Source.Announcement)); Loaded = true; Failed = false; dirty = true; });
+                .Listen(snap => { announcements.Clear(); foreach (var d in snap.Documents) announcements.Add(Read(d, Source.Announcement)); Loaded = true; Failed = false; dirty = true; retries = 0; });
+            int mine = generation;
+            Watch(personalListener, mine); Watch(stateListener, mine); Watch(announcementListener, mine);
+        }
+
+        async void Watch(ListenerRegistration listener, int mine)
+        {
+            if (listener == null) return;
+            try { await listener.ListenerTask; }
+            catch (Exception) { }                                               // ended with an error: attach again below
+            if (this == null || mine != generation || string.IsNullOrEmpty(uid)) return;      // stopped on purpose (sign-out, new account)
+            Failed = true; dirty = true;
+            float wait = Mathf.Min(30f, 2f * (1 << Mathf.Min(retries, 4)));      // 2, 4, 8, 16, 30 seconds
+            retries++;
+            await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(wait));
+            if (this == null || mine != generation || string.IsNullOrEmpty(uid)) return;
+            string account = uid;
+            Stop();
+            uid = account;
+            Attach();
         }
 
         void Stop()
         {
+            generation++;
             personalListener?.Stop(); personalListener = null;
             announcementListener?.Stop(); announcementListener = null;
             stateListener?.Stop(); stateListener = null;

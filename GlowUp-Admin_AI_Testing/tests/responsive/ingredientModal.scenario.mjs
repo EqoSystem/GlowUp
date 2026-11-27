@@ -104,7 +104,7 @@ try {
         ok(await page.evaluate(() => Array.from(document.querySelectorAll(".ing-modal .label-row > label[for]")).every((l) => document.getElementById(l.htmlFor))), `${tag}: every label points at its box`);
 
         const sequence = await page.evaluate(() => Array.from(document.querySelectorAll("#secJudge .label-row > label, #secJudge .label-row > .label-text")).map((l) => l.textContent.replace(/\(optional\)/, "").trim()));
-        ok(sequence.join("|") === "Risk Level|Minimum Age|Caution Note|Commonly Used In|Highlights|Allergen Family|Skin Types|Chronic Skin Conditions", `${tag}: order in the last section (got ${sequence.join("|")})`);
+        ok(sequence.join("|") === "Risk Level|Minimum Age|Caution Note|Commonly Used In|Highlights|Allergen Family|Caution for skin types", `${tag}: order in the last section (got ${sequence.join("|")})`);
 
         const halves = await page.evaluate(() => Array.from(document.querySelectorAll(".ing-grid > .half")).map((n) => n.querySelector("label").textContent.trim().replace(/\s*\*$/, "")));
         ok(halves.join("|") === "INCI name|Ingredient classification|Risk Level|Minimum Age", `${tag}: only the short boxes share a row`);
@@ -116,7 +116,7 @@ try {
         ok(await page.evaluate(() => Array.from(document.querySelectorAll("#allergenLabel, #conditionsLabel")).every((l) => { const slot = l.parentElement.querySelector(".label-actions"); const kids = Array.from(slot.children); return kids.length === 2 && kids[0].classList.contains("info-slot") && kids[1].classList.contains("list-edit"); })), `${tag}: info icon then edit icon, at the right of the label row`);
         ok(await page.evaluate(() => Array.from(document.querySelectorAll(".fit-row")).every((r) => r.tagName === "FIELDSET" && r.querySelector("legend"))), `${tag}: each skin row is a fieldset with a legend`);
         ok(await page.evaluate(() => Array.from(document.querySelectorAll("#skinTypesFit .fit-choice span")).slice(0, 3).map((s) => s.textContent).join("|") === "Avoid|Neutral|Good"), `${tag}: Avoid | Neutral | Good (no bare dash)`);
-        ok(await page.evaluate(() => { const rows = Array.from(document.querySelectorAll(".fit-row")).map((r) => Math.round(r.getBoundingClientRect().height)); return Math.max(...rows) - Math.min(...rows) <= 2 || window.innerWidth < 768; }), `${tag}: the skin rows have one height`);
+        ok(await page.evaluate(() => { const rows = Array.from(document.querySelectorAll(".fit-row")).map((r) => Math.round(r.getBoundingClientRect().height)).filter((h) => h > 0); return Math.max(...rows) - Math.min(...rows) <= 2 || window.innerWidth < 768; }), `${tag}: the skin rows have one height`);
 
         ok(await page.locator('[data-field-sources="purpose"]:visible').count() === 0, `${tag}: no sources before a name is typed`);
         ok(await page.locator('[data-field-sources="name"], [data-field-sources="classification"], [data-field-sources="allergens"]').count() === 0, `${tag}: no Sources row for the INCI name, the classification and the allergen family`);
@@ -163,7 +163,7 @@ try {
         await page.keyboard.press("Enter");
         await page.waitForSelector("#conditionsWhy p", { state: "attached", timeout: 8000 });
         const picked = () => page.evaluate(() => Array.from(document.querySelectorAll("#skinTypesFit .fit-row, #conditionsFit .fit-row")).filter((r) => r.querySelector('input[value="avoid"]:checked')).map((r) => r.dataset.value).join());
-        ok(await picked() === "Sensitive,allergiccontact,contact", `${width}: H317 ticks Sensitive and allergic contact dermatitis (got ${await picked()})`);
+        ok(await picked() === "Sensitive", `${width}: H317 ticks Sensitive only; skin conditions are no longer ticked (got ${await picked()})`);
         const why = await page.evaluate(() => ["allergenWhy", "skinTypesWhy", "conditionsWhy", "riskWhy"].map((id) => document.getElementById(id).textContent));
         ok(/Not filled/.test(why[0]) && /H317/.test(why[1]) && /H317/.test(why[2]) && /Not filled/.test(why[3]), `${width}: every group says why`);
         ok(await page.locator("#skinTypesWhy a.source-link[target=_blank]").count() === 1, `${width}: the reason links its page`);

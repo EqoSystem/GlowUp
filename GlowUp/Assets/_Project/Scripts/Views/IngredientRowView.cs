@@ -45,7 +45,7 @@ namespace GlowUp.Views
         [SerializeField] private Button sourceLinkButton;
 
         [Header("Wording")]
-        [SerializeField] private string safeLabel = "Not flagged";
+        [SerializeField] private string safeLabel = "Neutral";            // identified, no caution rule matched; never called safe
         [SerializeField] private string cautionLabel = "Caution";
         [SerializeField] private string avoidLabel = "Avoid";
         [SerializeField] private string unknownLabel = "Not checked";
@@ -181,7 +181,7 @@ namespace GlowUp.Views
             if (levelDot != null) levelDot.color = c;
             if (levelText != null)
             {
-                levelText.text = level == "safe" ? safeLabel : level == "caution" ? cautionLabel : level == "harmful" ? avoidLabel : unknownLabel;
+                levelText.text = level == "safe" ? (safeLabel == "Not flagged" || safeLabel == "Safe" ? "Neutral" : safeLabel) : level == "caution" ? cautionLabel : level == "harmful" ? avoidLabel : unknownLabel;
                 levelText.color = c;
             }
             if (reasonText != null) reasonText.color = level == "harmful" ? harmfulColor : cautionColor;

@@ -16,8 +16,8 @@ namespace GlowUp.Views
         [SerializeField] private Image icon;
 
         [Header("Wording")]
-        [SerializeField] private string safeText = "Nothing flagged";
-        [SerializeField] private string cautionText = "Use with care";
+        [SerializeField] private string safeText = "No caution found";
+        [SerializeField] private string cautionText = "Caution";
         [SerializeField] private string avoidText = "Avoid";
 
         [Header("Icons (optional)")]
@@ -46,6 +46,18 @@ namespace GlowUp.Views
             Paint();
         }
 
+        /// <summary>The result words of the redesign plan (27 Nov 2026): Avoid, Caution, No caution found. The word "safe" is never shown;
+        /// a scene saved with the older words shows the new ones.</summary>
+        public static string Current(string words)
+        {
+            switch (words)
+            {
+                case "Use with care": return "Caution";
+                case "Nothing flagged": case "Safe": return "No caution found";
+                default: return words;
+            }
+        }
+
         void Paint()
         {
             Color c = status == "safe" ? safeColor : status == "harmful" ? harmfulColor : cautionColor;
@@ -54,7 +66,7 @@ namespace GlowUp.Views
             if (background != null) background.color = c;
             if (label != null)
             {
-                label.text = status == "safe" ? safeText : status == "harmful" ? avoidText : cautionText;
+                label.text = Current(status == "safe" ? safeText : status == "harmful" ? avoidText : cautionText);
                 label.color = text;
             }
             if (icon != null)

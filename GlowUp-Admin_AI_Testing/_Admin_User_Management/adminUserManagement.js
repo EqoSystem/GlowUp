@@ -317,7 +317,7 @@ function openDetails(uid) {
         const u = byUid(uid);
         if (!u) { content.innerHTML = '<p class="um-none">This user no longer exists.</p>'; return; }
         const s = u.skin;
-        const hasSkin = s.skinType || s.skinTone || s.skinConditions.length || s.knownAllergens.length || s.age;
+        const hasSkin = s.skinType || s.skinTone || s.knownAllergens.length || s.age;      // chronic skin conditions are no longer asked (27 Nov 2026)
         const fact = (k, v) => `<dt>${k}</dt><dd>${v}</dd>`;
         content.innerHTML = `
             <section class="um-section"><h4>Account info</h4>
@@ -335,7 +335,6 @@ function openDetails(uid) {
                     ${fact("Skin type", escapeHtml(s.skinType) || '<span class="muted">Not set</span>')}
                     ${fact("Skin tone", escapeHtml(s.skinTone) || '<span class="muted">Not set</span>')}
                     ${s.age ? fact("Age", String(s.age)) : ""}
-                    ${fact("Chronic skin conditions", s.skinConditions.length ? `<span class="um-tags">${s.skinConditions.map(tag).join("")}</span>` : '<span class="muted">None</span>')}
                     ${fact("Allergens", s.knownAllergens.length ? `<span class="um-tags">${s.knownAllergens.map(tag).join("")}</span>` : '<span class="muted">None</span>')}
                 </dl>` : '<p class="um-none">No skin profile found.</p>'}</section>`;
     };

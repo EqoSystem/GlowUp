@@ -14,7 +14,8 @@ namespace GlowUp.EditorTools
     public static class OnboardingTileBuilders
     {
         const float TileRadius = 80;          // corner radius of every tile (matches PillCorners' default maximum)
-        const float Frame = 16;               // thickness of the frame (outer panel) around the inner panel
+        const float Frame = 16;
+        const float WhyH = 84;                // the "why we ask" line above the skin type tiles               // thickness of the frame (outer panel) around the inner panel
 
         // =====================================================================================
         //  Step 2 - skin type
@@ -26,9 +27,15 @@ namespace GlowUp.EditorTools
             var c = BuildChrome(2, "Skin Type Selection");
 
             const float cellH = 210, gap = 16, wideH = 170;
+            // why the app asks (redesign plan, 27 Nov 2026): one line above the tiles
+            var why = TextOn(c.card, "SkinTypeWhyText", "", HelperSize, TextAlignmentOptions.MidlineLeft);
+            SetText(why, "Used only to match ingredient cautions. This is not a diagnosis.", HelperSize, TextAlignmentOptions.MidlineLeft);
+            why.enableWordWrapping = true;
+            Top(why.transform, c.card, HeaderBottom, WhyH); Role(why.transform, ThemeRole.SecondaryText);
+            float top = HeaderBottom + WhyH + 12;
             var grid = TileGrid(c.card, "SkinTypeTiles", gap);
             RemoveBrokenScripts(grid.gameObject);
-            Top(grid, c.card, HeaderBottom, 2 * cellH + gap);
+            Top(grid, c.card, top, 2 * cellH + gap);
             grid.GetComponent<GridLayoutGroup>().cellSize = new Vector2((InnerWidth - gap) / 2f, cellH);
 
             // each tile: OuterPanel (frame, subtitle at the bottom) > InnerPanel (skin texture, skin type name inside)
@@ -43,7 +50,7 @@ namespace GlowUp.EditorTools
             var sensitive = SkinTile(grid, "SensitiveCard", "SensitiveText", "Sensitive", "Reacts Easily", SkinTextureFactory.Dry, "Stings, itches or flushes easily");
             var sensitiveRoot = sensitive.transform;
             sensitiveRoot.SetParent(c.card, false);
-            Top(sensitiveRoot, c.card, HeaderBottom + 2 * cellH + gap + gap, wideH);
+            Top(sensitiveRoot, c.card, top + 2 * cellH + gap + gap, wideH);
             // the five names share one size that fits "Combination" and the short window of a tile
             foreach (var pair in new (SelectableTile tile, string name)[] { (normal, "NormalText"), (dry, "DryText"), (oily, "OilyText"), (mix, "MixText"), (sensitive, "SensitiveText") })
                 foreach (TMP_Text t in pair.tile.GetComponentsInChildren<TMP_Text>(true))
@@ -52,7 +59,7 @@ namespace GlowUp.EditorTools
             var group = SceneBuilderCore.Ensure<TileSelectionGroup>(grid.gameObject);
             SetArray(group, "tiles", new Object[] { normal, dry, oily, mix, sensitive });
 
-            float y = HeaderBottom + 2 * cellH + gap + gap + wideH + 14;
+            float y = top + 2 * cellH + gap + gap + wideH + 14;
             // panel revision (22 Nov 2026): help is on the page, the user never has to look it up elsewhere
             var finder = HelpLink(c.card, "SkinTypeFinderButton", "Find my skin type", y, true);
             { var fr = (RectTransform)finder.transform; fr.anchorMax = new Vector2(1f, 1f); fr.offsetMax = new Vector2(-fr.offsetMin.x, fr.offsetMax.y); }   // the whole row; the controller halves it while "How it reacts" shows
@@ -61,17 +68,12 @@ namespace GlowUp.EditorTools
             Transform oldSources = Loose(c.card, "SkinListSourcesButton"); if (oldSources != null) Object.DestroyImmediate(oldSources.gameObject);
             var reactionsOpen = HelpLink(c.card, "SensitiveReactionsButton", "How it reacts", y, false);
             reactionsOpen.gameObject.SetActive(false);
-            y += 132 + 28;
-            var head = TextOn(c.card, "SkinConditionHeaderText", "Chronic Skin Conditions (Optional)", HeaderSize, TextAlignmentOptions.MidlineLeft);
-            SetText(head, "Chronic Skin Conditions (Optional)", HeaderSize, TextAlignmentOptions.MidlineLeft);
-            Top(head.transform, c.card, y, 56); Role(head.transform, ThemeRole.Heading); y += 58;
-            var desc = TextOn(c.card, "SkinConditionHintText", "", HelperSize, TextAlignmentOptions.MidlineLeft);
-            SetText(desc, "Tick any that apply, or add your own below.", HelperSize, TextAlignmentOptions.MidlineLeft);
-            Top(desc.transform, c.card, y, 44); Role(desc.transform, ThemeRole.SecondaryText); y += 54;
-
-            var panel = ChecklistBuilder.Build(c.card, "ConditionsPanel", y,
-                new[] { "Atopic Dermatitis", "Psoriasis", "Rosacea", "Seborrheic Dermatitis", "Allergic Contact Dermatitis", "Irritant Contact Dermatitis", "Hidradenitis Suppurativa", "Lichen Planus", "Chronic Urticaria", "Alopecia Areata", "Vitiligo", "Chronic Prurigo", "Cutaneous Lupus Erythematosus", "Lichen Sclerosus", "Ichthyosis" },
-                "Not listed? Add it here", null, null, null, c.feedback);
+            // Chronic skin conditions were removed (27 Nov 2026, owner): no basis or use in the app. Old objects from earlier builds go.
+            foreach (string gone in new[] { "SkinConditionHeaderText", "SkinConditionHintText", "ConditionsPanel", "ConditionsPanel_AddInput", "ConditionsPanel_AddButton" })
+            {
+                Transform old = Loose(c.card, gone);
+                if (old != null) Object.DestroyImmediate(old.gameObject);
+            }
 
             // ---- "How does your skin react?": optional, opens when Sensitive is chosen (or from "How it reacts"); one tick row per reaction ----
             Transform oldReact = Loose(c.canvas, "ReactionsPanel");
@@ -101,7 +103,7 @@ namespace GlowUp.EditorTools
 
             var go = SceneBuilderCore.EnsureRoot("OnboardingStep2FlowController");
             var ctl = SceneBuilderCore.Ensure<OnboardingStep2FlowController>(go);
-            SceneBuilderCore.SetField(ctl, "skinTypeGroup", group); SceneBuilderCore.SetField(ctl, "conditions", panel);
+            SceneBuilderCore.SetField(ctl, "skinTypeGroup", group);
             SceneBuilderCore.SetField(ctl, "continueButton", c.cont); SceneBuilderCore.SetField(ctl, "continueAnimator", c.anim);
             SceneBuilderCore.SetField(ctl, "backButton", c.back); SceneBuilderCore.SetField(ctl, "feedbackText", c.feedback);
             SceneBuilderCore.SetField(ctl, "finderButton", finder);
@@ -246,9 +248,9 @@ namespace GlowUp.EditorTools
             var selfieCamera = SceneBuilderCore.Ensure<GlowUp.Scan.CameraFeedController>(selfieTone.gameObject);
             SceneBuilderCore.SetField(selfieCamera, "display", cameraDisplay); SceneBuilderCore.SetField(selfieCamera, "viewport", viewport.rectTransform);
             SceneBuilderCore.SetField(selfieCamera, "mirrorRoot", mirror.transform); SceneBuilderCore.SetField(selfieCamera, "useFrontCamera", true);
-            GlowUp.Scan.AutoBrighten selfieBrighten = AdminScenesBuilder.AutoBrightenControl(viewport.transform, selfieCamera, new Vector2(-24, -24));
+            GlowUp.Scan.AutoBrighten selfieBrighten = CameraControlsKit.AutoBrightenControl(viewport.transform, selfieCamera, new Vector2(-24, -24));
             SceneBuilderCore.SetField(selfieTone, "brighten", selfieBrighten);
-            AdminScenesBuilder.FocusLockControl(viewport.transform, selfieCamera);          // the padlock of the AI Smart Scan camera, top centre (manual focus)
+            CameraControlsKit.FocusLockControl(viewport.transform, selfieCamera);          // the padlock of the AI Smart Scan camera, top centre (manual focus)
             SceneBuilderCore.SetField(selfieTone, "cameraFeed", selfieCamera); SceneBuilderCore.SetField(selfieTone, "resultImage", resultImage);
             SceneBuilderCore.SetField(selfieTone, "resultRow", resultRow);
             SceneBuilderCore.SetField(selfieTone, "foundSwatch", foundSwatch); SceneBuilderCore.SetField(selfieTone, "toneSwatch", toneSwatch);

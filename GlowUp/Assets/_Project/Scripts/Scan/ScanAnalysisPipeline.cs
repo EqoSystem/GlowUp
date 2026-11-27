@@ -156,7 +156,7 @@ namespace GlowUp.Scan
             if (!record.pendingApproval)
                 try
                 {
-                    await GlowUp.Auth.AdminAccount.Ensure();           // an admin's scan is registered in the catalogue at once
+                    await GlowUp.Auth.AdminAccount.Ensure();           // an admin sees the photo guide in Smart Scan; the scan itself is saved as Pending like anyone else
                     ScannedProductPublisher.PublishIfNew(record, names, kindIsKnown);
                 }
             catch (Exception e) { { } }

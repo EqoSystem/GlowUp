@@ -88,11 +88,28 @@ export function onSnapshot(target, next, fail) {
     // Real time across devices: a live listener on one of the cached lists writes what changed into the cache first, so the
     // page's next read shows a change made elsewhere (the mobile staff capture, another admin) at once, not after the next sync.
     const listName = target && target.type === "collection" && LISTS.includes(target.id) ? target.id : "";
-    return fb.onSnapshot(target, (snapshot) => {
-        noteReads("live listener", snapshot.docChanges().length);
-        if (listName) absorb(listName, snapshot);
-        next(snapshot);
-    }, fail);
+    // Real time (27 Nov 2026 fix): Firestore ends a listener for good after an error (a dropped connection it gives up on, a rules
+    // check made while the sign-in token was refreshing). Before, the panel then stayed frozen until the page was reloaded, so a
+    // report sent from the app did not appear. The listener is now attached again after a short pause (2 s, 4 s ... at most 60 s);
+    // the caller's error handler still runs once per failure. Stopping it (the returned function) ends the retries too.
+    let stop = null, stopped = false, timer = 0, tries = 0;
+    const attach = () => {
+        if (stopped) return;
+        stop = fb.onSnapshot(target, (snapshot) => {
+            tries = 0;
+            noteReads("live listener", snapshot.docChanges().length);
+            if (listName) absorb(listName, snapshot);
+            next(snapshot);
+        }, (error) => {
+            if (fail) { try { fail(error); } catch (problem) { console.error(problem); } }
+            if (stopped) return;
+            const wait = Math.min(60000, 2000 * Math.pow(2, Math.min(tries, 5)));
+            tries++;
+            timer = setTimeout(attach, wait);
+        });
+    };
+    attach();
+    return () => { stopped = true; clearTimeout(timer); if (stop) stop(); };
 }
 
 function absorb(name, snapshot) {

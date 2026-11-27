@@ -184,7 +184,6 @@ namespace GlowUp.Auth
 
         async void Start()
         {
-            GlowUp.Admin.StaffAccess.ForgetStaffSession();     // the login page means no staff session is open
             Show("");
             if (!autoSkipIfSignedIn) return;
             // Whoever was signed in stays signed in: after closing the app, after the phone restarts, and after a crash.

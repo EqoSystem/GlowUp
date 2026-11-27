@@ -9,7 +9,7 @@ namespace GlowUp.EditorTools
     /// Rebuilds only the scenes that were named, in batch mode (the Editor must be closed): the rest of the project is left alone.
     ///   Unity.exe -batchmode -quit -projectPath ... -executeMethod GlowUp.EditorTools.BatchRebuild.Run
     /// Environment: GLOWUP_BUILD_LIST = "Class.Method;Class.Method" (classes in GlowUp.EditorTools), for example
-    ///   "AdminScenesBuilder.BuildStaffLogin;OnboardingTileBuilders.BuildStep2".
+    ///   "SendForReviewSceneBuilder.Build;OnboardingTileBuilders.BuildStep2".
     /// </summary>
     public static class BatchRebuild
     {

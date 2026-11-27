@@ -1,5 +1,5 @@
 # Privacy Policy
-Last updated: 10 November 2026
+Last updated: 27 November 2026
 
 ## 1. Introduction
 GlowUp ("we", "our", or "us") respects your privacy and is committed to protecting your personal data. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our mobile application. Please read this privacy policy carefully. If you do not agree with the terms of this privacy policy, please do not access the application.
@@ -8,9 +8,9 @@ GlowUp ("we", "our", or "us") respects your privacy and is committed to protecti
 We collect information that you voluntarily provide to us when registering for an account and while using the application. This includes:
 
 - Personal Identifiers: your first name, middle name, last name, date of birth, age, and email address.
-- Profile and Preference Data: your skin type, skin tone, skin conditions, and known cosmetic allergens and sensitivities. This information is used exclusively to tailor the app's safety analyses and product recommendations to your personal profile.
+- Profile and Preference Data: your skin type, skin tone, optional skin reactions, and known cosmetic allergens and sensitivities. This information is used exclusively to tailor the app's safety analyses and product recommendations to your personal profile.
 - Scan Data: the ingredient text read from product labels, the results of each analysis, the products you save to your Recent Scans, and any names you give them.
-- Suggestions: skin conditions, allergens, or ingredients you add that are not yet in our lists, so that we can review them and improve the database.
+- Suggestions: allergens, or ingredients you add that are not yet in our lists, so that we can review them and improve the database.
 - Technical Data: our cloud provider may process basic technical information, such as your IP address and device identifiers, in order to deliver and secure the service.
 
 ## 3. How We Use Your Information
@@ -20,7 +20,7 @@ Having accurate information permits us to provide you with a smooth, efficient, 
 - Confirm that the email address is yours. When you sign up with an email and password, your account is created as soon as the first sign-up page is filled in, and Google Firebase Authentication sends a message with a link to that address. The sign-up goes on once you have tapped the link. If you leave the sign-up before finishing it, that unfinished account is removed again.
 - Make sure the email address you sign up with can really receive email. For an address that is not from a well-known provider, the app asks a public internet directory (DNS, run by Google or Cloudflare) whether the part after the @ (for example "school.edu.ph") has a mail server. Only that part is sent, never your name or the whole address. Temporary ("throw-away") email addresses cannot be used to sign up.
 - Store and retrieve your profile preferences securely using Google Cloud Firestore.
-- Personalize cosmetic ingredient safety assessments and filter recommendations based on your registered skin type, skin conditions, age, and allergies.
+- Personalize cosmetic ingredient safety assessments and filter recommendations based on your registered skin type, skin reactions, age, and allergies.
 - Keep your scan history available across sessions and, when you are online, across your devices.
 - Count how often a brand is scanned, without attaching your name to that count, so that we can prioritise which products to add to the database.
 - Communicate with you regarding account updates, security alerts, and support messages.
@@ -48,7 +48,7 @@ When a product you scan is not in our catalog yet, you can choose to take one ph
 ## 5. AI-Assisted Analysis
 Part of each analysis is produced automatically. When you are online, the following may be sent to our AI service provider: up to four still pictures of the product, the text read from it, the product's name, and ingredient names. This is used to recognise the product, to find its published ingredient list, and to describe ingredients that are not yet in our database. The product's name may also be sent to the FDA Philippines verification site to check whether the product is registered. When the camera read the product's barcode, that barcode (and nothing else) may be sent to Open Beauty Facts, a public list of cosmetics, to compare its ingredient list with the one the app has.
 
-Your profile is never sent to the AI service. Your name, email address, password, age, skin type, skin tone, skin conditions, and allergens stay out of every such request: the comparison between a product and your profile is made on your device.
+Your profile is never sent to the AI service. Your name, email address, password, age, skin type, skin tone, skin reactions, and allergens stay out of every such request: the comparison between a product and your profile is made on your device.
 
 Automated results can be incomplete or wrong. Please read section 4 of the Terms and Conditions below.
 
@@ -65,7 +65,7 @@ The email addresses that have signed in with a password on this device are also 
 ## 8. Data Retention and Account Deletion
 We retain your personal data only for as long as your account is active or as needed to provide you with app services. You can delete your account yourself at any time: open Settings and choose Delete My Account (you need an internet connection and your password). This removes your profile, your scan history and your sign-in from our database, and everything about the account on your phone. You can also ask our support team to delete it.
 
-A few things are kept apart from your profile and are not removed by Delete My Account: the anonymous scan counts (they carry no name, email or account id), and the skin conditions, allergens, ingredients or product photos you sent us as suggestions, which carry your account id until our team has reviewed them. Ask our support team if you want those removed too.
+A few things are kept apart from your profile and are not removed by Delete My Account: the anonymous scan counts (they carry no name, email or account id), and the allergens, ingredients or product photos you sent us as suggestions, which carry your account id until our team has reviewed them. Ask our support team if you want those removed too.
 
 ## 9. Children's Privacy
 GlowUp is not intended for children under 13 years of age, and we do not knowingly collect personal data from them. If you believe a child under 13 has created an account, please contact us so that we can remove it.
@@ -73,7 +73,7 @@ GlowUp is not intended for children under 13 years of age, and we do not knowing
 ## 10. Your Rights and Choices
 GlowUp follows the Data Privacy Act of 2012 (Republic Act No. 10173) of the Philippines. Under that law you have the right to be informed about how your personal data is used, to see the data we hold about you, to correct it, to object to its use, to ask for it to be deleted or blocked, to receive a copy of it, to be compensated for damage caused by misuse of it, and to withdraw your consent at any time. You can update your profile in the app, delete your account in Settings, and contact us for anything else. If you think your data was handled wrongly, you may also complain to the National Privacy Commission (privacy.gov.ph).
 
-Your skin type, skin tone, skin conditions and allergens are information about your health. The law treats such information as sensitive personal information, so we use it only with your clear consent. You give that consent with the second box on the page where you accept this policy, and you can withdraw it by deleting your account. Without that consent the app cannot compare products with your profile.
+Your skin type, skin tone, skin reactions and allergens are information about your health. The law treats such information as sensitive personal information, so we use it only with your clear consent. You give that consent with the second box on the page where you accept this policy, and you can withdraw it by deleting your account. Without that consent the app cannot compare products with your profile.
 
 Your data is stored with Google Firebase (Google Cloud), whose servers are outside the Philippines. Google keeps it under its own security and data protection terms.
 
@@ -123,7 +123,7 @@ Product, brand, and ingredient information is supplied by our team and by third 
 You agree not to copy or extract the database in bulk, attempt to bypass the security of the application, use the application to harass or harm another person, or submit content that is unlawful, misleading, or that you do not have the right to share.
 
 ## 9. Your Suggestions
-When you suggest a skin condition, allergen, ingredient, or product, you allow us to review it, edit it, and add it to the database so that other users can benefit from it. Do not include personal or confidential information in a suggestion.
+When you suggest an allergen, ingredient, or product, you allow us to review it, edit it, and add it to the database so that other users can benefit from it. Do not include personal or confidential information in a suggestion.
 
 ## 10. Intellectual Property Rights
 The GlowUp name, logo, source code, design elements, and underlying software are the intellectual property of the developers. You may not copy, modify, distribute, or reverse-engineer any portion of this application without express written permission.

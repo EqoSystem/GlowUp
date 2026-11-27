@@ -194,7 +194,7 @@ namespace GlowUp.EditorTools
             }
             TextMeshProUGUI factType = Fact("SkinTypeTile", "Skin Type", 542, false);
             TextMeshProUGUI factTone = Fact("SkinToneTile", "Skin Tone", 542, true);
-            TextMeshProUGUI factCondition = Fact("ConditionTile", "Skin Concerns", 690, false);
+            TextMeshProUGUI factCondition = Fact("ConditionTile", "Skin Reactions", 690, false);
             TextMeshProUGUI factAllergens = Fact("AllergensTile", "Allergies", 690, true);
             Image tip = A.Panel(account.box, "TipPanel", ThemeRole.SurfaceAlt, Kit.PanelAlpha, 24f);
             A.TopStrip(tip.transform, 840, 96, 48, 48);

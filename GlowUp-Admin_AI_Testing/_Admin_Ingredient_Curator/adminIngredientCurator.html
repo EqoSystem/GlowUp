@@ -100,6 +100,9 @@
                     <button type="button" class="stat" data-source="review" data-risk="" data-tip-title="Waiting for review" data-tip="Found by the app's AI lookup and not checked yet. The app uses their warnings but never counts them as proof of safety." data-tip-preview="Click: the list shows only these."><span class="stat-icon"><i data-icon="inbox"></i></span><span><span class="stat-value skeleton" id="curatorStatReview">00</span><span class="stat-title">Waiting for review</span></span></button>
                     <button type="button" class="stat" data-source="" data-risk="harmful" data-tip-title="Harmful" data-tip="Ingredients marked Harmful here." data-tip-preview="Click: the list shows only these."><span class="stat-icon"><i data-icon="alert"></i></span><span><span class="stat-value skeleton" id="curatorStatHarmful">00</span><span class="stat-title">Harmful</span></span></button>
                     <button type="button" class="stat" data-source="" data-risk="caution" data-tip-title="Caution" data-tip="Ingredients marked Caution here." data-tip-preview="Click: the list shows only these."><span class="stat-icon"><i data-icon="shield"></i></span><span><span class="stat-value skeleton" id="curatorStatCaution">00</span><span class="stat-title">Caution</span></span></button>
+                    <button type="button" class="stat" data-source="" data-risk="r:flagged"><span class="stat-icon"><i data-icon="flag"></i></span><span><span class="stat-value skeleton" id="curatorStatFlagged">00</span><span class="stat-title">Flagged</span></span></button>
+                    <button type="button" class="stat" data-source="" data-risk="r:none"><span class="stat-icon"><i data-icon="check"></i></span><span><span class="stat-value skeleton" id="curatorStatNoRule">00</span><span class="stat-title">No rule matched</span></span></button>
+                    <button type="button" class="stat" data-source="" data-risk="r:unknown"><span class="stat-icon"><i data-icon="alert"></i></span><span><span class="stat-value skeleton" id="curatorStatUnknown">00</span><span class="stat-title">Not identified</span></span></button>
                     <button type="button" class="stat" data-source="products" data-risk="" data-tip-title="From products, not explained" data-tip="Ingredients the inventory's products list that have no entry here yet. The app uses its built-in knowledge for them." data-tip-preview="Click: the list shows only these."><span class="stat-icon"><i data-icon="lipstick"></i></span><span><span class="stat-value skeleton" id="curatorStatFromProducts">00</span><span class="stat-title">From products, not explained</span></span></button>
                 </div>
             </section>
@@ -122,6 +125,9 @@
                         <option value="caution">Caution</option>
                         <option value="safe">Safe</option>
                         <option value="auto">App decides</option>
+                        <option value="r:flagged">Result: Flagged</option>
+                        <option value="r:none">Result: No rule matched</option>
+                        <option value="r:unknown">Result: Not identified</option>
                     </select>
                     <select id="ingredientClassFilter" class="toolbar-select head-select" aria-label="Show one classification"><option value="">Any classification</option></select>
                     <button type="button" class="icon-btn small" id="manageClassBtn" aria-label="Manage classifications"><i data-icon="sliders"></i></button>
@@ -284,15 +290,12 @@
                             </div>
 
                             <div class="field full" role="group" aria-labelledby="skinTypesLabel">
-                                <div class="label-row"><span class="label-text" id="skinTypesLabel">Skin Types</span></div>
+                                <div class="label-row"><span class="label-text" id="skinTypesLabel">Caution for skin types</span></div>
                                 <div class="fit-list" id="skinTypesFit"></div>
                                 <div class="fit-why" id="skinTypesWhy"></div>
                             </div>
-                            <div class="field full" role="group" aria-labelledby="conditionsLabel">
-                                <div class="label-row">
-                                    <span class="label-text" id="conditionsLabel">Chronic Skin Conditions</span>
-                                    <span class="label-actions"><span class="info-slot" data-info="Choose Avoid or Good only where this ingredient matters; leave the rest on Neutral." data-info-label="About Chronic Skin Conditions"></span><button type="button" class="icon-btn small list-edit" data-list-edit="conditions" aria-label="Edit the chronic skin conditions list"><i data-icon="edit"></i></button></span>
-                                </div>
+                            <div class="fit-kept" hidden aria-hidden="true">
+                                <!-- chronic skin conditions are no longer asked by the app (27 Nov 2026): kept hidden so saved values stay as they are -->
                                 <div class="fit-list" id="conditionsFit"></div>
                                 <div class="fit-why" id="conditionsWhy"></div>
                             </div>

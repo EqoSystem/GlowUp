@@ -36,7 +36,7 @@ namespace GlowUp.Result
                 list.Add(new Item("Which ingredients should I watch?", "None of the checked ingredients is flagged for your profile."));
 
             AddMatch(list, "Does it contain my allergens?", r.allergenMatch);
-            AddMatch(list, "Is it OK with my chronic skin condition?", r.concernMatch);
+            AddMatch(list, "Could it set off my skin reactions?", r.concernMatch);
             AddMatch(list, "Does it suit my skin type?", r.skinTypeMatch);
             AddMatch(list, "Is it right for my age?", r.ageMatch);
 
@@ -46,8 +46,8 @@ namespace GlowUp.Result
 
             // the panel's own wording (22 Nov 2026): what it does, how it affects the skin condition, how it triggers an allergy
             list.Insert(1, new Item("What does it do?", WhatItDoes(r)));
-            list.Add(new Item("How does this product affect my skin condition?", Affect(r.concernMatch, r.skinTypeMatch, r.findings, "condition")));
-            list.Add(new Item("How could this product trigger my allergy or chronic skin condition?", Trigger(r)));
+            list.Add(new Item("How does this product affect my skin?", Affect(r.concernMatch, r.skinTypeMatch, r.findings, "condition")));
+            list.Add(new Item("How could this product trigger my allergy or skin reaction?", Trigger(r)));
 
             list.Add(new Item("Is it registered with the FDA Philippines?", Fda(r)));
 
@@ -82,7 +82,7 @@ namespace GlowUp.Result
             var parts = new List<string>();
             if (concern != null && !string.IsNullOrWhiteSpace(concern.summary)) parts.Add(concern.summary.Trim());
             if (skinType != null && !string.IsNullOrWhiteSpace(skinType.summary)) parts.Add(skinType.summary.Trim());
-            if (parts.Count == 0) return "Your skin profile has no chronic skin condition saved, so GlowUp has nothing to compare. Add it in Settings, then scan again.";
+            if (parts.Count == 0) return "Your skin profile has no skin type saved, so GlowUp has nothing to compare. Add it in Settings, then scan again.";
             return string.Join(((char)10).ToString() + (char)10, parts);
         }
 
@@ -91,19 +91,19 @@ namespace GlowUp.Result
             var lines = new List<string>();
             if (r.allergenMatch != null && r.allergenMatch.level == "bad" && !string.IsNullOrWhiteSpace(r.allergenMatch.summary)) lines.Add("<b>Allergy:</b> " + r.allergenMatch.summary.Trim());
             else if (r.allergenMatch != null && r.allergenMatch.level == "good") lines.Add("<b>Allergy:</b> none of your saved allergens was found in the list.");
-            if (r.concernMatch != null && (r.concernMatch.level == "caution" || r.concernMatch.level == "bad") && !string.IsNullOrWhiteSpace(r.concernMatch.summary)) lines.Add("<b>Chronic skin condition:</b> " + r.concernMatch.summary.Trim());
-            else if (r.concernMatch != null && r.concernMatch.level == "good") lines.Add("<b>Chronic skin condition:</b> no conflict found with your saved conditions.");
+            if (r.concernMatch != null && (r.concernMatch.level == "caution" || r.concernMatch.level == "bad") && !string.IsNullOrWhiteSpace(r.concernMatch.summary)) lines.Add("<b>Skin reaction:</b> " + r.concernMatch.summary.Trim());
+            else if (r.concernMatch != null && r.concernMatch.level == "good") lines.Add("<b>Skin reaction:</b> no caution rule matched your saved reactions.");
             var why = (r.findings ?? new List<IngredientFinding>()).Where(f => f != null && !string.IsNullOrWhiteSpace(f.reason) && (f.level == "harmful" || f.level == "caution")).Take(6)
                 .Select(f => "• <b>" + f.name + "</b>: " + f.reason.Trim()).ToList();
             if (why.Count > 0) lines.Add("The ingredients behind it:" + (char)10 + string.Join(((char)10).ToString(), why));
-            if (lines.Count == 0) return "Nothing to compare yet: save your allergens and chronic skin conditions in your profile, then scan again.";
+            if (lines.Count == 0) return "Nothing to compare yet: save your allergens and skin type in your profile, then scan again.";
             lines.Add("Only the ingredients on the list can trigger a reaction, so GlowUp matches each one against what you saved. Names it does not know show as \"Not checked\".");
             return string.Join(((char)10).ToString() + (char)10, lines);
         }
 
         static string Verdict(ScanRecord r)
         {
-            string head = r.status == "harmful" ? "<b>Flagged for your profile.</b> " : r.status == "caution" ? "<b>Use with care.</b> " : r.status == "safe" ? "<b>Nothing flagged for your profile.</b> " : "";
+            string head = r.status == "harmful" ? "<b>Flagged for your profile.</b> " : r.status == "caution" ? "<b>Caution.</b> " : r.status == "safe" ? "<b>No caution found for your profile.</b> " : "";
             return head + (r.summary ?? "").Trim();
         }
 

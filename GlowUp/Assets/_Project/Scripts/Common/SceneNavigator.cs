@@ -28,6 +28,7 @@ namespace GlowUp.Common
         public const string ArTryOn = "ARTryOnScene";
         public const string Settings = "SettingsScene";
         public const string Notifications = "NotificationsScene";
+        public const string SendForReview = "SendForReviewScene";
     }
 
     /// <summary>

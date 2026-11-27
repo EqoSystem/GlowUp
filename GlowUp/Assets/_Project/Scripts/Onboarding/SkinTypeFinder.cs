@@ -78,10 +78,6 @@ namespace GlowUp.Onboarding
 
         public const string Body =
             "<b>Skin types</b>: Normal, Dry, Oily, Combination and Sensitive. These are GlowUp's official skin types.\n\n"
-            + "<b>Chronic skin conditions</b>: GlowUp's official list of long-lasting skin conditions that make-up ingredients can affect: "
-            + "Atopic Dermatitis, Psoriasis, Rosacea, Seborrheic Dermatitis, Allergic Contact Dermatitis, Irritant Contact Dermatitis, "
-            + "Hidradenitis Suppurativa, Lichen Planus, Chronic Urticaria, Alopecia Areata, Vitiligo, Chronic Prurigo, "
-            + "Cutaneous Lupus Erythematosus, Lichen Sclerosus and Ichthyosis.\n\n"
             + TypeSources + "\n\n"
             + "<b>Allergens</b>: the ingredient families most often behind cosmetic reactions in patch testing (fragrance, preservatives "
             + "such as parabens and formaldehyde releasers, lanolin and others), from the American Contact Dermatitis Society's lists.\n\n"

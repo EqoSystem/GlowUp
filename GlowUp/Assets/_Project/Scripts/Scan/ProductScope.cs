@@ -344,11 +344,16 @@ namespace GlowUp.Scan
         // ---------------------------------------------------------------------------------------
         //  What the user is told
         // ---------------------------------------------------------------------------------------
-        public const string DermatologistLine = "Consult a dermatologist for the best treatment.";
+        public const string DermatologistLine = "A guide for buying decisions. Not medical advice.";
+        /// <summary>The treatment phrase used before 27 Nov 2026; still found in scans and scenes saved before then.</summary>
+        public const string OldDermatologistLine = "Consult a dermatologist for the best treatment.";
+        /// <summary>Old wording replaced by the current one (cautions only, no treatment advice).</summary>
+        public static string CurrentWording(string text) => string.IsNullOrEmpty(text) ? text ?? ""
+            : text.Replace(OldDermatologistLine, DermatologistLine).Replace("May aggravate ", "Caution for ").Replace("often used for", "listed for");
         /// <summary>Said when a scan is stopped because the product is not make-up. {0} = "a hair product", "a skin care product" ...</summary>
         public static string NotMakeupMessage = "GlowUp only checks make-up products. This looks like {0}. Scan again, or type the name if we got it wrong.";
         public static string NotMakeupMessagePlain = "GlowUp only checks make-up products. Scan again, or type the name if we got it wrong.";
-        public static string ConditionNotice = "You listed {0}. GlowUp cannot suggest a cure or a treatment. It only warns you and explains how this product may affect your skin type and that condition.";
+        public static string ConditionNotice = "You listed {0}. GlowUp does not suggest a cure or a treatment. It only shows cautions.";
         /// <summary>Kept for scans saved before the app became make-up only.</summary>
         public static string OutOfScopeNotice = "GlowUp only checks make-up products. This looks like a {0} product, so the result only lists ingredient warnings and AR Try-On is not available for it.";
         public static string SkinCareNotice = "This is a skin care product. GlowUp only checks make-up products: the result only lists ingredient warnings and AR Try-On is not available for it.";

@@ -26,6 +26,8 @@ namespace GlowUp.Scan
         [SerializeField] private Button findButton;
         [SerializeField] private Button photoButton;
         [SerializeField] private Button cancelButton;
+        [Tooltip("Send for review (redesign plan, 27 Nov 2026): shown only when GlowUp cannot find the product")]
+        [SerializeField] private Button reviewButton;
         [Header("Words")]
         [SerializeField] private string hintWords = "Type the digits under the barcode, or photograph it. GlowUp finds the product by that number.";
         [SerializeField] private string notABarcodeWords = "That is not a barcode yet: it has 6 to 14 digits.";
@@ -35,6 +37,8 @@ namespace GlowUp.Scan
         /// <summary>The user asked for this number: (barcode key, the typed product name or "").</summary>
         public event Action<string, string> FindRequested;
         public event Action PhotoRequested;
+        /// <summary>The user wants to send this product to the admins: (barcode key or "", the typed product name or "").</summary>
+        public event Action<string, string> ReviewRequested;
 
         public bool IsOpen => panel != null && panel.IsOpen;
 
@@ -50,6 +54,7 @@ namespace GlowUp.Scan
             if (findButton != null) findButton.onClick.AddListener(Find);
             if (photoButton != null) photoButton.onClick.AddListener(() => PhotoRequested?.Invoke());
             if (cancelButton != null) cancelButton.onClick.AddListener(Hide);
+            if (reviewButton != null) reviewButton.onClick.AddListener(() => ReviewRequested?.Invoke(Key, nameInput != null ? nameInput.text.Trim() : ""));
             if (numberInput != null) numberInput.onValueChanged.AddListener(_ => { if (nameRow != null) nameRow.SetActive(false); Say(hintWords); });
         }
 
@@ -61,6 +66,7 @@ namespace GlowUp.Scan
             if (numberInput != null) numberInput.SetTextWithoutNotify(barcode ?? "");
             if (nameInput != null) nameInput.SetTextWithoutNotify("");
             if (nameRow != null) nameRow.SetActive(false);
+            ShowReview(false);
             Say(string.IsNullOrEmpty(message) ? hintWords : message);
             panel.Show();
         }
@@ -68,9 +74,12 @@ namespace GlowUp.Scan
         public void Hide() { if (panel != null) panel.Hide(); }
 
         /// <summary>The number is right but no product has it: the name box opens (and the words say why).</summary>
-        public void AskForName() { if (nameRow != null) nameRow.SetActive(true); Say(unknownWords); }
+        public void AskForName() { if (nameRow != null) nameRow.SetActive(true); ShowReview(true); Say(unknownWords); }
 
-        public void NameNotFound() { Say(nameNotFoundWords); }
+        public void NameNotFound() { ShowReview(true); Say(nameNotFoundWords); }
+
+        /// <summary>Shows or hides the "Send for review" button (only in the not-found states).</summary>
+        public void ShowReview(bool on) { if (reviewButton != null) reviewButton.gameObject.SetActive(on); }
 
         public void Say(string words) { if (feedbackText != null) feedbackText.text = words ?? ""; }
 

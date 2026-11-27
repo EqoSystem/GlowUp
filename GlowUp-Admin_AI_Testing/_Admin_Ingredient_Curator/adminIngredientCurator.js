@@ -55,6 +55,7 @@ import { wireWindow } from "../_Shared/adminWindow.js";
 import { mountSourceLinks, countSaved } from "./sourceLinks.js";
 import { lookupIngredient, lookupHazards } from "../_Shared/quickFill.js";
 import { planFit } from "../_Shared/fitReasons.js";
+import { judgeEntry } from "../_Shared/importChain.js";
 import { suggestClassification, friendlyStarter, pubchemPage as pubchemCompoundPage } from "../_Shared/smartAdd.js";
 import { SOURCE_LINK_FIELDS } from "../_Shared/fieldSources.js";
 import { autoFitPatch, autoDetailsPatch, suggestFit, refFunction, REF_CREDIT } from "../_Shared/ingredientFit.js";
@@ -402,6 +403,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     const askedFor = new URLSearchParams(window.location.search);
     loadIngredients().then(() => {
         startCuratorLive();
+        const named = askedFor.get("q");
+        if (named) { const box = el("ingredientSearchInput"); box.value = named; box.dispatchEvent(new Event("input", { bubbles: true })); }
         if (askedFor.get("add") === "1") openIngredientForm(null);
         else if (askedFor.get("cleanup") === "1") openCleanUp();
         else if (askedFor.get("duplicates") === "1") openDuplicates();
@@ -493,6 +496,7 @@ async function loadIngredients() {
                 sources: Array.isArray(data.sources) ? data.sources.map((s) => String(s)) : [],
                 fdaUnii: String(data.fdaUnii || "").trim(),
                 via: String(data.via || "").trim().toLowerCase(),
+                identified: data.identified !== false,
                 webSearched: data.webSearched === true,
                 autoApproved: data.autoApproved === true,
                 fitAuto: data.fitAuto === true,
@@ -697,7 +701,7 @@ async function fillSkinFit(name, found, filled) {
     if (readChecks(el("allergenTagsChecks")).length > 0) plan.notes.allergens.unshift(kept);
     else if (allergens.length) { writeChecks(el("allergenTagsChecks"), allergens); done.allergens = allergens; filled.push("allergen family"); }
 
-    [["skinTypesFit", plan.avoidForSkinTypes, "types", "skinTypes", "skin types"], ["conditionsFit", known("conditions", plan.avoidForConditions), "conditions", "conditions", "skin conditions"]].forEach(([id, avoid, key, note, label]) => {
+    [["skinTypesFit", plan.avoidForSkinTypes, "types", "skinTypes", "skin types"]].forEach(([id, avoid, key, note, label]) => {
         const now = readFit(el(id));
         if (now.avoid.length + now.good.length > 0) plan.notes[note].unshift(kept);
         else if (avoid.length) { writeFit(el(id), avoid, []); done[key] = avoid; filled.push(label); }
@@ -913,6 +917,9 @@ function proofLines(item) {
 }
 
 
+// the three results of the redesign plan (27 Nov 2026): Flagged, No rule matched, Not identified (importChain.judgeEntry)
+const resultOf = (item) => judgeEntry({ ...item, identified: item.identified !== false && !(item.via === "search-import" && !item.sources.length && !item.classificationId) }).result;
+
 function paintStats() {
     const inBin = org.view.kind === "bin";
     const source = el("ingredientSourceFilter").value, risk = el("ingredientRiskFilter").value;
@@ -921,6 +928,9 @@ function paintStats() {
         { label: "Waiting for review", value: ingredients.filter(needsReview).length, iconName: "inbox", source: "review", risk: "", tip: "Found by the app's AI lookup and not checked yet. The app uses their warnings but never counts them as proof of safety." },
         { label: "Harmful", value: ingredients.filter((i) => i.riskLevel === "harmful").length, iconName: "alert", source: "", risk: "harmful", tip: "Ingredients marked Harmful here." },
         { label: "Caution", value: ingredients.filter((i) => i.riskLevel === "caution").length, iconName: "shield", source: "", risk: "caution", tip: "Ingredients marked Caution here." },
+        { label: "Flagged", value: ingredients.filter((i) => resultOf(i) === "flagged").length, iconName: "flag", source: "", risk: "r:flagged", tip: "" },
+        { label: "No rule matched", value: ingredients.filter((i) => resultOf(i) === "none").length, iconName: "check", source: "", risk: "r:none", tip: "" },
+        { label: "Not identified", value: ingredients.filter((i) => resultOf(i) === "unknown").length, iconName: "alert", source: "", risk: "r:unknown", tip: "" },
         { label: "From products, not explained", value: fromProducts.length, iconName: "lipstick", source: FROM_PRODUCTS, risk: "", tip: "Ingredients the inventory's products list that have no entry here yet. The app uses its built-in knowledge for them." }
     ];
 
@@ -952,7 +962,7 @@ function renderIngredients() {
     const shown = (inBin
         ? pool.filter(matches).sort((a, b) => b.binnedAt - a.binnedAt || byName(a, b))
         : pool.filter((item) => filter.test(item)
-            && (!risk || (risk === "auto" ? !item.riskLevel : item.riskLevel === risk))
+            && (!risk || (risk.startsWith("r:") ? resultOf(item) === risk.slice(2) : risk === "auto" ? !item.riskLevel : item.riskLevel === risk))
             && (!folder || sameKey(item.folder) === sameKey(folder))
             && (!classFilter || (classFilter === NO_CLASS ? lacksClass(item) : item.classificationId === classFilter))
             && (!quick || QUICK[quick].test(item)) && matches(item)).sort(sortNow().cmp));
@@ -1973,7 +1983,6 @@ function registerData() {
             { id: "origin", label: "Where it came from", of: (i) => originLabel(i.source) || "Origin not recorded" },
             { id: "review", label: "Checked or not", of: (i) => (needsReview(i) ? "Waiting for review" : "Checked"), keys: ["Waiting for review", "Checked"], tone: (k) => (k === "Checked" ? "ok" : "info"), pick: (k) => narrow(k === "Checked" ? "" : "review", "") },
             { id: "allergen", label: "Allergen family", of: (i) => i.allergenTags.map((t) => labelOf(allOptions("allergens"), t)), none: "No allergen family" },
-            { id: "avoid", label: "Chronic skin condition to avoid it", of: (i) => i.avoidForConditions.map((t) => labelOf(allOptions("conditions"), t)), none: "None" },
             { id: "skin", label: "Skin type to avoid it", of: (i) => i.avoidForSkinTypes.map((t) => labelOf(SKIN_TYPES, t)), none: "None" },
             { id: "used", label: "Used in a listed product", of: (i) => (usedInProducts(i) > 0 ? "In a listed product" : "Not in any product"), keys: ["In a listed product", "Not in any product"] },
             { id: "folder", label: "Folder", of: (i) => i.folder || null, none: "No folder", pick: (k) => org.show(k === "No folder" ? { kind: "all" } : { kind: "folder", name: k }) }

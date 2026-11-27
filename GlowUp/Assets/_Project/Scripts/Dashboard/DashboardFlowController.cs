@@ -240,14 +240,19 @@ namespace GlowUp.Dashboard
             string Listed(List<string> items, string none) => items != null && items.Count > 0 ? string.Join(", ", items) : none;
             Set(skinTypeFact, p != null && !string.IsNullOrWhiteSpace(p.skinType) ? GlowUp.Onboarding.SkinTypeNames.Display(p.skinType) : notSet);
             Set(skinToneFact, p != null && !string.IsNullOrWhiteSpace(p.skinTone) ? p.skinTone : notSet);
-            Set(conditionFact, Listed(p?.skinConditions, "None"));
+            // the old "Skin Concerns" tile shows the optional skin reactions (chronic skin conditions were removed on 27 Nov 2026)
+            List<string> reactions = GlowUp.Scan.SensitiveReactions.Of(p).ConvertAll(r => r.label);
+            Set(conditionFact, Listed(reactions, "None"));
+            if (conditionFact != null && conditionFact.transform.parent != null)
+                foreach (TextMeshProUGUI label in conditionFact.transform.parent.GetComponentsInChildren<TextMeshProUGUI>(true))
+                    if (label != conditionFact && label.text == "Skin Concerns") label.text = "Skin Reactions";
             Set(allergensFact, Listed(p?.knownAllergens, noAllergens));
             if (skinProfileText != null)
             {
                 string List(List<string> items, string none) => items != null && items.Count > 0 ? string.Join(", ", items) : none;
                 skinProfileText.text = "<b>Skin type:</b> " + (p != null && !string.IsNullOrWhiteSpace(p.skinType) ? GlowUp.Onboarding.SkinTypeNames.Display(p.skinType) : notSet)
                     + "\n<b>Skin tone:</b> " + (p != null && !string.IsNullOrWhiteSpace(p.skinTone) ? p.skinTone : notSet)
-                    + "\n<b>Chronic skin condition:</b> " + List(p?.skinConditions, "None")
+                    + "\n<b>Skin reactions:</b> " + List(reactions, "None")
                     + "\n<b>Allergens:</b> " + List(p?.knownAllergens, noAllergens);
             }
         }
@@ -324,7 +329,7 @@ namespace GlowUp.Dashboard
             }
             // what a recommendation means, and does not mean: said under the heading when there is something to show
             // 12 November 2026: the line is no longer printed under the heading; it is inside the small "i" at the end of "Recommended for you"
-            string note = ProductScope.HasSkinCondition(who) ? noteWithCondition : noteStandard;
+            string note = noteStandard;
             if (recommendationsNoteText != null) { recommendationsNoteText.text = note; recommendationsNoteText.gameObject.SetActive(false); }
             if (recommendationsBadge != null) { recommendationsBadge.Message = note; recommendationsBadge.gameObject.SetActive(cards.Count > 0); }
         }

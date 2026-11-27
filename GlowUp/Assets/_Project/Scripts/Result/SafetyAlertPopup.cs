@@ -32,7 +32,7 @@ namespace GlowUp.Result
         [Tooltip("{0} = ingredient names")]
         [SerializeField] private string harmfulLine = "<b>Banned or harmful.</b> {0}";
         [Tooltip("{0} = the skin condition, {1} = ingredient names")]
-        [SerializeField] private string conditionLine = "<b>May aggravate {0}.</b> {1}";
+        [SerializeField] private string conditionLine = "<b>Caution for {0}.</b> {1}";
         [Tooltip("{0} = how many more")]
         [SerializeField] private string andMore = " and {0} more";
         [SerializeField] private string outro = "Open the ingredient list below for the reasons. If you are unsure, ask a dermatologist before using it.";
@@ -66,7 +66,7 @@ namespace GlowUp.Result
                 if (alert.trigger == SafetyAlert.Notice) text.Append(alert.detail);
                 else if (alert.trigger == SafetyAlertPreferences.Allergens) text.AppendFormat(allergenLine, alert.detail);
                 else if (alert.trigger == SafetyAlertPreferences.Harmful) text.AppendFormat(harmfulLine, Names(alert.ingredients));
-                else text.AppendFormat(conditionLine, ConditionName(alert.trigger), Names(alert.ingredients));
+                else text.Append(ProductScope.CurrentWording(string.Format(conditionLine, ConditionName(alert.trigger), Names(alert.ingredients))));
             }
             if (!string.IsNullOrEmpty(outro)) text.Append("\n\n").Append(outro);
             return text.ToString();

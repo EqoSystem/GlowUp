@@ -281,6 +281,8 @@ async function loadReviewQueue() {
             if (productCount > 0) parts.push(many(productCount, "product", "products"));
             if (brandCount > 0) parts.push(many(brandCount, "brand", "brands"));
             el("reviewInventoryTitle").textContent = parts.join(" and ") + " waiting for review";
+            el("reviewInventoryTitle").dataset.base = el("reviewInventoryTitle").textContent;
+            paintNewProductReports(newProductCount);
             shapeGone();
             el("reviewInventoryTile").style.display = "";
         }
@@ -443,8 +445,7 @@ function activityRow(a) {
 
 async function loadSuggestions() {
     const sources = [
-        { name: "allergenSuggestions", kind: "Allergen" },
-        { name: "conditionSuggestions", kind: "Chronic skin condition" }
+        { name: "allergenSuggestions", kind: "Allergen" }
     ];
     typedSuggestions = [];
     let failed = null;
@@ -527,14 +528,30 @@ async function onSuggestionClick(event) {
 
 
 
+// "New product" reports from the app (Send for Review): counted on the review tile, opened in the inventory's Review queue
+let newProductCount = 0;
+function paintNewProductReports(count) {
+    const tile = el("reviewInventoryTile"), title = el("reviewInventoryTitle");
+    if (!tile || !title) return;
+    newProductCount = count;
+    const base = title.dataset.base || "";
+    if (count > 0) {
+        title.textContent = (base ? base.replace(/ waiting for review$/, "") + " and " : "") + many(count, "user report", "user reports") + " waiting for review";
+        const shape = el("reviewTilesLoading"); if (shape) shape.remove();
+        tile.style.display = "";
+    } else if (base) title.textContent = base;
+}
+
 function watchSupportReports() {
     if (stopSupportReports) stopSupportReports();
     stopSupportReports = onSnapshot(query(collection(db, "supportReports"), where("status", "==", "new")), (snapshot) => {
         supportReports = [];
         appSuggestions = [];
+        let newProductReports = 0;
         snapshot.forEach((d) => {
             const data = d.data();
             const lastScan = data.lastScan && typeof data.lastScan === "object" ? data.lastScan : null;
+            if (String(data.category || "") === "New product") { newProductReports++; return; }       // they wait in the inventory's Review queue
             if (String(data.category || "") === "Suggestion") {
 
                 appSuggestions.push({ id: d.id, collection: "supportReports", kind: "App suggestion", text: String(data.message || ""), createdAtUnix: toWholeNumber(data.createdAtUnix), lastScan, from: senderText({ userName: String(data.userName || "").trim(), uid: String(data.uid || "") }) });
@@ -547,6 +564,7 @@ function watchSupportReports() {
             });
         });
         renderSupportReports();
+        paintNewProductReports(newProductReports);
         suggestions = typedSuggestions.concat(appSuggestions);
         if (suggestionsLoaded) renderSuggestions();
     }, (error) => {
@@ -823,7 +841,7 @@ function registerData() {
         label: "Suggestions", noun: "suggestions", nounOne: "suggestion",
         items: () => suggestions,
         map: (s) => ({ id: s.collection + "/" + s.id, title: s.text || "(empty)", subtitle: s.kind, meta: timeAgo(s.createdAtUnix), tone: s.kind === "Allergen" ? "warn" : "pink" }),
-        dimensions: [{ id: "kind", label: "Kind", of: (s) => s.kind, keys: ["Allergen", "Chronic skin condition"] }],
+        dimensions: [{ id: "kind", label: "Kind", of: (s) => s.kind, keys: ["Allergen"] }],
         removedWord: "dismissed", foreverLabel: "Dismiss for good",
         removeNote: "They leave this list for everyone who uses the admin site.",
         remove: async (rows) => {

@@ -34,7 +34,9 @@ namespace GlowUp.Scan
             };
 
             string skinType = (profile.skinType ?? "").Trim();
-            var conditions = (profile.skinConditions ?? new List<string>()).Where(c => !string.IsNullOrWhiteSpace(c)).ToList();
+            // Chronic skin conditions are no longer asked or matched (27 Nov 2026, owner: no basis or use in the app). A value saved by an
+            // older version is ignored. The "concerns" line of the result now reports the optional skin reactions instead.
+            var conditions = new List<string>();
             var allergens = profile.RealAllergens();          // "No known allergens" is an answer, not something to look for
             // the optional "How does your skin react?" answer (Sensitive skin only): a reaction that points at an allergen family joins the allergens
             var reactions = SensitiveReactions.Of(profile);
@@ -100,7 +102,7 @@ namespace GlowUp.Scan
                     if (MatchesCondition(data.avoidForConditions, condition))
                     {
                         level = Worse(level, "caution");
-                        reasons.Add($"May aggravate {ShortCondition(condition)}" + (note.Length > 0 ? $": it {note}." : "."));
+                        reasons.Add($"Caution for {ShortCondition(condition)}" + (note.Length > 0 ? $": it {note}." : "."));
                         conditionConflicts.Add(shown); if (!conditionNames.Contains(ShortCondition(condition))) conditionNames.Add(ShortCondition(condition));
                     }
                     else if (MatchesCondition(data.goodForConditions, condition))
@@ -193,7 +195,7 @@ namespace GlowUp.Scan
             else
             {
                 record.status = "safe";
-                record.summary = "No ingredients were flagged for your profile.";
+                record.summary = "No caution found for your profile. This is not a guarantee of safety.";
             }
             if (!incomplete && notChecked > 0)
                 record.summary += notChecked == 1 ? " 1 name on the label could not be checked." : $" {notChecked} names on the label could not be checked.";
@@ -209,10 +211,10 @@ namespace GlowUp.Scan
             else if (allergenHits.Count > 0) record.allergenMatch = Item("bad", $"Contains your allergen{(allergenLabels.Count == 1 ? "" : "s")} {Join(allergenLabels, 3)} ({Join(allergenHits, 3)}).");
             else record.allergenMatch = Item("good", "None of your saved allergens were found.");
 
-            if (conditions.Count == 0) record.concernMatch = Item("unknown", "No chronic skin conditions saved in your profile.");
-            else if (conditionConflicts.Count > 0) record.concernMatch = Item("caution", $"May aggravate {Join(conditionNames, 3)} ({Join(conditionConflicts.Distinct().ToList(), 3)}).");
-            else if (conditionPositives.Count > 0) record.concernMatch = Item("good", $"Contains ingredients often used for {Join(conditionPositiveNames, 3)} ({Join(conditionPositives.Distinct().ToList(), 3)}).");
-            else record.concernMatch = Item("good", "No conflicts with your saved chronic skin conditions.");
+            // the optional skin reactions (Sensitive skin): cautions only, never a statement that something treats or suits a condition
+            if (reactions.Count == 0) record.concernMatch = Item("unknown", "No skin reactions saved in your profile.");
+            else if (conditionConflicts.Count > 0) record.concernMatch = Item("caution", $"Caution for your reaction{(conditionNames.Count == 1 ? "" : "s")} {Join(conditionNames, 3)} ({Join(conditionConflicts.Distinct().ToList(), 3)}).");
+            else record.concernMatch = Item("good", "No caution rule matched your saved skin reactions.");
 
             if (profile.age <= 0) record.ageMatch = Item("unknown", "No age saved in your profile.");
             else if (ageFlags.Count > 0) record.ageMatch = Item("caution", $"Contains ingredients usually not advised under {ageLimit} ({Join(ageFlags, 3)}).");
@@ -221,7 +223,7 @@ namespace GlowUp.Scan
             // ---------------- the rest ----------------
             record.cosmeticType = !string.IsNullOrWhiteSpace(cosmeticType) ? cosmeticType : GuessCosmeticType(rawLabelText, record.ingredients);
             MatchBrand(record, rawLabelText, brands);
-            record.dermatologistAdvised = harmful > 0 || caution >= 2 || (conditions.Count > 0 && record.status != "safe");
+            record.dermatologistAdvised = harmful > 0 || caution >= 2;
             record.recommendedShades = ShadeAdvisor.Recommend(profile.skinTone, ShadeAdvisor.AreaFor(record.cosmeticType));
             record.explanation = BuildExplanation(record, names, notChecked, typePositives, conditionPositives, conditionPositiveNames, skinType);
             return record;
@@ -253,7 +255,7 @@ namespace GlowUp.Scan
             {
                 sb.Append("\n\n<b>What works in your favour</b>");
                 if (typePositives.Count > 0) sb.Append($"\n- {Join(typePositives, 4)} suit{(typePositives.Count == 1 ? "s" : "")} {skinType} skin.");
-                if (conditionPositives.Count > 0) sb.Append($"\n- {Join(conditionPositives.Distinct().ToList(), 4)} {(conditionPositives.Distinct().Count() == 1 ? "is" : "are")} often used for {Join(conditionPositiveNames, 3)}.");
+                // nothing is said to suit or treat a skin condition (27 Nov 2026)
             }
             if (r.hiddenAlerts.Count > 0)
             {

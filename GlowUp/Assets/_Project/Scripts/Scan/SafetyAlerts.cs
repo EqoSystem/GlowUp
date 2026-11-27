@@ -34,6 +34,9 @@ namespace GlowUp.Scan
         }
 
         /// <summary>Is this trigger switched on? Allergens and harmful ingredients start on; conditions start as in the user's profile.</summary>
+        /// <summary>Alerts for skin conditions. Off since 27 Nov 2026: the app no longer asks for chronic skin conditions.</summary>
+        public static bool ConditionAlerts = false;
+
         public static bool IsOn(string trigger)
         {
             bool startsOn = trigger == Allergens || trigger == Harmful;
@@ -52,7 +55,7 @@ namespace GlowUp.Scan
         /// </summary>
         public static void SeedFromProfile(UserProfileData profile)
         {
-            if (profile == null) return;
+            if (profile == null || !ConditionAlerts) return;
             string key = Prefix + "Seeded." + (string.IsNullOrEmpty(profile.uid) ? "guest" : profile.uid);
             if (PlayerPrefs.GetInt(key, 0) == 1) return;
             foreach (string condition in profile.skinConditions ?? new List<string>())
@@ -105,7 +108,8 @@ namespace GlowUp.Scan
                 foreach (string condition in data.avoidForConditions ?? new List<string>())
                 {
                     string conditionKey = (condition ?? "").Trim().ToLowerInvariant();
-                    if (conditionKey.Length == 0 || !SafetyAlertPreferences.IsOn(conditionKey)) continue;
+                    // skin-condition alerts ended with the chronic skin conditions (27 Nov 2026); a switch left on by an older version is ignored
+                    if (!SafetyAlertPreferences.ConditionAlerts || conditionKey.Length == 0 || !SafetyAlertPreferences.IsOn(conditionKey)) continue;
                     if (!byCondition.TryGetValue(conditionKey, out SafetyAlert alert)) byCondition[conditionKey] = alert = new SafetyAlert { trigger = conditionKey };
                     if (!alert.ingredients.Contains(shown)) alert.ingredients.Add(shown);
                 }

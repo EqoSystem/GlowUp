@@ -124,7 +124,7 @@ try {
         // details window: live
         await page.click('tr[data-uid="u1"] .um-name');
         ok(await page.isVisible(".um-dialog") && /Skin type/.test(await text(page, ".um-dialog")) && /Oily/.test(await text(page, ".um-dialog")) && /Nickel/.test(await text(page, ".um-dialog")), "the details window shows account info and skin profile");
-        ok(await page.evaluate(() => document.querySelectorAll(".um-dialog .um-tags .chip").length === 3), "skin concerns and allergens are tags");
+        ok(await page.evaluate(() => document.querySelectorAll(".um-dialog .um-tags .chip").length >= 1 && !/Chronic skin/i.test(document.querySelector(".um-dialog").textContent)), "allergens are tags; chronic skin conditions are no longer shown");
         ok(await page.evaluate(() => document.activeElement.closest(".um-dialog") !== null), "focus is inside the window");
         await page.evaluate(() => { const d = window.__STORE.get("users/u1"); window.__STORE.set("users/u1", Object.assign({}, d, { fullName: "Ana R. Reyes", skinType: "Dry" })); window.__NOTIFY(); });
         await page.waitForTimeout(120);

@@ -45,6 +45,46 @@
 
 
 
+            <section class="panel search-import" id="siPanel" data-panel="searchImport" data-label="Search and import" data-w="12">
+                <div class="panel-head wraps">
+                    <h3 class="panel-title">Search and import</h3>
+                    <div class="si-tabs" role="tablist" aria-label="How to import">
+                        <button type="button" class="chip-btn" role="tab" data-si-tab="one" aria-selected="true">One product</button>
+                        <button type="button" class="chip-btn" role="tab" data-si-tab="many" aria-selected="false">Many barcodes</button>
+                        <button type="button" class="chip-btn" role="tab" data-si-tab="file" aria-selected="false">From a file</button>
+                    </div>
+                    <span class="spacer"></span>
+                </div>
+                <div class="si-row">
+                    <label class="sr-only" for="siQuery">Brand, product name or barcode</label>
+                    <input type="search" id="siQuery" class="si-input" placeholder="Brand, product name or barcode" autocomplete="off" maxlength="120">
+                    <button type="button" class="btn" id="siPhone"><i data-icon="phone"></i><span class="btn-label">Use phone</span></button>
+                    <button type="button" class="save-btn" id="siRun">Search and import</button>
+                </div>
+                <div class="si-progress" id="siProgress" hidden aria-live="polite">
+                    <ol class="si-steps"></ol>
+                    <div class="si-found"></div>
+                    <p class="si-say small"></p>
+                    <div class="si-actions"><button type="button" class="btn si-cancel">Cancel</button><span class="spacer"></span><button type="button" class="save-btn si-open" disabled>Open review</button></div>
+                </div>
+                <p class="field-hint">Everything found is saved as Pending. The app does not use it until an admin approves it.</p>
+            </section>
+
+            <section class="panel review-queue" id="rqPanel" data-panel="reviewQueue" data-label="Review queue" data-w="12">
+                <div class="panel-head">
+                    <h3 class="panel-title">Review queue</h3><span class="count-pill" id="rqCount"></span>
+                    <span class="spacer"></span>
+                    <button type="button" class="save-btn" id="rqNext">Open the next one</button>
+                </div>
+                <div class="table-container">
+                    <table class="admin-table rq-table">
+                        <thead><tr><th>Product</th><th>Ingredients</th><th>Flagged</th><th>No rule matched</th><th>Not identified</th><th><span class="sr-only">Action</span></th></tr></thead>
+                        <tbody id="rqBody"><tr><td colspan="6" class="table-message"><span class="sk sk-line" aria-hidden="true"></span></td></tr></tbody>
+                    </table>
+                </div>
+                <div class="pager" id="rqPager"></div>
+            </section>
+
             <section class="panel notes-panel" data-panel="notes" data-label="Needs your attention" data-w="12">
                 <div class="panel-head">
                     <h3 class="panel-title">Needs your attention</h3>
@@ -134,7 +174,7 @@
                     <button type="button" class="guide-badge" data-tip-title="How to use this list" data-tip="Click a product to see everything about it; double-click to edit it. Click a brand to open or close it. The app only uses Active products of Active brands." data-tip-preview="Drag rows onto a folder or the Recycle bin. The small box in front of a name picks it; Ctrl+click picks several.">i</button>
                     <span class="panel-count" hidden id="inventoryCountLine"></span>
                     <span class="search-status" id="inventorySearchStatus" role="status" hidden><span id="inventorySearchStatusText"></span><button type="button" class="search-status-clear" id="inventorySearchStatusClear" aria-label="Clear the search"><i data-icon="x"></i></button></span>
-                    <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most scanned, newest, type, or what needs attention first." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i><span class="btn-label">Sort</span><span class="sort-now" id="sortNow"></span></button> <button type="button" class="btn" id="batchLookupBtn" aria-haspopup="dialog"><i data-icon="barcode"></i><span class="btn-label">Batch Lookup</span></button> <button type="button" class="btn" id="filterMenuBtn" aria-haspopup="dialog" aria-expanded="false" data-tip-title="Filters" data-tip="Narrow the list by kind, status and a few facts at once, then press Apply filters." data-tip-preview="Nothing is read from the database: it only looks through what is already loaded."><i data-icon="sliders"></i><span class="btn-label">Filters</span><span class="sort-now" id="filterNow"></span></button></span>
+                    <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most scanned, newest, type, or what needs attention first." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i><span class="btn-label">Sort</span><span class="sort-now" id="sortNow"></span></button> <button type="button" class="btn" id="batchLookupBtn" aria-haspopup="dialog" hidden><i data-icon="barcode"></i><span class="btn-label">Batch Lookup</span></button> <button type="button" class="btn" id="filterMenuBtn" aria-haspopup="dialog" aria-expanded="false" data-tip-title="Filters" data-tip="Narrow the list by kind, status and a few facts at once, then press Apply filters." data-tip-preview="Nothing is read from the database: it only looks through what is already loaded."><i data-icon="sliders"></i><span class="btn-label">Filters</span><span class="sort-now" id="filterNow"></span></button></span>
                     <span class="shelf" id="inventoryShelf"></span>
                     <span class="shelf" id="inventoryShelfAdd"></span>
                     <span id="inventoryQuick"></span>

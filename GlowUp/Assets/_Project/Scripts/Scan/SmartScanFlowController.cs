@@ -455,7 +455,7 @@ namespace GlowUp.Scan
             if (snapshot != null) { snapshot.Analysed += OnSnapshotAnalysed; snapshot.NameOnly += OnSnapshotNameOnly; snapshot.TypeItIn += OpenManual; snapshot.CaptureModeRequested += EnterPhotoMode; snapshot.CatalogMatches += ShowPhotoMatches; }
             if (manualAnalyseButton != null) manualAnalyseButton.onClick.AddListener(AnalyseManual);
             if (manualBarcodeButton != null) manualBarcodeButton.onClick.AddListener(() => { if (manualPanel != null) manualPanel.Hide(); OpenBarcodeCard(""); });
-            if (barcodeCard != null) { barcodeCard.FindRequested += OnBarcodeFind; barcodeCard.PhotoRequested += OnBarcodePhoto; }
+            if (barcodeCard != null) { barcodeCard.FindRequested += OnBarcodeFind; barcodeCard.PhotoRequested += OnBarcodePhoto; barcodeCard.ReviewRequested += OnSendForReview; }
             if (snapshot != null) snapshot.BarcodeUnknown += key => OpenBarcodeCard(key);
             if (lookUpButton != null) lookUpButton.onClick.AddListener(LookUp);
             if (backButton != null) backButton.onClick.AddListener(() => { StopCamera(); SceneNavigator.Go(backScene); });
@@ -3437,6 +3437,21 @@ namespace GlowUp.Scan
         {
             ProductData picked = knownProduct;
             if (HasStoredList(picked)) OnSnapshotAnalysed(picked, null);
+        }
+
+        /// <summary>
+        /// "Send for review" (redesign plan, 27 Nov 2026): the product is not in GlowUp. The barcode and any name already read go to the
+        /// Send for Review screen; the camera is stopped first. Coming back starts a new scan. Nothing else of the scan changes.
+        /// </summary>
+        void OnSendForReview(string key, string typedName)
+        {
+            if (stage == Stage.Leaving) return;
+            string name = !string.IsNullOrWhiteSpace(typedName) ? typedName.Trim() : identity.productName;
+            GlowUp.Review.SendForReviewHandoff.Set(key, identity.brandName, name);
+            if (barcodeCard != null) barcodeCard.Hide();
+            stage = Stage.Leaving;
+            if (cameraFeed != null) cameraFeed.StopCamera();
+            SceneNavigator.Go(SceneNames.SendForReview);
         }
 
         /// <summary>"Photograph the barcode": photo mode, whose photo step reads the bars first.</summary>

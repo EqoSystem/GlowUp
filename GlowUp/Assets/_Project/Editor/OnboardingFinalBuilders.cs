@@ -163,7 +163,6 @@ namespace GlowUp.EditorTools
             var emailCheck = AddEmailCheck(email, host: emailRow.gameObject);
             var typeRow = NewRow(content, "SkinType", "Skin Type", rows); var skinType = AddDropdown(typeRow);
             var toneRow = NewRow(content, "SkinTone", "Skin Tone", rows); var skinTone = AddDropdown(toneRow);
-            var condRow = NewRow(content, "Conditions", "Conditions", rows); var conditions = AddInput(condRow, "e.g. Acne, Eczema", 200);
             var allergenRow = NewRow(content, "Allergens", "Allergens", rows); var allergens = AddInput(allergenRow, "e.g. Fragrance, Parabens", 200);
 
             var popup = OnboardingStep1Builder.BuildDatePopup(c.card);
@@ -179,7 +178,7 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(ctl, "birthday", field);
             SceneBuilderCore.SetField(ctl, "email", email); SceneBuilderCore.SetField(ctl, "emailCheck", emailCheck); SceneBuilderCore.SetField(ctl, "emailMax", EmailLimit);
             SceneBuilderCore.SetField(ctl, "skinType", skinType); SceneBuilderCore.SetField(ctl, "skinTone", skinTone);
-            SceneBuilderCore.SetField(ctl, "conditions", conditions); SceneBuilderCore.SetField(ctl, "allergens", allergens);
+            SceneBuilderCore.SetField(ctl, "allergens", allergens);   // the Conditions row was removed on 27 Nov 2026
             SceneBuilderCore.SetField(ctl, "editButton", edit); SceneBuilderCore.SetField(ctl, "editButtonLabel", editLabel);
             SceneBuilderCore.SetField(ctl, "scroll", scrollRt.GetComponent<ScrollRect>());
             SceneBuilderCore.SetField(ctl, "generateButton", c.cont); SceneBuilderCore.SetField(ctl, "generateAnimator", c.anim);
@@ -389,7 +388,7 @@ namespace GlowUp.EditorTools
                 healthToggle.isOn = false;
                 Transform label = healthT.Find("ReadLabel");
                 if (label != null) healthLabel = label.GetComponent<TextMeshProUGUI>();
-                if (healthLabel != null) { healthLabel.text = "I agree that GlowUp keeps my skin type, skin tone, chronic skin conditions and allergies, to personalise my results"; healthLabel.fontSize = 28; }
+                if (healthLabel != null) { healthLabel.text = "I agree that GlowUp keeps my skin type, skin tone, skin reactions and allergies, to personalise my results"; healthLabel.fontSize = 28; }
             }
 
             var go = SceneBuilderCore.EnsureRoot("TermsAcceptanceFlowController");

@@ -331,6 +331,18 @@ await can("a user sends a Bug report", () => setDoc(doc(user(), "supportReports/
 await cannot("a user sends a report of an unknown kind", () => setDoc(doc(user(), "supportReports/r3"), report("Spam")));
 await cannot("a user sends a report in someone else's name", () => setDoc(doc(other(), "supportReports/r4"), report("Suggestion")));
 await cannot("a user reads support reports", () => getDoc(doc(user(), "supportReports/r1")));
+// Send for Review (27 Nov 2026): a "New product" report is text only
+const productReport = (extra) => Object.assign(report("New product"), { barcode: "4800000000000", brand: "Sample Brand", productName: "Sample Tint", ingredientText: "Aqua, Dimethicone, Parfum", note: "mall kiosk" }, extra || {});
+await can("a user sends a New product report", () => setDoc(doc(user(), "supportReports/np1"), productReport()));
+await can("a New product report with only a barcode", () => setDoc(doc(user(), "supportReports/np2"), productReport({ brand: "", productName: "", ingredientText: "", note: "" })));
+await can("a New product report with only a name", () => setDoc(doc(user(), "supportReports/np3"), productReport({ barcode: "" })));
+await cannot("a New product report with neither barcode nor name", () => setDoc(doc(user(), "supportReports/np4"), productReport({ barcode: "", productName: "" })));
+await cannot("a barcode with letters", () => setDoc(doc(user(), "supportReports/np5"), productReport({ barcode: "48000ABC" })));
+await cannot("an ingredient text over 4000 characters", () => setDoc(doc(user(), "supportReports/np6"), productReport({ ingredientText: "x".repeat(4001) })));
+await cannot("a New product report with a photo field", () => setDoc(doc(user(), "supportReports/np7"), productReport({ photo: "data:image/jpeg;base64,AAAA" })));
+await cannot("a New product report with the skin profile attached", () => setDoc(doc(user(), "supportReports/np8"), productReport({ lastScan: { product: "x" } })));
+await cannot("product fields on a Bug report", () => setDoc(doc(user(), "supportReports/np9"), Object.assign(report("Bug"), { barcode: "4800000000000" })));
+await cannot("a New product report in someone else's name", () => setDoc(doc(other(), "supportReports/np10"), productReport()));
 
 await cannot("a plain user saves shortcuts (the 403 of the endpoint)", () => setDoc(doc(user(), "adminShortcuts/u1"), keys()));
 await cannot("a plain user reads shortcuts", () => getDoc(doc(user(), "adminShortcuts/u1")));
