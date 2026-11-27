@@ -45,6 +45,8 @@ namespace GlowUp.Scan
         [SerializeField] private Button noneButton;
         [SerializeField] private TextMeshProUGUI noneLabel;
         [SerializeField] private Button scanAgainButton;
+        [Tooltip("Not one of these and not in GlowUp: opens Send for Review")]
+        [SerializeField] private Button reviewButton;
 
         [Header("Wording")]
         [Tooltip("The line under the name of a product this phone has scanned before. {0} = brand and kind")]
@@ -60,6 +62,8 @@ namespace GlowUp.Scan
 
         /// <summary>Looks a typed name and brand up (set by the scan screen).</summary>
         public Func<string, string, List<ScanShortlist.Entry>> Search;
+        /// <summary>"Send for review" was tapped: the typed name and brand (set by the scan screen).</summary>
+        public Action<string, string> ReviewRequested;
 
         readonly List<ScanShortlist.Entry> shown = new List<ScanShortlist.Entry>();
         List<ScanShortlist.Entry> offered = new List<ScanShortlist.Entry>();
@@ -86,6 +90,7 @@ namespace GlowUp.Scan
             if (useTypedButton != null) useTypedButton.onClick.AddListener(UseTyped);
             if (noneButton != null) noneButton.onClick.AddListener(() => Leave(none));
             if (scanAgainButton != null) scanAgainButton.onClick.AddListener(() => Leave(scanAgain));
+            if (reviewButton != null) reviewButton.onClick.AddListener(() => { string name = TypedName, brand = TypedBrand; Hide(); ReviewRequested?.Invoke(name, brand); });
         }
 
         /// <summary>

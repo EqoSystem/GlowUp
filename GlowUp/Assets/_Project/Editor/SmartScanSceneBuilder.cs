@@ -314,7 +314,7 @@ namespace GlowUp.EditorTools
 
             // ---- "Is it one of these?": up to three products the scan may be about, and a box to type the name ----
             A.AppPopup pick = A.Overlay(s, "ShortlistPanel", "Is it one of these?");
-            A.At(pick.box, A.MC, new Vector2(0, 170), new Vector2(940, 1240));
+            A.At(pick.box, A.MC, new Vector2(0, 150), new Vector2(940, 1350));
             TextMeshProUGUI pickMessage = A.Label(pick.box, "MessageText", "We are not sure which product this is. Tap it, or type its name.", 28, ThemeRole.SecondaryText, FontRole.Body,
                                                   TextAlignmentOptions.TopLeft, true);
             A.TopStrip(pickMessage.transform, 124, 84, 48, 48);
@@ -357,6 +357,10 @@ namespace GlowUp.EditorTools
             A.TopStrip(pickUse.transform, 904, 92, 48, 48);
             A.Outline(pickUse.transform, ThemeRole.Gold, 92f);
             A.Shrink(A.LabelOf(pickUse), 20);
+            Button pickReview = A.PillButton(pick.box, "SendForReviewButton", "Not your product? Send for review", 30, ThemeRole.Background, ThemeRole.AccentText);
+            A.TopStrip(pickReview.transform, 1022, 112, 48, 48);
+            A.Outline(pickReview.transform, ThemeRole.Accent, 112f);
+            A.Shrink(A.LabelOf(pickReview), 22);
             Button pickAgain = A.PillButton(pick.box, "ScanAgainButton", "Scan again", 34, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Scan);
             A.BottomStrip(pickAgain.transform, 44, 112, 48, 486);
             A.Outline(pickAgain.transform, ThemeRole.Accent, 112f);
@@ -369,7 +373,7 @@ namespace GlowUp.EditorTools
             A.Set(shortlistView, "emptyText", pickEmpty);
             A.Set(shortlistView, "nameInput", pickName); A.Set(shortlistView, "brandInput", pickBrand);
             A.Set(shortlistView, "useTypedButton", pickUse); A.Set(shortlistView, "useTypedLabel", A.LabelOf(pickUse));
-            A.Set(shortlistView, "noneButton", pickNone); A.Set(shortlistView, "noneLabel", A.LabelOf(pickNone)); A.Set(shortlistView, "scanAgainButton", pickAgain);
+            A.Set(shortlistView, "noneButton", pickNone); A.Set(shortlistView, "noneLabel", A.LabelOf(pickNone)); A.Set(shortlistView, "scanAgainButton", pickAgain); A.Set(shortlistView, "reviewButton", pickReview);
 
             // ---- type-it-in pop-up (for labels the camera cannot read) ----
             A.AppPopup manual = A.Overlay(s, "ManualEntryPanel", "Type it in");

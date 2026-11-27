@@ -1,3 +1,4 @@
+using GlowUp.AppSettings;
 using GlowUp.Common;
 using GlowUp.Result;
 using GlowUp.Scan;
@@ -259,6 +260,14 @@ namespace GlowUp.EditorTools
             A.Size(specialistQuiet, -1, Tap);
             A.Outline(specialistQuiet.transform, ThemeRole.Accent, Tap);
 
+            // 7. something wrong with this result: the product, its list or its flags (the report form opens on this screen)
+            GameObject reportCard = Section(content, "ReportCard", "Something looks wrong?");
+            A.Label(reportCard.transform, "ReportText", "Wrong product, ingredient or result? Tell the GlowUp team.",
+                BodySize, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            Button reportButton = A.PillButton(reportCard.transform, "ReportButton", "Report a problem", ButtonSize, ThemeRole.InputBackground, ThemeRole.MainText, IconFactory.Mail);
+            A.Size(reportButton, -1, Tap);
+            A.Outline(reportButton.transform, ThemeRole.Accent, Tap);
+
             // ---- bottom buttons ----
             Button scanAnother = A.PillButton(card, "ScanAnotherButton", "Scan again", ButtonSize, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Scan);
             A.BottomStrip(scanAnother.transform, 44, Tap, A.Pad, 512);
@@ -307,12 +316,18 @@ namespace GlowUp.EditorTools
             var alertView = A.Controller<SafetyAlertPopup>("SafetyAlertPopup");
             A.Set(alertView, "panel", alertPopup.panel); A.Set(alertView, "messageText", alertMessage); A.Set(alertView, "okButton", alertOk);
 
+            // ---- report a problem: the same pop-up as Settings > Contact support ----
+            var reportForm = A.Controller<SupportFeedbackForm>("SupportFeedbackForm");
+            SettingsSceneBuilder.SupportPopup(s, reportForm, out _, out TextMeshProUGUI reportScanLabel);
+            reportScanLabel.text = "Include this scan (product and ingredients)";
+
             // ---- controller ----
             var controller = A.Controller<ScanResultFlowController>("ScanResultFlowController");
             A.Set(controller, "brandText", brand); A.Set(controller, "nameText", name); A.Set(controller, "typeText", type); A.Set(controller, "dateText", date);
             A.Set(controller, "typeIcon", typeIcon); A.Set(controller, "status", status); A.Set(controller, "summaryText", summary);
             A.Set(controller, "typeIcons", A.TypeIcons());
             A.Set(controller, "askButton", askButton);
+            A.Set(controller, "reportCard", reportCard); A.Set(controller, "reportButton", reportButton); A.Set(controller, "reportForm", reportForm);
             A.Set(controller, "skinType", skinType); A.Set(controller, "allergens", allergens); A.Set(controller, "concerns", concerns); A.Set(controller, "age", age);
             A.Set(controller, "chipContent", chipGrid.transform); A.Set(controller, "chipTemplate", chipView);
             A.Set(controller, "ingredientBreakdownText", chipHint);

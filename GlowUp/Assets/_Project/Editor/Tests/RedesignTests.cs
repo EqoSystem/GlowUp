@@ -2,6 +2,9 @@ using GlowUp.Review;
 using GlowUp.Scan;
 using GlowUp.Views;
 using NUnit.Framework;
+using UnityEditor;
+using UnityEditor.SceneManagement;
+using UnityEngine;
 
 namespace GlowUp.Tests
 {
@@ -42,6 +45,19 @@ namespace GlowUp.Tests
             StringAssert.DoesNotContain("May aggravate", now);
             StringAssert.DoesNotContain("best treatment", now);
             StringAssert.Contains("Not medical advice", now);
+        }
+
+        [TestCase("AiSmartAnalysisResultScene", typeof(GlowUp.Result.ScanResultFlowController), "reportCard,reportButton,reportForm")]
+        [TestCase("AiSmartAnalysisResultScene", typeof(GlowUp.AppSettings.SupportFeedbackForm), "panel,categoryTabs,messageInput,includeLastScanToggle,sendButton")]
+        [TestCase("AiSmartAnalysisScene", typeof(ScanShortlistView), "reviewButton")]
+        public void TheReportButtonsAreConnected(string scene, System.Type type, string fields)
+        {
+            EditorSceneManager.OpenScene("Assets/_Project/Scenes/" + scene + ".unity", OpenSceneMode.Single);
+            Object[] found = Resources.FindObjectsOfTypeAll(type);
+            Assert.AreEqual(1, found.Length, type.Name + " in " + scene);
+            var so = new SerializedObject(found[0]);
+            foreach (string field in fields.Split(','))
+                Assert.IsNotNull(so.FindProperty(field).objectReferenceValue, field);
         }
     }
 }

@@ -179,6 +179,10 @@ namespace GlowUp.Result
         [SerializeField] private Button backButton;
         [Tooltip("\"Scan again\": asks whether it is the same product or a different one")]
         [SerializeField] private Button scanAnotherButton;
+        [Header("Report a problem")]
+        [SerializeField] private GameObject reportCard;
+        [SerializeField] private Button reportButton;
+        [SerializeField] private GlowUp.AppSettings.SupportFeedbackForm reportForm;
         [Tooltip("The question that button opens. Empty = the scanner opens at once, for a new product.")]
         [SerializeField] private OverlayPanel scanAgainPanel;
         [Tooltip("\"Scan the same product again\": the product keeps its name, and the new result takes the place of this one")]
@@ -219,6 +223,7 @@ namespace GlowUp.Result
             if (alternativesButton != null) alternativesButton.onClick.AddListener(ShowAlternatives);
             if (renameButton != null) renameButton.onClick.AddListener(BeginRename);
             if (renameSaveButton != null) renameSaveButton.onClick.AddListener(SaveRename);
+            if (reportButton != null) reportButton.onClick.AddListener(() => { if (reportForm != null) reportForm.OpenForScan(); });
         }
 
         /// <summary>
@@ -273,6 +278,8 @@ namespace GlowUp.Result
         void Show()
         {
             bool has = record != null;
+            // the form attaches the scanned product, so an alternative on show (never scanned) has no report button
+            if (reportCard != null) reportCard.SetActive(has && cameFrom.Count == 0);
             if (tryOnButton != null) tryOnButton.interactable = has && ProductScope.CanTryOn(record);      // AR Try-On is for make-up only
             if (allIngredientsButton != null) allIngredientsButton.interactable = has;
             if (fdaVerificationButton != null) fdaVerificationButton.interactable = has;

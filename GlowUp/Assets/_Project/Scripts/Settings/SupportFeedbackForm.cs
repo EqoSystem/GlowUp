@@ -85,6 +85,14 @@ namespace GlowUp.AppSettings
             AddLimitAndEmail();
         }
 
+        /// <summary>"Report a problem" on the result screen: the form opens on "Wrong scan result" with the scan attached.</summary>
+        public void OpenForScan()
+        {
+            if (categoryTabs != null) categoryTabs.Select(Mathf.Max(0, Array.IndexOf(categoryNames, "Wrong scan result")), false);
+            if (includeLastScanToggle != null) includeLastScanToggle.isOn = true;
+            if (panel != null) panel.Show();
+        }
+
         // ---- New22 (20 November 2026): a character limit with a counter, and the support address that opens Gmail ----
         /// <summary>The longest report a person can type. Long enough for steps to reproduce, short enough to read at a glance.</summary>
         public const int ReportLimit = 500;

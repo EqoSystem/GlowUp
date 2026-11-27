@@ -462,6 +462,7 @@ namespace GlowUp.Scan
             if (cameraFeed != null) cameraFeed.Started += OnCameraStarted;
             if (aiConfig != null) ProductAiAdvisor.Config = aiConfig;
             if (shortlist != null) shortlist.Search = (name, brand) => ScanShortlist.Typed(ProductRepository.Index, name, brand);
+            if (shortlist != null) shortlist.ReviewRequested = (name, brand) => OnSendForReview(barcode ?? "", name, brand);
             CopyWords();
         }
 
@@ -3443,11 +3444,14 @@ namespace GlowUp.Scan
         /// "Send for review" (redesign plan, 27 Nov 2026): the product is not in GlowUp. The barcode and any name already read go to the
         /// Send for Review screen; the camera is stopped first. Coming back starts a new scan. Nothing else of the scan changes.
         /// </summary>
-        void OnSendForReview(string key, string typedName)
+        void OnSendForReview(string key, string typedName) => OnSendForReview(key, typedName, "");
+
+        void OnSendForReview(string key, string typedName, string typedBrand)
         {
             if (stage == Stage.Leaving) return;
             string name = !string.IsNullOrWhiteSpace(typedName) ? typedName.Trim() : identity.productName;
-            GlowUp.Review.SendForReviewHandoff.Set(key, identity.brandName, name);
+            string brand = !string.IsNullOrWhiteSpace(typedBrand) ? typedBrand.Trim() : identity.brandName;
+            GlowUp.Review.SendForReviewHandoff.Set(key, brand, name);
             if (barcodeCard != null) barcodeCard.Hide();
             stage = Stage.Leaving;
             if (cameraFeed != null) cameraFeed.StopCamera();

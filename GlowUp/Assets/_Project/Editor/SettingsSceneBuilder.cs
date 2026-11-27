@@ -125,88 +125,7 @@ namespace GlowUp.EditorTools
             else Debug.LogWarning("[GlowUp] Settings: " + LegalPath + " was not found, so the legal pop-up has no text. Assign a document on LegalText > Legal Text Source.");
 
             // ---- contact support ----
-            A.AppPopup supportPopup = A.Overlay(s, "SupportPanel", "Contact Support");
-            // Keep this as a centered, self-contained card so it remains readable on phones and tablets.
-            A.At(supportPopup.box, A.MC, new Vector2(0, 40), new Vector2(940, 1230));
-            TextMeshProUGUI supportIntro = A.Label(supportPopup.box, "IntroText", "Tell us what went wrong. Your report goes straight to the GlowUp team.",
-                                                   30, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            A.TopStrip(supportIntro.transform, 118, 88, 48, 48);
-            // phase 4 (11 November 2026): four kinds, Suggestion between Wrong scan result and Other, as two rows of two so every name fits
-            ChoiceTabs categoryTabs = TabsGrid(supportPopup.box, "CategoryTabs", new[] { "Bug", "Wrong scan result", "Suggestion", "Other" }, 0, 2, 28);
-            A.TopStrip(categoryTabs.transform.parent, 222, TwoRowTrack, 48, 48);
-            // Top to bottom, nothing overlaps: intro, kinds, description, its counter UNDER the box, the scan switch, the e-mail
-            // row, the status line, then Send Report pinned to the bottom of the card.
-            const float FeedbackHeight = 320;
-            TMP_InputField feedbackInput = SceneBuilderCore.MakeInput(supportPopup.box, "FeedbackInputField", "Describe what happened...", A.TC, Vector2.zero, new Vector2(840, FeedbackHeight));
-            float feedbackTop = 222 + TwoRowTrack + 18;
-            A.TopStrip(feedbackInput.transform, feedbackTop, FeedbackHeight, 48, 48);
-            Kit.StyleInput(feedbackInput, "Describe what happened...", ThemeRole.InputBackground);
-            SmartScanSceneBuilder.MakeMultiLine(feedbackInput, 32);
-            var feedbackBehaviour = SceneBuilderCore.Ensure<InputFieldBehaviour>(feedbackInput.gameObject);
-            A.Set(feedbackBehaviour, "characterLimit", SupportFeedbackForm.ReportLimit);
-
-            // The report counter belongs to the description field and stays inside the card's width.
-            GameObject counterRow = A.Node(supportPopup.box, "FeedbackCounterRow");
-            A.TopStrip(counterRow.transform, feedbackTop + FeedbackHeight + 6, 36, 56, 56);
-            TextMeshProUGUI counterText = A.Label(counterRow.transform, "CharacterCounter", "0 / 500", 22, ThemeRole.SecondaryText,
-                                                   FontRole.Body, TextAlignmentOptions.Right);
-            A.Fill(counterText.transform, 0, 0, 0, 0);
-            var counter = SceneBuilderCore.Ensure<InlineHelperText>(counterRow);
-            A.Set(counter, "inputField", feedbackInput);
-            A.Set(counter, "helperLabel", null);
-            A.Set(counter, "badgeLabel", counterText);
-            A.Set(counter, "helperMessage", "");
-            A.Set(counter, "badgeMessage", "0 / 500");
-            A.Set(counter, "showCharacterCounter", true);
-
-            GameObject includeRow = A.Node(supportPopup.box, "IncludeLastScanRow");
-            float includeTop = feedbackTop + FeedbackHeight + 48;
-            A.TopStrip(includeRow.transform, includeTop, 96, 56, 56);
-            A.HStack(includeRow, 20);
-            TextMeshProUGUI includeLabel = A.Label(includeRow.transform, "Label", "Include my last scan (product and ingredients)", 30, ThemeRole.MainText, FontRole.Label,
-                                                   TextAlignmentOptions.MidlineLeft, true);
-            A.Size(includeLabel, -1, -1, 1);
-            A.ShrinkWrapped(includeLabel, 22);
-            Toggle includeScan = Switch(includeRow.transform, "IncludeLastScanSwitch", true);
-
-            // the support address on its own row (mail icon + two lines), so a long address wraps or shrinks instead of
-            // running into the switch; the whole row is one 48 dp tap target that opens the mail app
-            float emailTop = includeTop + 96 + 12;
-            Image emailRow = A.Panel(supportPopup.box, "SupportEmailRow", ThemeRole.SurfaceAlt, Kit.PanelAlpha, 28f);
-            A.TopStrip(emailRow.transform, emailTop, 104, 48, 48);
-            emailRow.raycastTarget = true;
-            Button emailButton = SceneBuilderCore.Ensure<Button>(emailRow.gameObject);
-            emailButton.targetGraphic = emailRow;
-            Image emailIcon = A.Icon(emailRow.transform, "Icon", IconFactory.Mail, 40, ThemeRole.AccentText);
-            A.At(emailIcon.transform, A.ML, new Vector2(28, 0), new Vector2(40, 40));
-            emailIcon.raycastTarget = false;
-            TextMeshProUGUI emailText = A.Label(emailRow.transform, "EmailText", "Or email us\n<u>" + SupportFeedbackForm.SupportAddress + "</u>", 26,
-                                                ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.MidlineLeft, true);
-            A.Fill(emailText.transform, 92, 8, 24, 8); A.ShrinkWrapped(emailText, 18);
-            emailText.raycastTarget = false;
-
-            TextMeshProUGUI supportMessage = A.Label(supportPopup.box, "FeedbackText", "", 24, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            A.TopStrip(supportMessage.transform, emailTop + 104 + 8, 48, 48, 48);
-            A.ShrinkWrapped(supportMessage, 18);
-            Button supportSend = A.PillButton(supportPopup.box, "SendButton", "Send Report", 38, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Mail);
-            A.BottomStrip(supportSend.transform, 44, 112, 48, 48);
-            // 22 Nov 2026 (phone check): the keyboard covered Send Report, so nothing could be sent. The pop-up now slides up until the counter, the
-            // e-mail row, the message line and Send Report are above the keyboard, not just the text field.
-            KeyboardKit.KeepVisible(feedbackInput, counterText, includeRow.transform, emailRow, supportMessage, supportSend);
-
-            var support = Feature<SupportFeedbackForm>(features, "SupportFeedbackForm");
-            A.Set(support, "panel", supportPopup.panel); A.Set(support, "categoryTabs", categoryTabs); A.Set(support, "messageInput", feedbackInput);
-            A.Set(support, "includeLastScanToggle", includeScan); A.Set(support, "sendButton", supportSend); A.Set(support, "feedbackText", supportMessage);
-            A.Set(support, "supportEmailButton", emailButton);
-            SceneBuilderCore.ReplaceText(support, "msgTimeout", "Not sent yet: there is no connection. Your report is saved on this phone and goes out by itself when you are back online.",
-                "No connection right now. Your report will be sent when you're back online.");
-            // a form saved before phase 4 keeps its own words: the kinds and the two messages are brought up to date
-            var supportSo = new SerializedObject(support);
-            SerializedProperty kinds = supportSo.FindProperty("categoryNames");
-            string[] kindNames = { "Bug", "Wrong scan result", "Suggestion", "Other" };
-            if (kinds != null) { kinds.arraySize = kindNames.Length; for (int k = 0; k < kindNames.Length; k++) kinds.GetArrayElementAtIndex(k).stringValue = kindNames[k]; supportSo.ApplyModifiedPropertiesWithoutUndo(); }
-            SceneBuilderCore.ReplaceText(support, "msgSent", "Report sent. Thank you!", "Report sent. Thank you.");
-            SceneBuilderCore.ReplaceText(support, "msgNotSent", "Your report couldn't be sent. Check your connection and try again.", "The report could not be sent. Check your connection.");
+            SupportPopup(s, Feature<SupportFeedbackForm>(features, "SupportFeedbackForm"), out A.AppPopup supportPopup, out _);
 
             // =====================================================================================
             //  1. Appearance and performance
@@ -518,6 +437,93 @@ namespace GlowUp.EditorTools
             A.Finish(s);
             Debug.Log("[GlowUp] SettingsScene built. The pop-ups (ConfirmPanel, DeleteAccountPanel, LegalPanel, SupportPanel) are inactive until used. " +
                       "Set the support address on SettingsFeatures > SupportFeedbackForm > Support Email.");
+        }
+
+        /// <summary>The Contact Support pop-up, wired to its form. Settings and the result screen ("Report a problem") show the same one.</summary>
+        internal static void SupportPopup(A.AppScreen s, SupportFeedbackForm support, out A.AppPopup supportPopup, out TextMeshProUGUI includeLabel)
+        {
+            // ---- contact support ----
+            supportPopup = A.Overlay(s, "SupportPanel", "Contact Support");
+            // Keep this as a centered, self-contained card so it remains readable on phones and tablets.
+            A.At(supportPopup.box, A.MC, new Vector2(0, 40), new Vector2(940, 1230));
+            TextMeshProUGUI supportIntro = A.Label(supportPopup.box, "IntroText", "Tell us what went wrong. Your report goes straight to the GlowUp team.",
+                                                   30, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            A.TopStrip(supportIntro.transform, 118, 88, 48, 48);
+            // phase 4 (11 November 2026): four kinds, Suggestion between Wrong scan result and Other, as two rows of two so every name fits
+            ChoiceTabs categoryTabs = TabsGrid(supportPopup.box, "CategoryTabs", new[] { "Bug", "Wrong scan result", "Suggestion", "Other" }, 0, 2, 28);
+            A.TopStrip(categoryTabs.transform.parent, 222, TwoRowTrack, 48, 48);
+            // Top to bottom, nothing overlaps: intro, kinds, description, its counter UNDER the box, the scan switch, the e-mail
+            // row, the status line, then Send Report pinned to the bottom of the card.
+            const float FeedbackHeight = 320;
+            TMP_InputField feedbackInput = SceneBuilderCore.MakeInput(supportPopup.box, "FeedbackInputField", "Describe what happened...", A.TC, Vector2.zero, new Vector2(840, FeedbackHeight));
+            float feedbackTop = 222 + TwoRowTrack + 18;
+            A.TopStrip(feedbackInput.transform, feedbackTop, FeedbackHeight, 48, 48);
+            Kit.StyleInput(feedbackInput, "Describe what happened...", ThemeRole.InputBackground);
+            SmartScanSceneBuilder.MakeMultiLine(feedbackInput, 32);
+            var feedbackBehaviour = SceneBuilderCore.Ensure<InputFieldBehaviour>(feedbackInput.gameObject);
+            A.Set(feedbackBehaviour, "characterLimit", SupportFeedbackForm.ReportLimit);
+
+            // The report counter belongs to the description field and stays inside the card's width.
+            GameObject counterRow = A.Node(supportPopup.box, "FeedbackCounterRow");
+            A.TopStrip(counterRow.transform, feedbackTop + FeedbackHeight + 6, 36, 56, 56);
+            TextMeshProUGUI counterText = A.Label(counterRow.transform, "CharacterCounter", "0 / 500", 22, ThemeRole.SecondaryText,
+                                                   FontRole.Body, TextAlignmentOptions.Right);
+            A.Fill(counterText.transform, 0, 0, 0, 0);
+            var counter = SceneBuilderCore.Ensure<InlineHelperText>(counterRow);
+            A.Set(counter, "inputField", feedbackInput);
+            A.Set(counter, "helperLabel", null);
+            A.Set(counter, "badgeLabel", counterText);
+            A.Set(counter, "helperMessage", "");
+            A.Set(counter, "badgeMessage", "0 / 500");
+            A.Set(counter, "showCharacterCounter", true);
+
+            GameObject includeRow = A.Node(supportPopup.box, "IncludeLastScanRow");
+            float includeTop = feedbackTop + FeedbackHeight + 48;
+            A.TopStrip(includeRow.transform, includeTop, 96, 56, 56);
+            A.HStack(includeRow, 20);
+            includeLabel = A.Label(includeRow.transform, "Label", "Include my last scan (product and ingredients)", 30, ThemeRole.MainText, FontRole.Label,
+                                                   TextAlignmentOptions.MidlineLeft, true);
+            A.Size(includeLabel, -1, -1, 1);
+            A.ShrinkWrapped(includeLabel, 22);
+            Toggle includeScan = Switch(includeRow.transform, "IncludeLastScanSwitch", true);
+
+            // the support address on its own row (mail icon + two lines), so a long address wraps or shrinks instead of
+            // running into the switch; the whole row is one 48 dp tap target that opens the mail app
+            float emailTop = includeTop + 96 + 12;
+            Image emailRow = A.Panel(supportPopup.box, "SupportEmailRow", ThemeRole.SurfaceAlt, Kit.PanelAlpha, 28f);
+            A.TopStrip(emailRow.transform, emailTop, 104, 48, 48);
+            emailRow.raycastTarget = true;
+            Button emailButton = SceneBuilderCore.Ensure<Button>(emailRow.gameObject);
+            emailButton.targetGraphic = emailRow;
+            Image emailIcon = A.Icon(emailRow.transform, "Icon", IconFactory.Mail, 40, ThemeRole.AccentText);
+            A.At(emailIcon.transform, A.ML, new Vector2(28, 0), new Vector2(40, 40));
+            emailIcon.raycastTarget = false;
+            TextMeshProUGUI emailText = A.Label(emailRow.transform, "EmailText", "Or email us\n<u>" + SupportFeedbackForm.SupportAddress + "</u>", 26,
+                                                ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.MidlineLeft, true);
+            A.Fill(emailText.transform, 92, 8, 24, 8); A.ShrinkWrapped(emailText, 18);
+            emailText.raycastTarget = false;
+
+            TextMeshProUGUI supportMessage = A.Label(supportPopup.box, "FeedbackText", "", 24, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            A.TopStrip(supportMessage.transform, emailTop + 104 + 8, 48, 48, 48);
+            A.ShrinkWrapped(supportMessage, 18);
+            Button supportSend = A.PillButton(supportPopup.box, "SendButton", "Send Report", 38, ThemeRole.ButtonFill, ThemeRole.ButtonText, IconFactory.Mail);
+            A.BottomStrip(supportSend.transform, 44, 112, 48, 48);
+            // 22 Nov 2026 (phone check): the keyboard covered Send Report, so nothing could be sent. The pop-up now slides up until the counter, the
+            // e-mail row, the message line and Send Report are above the keyboard, not just the text field.
+            KeyboardKit.KeepVisible(feedbackInput, counterText, includeRow.transform, emailRow, supportMessage, supportSend);
+
+            A.Set(support, "panel", supportPopup.panel); A.Set(support, "categoryTabs", categoryTabs); A.Set(support, "messageInput", feedbackInput);
+            A.Set(support, "includeLastScanToggle", includeScan); A.Set(support, "sendButton", supportSend); A.Set(support, "feedbackText", supportMessage);
+            A.Set(support, "supportEmailButton", emailButton);
+            SceneBuilderCore.ReplaceText(support, "msgTimeout", "Not sent yet: there is no connection. Your report is saved on this phone and goes out by itself when you are back online.",
+                "No connection right now. Your report will be sent when you're back online.");
+            // a form saved before phase 4 keeps its own words: the kinds and the two messages are brought up to date
+            var supportSo = new SerializedObject(support);
+            SerializedProperty kinds = supportSo.FindProperty("categoryNames");
+            string[] kindNames = { "Bug", "Wrong scan result", "Suggestion", "Other" };
+            if (kinds != null) { kinds.arraySize = kindNames.Length; for (int k = 0; k < kindNames.Length; k++) kinds.GetArrayElementAtIndex(k).stringValue = kindNames[k]; supportSo.ApplyModifiedPropertiesWithoutUndo(); }
+            SceneBuilderCore.ReplaceText(support, "msgSent", "Report sent. Thank you!", "Report sent. Thank you.");
+            SceneBuilderCore.ReplaceText(support, "msgNotSent", "Your report couldn't be sent. Check your connection and try again.", "The report could not be sent. Check your connection.");
         }
 
         // =========================================================================================
