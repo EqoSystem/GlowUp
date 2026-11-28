@@ -22,7 +22,7 @@ const TAB_EMPTY = {
     active: ["No active admins.", "Admins you archive or send to the Recycle Bin are not listed here."],
     archived: ["Nothing archived.", "Archived admins have no portal access. Restore them, or delete them."],
     bin: ["The Recycle Bin is empty.", "Admins you delete come here. Restore them, or delete them permanently."],
-    online: ["No admins are online.", "Admins appear here while one of their pages is open (checked in within the last 5 minutes)."]
+    online: ["No admins are online.", "Admins appear here while one of their pages is open on screen (checked in within the last 5 minutes)."]
 };
 
 let admins = null;                        // null = the first answer has not come yet

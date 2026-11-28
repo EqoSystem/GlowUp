@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GlowUp – Scan make-up. Know what's inside.</title>
+    <meta name="description" content="GlowUp reads a make-up label, checks every ingredient against your skin profile and lets you try shades on with your camera.">
+    <link rel="icon" type="image/png" sizes="32x32" href="../_Shared/assets/glowup-icon-32.png">
+    <script>
+        (function () {
+            var t = null;
+            try { t = localStorage.getItem("glowup.theme"); } catch (e) { }
+            if (t !== "light" && t !== "dark") t = "light";
+            document.documentElement.dataset.theme = t;
+            document.documentElement.classList.add("js");
+        })();
+    </script>
+    <link rel="stylesheet" href="../_Shared/adminCommon.css">
+    <link rel="stylesheet" href="landing.css">
+</head>
+<body class="landing">
+
+    <!-- ===== Top bar ===== -->
+    <header class="lp-top" id="top">
+        <a class="lp-brand" href="#top" aria-label="GlowUp – back to top">
+            <img src="../_Shared/assets/glowup-icon-128.png" width="34" height="34" alt="" decoding="async">
+            <span>Glow Up</span>
+        </a>
+        <nav class="lp-nav" id="lpNav" aria-label="Sections">
+            <a href="#how">How it works</a>
+            <a href="#features">Features</a>
+            <a href="#screens">Screens</a>
+            <a href="#faq">FAQ</a>
+        </nav>
+        <div class="lp-tools">
+            <div class="lp-theme" role="group" aria-label="Theme">
+                <button type="button" data-theme-pick="light" aria-label="Light theme">
+                    <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+                </button>
+                <button type="button" data-theme-pick="dark" aria-label="Dark theme">
+                    <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+                </button>
+            </div>
+            <button type="button" class="lp-menu-btn" id="lpMenuBtn" aria-label="Open the menu" aria-expanded="false" aria-controls="lpNav">
+                <svg class="ic open" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+                <svg class="ic close" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <!-- ===== Hero ===== -->
+        <section class="lp-hero">
+            <div class="lp-hero-text reveal">
+                <span class="lp-kicker">Make-up scanner for Android</span>
+                <h1>Scan make-up.<br><em>Know what's inside.</em></h1>
+                <p class="lp-lead">GlowUp reads the label, checks every ingredient against your skin profile, and lets you try shades on with your camera.</p>
+                <div class="lp-cta">
+                    <a class="btn primary lp-big" id="downloadBtn" href="#download">
+                        <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+                        <span>Download for Android</span>
+                    </a>
+                    <a class="btn lp-big" href="#how">See how it works</a>
+                </div>
+                <p class="lp-note" id="downloadNote" hidden>Coming soon. The download link is on its way.</p>
+            </div>
+
+            <div class="lp-hero-phone reveal" aria-hidden="true">
+                <div class="phone">
+                    <div class="phone-notch"></div>
+                    <div class="scr scr-result">
+                        <div class="scr-bar"><span>Scan result</span><i></i></div>
+                        <div class="scr-product">
+                            <div class="scr-thumb"></div>
+                            <div><b>Velvet Matte Lip</b><small>Lipstick · 18 ingredients</small></div>
+                        </div>
+                        <div class="scr-verdict ok"><b>Good fit for you</b><small>Nothing flagged for your skin</small></div>
+                        <div class="scr-counts">
+                            <span class="c-ok"><b>15</b>Safe</span>
+                            <span class="c-warn"><b>3</b>Caution</span>
+                            <span class="c-bad"><b>0</b>Harmful</span>
+                        </div>
+                        <div class="scr-mini">
+                            <small>Ingredients</small>
+                            <div><i class="dot ok"></i>Dimethicone<em class="chip ok">Safe</em></div>
+                            <div><i class="dot warn"></i>Fragrance<em class="chip warn">Caution</em></div>
+                            <div><i class="dot ok"></i>Tocopherol<em class="chip ok">Safe</em></div>
+                        </div>
+                        <div class="scr-btn">Try it on</div>
+                    </div>
+                </div>
+                <div class="lp-float f1"><i class="dot ok"></i>Glycerin · safe</div>
+                <div class="lp-float f2"><i class="dot warn"></i>Fragrance · caution</div>
+            </div>
+        </section>
+
+        <!-- ===== How it works ===== -->
+        <section class="lp-section" id="how">
+            <header class="lp-head reveal">
+                <span class="lp-kicker">How it works</span>
+                <h2>Three steps, under a minute</h2>
+            </header>
+            <ol class="lp-steps">
+                <li class="reveal">
+                    <span class="step-n">1</span>
+                    <h3>Set up your skin</h3>
+                    <p>Answer a short quiz about your skin type, allergies and conditions.</p>
+                </li>
+                <li class="reveal">
+                    <span class="step-n">2</span>
+                    <h3>Scan the product</h3>
+                    <p>Point the camera at the ingredient label or the barcode.</p>
+                </li>
+                <li class="reveal">
+                    <span class="step-n">3</span>
+                    <h3>See your result</h3>
+                    <p>Every ingredient marked safe, caution or harmful, then try the shade on.</p>
+                </li>
+            </ol>
+        </section>
+
+        <!-- ===== Features ===== -->
+        <section class="lp-section" id="features">
+            <header class="lp-head reveal">
+                <span class="lp-kicker">Features</span>
+                <h2>Everything in one scan</h2>
+            </header>
+            <div class="lp-grid">
+                <article class="lp-card reveal">
+                    <span class="lp-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2"/><path d="M8 9h8M8 12h8M8 15h5"/></svg></span>
+                    <h3>Label reading</h3>
+                    <p>Reads the printed ingredient list straight from the pack.</p>
+                </article>
+                <article class="lp-card reveal">
+                    <span class="lp-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6v12M7 6v12M10 6v12M14 6v12M17 6v12M20 6v12"/></svg></span>
+                    <h3>Barcode lookup</h3>
+                    <p>Finds the product in our database from its barcode.</p>
+                </article>
+                <article class="lp-card reveal">
+                    <span class="lp-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
+                    <h3>Personal risk check</h3>
+                    <p>Each ingredient is checked against your skin type and allergies.</p>
+                </article>
+                <article class="lp-card reveal">
+                    <span class="lp-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.2 6.8L21 12l-6.8 2.2L12 21l-2.2-6.8L3 12l6.8-2.2z"/></svg></span>
+                    <h3>Safe picks for you</h3>
+                    <p>Recommends make-up with nothing flagged for your profile.</p>
+                </article>
+                <article class="lp-card reveal">
+                    <span class="lp-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="10" r="6"/><path d="M9.5 12.5c1.4 1 3.6 1 5 0"/><path d="M5 21c1.5-2.5 4-3.5 7-3.5s5.5 1 7 3.5"/></svg></span>
+                    <h3>AR shade try-on</h3>
+                    <p>See shades on your own face with the camera before you buy.</p>
+                </article>
+                <article class="lp-card reveal">
+                    <span class="lp-ic"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+                    <h3>Private by design</h3>
+                    <p>Your profile is never sent to the AI. Shared scan counts are anonymous.</p>
+                </article>
+            </div>
+        </section>
+
+        <!-- ===== Phone mock-ups ===== -->
+        <section class="lp-section" id="screens">
+            <header class="lp-head reveal">
+                <span class="lp-kicker">Inside the app</span>
+                <h2>Built for quick answers</h2>
+            </header>
+            <div class="lp-phones" aria-hidden="true">
+                <!-- Scan screen -->
+                <div class="phone small reveal">
+                    <div class="phone-notch"></div>
+                    <div class="scr scr-scan">
+                        <div class="scr-bar"><span>Scan label</span><i></i></div>
+                        <div class="scan-view">
+                            <span class="scan-frame"></span>
+                            <span class="scan-line"></span>
+                            <span class="scan-text t1"></span><span class="scan-text t2"></span><span class="scan-text t3"></span><span class="scan-text t4"></span>
+                        </div>
+                        <div class="scr-btn">Capture</div>
+                    </div>
+                </div>
+                <!-- Ingredient list -->
+                <div class="phone small reveal">
+                    <div class="phone-notch"></div>
+                    <div class="scr scr-list">
+                        <div class="scr-bar"><span>Ingredients</span><i></i></div>
+                        <ul>
+                            <li><span>Dimethicone</span><em class="chip ok">Safe</em></li>
+                            <li><span>Glycerin</span><em class="chip ok">Safe</em></li>
+                            <li><span>Fragrance</span><em class="chip warn">Caution</em></li>
+                            <li><span>Mica</span><em class="chip ok">Safe</em></li>
+                            <li><span>Lanolin</span><em class="chip warn">Caution</em></li>
+                            <li><span>Tocopherol</span><em class="chip ok">Safe</em></li>
+                        </ul>
+                    </div>
+                </div>
+                <!-- Try-on -->
+                <div class="phone small reveal">
+                    <div class="phone-notch"></div>
+                    <div class="scr scr-try">
+                        <div class="scr-bar"><span>Try on</span><i></i></div>
+                        <div class="face">
+                            <span class="face-head"></span>
+                            <span class="face-lips"></span>
+                        </div>
+                        <div class="swatches">
+                            <i style="--s:#b8325a"></i><i style="--s:#d9667e" class="on"></i><i style="--s:#9c3d3d"></i><i style="--s:#e08f86"></i><i style="--s:#7a2a44"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <p class="lp-caption reveal">Sample screens. Product names are made up.</p>
+        </section>
+
+        <!-- ===== Data sources ===== -->
+        <section class="lp-section lp-sources reveal">
+            <span class="lp-kicker">Ingredient facts come from</span>
+            <ul>
+                <li>FDA Philippines</li>
+                <li>Open Beauty Facts</li>
+                <li>PubChem</li>
+                <li>COSMILE</li>
+            </ul>
+        </section>
+
+        <!-- ===== FAQ ===== -->
+        <section class="lp-section" id="faq">
+            <header class="lp-head reveal">
+                <span class="lp-kicker">FAQ</span>
+                <h2>Good questions</h2>
+            </header>
+            <div class="lp-faq">
+                <details class="reveal">
+                    <summary>Is this medical advice?</summary>
+                    <p>No. GlowUp gives information only. For a skin condition or a reaction, talk to a dermatologist.</p>
+                </details>
+                <details class="reveal">
+                    <summary>What happens to my data?</summary>
+                    <p>Your skin profile is saved to your own account, and the comparison with a product happens on your phone. Your profile is never sent to the AI. The scan counts our team sees carry no name or account. You can delete your account and data in Settings.</p>
+                </details>
+                <details class="reveal">
+                    <summary>Which phones does it work on?</summary>
+                    <p>Android phones. Shade try-on works best on phones with Google ARCore; others use a simpler face tracker.</p>
+                </details>
+                <details class="reveal">
+                    <summary>Is it free?</summary>
+                    <p>Yes. GlowUp is a student research project and costs nothing to use.</p>
+                </details>
+                <details class="reveal">
+                    <summary>What if a product isn't found?</summary>
+                    <p>Scan its label. The app reads the ingredients and sends the new product to our team to check and add.</p>
+                </details>
+            </div>
+        </section>
+
+        <!-- ===== Closing call to action ===== -->
+        <section class="lp-section lp-end reveal" id="download">
+            <h2>Ready to scan?</h2>
+            <p>Free for Android.</p>
+            <a class="btn primary lp-big" id="downloadBtn2" href="#download">
+                <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+                <span>Download for Android</span>
+            </a>
+            <p class="lp-note" id="downloadNote2" hidden>Coming soon. The download link is on its way.</p>
+        </section>
+    </main>
+
+    <!-- ===== Footer ===== -->
+    <footer class="lp-foot">
+        <div class="lp-foot-brand">
+            <img src="../_Shared/assets/glowup-icon-32.png" width="22" height="22" alt="">
+            <span>© 2026 GlowUp · Student research project</span>
+        </div>
+        <p class="lp-foot-note">Informational only, not medical advice.</p>
+        <a class="btn lp-admin" href="../_Index/index.html">
+            <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+            Admin login
+        </a>
+    </footer>
+
+    <script src="landing.js"></script>
+</body>
+</html>

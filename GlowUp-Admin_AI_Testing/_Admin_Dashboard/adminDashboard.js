@@ -125,7 +125,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     await requireAdmin();
 
     watchCatalogueCards();
-    onListsRefreshed(() => { /* live card listeners below are the source of truth */ });
+    onListsRefreshed((name) => { if (name === "brands") loadBrandList(); });   // the shared cache found brand changes
+    document.addEventListener("visibilitychange", () => { if (!document.hidden && cardTimer) countCards(); });
     watchScansToday();
     watchRecentActivity();
     loadSuggestions();
@@ -169,54 +170,74 @@ function setMetric(id, value, title) {
 
 
 
-async function loadCatalogueCounts() {
+// The dashboard cards, the cheap way (28 Nov 2026). Before, three live listeners downloaded the WHOLE brands, products and
+// ingredients lists on every page load (one read per document, thousands each time), which used up the free daily reads.
+// Now:
+//   - the three totals are count queries (about 1 read per 1,000 documents), redone every 2 minutes while the page is visible;
+//   - the brand list (Top brands card and its widgets) comes from the shared cache in adminStore, which only downloads changes;
+//   - the Top brands card stays live by watching just the few most-scanned brands, not the whole list.
+const CARD_REFRESH_MS = 2 * 60 * 1000;
+let cardTimer = 0;
+const liveTop = new Map();   // the newest copy of each brand the live watch has sent (beats the cached copy)
 
+const brandRow = (id, data) => ({ id, name: data.name || "Unnamed Brand", category: data.category || "", status: String(data.status || "Active"), scans: toWholeNumber(data.scans), binned: data.binned === true });
+
+function showBrands() {
+    allBrands.sort((a, b) => b.scans - a.scans || a.name.localeCompare(b.name));
+    brandsAnswered = true;
+    renderTopBrands(allBrands);
+    datasetChanged("topBrands");
+    refreshAssist("brands");
+}
+
+async function loadBrandList() {
     try {
-        const snapshot = await getDocs(collection(db, "brands"));
-
-        allBrands = snapshot.docs.filter((d) => d.data().binned !== true).map((d) => ({ id: d.id, name: d.data().name || "Unnamed Brand", category: d.data().category || "", status: String(d.data().status || "Active"), scans: toWholeNumber(d.data().scans) }));
-        setMetric("totalBrandsCount", allBrands.length);
-        allBrands.sort((a, b) => b.scans - a.scans || a.name.localeCompare(b.name));
-        brandsAnswered = true;
-        renderTopBrands(allBrands);
-        datasetChanged("topBrands");
-        refreshAssist("brands");
+        const snapshot = await getDocs(collection(db, "brands"));   // adminStore's cached list: changes only after the first visit
+        allBrands = snapshot.docs.map((d) => brandRow(d.id, d.data())).filter((b) => !b.binned);
+        liveTop.forEach((data, id) => mergeBrand(id, data));   // the cache may be older than what the live watch already sent
+        showBrands();
     } catch (error) {
-        console.error("Error counting brands: ", error);
+        console.error("Error loading brands: ", error);
         brandsAnswered = true;
         refreshAssist("brands");
-        setMetric("totalBrandsCount", "–", describeError(error));
         showEmpty("topBrands", "Could not load the brands.", true);
     }
+}
+
+// A brand from the live top-brands watch replaces the cached copy (its scan count moves as the app is used).
+function mergeBrand(id, data) {
+    const row = brandRow(id, data);
+    allBrands = allBrands.filter((b) => b.id !== id);
+    if (!row.binned) allBrands.push(row);
+}
+
+function countCards() {
+    countInto("brands", "totalBrandsCount");
     countInto("products", "totalProductsCount");
     countInto("ingredients", "totalIngredientsCount");
 }
 
-// The dashboard cards must move when another admin or the app changes the catalogue.
-// The listener snapshots also keep the top-brand card in step with the three totals.
 function stopCatalogueCardListeners() {
     stopCatalogueCards.forEach((stop) => stop());
     stopCatalogueCards = [];
+    window.clearInterval(cardTimer);
+    cardTimer = 0;
 }
 
 function watchCatalogueCards() {
     stopCatalogueCardListeners();
-    const watch = (name, done) => stopCatalogueCards.push(onSnapshot(collection(db, name), done, (error) => {
-        console.error(`Error watching ${name} for dashboard cards: `, error);
-        const target = name === "brands" ? "totalBrandsCount" : name === "products" ? "totalProductsCount" : "totalIngredientsCount";
-        setMetric(target, "–", describeError(error));
-    }));
-    watch("brands", (snapshot) => {
-        allBrands = snapshot.docs.filter((d) => d.data().binned !== true).map((d) => ({ id: d.id, name: d.data().name || "Unnamed Brand", category: d.data().category || "", status: String(d.data().status || "Active"), scans: toWholeNumber(d.data().scans) }));
-        setMetric("totalBrandsCount", allBrands.length);
-        allBrands.sort((a, b) => b.scans - a.scans || a.name.localeCompare(b.name));
-        brandsAnswered = true;
-        renderTopBrands(allBrands);
-        datasetChanged("topBrands");
-        refreshAssist("brands");
-    });
-    watch("products", (snapshot) => setMetric("totalProductsCount", snapshot.docs.filter((d) => d.data().binned !== true).length));
-    watch("ingredients", (snapshot) => setMetric("totalIngredientsCount", snapshot.docs.filter((d) => d.data().binned !== true).length));
+    countCards();
+    loadBrandList();
+    const top = query(collection(db, "brands"), orderBy("scans", "desc"), limit(TOP_BRANDS * 2));   // a few extra in case some are in the bin
+    stopCatalogueCards.push(onSnapshot(top, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === "removed") return;               // it only left the top list; the cached list still has it
+            liveTop.set(change.doc.id, change.doc.data());
+            mergeBrand(change.doc.id, change.doc.data());
+        });
+        showBrands();
+    }, (error) => console.warn("Could not watch the top brands:", error)));
+    cardTimer = window.setInterval(() => { if (!document.hidden) countCards(); }, CARD_REFRESH_MS);
 }
 
 async function countInto(collectionName, elementId) {

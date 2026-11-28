@@ -90,14 +90,30 @@ function leaveToLogin(address) {
 
 // "Online now" on Admin Management: this admin's own record gets lastActiveAt now and then while a page is open and visible
 // (firestore.rules let an admin write that one field of their own record, and only the server's time).
+// Cheaper since 28 Nov 2026: it used to write every 30 s from every open tab, hidden or not (about 2,900 writes a day per
+// forgotten tab, a large share of the free 20,000). Now:
+//   - only a VISIBLE tab writes (a background or minimised tab writes nothing);
+//   - at most once every 2 minutes, shared by all tabs of this browser (the time of the last beat is kept in localStorage);
+//   - "Online Now" counts an admin for 5 minutes after a beat (ONLINE_MS in userRules.js), so 2 minutes keeps them listed.
+const BEAT_EVERY_MS = 2 * 60 * 1000;
 let heartbeatTimer = 0;
+let currentBeat = null;
 function startHeartbeat(user) {
-    const beat = () => { updateDoc(doc(db, "admins", user.uid), { lastActiveAt: serverTimestamp() }).catch(() => { }); };
-    beat();
+    const key = "glowup.beat." + user.uid;
+    currentBeat = () => {
+        if (document.hidden) return;
+        let last = 0;
+        try { last = Number(localStorage.getItem(key)) || 0; } catch (error) { }
+        if (Date.now() - last < BEAT_EVERY_MS - 5000) return;          // another tab of this browser beat a moment ago
+        try { localStorage.setItem(key, String(Date.now())); } catch (error) { }
+        updateDoc(doc(db, "admins", user.uid), { lastActiveAt: serverTimestamp() }).catch(() => { });
+    };
+    currentBeat();
     window.clearInterval(heartbeatTimer);
-    heartbeatTimer = window.setInterval(beat, 30 * 1000);   // the phone app shows "Online" while a beat is under 2 minutes old; an open background tab still beats (slowed to about 1 a minute)
-    document.addEventListener("visibilitychange", () => { if (!document.hidden) beat(); });
+    heartbeatTimer = window.setInterval(() => currentBeat(), BEAT_EVERY_MS);
 }
+// one listener for the whole page (before, every sign-in check added another one): coming back to the tab beats at once
+document.addEventListener("visibilitychange", () => { if (currentBeat) currentBeat(); });
 
 export function requireAdmin() {
     return new Promise((resolve) => {
