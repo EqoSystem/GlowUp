@@ -15,6 +15,7 @@ import { mountHints } from "../_Shared/buttonHints.js";
 import { draftIngredient, ingredientRecord } from "../_Shared/draftIngredient.js";
 import { classifications, loadClassifications } from "../_Shared/adminClassifications.js";
 import { runImport, reviewRows, countResults, STEPS, RESULT_WORDS, FLAGGED, NO_RULE, NOT_IDENTIFIED } from "../_Shared/importChain.js";
+import { matchRoute } from "../_Shared/capture.js";
 
 export const NEW_PRODUCT = "New product";
 const el = (id) => document.getElementById(id);
@@ -62,6 +63,7 @@ export function mountSearchImport(deps) {
     // ---------- 1. Search: brand, product name, or several barcodes ----------
     async function search() {
         if (busy) return;
+        if (!progress.hidden && !abort) { progress.hidden = true; runRows = []; }
         const typed = queryBox.value.trim();
         if (!typed) { queryBox.focus(); notify("Type a brand, a product name or a barcode first.", "info"); return; }
         lock(true);
@@ -136,43 +138,119 @@ export function mountSearchImport(deps) {
         el("siBatchImport").textContent = batch.size ? `Import batch (${batch.size})` : "Import batch";
     }
 
-    // ---------- 2. Import the batch: each product runs the chain and is saved as Pending ----------
+    // ---------- 2. Import the batch (redesigned 28 Nov 2026) ----------
+    // One table row per product shows where it is: Waiting, then each step, then Saved / Not saved / Cancelled. Before the chain
+    // runs, the missing details of each product (list, kind, barcode, FDA number) are filled from the other sources by itself:
+    // only a sure match of the SAME brand is used. Cancel stops at once: the rows not saved yet are marked Cancelled.
+    const runBody = progress.querySelector(".si-run"), say = progress.querySelector(".si-say"), bar = progress.querySelector(".si-bar > span");
+    const cancelBtn = progress.querySelector(".si-cancel"), openBtn = progress.querySelector(".si-open"), doneBtn = progress.querySelector(".si-done");
+    let runRows = [];
+    const stoppedError = () => { const e = new Error("Cancelled"); e.stopped = true; return e; };
+    // resolves like the promise, but rejects AT ONCE when Cancel is pressed (the screen never waits for a slow source)
+    const cut = (promise, signal) => new Promise((resolve, reject) => {
+        if (signal.aborted) { reject(stoppedError()); return; }
+        const onAbort = () => reject(stoppedError());
+        signal.addEventListener("abort", onAbort, { once: true });
+        Promise.resolve(promise).then((v) => { signal.removeEventListener("abort", onAbort); resolve(v); }, (e) => { signal.removeEventListener("abort", onAbort); reject(e); });
+    });
+    const ROW_WORDS = { wait: "Waiting", fill: "Filling missing details", saving: "Saving", saved: "Saved as Pending", failed: "Not saved", cancelled: "Cancelled, not saved" };
+    const ROW_TONE = { saved: "good", failed: "bad", cancelled: "" };
+    function paintRun() {
+        runBody.innerHTML = runRows.map((r) => {
+            const step = r.state === "step" ? `${r.at + 1} of ${STEPS.length}: ${STEPS[r.at]}` : ROW_WORDS[r.state];
+            const tone = ROW_TONE[r.state];
+            return `<tr><td><strong>${escapeHtml(r.c.name || "")}</strong><div class="small muted">${escapeHtml(r.c.brand || "")}</div></td>
+                <td>${tone !== undefined ? `<span class="chip ${tone}">${escapeHtml(step)}</span>` : `<span class="si-now${r.state === "wait" ? " muted" : ""}">${escapeHtml(step)}</span>`}${r.why ? `<div class="small muted">${escapeHtml(r.why)}</div>` : ""}</td>
+                <td class="small">${r.filled.length ? escapeHtml(r.filled.join(", ")) : `<span class="muted">${r.state === "fill" ? "looking..." : r.fillDone ? "nothing missing, or no source had it" : "-"}</span>`}</td>
+                <td>${r.count == null ? "-" : r.count ? `${r.count}` : `<span class="chip bad">None found</span>`}</td></tr>`;
+        }).join("");
+        const finished = runRows.filter((r) => ["saved", "failed", "cancelled"].includes(r.state)).length;
+        bar.style.width = runRows.length ? `${Math.round((finished / runRows.length) * 100)}%` : "0%";
+    }
+    function startRun(list) {
+        runRows = list.map(([key, c]) => ({ key, c, state: "wait", at: 0, filled: [], count: null, why: "" }));
+        progress.hidden = false;
+        cancelBtn.hidden = false; cancelBtn.disabled = false; openBtn.hidden = true; doneBtn.hidden = true;
+        paintRun();
+        progress.scrollIntoView({ block: "nearest" });
+    }
+    function endRun(text) {
+        say.textContent = text;
+        cancelBtn.hidden = true;
+        openBtn.hidden = !runRows.some((r) => r.state === "saved"); openBtn.disabled = openBtn.hidden;
+        doneBtn.hidden = false;
+        paintRun();
+    }
+
+    // the missing details of one product, from the other sources (same brand, a match that is not weak); never replaces a value
+    const FILL_KEYS = [["ingredients", "ingredient list"], ["cosmeticType", "cosmetic type"], ["barcode", "barcode"], ["fdaNumber", "FDA number"]];
+    const emptyOf = (c, k) => (Array.isArray(c[k]) ? !c[k].length : !c[k]);
+    async function fillGaps(c, signal) {
+        const out = { ...c, sources: (c.sources || []).slice() }, filled = [];
+        if (!FILL_KEYS.some(([k]) => emptyOf(out, k))) return { candidate: out, filled };
+        const brandKey = compact(c.brand), queries = [];
+        if (c.barcode) queries.push(String(c.barcode));
+        if (c.name) queries.push([c.brand, c.name].filter(Boolean).join(" "));
+        const from = new Set();
+        for (const text of queries) {
+            const answer = await cut(deps.lookup(text).catch(() => ({ candidates: [] })), signal);
+            for (const other of answer.candidates || []) {
+                const exactCode = c.barcode && String(other.barcode || "").replace(/\D/g, "").replace(/^0+/, "") === String(c.barcode).replace(/\D/g, "").replace(/^0+/, "");
+                if (brandKey && compact(other.brand) !== brandKey) continue;
+                if (!exactCode && matchRoute(other.score) === "weak") continue;
+                FILL_KEYS.forEach(([k, words]) => {
+                    if (!emptyOf(out, k) || emptyOf(other, k)) return;
+                    out[k] = Array.isArray(other[k]) ? other[k].slice() : other[k];
+                    filled.push(words); from.add(other.originLabel || (other.origins || [])[0] || "another source");
+                });
+                (other.sources || []).forEach((line) => { if (!out.sources.includes(line) && out.sources.length < 10) out.sources.push(line); });
+            }
+            if (!FILL_KEYS.some(([k]) => emptyOf(out, k))) break;
+        }
+        if (filled.length) out.originLabel = [c.originLabel || c.origin, ...from].filter(Boolean).filter((v, at, all) => all.indexOf(v) === at).join(" + ");
+        return { candidate: out, filled };
+    }
+
     async function importBatch() {
         if (busy || !batch.size) return;
         const items = Array.from(batch.entries());
-        if (!(await askConfirm({ title: `Import ${items.length} product${items.length === 1 ? "" : "s"}?`, message: "Each one is saved as Pending with its ingredients matched to the Curator. It waits in the Review queue until you approve it.", items: items.map(([, c]) => [c.brand, c.name].filter(Boolean).join(", ")), confirmLabel: "Import batch" }))) return;
+        if (!(await askConfirm({ title: `Import ${items.length} product${items.length === 1 ? "" : "s"}?`, message: "Missing details are filled from the other sources first. Each product is saved as Pending and waits in the Review queue until you approve it. Cancel stops at once.", items: items.map(([, c]) => [c.brand, c.name].filter(Boolean).join(", ")), confirmLabel: "Import batch" }))) return;
         lock(true);
-        progress.hidden = false;
-        const card = progress.querySelector(".si-found"), cancel = progress.querySelector(".si-cancel"), open = progress.querySelector(".si-open"), say = progress.querySelector(".si-say");
-        card.innerHTML = ""; open.disabled = true; cancel.hidden = false; cancel.disabled = false;
+        startRun(items);
         abort = new AbortController();
+        const signal = abort.signal;
         let done = 0;
-        const failed = [];
-        for (let i = 0; i < items.length && !abort.signal.aborted; i++) {
-            const [key, candidate] = items[i];
-            say.textContent = `Importing ${i + 1} of ${items.length}: ${[candidate.brand, candidate.name].filter(Boolean).join(", ")}`;
-            paintSteps(0, false);
-            try {
-                const made = await runImport("", { candidate, lookupProduct: () => ({ candidates: [] }), library: deps.library(), draftIngredient, fallback: {} }, (at) => paintSteps(at, false), abort.signal);
-                paintFound(card, made);
-                await savePlan(made);
-                paintSteps(STEPS.length - 1, true);
-                batch.delete(key); done++;
-            } catch (error) { if (!(error && error.stopped)) failed.push(candidate.name); }
+        try {
+            for (const row of runRows) {
+                if (signal.aborted) break;
+                say.textContent = `Importing ${runRows.indexOf(row) + 1} of ${runRows.length}. ${done} saved so far.`;
+                try {
+                    row.state = "fill"; paintRun();
+                    const { candidate, filled } = await fillGaps(row.c, signal);
+                    row.filled = filled; row.fillDone = true; row.state = "step"; paintRun();
+                    const made = await cut(runImport("", { candidate, lookupProduct: () => ({ candidates: [] }), library: deps.library(), draftIngredient, fallback: {} }, (at) => { row.at = at; paintRun(); }, signal), signal);
+                    row.count = made.names.length;
+                    if (!made.names.length) row.why = "No source had its ingredient list: add it in the Review queue.";
+                    row.state = "saving"; paintRun();
+                    await cut(savePlan(made, signal), signal);
+                    row.state = "saved"; batch.delete(row.key); done++;
+                } catch (error) {
+                    if (error && error.stopped) break;
+                    row.state = "failed"; row.why = describeError(error);
+                }
+                paintRun();
+            }
+        } finally {
+            const stopped = signal.aborted;
+            let maybe = false;
+            runRows.forEach((r) => { if (r.state === "saving") maybe = true; if (!["saved", "failed"].includes(r.state)) { r.state = "cancelled"; r.why = r.why || ""; } });
+            abort = null;
+            const failed = runRows.filter((r) => r.state === "failed").length;
+            endRun((stopped ? "Cancelled. " : "Done. ") + `${done} saved as Pending in the Review queue.` + (failed ? ` ${failed} not saved: tick them and try again.` : "")
+                + (maybe ? " The product being saved when you pressed Cancel may still appear in the Review queue: bin it there if you do not want it." : ""));
+            shown.forEach((r) => { if (!r.owner) r.owner = deps.inInventory(r.candidate); });
+            lock(false); paintResults(); paintBatch();
         }
-        const stopped = abort.signal.aborted;
-        abort = null; cancel.hidden = true; open.disabled = done === 0;
-        say.textContent = (stopped ? "Stopped. " : "") + `${done} saved as Pending in the Review queue.` + (failed.length ? ` Not saved (try again): ${failed.join(", ")}.` : "");
-        shown.forEach((r) => { if (!r.owner) r.owner = deps.inInventory(r.candidate); });
-        lock(false); paintResults(); paintBatch();
-    }
-
-    function paintSteps(at, done) {
-        const bar = progress.querySelector(".si-steps");
-        bar.innerHTML = STEPS.map((words, i) => {
-            const state = done || i < at ? "done" : i === at ? "now" : "";
-            return `<li class="${state}"><span class="si-step-mark">${state === "done" ? icon("check") : i + 1}</span>${escapeHtml(words)}</li>`;
-        }).join("");
     }
 
     // ---------- a user's "New product" report: one product, the report's text fills what the sources lack ----------
@@ -180,38 +258,34 @@ export function mountSearchImport(deps) {
         if (busy) return;
         const typed = queryBox.value.trim();
         lock(true); plan = null;
-        progress.hidden = false;
-        const card = progress.querySelector(".si-found"), cancel = progress.querySelector(".si-cancel"), open = progress.querySelector(".si-open"), say = progress.querySelector(".si-say");
-        card.innerHTML = ""; say.textContent = ""; open.disabled = true; cancel.disabled = false; cancel.hidden = false;
-        paintSteps(0, false);
+        startRun([["report", { name: typed || "Reported product", brand: fallback ? fallback.brand : "" }]]);
+        const row = runRows[0];
+        say.textContent = "Importing the reported product...";
         abort = new AbortController();
+        const signal = abort.signal;
         try {
-            plan = await runImport(typed, { lookupProduct: (text) => deps.lookup(text), library: deps.library(), draftIngredient, fallback: fallback || {} }, (at) => paintSteps(at, false), abort.signal);
-            cancel.disabled = true;
-            paintFound(card, plan);
-            say.textContent = "Saving as Pending...";
-            await savePlan(plan);
-            paintSteps(STEPS.length - 1, true);
-            say.textContent = plan.names.length ? "Saved as Pending. It is in the Review queue." : "Saved as Pending without an ingredient list: add it from the pack or the brand's page.";
-            open.disabled = false;
-            cancel.hidden = true;
+            row.state = "step"; paintRun();
+            plan = await cut(runImport(typed, { lookupProduct: (text) => deps.lookup(text), library: deps.library(), draftIngredient, fallback: fallback || {} }, (at) => { row.at = at; paintRun(); }, signal), signal);
+            row.c = { name: plan.product.name, brand: plan.product.brand };
+            row.count = plan.names.length;
+            row.state = "saving"; paintRun();
+            await cut(savePlan(plan, signal), signal);
+            row.state = "saved";
+            if (!plan.names.length) row.why = "No ingredient list was found: add it from the pack or the brand's page.";
+            endRun("Saved as Pending. It is in the Review queue.");
             if (fromReport) { await closeReport(fromReport, true); fromReport = null; }
             fallback = null;
         } catch (error) {
-            say.textContent = error && error.stopped ? "Cancelled. Nothing was saved." : error && error.notFound ? "No product was found for that report. Check the spelling or the barcode, or try the brand and the name." : "The import stopped. " + describeError(error);
-            cancel.hidden = true;
+            row.state = error && error.stopped ? "cancelled" : "failed";
+            row.why = error && error.stopped ? "" : error && error.notFound ? "No product was found. Check the spelling or the barcode, or try the brand and the name." : describeError(error);
+            endRun(error && error.stopped ? "Cancelled. Nothing was saved." : "The import stopped.");
         } finally { abort = null; lock(false); }
     }
-    progress.querySelector(".si-cancel").addEventListener("click", () => { if (abort) abort.abort(); });
-    progress.querySelector(".si-open").addEventListener("click", () => el("rqPanel").scrollIntoView({ behavior: "smooth", block: "start" }));
+    cancelBtn.addEventListener("click", () => { if (!abort) return; cancelBtn.disabled = true; say.textContent = "Cancelling..."; abort.abort(); });
+    openBtn.addEventListener("click", () => el("rqPanel").scrollIntoView({ behavior: "smooth", block: "start" }));
+    doneBtn.addEventListener("click", () => { progress.hidden = true; runRows = []; });
 
-    function paintFound(card, p) {
-        const from = [p.product.foundBy ? `Brand and name: ${p.product.foundBy}.` : "", p.listFrom ? `Ingredient list: ${p.listFrom}.` : "Ingredient list: none found."].filter(Boolean).join(" ");
-        card.innerHTML = `<div class="si-found-main"><strong>${escapeHtml([p.product.brand, p.product.name].filter(Boolean).join(", "))}</strong><span class="small muted">${escapeHtml(from)}</span></div>
-            <div class="si-found-counts small"><span>${p.names.length} ingredients</span><span>${p.known} already in the Curator</span><span>${p.fresh} new</span></div>`;
-    }
-
-    async function savePlan(p) {
+    async function savePlan(p, signal = null) {
         const product = p.product;
         const record = {
             brandName: product.brand, productName: product.name, cosmeticType: product.cosmeticType, ingredients: p.names.slice(0, 300),
@@ -219,11 +293,13 @@ export function mountSearchImport(deps) {
             lookupFrom: "Search and import" + (product.foundBy ? `: ${product.foundBy}` : "")
         };
         if (p.listFrom && /user report/i.test(p.listFrom)) record.description = ("Ingredient list typed in a user report: not verified. " + record.description).trim();
+        if (signal && signal.aborted) throw stoppedError();
         await deps.saveRecord(record);
         // the new ingredient names go to the Curator now, as Pending: rules filled the cautions, an admin checks them
         const uid = auth.currentUser ? auth.currentUser.uid : "";
         await loadClassifications().catch(() => null);
         for (const d of p.drafts) {
+            if (signal && signal.aborted) break;              // the product is saved; its remaining new names wait for the Curator
             if (!d.name || d.name.length < 2) continue;
             // source "ai" means "nobody has checked it": the app then takes its warnings but never as proof of safety
             try { await rawAddDoc(collection(db, "ingredients"), ingredientRecord(d, { uid, via: "search-import", stamp: serverTimestamp(), classes: classifications() })); }

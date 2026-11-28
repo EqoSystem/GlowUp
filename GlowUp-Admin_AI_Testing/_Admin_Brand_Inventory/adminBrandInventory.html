@@ -91,11 +91,21 @@
 
                 <div class="import-flags" id="inventoryImportFlags" hidden></div>
                 </div>
-                <div class="si-progress" id="siProgress" hidden aria-live="polite">
-                    <ol class="si-steps"></ol>
-                    <div class="si-found"></div>
-                    <p class="si-say small"></p>
-                    <div class="si-actions"><button type="button" class="btn si-cancel">Cancel</button><span class="spacer"></span><button type="button" class="btn si-open" disabled>Show in the Review queue</button></div>
+                <div class="si-progress" id="siProgress" hidden>
+                    <div class="si-run-head">
+                        <strong class="si-say" role="status" aria-live="polite"></strong>
+                        <span class="spacer"></span>
+                        <button type="button" class="btn danger si-cancel" data-hint="Cancel: stops at once. Products already saved stay in the Review queue; the rest are not saved.">Cancel</button>
+                        <button type="button" class="btn si-done" hidden data-hint="Close: hides this list. What was saved stays in the Review queue.">Close</button>
+                        <button type="button" class="save-btn si-open" hidden data-hint="Review the batch: goes to the Review queue below, where the saved products wait.">Review the batch</button>
+                    </div>
+                    <div class="si-bar" aria-hidden="true"><span></span></div>
+                    <div class="table-container">
+                        <table class="admin-table si-run-table">
+                            <thead><tr><th>Product</th><th>Step</th><th>Filled by itself</th><th>Ingredients</th></tr></thead>
+                            <tbody class="si-run"></tbody>
+                        </table>
+                    </div>
                 </div>
                 <p class="btn-hint">Everything imported is saved as Pending. The app does not use it until an admin approves it.</p>
             </section>
@@ -316,15 +326,10 @@
 
                     <section class="ing-section qf-section" id="productQuickFill" aria-labelledby="productQuickFillTitle">
                         <h4 class="ing-section-title" id="productQuickFillTitle">Quick fill</h4>
-                        <p class="field-hint">Type the product name or the barcode, scan it, or read photos of the pack. The form fills itself from the FDA Philippines list and Open Beauty Facts. Filled values are marked Detected until you check them against the pack.</p>
+                        <p class="field-hint">A product with missing details fills its empty fields by itself when it opens, from the FDA Philippines list, Open Beauty Facts and UPCitemdb. To look up another one, type its name or barcode and press Find. Filled values are marked Detected until you check them against the pack.</p>
                         <div class="qf-bar">
                             <input type="text" id="productQuickInput" maxlength="120" placeholder="Product name or barcode, e.g. Superstay Matte Ink or 3600531652300" autocomplete="off" aria-label="Product name or barcode to look up">
                             <button type="button" class="btn primary" id="productQuickFind">Find</button>
-                        </div>
-                        <div class="qf-tools">
-                            <button type="button" class="btn" id="productQuickLabel"><i data-icon="camera"></i>Ingredient photo</button>
-                            <button type="button" class="btn" id="productQuickPhotos"><i data-icon="image"></i>Gallery photos</button>
-                            <button type="button" class="btn" id="productQuickPhone"><i data-icon="phone"></i>Use my phone</button>
                         </div>
                         <p class="field-hint qf-status" id="productQuickStatus" role="status" aria-live="polite"></p>
                         <div class="qf-results" id="productQuickResults"></div>

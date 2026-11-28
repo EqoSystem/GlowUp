@@ -214,7 +214,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         `<option value="${OTHER_TYPE}">Other (type it)</option>`;
 
     brandModal = setupModal(el("addBrandModal"), () => { editingBrandId = null; });
-    productModal = setupModal(el("productModal"), () => { editingProductId = null; });
+    productModal = setupModal(el("productModal"), () => { editingProductId = null; quickFill.reset(); });
     brandWindow = wireWindow(el("addBrandModal"));
     productWindow = wireWindow(el("productModal"));
 
@@ -393,7 +393,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         fill: fillProductFromQuick,
         noteOrigins: (rows, method, score) => { fieldOrigins = originsAfterFill(fieldOrigins, rows, method, score); paintOrigins(); saveDraft(); },
         noteRaw: (text, from) => { ingredientsRaw = { text: String(text || "").slice(0, 4000), from: String(from || "").slice(0, 120) }; paintRawIngredients(); saveDraft(); },
-        openExisting: (product) => { productModal.close(); openProductForm(product); }
+        openExisting: (product) => { productModal.close(); openProductForm(product); },
+        editingId: () => editingProductId || ""
     });
     // Search and import + Review queue (redesign plan, 27 Nov 2026): one panel, one button; imports, app scans and user reports in one queue
     attentionLabel(el("inventorySearchStatus").closest(".panel-head").querySelector(".spacer"), el("notesList"));
@@ -2651,7 +2652,11 @@ function openProductForm(product, brandId) {
     ingredientsRaw = product && product.ingredientsRaw ? { text: product.ingredientsRaw, from: product.ingredientsRawFrom } : { text: "", from: "" };
     paintOrigins();
     paintRawIngredients();
-    el("productQuickFill").hidden = !!product && !product.needsReview;            // also for a product waiting for review: complete it from the sources
+    // Quick fill shows for a new product, a product waiting for review, and any product that still lacks a detail (28 Nov 2026)
+    const lacking = !!product && (!product.ingredients.length || !product.cosmeticType || !product.barcode || !product.fdaNumber);
+    el("productQuickFill").hidden = !!product && !product.needsReview && !lacking;
+    el("productShadeFindStatus").textContent = "";                                  // a message about the last product's shades must not stay
+    el("productShadeFindStatus").className = "field-hint";
     showNameClash();
     showDraftNote(product);
 
@@ -2662,6 +2667,7 @@ function openProductForm(product, brandId) {
     showReviewNote(el("productReviewNote"), product, "product");
     productModal.open();
     productWindow.reset();
+    if (product && lacking) quickFill.autoFill();              // fills the EMPTY fields from the sources by itself; the admin checks and saves
 
     if (brands.length === 0) setFormError(form, "There are no brands yet. Close this, add a brand first, then add the brand's products.");
 }

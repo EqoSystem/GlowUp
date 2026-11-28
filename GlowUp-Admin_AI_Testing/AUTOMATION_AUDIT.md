@@ -73,3 +73,9 @@ None new. Open Beauty Facts and PubChem need no key; the CSP already allows them
 - **Makeup API** "Find shades online" in the shade editor: colours by brand and kind, the closest product first, ticked shades added with their names (`shadeNames`) and a code only when printed at the start of the name. Marked Needs review. Checked live: 7 Maybelline lipsticks, the right product at 90 %. US and international brands only; the data is old and the service is a free hobby server.
 - A look-up brand now matches one listed brand whose name starts with it ("Maybelline" -> "Maybelline New York", 5+ letters); two possible brands = the admin chooses.
 - Tests: `tests/productSources.test.mjs` (47 checks), `tests/responsive/productSources.scenario.mjs` (38, desktop and phone).
+
+## 28 November 2026, round 3 (owner's notes)
+- Edit Product Quick fill: the Ingredient photo, Gallery photos and Use my phone buttons were removed. A product that opens with an empty field (ingredient list, cosmetic type, barcode, FDA number) now fills only the EMPTY fields by itself: barcode first, then brand and name; only a same-brand match that is not weak is used. Filled values are marked Detected; the admin checks and saves. `_Shared/phoneLink.js`, `_Admin_Phone_Scan/` and the `phoneLinks` rule stay, but no page opens them now; `phoneLink.scenario` was removed.
+- Edit Ingredient: an entry with empty boxes runs "Fill from the name" by itself when it opens (PubChem + GlowUp's rules, empty boxes only).
+- Search and import batch: one row per product (step, what was filled by itself, ingredient count), a progress bar, and a Cancel that stops at once (each wait is cut by the cancel signal). Before the chain runs, each product's missing details are filled from the other sources (same rule as above).
+- The "Find shades online" message is cleared when another product opens (it stayed from the last product).

@@ -28,6 +28,23 @@ try {
         ok(/In inventory/.test(await page.textContent("#siBody")), `${width}px: a brand search lists the brand's products already in the inventory`);
         const box = page.locator("#siBody [data-si-pick]").first();
         if (await box.count()) { await box.check(); ok(await page.isVisible("#siBatch") && /Batch: 1 product/.test(await page.textContent("#siBatch")), `${width}px: a tick puts the product in the batch`); }
+        if (await box.count() && width === 1440) {
+            // 28 Nov 2026: the batch runs as a list, one row per product, and Cancel stops it AT ONCE (the sources are made slow here)
+            await page.route((url) => !url.href.startsWith("http://glowup.test/"), (route) => setTimeout(() => route.abort().catch(() => {}), 6000));
+            await page.click("#siBatchImport");
+            await page.click('.modal-actions .save-btn:has-text("Import batch")');
+            await page.waitForSelector("#siProgress .si-run tr", { timeout: 4000 });
+            ok(await page.isVisible("#siProgress .si-run-table") && /Filling missing details|of 5/.test(await page.textContent("#siProgress .si-run")), `${width}px: the batch shows one row per product with its step`);
+            const t0 = Date.now();
+            await page.click("#siProgress .si-cancel");
+            await page.waitForFunction(() => /Cancelled/.test(document.querySelector("#siProgress .si-say").textContent), null, { timeout: 1500 }).catch(() => {});
+            ok(/Cancelled/.test(await page.textContent("#siProgress .si-say")) && Date.now() - t0 < 1500, `${width}px: Cancel stops the batch at once (${Date.now() - t0} ms)`);
+            ok(/Cancelled, not saved/.test(await page.textContent("#siProgress .si-run")) && await page.isHidden("#siProgress .si-cancel"), `${width}px: the row says Cancelled, not saved; Cancel is gone`);
+            ok(!(await page.isDisabled("#siRun")), `${width}px: the search works again after Cancel`);
+            await page.unrouteAll({ behavior: "ignoreErrors" }).catch(() => {});
+            await page.click("#siProgress .si-done");
+            ok(await page.isHidden("#siProgress"), `${width}px: Close hides the batch list`);
+        }
 
         // the user report
         await page.click('#rqBody [data-rq-open^="report:"]');

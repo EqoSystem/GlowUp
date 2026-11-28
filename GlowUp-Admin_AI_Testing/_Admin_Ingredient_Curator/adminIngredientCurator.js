@@ -1012,6 +1012,7 @@ function onQueueClick(event) {
     const box = el("ingredientNameInput");
     box.value = name.replace(/\s+/g, " ").trim().slice(0, 80);
     box.dispatchEvent(new Event("input", { bubbles: true }));
+    autoFillIngredient();                                   // a new entry: every box is empty, so the look-up fills them by itself
 }
 
 function renderIngredients() {
@@ -1870,6 +1871,14 @@ function openIngredientForm(item) {
     paintLimited();
     if (sourceUi) sourceUi.fill(item);
     windowKit.reset();
+    // 28 Nov 2026 (owner): an entry with empty boxes fills them by itself (the same look-up as "Fill from the name": empty boxes
+    // only, PubChem + GlowUp's rules, nothing saved). The admin reads the boxes and saves.
+    if (item && item.name && (!item.classificationId || !item.purpose || !item.description || !item.aliases.length || !item.chemicalDescription)) autoFillIngredient();
+}
+
+function autoFillIngredient() {
+    el("ingredientQuickStatus").textContent = "Filling the empty boxes by itself from PubChem and GlowUp's rules...";
+    quickFillIngredient();
 }
 
 async function saveIngredient(event) {

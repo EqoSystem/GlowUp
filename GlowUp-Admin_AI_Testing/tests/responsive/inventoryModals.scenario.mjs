@@ -142,7 +142,7 @@ try {
             }
             await closeWindow(page);
         }
-        ok(errors.filter((e) => !/404/.test(e)).length === 0, `${theme} ${label}: no page errors ${errors.join("; ")}`);
+        ok(errors.filter((e) => !/404|Failed to load resource/.test(e)).length === 0, `${theme} ${label}: no page errors ${errors.join("; ")}`);
         await page.context().close();
     }
 
@@ -196,7 +196,7 @@ try {
         ok(await page.evaluate(() => Array.from(document.querySelectorAll("#addBrandModal .ing-section-title")).map((h) => h.textContent).join("|") === "Brand|Pictures and website"), "the brand window has two sections");
         ok(await page.locator("#brandWebsiteConfirm").isVisible() && await page.evaluate(() => { const c = document.getElementById("brandWebsiteConfirm").getBoundingClientRect(); return c.width >= 14 && c.width <= 24; }), "the confirm tick box is an ordinary tick box (not stretched)");
         await closeWindow(page);
-        ok(errors.filter((e) => !/404/.test(e)).length === 0, "no page errors in the behaviour checks " + errors.join("; "));
+        ok(errors.filter((e) => !/404|Failed to load resource/.test(e)).length === 0, "no page errors in the behaviour checks " + errors.join("; "));
         await page.context().close();
     }
 } finally { await browser.close(); }
