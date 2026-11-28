@@ -32,7 +32,7 @@ import { auth } from "../_Database/firebase-console.js";
 import { collection, doc, serverTimestamp, getDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 
-import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed, onSnapshot } from "../_Shared/adminStore.js";
+import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed, watchChanges } from "../_Shared/adminStore.js";
 import { TEST_MODE } from "../_Shared/adminClassifications.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
@@ -453,9 +453,9 @@ function stopInventoryLive() {
 
 function startInventoryLive() {
     stopInventoryLive();
-    const watch = (name) => inventoryLiveStops.push(onSnapshot(collection(db, name), () => {
-        inventoryLiveReady.add(name);
-        if (inventoryLiveReady.size < 4 || inventoryLiveRefresh || dialogIsOpen()) return;
+    // only changes made after the page opened (watchChanges): watching the whole collections re-read all of them every visit
+    const watch = (name) => inventoryLiveStops.push(watchChanges(name, () => {
+        if (inventoryLiveRefresh || dialogIsOpen()) return;
         inventoryLiveRefresh = true;
         loadInventory().finally(() => { inventoryLiveRefresh = false; });
     }, (error) => console.error(`Error watching ${name} for inventory cards: `, error)));

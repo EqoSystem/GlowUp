@@ -112,6 +112,28 @@ export function onSnapshot(target, next, fail) {
     return () => { stopped = true; clearTimeout(timer); if (stop) stop(); };
 }
 
+// Watch only what CHANGES from now on (28 Nov 2026 quota fix). A live listener on a whole collection first downloads every
+// document in it: opening Brand Inventory cost one read per brand, product, ingredient and suggestion, every visit.
+// These three small queries (the same fields the cache sync and the phone app use) start almost empty, so a visit costs a
+// few reads, and each later change costs one. A short overlap covers a computer clock that runs a little fast.
+// onChange runs once per real change batch, never for the empty first answer.
+const WATCH_OVERLAP_MS = 2 * 60 * 1000;
+export function watchChanges(name, onChange, fail) {
+    const ref = fb.collection(db, name);
+    const since = Date.now() - WATCH_OVERLAP_MS;
+    const queries = [
+        fb.query(ref, fb.where("updatedAt", ">", fb.Timestamp.fromMillis(since))),
+        fb.query(ref, fb.where("createdAt", ">", fb.Timestamp.fromMillis(since))),
+        fb.query(ref, fb.where("addedAtUnix", ">", Math.floor(since / 1000)))
+    ];
+    const stops = queries.map((target) => onSnapshot(target, (snapshot) => {
+        if (snapshot.docChanges().length === 0) return;
+        if (LISTS.includes(name)) absorb(name, snapshot);
+        onChange(snapshot);
+    }, fail));
+    return () => stops.forEach((stop) => stop());
+}
+
 function absorb(name, snapshot) {
     const kept = load(name);
     if (!kept) return;                                           // nothing cached yet: the first read downloads the whole list

@@ -30,7 +30,7 @@ import { collection, doc, serverTimestamp, deleteField } from "https://www.gstat
 import { refreshRecommendabilityFlags } from "../_Shared/recommendabilityAdmin.js";
 // reading and writing go through the site's own copy of its lists: a list is downloaded once and kept between pages,
 // and after a change only the documents that were written are read again (see adminStore.js)
-import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed, onSnapshot } from "../_Shared/adminStore.js";
+import { getDocs, addDoc, updateDoc, writeBatch, onListsRefreshed, watchChanges } from "../_Shared/adminStore.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, setupModal, escapeHtml, sameKey, toList, asArray, toWholeNumber, toDate, timeAgo,
     notify, describeError, setBusy, setFormError, renderChecks, readChecks, writeChecks, originLabel, sourceLinks, sourceGuideHtml, wireSearch,
@@ -435,9 +435,9 @@ function stopCuratorLive() {
 
 function startCuratorLive() {
     stopCuratorLive();
-    ["ingredients", "products"].forEach((name) => curatorLiveStops.push(onSnapshot(collection(db, name), () => {
-        curatorLiveReady.add(name);
-        if (curatorLiveReady.size < 2 || curatorLiveRefresh || dialogIsOpen()) return;
+    // only changes made after the page opened (watchChanges): watching the whole collections re-read all of them every visit
+    ["ingredients", "products"].forEach((name) => curatorLiveStops.push(watchChanges(name, () => {
+        if (curatorLiveRefresh || dialogIsOpen()) return;
         curatorLiveRefresh = true;
         loadIngredients().finally(() => { curatorLiveRefresh = false; });
     }, (error) => console.error(`Error watching ${name} for curator cards: `, error))));
