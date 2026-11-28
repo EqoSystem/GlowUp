@@ -709,7 +709,12 @@ async function loadInventory() {
                 reviewNote: String(data.reviewNote || "").slice(0, 500),
                 aliases: asArray(data.aliases),
                 folder: cleanFolder(data.folder),
-                addedAt: madeAt(data)
+                addedAt: madeAt(data),
+                // the STORED flags, so refreshRecommendabilityFlags writes only a product whose flag really changed.
+                // 28 Nov 2026 quota fix: without them every product looked changed (undefined !== true), so each visit
+                // rewrote every product (about 165 writes), and those writes woke the live watch, which loaded and rewrote again.
+                recommendable: data.recommendable,
+                ...(Object.prototype.hasOwnProperty.call(data, "alternativeEligible") ? { alternativeEligible: data.alternativeEligible } : {})
             }, binFields(data));
         });
     } catch (error) {
@@ -814,7 +819,9 @@ async function loadInventory() {
 
     if (curatorKnown) {
         try {
-            await refreshRecommendabilityFlags({ brands: everyBrand, products: everyProduct, ingredients: curatedList });
+            // ingredients left out on purpose: both this page and the Curator let the shared function read the same raw cached list,
+            // so the two pages always agree and never undo each other's flags (each undo was a write of every product it touched)
+            await refreshRecommendabilityFlags({ brands: everyBrand, products: everyProduct });
         } catch (error) {
             console.error("Could not refresh recommendation eligibility: ", error);
             notify("Recommendation eligibility could not be refreshed. " + describeError(error), "error");

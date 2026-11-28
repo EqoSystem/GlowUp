@@ -615,7 +615,8 @@ async function loadIngredients() {
         productUseKnown = false;
     }
     try {
-        await refreshRecommendabilityFlags({ ingredients: everyIngredient });
+        // no ingredients passed: the shared function reads the raw cached list, the same one Brand Inventory uses (see there)
+        await refreshRecommendabilityFlags();
     } catch (error) {
         console.error("Could not refresh recommendation eligibility after ingredient curation: ", error);
         notify("Recommendation eligibility could not be refreshed. " + describeError(error), "error");
