@@ -74,3 +74,14 @@ tools/__pycache__/
 
 # screenshots written by the responsive test rig
 GlowUp-Admin_AI_Testing/tests/responsive/*.png
+
+# 4. Logs, test reports and screenshots made by builds, tests and scene captures at the top folder,
+#    editor and shell settings of this computer, and loose helper scripts (28 Nov 2026)
+/*.log
+/*.xml
+/*.txt
+/*.sh
+/cap_cam/
+/scene_captures_*/
+/.vscode/
+/Microsoft/
