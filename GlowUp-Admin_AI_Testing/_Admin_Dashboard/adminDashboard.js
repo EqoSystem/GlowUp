@@ -173,10 +173,10 @@ function setMetric(id, value, title) {
 // The dashboard cards, the cheap way (28 Nov 2026). Before, three live listeners downloaded the WHOLE brands, products and
 // ingredients lists on every page load (one read per document, thousands each time), which used up the free daily reads.
 // Now:
-//   - the three totals are count queries (about 1 read per 1,000 documents), redone every 2 minutes while the page is visible;
+//   - the three totals are count queries (about 1 read per 1,000 documents), redone every 5 minutes while the page is visible;
 //   - the brand list (Top brands card and its widgets) comes from the shared cache in adminStore, which only downloads changes;
 //   - the Top brands card stays live by watching just the few most-scanned brands, not the whole list.
-const CARD_REFRESH_MS = 2 * 60 * 1000;
+const CARD_REFRESH_MS = 5 * 60 * 1000;   // 6 count reads per refresh: every 5 min is about 72 reads an hour (was 2 min, about 180)
 let cardTimer = 0;
 const liveTop = new Map();   // the newest copy of each brand the live watch has sent (beats the cached copy)
 
