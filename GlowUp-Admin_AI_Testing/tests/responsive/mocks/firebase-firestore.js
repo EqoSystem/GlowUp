@@ -154,3 +154,7 @@ export const arrayUnion = (...v) => v;
 export const arrayRemove = () => [];
 export const enableIndexedDbPersistence = async () => { };
 export const initializeFirestore = () => db;
+export const persistentLocalCache = (settings) => settings || {};
+export const persistentMultipleTabManager = () => ({});
+export const terminate = async () => {};
+export const clearIndexedDbPersistence = async () => {};

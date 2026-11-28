@@ -249,6 +249,9 @@ export function keptBinnedCount(name) {
 export function clearStore() {
     LISTS.forEach((name) => { delete memory[name]; });
     try { Object.keys(disk).filter((key) => key.startsWith(KEY)).forEach((key) => disk.removeItem(key)); } catch (error) {                        }
+    // Firestore's own browser cache (firebase-console.js) goes too, so a shared computer keeps no admin data after sign-out.
+    // Every caller leaves the page next. Best effort: the browser refuses while another admin tab still has the cache open.
+    try { fb.terminate(db).then(() => fb.clearIndexedDbPersistence(db)).catch(() => { }); } catch (error) { }
 }
 
 async function download(name, ref, label) {
