@@ -15,7 +15,7 @@
 import { db } from "../_Database/firebase-console.js";
 import { auth } from "../_Database/firebase-console.js";
 import { collection, doc, serverTimestamp, query, where } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { writeBatch, onSnapshot } from "../_Shared/adminStore.js";
+import { writeBatch, onSnapshot, getDocs } from "../_Shared/adminStore.js";
 import { normalizeUser, statusPatch, restoreTarget, statusLabel } from "../_Shared/userRules.js";
 import {
     requireAdmin, wireSignOut, setupNavigationGuard, escapeHtml, sameKey, asArray, toDate, timeAgo, formatWhen, notify, describeError,
@@ -91,6 +91,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
 // Live lists: one listener per list, so a removal on another page or by another admin shows here at once.
+// Only the entries IN the bin are watched (binned == true; 28 Nov 2026 quota fix): watching the whole ingredients, brands
+// and products collections read every document in them on each visit. A restored entry leaves the query, which the
+// listener reports as a change, so it still disappears from the list at once.
 let stops = [];
 const answered = new Set();
 function stopListening() { stops.forEach((stop) => stop()); stops = []; answered.clear(); }
@@ -107,7 +110,7 @@ function load() {
     });
     const arrive = (name) => { answered.add(name); loaded = answered.size === 4; if (loaded && !dialogIsOpen()) render(); };
     ["ingredients", "brands", "products"].forEach((name) => {
-        stops.push(onSnapshot(collection(db, name), (snapshot) => { all[name] = read(snapshot); arrive(name); }, failed));
+        stops.push(onSnapshot(query(collection(db, name), where("binned", "==", true)), (snapshot) => { all[name] = read(snapshot); arrive(name); }, failed));
     });
     // users removed on User Management (status "deleted", inBin true): the same rows, restored to the status they had
     stops.push(onSnapshot(query(collection(db, "users"), where("inBin", "==", true)), (snapshot) => {
@@ -330,9 +333,10 @@ async function restore(entries) {
 }
 
 
-function productsUsing(ingredient) {
+// listed products come from the shared cached list (a few reads), read only when an ingredient is deleted for good
+function productsUsing(ingredient, products) {
     const keys = new Set([ingredient.name, ingredient.techName].concat(asArray(ingredient.aliases)).map(sameKey).filter((key) => key));
-    return all.products.filter((p) => !p.binned && asArray(p.ingredients).some((name) => keys.has(sameKey(name)))).length;
+    return products.filter((p) => !p.binned && asArray(p.ingredients).some((name) => keys.has(sameKey(name)))).length;
 }
 
 
@@ -396,13 +400,18 @@ async function purge(entries) {
         return true;
     };
     let lost = "", stillUsed = 0;
+    let listed = [];
+    if (kind === "ingredients") {
+        try { listed = (await getDocs(collection(db, "products"))).docs.map((d) => d.data()); }
+        catch (error) { console.warn("Could not check which products still list these ingredients: ", error); }
+    }
     entries.forEach((x) => {
         if (kind === "brands") {
             const riders = all.products.filter((p) => p.binned && p.brandId === x.id);
             riders.forEach((p) => take(p, "products"));
             names.push(nameOf(x) + (riders.length > 0 ? ` (with ${many(riders.length, "product", "products")})` : ""));
         } else if (kind === "products") names.push((x.brandName ? x.brandName + ": " : "") + nameOf(x));
-        else { const used = productsUsing(x); if (used > 0) stillUsed++; names.push(nameOf(x) + (used > 0 ? ` (still listed by ${many(used, "product", "products")})` : "")); }
+        else { const used = productsUsing(x, listed); if (used > 0) stillUsed++; names.push(nameOf(x) + (used > 0 ? ` (still listed by ${many(used, "product", "products")})` : "")); }
     });
     entries.forEach((x) => take(x, kind));
     if (kind === "ingredients") lost = (stillUsed > 0 ? `${many(stillUsed, "of them is", "of them are")} still in the ingredient list of products. ` : "")
