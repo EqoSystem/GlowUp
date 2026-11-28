@@ -80,10 +80,11 @@ namespace GlowUp.EditorTools
                     clips.GetArrayElementAtIndex(i).objectReferenceValue = AssetDatabase.LoadAssetAtPath<AudioClip>(AudioFolder + SoundFiles[i] + ".wav");
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
-            // finger signs (1 to 5 fingers held up to the selfie camera), brought back 19 November 2026. The navigator does nothing
-            // until the user switches finger signs on in Settings > Sounds & Motion.
-            var signs = SceneBuilderCore.Ensure<FingerSignNavigator>(root);
-            SceneBuilderCore.SetField(signs, "indicator", BuildFingerSignIndicator(root));
+            // finger signs were removed on 28 November 2026: what an earlier build put in the scene goes
+            if (root.TryGetComponent(out FingerSignNavigator signs)) Object.DestroyImmediate(signs);
+            if (root.TryGetComponent(out FingerSignIndicator signIndicator)) Object.DestroyImmediate(signIndicator);
+            Transform oldSigns = root.transform.Find("FingerSignCanvas");
+            if (oldSigns != null) Object.DestroyImmediate(oldSigns.gameObject);
 
             var transition = SceneBuilderCore.Ensure<ScreenTransition>(root);
 

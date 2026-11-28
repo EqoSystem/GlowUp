@@ -99,7 +99,8 @@ export async function runImport(query, deps, onStep = () => {}, signal = null) {
     const stop = () => { if (signal && signal.aborted) { const e = new Error("Cancelled"); e.stopped = true; throw e; } };
     const fallback = deps.fallback || {};
     onStep(0, STEPS[0]);
-    const found = String(query || "").trim() ? await deps.lookupProduct(query) : { candidates: [] };
+    // 28 Nov 2026: a product the admin ticked in the results is used as found (no second look-up)
+    const found = deps.candidate ? { candidates: [deps.candidate] } : String(query || "").trim() ? await deps.lookupProduct(query) : { candidates: [] };
     stop();
     const best = (found.candidates || [])[0] || null;
     const product = {

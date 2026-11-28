@@ -432,7 +432,7 @@ namespace GlowUp.Review
             if (sendLabel != null) sendLabel.text = busy ? msgSending : "Confirm and send";
         }
 
-        static string WhoSent(FirebaseUser user)
+        internal static string WhoSent(FirebaseUser user)
         {
             try
             {

@@ -46,6 +46,8 @@ namespace GlowUp.Onboarding
         [SerializeField] private RequirementIndicatorItem pwSpecial;
         [SerializeField] private RequirementIndicatorItem pwLength;
         [SerializeField] private RequirementIndicatorItem pwMatch;
+        [Tooltip("The row under Age: \"Minimum of 13 years old\". Ticks once the birthday gives an allowed age.")]
+        [SerializeField] private RequirementIndicatorItem ageMinimum;
 
         [Header("Buttons / Feedback")]
         [SerializeField] private Button continueButton;
@@ -368,6 +370,7 @@ namespace GlowUp.Onboarding
             bool namesOk = !requireFirstAndLastName || (T(firstName).Length > 0 && T(lastName).Length > 0);
             int ageNow = birthday != null && birthday.Value.HasValue ? InputRules.CalculateAge(birthday.Value.Value) : -1;
             bool dobOk = ageNow >= minimumAge && ageNow <= maximumAge;
+            ageMinimum?.SetMet(dobOk);
 
             bool ready = pwOk && match && emailOk && namesOk && dobOk && !busy;
             if (continueAnimator != null) continueAnimator.SetReady(ready);

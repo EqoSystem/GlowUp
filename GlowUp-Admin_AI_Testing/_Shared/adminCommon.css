@@ -2614,3 +2614,25 @@ body:not(.layout-editing) .board.two-sides > .panel[data-side="side"] { grid-col
 .pw-actions .spacer { flex: 1 1 auto; }
 .pw-foot .bl-actions, .pw-foot .bl-importbar { justify-content: flex-start; }
 @media (max-width: 640px) { .pw-actions .spacer { display: none; } }
+
+/* ---- 28 Nov 2026: Search and import results + batch, Review queue reasons, the Curator's queue table ---- */
+.si-results { margin-top: calc(12 * var(--u)); display: grid; gap: calc(8 * var(--u)); }
+.si-results[hidden], .si-batch[hidden] { display: none; }
+.si-results-head { display: flex; align-items: center; gap: calc(10 * var(--u)); flex-wrap: wrap; }
+.si-table td.si-pick { width: calc(44 * var(--u)); text-align: center; }
+.si-table td.si-pick input { width: calc(20 * var(--u)); height: calc(20 * var(--u)); accent-color: var(--accent); cursor: pointer; }
+.si-table td.actions, .rq-table td.actions { text-align: right; }
+.si-table td.actions .btn, .rq-table td.actions .btn { margin: calc(2 * var(--u)) 0 calc(2 * var(--u)) calc(6 * var(--u)); }
+.si-batch { position: sticky; bottom: calc(8 * var(--u)); z-index: 2; display: flex; flex-wrap: wrap; align-items: center; gap: calc(10 * var(--u)); margin-top: calc(10 * var(--u));
+    padding: calc(10 * var(--u)) calc(14 * var(--u)); border: 1px solid var(--accent); border-radius: calc(12 * var(--u)); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.si-batch-words { font-weight: 600; font-size: var(--fs-sm); }
+.rq-why { margin-top: calc(4 * var(--u)); max-width: calc(280 * var(--u)); line-height: 1.4; }
+.cq-table td { vertical-align: top; }
+.cq-list { display: flex; flex-wrap: wrap; gap: calc(6 * var(--u)); }
+.cq-ing { font: inherit; font-size: var(--fs-xs); line-height: 1.3; padding: calc(4 * var(--u)) calc(10 * var(--u)); border-radius: 999px; border: 1px solid var(--border);
+    background: var(--surface-2); color: var(--text-2); cursor: pointer; text-align: left; min-height: calc(28 * var(--u)); }
+.cq-ing.missing, .cq-ing.waiting { border-color: var(--accent); color: var(--accent-text); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); font-weight: 600; }
+.cq-ing.unknown { border-color: var(--bad, #b3261e); color: var(--text); background: color-mix(in srgb, var(--bad, #b3261e) 10%, var(--surface)); font-weight: 600; }
+.cq-ing:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (pointer: coarse) { .cq-ing { min-height: 44px; } }
+@media (max-width: 640px) { .si-table th:nth-child(3), .si-table td:nth-child(3), .si-table th:nth-child(5), .si-table td:nth-child(5) { display: none; } .si-batch .save-btn { flex: 1 1 100%; } }

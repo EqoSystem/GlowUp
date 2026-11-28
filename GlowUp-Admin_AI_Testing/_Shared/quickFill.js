@@ -6,8 +6,9 @@ import { hazardCodes } from "./fitReasons.js";
 import {
     queryKind, offProductUrl, offSearchUrl, fromOpenBeautyFacts, searchCatalogue, mergeCandidates,
     pubchemSynonymsUrl, pubchemDescriptionUrl, aliasesFromPubchem, descriptionFromPubchem, ingredientsFromText, scoreCandidate,
-    fromUpcItemDb, gtinValid, findInObfDump, searchObfDump
+    fromUpcItemDb, gtinValid, findInObfDump, searchObfDump, fromFdaCatalogue, fromObfDump
 } from "./smartAdd.js";
+import { compactName } from "./glowupRules.js";
 
 const ZXING = "https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js";
 const TESSERACT = "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js";
@@ -255,6 +256,21 @@ export async function lookupProduct(text, options = {}) {
         found.push(...products.slice(0, 5));
     }
     return { query, candidates: mergeCandidates(found).slice(0, 6), note };
+}
+
+// 28 Nov 2026: every product of ONE brand the sources know (the FDA Philippines list, the Open Beauty Facts copy and its live
+// search), for "Search and import" by brand. Only products whose brand is the typed name (or its start) are kept.
+export async function lookupBrand(text, most = 40) {
+    const key = compactName(text);
+    if (key.length < 2) return { candidates: [] };
+    const [list, table, dump] = await Promise.all([loadCatalogue(), loadCategoryTable(), loadObfDump()]);
+    const sameBrand = (c) => c && compactName(c.brand) && (compactName(c.brand) === key || (key.length >= 4 && compactName(c.brand).startsWith(key)));
+    const found = [];
+    found.push(...((list && list.products) || []).map(fromFdaCatalogue).filter(sameBrand));
+    found.push(...((dump && dump.items) || []).map(fromObfDump).filter(sameBrand));
+    const json = await getJson(offSearchUrl(text));
+    found.push(...(json && Array.isArray(json.products) ? json.products : []).map((p) => fromOpenBeautyFacts(p, table)).filter(sameBrand));
+    return { candidates: mergeCandidates(found).slice(0, most) };
 }
 
 // The skin hazard codes PubChem lists for a compound. ok = false only when PubChem could not be asked (no entry = no codes).

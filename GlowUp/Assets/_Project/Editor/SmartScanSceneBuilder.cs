@@ -381,38 +381,67 @@ namespace GlowUp.EditorTools
             TextMeshProUGUI manualHint = A.Label(manual.box, "ManualHintText", "No pack at hand? Type the product's name: GlowUp looks its ingredient list up. Or type the list yourself.",
                                                  27, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             A.TopStrip(manualHint.transform, 116, 76, 48, 48);
-
-            TMP_InputField manualProduct = SceneBuilderCore.MakeInput(manual.box, "ManualProductField", "Product name", A.TC, Vector2.zero, new Vector2(800, 104));
-            A.TopStrip(manualProduct.transform, 200, 104, 48, 48);
-            Kit.StyleInput(manualProduct, "Product name", ThemeRole.InputBackground);
+            // 28 Nov 2026 (owner): a label above every box, so the user sees what goes where; the title leaves room for "?" and X
+            A.TopStrip(manual.title.transform, 34, 80, 48, 236);
+            TextMeshProUGUI FieldLabel(string name, string words, float y, float left, float right)
+            {
+                TextMeshProUGUI l = A.Label(manual.box, name, words, 28, ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.BottomLeft);
+                A.TopStrip(l.transform, y, 40, left, right);
+                return l;
+            }
+            FieldLabel("ProductLabel", "Product name", 206, 52, 48);
+            TMP_InputField manualProduct = SceneBuilderCore.MakeInput(manual.box, "ManualProductField", "e.g. Superstay Matte Ink", A.TC, Vector2.zero, new Vector2(800, 104));
+            A.TopStrip(manualProduct.transform, 254, 104, 48, 48);
+            Kit.StyleInput(manualProduct, "e.g. Superstay Matte Ink", ThemeRole.InputBackground);
             A.Set(SceneBuilderCore.Ensure<InputFieldBehaviour>(manualProduct.gameObject), "characterLimit", 80);
 
             // the brand is chosen from the saved brands, not typed (18 Nov 2026); the list opens over the pop-up on its own layer and a tap outside closes it
+            FieldLabel("BrandLabel", "Brand", 378, 52, 512);
+            FieldLabel("TypeLabel", "Cosmetic type", 378, 516, 48);
             TMP_Dropdown manualBrand = Kit.MakeDropdown(manual.box, "ManualBrandDropdown", Vector2.zero, new Vector2(390, 104), 32);
-            A.TopStrip(manualBrand.transform, 320, 104, 48, 512);
+            A.TopStrip(manualBrand.transform, 426, 104, 48, 512);
             manualBrand.ClearOptions();
             manualBrand.AddOptions(new System.Collections.Generic.List<string> { "Brand" });          // the saved brands are added by the controller
             manualBrand.RefreshShownValue();
 
             TMP_Dropdown manualType = Kit.MakeDropdown(manual.box, "ManualTypeDropdown", Vector2.zero, new Vector2(440, 104), 32);
-            A.TopStrip(manualType.transform, 320, 104, 512, 48);
+            A.TopStrip(manualType.transform, 426, 104, 512, 48);
             manualType.ClearOptions();
             manualType.AddOptions(new System.Collections.Generic.List<string> { "Cosmetic type", "Lipstick", "Foundation", "Blush", "Eyeshadow", "Mascara", "Powder" });   // the full list is on the controller
             manualType.RefreshShownValue();
 
-            TMP_InputField manualInput = SceneBuilderCore.MakeInput(manual.box, "ManualInputField", "Ingredient list (leave empty to look it up), e.g. Aqua, Glycerin, Niacinamide, Parfum", A.TC, Vector2.zero, new Vector2(800, 430));
-            A.TopStrip(manualInput.transform, 444, 440, 48, 48);
-            Kit.StyleInput(manualInput, "Ingredient list (leave empty to look it up), e.g. Aqua, Glycerin, Niacinamide, Parfum", ThemeRole.InputBackground);
+            FieldLabel("ListLabel", "Ingredient list (optional)", 550, 52, 48);
+            TMP_InputField manualInput = SceneBuilderCore.MakeInput(manual.box, "ManualInputField", "Leave empty to look it up, or type it: Aqua, Glycerin, Niacinamide, Parfum", A.TC, Vector2.zero, new Vector2(800, 330));
+            A.TopStrip(manualInput.transform, 598, 330, 48, 48);
+            Kit.StyleInput(manualInput, "Leave empty to look it up, or type it: Aqua, Glycerin, Niacinamide, Parfum", ThemeRole.InputBackground);
             MakeMultiLine(manualInput, 32);
             var behaviour = SceneBuilderCore.Ensure<InputFieldBehaviour>(manualInput.gameObject);
             A.Set(behaviour, "characterLimit", 3000);
 
             // the optional Barcode card from here: the user has the barcode but cannot type the name (11 November 2026)
             Button manualBarcode = A.PillButton(manual.box, "UseBarcodeButton", "Use a barcode", 30, ThemeRole.InputBackground, ThemeRole.MainText, IconFactory.ScanFrame);
-            A.TopStrip(manualBarcode.transform, 896, 96, 48, 48);
+            A.TopStrip(manualBarcode.transform, 948, 96, 48, 48);
             A.Outline(manualBarcode.transform, ThemeRole.Accent, 96f);
+
+            // "?" opens a short guide; it stands 32 left of the X so one is not tapped for the other
+            Button manualGuide = A.PillButton(manual.box, "GuideButton", "?", 44, ThemeRole.SurfaceAlt, ThemeRole.MainText);
+            A.At(manualGuide.transform, A.TR, new Vector2(-24 - 84 - 32, -30), new Vector2(84, 84));
+            A.AppPopup typeGuide = A.Overlay(s, "ManualGuidePanel", "How to use Type it in");
+            A.At(typeGuide.box, A.MC, new Vector2(0, 40), new Vector2(900, 1080));
+            TextMeshProUGUI guideText = A.Label(typeGuide.box, "GuideText",
+                "1. Product name: type the name printed on the pack.\n\n2. Brand and Cosmetic type: pick them from the lists. They help GlowUp find the right product.\n\n" +
+                "3. Ingredient list: leave it empty and GlowUp looks the list up. Or copy it from the pack, separated by commas.\n\n" +
+                "4. Use a barcode: type or photograph the digits under the barcode instead.\n\n5. Press Analyse. Cancel closes without saving.",
+                30, ThemeRole.MainText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
+            A.TopStrip(guideText.transform, 140, 720, 52, 52);
+            A.ShrinkWrapped(guideText, 22);
+            Button guideDone = A.PillButton(typeGuide.box, "GotItButton", "Got it", 38, ThemeRole.ButtonFill, ThemeRole.ButtonText);
+            A.BottomStrip(guideDone.transform, 44, 120, 48, 48);
+            UnityEventTools.AddPersistentListener(guideDone.onClick, typeGuide.panel.Hide);
+            UnityEventTools.AddPersistentListener(manualGuide.onClick, typeGuide.panel.Show);
+            typeGuide.root.transform.SetAsLastSibling();        // drawn over the Type it in pop-up
             TextMeshProUGUI manualFeedback = A.Label(manual.box, "ManualFeedbackText", "", 28, ThemeRole.Warning, FontRole.Body, TextAlignmentOptions.Center, true);
-            A.TopStrip(manualFeedback.transform, 1004, 140, 48, 48);      // up to three short lines that say what to do next; ends at 1144, the buttons start at 1216
+            A.TopStrip(manualFeedback.transform, 1056, 140, 48, 48);      // up to three short lines that say what to do next; ends at 1196, the buttons start at 1216
             A.ShrinkWrapped(manualFeedback, 22);
             Button manualCancel = A.PillButton(manual.box, "CancelButton", "Cancel", 38, ThemeRole.SurfaceAlt, ThemeRole.MainText);
             A.BottomStrip(manualCancel.transform, 44, 120, 48, 512);

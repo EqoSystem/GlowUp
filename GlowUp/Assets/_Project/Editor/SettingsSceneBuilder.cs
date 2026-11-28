@@ -180,7 +180,7 @@ namespace GlowUp.EditorTools
             // =====================================================================================
             //  Sounds and motion: tap sounds, shake to change screen, the light round the screen edge
             // =====================================================================================
-            Transform sounds = TileSection(content, scroll, "SoundsMotionSection", "Sounds & Motion", "Tap and delete sounds, finger signs, edge light", IconFactory.Speaker, SettingsIconAnimator.Style.Pulse, 1);
+            Transform sounds = TileSection(content, scroll, "SoundsMotionSection", "Sounds & Motion", "Tap sounds, edge light", IconFactory.Speaker, SettingsIconAnimator.Style.Pulse, 1);
             Toggle tapSounds = SwitchRow(sounds, "TapSoundsRow", "Tap sounds", "A short sound when you tap a button.", true);
             GameObject soundBlock = Block(sounds, "TapSoundBlock", 14);
             soundBlock.AddComponent<CanvasGroup>();
@@ -199,49 +199,9 @@ namespace GlowUp.EditorTools
             var soundPicker = SceneBuilderCore.Ensure<TapSoundPicker>(soundBlock);
             A.Set(soundPicker, "tabs", soundTabs); Kit.SetArray(soundPicker, "tabLabels", soundLabels); A.Set(soundPicker, "volumeSlider", volume);
             Divider(sounds);
-            // the freezing sound when a scan is removed in Recent Scans (DeleteSoundPlayer in that scene); on until switched off
-            PreferenceRow(sounds, "DeleteSoundRow", "Delete sound", "A freezing sound when you remove a scan in Recent Scans.", true, UiPreferenceToggle.Preference.DeleteSound);
-            Divider(sounds);
-            // finger signs (FingerSignNavigator on UiServices), brought back 19 November 2026. Off until the user switches them on.
-            Toggle signsToggle = PreferenceRow(sounds, "FingerSignsRow", "Finger signs",
-                "Hold 1 to 5 fingers up to the selfie camera to open a screen. Works on Home, Recent Scans, Settings and a result.", false, UiPreferenceToggle.Preference.FingerSigns);
-            // which screen each number opens, and how long a sign is held (the block fades while finger signs are switched off)
-            GameObject signBlock = Block(sounds, "FingerSignsBlock", 8);
-            signBlock.AddComponent<CanvasGroup>();
-            string[] signScreens = { "Home", "AI Smart Scan", "Recent Scans", "AR Try-On", "Settings" };
-            var signButtons = new Button[5];
-            var signLabels = new TextMeshProUGUI[5];
-            for (int i = 0; i < 5; i++)
-            {
-                GameObject signRow = Row(signBlock.transform, "Fingers" + (i + 1) + "Row", 92);
-                TextMeshProUGUI signTitle = A.Label(signRow.transform, "Title", (i + 1) + (i == 0 ? " finger" : " fingers"), 34, ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.Left);
-                A.Size(signTitle, -1, -1, 1);
-                Button pick = A.PillButton(signRow.transform, "ScreenButton", signScreens[i], 31, ThemeRole.SurfaceAlt, ThemeRole.MainText, IconFactory.Swap);
-                A.Size(pick, 430, 80);
-                A.Outline(pick.transform, ThemeRole.Accent, 80f);
-                signButtons[i] = pick; signLabels[i] = A.LabelOf(pick);
-            }
-            GameObject holdRow = Row(signBlock.transform, "HoldRow", 80);
-            TextMeshProUGUI holdTitle = A.Label(holdRow.transform, "Title", "Hold for", RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.Left);
-            A.Size(holdTitle, 150, -1);
-            Slider hold = ArTryOnSceneBuilder.BuildSlider(holdRow.transform, "HoldSlider");
-            A.Size(hold, -1, 64, 1);
-            hold.minValue = UiPreferences.ShortestFingerHold; hold.maxValue = UiPreferences.LongestFingerHold; hold.value = 0.9f;
-            TextMeshProUGUI holdValue = A.Label(holdRow.transform, "ValueText", "0.9 s", RowCaption, ThemeRole.MainText, FontRole.Label, TextAlignmentOptions.Right);
-            A.Size(holdValue, 110, -1);
-            TextMeshProUGUI signStatus = A.Label(signBlock.transform, "StatusText",
-                "On. Hold your hand up to the selfie camera, about 30 cm away, and keep the sign still. The picture stays on this phone.",
-                RowCaption, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
-            // a short label: a link is one line and must fit inside the card (the starting order is what the five rows show after a tap)
-            Button signReset = A.LinkButton(signBlock.transform, "ResetButton", "Reset the five numbers", 28, ThemeRole.AccentText);
-            SceneBuilderCore.ReplaceText(A.LabelOf(signReset), "m_text", "<u>Reset the five numbers</u>", "<u>Back to how it was: 1 Home, 2 Scan, 3 Recent, 4 Try-On, 5 Settings</u>");
-            A.Size(signReset, -1, 56);
-            var signSettings = Feature<FingerSignSettings>(features, "FingerSignSettings");
-            Kit.SetArray(signSettings, "screenButtons", signButtons); Kit.SetArray(signSettings, "screenLabels", signLabels);
-            A.Set(signSettings, "holdSlider", hold); A.Set(signSettings, "holdValueText", holdValue);
-            A.Set(signSettings, "resetButton", signReset); A.Set(signSettings, "statusText", signStatus);
-            A.Set(signsToggle.GetComponent<UiPreferenceToggle>(), "onlyWhenOn", signBlock.GetComponent<CanvasGroup>());
-            Divider(sounds);
+            // 28 Nov 2026: the Delete sound and Finger signs rows are removed (the user: not needed anymore)
+            foreach (string gone in new[] { "DeleteSoundRow", "FingerSignsRow", "FingerSignsBlock", "FingerSignSettings" })
+            { GameObject old = SceneBuilderCore.FindInScene(gone); if (old != null) Object.DestroyImmediate(old); }
             PreferenceRow(sounds, "EdgeLightRow", "Edge light", "A light that runs round the edge of every screen.", true, UiPreferenceToggle.Preference.EdgeLight);
 
             // =====================================================================================
@@ -445,18 +405,24 @@ namespace GlowUp.EditorTools
             // ---- contact support ----
             supportPopup = A.Overlay(s, "SupportPanel", "Contact Support");
             // Keep this as a centered, self-contained card so it remains readable on phones and tablets.
-            A.At(supportPopup.box, A.MC, new Vector2(0, 40), new Vector2(940, 1230));
+            A.At(supportPopup.box, A.MC, new Vector2(0, 40), new Vector2(940, 1230 - (TwoRowTrack - 104) + 6));
             TextMeshProUGUI supportIntro = A.Label(supportPopup.box, "IntroText", "Tell us what went wrong. Your report goes straight to the GlowUp team.",
                                                    30, ThemeRole.SecondaryText, FontRole.Body, TextAlignmentOptions.TopLeft, true);
             A.TopStrip(supportIntro.transform, 118, 88, 48, 48);
-            // phase 4 (11 November 2026): four kinds, Suggestion between Wrong scan result and Other, as two rows of two so every name fits
-            ChoiceTabs categoryTabs = TabsGrid(supportPopup.box, "CategoryTabs", new[] { "Bug", "Wrong scan result", "Suggestion", "Other" }, 0, 2, 28);
-            A.TopStrip(categoryTabs.transform.parent, 222, TwoRowTrack, 48, 48);
+            // 28 Nov 2026: the four kinds are one drop-down list, as wide as the description box under it (it was two rows of tabs)
+            Transform oldTabs = supportPopup.box.Find("CategoryTabs");
+            if (oldTabs != null) Object.DestroyImmediate(oldTabs.gameObject);
+            const float KindTrack = 104;
+            TMP_Dropdown categoryDropdown = Kit.MakeDropdown(supportPopup.box, "CategoryDropdown", Vector2.zero, new Vector2(840, KindTrack), 32);
+            categoryDropdown.ClearOptions();
+            categoryDropdown.AddOptions(new List<string> { "Bug", "Wrong scan result", "Suggestion", "Other" });
+            categoryDropdown.SetValueWithoutNotify(0);
+            A.TopStrip(categoryDropdown.transform, 222, KindTrack, 48, 48);
             // Top to bottom, nothing overlaps: intro, kinds, description, its counter UNDER the box, the scan switch, the e-mail
             // row, the status line, then Send Report pinned to the bottom of the card.
             const float FeedbackHeight = 320;
             TMP_InputField feedbackInput = SceneBuilderCore.MakeInput(supportPopup.box, "FeedbackInputField", "Describe what happened...", A.TC, Vector2.zero, new Vector2(840, FeedbackHeight));
-            float feedbackTop = 222 + TwoRowTrack + 18;
+            float feedbackTop = 222 + KindTrack + 24;
             A.TopStrip(feedbackInput.transform, feedbackTop, FeedbackHeight, 48, 48);
             Kit.StyleInput(feedbackInput, "Describe what happened...", ThemeRole.InputBackground);
             SmartScanSceneBuilder.MakeMultiLine(feedbackInput, 32);
@@ -512,7 +478,7 @@ namespace GlowUp.EditorTools
             // e-mail row, the message line and Send Report are above the keyboard, not just the text field.
             KeyboardKit.KeepVisible(feedbackInput, counterText, includeRow.transform, emailRow, supportMessage, supportSend);
 
-            A.Set(support, "panel", supportPopup.panel); A.Set(support, "categoryTabs", categoryTabs); A.Set(support, "messageInput", feedbackInput);
+            A.Set(support, "panel", supportPopup.panel); A.Set(support, "categoryTabs", null); A.Set(support, "categoryDropdown", categoryDropdown); A.Set(support, "messageInput", feedbackInput);
             A.Set(support, "includeLastScanToggle", includeScan); A.Set(support, "sendButton", supportSend); A.Set(support, "feedbackText", supportMessage);
             A.Set(support, "supportEmailButton", emailButton);
             SceneBuilderCore.ReplaceText(support, "msgTimeout", "Not sent yet: there is no connection. Your report is saved on this phone and goes out by itself when you are back online.",

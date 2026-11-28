@@ -1,6 +1,6 @@
 import { attentionLabel, popWindow } from "../_Shared/planViews.js";
 import { mountHints } from "../_Shared/buttonHints.js";
-import { draftIngredient, ingredientRecord, parseNames, MAX_NAMES } from "../_Shared/draftIngredient.js";
+import { draftIngredient, ingredientRecord, parseNames } from "../_Shared/draftIngredient.js";
 
 
 
@@ -179,6 +179,8 @@ let ingredients = [];
 let binIngredients = [];
 let productUse = new Map();
 let productUseKnown = false;
+let queueProducts = [];            // every product (not binned): the Review queue table reads their lists
+const queueView = { show: "all", page: 1, size: 8 };
 let editingIngredientId = null;
 let modal = null;
 let sourceUi = null;
@@ -339,15 +341,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     ]);
     el("ingredientSourceFilter").addEventListener("change", fromFirstPage);
     el("ingredientRiskFilter").addEventListener("change", fromFirstPage);
-    document.querySelectorAll("[data-cq]").forEach((b) => b.addEventListener("click", () => showQueue(b.dataset.cq)));
+    document.querySelectorAll("[data-cq]").forEach((b) => b.addEventListener("click", () => { queueView.show = b.dataset.cq; queueView.page = 1; paintQueueTable(); }));
     mountHints(el("curSiPanel"));
     mountHints(el("curQueuePanel"));
     wireSearchImport();
-    el("cqApprove").addEventListener("click", () => {
-        const keys = Array.from(el("ingredientsList").querySelectorAll(".ingredient-card.is-picked")).map((card) => card.dataset.key);
-        if (!keys.length) { notify("Tick the ingredients to approve first.", "info"); return; }
-        approveSelectedIngredients(keys);
-    });
+    el("cqBody").addEventListener("click", onQueueClick);
     attentionLabel(document.querySelector(".cur-toolrow > .spacer"), el("notesList"));
     el("ingredientClassFilter").addEventListener("change", fromFirstPage);
     el("manageClassBtn").addEventListener("click", manageClassifications);
@@ -587,8 +585,11 @@ async function loadIngredients() {
         const productSnapshot = await getDocs(collection(db, "products"));
         const checkedBrands = new Set();
         const listedBy = new Map();
+        queueProducts = [];
         productSnapshot.forEach((d) => {
             if (d.data().binned === true) return;
+            queueProducts.push({ id: d.id, name: String(d.data().name || ""), brand: String(d.data().brandName || ""), ingredients: asArray(d.data().ingredients).map(String),
+                sources: Array.isArray(d.data().sources) ? d.data().sources.map(String) : [], pending: d.data().reviewed === false });
             if (d.data().source === "fdaph" || /FDA Philippines: notified as/i.test(String(d.data().description || ""))) checkedBrands.add(String(d.data().brandName || "").trim());
             const seen = new Set();
             asArray(d.data().ingredients).forEach((listed) => {
@@ -607,6 +608,7 @@ async function loadIngredients() {
         fromProducts = Array.from(listedBy.values()).filter((x) => x.key.length >= 2 && !known.has(x.key)).sort((a, b) => b.products.length - a.products.length || a.name.localeCompare(b.name));
         fdaBrands = Array.from(checkedBrands).filter((name) => name).sort((a, b) => a.localeCompare(b));
         productUseKnown = true;
+        paintQueueTable();
         autoDetails().then((n) => { if (n > 0) return loadIngredients(); }).catch(() => { });
     } catch (error) {
         console.warn("Could not read the products: ", error);
@@ -958,20 +960,58 @@ function paintStats() {
 }
 
 // the Review queue of page 34: what waits, what is not identified, what the rules set by themselves
-function paintQueueTabs(inBin, source, risk) {
-    const counts = { cqWaiting: ingredients.filter(needsReview).length, cqUnknown: ingredients.filter((i) => resultOf(i) === "unknown").length, cqAuto: ingredients.filter((i) => i.fitAuto).length };
-    Object.entries(counts).forEach(([id, n]) => { el(id).textContent = String(n); });
-    const on = inBin ? "" : source === "review" ? "waiting" : risk === "r:unknown" ? "unknown" : quick === "auto" ? "auto" : "";
-    document.querySelectorAll("[data-cq]").forEach((b) => { b.setAttribute("aria-pressed", String(b.dataset.cq === on)); b.classList.toggle("on", b.dataset.cq === on); });
-}
+function paintQueueTabs() { paintQueueTable(); }
 
-function showQueue(name) {
-    const was = document.querySelector(`[data-cq="${name}"]`).getAttribute("aria-pressed") === "true";
-    el("ingredientSearchInput").value = "";
-    el("ingredientSourceFilter").value = !was && name === "waiting" ? "review" : "";
-    el("ingredientRiskFilter").value = !was && name === "unknown" ? "r:unknown" : "";
-    quick = !was && name === "auto" ? "auto" : "";
-    if (org.view.kind !== "all") org.show({ kind: "all" }); else fromFirstPage();
+// 28 Nov 2026 (owner): the Review queue is a TABLE: product | its ingredient list | source. Each ingredient is a button: an entry
+// that is missing opens the Add form with the name filled in, an entry that waits or is not identified opens its form.
+function ingredientState(name) {
+    const key = sameKey(name);
+    const entry = key ? ingredients.find((item) => keysOf(item).includes(key)) : null;
+    if (!entry) return { state: "missing", entry: null };
+    if (resultOf(entry) === "unknown") return { state: "unknown", entry };
+    if (needsReview(entry)) return { state: "waiting", entry };
+    return { state: "ok", entry };
+}
+function queueRows() {
+    return queueProducts.map((p) => {
+        const parts = p.ingredients.map((name) => ({ name, ...ingredientState(name) }));
+        const has = (st) => parts.some((x) => x.state === st);
+        return { p, parts, missing: has("missing"), waiting: has("waiting"), unknown: has("unknown") };
+    }).filter((r) => r.missing || r.waiting || r.unknown)
+        .sort((a, b) => Number(b.p.pending) - Number(a.p.pending) || a.p.name.localeCompare(b.p.name));
+}
+function paintQueueTable() {
+    const body = el("cqBody");
+    if (!body) return;
+    if (!productUseKnown) return;
+    const all = queueRows();
+    const counts = { cqAll: all.length, cqMissing: all.filter((r) => r.missing).length, cqWaiting: all.filter((r) => r.waiting).length, cqUnknown: all.filter((r) => r.unknown).length };
+    Object.entries(counts).forEach(([id, n]) => { if (el(id)) el(id).textContent = String(n); });
+    el("cqCount").textContent = all.length ? String(all.length) : "";
+    document.querySelectorAll("[data-cq]").forEach((b) => { const on = b.dataset.cq === queueView.show; b.setAttribute("aria-pressed", String(on)); b.classList.toggle("on", on); });
+    const rows = queueView.show === "all" ? all : all.filter((r) => r[queueView.show]);
+    if (!rows.length) { body.innerHTML = `<tr><td colspan="3" class="table-message">${all.length ? "Nothing in this group." : "No product has an ingredient that needs you."}</td></tr>`; renderPager(el("cqPager"), queueView, 0, paintQueueTable, "products"); return; }
+    const WORD = { missing: "not in the Curator", waiting: "waiting for review", unknown: "not identified", ok: "checked" };
+    body.innerHTML = paginate(rows, queueView).map((r) => {
+        const link = r.p.sources.map((line) => line.slice(line.lastIndexOf("|") + 1).trim()).find((u) => /^https:\/\//i.test(u)) || "";
+        const host = link ? link.replace(/^https:\/\/(www\.)?/i, "").split("/")[0] : "";
+        const chips = r.parts.map((x) => `<button type="button" class="cq-ing ${x.state}" data-cq-ing="${escapeHtml(x.name)}" aria-label="${escapeHtml(x.name)}: ${WORD[x.state]}">${escapeHtml(x.name)}</button>`).join("");
+        return `<tr><td><strong>${escapeHtml(r.p.name || "Unnamed product")}</strong><div class="small muted">${escapeHtml(r.p.brand)}${r.p.pending ? " · Pending" : ""}</div></td>
+            <td><div class="cq-list">${chips}</div></td>
+            <td>${link ? `<a class="source-link" href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(host)}</a>` : `<span class="muted">none saved</span>`}</td></tr>`;
+    }).join("");
+    renderPager(el("cqPager"), queueView, rows.length, paintQueueTable, "products");
+}
+function onQueueClick(event) {
+    const chip = event.target.closest("[data-cq-ing]");
+    if (!chip) return;
+    const name = chip.dataset.cqIng;
+    const { entry } = ingredientState(name);
+    if (entry) { openIngredientForm(entry); return; }
+    openIngredientForm(null);
+    const box = el("ingredientNameInput");
+    box.value = name.replace(/\s+/g, " ").trim().slice(0, 80);
+    box.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
 function renderIngredients() {
@@ -1378,47 +1418,20 @@ function wireSearchImport() {
     };
     el("curSiRun").addEventListener("click", one);
     box.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); one(); } });
-    el("curSiMany").addEventListener("click", openNameList);
     el("curSiCancel").addEventListener("click", () => { if (importing) importing.abort(); });
     el("curSiShow").addEventListener("click", () => {
-        if (document.querySelector('[data-cq="waiting"]').getAttribute("aria-pressed") !== "true") showQueue("waiting");
-        el("curQueuePanel").scrollIntoView({ block: "start" });
+        // the new entries wait for review: the list shows only those
+        el("ingredientSearchInput").value = ""; el("ingredientRiskFilter").value = ""; el("ingredientSourceFilter").value = "review"; quick = "";
+        if (org.view.kind !== "all") org.show({ kind: "all" }); else fromFirstPage();
+        el("ingredientsList").closest(".panel").scrollIntoView({ block: "start" });
     });
-}
-
-function openNameList() {
-    let frame;
-    const area = document.createElement("textarea");
-    const dismiss = async () => {
-        if (area.value.trim() && !(await askConfirm({ title: "Discard changes?", message: "The names in this window will be lost.", confirmLabel: "Discard", cancelLabel: "Keep editing" }))) return;
-        frame.close();
-    };
-    frame = popWindow("Add ingredient list", dismiss, { subtitle: "Paste the names. Each one is looked up and saved as Pending." });
-    const label = document.createElement("label"); label.className = "field-label"; label.htmlFor = "curSiNames"; label.textContent = "Ingredient names";
-    area.id = "curSiNames"; area.className = "pw-textarea"; area.rows = 8; area.placeholder = "One per line, e.g.\nNiacinamide\n1,2-Hexanediol";
-    const counts = document.createElement("p"); counts.className = "field-hint"; counts.setAttribute("role", "status");
-    frame.body.append(label, area, counts);
-    const actions = document.createElement("div"); actions.className = "pw-actions";
-    actions.innerHTML = '<button type="button" class="btn">Cancel</button><span class="spacer"></span><button type="button" class="save-btn">Search and import</button>';
-    const [cancel, run] = actions.querySelectorAll("button");
-    frame.foot.append(actions);
-    const paint = () => {
-        const n = parseNames(area.value).length;
-        counts.textContent = n > MAX_NAMES ? `${n} names: only the first ${MAX_NAMES} are imported now.` : n ? `${many(n, "name", "names")}.` : `Up to ${MAX_NAMES} names at a time.`;
-        run.disabled = n === 0 || !!importing;
-    };
-    area.addEventListener("input", paint);
-    cancel.addEventListener("click", dismiss);
-    run.addEventListener("click", () => { const names = parseNames(area.value).slice(0, MAX_NAMES); frame.close(); importNames(names); });
-    paint();
-    area.focus();
 }
 
 /** Resolves true when every name was added or was already listed. */
 async function importNames(names) {
     if (importing) return false;
     const say = el("curSiSay"), cancel = el("curSiCancel"), show = el("curSiShow");
-    const lock = (on) => { el("curSiRun").disabled = on; el("curSiMany").disabled = on; el("curSiQuery").readOnly = on; cancel.hidden = !on; };
+    const lock = (on) => { el("curSiRun").disabled = on; el("curSiQuery").readOnly = on; cancel.hidden = !on; };
     importing = new AbortController();
     const signal = importing.signal;
     el("curSiStatus").hidden = false; show.hidden = true; lock(true);

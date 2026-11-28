@@ -12,7 +12,12 @@ const WORD = { product: ["product", "products"], ingredient: ["ingredient", "ing
 // the app also shows notices as plain text
 const plain = (text) => String(text || "").replace(/[\u0000-\u001f\u007f<>]/g, " ");
 const cut = (text, max) => { const t = plain(text).replace(/\s+/g, " ").trim(); return t.length <= max ? t : t.slice(0, max - 1).trimEnd() + "…"; };
-const meaningful = (item) => item.action === "delete" || !Array.isArray(item.fields) || item.fields.length === 0 || item.fields.some((f) => !QUIET_FIELDS.has(f));
+// 28 Nov 2026 (owner: the app showed "165 products updated" again and again with nothing to read): an automatic job (the
+// recommendation flags, the rule-filled cautions, the review marks) changes many entries at once and is not news for a user. Only a
+// change to what the app SHOWS makes a notice: these fields. A new entry ("set" with every field) always has some of them.
+const SHOWN_FIELDS = new Set(["name", "brandName", "brandId", "cosmeticType", "ingredients", "shades", "shadeCodes", "shadeNames", "status", "barcode", "description",
+    "imageUrl", "minAge", "binned", "aliases", "purpose", "riskLevel", "cautionNote", "allergenTags", "avoidForSkinTypes", "classificationId", "commonUses", "chemicalDescription"]);
+const meaningful = (item) => item.action === "delete" || !Array.isArray(item.fields) || item.fields.some((f) => !QUIET_FIELDS.has(f) && SHOWN_FIELDS.has(f));
 
 /**
  * The notice for one batch of audit items ({ collection, docId, action, fields, name }), or null when nothing the app shows changed.

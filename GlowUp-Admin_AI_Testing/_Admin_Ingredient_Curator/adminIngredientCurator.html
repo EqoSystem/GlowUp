@@ -94,30 +94,33 @@
                     <input type="search" id="curSiQuery" class="si-input" placeholder="Ingredient name, e.g. Niacinamide" autocomplete="off" maxlength="80">
                     <button type="button" class="save-btn" id="curSiRun" data-hint="Search and import: asks PubChem and GlowUp's rules, then saves the entry as Pending.">Search and import</button>
                 </div>
-                <div class="si-alt">
-                    <span>Have many names?</span>
-                    <button type="button" class="btn" id="curSiMany" aria-haspopup="dialog" data-hint="Add ingredient list: paste many names at once, one per line."><i data-icon="list"></i>Add ingredient list</button>
-                </div>
                 <div class="cur-si-status" id="curSiStatus" hidden>
                     <p class="si-say small" id="curSiSay" role="status" aria-live="polite"></p>
                     <button type="button" class="btn" id="curSiCancel">Cancel</button>
-                    <button type="button" class="btn" id="curSiShow" hidden>Show waiting entries</button>
+                    <button type="button" class="btn" id="curSiShow" hidden>Show the new entries</button>
                 </div>
                 <p class="btn-hint">Everything found is saved as Pending. Your job is to review it.</p>
             </section>
 
             <section class="panel cur-queue" id="curQueuePanel" data-panel="reviewQueue" data-label="Review queue" data-w="12">
                 <div class="panel-head">
-                    <h3 class="panel-title">Review queue</h3>
+                    <h3 class="panel-title">Review queue</h3><span class="count-pill" id="cqCount"></span>
                 </div>
-                <p class="panel-lead">1. Pick a group. 2. Tick entries in the list. 3. Approve.</p>
-                <div class="si-tabs" role="group" aria-label="Pick a group">
-                    <button type="button" class="chip-btn" data-cq="waiting" aria-pressed="false" data-hint="Waiting: entries nobody has checked yet.">Waiting <span id="cqWaiting">0</span></button>
+                <p class="panel-lead">Products whose ingredients still need you. Click an ingredient to fill in or check its details.</p>
+                <div class="si-tabs" role="group" aria-label="Show">
+                    <button type="button" class="chip-btn on" data-cq="all" aria-pressed="true" data-hint="All: every product with an ingredient that needs you.">All <span id="cqAll">0</span></button>
+                    <button type="button" class="chip-btn" data-cq="missing" aria-pressed="false" data-hint="Not in the Curator: names on a list that have no entry yet. Click one to add it.">Not in the Curator <span id="cqMissing">0</span></button>
+                    <button type="button" class="chip-btn" data-cq="waiting" aria-pressed="false" data-hint="Waiting: entries nobody has checked yet. Click one to check and save it.">Waiting <span id="cqWaiting">0</span></button>
                     <button type="button" class="chip-btn" data-cq="unknown" aria-pressed="false" data-hint="Not identified: names no source recognised. Check the spelling.">Not identified <span id="cqUnknown">0</span></button>
-                    <button type="button" class="chip-btn" data-cq="auto" aria-pressed="false" data-hint="Set automatically: cautions filled by GlowUp's rules. Spot-check them.">Set automatically <span id="cqAuto">0</span></button>
                 </div>
-                <div class="panel-primary"><button type="button" class="save-btn" id="cqApprove" data-hint="Approve selected: marks the ticked entries as checked. It asks first.">Approve selected</button></div>
-                <p class="btn-hint">Point at a button to see what it does.</p>
+                <div class="table-container">
+                    <table class="admin-table cq-table">
+                        <thead><tr><th>Product</th><th>Ingredient list</th><th>Source</th></tr></thead>
+                        <tbody id="cqBody"><tr><td colspan="3" class="table-message"><span class="sk sk-line" aria-hidden="true"></span></td></tr></tbody>
+                    </table>
+                </div>
+                <div class="pager" id="cqPager"></div>
+                <p class="btn-hint">Pink names need you: grey ones are checked. Point at a button to see what it does.</p>
             </section>
 
             <section class="panel" data-panel="list" data-label="Ingredient list" data-w="12" data-source="ingredients" data-no-fold>

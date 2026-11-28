@@ -26,7 +26,9 @@ namespace GlowUp.Notifications
             badge.raycastTarget = false;
             var rt = badge.rectTransform;
             rt.anchorMin = rt.anchorMax = new Vector2(1f, 1f); rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.anchoredPosition = new Vector2(8f, 8f); rt.sizeDelta = new Vector2(38f, 38f);   // on the corner, mostly outside the bell: the bell itself is never covered
+            // 28 Nov 2026: the bell icon is 58 of the button's 92, so its corner is 17 inside the button's corner. The badge sits on the
+            // icon's top-right corner (it was 25 beyond it, leaving a visible gap); it only covers the empty corner of the bell shape.
+            rt.anchoredPosition = new Vector2(-14f, -14f); rt.sizeDelta = new Vector2(38f, 38f);
             count = RuntimeUiKit.Label(badge.transform, "Count", "", 22, GlowUp.Theme.ContrastInk.On(p.warning), RuntimeTheme.Font(GlowUp.Theme.FontRole.Label, GetComponentInChildren<TMP_Text>(true)));
             count.fontStyle = FontStyles.Bold; count.enableWordWrapping = false;
             RuntimeUiKit.Stretch(count.rectTransform);

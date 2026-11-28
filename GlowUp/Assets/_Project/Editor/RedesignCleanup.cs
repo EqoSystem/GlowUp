@@ -44,6 +44,21 @@ namespace GlowUp.EditorTools
             "Assets/_Project/Scripts/Admin/WebsitePresence.cs",
         };
 
+        /// <summary>
+        /// 28 November 2026 (owner: finger signs are not needed anymore): the 7.8 MB hand model leaves the app (through the
+        /// AssetDatabase, so its .meta goes too), then every scene is rebuilt so the finger-sign objects and Settings rows go.
+        /// Batch: -executeMethod GlowUp.EditorTools.RedesignCleanup.Nov28
+        /// </summary>
+        [MenuItem("GlowUp/Rebuild for the 28 November 2026 changes")]
+        public static void Nov28()
+        {
+            const string handModel = "Assets/StreamingAssets/hand_landmarker.task";
+            if (AssetDatabase.LoadMainAssetAtPath(handModel) != null || System.IO.File.Exists(handModel))
+                Debug.Log("[GlowUp] Hand model " + (AssetDatabase.DeleteAsset(handModel) ? "removed." : "could NOT be removed."));
+            AllScenesBuilder.BuildEverything();
+            AssetDatabase.SaveAssets();
+        }
+
         [MenuItem("GlowUp/Remove Admin Scanner")]
         public static void Run()
         {

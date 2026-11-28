@@ -1,4 +1,5 @@
-// Search and import + Review queue + Product review + User report (redesign plan, 27 November 2026).
+// Search and import + Review queue + Product review + User report (redesign plan, 27 November 2026; brand search, ticks kept
+// across searches and one batch import since 28 November 2026, when the separate barcode list window was removed).
 // One panel and one button run the whole chain (_Shared/importChain.js). Everything found is saved as Pending; the app does not use
 // it until an admin approves it. Imports, app scans and "New product" reports from the app wait in ONE Review queue.
 // Navigation rules (docs/NAVIGATION_RULES.md 3c): closing a review or a report returns to the queue with its page kept and shows the
@@ -26,6 +27,9 @@ const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, "
 /**
  * deps (from the inventory page):
  *   lookup(text)              the page's product look-up (quickFill.lookupProduct)
+ *   lookupBrand(text)         every product of one brand the sources know (quickFill.lookupBrand)
+ *   inInventory(candidate)    the inventory product that is this candidate (same barcode, or same brand and name), or null
+ *   brandProducts(text)       the inventory products of the brand typed (not in the bin)
  *   library()                 Curator entries { id, name, techName, aliases, allergenTags, avoidForSkinTypes, riskLevel, sources, identified }
  *   pending()                 products waiting for review (not in the bin)
  *   saveRecord(record)        saves one product as Pending (the file-import path); resolves with a summary text
@@ -33,24 +37,135 @@ const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, "
  *   approve(product)          approves one product (asks first); resolves true when it was approved
  *   toBin(product)            moves one product to the Recycle bin
  *   openProduct(product)      opens the product form (to add a list by hand)
- *   openBatch()               the Add barcode list window (a file is picked from the + menu and shows its progress here)
  *   reload()                  reads the lists again
  */
 export function mountSearchImport(deps) {
-    const queryBox = el("siQuery"), run = el("siRun"), many = el("siMany"), progress = el("siProgress");
+    const queryBox = el("siQuery"), run = el("siRun"), progress = el("siProgress");
+    const results = el("siResults"), body = el("siBody"), batchBar = el("siBatch");
     let busy = false, abort = null, fallback = null, fromReport = null, plan = null;
     const queueState = { page: 1, size: 10 };
     let reports = [];
+    let shown = [];                                   // the rows of the last search: { key, candidate, owner }
+    const batch = new Map();                          // ticked products, kept across searches and brands: key -> candidate
 
-    // a file picked from anywhere (the + menu, a shortcut) shows its progress in this panel
+    // a file picked from the + menu (or a shortcut) shows its progress in this panel
     el("inventoryFileInput").addEventListener("change", () => { el("siFile").hidden = false; el("siPanel").scrollIntoView({ block: "nearest" }); });
-    many.addEventListener("click", () => { if (!busy) deps.openBatch(); });
     mountHints(el("siPanel"));
     mountHints(el("rqPanel"));
-    queryBox.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); start(); } });
-    run.addEventListener("click", start);
+    queryBox.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); search(); } });
+    run.addEventListener("click", search);
 
-    const lock = (on) => { busy = on; run.disabled = on; queryBox.readOnly = on; many.disabled = on; };
+    const lock = (on) => { busy = on; run.disabled = on; queryBox.readOnly = on; el("siBatchImport").disabled = on || batch.size === 0; el("siBatchClear").disabled = on; el("siPickAll").disabled = on; };
+    const keyOf = (c) => [compact(c.brand), compact(c.name), String(c.barcode || "").replace(/\D/g, "")].join("|");
+    const compact = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+
+    // ---------- 1. Search: brand, product name, or several barcodes ----------
+    async function search() {
+        if (busy) return;
+        const typed = queryBox.value.trim();
+        if (!typed) { queryBox.focus(); notify("Type a brand, a product name or a barcode first.", "info"); return; }
+        lock(true);
+        results.hidden = false;
+        el("siResultsTitle").textContent = `Searching for "${typed}"...`;
+        body.innerHTML = `<tr><td colspan="6" class="table-message"><span class="sk sk-line" aria-hidden="true"></span></td></tr>`;
+        try {
+            const parts = typed.split(/[\s,;]+/).filter(Boolean);
+            const codes = parts.length > 1 && parts.every((t) => /^\d{6,14}$/.test(t)) ? parts.slice(0, 30) : null;
+            let found = [];
+            if (codes) {
+                for (const code of codes) { const r = await deps.lookup(code).catch(() => ({ candidates: [] })); if (r.candidates && r.candidates[0]) found.push(r.candidates[0]); }
+            } else {
+                const [brand, name] = await Promise.all([deps.lookupBrand(typed).catch(() => ({ candidates: [] })), deps.lookup(typed).catch(() => ({ candidates: [] }))]);
+                found = (brand.candidates || []).concat(name.candidates || []);
+            }
+            const seen = new Set();
+            shown = [];
+            found.forEach((c) => { const key = keyOf(c); if (!c || !c.name || seen.has(key)) return; seen.add(key); shown.push({ key, candidate: c, owner: deps.inInventory(c) }); });
+            // the brand's products that are in the inventory already, also when no source lists them (the admin can review them)
+            if (!codes) deps.brandProducts(typed).forEach((p) => {
+                const key = keyOf({ brand: p.brandName, name: p.name, barcode: p.barcode });
+                if (shown.some((r) => r.owner && r.owner.id === p.id) || seen.has(key)) return;
+                seen.add(key); shown.push({ key, candidate: { brand: p.brandName, name: p.name, cosmeticType: p.cosmeticType, ingredients: p.ingredients, originLabel: "GlowUp inventory" }, owner: p });
+            });
+            shown.sort((a, b) => Number(!!a.owner) - Number(!!b.owner));
+            el("siResultsTitle").textContent = shown.length ? `${shown.length} found for "${typed}"` : `Nothing found for "${typed}". Check the spelling, or try the brand alone.`;
+            paintResults();
+        } catch (error) {
+            el("siResultsTitle").textContent = "The search stopped. " + describeError(error);
+            body.innerHTML = `<tr><td colspan="6" class="table-message"><button type="button" class="btn" data-si-retry>Retry</button></td></tr>`;
+        } finally { lock(false); paintBatch(); }
+    }
+    body.addEventListener("click", (event) => {
+        if (event.target.closest("[data-si-retry]")) { search(); return; }
+        const open = event.target.closest("[data-si-open]");
+        if (open) { const row = shown.find((r) => r.owner && r.owner.id === open.dataset.siOpen); if (row) openOwner(row.owner); }
+    });
+    body.addEventListener("change", (event) => {
+        const box = event.target.closest("[data-si-pick]");
+        if (!box) return;
+        const row = shown.find((r) => r.key === box.dataset.siPick);
+        if (!row) return;
+        if (box.checked) batch.set(row.key, row.candidate); else batch.delete(row.key);
+        paintBatch();
+    });
+    el("siPickAll").addEventListener("click", () => { shown.filter((r) => !r.owner).forEach((r) => batch.set(r.key, r.candidate)); paintResults(); paintBatch(); });
+    el("siBatchClear").addEventListener("click", () => { batch.clear(); paintResults(); paintBatch(); });
+    el("siBatchImport").addEventListener("click", importBatch);
+
+    const openOwner = (p) => { if (p.needsReview && p.ingredients.length) openReview(p); else deps.openProduct(p); };
+
+    function paintResults() {
+        if (!shown.length) { body.innerHTML = `<tr><td colspan="6" class="table-message">No products to show.</td></tr>`; return; }
+        body.innerHTML = shown.map((r) => {
+            const c = r.candidate, n = Array.isArray(c.ingredients) ? c.ingredients.length : 0;
+            const pick = r.owner ? "" : `<input type="checkbox" data-si-pick="${escapeHtml(r.key)}" aria-label="Tick ${escapeHtml(c.name)}"${batch.has(r.key) ? " checked" : ""}>`;
+            const status = r.owner
+                ? `<span class="chip ${r.owner.needsReview ? "warn" : "good"}">In inventory · ${r.owner.needsReview ? "Pending" : escapeHtml(r.owner.status || "Active")}</span> <button type="button" class="btn" data-si-open="${escapeHtml(r.owner.id)}">${r.owner.needsReview ? "Review" : "Open"}</button>`
+                : `<span class="chip">New</span>`;
+            return `<tr><td class="si-pick">${pick}</td><td><strong>${escapeHtml(c.name)}</strong><div class="small muted">${escapeHtml(c.brand || "")}${c.barcode ? " · " + escapeHtml(c.barcode) : ""}</div></td>
+                <td>${escapeHtml(c.cosmeticType || "-")}</td><td>${n ? `${n} ingredients` : `<span class="chip bad">None found</span>`}</td>
+                <td class="small">${escapeHtml(c.originLabel || c.origin || "-")}</td><td class="actions">${status}</td></tr>`;
+        }).join("");
+    }
+
+    function paintBatch() {
+        batchBar.hidden = batch.size === 0;
+        const brands = new Set(Array.from(batch.values()).map((c) => compact(c.brand)).filter(Boolean));
+        el("siBatchWords").textContent = batch.size ? `Batch: ${batch.size} product${batch.size === 1 ? "" : "s"} from ${brands.size || 1} brand${brands.size > 1 ? "s" : ""}, ready to import` : "";
+        el("siBatchImport").disabled = busy || batch.size === 0;
+        el("siBatchImport").textContent = batch.size ? `Import batch (${batch.size})` : "Import batch";
+    }
+
+    // ---------- 2. Import the batch: each product runs the chain and is saved as Pending ----------
+    async function importBatch() {
+        if (busy || !batch.size) return;
+        const items = Array.from(batch.entries());
+        if (!(await askConfirm({ title: `Import ${items.length} product${items.length === 1 ? "" : "s"}?`, message: "Each one is saved as Pending with its ingredients matched to the Curator. It waits in the Review queue until you approve it.", items: items.map(([, c]) => [c.brand, c.name].filter(Boolean).join(", ")), confirmLabel: "Import batch" }))) return;
+        lock(true);
+        progress.hidden = false;
+        const card = progress.querySelector(".si-found"), cancel = progress.querySelector(".si-cancel"), open = progress.querySelector(".si-open"), say = progress.querySelector(".si-say");
+        card.innerHTML = ""; open.disabled = true; cancel.hidden = false; cancel.disabled = false;
+        abort = new AbortController();
+        let done = 0;
+        const failed = [];
+        for (let i = 0; i < items.length && !abort.signal.aborted; i++) {
+            const [key, candidate] = items[i];
+            say.textContent = `Importing ${i + 1} of ${items.length}: ${[candidate.brand, candidate.name].filter(Boolean).join(", ")}`;
+            paintSteps(0, false);
+            try {
+                const made = await runImport("", { candidate, lookupProduct: () => ({ candidates: [] }), library: deps.library(), draftIngredient, fallback: {} }, (at) => paintSteps(at, false), abort.signal);
+                paintFound(card, made);
+                await savePlan(made);
+                paintSteps(STEPS.length - 1, true);
+                batch.delete(key); done++;
+            } catch (error) { if (!(error && error.stopped)) failed.push(candidate.name); }
+        }
+        const stopped = abort.signal.aborted;
+        abort = null; cancel.hidden = true; open.disabled = done === 0;
+        say.textContent = (stopped ? "Stopped. " : "") + `${done} saved as Pending in the Review queue.` + (failed.length ? ` Not saved (try again): ${failed.join(", ")}.` : "");
+        shown.forEach((r) => { if (!r.owner) r.owner = deps.inInventory(r.candidate); });
+        lock(false); paintResults(); paintBatch();
+    }
 
     function paintSteps(at, done) {
         const bar = progress.querySelector(".si-steps");
@@ -60,10 +175,10 @@ export function mountSearchImport(deps) {
         }).join("");
     }
 
-    async function start() {
+    // ---------- a user's "New product" report: one product, the report's text fills what the sources lack ----------
+    async function importReportProduct() {
         if (busy) return;
         const typed = queryBox.value.trim();
-        if (!typed && !(fallback && (fallback.name || fallback.barcode))) { queryBox.focus(); notify("Type a brand, a product name or a barcode first.", "info"); return; }
         lock(true); plan = null;
         progress.hidden = false;
         const card = progress.querySelector(".si-found"), cancel = progress.querySelector(".si-cancel"), open = progress.querySelector(".si-open"), say = progress.querySelector(".si-say");
@@ -71,32 +186,24 @@ export function mountSearchImport(deps) {
         paintSteps(0, false);
         abort = new AbortController();
         try {
-            plan = await runImport(typed, {
-                lookupProduct: (text) => deps.lookup(text),
-                library: deps.library(),
-                draftIngredient,
-                fallback: fallback || {}
-            }, (at) => paintSteps(at, false), abort.signal);
+            plan = await runImport(typed, { lookupProduct: (text) => deps.lookup(text), library: deps.library(), draftIngredient, fallback: fallback || {} }, (at) => paintSteps(at, false), abort.signal);
             cancel.disabled = true;
             paintFound(card, plan);
             say.textContent = "Saving as Pending...";
             await savePlan(plan);
             paintSteps(STEPS.length - 1, true);
-            say.textContent = plan.names.length ? "Saved as Pending. Open the review to check it." : "Saved as Pending without an ingredient list: add it from the pack or the brand's page.";
+            say.textContent = plan.names.length ? "Saved as Pending. It is in the Review queue." : "Saved as Pending without an ingredient list: add it from the pack or the brand's page.";
             open.disabled = false;
             cancel.hidden = true;
             if (fromReport) { await closeReport(fromReport, true); fromReport = null; }
             fallback = null;
         } catch (error) {
-            say.textContent = error && error.stopped ? "Cancelled. Nothing was saved." : error && error.notFound ? "No product was found for that search. Check the spelling or the barcode, or try the brand and the name." : "The import stopped. " + describeError(error);
+            say.textContent = error && error.stopped ? "Cancelled. Nothing was saved." : error && error.notFound ? "No product was found for that report. Check the spelling or the barcode, or try the brand and the name." : "The import stopped. " + describeError(error);
             cancel.hidden = true;
         } finally { abort = null; lock(false); }
     }
     progress.querySelector(".si-cancel").addEventListener("click", () => { if (abort) abort.abort(); });
-    progress.querySelector(".si-open").addEventListener("click", () => {
-        const saved = plan ? deps.findSaved(plan.product) : null;
-        if (saved) openReview(saved); else notify("The saved product is not in the list yet. It appears in the Review queue in a moment.", "info");
-    });
+    progress.querySelector(".si-open").addEventListener("click", () => el("rqPanel").scrollIntoView({ behavior: "smooth", block: "start" }));
 
     function paintFound(card, p) {
         const from = [p.product.foundBy ? `Brand and name: ${p.product.foundBy}.` : "", p.listFrom ? `Ingredient list: ${p.listFrom}.` : "Ingredient list: none found."].filter(Boolean).join(" ");
@@ -145,9 +252,8 @@ export function mountSearchImport(deps) {
         const body = el("rqBody");
         if (!body) return;
         const items = queueItems();
-        const count = el("rqCount"), next = el("rqNext");
+        const count = el("rqCount");
         if (count) count.textContent = items.length ? String(items.length) : "";
-        if (next) next.disabled = items.length === 0;
         if (!items.length) { put(body, `<tr><td colspan="6" class="table-message">No pending items.</td></tr>`); renderPager(el("rqPager"), queueState, 0, paintQueue, "items"); return; }
         put(body, paginate(items, queueState).map((item, at) => {
             const key = `${item.kind}:${item.kind === "product" ? item.product.id : item.report.id}`;
@@ -157,13 +263,24 @@ export function mountSearchImport(deps) {
                     <td>-</td><td>-</td><td>-</td><td><span class="chip warn">From a user</span></td><td class="actions"><button type="button" class="btn" data-rq-open="${escapeHtml(key)}" data-hint="Open report: read what the user sent, then import it, reply or close it.">Open report</button></td></tr>`;
             }
             const p = item.product, c = item.counts;
+            const both = `<button type="button" class="btn" data-rq-open="${escapeHtml(key)}" data-hint="Review: check the ingredients in a window, then approve, save for later or bin.">Review</button><button type="button" class="btn" data-rq-add="${escapeHtml(key)}" data-hint="Add the list: open the product form and type or correct the ingredients from the pack.">Add the list</button>`;
             if (!p.ingredients.length) return `<tr data-rq="${escapeHtml(key)}"><td><strong>${escapeHtml(p.name)}</strong><div class="small muted">${escapeHtml(p.brandName)}</div></td>
-                <td>0</td><td>-</td><td>-</td><td><span class="chip bad">No list found</span></td><td class="actions"><button type="button" class="btn" data-rq-add="${escapeHtml(key)}" data-hint="Add the list: open the product form and type the ingredients from the pack.">Add the list</button></td></tr>`;
+                <td>0</td><td>-</td><td>-</td><td><span class="chip bad">No list found</span><div class="small muted rq-why">${escapeHtml(noListReason(p))}</div></td><td class="actions">${both}</td></tr>`;
             return `<tr data-rq="${escapeHtml(key)}"><td><strong>${escapeHtml(p.name)}</strong><div class="small muted">${escapeHtml(p.brandName)}</div></td>
                 <td>${c.all}</td><td><span class="chip warn">${c[FLAGGED]}</span></td><td><span class="chip">${c[NO_RULE]}</span></td><td><span class="chip ${c[NOT_IDENTIFIED] ? "bad" : ""}">${c[NOT_IDENTIFIED]}</span></td>
-                <td class="actions"><button type="button" class="btn" data-rq-open="${escapeHtml(key)}" data-hint="Review: check the ingredients in a window, then approve, save for later or bin.">Review</button></td></tr>`;
+                <td class="actions">${both}</td></tr>`;
         }).join(""));
         renderPager(el("rqPager"), queueState, items.length, paintQueue, "items");
+    }
+
+    // why a waiting product has no ingredient list, from where it came from (the admin then knows to add it by hand)
+    function noListReason(p) {
+        const from = String((p.fieldOrigins && p.fieldOrigins.name && p.fieldOrigins.name.from) || "");
+        if (/search and import/i.test(from)) return "Searched the FDA Philippines list, Open Beauty Facts and UPCitemdb: none had its list.";
+        if (p.source === "scan" || String(p.id || "").startsWith("scan_")) return "Added by an app scan: the list on the pack could not be read.";
+        if (/barcode look-up/i.test(from)) return "Found by its barcode, but that source had no ingredient list.";
+        if (p.source === "document-import") return "The imported file had no ingredient list for it.";
+        return "No source with its ingredient list was saved.";
     }
 
     const itemByKey = (key) => queueItems().find((item) => `${item.kind}:${item.kind === "product" ? item.product.id : item.report.id}` === key) || null;
@@ -175,7 +292,6 @@ export function mountSearchImport(deps) {
         if (!item) return;
         if (item.kind === "report") openReport(item.report); else openReview(item.product);
     });
-    el("rqNext").addEventListener("click", () => openNext(null));
 
     function openNext(afterKey) {
         const items = queueItems().filter((item) => `${item.kind}:${item.kind === "product" ? item.product.id : item.report.id}` !== afterKey);
@@ -289,7 +405,7 @@ export function mountSearchImport(deps) {
             fromReport = r;
             queryBox.value = r.barcode || [r.brand, r.productName].filter(Boolean).join(" ");
             el("siPanel").scrollIntoView({ behavior: "smooth", block: "start" });
-            start();
+            importReportProduct();
         });
     }
 

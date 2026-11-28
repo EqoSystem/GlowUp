@@ -66,6 +66,21 @@ namespace GlowUp.Onboarding
         const string ConsentKey = "glowup.selfie.consent";
 
         [SerializeField] private AutoBrighten brighten;     // 24 Nov 2026: the sun button (live veil; evens out the photo shown after the capture)
+
+        [Header("28 Nov 2026: camera flip, flashlight in the dark, pick the area yourself")]
+        [Tooltip("Switches between the front (selfie) and the back camera")]
+        [SerializeField] private Button flipButton;
+        [Tooltip("The flashlight button (back camera only). It also comes on by itself when the picture is dark.")]
+        [SerializeField] private Button lightButton;
+        [SerializeField] private Image lightIcon;
+        [Tooltip("The outline drawn where the user tapped the photo (switched off until a tap)")]
+        [SerializeField] private RectTransform pickBox;
+        [Range(0.05f, 0.5f)] [SerializeField] private float darkBelow = 0.22f;
+        [SerializeField] private string msgPickHint = "Not right? Tap the photo on your cheek or forehead to read that spot instead.";
+        [SerializeField] private string msgPicked = "GlowUp read the spot you tapped. Your skin looks like {0}. Tap Use tone, or tap another spot.";
+        [SerializeField] private string msgDarkLight = "It's dark here, so the flashlight is on.";
+        [SerializeField] private string msgBackCamera = "Back camera: ask someone to take the photo, or use a mirror. Keep the face in the middle.";
+        float nextLightCheck;
         Texture2D enhanced;               // the brightened copy of the frozen photo, while Auto brighten is on
         Texture2D frozen;                 // the photo shown on the result card (destroyed when the card closes)
         int foundIndex = -1;              // the tone tile that fits; -1 = no result yet
@@ -78,6 +93,8 @@ namespace GlowUp.Onboarding
             if (openButton != null) openButton.onClick.AddListener(Open);
             if (takeButton != null) takeButton.onClick.AddListener(OnRight);
             if (closeButton != null) closeButton.onClick.AddListener(OnLeft);
+            if (flipButton != null) flipButton.onClick.AddListener(Flip);
+            if (lightButton != null) lightButton.onClick.AddListener(() => SetLight(!Flashlight.IsOn, false));
             if (deleteButton != null) deleteButton.onClick.AddListener(DeletePhoto);
             if (panel != null) panel.Closed += Reset;
             if (cameraFeed != null) cameraFeed.Started += OnCameraStarted;
@@ -120,8 +137,79 @@ namespace GlowUp.Onboarding
         {
             if (this == null || ShowingResult) return;
             cameraReady = ok;
-            Say(ok ? msgGuide : (string.IsNullOrEmpty(message) ? msgNoCamera : message));
+            bool back = cameraFeed != null && !cameraFeed.IsFrontCamera;
+            Say(ok ? (back ? msgBackCamera : msgGuide) : (string.IsNullOrEmpty(message) ? msgNoCamera : message));
+            if (lightButton != null) lightButton.gameObject.SetActive(ok && back && Flashlight.Available);
+            nextLightCheck = Time.unscaledTime + 1f;
             SetWords();
+        }
+
+        void Flip()
+        {
+            if (cameraFeed == null || ShowingResult) return;
+            SetLight(false, true);
+            if (lightButton != null) lightButton.gameObject.SetActive(false);
+            Say(msgStarting);
+            cameraFeed.UseFront(!cameraFeed.WantsFrontCamera);
+        }
+
+        void SetLight(bool on, bool quiet)
+        {
+            if (on == Flashlight.IsOn) return;
+            Flashlight.TrySet(on, out _);
+            if (lightIcon != null) lightIcon.color = Flashlight.IsOn ? new Color(1f, 0.85f, 0.35f) : Color.white;
+            if (on && Flashlight.IsOn && !quiet) Say(msgDarkLight);
+        }
+
+        void Update()
+        {
+            // the back camera in a dark room: the flashlight comes on by itself (checked once a second)
+            if (cameraFeed != null && cameraFeed.IsPlaying && !cameraFeed.IsFrontCamera && !ShowingResult && Time.unscaledTime >= nextLightCheck)
+            {
+                nextLightCheck = Time.unscaledTime + 1f;
+                float light = cameraFeed.Brightness();
+                if (light >= 0f && light < darkBelow && !Flashlight.IsOn && Flashlight.Available) SetLight(true, false);
+            }
+            // after the photo: a tap on it reads that spot instead of the middle
+            if (ShowingResult && frozen != null && resultImage != null && Input.GetMouseButtonDown(0))
+            {
+                Camera eye = resultImage.canvas != null && resultImage.canvas.renderMode != RenderMode.ScreenSpaceOverlay ? resultImage.canvas.worldCamera : null;
+                RectTransform rt = resultImage.rectTransform;
+                if (RectTransformUtility.RectangleContainsScreenPoint(rt, Input.mousePosition, eye)
+                    && RectTransformUtility.ScreenPointToLocalPointInRectangle(rt, Input.mousePosition, eye, out Vector2 local))
+                {
+                    Rect r = rt.rect;
+                    ReadSpot(Mathf.InverseLerp(r.xMin, r.xMax, local.x), Mathf.InverseLerp(r.yMin, r.yMax, local.y));
+                }
+            }
+        }
+
+        /// <summary>Reads a square around the tapped spot (fractions of the photo) and shows the tone found there.</summary>
+        void ReadSpot(float u, float v)
+        {
+            int w = frozen.width, h = frozen.height;
+            float bw = BoxWidth * 0.6f, bh = Mathf.Clamp(bw * w / Mathf.Max(1, h), 0.04f, 0.6f);
+            float left = Mathf.Clamp(u - bw / 2f, 0f, 1f - bw), bottom = Mathf.Clamp(v - bh / 2f, 0f, 1f - bh);
+            Color32[] all = frozen.GetPixels32();
+            var points = new List<Color32>();
+            int x0 = (int)(w * left), x1 = (int)(w * (left + bw)), y0 = (int)(h * bottom), y1 = (int)(h * (bottom + bh));
+            for (int y = y0; y < y1; y += 2) for (int x = x0; x < x1; x += 2) points.Add(all[y * w + x]);
+            if (points.Count == 0) return;
+            Color32 found = SkinToneMatch.Median(points);
+            int index = SkinToneMatch.Nearest(found);
+            if (index < 0) return;
+            foundIndex = index;
+            string tone = SkinToneMatch.Names[foundIndex];
+            if (foundSwatch != null) foundSwatch.color = found;
+            if (toneSwatch != null) toneSwatch.color = SkinToneMatch.Palette[foundIndex];
+            if (toneLabel != null) toneLabel.text = string.Format(msgToneLabel, tone);
+            if (pickBox != null)
+            {
+                pickBox.anchorMin = new Vector2(left, bottom); pickBox.anchorMax = new Vector2(left + bw, bottom + bh);
+                pickBox.offsetMin = pickBox.offsetMax = Vector2.zero;
+                pickBox.gameObject.SetActive(true);
+            }
+            Say(string.Format(msgPicked, tone));
         }
 
         // the two buttons change their words with the step: [Close | Take photo] before a photo, [Retake | Use tone] after it
@@ -179,7 +267,8 @@ namespace GlowUp.Onboarding
             if (foundLabel != null) foundLabel.text = msgFoundLabel;
             if (toneLabel != null) toneLabel.text = string.Format(msgToneLabel, tone);
             if (resultRow != null) resultRow.SetActive(true);
-            Say(string.Format(msgResult, tone) + (kept ? " " + msgKept : ""));
+            Say(string.Format(msgResult, tone) + " " + msgPickHint + (kept ? " " + msgKept : ""));
+            SetLight(false, true);
             SetWords();
         }
 
@@ -206,7 +295,7 @@ namespace GlowUp.Onboarding
 
         void DeletePhoto() { SelfieStore.Delete(); RefreshDelete(); Say(msgDeleted); }
         void RefreshDelete() { if (deleteButton != null) deleteButton.gameObject.SetActive(SelfieStore.Exists); }
-        void Close() { Reset(); if (panel != null) panel.Hide(); }
+        void Close() { SetLight(false, true); Reset(); if (panel != null) panel.Hide(); }
         void Say(string text) { if (statusText != null) statusText.text = text; }
 
         void SetWords()
@@ -228,6 +317,7 @@ namespace GlowUp.Onboarding
             foundIndex = -1;
             if (resultImage != null) { resultImage.texture = null; resultImage.gameObject.SetActive(false); }
             if (sampleBox != null) sampleBox.gameObject.SetActive(false);
+            if (pickBox != null) pickBox.gameObject.SetActive(false);
             if (resultRow != null) resultRow.SetActive(false);
             if (frozen != null) { Destroy(frozen); frozen = null; }
             if (enhanced != null) { Destroy(enhanced); enhanced = null; }

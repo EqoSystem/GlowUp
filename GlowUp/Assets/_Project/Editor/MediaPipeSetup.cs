@@ -28,7 +28,7 @@ namespace GlowUp.EditorTools
         {
             notes = notes ?? new List<string>();
             bool ready = true;
-            if (!File.Exists(HandModelPath))
+            if (false)      // finger signs were removed on 28 November 2026: the hand model is no longer needed
             {
                 ready = false;
                 notes.Add("- Finger signs: the hand model is missing. Download " + HandModelAddress + " and save it as " + HandModelPath +

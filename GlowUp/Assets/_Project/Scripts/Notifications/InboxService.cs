@@ -29,6 +29,8 @@ namespace GlowUp.Notifications
             public string title, body;
             public DateTime createdAt;
             public bool read;
+            /// <summary>28 Nov 2026: the other announcements with the same words, shown as this one item (read / removed together).</summary>
+            public List<string> sameAs = new List<string>();
         }
 
         const int Limit = 50;
@@ -163,17 +165,40 @@ namespace GlowUp.Notifications
         /// <summary>Every notification still shown, newest first.</summary>
         public List<Item> Items()
         {
-            return personal.Concat(announcements.Where(a => !hidden.Contains(a.id)).Select(a => { a.read = readHere.Contains(a.id); return a; }))
-                           .OrderByDescending(i => i.createdAt).ToList();
+            // 28 Nov 2026 (owner: "165 products updated" again and again): announcements with the same kind, title and text are ONE
+            // item (the newest), and only what was announced after this account was made is listed (a new account does not inherit
+            // the catalogue's history)
+            DateTime since = AccountCreated();
+            var shown = announcements.Where(a => !hidden.Contains(a.id) && a.createdAt >= since)
+                .GroupBy(a => a.kind + "|" + a.title + "|" + a.body)
+                .Select(g =>
+                {
+                    Item newest = g.OrderByDescending(a => a.createdAt).First();
+                    newest.sameAs = g.Where(a => a != newest).Select(a => a.id).ToList();
+                    newest.read = g.All(a => readHere.Contains(a.id)) || readHere.Contains(newest.id);
+                    return newest;
+                });
+            return personal.Concat(shown).OrderByDescending(i => i.createdAt).ToList();
         }
 
         public int UnreadCount => Items().Count(i => !i.read);
+
+        static DateTime AccountCreated()
+        {
+            try
+            {
+                FirebaseUser user = FirebaseAuth.DefaultInstance.CurrentUser;
+                ulong ms = user != null && user.Metadata != null ? user.Metadata.CreationTimestamp : 0;
+                return ms > 0 ? DateTimeOffset.FromUnixTimeMilliseconds((long)ms).LocalDateTime.AddMinutes(-5) : DateTime.MinValue;
+            }
+            catch (Exception) { return DateTime.MinValue; }
+        }
 
         public async void MarkRead(Item item)
         {
             if (item == null || item.read) return;
             item.read = true; dirty = true;
-            if (item.source == Source.Announcement) { readHere.Add(item.id); SaveSet(ReadKey + uid, readHere); PushState("read", item.id); return; }
+            if (item.source == Source.Announcement) { foreach (string id in AllIds(item)) { readHere.Add(id); PushState("read", id); } SaveSet(ReadKey + uid, readHere); return; }
             try { await FirebaseFirestore.DefaultInstance.Collection("users").Document(uid).Collection("notifications").Document(item.id).UpdateAsync("read", true); }
             catch (Exception) { /* offline: the database library sends it later */ }
         }
@@ -198,11 +223,13 @@ namespace GlowUp.Notifications
         public async System.Threading.Tasks.Task<bool> Delete(Item item)
         {
             if (item == null) return false;
-            if (item.source == Source.Announcement) { hidden.Add(item.id); SaveSet(HiddenKey + uid, hidden); dirty = true; PushState("hidden", item.id); return true; }
+            if (item.source == Source.Announcement) { foreach (string id in AllIds(item)) { hidden.Add(id); PushState("hidden", id); } SaveSet(HiddenKey + uid, hidden); dirty = true; return true; }
             personal.RemoveAll(p => p.id == item.id); dirty = true;
             try { await FirebaseFirestore.DefaultInstance.Collection("users").Document(uid).Collection("notifications").Document(item.id).DeleteAsync(); return true; }
             catch (Exception) { return false; }
         }
+
+        static IEnumerable<string> AllIds(Item item) => new[] { item.id }.Concat(item.sameAs ?? new List<string>());
 
         /// <summary>Adds one id to this account's read / hidden list (a merge: two phones adding at once keep both). Offline, the library sends it later.</summary>
         async void PushState(string field, string id)

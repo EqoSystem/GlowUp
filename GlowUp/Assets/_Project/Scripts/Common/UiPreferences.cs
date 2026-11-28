@@ -28,11 +28,13 @@ namespace GlowUp.Common
         }
 
         /// <summary>The freezing sound when a scan is removed in Recent Scans (on until the user switches it off). See DeleteSoundPlayer.</summary>
-        public static bool DeleteSound { get => Get("GlowUp.Ui.DeleteSound", true); set => Set("GlowUp.Ui.DeleteSound", value); }
+        // 28 Nov 2026: the delete sound is removed from the app (the user: "not needed anymore"); always off, the switch is gone.
+        public static bool DeleteSound { get => false; set { } }
 
         // ---- finger signs: hold 1 to 5 fingers up to the selfie camera to open a screen (brought back 19 November 2026) ----
         /// <summary>Off until the user switches it on (it uses the selfie camera). See FingerSignNavigator.</summary>
-        public static bool FingerSigns { get => Get("GlowUp.Ui.FingerSigns", false); set => Set("GlowUp.Ui.FingerSigns", value); }
+        // 28 Nov 2026: finger signs are removed from the app again (the user: "not needed anymore"); always off, the Settings rows are gone.
+        public static bool FingerSigns { get => false; set { } }
 
         /// <summary>How long a sign must be held before the screen changes, in seconds.</summary>
         public static float FingerSignHoldSeconds

@@ -26,7 +26,10 @@ namespace GlowUp.EditorTools
             var scene = SceneBuilderCore.Open("OnboardingStep2Scene");
             var c = BuildChrome(2, "Skin Type Selection");
 
-            const float cellH = 210, gap = 16, wideH = 170;
+            // 28 Nov 2026 (owner: "a design that helps the user decide"): the five skin types are a LIST of full-width rows, read top to
+            // bottom. Each row shows everything at once: the skin texture with the name, the short title and the everyday signs
+            // (before, the signs sat in a pill that only new users saw). Same words, same values, same TileSelectionGroup.
+            const float rowH = 178, gap = 14;
             // why the app asks (redesign plan, 27 Nov 2026): one line above the tiles
             var why = TextOn(c.card, "SkinTypeWhyText", "", HelperSize, TextAlignmentOptions.MidlineLeft);
             SetText(why, "Used only to match ingredient cautions. This is not a diagnosis.", HelperSize, TextAlignmentOptions.MidlineLeft);
@@ -35,8 +38,9 @@ namespace GlowUp.EditorTools
             float top = HeaderBottom + WhyH + 12;
             var grid = TileGrid(c.card, "SkinTypeTiles", gap);
             RemoveBrokenScripts(grid.gameObject);
-            Top(grid, c.card, top, 2 * cellH + gap);
-            grid.GetComponent<GridLayoutGroup>().cellSize = new Vector2((InnerWidth - gap) / 2f, cellH);
+            Top(grid, c.card, top, 5 * rowH + 4 * gap);
+            var list = grid.GetComponent<GridLayoutGroup>();
+            list.constraintCount = 1; list.cellSize = new Vector2(InnerWidth, rowH);
 
             // each tile: OuterPanel (frame, subtitle at the bottom) > InnerPanel (skin texture, skin type name inside)
             // the official skin types (23 Nov 2026), in this order: Normal, Dry, Oily, Combination, Sensitive. A tile's VALUE is what is saved;
@@ -46,20 +50,17 @@ namespace GlowUp.EditorTools
             var oily = SkinTile(grid, "OilyCard", "OilyText", "Oily", "Oil Control Needed", SkinTextureFactory.Oily, "Shiny T-zone, visible pores");
             var mix = SkinTile(grid, "MixCard", "MixText", "Mix", "Combination Zones", SkinTextureFactory.Mix, "Oily T-zone, dry cheeks");
             SetTileTitle(mix, "MixText", "Combination");
-            // the fifth tile spans the row under the grid
             var sensitive = SkinTile(grid, "SensitiveCard", "SensitiveText", "Sensitive", "Reacts Easily", SkinTextureFactory.Dry, "Stings, itches or flushes easily");
             var sensitiveRoot = sensitive.transform;
-            sensitiveRoot.SetParent(c.card, false);
-            Top(sensitiveRoot, c.card, top + 2 * cellH + gap + gap, wideH);
+            if (sensitiveRoot.parent != grid) sensitiveRoot.SetParent(grid, false);       // an earlier layout put it under the grid, across the card
             // the five names share one size that fits "Combination" and the short window of a tile
             foreach (var pair in new (SelectableTile tile, string name)[] { (normal, "NormalText"), (dry, "DryText"), (oily, "OilyText"), (mix, "MixText"), (sensitive, "SensitiveText") })
                 foreach (TMP_Text t in pair.tile.GetComponentsInChildren<TMP_Text>(true))
-                    if (t.name == pair.name) { t.fontSize = 46; t.enableAutoSizing = true; t.fontSizeMin = 30; t.fontSizeMax = 46; t.alignment = TextAlignmentOptions.Bottom; }   // below the hint pill a new user sees
-            Transform sensitiveBadge = sensitiveRoot.Find("InfoBadge"); if (sensitiveBadge != null) Object.DestroyImmediate(sensitiveBadge.gameObject);   // its window is too short for a hint pill
+                    if (t.name == pair.name) { t.fontSize = 44; t.enableAutoSizing = true; t.fontSizeMin = 28; t.fontSizeMax = 44; t.alignment = TextAlignmentOptions.Center; }
             var group = SceneBuilderCore.Ensure<TileSelectionGroup>(grid.gameObject);
             SetArray(group, "tiles", new Object[] { normal, dry, oily, mix, sensitive });
 
-            float y = top + 2 * cellH + gap + gap + wideH + 14;
+            float y = top + 5 * rowH + 4 * gap + 18;
             // panel revision (22 Nov 2026): help is on the page, the user never has to look it up elsewhere
             var finder = HelpLink(c.card, "SkinTypeFinderButton", "Find my skin type", y, true);
             { var fr = (RectTransform)finder.transform; fr.anchorMax = new Vector2(1f, 1f); fr.offsetMax = new Vector2(-fr.offsetMin.x, fr.offsetMax.y); }   // the whole row; the controller halves it while "How it reacts" shows
@@ -251,6 +252,19 @@ namespace GlowUp.EditorTools
             GlowUp.Scan.AutoBrighten selfieBrighten = CameraControlsKit.AutoBrightenControl(viewport.transform, selfieCamera, new Vector2(-24, -24));
             SceneBuilderCore.SetField(selfieTone, "brighten", selfieBrighten);
             CameraControlsKit.FocusLockControl(viewport.transform, selfieCamera);          // the padlock of the AI Smart Scan camera, top centre (manual focus)
+            // 28 Nov 2026: flip between the front and the back camera (top left), the flashlight (bottom right, back camera only; it
+            // also comes on by itself in the dark), and the outline of the spot the user tapped on the photo
+            Button flip = SmartScanSceneBuilder.CameraButton(viewport.transform, "FlipCameraButton", IconFactory.Swap, out _);
+            AppKit.At(flip.transform, AppKit.TL, new Vector2(24, -24), new Vector2(92, 92));
+            Button flashButton = SmartScanSceneBuilder.CameraButton(viewport.transform, "FlashlightButton", IconFactory.Bolt, out Image flashIcon);
+            AppKit.At(flashButton.transform, AppKit.BR, new Vector2(-24, 24), new Vector2(92, 92));
+            flashButton.gameObject.SetActive(false);
+            Image pick = AppKit.RawPanel(viewport.transform, "PickedSpotBox", new Color(1, 1, 1, 0), 16f);
+            pick.raycastTarget = false;
+            AppKit.Outline(pick.transform, ThemeRole.Accent, 16f);
+            pick.gameObject.SetActive(false);
+            SceneBuilderCore.SetField(selfieTone, "flipButton", flip); SceneBuilderCore.SetField(selfieTone, "lightButton", flashButton);
+            SceneBuilderCore.SetField(selfieTone, "lightIcon", flashIcon); SceneBuilderCore.SetField(selfieTone, "pickBox", pick.rectTransform);
             SceneBuilderCore.SetField(selfieTone, "cameraFeed", selfieCamera); SceneBuilderCore.SetField(selfieTone, "resultImage", resultImage);
             SceneBuilderCore.SetField(selfieTone, "resultRow", resultRow);
             SceneBuilderCore.SetField(selfieTone, "foundSwatch", foundSwatch); SceneBuilderCore.SetField(selfieTone, "toneSwatch", toneSwatch);
@@ -462,15 +476,22 @@ namespace GlowUp.EditorTools
             f.title.color = Color.white;
             f.title.transform.SetAsLastSibling();
 
-            // info badge: a small pill that hugs its text, at the top of the inner panel (only shown to new / struggling users)
-            Transform badge = root.Find("InfoBadge");
-            if (badge == null) { var b = new GameObject("InfoBadge", typeof(RectTransform), typeof(CanvasGroup)); b.transform.SetParent(root, false); badge = b.transform; }
-            badge.localScale = Vector3.one;
-            AutoPill(badge, badgeText, 20, new Color(0.14f, 0.11f, 0.11f, 0.72f), Color.white, 18, 4);
-            var brt = (RectTransform)badge; brt.anchorMin = brt.anchorMax = new Vector2(0.5f, 1); brt.pivot = new Vector2(0.5f, 1);
-            brt.anchoredPosition = new Vector2(0, -(Frame + 6));
-            SceneBuilderCore.Ensure<HintGroup>(badge.gameObject);
-            badge.SetAsLastSibling();
+            // 28 Nov 2026, list row: the texture window on the left (name inside it), the title and the everyday signs on the right.
+            // The signs were a pill shown only to new users; in a row there is room to show them to everyone.
+            Transform badge = root.Find("InfoBadge"); if (badge != null) Object.DestroyImmediate(badge.gameObject);
+            const float Window = 300, TextLeft = Window + Frame + 32;
+            var irt = (RectTransform)innerT; irt.anchorMin = new Vector2(0, 0); irt.anchorMax = new Vector2(0, 1); irt.pivot = new Vector2(0, 0.5f);
+            irt.offsetMin = new Vector2(Frame, Frame); irt.offsetMax = new Vector2(Frame + Window, -Frame);
+            var d = f.description;
+            d.enableAutoSizing = true; d.fontSizeMin = 28; d.fontSizeMax = 38; d.fontStyle = FontStyles.Bold; d.alignment = TextAlignmentOptions.BottomLeft;
+            var drt = d.rectTransform; drt.anchorMin = new Vector2(0, 0.5f); drt.anchorMax = new Vector2(1, 1); drt.pivot = new Vector2(0, 0.5f);
+            drt.offsetMin = new Vector2(TextLeft, 4); drt.offsetMax = new Vector2(-28, -Frame - 6);
+            var cue = TileText(root, root, "CueText", badgeText, 30, Color.white);
+            SceneBuilderCore.Themed(cue.gameObject, ThemeRole.SecondaryText);
+            cue.enableWordWrapping = true; cue.enableAutoSizing = true; cue.fontSizeMin = 22; cue.fontSizeMax = 30; cue.alignment = TextAlignmentOptions.TopLeft;
+            var crt = cue.rectTransform; crt.anchorMin = new Vector2(0, 0); crt.anchorMax = new Vector2(1, 0.5f); crt.pivot = new Vector2(0, 0.5f);
+            crt.offsetMin = new Vector2(TextLeft, Frame + 6); crt.offsetMax = new Vector2(-28, -4);
+            cue.transform.SetAsLastSibling();
             return f.tile.tile;
         }
 

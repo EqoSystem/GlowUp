@@ -26,6 +26,8 @@ namespace GlowUp.AppSettings
         [SerializeField] private OverlayPanel panel;
         [Tooltip("Tab 0, 1, 2, 3 = the categories of report, named in Category Names")]
         [SerializeField] private ChoiceTabs categoryTabs;
+        [Tooltip("28 Nov 2026: the kinds as one drop-down list (used instead of the tabs when set). Options follow Category Names.")]
+        [SerializeField] private TMP_Dropdown categoryDropdown;
         [SerializeField] private TMP_InputField messageInput;
         [SerializeField] private Toggle includeLastScanToggle;
         [SerializeField] private Button sendButton;
@@ -85,10 +87,16 @@ namespace GlowUp.AppSettings
             AddLimitAndEmail();
         }
 
+        void SelectCategory(int index)
+        {
+            if (categoryDropdown != null) categoryDropdown.SetValueWithoutNotify(index);
+            if (categoryTabs != null) categoryTabs.Select(index, false);
+        }
+
         /// <summary>"Report a problem" on the result screen: the form opens on "Wrong scan result" with the scan attached.</summary>
         public void OpenForScan()
         {
-            if (categoryTabs != null) categoryTabs.Select(Mathf.Max(0, Array.IndexOf(categoryNames, "Wrong scan result")), false);
+            SelectCategory(Mathf.Max(0, Array.IndexOf(categoryNames, "Wrong scan result")));
             if (includeLastScanToggle != null) includeLastScanToggle.isOn = true;
             if (panel != null) panel.Show();
         }
@@ -288,7 +296,7 @@ namespace GlowUp.AppSettings
             if (sending) return;
 
             string message = messageInput != null ? (messageInput.text ?? "").Trim() : "";
-            int selectedCategoryIndex = categoryTabs != null ? categoryTabs.SelectedIndex : -1;
+            int selectedCategoryIndex = categoryDropdown != null ? categoryDropdown.value : categoryTabs != null ? categoryTabs.SelectedIndex : -1;
 
             // 1. VALIDATION: Check category and message
             bool categoryValid = selectedCategoryIndex >= 0 && categoryNames != null && selectedCategoryIndex < categoryNames.Length;
@@ -405,7 +413,7 @@ namespace GlowUp.AppSettings
                     void ClearForm()
                     {
                         if (messageInput != null) messageInput.text = "";
-                        if (categoryTabs != null) categoryTabs.Select(0, false);
+                        SelectCategory(0);
                         currentReportDocId = null; // Generate a fresh ID for the next report
                         if (panel != null && panel.IsOpen) panel.Hide();
                     }

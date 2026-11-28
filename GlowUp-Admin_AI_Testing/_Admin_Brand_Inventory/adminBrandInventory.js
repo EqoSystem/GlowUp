@@ -71,10 +71,9 @@ import {
     barcodeDigits, originEntry, originsAfterFill, uncheckedFields, markChecked, cleanOrigins, similarProducts, similarBrands,
     reviewReason, skippedLine, repeatedNames, FILL_FIELDS, STATE_WORDS, METHODS, DETECTED, NEEDS_REVIEW, VERIFIED, TYPED, REVIEW_CHANGES, waiting
 } from "../_Shared/capture.js";
-import { loadCatalogue, lookupProduct } from "../_Shared/quickFill.js";
+import { loadCatalogue, lookupProduct, lookupBrand } from "../_Shared/quickFill.js";
 import { waitingForList, suggestionFrom, LISTS_PER_LOAD } from "../_Shared/productListFill.js";
 import { parseBarcodes, lookupBatch, batchSummary } from "../_Shared/batchBarcodes.js";
-import { openBatchLookup } from "./batchLookup.js";
 import { mountSearchImport } from "./searchImport.js";
 import { attentionLabel } from "../_Shared/planViews.js";
 
@@ -359,13 +358,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("addBrandForm").addEventListener("submit", saveBrand);
     el("productForm").addEventListener("submit", saveProduct);
     el("chooseInventoryFileBtn").addEventListener("click", () => el("inventoryFileInput").click());
-    const batchLookupBtn = el("batchLookupBtn");
-    if (batchLookupBtn) batchLookupBtn.addEventListener("click", () => openBatchLookup({
-        lookup: (code) => lookupProduct(code, { getToken: () => (auth.currentUser ? auth.currentUser.getIdToken() : "") }),
-        existing: (code) => everyProduct.find((p) => !p.binned && barcodeKey(p.barcode) === barcodeKey(code)) || null,
-        importRecords: (records) => saveInventoryDraft({ products: records, brands: [] }, "Batch lookup.txt", () => {}),
-        notify
-    }));
     el("inventoryDropBox").addEventListener("click", () => el("inventoryFileInput").click());
     el("inventoryFileInput").addEventListener("change", (event) => {
         const file = event.target.files && event.target.files[0];
@@ -407,6 +399,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     attentionLabel(el("inventorySearchStatus").closest(".panel-head").querySelector(".spacer"), el("notesList"));
     searchImport = mountSearchImport({
         lookup: (text) => lookupProduct(text, { getToken: () => (auth.currentUser ? auth.currentUser.getIdToken() : "") }),
+        lookupBrand: (text) => lookupBrand(text),
+        inInventory: (c) => everyProduct.find((p) => !p.binned && ((c.barcode && barcodeKey(p.barcode) && barcodeKey(p.barcode) === barcodeKey(c.barcode))
+            || (sameKey(p.name) === sameKey(c.name) && sameKey(p.brandName) === sameKey(c.brand)))) || null,
+        brandProducts: (text) => {
+            const want = sameKey(text);
+            const brand = everyBrand.find((b) => !b.binned && [b.name, ...(b.aliases || [])].some((n) => sameKey(n) === want));
+            return everyProduct.filter((p) => !p.binned && (brand ? p.brandId === brand.id : sameKey(p.brandName) === want)).slice(0, 40);
+        },
         library: () => curatedList,
         pending: () => everyProduct.filter((p) => p.needsReview && !p.binned && !isOut(p)),
         saveRecord: (record) => saveInventoryDraft({ products: [record], brands: [] }, "Search and import.txt", () => {}),
@@ -415,7 +415,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         approve: async (p) => { await approveSelectedInventory(["p:" + p.id]); const now = itemOf("p:" + p.id); return !!now && !now.needsReview; },
         toBin: (p) => moveToBin(["p:" + p.id]),
         openProduct: (p) => openProductForm(p),
-        openBatch: () => el("batchLookupBtn").click(),
         reload: () => loadInventory()
     });
     mountShadeFinder({

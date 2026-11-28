@@ -9,8 +9,8 @@ try {
         const { page, errors, settle } = await openPage(browser, "inv", { width, height });
         await settle(1200);
         ok(await page.isVisible("#siPanel"), `${width}px: the Search and import panel shows`);
-        ok((await page.textContent("#siPanel")).includes("Everything found is saved as Pending"), `${width}px: it says found products are Pending`);
-        ok(await page.locator("[data-si-tab], #siPhone").count() === 0 && await page.isVisible("#siMany"), `${width}px: one search box and Add barcode list`);
+        ok((await page.textContent("#siPanel")).includes("saved as Pending"), `${width}px: it says found products are Pending`);
+        ok(await page.locator("[data-si-tab], #siPhone, #siMany, #rqNext").count() === 0, `${width}px: one search box; no barcode list window, no "Review next item"`);
         ok(await page.isHidden("#batchLookupBtn"), `${width}px: the separate Batch Lookup button is gone from the table`);
         await page.waitForSelector("#rqBody tr[data-rq]", { timeout: 8000 });
         const queue = await page.textContent("#rqBody");
@@ -18,12 +18,16 @@ try {
         ok(/No list found/.test(queue), `${width}px: a product without a list says so`);
         ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `${width}px: no sideways scroll`);
 
-        await page.hover("#siMany");
-        ok(/paste many barcodes/.test(await page.textContent("#siPanel .btn-hint")), `${width}px: pointing at a button explains it in the help line`);
-        await page.click("#siMany");
-        await page.waitForSelector(".batch-window", { timeout: 4000 });
-        await page.goBack(); await page.waitForTimeout(300);
-        ok(await page.locator(".batch-window").count() === 0, `${width}px: browser Back closes the pop-up`);
+        ok(await page.locator('#rqBody tr:has-text("No list found") [data-rq-open]').count() > 0 && await page.locator('#rqBody tr:has-text("No list found") [data-rq-add]').count() > 0, `${width}px: a row without a list has Review and Add the list`);
+        ok(/an app scan|no ingredient list|none had its list|had no ingredient list|was saved/.test(await page.textContent("#rqBody .rq-why")), `${width}px: the row says why there is no list`);
+        await page.hover("#siRun");
+        ok(/lists what the sources know/.test(await page.textContent("#siPanel .btn-hint")), `${width}px: pointing at a button explains it in the help line`);
+        await page.fill("#siQuery", "Maybelline New York");
+        await page.click("#siRun");
+        await page.waitForFunction(() => !/Searching/.test(document.getElementById("siResultsTitle").textContent), null, { timeout: 15000 });
+        ok(/In inventory/.test(await page.textContent("#siBody")), `${width}px: a brand search lists the brand's products already in the inventory`);
+        const box = page.locator("#siBody [data-si-pick]").first();
+        if (await box.count()) { await box.check(); ok(await page.isVisible("#siBatch") && /Batch: 1 product/.test(await page.textContent("#siBatch")), `${width}px: a tick puts the product in the batch`); }
 
         // the user report
         await page.click('#rqBody [data-rq-open^="report:"]');
@@ -45,7 +49,7 @@ try {
         await page.click('.review-window [data-rv="later"]');
         await page.waitForTimeout(400);
         ok(await page.locator(".review-window").count() === 0, `${width}px: Save for later returns to the queue`);
-        ok(errors.length === 0, `${width}px: no page errors (${errors.join(" | ")})`);
+        ok(errors.filter((e) => !/Failed to load resource/.test(e)).length === 0, `${width}px: no page errors (outside calls are blocked in this rig) (${errors.join(" | ")})`);
         await page.close();
     }
 
@@ -65,15 +69,11 @@ try {
     await page.waitForTimeout(300);
     ok(await page.evaluate(() => document.getElementById("ingredientRiskFilter").value === "r:flagged"), "curator: a result count filters the list");
     ok(await page.locator("#chooseIngredientFileBtn").count() === 0 && await page.isVisible("#curSiRun"), "curator: Search and import replaces Import a file");
-    await page.click("#curSiMany");
-    await page.fill("#curSiNames", "Niacinamide\n1,2-Hexanediol");
-    ok(/2 names/.test(await page.textContent(".pop-window")), "curator: the list window counts names, keeping 1,2-Hexanediol whole");
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(200);
-    ok(/Discard changes/.test(await page.textContent("body")), "curator: leaving with names typed asks first");
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(200);
-    ok(await page.locator("#curSiNames").count() === 1, "curator: Escape on the question keeps the window");
+    ok(await page.locator("#curSiMany").count() === 0, "curator: no Add ingredient list button");
+    await page.waitForSelector("#cqBody .cq-ing", { timeout: 6000 }).catch(() => {});
+    ok(await page.locator(".cq-table thead th").count() === 3 && /Product/.test(await page.textContent(".cq-table thead")) && /Source/.test(await page.textContent(".cq-table thead")), "curator: the Review queue is a table of product, list and source");
+    const chip = page.locator("#cqBody .cq-ing.missing, #cqBody .cq-ing.waiting, #cqBody .cq-ing.unknown").first();
+    if (await chip.count()) { await chip.click(); await page.waitForTimeout(400); ok(await page.isVisible("#addIngredientModal"), "curator: an ingredient in the queue opens its form"); }
     ok(errors.length === 0, `curator: no page errors (${errors.join(" | ")})`);
 } finally { await browser.close(); }
 console.log(`redesign: ${checks} checks, ${failed} failed`);

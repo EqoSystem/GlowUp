@@ -58,15 +58,26 @@
                 <div class="panel-head">
                     <h3 class="panel-title">Search and import</h3>
                 </div>
-                <p class="panel-lead">Find a product online. It goes to the Review queue below.</p>
+                <p class="panel-lead">Search a brand, a product name or barcodes. Tick what to import, from as many searches and brands as you like, then import the batch.</p>
                 <div class="si-row">
-                    <label class="sr-only" for="siQuery">Brand, product name or barcode</label>
-                    <input type="search" id="siQuery" class="si-input" placeholder="Brand, product name or barcode" autocomplete="off" maxlength="120">
-                    <button type="button" class="save-btn" id="siRun" data-hint="Search and import: looks up one product and saves it as Pending.">Search and import</button>
+                    <label class="sr-only" for="siQuery">Brand, product name or barcodes</label>
+                    <input type="search" id="siQuery" class="si-input" placeholder="Brand, product name or barcodes (separate several with commas)" autocomplete="off" maxlength="400">
+                    <button type="button" class="save-btn" id="siRun" data-hint="Search: lists what the sources know, and what is already in the inventory. Nothing is saved yet.">Search</button>
                 </div>
-                <div class="si-alt">
-                    <span>Have many barcodes?</span>
-                    <button type="button" class="btn" id="siMany" aria-haspopup="dialog" data-hint="Add barcode list: paste many barcodes, check the results, then import."><i data-icon="barcode"></i>Add barcode list</button>
+                <div class="si-results" id="siResults" hidden>
+                    <div class="si-results-head"><strong id="siResultsTitle"></strong><span class="spacer"></span><button type="button" class="btn" id="siPickAll" data-hint="Tick all new: every product found that is not in the inventory yet.">Tick all new</button></div>
+                    <div class="table-container">
+                        <table class="admin-table si-table">
+                            <thead><tr><th><span class="sr-only">Pick</span></th><th>Product</th><th>Type</th><th>Ingredient list</th><th>Found in</th><th>Status</th></tr></thead>
+                            <tbody id="siBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="si-batch" id="siBatch" hidden>
+                    <span class="si-batch-words" id="siBatchWords" role="status" aria-live="polite"></span>
+                    <span class="spacer"></span>
+                    <button type="button" class="btn" id="siBatchClear" data-hint="Clear: unticks every product in the batch. Nothing was saved.">Clear</button>
+                    <button type="button" class="save-btn" id="siBatchImport" data-hint="Import batch: every ticked product is saved as Pending and waits in the Review queue below.">Import batch</button>
                 </div>
                 <div class="si-file" id="siFile" hidden>
                     <button type="button" class="btn" id="chooseInventoryFileBtn"><i data-icon="upload"></i>Choose file</button>
@@ -84,9 +95,9 @@
                     <ol class="si-steps"></ol>
                     <div class="si-found"></div>
                     <p class="si-say small"></p>
-                    <div class="si-actions"><button type="button" class="btn si-cancel">Cancel</button><span class="spacer"></span><button type="button" class="save-btn si-open" disabled>Open review</button></div>
+                    <div class="si-actions"><button type="button" class="btn si-cancel">Cancel</button><span class="spacer"></span><button type="button" class="btn si-open" disabled>Show in the Review queue</button></div>
                 </div>
-                <p class="btn-hint">Everything found is saved as Pending. The app does not use it until an admin approves it.</p>
+                <p class="btn-hint">Everything imported is saved as Pending. The app does not use it until an admin approves it.</p>
             </section>
 
             <section class="panel review-queue" id="rqPanel" data-panel="reviewQueue" data-label="Review queue" data-w="12">
@@ -94,10 +105,9 @@
                     <h3 class="panel-title">Review queue</h3><span class="count-pill" id="rqCount"></span>
                 </div>
                 <p class="panel-lead">Check each item, then approve it. The app uses only what you approve.</p>
-                <div class="panel-primary"><button type="button" class="save-btn" id="rqNext" aria-haspopup="dialog" data-hint="Review next item: opens the newest waiting item. After you decide, the next one opens.">Review next item</button></div>
                 <div class="table-container">
                     <table class="admin-table rq-table">
-                        <thead><tr><th>Product</th><th>Ingredients</th><th>Flagged</th><th>No rule matched</th><th>Not identified</th><th><span class="sr-only">Action</span></th></tr></thead>
+                        <thead><tr><th>Product</th><th>Ingredients</th><th>Flagged</th><th>No rule matched</th><th>Not identified, or why there is no list</th><th><span class="sr-only">Actions</span></th></tr></thead>
                         <tbody id="rqBody"><tr><td colspan="6" class="table-message"><span class="sk sk-line" aria-hidden="true"></span></td></tr></tbody>
                     </table>
                 </div>
@@ -155,7 +165,7 @@
                     <button type="button" class="guide-badge" data-tip-title="How to use this list" data-tip="Click a product to see everything about it; double-click to edit it. Click a brand to open or close it. The app only uses Active products of Active brands." data-tip-preview="Drag rows onto a folder or the Recycle bin. The small box in front of a name picks it; Ctrl+click picks several.">i</button>
                     <span class="panel-count" hidden id="inventoryCountLine"></span>
                     <span class="search-status" id="inventorySearchStatus" role="status" hidden><span id="inventorySearchStatusText"></span><button type="button" class="search-status-clear" id="inventorySearchStatusClear" aria-label="Clear the search"><i data-icon="x"></i></button></span>
-                    <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most scanned, newest, type, or what needs attention first." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i><span class="btn-label">Sort</span><span class="sort-now" id="sortNow"></span></button> <button type="button" class="btn" id="batchLookupBtn" aria-haspopup="dialog" hidden><i data-icon="barcode"></i><span class="btn-label">Batch Lookup</span></button> <button type="button" class="btn" id="filterMenuBtn" aria-haspopup="dialog" aria-expanded="false" data-tip-title="Filters" data-tip="Narrow the list by kind, status and a few facts at once, then press Apply filters." data-tip-preview="Nothing is read from the database: it only looks through what is already loaded."><i data-icon="sliders"></i><span class="btn-label">Filters</span><span class="sort-now" id="filterNow"></span></button></span>
+                    <span class="table-tools"><button type="button" class="btn" id="sortMenuBtn" aria-haspopup="menu" data-tip-title="Sort" data-tip="Choose the order of the list: by name, most scanned, newest, type, or what needs attention first." data-tip-preview="The choice is remembered on this computer."><i data-icon="sort"></i><span class="btn-label">Sort</span><span class="sort-now" id="sortNow"></span></button> <button type="button" class="btn" id="filterMenuBtn" aria-haspopup="dialog" aria-expanded="false" data-tip-title="Filters" data-tip="Narrow the list by kind, status and a few facts at once, then press Apply filters." data-tip-preview="Nothing is read from the database: it only looks through what is already loaded."><i data-icon="sliders"></i><span class="btn-label">Filters</span><span class="sort-now" id="filterNow"></span></button></span>
                     <span class="shelf" id="inventoryShelf"></span>
                     <span class="shelf" id="inventoryShelfAdd"></span>
                     <span id="inventoryQuick"></span>

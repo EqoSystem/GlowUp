@@ -97,6 +97,29 @@ namespace GlowUp.Scan
         public RawImage Display => display;
         /// <summary>True when the picture is shown like a mirror (the selfie camera): a point of the upright picture is turned round left to right on screen.</summary>
         public bool ShowsMirrored => IsFrontCamera && mirrorFrontCamera;
+        /// <summary>The camera this component asks for (front or back).</summary>
+        public bool WantsFrontCamera => useFrontCamera;
+
+        /// <summary>28 Nov 2026 (Find my tone): switches between the front and the back camera, and restarts the picture.</summary>
+        public void UseFront(bool front)
+        {
+            if (useFrontCamera == front && IsPlaying) return;
+            useFrontCamera = front;
+            StopCamera();
+            StartCamera();
+        }
+
+        /// <summary>How light the live picture is, 0 (black) to 1 (white); -1 while no picture runs. Reads every 61st pixel.</summary>
+        public float Brightness()
+        {
+            if (!IsPlaying) return -1f;
+            Color32[] px;
+            try { px = cam.GetPixels32(); } catch (Exception) { return -1f; }
+            if (px == null || px.Length == 0) return -1f;
+            long sum = 0; int n = 0;
+            for (int i = 0; i < px.Length; i += 61) { sum += (px[i].r * 299 + px[i].g * 587 + px[i].b * 114) / 1000; n++; }
+            return n == 0 ? -1f : sum / (255f * n);
+        }
         /// <summary>Raised once: true + "" when the camera is running, false + reason when it cannot start.</summary>
         public event Action<bool, string> Started;
         /// <summary>Raised when the camera was running and is closed (its flashlight goes out with it).</summary>

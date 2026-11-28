@@ -25,5 +25,9 @@ ok(n.title === "450 ingredients updated" && n.body.length <= BODY_MAX, "a big im
 ok(noticeFor([it("products", "P", { action: "set", fields: ["updatedAt"] })]) === null, "only a time stamp changed: nothing to say");
 n = noticeFor([it("products", "<size=300><link=\"x\">Free gift</link>\u0007")]);
 ok(n && !/[<>\u0007]/.test(n.title + n.body) && /Free gift/.test(n.body), `markup is removed from names ${n && n.body}`);
+// 28 Nov 2026: an automatic job that only sets flags is not news (the "165 products updated" notices)
+ok(noticeFor(Array.from({ length: 165 }, (_, n) => ({ collection: "products", docId: "p" + n, action: "update", fields: ["recommendable"] }))) === null, "flag-only batch makes no notice");
+ok(noticeFor([{ collection: "ingredients", docId: "i1", action: "update", fields: ["reviewed", "reviewedBy", "reviewedAt"] }]) === null, "an approval mark makes no notice");
+ok(noticeFor([{ collection: "products", docId: "p1", action: "update", fields: ["ingredients"], name: "Fit Me" }]).title === "Product updated", "a list change still makes one");
 console.log(failed === 0 ? `ALL PASSED  (checks made: ${checks})` : `${failed} FAILED  (checks made: ${checks})`);
 process.exit(failed === 0 ? 0 : 1);

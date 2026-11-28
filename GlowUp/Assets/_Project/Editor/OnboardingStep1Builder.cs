@@ -56,6 +56,11 @@ namespace GlowUp.EditorTools
             var ageLabel = LabelRow(content, Loose(ct, "AgeText"), "AgeText", "Age");
             var age = FieldRow(content, Loose(ct, "AgeInputField"), "AgeInputField", "Calculated from your birthday", 3);
             InfoBadge(content, ageLabel, "AgeHelperText", "Filled in automatically from your birthday.");
+            // 28 Nov 2026: the age rule is a checklist row under the Age field, like the password rules (it ticks green at 13 or older)
+            var aReq = Checklist(content, "Age", new[] { "Minimum of 13 years old" });
+            Transform ageRow = age.transform;
+            while (ageRow.parent != null && ageRow.parent != content) ageRow = ageRow.parent;
+            if (ageRow.parent == content) aReq[0].transform.SetSiblingIndex(ageRow.GetSiblingIndex() + 1);
 
             // ---- email ----
             var emailLabel = LabelRow(content, Loose(ct, "EmailAddressText"), "EmailAddressText", "Email");
@@ -111,6 +116,7 @@ namespace GlowUp.EditorTools
             SceneBuilderCore.SetField(ctl, "pwUpper", pReq[0]); SceneBuilderCore.SetField(ctl, "pwLower", pReq[1]);
             SceneBuilderCore.SetField(ctl, "pwNumber", pReq[2]); SceneBuilderCore.SetField(ctl, "pwSpecial", pReq[3]);
             SceneBuilderCore.SetField(ctl, "pwLength", pReq[4]); SceneBuilderCore.SetField(ctl, "pwMatch", mReq[0]);
+            SceneBuilderCore.SetField(ctl, "ageMinimum", aReq[0]);
             SceneBuilderCore.SetField(ctl, "continueButton", c.cont); SceneBuilderCore.SetField(ctl, "continueAnimator", c.anim);
             SceneBuilderCore.SetField(ctl, "backButton", c.back); SceneBuilderCore.SetField(ctl, "feedbackText", c.feedback);
             SceneBuilderCore.SetField(ctl, "emailMax", EmailLimit);

@@ -19,7 +19,7 @@ namespace GlowUp.EditorTools
     public static class AndroidApkBuilder
     {
         public const string OutputFolder = "Builds";
-        public const string FileName = "GlowUp.111.apk";       // 27 November 2026 (version 1.2.0): redesign plan (Send for Review, Admin Scanner removed, result words), chronic skin conditions removed, live notifications re-attach
+        public const string FileName = "GlowUp.112.apk";       // 28 November 2026 (version 1.2.2): support kinds list, Step 2 list, age rule, Type it in labels + guide, selfie camera flip/flashlight/spot, Send for review from a photo, notices merged, finger signs and delete sound removed
 
         [MenuItem("GlowUp/Build Android APK", false, 300)]
         static void BuildFromMenu()
