@@ -55,14 +55,18 @@
             </section>
 
             <section class="panel search-import" id="siPanel" data-panel="searchImport" data-label="Search and import" data-w="12">
-                <div class="panel-head wraps">
+                <div class="panel-head">
                     <h3 class="panel-title">Search and import</h3>
-                    <div class="si-tabs" role="tablist" aria-label="How to import">
-                        <button type="button" class="chip-btn" role="tab" data-si-tab="one" aria-selected="true">One product</button>
-                        <button type="button" class="chip-btn" role="tab" data-si-tab="many" aria-selected="false">Many barcodes</button>
-                        <button type="button" class="chip-btn" role="tab" data-si-tab="file" aria-selected="false">From a file</button>
-                    </div>
-                    <span class="spacer"></span>
+                </div>
+                <p class="panel-lead">Find a product online. It goes to the Review queue below.</p>
+                <div class="si-row">
+                    <label class="sr-only" for="siQuery">Brand, product name or barcode</label>
+                    <input type="search" id="siQuery" class="si-input" placeholder="Brand, product name or barcode" autocomplete="off" maxlength="120">
+                    <button type="button" class="save-btn" id="siRun" data-hint="Search and import: looks up one product and saves it as Pending.">Search and import</button>
+                </div>
+                <div class="si-alt">
+                    <span>Have many barcodes?</span>
+                    <button type="button" class="btn" id="siMany" aria-haspopup="dialog" data-hint="Add barcode list: paste many barcodes, check the results, then import."><i data-icon="barcode"></i>Add barcode list</button>
                 </div>
                 <div class="si-file" id="siFile" hidden>
                     <button type="button" class="btn" id="chooseInventoryFileBtn"><i data-icon="upload"></i>Choose file</button>
@@ -76,27 +80,21 @@
 
                 <div class="import-flags" id="inventoryImportFlags" hidden></div>
                 </div>
-                <div class="si-row">
-                    <label class="sr-only" for="siQuery">Brand, product name or barcode</label>
-                    <input type="search" id="siQuery" class="si-input" placeholder="Brand, product name or barcode" autocomplete="off" maxlength="120">
-                    <button type="button" class="btn" id="siPhone"><i data-icon="phone"></i><span class="btn-label">Use phone</span></button>
-                    <button type="button" class="save-btn" id="siRun">Search and import</button>
-                </div>
                 <div class="si-progress" id="siProgress" hidden aria-live="polite">
                     <ol class="si-steps"></ol>
                     <div class="si-found"></div>
                     <p class="si-say small"></p>
                     <div class="si-actions"><button type="button" class="btn si-cancel">Cancel</button><span class="spacer"></span><button type="button" class="save-btn si-open" disabled>Open review</button></div>
                 </div>
-                <p class="field-hint">Everything found is saved as Pending. The app does not use it until an admin approves it.</p>
+                <p class="btn-hint">Everything found is saved as Pending. The app does not use it until an admin approves it.</p>
             </section>
 
             <section class="panel review-queue" id="rqPanel" data-panel="reviewQueue" data-label="Review queue" data-w="12">
                 <div class="panel-head">
                     <h3 class="panel-title">Review queue</h3><span class="count-pill" id="rqCount"></span>
-                    <span class="spacer"></span>
-                    <button type="button" class="save-btn" id="rqNext">Open the next one</button>
                 </div>
+                <p class="panel-lead">Check each item, then approve it. The app uses only what you approve.</p>
+                <div class="panel-primary"><button type="button" class="save-btn" id="rqNext" aria-haspopup="dialog" data-hint="Review next item: opens the newest waiting item. After you decide, the next one opens.">Review next item</button></div>
                 <div class="table-container">
                     <table class="admin-table rq-table">
                         <thead><tr><th>Product</th><th>Ingredients</th><th>Flagged</th><th>No rule matched</th><th>Not identified</th><th><span class="sr-only">Action</span></th></tr></thead>
@@ -104,6 +102,7 @@
                     </table>
                 </div>
                 <div class="pager" id="rqPager"></div>
+                <p class="btn-hint">Point at a button to see what it does.</p>
             </section>
 
 

@@ -54,8 +54,8 @@ try {
 
     await page.locator("#addMenuBtn").click();
     await settle(200);
-    ok(await page.locator(".menu .menu-item .kb-combo").count() === 2, "the Add menu shows its two combos as key chips");
-    ok(await page.locator(".menu .menu-item[aria-keyshortcuts]").count() === 2, "the Add menu items carry aria-keyshortcuts");
+    ok(await page.locator(".menu .menu-item .kb-combo").count() === 3, "the Add menu shows its three combos as key chips");
+    ok(await page.locator(".menu .menu-item[aria-keyshortcuts]").count() === 3, "the Add menu items carry aria-keyshortcuts");
     await page.keyboard.press("Escape");
     ok(await page.getAttribute("#chooseInventoryFileBtn", "aria-keyshortcuts") === "Control+Alt+I", "a bound button carries aria-keyshortcuts");
     ok(await page.getAttribute("#chooseInventoryFileBtn", "title") === null, "no hover label is added");

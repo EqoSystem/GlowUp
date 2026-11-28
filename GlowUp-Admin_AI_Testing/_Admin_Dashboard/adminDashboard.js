@@ -7,6 +7,7 @@
 
 
 
+import { setBellNotes } from "../_Shared/headerAccount.js";
 import { db } from "../_Database/firebase-console.js";
 import {
     collection, query, where, orderBy, limit, doc, serverTimestamp
@@ -736,7 +737,7 @@ function registerHelpers() {
     const percent = (part, whole) => (whole > 0 ? Math.round(part * 100 / whole) : 0);
     const hourName = (hour) => new Date(2000, 0, 1, hour).toLocaleTimeString(undefined, { hour: "numeric" });
 
-    registerAssist("numbers", () => {
+    setBellNotes(() => {
         if (!todayAnswered) return null;
         if (scansToday === null) return [];
 

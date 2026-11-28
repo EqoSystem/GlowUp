@@ -1,36 +1,49 @@
-// Redesign plan, pages 29 to 35: a full-page view that takes the board's place ("← Queue"), and the "Needs your attention: N"
-// label that stands in for the large notes panel. Navigation rules: browser Back and Escape leave a view (2 and 1), a view that
-// refuses to leave (unsaved edits) stays.
-import { dialogFrame } from "./adminShell.js";
+// Redesign plan, pages 29 to 35 (pop-up form since 28 Nov 2026): popWindow, the centred window used by Product review, User report
+// and the "add a list" windows, and the "Needs your attention: N" label that stands in for the large notes panel.
+// Navigation rules: X, Escape, backdrop and browser Back all ask the window to close; a window that refuses (unsaved edits,
+// a save running) stays.
+import { dialogFrame, icon } from "./adminShell.js";
 
 const open = [];
-
-function showBoard() {
-    const main = document.querySelector("main.main-content"), board = main && main.querySelector(":scope > .board");
-    if (board) board.hidden = open.length > 0;
-}
 
 window.addEventListener("popstate", () => {
     const view = open[open.length - 1];
     if (!view) return;
-    history.pushState({ planView: true }, "");          // stays on this page; the view itself decides whether it closes
+    history.pushState({ popWindow: true }, "");          // stays on this page; the window itself decides whether it closes
     view.dismiss();
 });
 
-/** The same shape as dialogFrame ({ box, close }), drawn in the page instead of over it. */
-export function pageView(title, onDismiss) {
-    const main = document.querySelector("main.main-content");
-    const box = document.createElement("div");
-    box.className = "plan-view";
-    box.setAttribute("role", "region");
+const make = (tag, className, text) => { const n = document.createElement(tag); if (className) n.className = className; if (text) n.textContent = text; return n; };
+
+/** { box, head, title, body, foot, close }. The head has the title, an optional line under it, and the X. */
+export function popWindow(title, onDismiss, { subtitle = "" } = {}) {
+    const overlay = make("div", "modal-overlay");
+    overlay.style.display = "flex";
+    const box = make("div", "modal-content pop-window");
+    box.setAttribute("role", "dialog");
+    box.setAttribute("aria-modal", "true");
     box.setAttribute("aria-label", title);
-    const heading = document.createElement("h3");
-    heading.textContent = title;
-    box.appendChild(heading);
+    const head = make("header", "pw-head"), titles = make("div", "pw-titles"), heading = make("h3", "", title);
+    titles.append(heading);
+    if (subtitle) titles.append(make("p", "pw-sub", subtitle));
+    const x = make("button", "icon-btn pw-x");
+    x.type = "button";
+    x.setAttribute("aria-label", "Close");
+    x.innerHTML = icon("x");
+    head.append(titles, x);
+    const body = make("div", "pw-body"), foot = make("footer", "pw-foot");
+    box.append(head, body, foot);
+    overlay.append(box);
+
+    // a question asked on top of this window answers Escape first
+    const onTop = () => {
+        const shown = Array.from(document.querySelectorAll(".modal-overlay")).filter((o) => o.getClientRects().length > 0);
+        return shown[shown.length - 1] === overlay;
+    };
     const onKey = (event) => {
-        // a question on top answers Escape first (the page keeps its closed pop-ups in the document: only a shown one counts)
-        if (event.key !== "Escape" || Array.from(document.querySelectorAll(".modal-overlay")).some((o) => o.getClientRects().length > 0)) return;
-        event.stopPropagation(); onDismiss();
+        if (event.key !== "Escape" || !onTop()) return;
+        event.stopPropagation();
+        onDismiss();
     };
     const view = { dismiss: onDismiss };
     open.slice().forEach((other) => other.close());
@@ -40,17 +53,17 @@ export function pageView(title, onDismiss) {
         if (at < 0) return;
         open.splice(at, 1);
         document.removeEventListener("keydown", onKey, true);
-        box.remove();
-        showBoard();
-        // the history entry goes only when no other view took this one's place
-        setTimeout(() => { if (!open.length && history.state && history.state.planView) history.back(); }, 0);
+        overlay.remove();
+        // the history entry goes only when no other window took this one's place
+        setTimeout(() => { if (!open.length && history.state && history.state.popWindow) history.back(); }, 0);
     };
+    x.addEventListener("click", () => onDismiss());
+    overlay.addEventListener("mousedown", (event) => { if (event.target === overlay) onDismiss(); });
     document.addEventListener("keydown", onKey, true);
-    if (!(history.state && history.state.planView)) history.pushState({ planView: true }, "");
-    main.appendChild(box);
-    showBoard();
-    window.scrollTo(0, 0);
-    return { box, close: view.close };
+    if (!(history.state && history.state.popWindow)) history.pushState({ popWindow: true }, "");
+    document.body.append(overlay);
+    x.focus({ preventScroll: true });
+    return { box, head, title: heading, body, foot, close: view.close };
 }
 
 /** `list` is the notes list the page already fills; it is shown in a window opened from the label. */

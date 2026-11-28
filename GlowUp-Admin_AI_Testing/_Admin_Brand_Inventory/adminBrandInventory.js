@@ -262,7 +262,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }));
     el("addMenuBtn").addEventListener("click", (event) => openMenu(event.currentTarget, [
         { label: "Brand", icon: "tag", description: "A new brand: name, category, market, status.", keys: comboFor("inventory.addBrand"), run: () => openBrandForm(null) },
-        { label: "Product", icon: "lipstick", description: "A make-up product of a listed brand.", keys: comboFor("inventory.addProduct"), disabled: brands.length === 0, run: () => openProductForm(null, brandFilterValue()) }
+        { label: "Product", icon: "lipstick", description: "A make-up product of a listed brand.", keys: comboFor("inventory.addProduct"), disabled: brands.length === 0, run: () => openProductForm(null, brandFilterValue()) },
+        { label: "From a file", icon: "upload", description: "PDF, Excel, Word, CSV or text. Saved as Pending for review.", keys: comboFor("inventory.import"), run: () => el("inventoryFileInput").click() }
     ]));
 
     bindButtons({ "inventory.new": "#addMenuBtn", "inventory.import": "#chooseInventoryFileBtn", "inventory.filters": "#filterMenuBtn",
@@ -414,7 +415,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         approve: async (p) => { await approveSelectedInventory(["p:" + p.id]); const now = itemOf("p:" + p.id); return !!now && !now.needsReview; },
         toBin: (p) => moveToBin(["p:" + p.id]),
         openProduct: (p) => openProductForm(p),
-        openBatch: () => { const b = el("batchLookupBtn"); if (b) b.click(); },
+        openBatch: () => el("batchLookupBtn").click(),
         reload: () => loadInventory()
     });
     mountShadeFinder({

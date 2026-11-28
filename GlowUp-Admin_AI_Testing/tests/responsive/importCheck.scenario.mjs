@@ -11,7 +11,7 @@ try {
     for (const width of [1440, 390]) {
         const { page, errors, settle } = await openPage(browser, "inv", { width, height: 900 });
         await settle(800);
-        await page.click('[data-si-tab="file"]');   // the drop box sits under "From a file" (redesign plan, page 29)
+        await page.evaluate(() => { document.getElementById("siFile").hidden = false; });   // the drop box shows once a file is picked from the + menu
         const dropBefore = await page.locator("#inventoryDropBox").boundingBox();
         await page.setInputFiles("#inventoryFileInput", { name: "check.txt", mimeType: "text/plain", buffer: Buffer.from(FILE) });
         await page.waitForSelector(".import-cover.ready", { timeout: 8000 });

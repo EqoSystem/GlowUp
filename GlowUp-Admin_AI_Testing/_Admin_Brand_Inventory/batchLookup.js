@@ -1,8 +1,9 @@
-// Batch Lookup window (23 Nov 2026): Enter barcodes -> Look up -> Review results -> Import selected (saved as Pending).
-// A drawer on a wide screen, a full-screen sheet on a phone. All look-up work is the existing code: parseEntries / lookupBatch /
+// Add barcode list (23 Nov 2026; centred pop-up since 28 Nov): 1 Paste -> 2 Check -> 3 Import selected (saved as Pending).
+// A centred window on a wide screen, a full-screen sheet on a phone. All look-up work is the existing code: parseEntries / lookupBatch /
 // recordFromCandidate (_Shared/batchBarcodes.js) and the page's own lookupProduct + saveInventoryDraft. Nothing is saved until the
 // admin presses "Import selected products", and then through the same path as a product file: Pending, reviewed = false, Detected.
-import { dialogFrame, askConfirm, icon } from "../_Shared/adminShell.js";
+import { askConfirm, icon } from "../_Shared/adminShell.js";
+import { popWindow } from "../_Shared/planViews.js";
 import { MAX_BARCODES, parseEntries, lookupBatch } from "../_Shared/batchBarcodes.js";
 
 const make = (tag, className, text) => { const n = document.createElement(tag); if (className) n.className = className; if (text != null) n.textContent = text; return n; };
@@ -30,20 +31,14 @@ export function openBatchLookup(deps) {
         if (dirty && !(await askConfirm({ title: "Discard changes?", message: "The barcodes and results in this window will be lost.", confirmLabel: "Discard", cancelLabel: "Keep editing" }))) return;
         frame.close();
     };
-    const frame = dialogFrame("Batch Barcode Lookup", dismiss);
-    frame.overlay.classList.add("drawer-overlay");
-    frame.box.classList.add("drawer", "batch-drawer");
-    const heading = frame.box.querySelector("h3");
-    const head = make("div", "drawer-head");
-    const titles = make("div", "drawer-titles");
-    heading.replaceWith(head);
-    titles.append(heading, make("p", "modal-intro", "Find multiple products using their barcodes in one operation."));
-    const close = make("button", "icon-btn drawer-close"); close.type = "button"; close.setAttribute("aria-label", "Close"); close.innerHTML = icon("x");
-    close.addEventListener("click", dismiss);
-    head.append(titles, close);
-
-    const body = make("div", "drawer-body");
-    frame.box.appendChild(body);
+    const frame = popWindow("Add barcode list", dismiss, { subtitle: "Find many products at once. Nothing is saved until you import." });
+    frame.box.classList.add("batch-window");
+    const steps = make("ol", "pw-steps");
+    ["Paste barcodes", "Check results", "Import"].forEach((words, i) => { const li = make("li"); li.append(make("b", "", String(i + 1)), document.createTextNode(words)); steps.append(li); });
+    const atStep = (n) => Array.from(steps.children).forEach((li, i) => { li.classList.toggle("now", i === n); li.classList.toggle("done", i < n); if (i === n) li.setAttribute("aria-current", "step"); else li.removeAttribute("aria-current"); });
+    const body = frame.body;
+    body.append(steps);
+    atStep(0);
 
     // ---------- step 1: enter ----------
     const enter = make("section", "bl-enter");
@@ -54,8 +49,8 @@ export function openBatchLookup(deps) {
     const enterActions = make("div", "bl-actions");
     const clearAll = make("button", "btn", "Clear all"); clearAll.type = "button";
     const run = make("button", "save-btn", "Look up barcodes"); run.type = "button";
-    enterActions.append(clearAll, run);
-    enter.append(label, textarea, counts, enterActions);
+    enterActions.append(clearAll, make("span", "spacer"), run);
+    enter.append(label, textarea, counts);
 
     // ---------- step 2 + 3: results, summary, import ----------
     const results = make("section", "bl-results"); results.hidden = true;
@@ -74,7 +69,9 @@ export function openBatchLookup(deps) {
     const cancelLookup = make("button", "cancel-btn", "Cancel look-up"); cancelLookup.type = "button"; cancelLookup.hidden = true;
     const importBtn = make("button", "save-btn", "Import selected products"); importBtn.type = "button";
     importBar.append(importNote, cancelLookup, importBtn);
-    results.append(progress, summary, tools, list, importBar);
+    results.append(progress, summary, tools, list);
+    frame.foot.append(enterActions, importBar);
+    importBar.hidden = true;
     body.append(enter, results);
 
     // ---------- helpers ----------
@@ -132,8 +129,8 @@ export function openBatchLookup(deps) {
         clearResults.disabled = busy; backToList.disabled = busy;
     }
 
-    function toEnter() { results.hidden = true; enter.hidden = false; paintCounts(); textarea.focus(); }
-    function toResults() { enter.hidden = true; results.hidden = false; paintResults(); }
+    function toEnter() { results.hidden = true; importBar.hidden = true; enter.hidden = false; enterActions.hidden = false; atStep(0); paintCounts(); textarea.focus(); }
+    function toResults() { enter.hidden = true; enterActions.hidden = true; results.hidden = false; importBar.hidden = false; atStep(1); paintResults(); }
 
     // ---------- look-up ----------
     function classify(row, record, notFoundWhy) {
@@ -192,7 +189,7 @@ export function openBatchLookup(deps) {
             confirmLabel: "Import selected products", cancelLabel: "Back"
         });
         if (!ok) return;
-        busy = true; paintResults(); importBtn.textContent = "Importing...";
+        busy = true; atStep(2); paintResults(); importBtn.textContent = "Importing...";
         try {
             const text = await deps.importRecords(chosen.map((r) => r.record));
             const done = new Set(chosen.map((r) => r.key));
@@ -202,7 +199,7 @@ export function openBatchLookup(deps) {
         } catch (error) {
             deps.notify("The import did not finish: " + (error && error.message ? error.message : "try again") + ". Your results are kept.", "error");
         }
-        busy = false; importBtn.textContent = "Import selected products"; paintResults();
+        busy = false; atStep(1); importBtn.textContent = "Import selected products"; paintResults();
     }
 
     // ---------- wiring ----------

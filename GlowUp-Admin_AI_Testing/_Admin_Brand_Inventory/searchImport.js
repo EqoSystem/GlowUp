@@ -9,12 +9,10 @@ import { updateDoc, onSnapshot } from "../_Shared/adminStore.js";
 import { escapeHtml, notify, describeError } from "../_Shared/adminCommon.js";
 import { askConfirm, askText, icon, paginate, renderPager } from "../_Shared/adminShell.js";
 import { openReplyDrawer } from "../_Shared/replyDrawer.js";
-import { openPhoneLink } from "../_Shared/phoneLink.js";
-import { pageView } from "../_Shared/planViews.js";
-import { lookupIngredient, lookupHazards } from "../_Shared/quickFill.js";
-import { suggestFit } from "../_Shared/ingredientFit.js";
-import { planFit } from "../_Shared/fitReasons.js";
-import { pubchemPage } from "../_Shared/smartAdd.js";
+import { popWindow } from "../_Shared/planViews.js";
+import { mountHints } from "../_Shared/buttonHints.js";
+import { draftIngredient, ingredientRecord } from "../_Shared/draftIngredient.js";
+import { classifications, loadClassifications } from "../_Shared/adminClassifications.js";
 import { runImport, reviewRows, countResults, STEPS, RESULT_WORDS, FLAGGED, NO_RULE, NOT_IDENTIFIED } from "../_Shared/importChain.js";
 
 export const NEW_PRODUCT = "New product";
@@ -24,32 +22,6 @@ const TONE = { [FLAGGED]: "warn", [NO_RULE]: "", [NOT_IDENTIFIED]: "bad" };
 const lineUrl = (line) => { const t = String(line || ""); const u = t.slice(t.lastIndexOf("|") + 1).trim(); return /^https:\/\//i.test(u) ? u : ""; };
 const lineTitle = (line) => { const t = String(line || ""); const at = t.lastIndexOf("|"); return (at > 0 ? t.slice(0, at) : t).trim(); };
 const hostOf = (url) => { try { return new URL(url).hostname.replace(/^www\./, ""); } catch (error) { return url; } };
-
-let refs;
-async function loadRefs() {
-    if (refs !== undefined) return refs;
-    try { const r = await fetch(new URL("../_Shared/data/ingredientRefs.json", import.meta.url).href, { credentials: "omit" }); refs = r.ok ? await r.json() : null; }
-    catch (error) { refs = null; }
-    return refs;
-}
-
-/** A new Curator entry for a name no entry knows: PubChem names + hazard codes and GlowUp's name rules. Never sets a risk level. */
-async function draftIngredient(name) {
-    const table = await loadRefs();
-    const found = await lookupIngredient(name).catch(() => null);
-    const key = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
-    const aliases = (found ? found.aliases : []).filter((a) => key(a) !== key(name)).slice(0, 6);
-    const page = found && found.cid ? pubchemPage(found.cid) : "";
-    const fit = suggestFit([name].concat(aliases), table);
-    const hazards = found && found.cid ? await lookupHazards(found.cid).catch(() => null) : null;
-    const plan = planFit({ rules: fit, hazards });
-    const sources = Array.from(new Set([page ? "PubChem | " + page : ""].concat(plan.sources).filter(Boolean))).slice(0, 10);
-    return {
-        name: String(name).replace(/\s+/g, " ").trim().slice(0, 80), aliases, identified: !!page || fit.rules.length > 0,
-        allergenTags: plan.allergenTags, avoidForSkinTypes: plan.avoidForSkinTypes, sources,
-        cautionNote: "", fitWhy: fit.why.join(" ").slice(0, 400), chemical: found ? String(found.chemical || "").slice(0, 600) : "", page
-    };
-}
 
 /**
  * deps (from the inventory page):
@@ -61,35 +33,24 @@ async function draftIngredient(name) {
  *   approve(product)          approves one product (asks first); resolves true when it was approved
  *   toBin(product)            moves one product to the Recycle bin
  *   openProduct(product)      opens the product form (to add a list by hand)
- *   openBatch()               the existing Many barcodes drawer (file import sits inside the panel)
+ *   openBatch()               the Add barcode list window (a file is picked from the + menu and shows its progress here)
  *   reload()                  reads the lists again
  */
 export function mountSearchImport(deps) {
-    const queryBox = el("siQuery"), run = el("siRun"), phone = el("siPhone"), progress = el("siProgress");
-    const tabs = Array.from(document.querySelectorAll("[data-si-tab]"));
+    const queryBox = el("siQuery"), run = el("siRun"), many = el("siMany"), progress = el("siProgress");
     let busy = false, abort = null, fallback = null, fromReport = null, plan = null;
     const queueState = { page: 1, size: 10 };
     let reports = [];
 
-    // ---------- the three ways to import ----------
-    const fileBox = el("siFile"), searchRow = queryBox.parentElement;
-    const showMode = (mode) => {
-        tabs.forEach((t) => t.setAttribute("aria-selected", String(t.dataset.siTab === mode)));
-        fileBox.hidden = mode !== "file"; searchRow.hidden = mode === "file";
-        if (mode === "one") queryBox.focus();
-    };
-    // a file picked from anywhere (the tab, the + menu, a shortcut) shows its progress under "From a file"
-    el("inventoryFileInput").addEventListener("change", () => showMode("file"));
-    tabs.forEach((tab) => tab.addEventListener("click", () => {
-        if (busy) return;
-        if (tab.dataset.siTab === "many") { deps.openBatch(); return; }
-        showMode(tab.dataset.siTab);
-    }));
-    phone.addEventListener("click", () => openPhoneLink({ title: "Scan with your phone", what: "barcode", onValue: (value) => { queryBox.value = String(value || "").trim(); queryBox.focus(); } }));
+    // a file picked from anywhere (the + menu, a shortcut) shows its progress in this panel
+    el("inventoryFileInput").addEventListener("change", () => { el("siFile").hidden = false; el("siPanel").scrollIntoView({ block: "nearest" }); });
+    many.addEventListener("click", () => { if (!busy) deps.openBatch(); });
+    mountHints(el("siPanel"));
+    mountHints(el("rqPanel"));
     queryBox.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); start(); } });
     run.addEventListener("click", start);
 
-    const lock = (on) => { busy = on; run.disabled = on; queryBox.readOnly = on; phone.disabled = on; tabs.forEach((t) => { t.disabled = on; }); };
+    const lock = (on) => { busy = on; run.disabled = on; queryBox.readOnly = on; many.disabled = on; };
 
     function paintSteps(at, done) {
         const bar = progress.querySelector(".si-steps");
@@ -154,17 +115,12 @@ export function mountSearchImport(deps) {
         await deps.saveRecord(record);
         // the new ingredient names go to the Curator now, as Pending: rules filled the cautions, an admin checks them
         const uid = auth.currentUser ? auth.currentUser.uid : "";
+        await loadClassifications().catch(() => null);
         for (const d of p.drafts) {
             if (!d.name || d.name.length < 2) continue;
-            const data = {
-                name: d.name, techName: "", aliases: d.aliases || [], classificationId: "", purpose: "", description: "", chemicalDescription: d.chemical || "",
-                riskLevel: "", cautionNote: "", commonUses: "", minAge: 0, allergenTags: d.allergenTags || [], avoidForSkinTypes: d.avoidForSkinTypes || [],
-                avoidForConditions: [], goodForSkinTypes: [], goodForConditions: [], sources: d.sources || [], folder: "", source: "import", via: "search-import",
-                reviewed: false, identified: d.identified !== false, fitAuto: (d.allergenTags || []).length + (d.avoidForSkinTypes || []).length > 0, fitAutoWhy: d.fitWhy || "",
-                detailsAutoChecked: false, addedBy: uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-            };
-            if (d.page) data.aliasesSourceUrl = d.page;
-            try { await rawAddDoc(collection(db, "ingredients"), data); } catch (error) { console.warn("A new ingredient entry was not saved:", error && error.code ? error.code : error); }
+            // source "ai" means "nobody has checked it": the app then takes its warnings but never as proof of safety
+            try { await rawAddDoc(collection(db, "ingredients"), ingredientRecord(d, { uid, via: "search-import", stamp: serverTimestamp(), classes: classifications() })); }
+            catch (error) { console.warn("A new ingredient entry was not saved:", error && error.code ? error.code : error); }
         }
         await deps.reload();
     }
@@ -198,14 +154,14 @@ export function mountSearchImport(deps) {
             if (item.kind === "report") {
                 const r = item.report;
                 return `<tr data-rq="${escapeHtml(key)}"><td><strong>User report: new product</strong><div class="small muted">${escapeHtml([r.brand, r.productName].filter(Boolean).join(", ") || (r.barcode ? "Barcode " + r.barcode : ""))}</div></td>
-                    <td>-</td><td>-</td><td>-</td><td><span class="chip warn">From a user</span></td><td class="actions"><button type="button" class="btn" data-rq-open="${escapeHtml(key)}">Open report</button></td></tr>`;
+                    <td>-</td><td>-</td><td>-</td><td><span class="chip warn">From a user</span></td><td class="actions"><button type="button" class="btn" data-rq-open="${escapeHtml(key)}" data-hint="Open report: read what the user sent, then import it, reply or close it.">Open report</button></td></tr>`;
             }
             const p = item.product, c = item.counts;
             if (!p.ingredients.length) return `<tr data-rq="${escapeHtml(key)}"><td><strong>${escapeHtml(p.name)}</strong><div class="small muted">${escapeHtml(p.brandName)}</div></td>
-                <td>0</td><td>-</td><td>-</td><td><span class="chip bad">No list found</span></td><td class="actions"><button type="button" class="btn" data-rq-add="${escapeHtml(key)}">Add the list</button></td></tr>`;
+                <td>0</td><td>-</td><td>-</td><td><span class="chip bad">No list found</span></td><td class="actions"><button type="button" class="btn" data-rq-add="${escapeHtml(key)}" data-hint="Add the list: open the product form and type the ingredients from the pack.">Add the list</button></td></tr>`;
             return `<tr data-rq="${escapeHtml(key)}"><td><strong>${escapeHtml(p.name)}</strong><div class="small muted">${escapeHtml(p.brandName)}</div></td>
                 <td>${c.all}</td><td><span class="chip warn">${c[FLAGGED]}</span></td><td><span class="chip">${c[NO_RULE]}</span></td><td><span class="chip ${c[NOT_IDENTIFIED] ? "bad" : ""}">${c[NOT_IDENTIFIED]}</span></td>
-                <td class="actions"><button type="button" class="btn" data-rq-open="${escapeHtml(key)}">Review</button></td></tr>`;
+                <td class="actions"><button type="button" class="btn" data-rq-open="${escapeHtml(key)}" data-hint="Review: check the ingredients in a window, then approve, save for later or bin.">Review</button></td></tr>`;
         }).join(""));
         renderPager(el("rqPager"), queueState, items.length, paintQueue, "items");
     }
@@ -239,23 +195,16 @@ export function mountSearchImport(deps) {
             if (dirty && !(await askConfirm({ title: "Discard changes?", message: "The corrected names are not saved.", confirmLabel: "Discard", cancelLabel: "Keep editing" }))) return;
             frame.close(); paintQueue();
         };
-        const frame = pageView("Product review", leave);
+        const frame = popWindow("Product review", leave, { subtitle: [product.brandName, "Pending"].filter(Boolean).join(" · ") });
         frame.box.classList.add("review-window");
-        const head = frame.box.querySelector("h3");
-        const top = make("div", "rv-head");
-        const back = make("button", "btn"); back.type = "button"; back.innerHTML = `${icon("left")}Queue`;
-        back.addEventListener("click", leave);
-        head.textContent = product.name;
-        top.append(back, head, make("span", "small muted", product.brandName), make("span", "chip warn", "Pending"));
+        frame.title.textContent = product.name;
         const sources = make("p", "rv-sources small");
         const links = (product.sources || []).map((s) => lineUrl(s) ? `<a href="${escapeHtml(lineUrl(s))}" target="_blank" rel="noopener noreferrer">${escapeHtml(lineTitle(s) && lineTitle(s) !== lineUrl(s) ? lineTitle(s) : hostOf(lineUrl(s)))} ↗</a>` : "").filter(Boolean);
         sources.innerHTML = "Sources: " + (links.length ? links.join(" &nbsp; ") : `<span class="muted">none saved</span>`);
         const chips = make("div", "rv-filter"); chips.setAttribute("role", "tablist");
         const tableWrap = make("div", "table-container");
-        const foot = make("div", "rv-foot");
-        const headCard = make("div", "panel"), bodyCard = make("div", "panel"), footCard = make("div", "panel");
-        headCard.append(top, sources); bodyCard.append(chips, tableWrap); footCard.append(foot);
-        frame.box.replaceChildren(headCard, bodyCard, footCard);
+        const foot = frame.foot;
+        frame.body.append(sources, chips, tableWrap);
 
         const paint = () => {
             const rows = reviewRows(names, deps.library());
@@ -278,7 +227,9 @@ export function mountSearchImport(deps) {
                 + more || `<tr><td colspan="5" class="table-message">Nothing in this group.</td></tr>`}</tbody></table>`;
             const unknown = c[NOT_IDENTIFIED];
             foot.innerHTML = `<p class="small muted">${unknown ? `${unknown} ingredient${unknown === 1 ? " is" : "s are"} not identified. If approved now, ${unknown === 1 ? "it shows" : "they show"} as "Not checked" in the app.` : "Every ingredient was identified."}</p>
-                <div class="modal-actions"><button type="button" class="btn" data-rv="bin">${icon("trash")}Send to Recycle Bin</button><button type="button" class="btn" data-rv="later">Save for later</button><button type="button" class="save-btn" data-rv="approve">Approve all</button></div>`;
+                <p class="btn-hint">Save for later keeps your name fixes. The product stays Pending in the Review queue.</p>
+                <div class="pw-actions"><button type="button" class="btn danger" data-rv="bin" data-hint="Send to Recycle Bin: it leaves the queue. You can restore it.">${icon("trash")}Send to Recycle Bin</button><span class="spacer"></span><button type="button" class="btn" data-rv="later" data-hint="Save for later keeps your name fixes. The product stays Pending in the Review queue.">Save for later</button><button type="button" class="save-btn" data-rv="approve" data-hint="Approve all: the product goes live and the app starts using it.">Approve all</button></div>`;
+            mountHints(foot);
         };
         chips.addEventListener("click", (event) => { const b = event.target.closest("[data-rv-filter]"); if (b) { filter = b.dataset.rvFilter; paint(); } });
         tableWrap.addEventListener("click", async (event) => {
@@ -297,7 +248,7 @@ export function mountSearchImport(deps) {
             if (!b || working) return;
             working = true; b.disabled = true;
             try {
-                if (b.dataset.rv === "later") { await saveNames(); frame.close(); paintQueue(); notify("Saved for later. It stays in the Review queue.", "ok"); return; }
+                if (b.dataset.rv === "later") { await saveNames(); frame.close(); paintQueue(); notify(`Saved for later. "${product.name}" is in the Review queue on this page, still Pending.`, "ok"); return; }
                 if (b.dataset.rv === "bin") { if (!(await askConfirm({ title: "Send to the Recycle Bin?", message: `${product.name} leaves the Review queue. You can restore it from the Recycle Bin.`, confirmLabel: "Send to Recycle Bin", danger: true }))) return; dirty = false; await deps.toBin(product); frame.close(); paintQueue(); openNext(`product:${product.id}`); return; }
                 if (b.dataset.rv === "approve") {
                     await saveNames();
@@ -314,7 +265,7 @@ export function mountSearchImport(deps) {
     // ---------- User report: a "New product" sent from the app ----------
     function openReport(r) {
         const leave = () => { frame.close(); paintQueue(); };
-        const frame = pageView("User report: new product", leave);
+        const frame = popWindow("User report: new product", leave, { subtitle: "Sent by an app user. Not verified." });
         frame.box.classList.add("review-window");
         const body = make("div", "ur-body");
         body.innerHTML = `<div class="ur-grid">
@@ -323,18 +274,13 @@ export function mountSearchImport(deps) {
             </div>
             <div class="field-label">Ingredient text</div><div class="ur-value ur-text">${escapeHtml(r.ingredientText || "-")}</div>
             <p class="small muted">Reported by a user. Not verified.${r.note ? " Note: " + escapeHtml(r.note) : ""}</p>`;
-        const actions = make("div", "modal-actions");
+        const actions = make("div", "pw-actions");
         const closeBtn = make("button", "btn", "Close report"); closeBtn.type = "button";
         const reply = make("button", "btn", "Reply"); reply.type = "button"; reply.disabled = !r.uid;
         const importBtn = make("button", "save-btn", "Search and import this"); importBtn.type = "button";
-        actions.append(closeBtn, reply, make("span", "spacer"), importBtn);
-        const headCard = make("div", "panel"), bodyCard = make("div", "panel"), footCard = make("div", "panel");
-        const top = make("div", "rv-head");
-        const back = make("button", "btn"); back.type = "button"; back.innerHTML = `${icon("left")}Queue`;
-        back.addEventListener("click", leave);
-        top.append(back, frame.box.querySelector("h3"), make("span", "chip warn", "New"));
-        headCard.append(top); bodyCard.append(body); footCard.append(actions);
-        frame.box.replaceChildren(headCard, bodyCard, footCard);
+        actions.append(closeBtn, make("span", "spacer"), reply, importBtn);
+        frame.body.append(body);
+        frame.foot.append(actions);
         closeBtn.addEventListener("click", async () => { closeBtn.disabled = true; await closeReport(r, false); frame.close(); paintQueue(); openNext(`report:${r.id}`); });
         reply.addEventListener("click", () => { frame.close(); openReplyDrawer({ id: r.id, uid: r.uid, category: NEW_PRODUCT, message: r.message, userName: r.userName }, { onSent: () => paintQueue() }); });
         importBtn.addEventListener("click", () => {

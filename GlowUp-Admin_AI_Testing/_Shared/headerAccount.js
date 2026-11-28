@@ -132,6 +132,28 @@ function openPop(name, anchor, el, repaint) {
 const node = (tag, className, text) => { const el = document.createElement(tag); if (className) el.className = className; if (text !== undefined) el.textContent = text; return el; };
 
 // ---- bell ----
+// The dashboard's scan facts (once a strip under its numbers) are shown here, above the reports. They are facts, not unread
+// items: they never add to the red number.
+let bellNotes = () => null;
+export function setBellNotes(provider) { bellNotes = provider; emit(); }
+function noteGroup() {
+    const lines = bellNotes() || [];
+    if (!lines.length) return null;
+    const group = node("section", "np-group np-notes");
+    group.append(node("h4", "np-group-title", "Scan activity"));
+    lines.forEach((line) => {
+        const row = node("div", "np-note");
+        row.append(node("span", "np-note-text", line.text));
+        if (line.run) {
+            const act = node("button", "btn", line.label);
+            act.type = "button";
+            act.addEventListener("click", () => { closePop(false); line.run(); });
+            row.append(act);
+        }
+        group.append(row);
+    });
+    return group;
+}
 const unread = () => (reports || []).filter((r) => !r.read);
 function paintBadge() {
     if (!bellBtn) return;
@@ -200,6 +222,8 @@ function paintNotifications(panel) {
             body.append(group);
         });
     }
+    const notes = noteGroup();
+    if (notes) body.prepend(notes);
     const foot = node("a", "np-foot", "View all reports");
     foot.href = "../_Admin_Dashboard/adminDashboard.html#reports";
     panel.replaceChildren(head, body, foot);

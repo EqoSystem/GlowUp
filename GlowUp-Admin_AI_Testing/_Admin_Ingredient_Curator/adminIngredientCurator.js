@@ -1,4 +1,6 @@
-import { attentionLabel } from "../_Shared/planViews.js";
+import { attentionLabel, popWindow } from "../_Shared/planViews.js";
+import { mountHints } from "../_Shared/buttonHints.js";
+import { draftIngredient, ingredientRecord, parseNames, MAX_NAMES } from "../_Shared/draftIngredient.js";
 
 
 
@@ -214,7 +216,8 @@ const toneOfRisk = (risk) => ({ harmful: "bad", caution: "warn", safe: "ok" }[ri
 const brokenText = (text) => /System\.Collections\./i.test(String(text || ""));
 
 
-const needsReview = (item) => item.source === "ai" && !item.reviewed;
+// via "search-import" with source "import": what the inventory's Search and import saved before 28 Nov 2026
+const needsReview = (item) => !item.reviewed && (item.source === "ai" || item.via === "search-import");
 
 const reviewer = () => (auth.currentUser ? auth.currentUser.uid : "");
 
@@ -260,7 +263,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     registerData();
     mountShell("curator");
 
-    bindButtons({ "curator.addIngredient": "#addIngredientBtn", "curator.import": "#chooseIngredientFileBtn", "curator.classifications": "#manageClassBtn",
+    bindButtons({ "curator.addIngredient": "#addIngredientBtn", "curator.import": "#ingredientDropBox", "curator.classifications": "#manageClassBtn",
         "curator.sort": "#sortMenuBtn" });
     placeInHeader(".search-container", "headerActions");
     wireSignOut();
@@ -329,6 +332,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     setPageSettings(() => [
         { label: "Manage classifications", icon: "sliders", description: "Add, rename or remove the classifications ingredients can have.", run: manageClassifications },
+        { label: "Import a file", icon: "upload", description: "A file in the GlowUp import format. Saved as Pending for review.", run: () => el("ingredientFileInput").click() },
         ...(fieldChangeWaits() ? [{ label: "Change the ingredient fields", icon: "layers", description: "One time: back up, add the classification list, move old INCI values into Also Known As.", run: runFieldChange }] : []),
         { label: "Clean up", icon: "sparkle", description: "Entries that are notes, joined names or label text, and entries that are there twice. You see every change first.", run: openCleanUp },
         { label: "Find duplicates", icon: "layers", description: "Entries that explain the same ingredient, or have nearly the same name. You choose which one to keep.", run: openDuplicates }
@@ -336,12 +340,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     el("ingredientSourceFilter").addEventListener("change", fromFirstPage);
     el("ingredientRiskFilter").addEventListener("change", fromFirstPage);
     document.querySelectorAll("[data-cq]").forEach((b) => b.addEventListener("click", () => showQueue(b.dataset.cq)));
+    mountHints(el("curSiPanel"));
+    mountHints(el("curQueuePanel"));
+    wireSearchImport();
     el("cqApprove").addEventListener("click", () => {
         const keys = Array.from(el("ingredientsList").querySelectorAll(".ingredient-card.is-picked")).map((card) => card.dataset.key);
         if (!keys.length) { notify("Tick the ingredients to approve first.", "info"); return; }
         approveSelectedIngredients(keys);
     });
-    attentionLabel(el("chooseIngredientFileBtn"), el("notesList"));
+    attentionLabel(document.querySelector(".cur-toolrow > .spacer"), el("notesList"));
     el("ingredientClassFilter").addEventListener("change", fromFirstPage);
     el("manageClassBtn").addEventListener("click", manageClassifications);
     wirePurposeAndClassification();
@@ -361,7 +368,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     }));
     paintListLayout();
 
-    el("chooseIngredientFileBtn").addEventListener("click", () => el("ingredientFileInput").click());
     el("ingredientDropBox").addEventListener("click", () => el("ingredientFileInput").click());
     el("ingredientFileInput").addEventListener("change", (event) => {
         const file = event.target.files && event.target.files[0];
@@ -530,7 +536,7 @@ async function loadIngredients() {
     afterChange();
 
     if (AUTO_APPROVE_AI && !TEST_MODE) {
-        const fresh = everyIngredient.filter((item) => needsReview(item) && !item.binned && hasCredibleSource(item));
+        const fresh = everyIngredient.filter((item) => needsReview(item) && !item.binned && item.via !== "search-import" && hasCredibleSource(item));   // an imported draft waits for a person
         if (fresh.length > 0) {
             try {
                 for (let i = 0; i < fresh.length; i += BATCH_LIMIT) {
@@ -913,14 +919,14 @@ function proofLines(item) {
     const lines = [];
     const links = sourceLinks(item.sources);
     if (links) {
-        const lead = item.source !== "ai" ? "Source: "
+        const lead = item.source !== "ai" || item.via === "search-import" ? "Source: "
             : item.webSearched ? "Pages the AI's web search used: "
             : "Pages named by the AI (it did not search the web, so open them and check): ";
         lines.push(lead + links);
     }
     if (item.fdaUnii)
         lines.push(`Listed in the US FDA substance registry: <a class="source-link" href="${FDA_SUBSTANCE_PAGE}${encodeURIComponent(item.fdaUnii)}" target="_blank" rel="noopener noreferrer">UNII ${escapeHtml(item.fdaUnii)}</a>`);
-    else if (item.source === "ai")
+    else if (item.source === "ai" && item.via !== "search-import")
         lines.push("No match in the US FDA substance registry was recorded for this name.");
     return lines;
 }
@@ -934,7 +940,7 @@ function paintStats() {
     const source = el("ingredientSourceFilter").value, risk = el("ingredientRiskFilter").value;
     const tiles = [
         { label: "Ingredients", value: ingredients.length, iconName: "flask", source: "", risk: "", tip: "Show every ingredient." },
-        { label: "Waiting for review", value: ingredients.filter(needsReview).length, iconName: "inbox", source: "review", risk: "", tip: "Found by the app's AI lookup and not checked yet. The app uses their warnings but never counts them as proof of safety." },
+        { label: "Waiting for review", value: ingredients.filter(needsReview).length, iconName: "inbox", source: "review", risk: "", tip: "Added by a scan or an import and not checked yet." },
         { label: "Flagged", value: ingredients.filter((i) => resultOf(i) === "flagged").length, iconName: "flag", source: "", risk: "r:flagged", tip: "" },
         { label: "No rule matched", value: ingredients.filter((i) => resultOf(i) === "none").length, iconName: "check", source: "", risk: "r:none", tip: "" },
         { label: "Not identified", value: ingredients.filter((i) => resultOf(i) === "unknown").length, iconName: "alert", source: "", risk: "r:unknown", tip: "" },
@@ -1089,7 +1095,7 @@ const classCell = (item) => lacksClass(item) ? `<span class="chip warn">Needs cl
 
 function detailOf(item, inBin) {
     const review = needsReview(item);
-    const origin = originLabel(item.source);
+    const origin = item.via === "search-import" ? "by Search and import" : originLabel(item.source);
     const facts = [];
 
     if (item.purpose) facts.push(["Purpose", escapeHtml(item.purpose)]);
@@ -1361,6 +1367,99 @@ function showPasteNote(box, text) {
 }
 
 
+// ---------- Search and import: the admin gives names, the page fills the entries, the admin only reviews ----------
+let importing = null;      // AbortController while a run is going
+
+function wireSearchImport() {
+    const box = el("curSiQuery");
+    const one = async () => {
+        if (!parseNames(box.value).length) { box.focus(); notify("Type an ingredient name first.", "info"); return; }
+        if (await importNames(parseNames(box.value))) box.value = "";
+    };
+    el("curSiRun").addEventListener("click", one);
+    box.addEventListener("keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); one(); } });
+    el("curSiMany").addEventListener("click", openNameList);
+    el("curSiCancel").addEventListener("click", () => { if (importing) importing.abort(); });
+    el("curSiShow").addEventListener("click", () => {
+        if (document.querySelector('[data-cq="waiting"]').getAttribute("aria-pressed") !== "true") showQueue("waiting");
+        el("curQueuePanel").scrollIntoView({ block: "start" });
+    });
+}
+
+function openNameList() {
+    let frame;
+    const area = document.createElement("textarea");
+    const dismiss = async () => {
+        if (area.value.trim() && !(await askConfirm({ title: "Discard changes?", message: "The names in this window will be lost.", confirmLabel: "Discard", cancelLabel: "Keep editing" }))) return;
+        frame.close();
+    };
+    frame = popWindow("Add ingredient list", dismiss, { subtitle: "Paste the names. Each one is looked up and saved as Pending." });
+    const label = document.createElement("label"); label.className = "field-label"; label.htmlFor = "curSiNames"; label.textContent = "Ingredient names";
+    area.id = "curSiNames"; area.className = "pw-textarea"; area.rows = 8; area.placeholder = "One per line, e.g.\nNiacinamide\n1,2-Hexanediol";
+    const counts = document.createElement("p"); counts.className = "field-hint"; counts.setAttribute("role", "status");
+    frame.body.append(label, area, counts);
+    const actions = document.createElement("div"); actions.className = "pw-actions";
+    actions.innerHTML = '<button type="button" class="btn">Cancel</button><span class="spacer"></span><button type="button" class="save-btn">Search and import</button>';
+    const [cancel, run] = actions.querySelectorAll("button");
+    frame.foot.append(actions);
+    const paint = () => {
+        const n = parseNames(area.value).length;
+        counts.textContent = n > MAX_NAMES ? `${n} names: only the first ${MAX_NAMES} are imported now.` : n ? `${many(n, "name", "names")}.` : `Up to ${MAX_NAMES} names at a time.`;
+        run.disabled = n === 0 || !!importing;
+    };
+    area.addEventListener("input", paint);
+    cancel.addEventListener("click", dismiss);
+    run.addEventListener("click", () => { const names = parseNames(area.value).slice(0, MAX_NAMES); frame.close(); importNames(names); });
+    paint();
+    area.focus();
+}
+
+/** Resolves true when every name was added or was already listed. */
+async function importNames(names) {
+    if (importing) return false;
+    const say = el("curSiSay"), cancel = el("curSiCancel"), show = el("curSiShow");
+    const lock = (on) => { el("curSiRun").disabled = on; el("curSiMany").disabled = on; el("curSiQuery").readOnly = on; cancel.hidden = !on; };
+    importing = new AbortController();
+    const signal = importing.signal;
+    el("curSiStatus").hidden = false; show.hidden = true; lock(true);
+    const added = [], listed = [], unknown = [], failed = [];
+    const known = new Set(everyIngredient.flatMap(keysOf));
+    // a look-up that hangs gives up after 20 s; Cancel stops waiting at once
+    const inTime = (promise) => new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("timeout")), 20000);
+        const stop = () => reject(new Error("stopped"));
+        signal.addEventListener("abort", stop, { once: true });
+        promise.then(resolve, reject).finally(() => { clearTimeout(timer); signal.removeEventListener("abort", stop); });
+    });
+    for (let i = 0; i < names.length && !signal.aborted; i++) {
+        const name = names[i];
+        say.textContent = `Looking up ${i + 1} of ${names.length}: ${name}`;
+        if (known.has(sameKey(name))) { listed.push(name); continue; }
+        try {
+            const draft = await inTime(draftIngredient(name, { strict: true }));
+            if (!draft.identified) { unknown.push(name); continue; }
+            if ([draft.name, ...draft.aliases].some((n) => known.has(sameKey(n)))) { listed.push(name); continue; }
+            if (signal.aborted) break;
+            await addDoc(collection(db, "ingredients"), ingredientRecord(draft, { uid: reviewer(), via: "search-import", stamp: serverTimestamp(), classes: classifications(), maxPurpose: MAX_PURPOSE }));
+            [draft.name, ...draft.aliases].forEach((n) => known.add(sameKey(n)));
+            added.push(name);
+        } catch (error) {
+            if (!signal.aborted) { console.warn("Search and import:", error && error.code ? error.code : error); failed.push(name); }
+        }
+    }
+    const stopped = signal.aborted;
+    importing = null; lock(false);
+    const parts = [stopped ? "Stopped." : "", added.length ? `Added ${added.length} to the Review queue as Pending.` : "Nothing new was added."];
+    if (listed.length) parts.push(`Already listed: ${listed.join(", ")}.`);
+    if (unknown.length) parts.push(`Not found (check the spelling, or use Add): ${unknown.join(", ")}.`);
+    if (failed.length) parts.push(`Not finished (check the connection and try again): ${failed.join(", ")}.`);
+    say.textContent = parts.filter(Boolean).join(" ");
+    show.hidden = added.length === 0;
+    if (added.length) await loadIngredients();
+    return !unknown.length && !failed.length && !stopped;
+}
+
+
 const IMPORT_MAX_ROWS = 60;
 
 
@@ -1369,7 +1468,7 @@ const IMPORT_MAX_ROWS = 60;
 
 function importIngredientFile(file) {
     startImport({
-        dropbox: el("ingredientDropBox"), choose: el("chooseIngredientFileBtn"), status: el("ingredientImportStatus"), file,
+        dropbox: el("ingredientDropBox"), choose: el("ingredientDropBox"), status: el("ingredientImportStatus"), file,
         read: (f, say) => readAdminDocument(f, say),
         extract: extractIngredients,
         review: INGREDIENT_REVIEW,
@@ -1723,7 +1822,7 @@ function openIngredientForm(item) {
     const note = el("ingredientReviewNote");
     if (item && needsReview(item)) {
         const proof = proofLines(item);
-        note.innerHTML = "The app's AI lookup wrote this entry and nobody has checked it yet. Compare every box with the sources, correct what is wrong, then save: <b>saving marks it as reviewed</b>, and the app then trusts it like an entry typed here."
+        note.innerHTML = (item.via === "search-import" ? "Search and import filled this entry from PubChem and GlowUp's rules" : "The app's AI lookup wrote this entry") + " and nobody has checked it yet. Compare every box with the sources, correct what is wrong, then save: <b>saving marks it as reviewed</b>, and the app then trusts it like an entry typed here."
             + (proof.length > 0 ? "<br>" + proof.join("<br>") : "");
         note.style.display = "";
     } else {
